@@ -3,34 +3,72 @@
 # generator reads it: /etc/containers/systemd/users/<uid>/<name>.container
 # (podman >= 4.8; rootless, so cross-user traffic is loopback-only per ADR 005).
 #
-# CONTRACT (step-0 freeze; phase-1 stream B implements rendering, phase 2 uses it):
+# Rendering semantics:
+#   - Sections emit in fixed Quadlet order; empty sections are omitted.
+#     .container: [Unit] [Container] [Service] [Install]
+#     .network:   [Unit] [Network] [Install]
+#   - Keys within a section render in Nix attrset order (lexicographic) — stable.
+#   - Lists render as repeated Key=value lines (Quadlet semantics).
+#   - Booleans render as true/false; everything else via toString.
+#   - Output is an environment.etc attrset fragment (text + world-readable mode).
 #
-#   mkContainerUnit {
-#     name = "llunde-backend";          # unit file basename
-#     uid = 991;                        # service user's uid (users/<uid>/ path)
-#     container = {                     # [Container] section, verbatim Quadlet keys
-#       Image = "ghcr.io/fredrir/llunde-backend:latest";
-#       Network = "llunde-backend.network";
-#       PublishPort = [ "127.0.0.1:8080:8080" ];
-#       Environment = [ "APP_ENV=prod" ];
-#       AutoUpdate = "registry";
-#     };
-#     service = { Restart = "always"; };    # [Service] section
-#     install = { WantedBy = [ "default.target" ]; };  # [Install] section
-#   }
-#   -> { "containers/systemd/users/991/llunde-backend.container".text = "..."; }
-#      (an environment.etc attrset fragment; mkNetworkUnit analogous for .network)
-#
-# List values render as repeated keys (Quadlet semantics). The module wrapping
-# these also owns: service user + subuid/subgid, linger, per-user
-# podman-auto-update.timer, and the daemon-reload hook on nixos-rebuild switch.
+# The module wrapping these also owns: service user + subuid/subgid, linger,
+# per-user podman-auto-update.timer, and the daemon-reload hook on switch.
 { lib }:
+let
+  renderValue = v: if lib.isBool v then lib.boolToString v else toString v;
+
+  renderEntry = key: value:
+    if lib.isList value then
+      map (item: "${key}=${renderValue item}") value
+    else
+      [ "${key}=${renderValue value}" ];
+
+  renderSection =
+    name: attrs:
+    lib.optionals (attrs != { }) [
+      ("[${name}]\n" + lib.concatStringsSep "\n" (lib.flatten (lib.mapAttrsToList renderEntry attrs)) + "\n")
+    ];
+
+  renderUnitFile =
+    sections:
+    lib.concatStringsSep "\n" (lib.flatten (map ({ name, attrs }: renderSection name attrs) sections));
+
+  etcFragment = uid: fileName: text: {
+    "containers/systemd/users/${toString uid}/${fileName}" = {
+      inherit text;
+      mode = "0644";
+    };
+  };
+in
 {
   mkContainerUnit =
-    args:
-    throw "mkQuadlet: rendering implemented by phase-1 stream B (${args.name or "unnamed"})";
+    {
+      name,
+      uid,
+      container,
+      unit ? { },
+      service ? { },
+      install ? { },
+    }:
+    etcFragment uid "${name}.container" (renderUnitFile [
+      { name = "Unit"; attrs = unit; }
+      { name = "Container"; attrs = container; }
+      { name = "Service"; attrs = service; }
+      { name = "Install"; attrs = install; }
+    ]);
 
   mkNetworkUnit =
-    args:
-    throw "mkQuadlet: rendering implemented by phase-1 stream B (${args.name or "unnamed"})";
+    {
+      name,
+      uid,
+      network ? { },
+      unit ? { },
+      install ? { },
+    }:
+    etcFragment uid "${name}.network" (renderUnitFile [
+      { name = "Unit"; attrs = unit; }
+      { name = "Network"; attrs = network; }
+      { name = "Install"; attrs = install; }
+    ]);
 }
