@@ -1,7 +1,6 @@
 # Doppler — secrets management for pyparser + llunde
 
-Doppler is the single source of truth for all app secrets, replacing the old
-hand-managed `.env` / `secrets.env` files. Two projects, each with three configs.
+Doppler is the single source of truth for all app secrets. Two projects, each with three configs.
 
 ```
 project: pyparser                          project: llunde
@@ -28,18 +27,6 @@ project: pyparser                          project: llunde
 The two hosts reach `api.doppler.com` over outbound HTTPS (already open — cloudflared
 dials out); the SSH-only inbound firewall is unaffected.
 
-## Local development
-
-```sh
-doppler login                 # once, browser auth
-cd pyparser && doppler setup  # binds this dir to pyparser/dev (reads doppler.yaml)
-doppler run -- pyparser-worker
-# backend:  cd backend  && doppler setup && doppler run -- pnpm dev
-# frontend: cd frontend && doppler setup && doppler run -- pnpm dev
-```
-
-`pyparser/.envrc` keeps the machine-path exports (CUDA/HF/uv/pip) and venv
-activation; it no longer relies on `.env` for secrets.
 
 ## Operating in production
 
@@ -50,26 +37,26 @@ host). To change a secret without a code deploy:
 
 ```sh
 doppler secrets set SOME_KEY="new-value" -p llunde -c prd
-ssh deploy "cd /opt/llunde && doppler secrets download --no-file --format docker > .env.new && mv .env.new .env && \
+ssh llunde_deploy "cd /opt/llunde && doppler secrets download --no-file --format docker > .env.new && mv .env.new .env && \
   docker compose -f docker-compose.prod.yml up -d --wait"
-# pyparser: ssh leploy, /opt/pyparser/secrets.env, then re-run the affected services
+# pyparser: ssh pyparser, /opt/pyparser/secrets.env, then re-run the affected services
 ```
 
 ## Host bootstrap (one-time, per host — done during migration)
 
 ```sh
-# Install the CLI (as root):  pyparser=letzner, llunde=hetzner
-ssh letzner 'curl -sLf --retry 3 https://cli.doppler.com/install.sh | sh'
+# Install the CLI (as root)
+ssh pyparser 'curl -sLf --retry 3 https://cli.doppler.com/install.sh | sh'
 
 # Configure the read-only prd token for the DEPLOY user, scoped to the app dir:
-#   pyparser deploy user = leploy @ /opt/pyparser
+#   pyparser deploy user = pyparser @ /opt/pyparser
 #   llunde   deploy user = deploy @ /opt/llunde
-ssh leploy 'doppler configure set token <PRD_SERVICE_TOKEN> --scope /opt/pyparser'
-ssh deploy 'doppler configure set token <PRD_SERVICE_TOKEN> --scope /opt/llunde'
+ssh pyparser 'doppler configure set token <PRD_SERVICE_TOKEN> --scope /opt/pyparser'
+ssh llunde 'doppler configure set token <PRD_SERVICE_TOKEN> --scope /opt/llunde'
 ```
 
 `doppler` must be on `PATH` for a non-interactive SSH shell (the install script
-puts it in `/usr/local/bin`, which is). Verify: `ssh leploy 'doppler --version'`.
+puts it in `/usr/local/bin`, which is). Verify: `ssh pyparser 'doppler --version'`.
 
 ## Tokens & GitHub secrets
 
@@ -80,17 +67,15 @@ puts it in `/usr/local/bin`, which is). Verify: `ssh leploy 'doppler --version'`
   --plain`, stored as GitHub repo secrets:
   - `DOPPLER_TOKEN_PYPARSER_CI`
   - `DOPPLER_TOKEN_LLUNDE_CI`
-- After a green cutover, the **old** GitHub secrets are unused and can be deleted:
-  `PYPARSER_HETZNER_SSH_KEY`, `PYPARSER_HETZNER_HOST`, `LINODE_SSH_KEY`,
-  `LINODE_HOST`, `LINODE_USER`, `VITE_TURNSTILE_SITE_KEY`. Keep `GITHUB_TOKEN`.
+
 
 ## Verification
 
 ```sh
 # Parity: does Doppler prd match the live host file? (expect only DOPPLER_* extras)
-ssh leploy 'doppler secrets download --no-file --format docker > /tmp/c.env; \
+ssh pyparser 'doppler secrets download --no-file --format docker > /tmp/c.env; \
   diff <(grep -vE "^DOPPLER_" /tmp/c.env | sort) <(sort /opt/pyparser/secrets.env); rm /tmp/c.env'
-# llunde: same on `ssh deploy` against /opt/llunde/.env (IMAGE_TAG is expected to
+# llunde: same on `ssh llunde` against /opt/llunde/.env (IMAGE_TAG is expected to
 # differ — it's supplied by CI, not Doppler).
 
 # Local: doppler run -- python -c "from pyparser.config import get_settings; print(get_settings().env)"
