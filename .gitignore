@@ -1,0 +1,18 @@
+# OpenTofu
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# Nix
+result
+result-*
+
+# Secrets that must never land unencrypted
+*.pem
+*.age
+!*.sops.*
+
+.DS_Store
