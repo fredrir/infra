@@ -1,0 +1,15 @@
+# Terraform — local state and secrets stay out of git (recurses into all subdirs).
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+!**/*.tfvars.example
+**/crash.log
+**/crash.*.log
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+
+# Keep provider lock files committed.
+!**/.terraform.lock.hcl

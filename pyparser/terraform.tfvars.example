@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+region              = "eu-north-1"
+dataset_bucket_name = "llunde-pyparser-bucket"
+
+# Your AWS SSO/CLI profile (leave commented to use the default credential chain).
+# aws_profile = "your-profile"
+
+# Hetzner Cloud API token (Read & Write) — supply via env, do NOT commit:
+#   export TF_VAR_hcloud_token="..."
