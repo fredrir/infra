@@ -57,13 +57,18 @@ The host's SSH key is created *by us* and injected at install, so sops-decryptio
    ssh-to-age < /tmp/llunde-01-keys/etc/ssh/ssh_host_ed25519_key.pub   # -> <HOST_AGE_PUBLIC_KEY>
    ```
 2. Edit `.sops.yaml`: the admin key is already real; replace `age1PLACEHOLDER_HOST_KEY` → `<HOST_AGE_PUBLIC_KEY>` (from `ssh-keyscan -t ed25519 46.62.214.182 | nix run nixpkgs#ssh-to-age`, or the pre-generated key path below).
-3. Create the four secret files (`sops secrets/<name>.yaml` opens an editor; exact keys below are final, from `modules/secrets/default.nix`):
+3. Create the five secret files (`sops secrets/<name>.yaml` opens an editor; exact keys below are final, from `modules/secrets/default.nix`):
    - `secrets/doppler.yaml` — key `doppler_token`, value in **env-file form** (it lands as an EnvironmentFile):
      `DOPPLER_TOKEN=<token>` where the token comes from
      `doppler configs tokens create llunde-01 --project llunde --config prd --plain --max-age 0`
    - `secrets/tailscale.yaml` — key `auth_key`, value from the Tailscale admin console → Settings → Keys → *Auth keys* → Generate (reusable: no, ephemeral: no, tags optional).
    - `secrets/restic.yaml` — two keys: `password` (from `openssl rand -base64 32`) and `env` in env-file form:\n     `AWS_ACCESS_KEY_ID=...`, `AWS_SECRET_ACCESS_KEY=...`, `AWS_DEFAULT_REGION=eu-north-1` — **decision (recorded)**: v1 reuses the `leploy` credentials from Doppler `pyparser/prd` (object-level S3 rights suffice); a dedicated backup IAM user is a hardening follow-up (contract.md).
    - `secrets/llunde-backend-db.yaml` — key `env`, value in env-file form (contract.md): `POSTGRES_PASSWORD`/`DB_PASSWORD` = `openssl rand -base64 24` (same value), optional `VALKEY_PASSWORD`.
+   - `secrets/ghcr.yaml` — key `auth_json` (images are PRIVATE): create a fine-grained PAT
+     (github.com/settings/tokens → read-only `packages` scope, no repo perms needed for classic `read:packages`),
+     then the value is the literal JSON:
+     `{"auths":{"ghcr.io":{"auth":"$(echo -n 'fredrir:<PAT>' | base64)"}}}`
+     Verify later on-host: `REGISTRY_AUTH_FILE=/run/secrets/ghcr-auth.json podman pull ghcr.io/fredrir/llunde-frontend:latest`.
 4. Mirror `DB_PASSWORD` (and `VALKEY_PASSWORD` if set) into Doppler `llunde/prd` so app-level and infra views agree.
 5. `git add -A && git commit -m "phase 2: real sops recipients + secrets"` (ciphertext only — verify `git diff --cached` shows only `sops`-encrypted content).
 

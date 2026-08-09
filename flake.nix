@@ -110,6 +110,7 @@
         PublishPort=127.0.0.1:8080:8080
 
         [Service]
+        Environment=REGISTRY_AUTH_FILE=/run/secrets/ghcr-auth.json
         MemoryMax=1G
         Restart=always
         TimeoutStartSec=300

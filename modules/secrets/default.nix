@@ -25,6 +25,11 @@
       default = null;
       description = "EnvironmentFile with Postgres/Valkey internal credentials (contract.md).";
     };
+    ghcrAuthFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "containers-auth.json with a read:packages GHCR PAT — images are private by decision.";
+    };
   };
 
   config = {
@@ -66,13 +71,28 @@
         owner = "llunde-backend";
         path = "/run/secrets/llunde-backend-db.env";
       };
+      # containers-auth.json for private GHCR pulls; group-readable by the
+      # image-pulling service users (REGISTRY_AUTH_FILE points here).
+      "ghcr-auth" = {
+        sopsFile = ../../secrets/ghcr.yaml;
+        key = "auth_json";
+        mode = "0640";
+        group = "ghcr";
+        path = "/run/secrets/ghcr-auth.json";
+      };
     };
+
+    users.groups.ghcr.members = [
+      "llunde-backend"
+      "llunde-frontend"
+    ];
 
     llunde.secrets = {
       dopplerTokenFile = config.sops.secrets."doppler-token".path;
       tailscaleAuthKeyFile = config.sops.secrets."tailscale-auth-key".path;
       resticPasswordFile = config.sops.secrets."restic-password".path;
       dbEnvFile = config.sops.secrets."llunde-backend-db-env".path;
+      ghcrAuthFile = config.sops.secrets."ghcr-auth".path;
     };
 
     llunde.tailscale.authKeyFile = lib.mkDefault config.sops.secrets."tailscale-auth-key".path;

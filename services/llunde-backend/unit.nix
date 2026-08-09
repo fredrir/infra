@@ -52,6 +52,8 @@ rec {
       PublishPort = [ "127.0.0.1:8080:8080" ];
     };
     service = {
+      # Auth for pulling the private GHCR image (podman-process env, not container env).
+      Environment = "REGISTRY_AUTH_FILE=/run/secrets/ghcr-auth.json";
       MemoryMax = "1G";
       Restart = "always";
       TimeoutStartSec = 300;
