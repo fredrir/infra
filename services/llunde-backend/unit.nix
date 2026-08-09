@@ -5,12 +5,10 @@
 # Secret path contract with modules/secrets (stream A2):
 #   /run/secrets/doppler.env            DOPPLER_TOKEN=...   (owner llunde-backend)
 #   /run/secrets/llunde-backend-db.env  POSTGRES_PASSWORD=... DB_PASSWORD=...
-{ lib }:
-let
-  quadlet = import ../../modules/quadlet/mk-quadlet.nix { inherit lib; };
+{lib}: let
+  quadlet = import ../../modules/quadlet/mk-quadlet.nix {inherit lib;};
   uid = 2001;
-in
-rec {
+in rec {
   args = {
     name = "llunde-backend";
     inherit uid;
@@ -51,7 +49,7 @@ rec {
         "llunde-backend-data.network"
         "podman"
       ];
-      PublishPort = [ "127.0.0.1:8080:8080" ];
+      PublishPort = ["127.0.0.1:8080:8080"];
     };
     service = {
       # Auth for pulling the private GHCR image (podman-process env, not container env).
@@ -60,7 +58,7 @@ rec {
       Restart = "always";
       TimeoutStartSec = 300;
     };
-    install.WantedBy = [ "default.target" ];
+    install.WantedBy = ["default.target"];
   };
 
   fragment = quadlet.mkContainerUnit args;

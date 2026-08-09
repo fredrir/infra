@@ -15,42 +15,63 @@
 # networking and therefore absent.
 #
 # Ops endpoints (/metrics, /health, /ready) are blocked on the public vhosts
-# (ADR 013 / backend phase-3 finding). They stay reachable for operators over
-# the tailnet via host access (`ssh llunde-01 -- curl 127.0.0.1:8080/ready`);
-# node-level metrics bind the tailscale IP in modules/observability. If
-# browser access is ever wanted, add a Caddy listener bound to the tailscale
-# IP — deliberately not done now (keep the public surface minimal).
+# (ADR 013 / backend phase-3 finding). Off-box they are reachable ONLY via
+# the tailnet-scoped :9101 listener below (phase 4 — Prometheus scrapes
+# /metrics, blackbox probes /ready); node-level metrics stay with
+# modules/observability. The public surface remains 80/443.
 {
   config,
   lib,
   ...
-}:
-let
+}: let
   cfg = config.llunde.ingress;
-  quadlet = import ../quadlet/mk-quadlet.nix { inherit lib; };
+  quadlet = import ../quadlet/mk-quadlet.nix {inherit lib;};
 
   acmeEmail = "fhansteen@gmail.com";
 
   opsBlock = ''
-    	@ops path /metrics /health /ready
-    	respond @ops 403
+    @ops path /metrics /health /ready
+    respond @ops 403
   '';
 
-  vhostBlock =
-    name: vhost:
-    if vhost.redirectTo != null then
-      ''
-        ${name} {
-        	redir ${vhost.redirectTo}{uri} permanent
-        }
-      ''
-    else
-      ''
-        ${name} {
-        	encode gzip
-        ${lib.optionalString vhost.blockOpsEndpoints opsBlock}	reverse_proxy ${vhost.upstream}
-        }
-      '';
+  # Backend ops listener for the tailnet (phase-4 workstream O, plan-review
+  # finding): ADR 013 claimed the app's /metrics is "scraped over the tailnet
+  # directly against 127.0.0.1-published ports" — but a loopback bind is by
+  # definition unreachable off-box, so until this listener that claim was
+  # aspirational; nothing could actually collect backend metrics remotely.
+  # Caddy already runs host-network and reaches the backend loopback, so it
+  # gains a second, plain-HTTP site on :9101. Exposure is the proven
+  # node_exporter model (modules/observability): the socket binds the
+  # wildcard, the public firewall never opens 9101 (publicTCPPorts), and only
+  # trusted tailscale0 admits traffic — tailnet-only reachability with zero
+  # public surface. EXACTLY two paths proxy to the backend — /metrics
+  # (Prometheus scrape) and /ready (blackbox full-readiness probe); everything
+  # else answers 403, mirroring the public vhosts' @ops block.
+  metricsSite = ''
+    http://:9101 {
+    	@scrape path /metrics /ready
+    	handle @scrape {
+    		reverse_proxy 127.0.0.1:8080
+    	}
+    	handle {
+    		respond 403
+    	}
+    }
+  '';
+
+  vhostBlock = name: vhost:
+    if vhost.redirectTo != null
+    then ''
+      ${name} {
+      	redir ${vhost.redirectTo}{uri} permanent
+      }
+    ''
+    else ''
+      ${name} {
+      	encode gzip
+      ${lib.optionalString vhost.blockOpsEndpoints opsBlock}	reverse_proxy ${vhost.upstream}
+      }
+    '';
 
   caddyfile =
     ''
@@ -59,9 +80,10 @@ let
       }
 
     ''
-    + lib.concatStringsSep "\n" (lib.mapAttrsToList vhostBlock cfg.virtualHosts);
-in
-{
+    + lib.concatStringsSep "\n" (lib.mapAttrsToList vhostBlock cfg.virtualHosts)
+    + "\n"
+    + metricsSite;
+in {
   options.llunde.ingress = {
     enable = lib.mkOption {
       type = lib.types.bool;
@@ -92,7 +114,7 @@ in
           };
         }
       );
-      default = { };
+      default = {};
       description = "Public vhosts, e.g. llunde.no and api.llunde.no.";
     };
   };
@@ -114,6 +136,12 @@ in
       };
     };
 
+    # Same belt-and-suspenders scoping as node_exporter's 9100
+    # (modules/observability): tailscale0 is already a trusted interface, but
+    # the explicit rule documents the intended reach of :9101 and survives if
+    # that blanket trust is ever narrowed.
+    networking.firewall.interfaces."tailscale0".allowedTCPPorts = [9101];
+
     environment.etc =
       quadlet.mkContainerUnit {
         name = "caddy";
@@ -133,7 +161,7 @@ in
           Restart = "always";
           MemoryMax = "256M";
         };
-        install.WantedBy = [ "default.target" ];
+        install.WantedBy = ["default.target"];
       }
       // {
         "llunde/caddy/Caddyfile".text = caddyfile;

@@ -1,0 +1,14 @@
+# Dashboard provider (O2): dashboards load from files the unit bind-mounts
+# under /etc/grafana/dashboards — outside /var/lib/grafana so the JSON never
+# collides with the grafana-data volume. UI edits do not persist (the repo is
+# the source of truth); edit grafana/overview.json instead.
+apiVersion: 1
+
+providers:
+  - name: llunde
+    folder: llunde
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

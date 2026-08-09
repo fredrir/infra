@@ -15,8 +15,7 @@
   lib,
   pkgs,
   ...
-}:
-let
+}: let
   # Rootless-podman named volume of the pyparser-files unit (stream B). Must
   # match the Volume= name in services/pyparser — reconciled at lead
   # integration. graphroot for a rootless user defaults to
@@ -25,13 +24,12 @@ let
   dumpDir = "/var/backup/pyparser";
   asPyparserUser = "${pkgs.util-linux}/bin/runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus";
   podman = "/run/current-system/sw/bin/podman";
-in
-{
+in {
   # Presence-gated (phase-3.5): this job only exists on hosts that actually run
   # pyparser — backups.enable alone would run `runuser -u pyparser` on
   # llunde-01, where uid 2001 is llunde-backend.
   config = lib.mkIf (config.llunde.backups.enable && (config.llunde.users.services ? pyparser)) {
-    systemd.tmpfiles.rules = [ "d ${dumpDir} 0700 root root -" ];
+    systemd.tmpfiles.rules = ["d ${dumpDir} 0700 root root -"];
 
     llunde.backups.jobs.pyparser = {
       schedule = "weekly";

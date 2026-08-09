@@ -2,8 +2,11 @@
 # decrypt, exactly as deployed at the phase-2 go-live. Mechanism (options,
 # host-key decryption) lives in modules/secrets; this file is content only
 # (phase-3.5 per-host split).
-{ config, lib, ... }:
 {
+  config,
+  lib,
+  ...
+}: {
   sops.secrets = {
     # Env-file form (DOPPLER_TOKEN=...): consumed as EnvironmentFile by the
     # backend quadlet, hence the explicit .env path (stream B2 contract).

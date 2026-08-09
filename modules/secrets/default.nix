@@ -3,8 +3,7 @@
 # hosts/<host>/secrets.nix and fills these paths (phase-3.5 stream A —
 # llunde-01's five and llunde-parser's four differ, so the sets cannot
 # live here).
-{ lib, ... }:
-{
+{lib, ...}: {
   options.llunde.secrets = {
     dopplerTokenFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
@@ -35,6 +34,6 @@
 
   config = {
     sops.validateSopsFiles = true;
-    sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+    sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
   };
 }

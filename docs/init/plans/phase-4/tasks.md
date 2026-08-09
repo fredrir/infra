@@ -7,7 +7,7 @@ House rules as ever: declarative files in parallel; live surfaces (DNS, firewall
 | # | Task | Proof | Rollback |
 |---|---|---|---|
 | G1 | **Replace** the stale `.github/workflows/ci.yml` (second-opinion finding: it validates tofu roots deleted in the unnesting — permanently red and ignored, alarm-fatigue conditions) with `check.yml`: on PR + push-to-main, `nix flake check`, build BOTH host closures, `tofu fmt -check` + `tofu validate` on the flat root. All actions **SHA-pinned**. No credentials | green run on main; old red job gone | restore ci.yml |
-| G2 | Make it a required check on `main`; prove it red-blocks a deliberately broken flake on a test PR | blocked PR screenshot-equivalent | unrequire |
+| G2 | Make it a required check on `main`; prove it red-blocks a deliberately broken flake on a test PR. **As executed**: GitHub requires Pro for branch-protection *enforcement* on private repos (403) — the gate runs on every PR/push and went properly red on the broken-flake test (PR #9), and the apply workflow depends on it **structurally** via `needs:`; the only unenforceable part is "cannot click merge on red", advisory for a solo owner. Revisit if the repo ever goes Pro/public | red `flake` check on PR #9; green on main | delete workflow |
 
 ## Workstream O — observability (parallel authoring; lead applies)
 

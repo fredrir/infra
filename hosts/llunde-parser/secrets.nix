@@ -1,8 +1,11 @@
 # llunde-parser's bootstrap secrets (phase-3.5 contract: FOUR files — no sops
 # DB password; POSTGRES_PASSWORD is single-sourced from the Doppler render).
 # Mechanism lives in modules/secrets; recipients in .sops.yaml (per-host rules).
-{ config, lib, ... }:
 {
+  config,
+  lib,
+  ...
+}: {
   sops.secrets = {
     # Env-file form (DOPPLER_TOKEN=...): consumed by the root-level env-render
     # oneshot (services/pyparser), never by containers directly.
@@ -34,7 +37,7 @@
     };
   };
 
-  users.groups.ghcr.members = [ "pyparser" ];
+  users.groups.ghcr.members = ["pyparser"];
 
   llunde.secrets = {
     dopplerTokenFile = config.sops.secrets."pyparser-doppler".path;

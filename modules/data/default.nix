@@ -10,10 +10,9 @@
   config,
   lib,
   ...
-}:
-let
+}: let
   cfg = config.llunde.data;
-  quadlet = import ../quadlet/mk-quadlet.nix { inherit lib; };
+  quadlet = import ../quadlet/mk-quadlet.nix {inherit lib;};
 
   # Fixed owner per contract: postgres/valkey belong to llunde-backend.
   owner = "llunde-backend";
@@ -27,8 +26,8 @@ let
     # this network and an Internal network's aardvark answers all DNS without
     # upstream, killing api.doppler.com/GHCR lookups. Isolation holds via the
     # user boundary and zero published ports on postgres/valkey.
-    network = { };
-    install.WantedBy = [ "default.target" ];
+    network = {};
+    install.WantedBy = ["default.target"];
   };
 
   postgresUnit = quadlet.mkContainerUnit {
@@ -41,21 +40,21 @@ let
         "POSTGRES_USER=llunde"
         "PGDATA=/var/lib/postgresql/data/pgdata"
       ];
-      EnvironmentFile = [ "/run/secrets/llunde-backend-db.env" ];
+      EnvironmentFile = ["/run/secrets/llunde-backend-db.env"];
       Exec = "postgres -c shared_buffers=${cfg.postgres.sharedBuffers}";
       Image = "docker.io/library/postgres:17";
-      Network = [ "llunde-backend-data.network" ];
+      Network = ["llunde-backend-data.network"];
       # Run as the image's postgres user from the start: the entrypoint's
       # PGDATA mkdir happens as uid 999, so :U must chown the bind mount to
       # THAT uid, not container-root (go-live finding).
       User = "postgres";
-      Volume = [ "${dataRoot}/postgres:/var/lib/postgresql/data:U" ];
+      Volume = ["${dataRoot}/postgres:/var/lib/postgresql/data:U"];
     };
     service = {
       MemoryMax = "768M";
       Restart = "always";
     };
-    install.WantedBy = [ "default.target" ];
+    install.WantedBy = ["default.target"];
   };
 
   valkeyUnit = quadlet.mkContainerUnit {
@@ -66,17 +65,16 @@ let
       # noeviction: sessions must fail loudly rather than silently evict (ADR 005).
       Exec = "valkey-server --appendonly yes --maxmemory ${cfg.valkey.maxMemory} --maxmemory-policy noeviction";
       Image = "docker.io/valkey/valkey:8";
-      Network = [ "llunde-backend-data.network" ];
-      Volume = [ "${dataRoot}/valkey:/data:U" ];
+      Network = ["llunde-backend-data.network"];
+      Volume = ["${dataRoot}/valkey:/data:U"];
     };
     service = {
       MemoryMax = "384M";
       Restart = "always";
     };
-    install.WantedBy = [ "default.target" ];
+    install.WantedBy = ["default.target"];
   };
-in
-{
+in {
   options.llunde.data = {
     postgres = {
       enable = lib.mkOption {
@@ -106,12 +104,12 @@ in
 
   config = lib.mkIf (cfg.postgres.enable || cfg.valkey.enable) {
     llunde.quadlet.units =
-      [ networkUnit ]
+      [networkUnit]
       ++ lib.optional cfg.postgres.enable postgresUnit
       ++ lib.optional cfg.valkey.enable valkeyUnit;
 
     systemd.tmpfiles.rules =
-      [ "d ${dataRoot} 0750 ${owner} ${owner} -" ]
+      ["d ${dataRoot} 0750 ${owner} ${owner} -"]
       ++ lib.optional cfg.postgres.enable "d ${dataRoot}/postgres 0700 ${owner} ${owner} -"
       ++ lib.optional cfg.valkey.enable "d ${dataRoot}/valkey 0700 ${owner} ${owner} -";
   };

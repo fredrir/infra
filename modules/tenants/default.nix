@@ -4,11 +4,13 @@
 # (quadlets in ~/.config/containers/systemd/, env files, deploy scripts,
 # tunnel tokens) is the tenant's own, placed by the tenant's own pipeline.
 # This module never references tenant internals.
-{ config, lib, ... }:
-let
-  cfg = config.llunde.tenants;
-in
 {
+  config,
+  lib,
+  ...
+}: let
+  cfg = config.llunde.tenants;
+in {
   options.llunde.tenants = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule {
@@ -28,7 +30,7 @@ in
           };
           packages = lib.mkOption {
             type = lib.types.listOf lib.types.package;
-            default = [ ];
+            default = [];
             description = "Host binaries the tenant's documented tooling needs (on its PATH).";
           };
           sshAccess = lib.mkOption {
@@ -38,7 +40,7 @@ in
           };
           homeDirectories = lib.mkOption {
             type = lib.types.listOf lib.types.str;
-            default = [ ];
+            default = [];
             description = ''
               $HOME-relative directories pre-created (0700, tenant-owned) —
               the declarative twin of what the tenant's imperative bootstrap
@@ -48,35 +50,39 @@ in
         };
       }
     );
-    default = { };
+    default = {};
     description = "Self-deploying tenant slots (ADR 016). portfolio is the first.";
   };
 
-  config = lib.mkIf (cfg != { }) {
-    users.users = lib.mapAttrs (name: t: {
-      uid = t.uid;
-      isNormalUser = true;
-      group = name;
-      linger = true;
-      autoSubUidGidRange = false;
-      subUidRanges = [
-        {
-          startUid = t.subUidStart;
-          count = t.subUidCount;
-        }
-      ];
-      subGidRanges = [
-        {
-          startGid = t.subUidStart;
-          count = t.subUidCount;
-        }
-      ];
-      packages = t.packages;
-    }) cfg;
+  config = lib.mkIf (cfg != {}) {
+    users.users =
+      lib.mapAttrs (name: t: {
+        uid = t.uid;
+        isNormalUser = true;
+        group = name;
+        linger = true;
+        autoSubUidGidRange = false;
+        subUidRanges = [
+          {
+            startUid = t.subUidStart;
+            count = t.subUidCount;
+          }
+        ];
+        subGidRanges = [
+          {
+            startGid = t.subUidStart;
+            count = t.subUidCount;
+          }
+        ];
+        packages = t.packages;
+      })
+      cfg;
 
-    users.groups = lib.mapAttrs (_name: t: {
-      gid = t.uid;
-    }) cfg;
+    users.groups =
+      lib.mapAttrs (_name: t: {
+        gid = t.uid;
+      })
+      cfg;
 
     # Tenant scripts are FHS-shaped (#!/bin/bash — including sshd forced
     # commands, which exec the script directly, so "run it via bash" is not
@@ -87,7 +93,8 @@ in
     systemd.tmpfiles.rules = lib.concatLists (
       lib.mapAttrsToList (
         name: t: map (d: "d /home/${name}/${d} 0700 ${name} ${name} -") t.homeDirectories
-      ) cfg
+      )
+      cfg
     );
   };
 }

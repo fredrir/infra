@@ -1,0 +1,23 @@
+# blackbox-exporter modules (O6). Mounted over the image's default
+# --config.file path (/etc/blackbox_exporter/config.yml).
+#
+# ip4 preferred: the probes' verdicts must not depend on whether the CF edge
+# and the tailnet happen to have working v6 paths from this box.
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+
+  # 403 IS the healthy answer (contract): https://api.llunde.no/health is
+  # blocked by Caddy's @ops rules on the public vhost, so a 403 arriving
+  # through the edge proves the WHOLE public chain — DNS, CF, tunnel, Caddy —
+  # is alive. Anything else (200 included) means the ops block regressed or
+  # the chain is broken.
+  http_403:
+    prober: http
+    timeout: 10s
+    http:
+      valid_status_codes: [403]
+      preferred_ip_protocol: ip4

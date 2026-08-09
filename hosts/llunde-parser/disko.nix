@@ -1,7 +1,6 @@
 # Single-disk ext4, UEFI ESP (same shape as llunde-01; recon 2026-08-09
 # confirmed UEFI boot and /dev/sda on the CCX23).
-{ ... }:
-{
+{...}: {
   disko.devices.disk.main = {
     device = "/dev/sda";
     type = "disk";

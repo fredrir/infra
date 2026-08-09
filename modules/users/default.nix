@@ -2,11 +2,13 @@
 # lingering user manager so quadlets start at boot, auto subuid/subgid ranges for
 # rootless podman. Cross-user traffic is loopback-only — rootless podman networks
 # cannot span users.
-{ config, lib, ... }:
-let
-  cfg = config.llunde.users.services;
-in
 {
+  config,
+  lib,
+  ...
+}: let
+  cfg = config.llunde.users.services;
+in {
   options.llunde.users.services = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule {
@@ -37,7 +39,7 @@ in
         };
       }
     );
-    default = { };
+    default = {};
     description = ''
       Rootless service users (llunde-backend, llunde-frontend, edge). Cross-user
       traffic is loopback-only: rootless podman networks cannot span users.
@@ -45,38 +47,41 @@ in
   };
 
   config = {
-    users.users = lib.mapAttrs (
-      name: svc:
-      {
-        uid = svc.uid;
-        isNormalUser = true;
-        group = name;
-        linger = svc.linger;
-      }
-      // (
-        if svc.subUidStart != null then
+    users.users =
+      lib.mapAttrs (
+        name: svc:
           {
-            autoSubUidGidRange = false;
-            subUidRanges = [
-              {
-                startUid = svc.subUidStart;
-                count = svc.subUidCount;
-              }
-            ];
-            subGidRanges = [
-              {
-                startGid = svc.subUidStart;
-                count = svc.subUidCount;
-              }
-            ];
+            uid = svc.uid;
+            isNormalUser = true;
+            group = name;
+            linger = svc.linger;
           }
-        else
-          { autoSubUidGidRange = true; }
+          // (
+            if svc.subUidStart != null
+            then {
+              autoSubUidGidRange = false;
+              subUidRanges = [
+                {
+                  startUid = svc.subUidStart;
+                  count = svc.subUidCount;
+                }
+              ];
+              subGidRanges = [
+                {
+                  startGid = svc.subUidStart;
+                  count = svc.subUidCount;
+                }
+              ];
+            }
+            else {autoSubUidGidRange = true;}
+          )
       )
-    ) cfg;
+      cfg;
 
-    users.groups = lib.mapAttrs (_name: svc: {
-      gid = svc.uid;
-    }) cfg;
+    users.groups =
+      lib.mapAttrs (_name: svc: {
+        gid = svc.uid;
+      })
+      cfg;
   };
 }

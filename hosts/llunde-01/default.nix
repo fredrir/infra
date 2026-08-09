@@ -1,7 +1,6 @@
 # Host = diffs only (ADR 003): everything shared lives in modules/; this file
 # says what llunde-01 IS — its services, its users, its disk.
-{ modulesPath, ... }:
-{
+{modulesPath, ...}: {
   imports = [
     # Hetzner Cloud is QEMU/KVM: without this the initrd lacks virtio drivers
     # and the box hangs before finding its root disk (go-live finding).
@@ -39,7 +38,12 @@
 
   llunde.ingress.enable = true;
   llunde.backups.enable = true;
-  llunde.observability.enable = true;
+  llunde.observability = {
+    enable = true;
+    # Journal → the collection stack on llunde-parser over the tailnet
+    # (phase-4 O3, ADR 018).
+    lokiUrl = "http://100.92.219.50:3100";
+  };
 
   system.stateVersion = "25.11";
 }

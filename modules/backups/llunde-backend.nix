@@ -11,8 +11,7 @@
   lib,
   pkgs,
   ...
-}:
-let
+}: let
   # Rootless-podman volume of the valkey unit (stream B2). Must match the
   # Volume= name in services/llunde-backend — reconciled at lead integration.
   # Bind mount of the valkey unit (stream B2 chose host paths over named
@@ -21,13 +20,12 @@ let
   dumpDir = "/var/backup/llunde-backend";
   asBackendUser = "${pkgs.util-linux}/bin/runuser -u llunde-backend -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus";
   podman = "/run/current-system/sw/bin/podman";
-in
-{
+in {
   # Presence-gated (phase-3.5): this job only exists on hosts that actually run
   # llunde-backend — backups.enable alone would run `runuser -u llunde-backend`
   # on llunde-parser, where uid 2001 is pyparser.
   config = lib.mkIf (config.llunde.backups.enable && (config.llunde.users.services ? llunde-backend)) {
-    systemd.tmpfiles.rules = [ "d ${dumpDir} 0700 root root -" ];
+    systemd.tmpfiles.rules = ["d ${dumpDir} 0700 root root -"];
 
     llunde.backups.jobs.llunde-backend = {
       schedule = "weekly";

@@ -1,11 +1,13 @@
 # Tailscale as the single management overlay (ADR 008): auto-join via the
 # sops-provided auth key. MagicDNS picks up networking.hostName, so the box is
 # `ssh llunde-01` on the tailnet; port 22 closure is staged post-gate (runbook).
-{ config, lib, ... }:
-let
-  cfg = config.llunde.tailscale;
-in
 {
+  config,
+  lib,
+  ...
+}: let
+  cfg = config.llunde.tailscale;
+in {
   options.llunde.tailscale = {
     enable = lib.mkOption {
       type = lib.types.bool;
