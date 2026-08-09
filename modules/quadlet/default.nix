@@ -23,6 +23,7 @@ let
 
     [Service]
     Type=oneshot
+    Environment=REGISTRY_AUTH_FILE=/run/secrets/ghcr-auth.json
     ExecStart=${pkgs.podman}/bin/podman auto-update
   '';
 
