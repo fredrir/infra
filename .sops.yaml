@@ -6,7 +6,7 @@
 # Placeholders below are replaced at go-live (tasks.md step 2.2).
 keys:
   - &admin age13upkqrd7v97a4gcgerwnkuwvznxh60u2g56x6cj55hemwq68q3lsalynwn
-  - &llunde-01 age1PLACEHOLDER_HOST_KEY
+  - &llunde-01 age1thj000t9nt90g7m23tpkz3krt3h5aurj8euayvqs3kq48geaxahs3e0q3r
 creation_rules:
   - path_regex: secrets/.*\.yaml$
     key_groups:

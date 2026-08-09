@@ -36,7 +36,7 @@
     # Placeholder secret files until go-live populates real sops-encrypted
     # values (tasks.md 2.2); real recipients replace .sops.yaml placeholders
     # first, then this flips to true.
-    sops.validateSopsFiles = false;
+    sops.validateSopsFiles = true;
 
     sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
