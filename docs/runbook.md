@@ -77,15 +77,15 @@ The host's SSH key is created *by us* and injected at install, so sops-decryptio
 Preconditions: step 2 applied; step 3 committed; you can `ssh root@46.62.214.182` (current alias `ssh llunde`).
 
 ```sh
-nixc run github:nix-community/nixos-anywhere -- \
+nix run github:nix-community/nixos-anywhere -- \
   --flake .#llunde-01 \
   --build-on-remote \
-  -i /root/.ssh/id_ed25519 \
+  -i ~/.ssh/id_ed25519 \
   --extra-files /tmp/llunde-01-keys \
   root@46.62.214.182
 ```
 
-Notes: run inside the podman wrapper with your SSH key mounted (`podman run -v ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro ...` added to the alias for this step); `--build-on-remote` is required (laptop container is aarch64, target is x86_64); nixos-anywhere kexecs into an installer, runs disko (single-disk ext4 wipe of `/dev/sda`), installs the flake's system, copies `--extra-files` (the host key) into place, reboots. ⚠️ Verify-at-execution: exact `-i`/`--extra-files` flag spellings against the nixos-anywhere version pulled.
+Notes: native nix on the Mac; `--build-on-remote` is required (laptop is aarch64-darwin, target x86_64-linux); nixos-anywhere kexecs into an installer, runs disko (single-disk ext4 wipe of `/dev/sda`), installs the flake's system, copies `--extra-files` (the host key) into place, reboots. ⚠️ Verify-at-execution: exact `-i`/`--extra-files` flag spellings against the nixos-anywhere version pulled.
 
 Afterwards: `rm -rf /tmp/llunde-01-keys` (the host key now lives only on the host). `ssh root@46.62.214.182` must present the ed25519 fingerprint you generated.
 
