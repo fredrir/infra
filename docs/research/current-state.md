@@ -1,6 +1,6 @@
 # Current state — repo and real infrastructure
 
-Audit of the transferred `llunde-infra` repo and the machines it describes, as of 2026-08-09. This is the ground truth the phase plans start from; where the repo's own docs disagree with its Terraform, the Terraform (and the live boxes) win — the docs are stale by the owner's own account and get reset ([ADR 014](../decisions/014-scope-boundaries.md)).
+Audit of the transferred `llunde-infra` repo and the machines it describes, as of 2026-08-09 **before phase 2 ran**. This is the ground truth the phase plans started from; where the repo's own docs disagree with its Terraform, the Terraform (and the live boxes) win — the docs are stale by the owner's own account and get reset ([ADR 014](../decisions/014-scope-boundaries.md)). For the post-phase-2 picture of `llunde-parser` and its tenants, see [phase-3-mapping.md](phase-3-mapping.md) — notably, it found a second live production (portfolio) on that box, which this audit did not cover.
 
 ## The repo
 

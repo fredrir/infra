@@ -17,6 +17,6 @@ The llunde tunnel fronts the old stack (cloudflared → nginx on the origin's in
 
 Do not rotate tunnel tokens. A tunnel's token embeds its secret — regenerating it drops the live connectors (site outage) until the new token is deployed. This constraint dies for llunde with the phase-2 tunnel retirement; it remains real for pyparser.
 
-## Bringing the zone into OpenTofu (Should)
+## Bringing the zone into OpenTofu (phase 3, step 2)
 
-When the zone moves under `tofu/` ([ADR 012](decisions/012-cloudflare-strategy.md)): import the existing records rather than recreating, keep the pyparser tunnel records pinned with `lifecycle { ignore_changes }` on anything embedding secrets, and mind the Cloudflare provider v4→v5 restructuring (`cloudflare_record` → `cloudflare_dns_record`, Zero Trust resources renamed) noted in `tofu/pyparser/CLOUDFLARE.md`.
+Scheduled: [phase-3 tasks](init/plans/phase-3/tasks.md) step 2 ([ADR 012](decisions/012-cloudflare-strategy.md)). When the zone moves under `tofu/`: import the existing records rather than recreating, keep the pyparser tunnel records pinned with `lifecycle { ignore_changes }` on anything embedding secrets, and mind the Cloudflare provider v4→v5 restructuring (`cloudflare_record` → `cloudflare_dns_record`, Zero Trust resources renamed) noted in `tofu/pyparser/CLOUDFLARE.md`.
