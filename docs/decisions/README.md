@@ -1,6 +1,6 @@
 # Decision records
 
-Sixteen accepted ADRs — fourteen from the 2026-08-09 design session, two (015–016) from the post-phase-2 planning round the same day. They are commitments, not proposals — reopen one explicitly (edit status, record why) rather than drifting from it in config.
+Nineteen accepted ADRs — fourteen from the 2026-08-09 design session, 015–016 from the post-phase-2 planning round, 017–019 from the phase-4 re-evaluation (all the same remarkable day). They are commitments, not proposals — reopen one explicitly (edit status, record why) rather than drifting from it in config.
 
 | ADR | Decision |
 |---|---|
@@ -20,3 +20,6 @@ Sixteen accepted ADRs — fourteen from the 2026-08-09 design session, two (015�
 | [014](014-scope-boundaries.md) | Repo split (rescopes backend phase-3); pyparser last+careful; openclaw not redeployed; k8s non-goal |
 | [015](015-tailnet-only-management.md) | Tailnet covers CI too (ephemeral tagged keys); port 22 closes on both boxes in phase 3; SSH-in-CI is scaffolding until 3.5 |
 | [016](016-tenant-slots-host-uniformity.md) | Tenant slots (`modules/tenants/` declares user+deps only, tenants self-deploy); uniform NixOS hosts as end state — phase 3.5 |
+| [017](017-tunnel-ingress-llunde.md) | llunde.no ingress via Cloudflare Tunnel; zero public inbound estate-wide; amends 012 part 3 |
+| [018](018-observability-collection.md) | Collection stack self-hosted on llunde-parser, tailnet-only, hard-capped; resolves 013's deferral |
+| [019](019-gitops-auto-apply.md) | Full auto-apply on merge (owner's call past the eval-gate-only rec); gate-first, environment-scoped creds |

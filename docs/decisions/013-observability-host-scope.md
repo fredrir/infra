@@ -1,5 +1,7 @@
 # ADR 013: Observability — Exporters Now, Collection Stack Later
 
+> Phase-4 note: the deferred collection decision is resolved by [ADR 018](018-observability-collection.md).
+
 **Status**: Accepted · **Date**: 2026-08-09
 
 ## Context

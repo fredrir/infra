@@ -1,6 +1,6 @@
 # ADR 012: Cloudflare — DNS-Only Now, Zone into Tofu, Proxy Deferred
 
-**Status**: Accepted · **Date**: 2026-08-09
+**Status**: Accepted; part 3 superseded by [ADR 017](017-tunnel-ingress-llunde.md) (tunnel, not orange-cloud) · **Date**: 2026-08-09
 
 ## Context
 
