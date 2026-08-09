@@ -23,7 +23,7 @@ let
   # ~/.local/share/containers/storage.
   filesVolumeData = "/home/pyparser/.local/share/containers/storage/volumes/pyparser-files/_data";
   dumpDir = "/var/backup/pyparser";
-  asPyparserUser = "${pkgs.util-linux}/bin/runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001";
+  asPyparserUser = "${pkgs.util-linux}/bin/runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus";
   podman = "/run/current-system/sw/bin/podman";
 in
 {

@@ -21,7 +21,7 @@ see `README.md`); Access and the tunnel itself are managed out-of-band
   closed (ADR 015; break-glass in `runbook.md` §11). There is no shell workflow
   as the service user: admin work happens as root, reaching into the rootless
   stack with `systemctl --user -M pyparser@ …` for units and
-  `runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001 podman …` for the
+  `runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus podman …` for the
   user's podman.
 - **Firewall**: zero public inbound ports of any kind (the Hetzner firewall has
   no rules; the NixOS host firewall opens nothing public). Web ingress is the
@@ -62,6 +62,11 @@ PYPARSER_CF_ACCESS_AUD=...
 # Cloudflare tunnel — the token embeds the tunnel secret; do NOT rotate casually
 TUNNEL_TOKEN=...
 ```
+
+> ⚠️ **Fresh installs restore a dump first.** The alembic chain assumes the
+> baseline schema (prod was initialized from `sql/init` and stamped) — an
+> `upgrade head` against an EMPTY database fails midway (rehearsal finding).
+> The stack's first start on a new box comes AFTER `pg_restore`.
 
 ## Deploys — pull-based, zero SSH
 
@@ -118,9 +123,12 @@ rollback is manual (`alembic downgrade` if the migration has a correct
   (user/pw/dbname real; host/port are placeholders the tunnel rewrites) +
   `PYPARSER_PROD_SSH_HOST=pyparser`, then e.g. `pyparser-sync db diff dev prod`
   or `pyparser-sync db pull prod`. `ssh pyparser` must work non-interactively
-  (ssh agent or keyfile — the tunnel uses `BatchMode`). The container-IP
-  discovery behind the tunnel is now podman, not docker:
-  `runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001 podman inspect pyparser-postgres`.
+  (ssh agent or keyfile — the tunnel uses `BatchMode`). **Known limitation**:
+  `pyparser-sync`'s auto-discovery shells out to `docker inspect` on the host,
+  and docker no longer exists — the tool needs a small update in the
+  llunde-pyparser repo (podman equivalent, run as the pyparser user:
+  `runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus podman inspect pyparser-postgres`).
+  Until then, resolve the IP manually with that command and point the tunnel at it.
 - **OpenTofu**: `doppler run --project pyparser --config prd -- tofu -chdir=tofu plan`
   should report "No changes." — the reinstall was invisible to the cloud API.
   The server is `prevent_destroy` + Hetzner `delete_protection`.

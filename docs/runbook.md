@@ -234,7 +234,7 @@ reusable reprovision knowledge.
   `restic restore latest --target /tmp/restore`, then the custom-format dump
   goes through `pg_restore` (not psql):
   ```sh
-  runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001 \
+  runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus \
     podman exec -i pyparser-postgres pg_restore --clean --if-exists \
     -U pyparser -d pyparser_llunde < /tmp/restore/var/backup/pyparser/pyparser_llunde.dump
   # files: copy the restored pyparser-files/_data contents back into the volume

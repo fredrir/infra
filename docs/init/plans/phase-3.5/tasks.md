@@ -28,7 +28,7 @@ Same model as phase 2: **declarative files in parallel streams; every live surfa
 | 2.1 | Create scratch server (cx-class, UEFI), nixos-anywhere the `llunde-parser` config onto it with the step-0.2 host key. **Two identity guards from first boot: cloudflared units masked** (a second connector would take real traffic) **and no production tailnet identity** (tailscale disabled or hostname overridden — the scratch box must never join as `llunde-parser` while prod lives) | boots, sops decrypts, zero public ports, absent from `tailscale status` under the prod name | delete server |
 | 2.2 | Restore drill: yesterday's pg_dump + files tar → new units; full stack up | in-box `curl review:8081/healthz` OK; workers idle-clean in journal; migrate unit ran alembic to head | n/a (scratch) |
 | 2.3 | Slot drill: portfolio slot present; as `portfolio`, drop a dummy `.container` into `~/.config/containers/systemd/`, `systemctl --user daemon-reload`, unit generates and runs | dummy container active | n/a |
-| 2.4 | Auto-update drill: retag a test image, timer pulls + restarts with migrate ordering respected | journal shows migrate→app order | n/a |
+| 2.4 | Migrate-ordering drill (**adjusted at execution**: retagging would touch the production `:latest`; the auto-update *mechanism* is phase-2-proven on llunde-01 — the parser-specific part is the ordering): `systemctl --user restart pyparser-review` must re-run migrate to completion first (PartOf + Requires/After) | migrate's `ExecMainStartTimestamp` advances; review healthy after | n/a |
 | 2.5 | Delete scratch box; fold every deviation into code/docs (fix-the-doc) | diff review | — |
 
 ## Step 3 — Cutover (lead, serial; announced maintenance window)

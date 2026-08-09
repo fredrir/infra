@@ -19,7 +19,7 @@ let
   # volumes precisely so restic sees plain files).
   valkeyVolumeData = "/home/llunde-backend/data/valkey";
   dumpDir = "/var/backup/llunde-backend";
-  asBackendUser = "${pkgs.util-linux}/bin/runuser -u llunde-backend -- env XDG_RUNTIME_DIR=/run/user/2001";
+  asBackendUser = "${pkgs.util-linux}/bin/runuser -u llunde-backend -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus";
   podman = "/run/current-system/sw/bin/podman";
 in
 {
