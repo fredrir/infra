@@ -56,6 +56,12 @@ in rec {
     inherit uid;
     container = {
       ContainerName = "pyparser-postgres";
+      # The Doppler-rendered PYPARSER_LLUNDE_DATABASE_URL says @postgres:5432 —
+      # compose's service name, which prod compose keeps using until cutover.
+      # Quadlet DNS resolves ContainerName, so alias the old name rather than
+      # fork the Doppler value (rehearsal finding: alembic could not resolve
+      # 'postgres' and the whole app chain failed its dependency start).
+      NetworkAlias = "postgres";
       Environment = [
         "POSTGRES_USER=pyparser"
         "POSTGRES_DB=pyparser_llunde"

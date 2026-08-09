@@ -27,7 +27,7 @@ Network `pyparser` (one per-user network, non-Internal — go-live fix 7). The f
 
 | Unit | From compose service | Carry-over knobs |
 |---|---|---|
-| `pyparser-postgres` | `postgres` (postgres:17-alpine) | volume `pyparser-pgdata`; `shm_size 256m` → `ShmSize=`; run as own uid for `:U` (go-live fix 5); healthcheck pg_isready |
+| `pyparser-postgres` | `postgres` (postgres:17-alpine) | volume `pyparser-pgdata`; `shm_size 256m` → `ShmSize=`; run as own uid for `:U` (go-live fix 5); healthcheck pg_isready; `NetworkAlias=postgres` (the Doppler DATABASE_URL's host — rehearsal finding) |
 | `pyparser-migrate` | *(new, oneshot)* | same image, `Exec=alembic upgrade head`; `After=pyparser-postgres` + healthy; app units `Requires=`+`After=` it |
 | `pyparser-review` | `review` | :8081 on the pod network only; `PYPARSER_DOCLING_NUM_THREADS=1`; HealthCmd curl healthz |
 | `pyparser-worker-extract` | `worker-extract` | `MemoryMax=6g` `CPUQuota=300%` `TimeoutStopSec=90`; stages EXTRACT, concurrency 1, docling threads 3, doctr resident; healthcheck off |
