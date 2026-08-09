@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars (gitignored). hcloud_token comes from the
+# environment (TF_VAR_hcloud_token), never from this file.
+region              = "eu-north-1"
+dataset_bucket_name = "llunde-pyparser-bucket"
