@@ -1,0 +1,72 @@
+# Declarative imports of the existing llunde.no records (phase-3 step 2).
+# Ids are <zone_id>/<record_id> from the zone listing at import time. Kept
+# after the apply as the audit trail, same as the server import block.
+
+locals {
+  cf_zone = "4ae54b24fc4140d4d1c450491645f1c8"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.a["llunde.no"]
+  id = "${local.cf_zone}/e257b8b6cfdc0b530f5b9179a519f82d"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.a["www.llunde.no"]
+  id = "${local.cf_zone}/9417d77e16d3f3262abdaa7ee4ec051e"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.a["api.llunde.no"]
+  id = "${local.cf_zone}/56c731500066e7e3d03baa85775eefbf"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.aaaa["llunde.no"]
+  id = "${local.cf_zone}/5de6fdf8d78da700afc150685ea59ad7"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.aaaa["www.llunde.no"]
+  id = "${local.cf_zone}/bb5d6bac8e1533638d4934bd4298e59c"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.aaaa["api.llunde.no"]
+  id = "${local.cf_zone}/e32a05f883f439e8100fe219fa3c5c0d"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.tunnel_cname["parser.llunde.no"]
+  id = "${local.cf_zone}/0d50fbb4e9e2f35cbca26553d142e868"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.tunnel_cname["external.llunde.no"]
+  id = "${local.cf_zone}/3468bf8dbf2fd8def438fc8001da1035"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.ses_dkim["3a3cp6jxlzhfahnvx5rj6pjb3f55rn4f"]
+  id = "${local.cf_zone}/2c78ce505d031b79479e021d1c64938a"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.ses_dkim["63zt7tsduuapiy4tttuh2pyidd237aoe"]
+  id = "${local.cf_zone}/1bad8d77dcf271ff4070ddf23bd35b83"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.ses_dkim["qtpkbhn7eweqzxahnj5ydaeihstnrcel"]
+  id = "${local.cf_zone}/1d99f35ced15e59203020378a5ef311d"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.spf
+  id = "${local.cf_zone}/14c50bdcde0f4e7e1e1aa95f52d1aa6e"
+}
+
+import {
+  to = module.cloudflare.cloudflare_dns_record.dmarc
+  id = "${local.cf_zone}/86077ea93a4f19c812c3109de2f3f50c"
+}

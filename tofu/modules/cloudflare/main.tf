@@ -39,4 +39,45 @@ resource "cloudflare_dns_record" "tunnel_cname" {
   content = "${var.pyparser_tunnel_id}.cfargotunnel.com"
   proxied = true
   ttl     = 1
+  comment = lookup({
+    "external.llunde.no" = "pyparser Convert public share origin"
+  }, each.value, null)
+}
+
+# ---- Email (Amazon SES domain identity) ----
+# Found in the zone during the phase-3 import audit; imported verbatim.
+
+locals {
+  ses_dkim_tokens = toset([
+    "3a3cp6jxlzhfahnvx5rj6pjb3f55rn4f",
+    "63zt7tsduuapiy4tttuh2pyidd237aoe",
+    "qtpkbhn7eweqzxahnj5ydaeihstnrcel",
+  ])
+}
+
+resource "cloudflare_dns_record" "ses_dkim" {
+  for_each = local.ses_dkim_tokens
+
+  zone_id = var.zone_id
+  name    = "${each.value}._domainkey.llunde.no"
+  type    = "CNAME"
+  content = "${each.value}.dkim.amazonses.com"
+  proxied = false
+  ttl     = 1
+}
+
+resource "cloudflare_dns_record" "spf" {
+  zone_id = var.zone_id
+  name    = "llunde.no"
+  type    = "TXT"
+  content = "\"v=spf1 include:amazonses.com ~all\""
+  ttl     = 1
+}
+
+resource "cloudflare_dns_record" "dmarc" {
+  zone_id = var.zone_id
+  name    = "_dmarc.llunde.no"
+  type    = "TXT"
+  content = "\"v=DMARC1; p=none; rua=mailto:fhansteen@gmail.com\""
+  ttl     = 1
 }
