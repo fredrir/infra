@@ -39,8 +39,12 @@
       python3
       rsync
     ];
-    # bootstrap.sh parity (its install.sh expects these to exist).
+    # bootstrap.sh parity (its install.sh expects these to exist). Every path
+    # level is listed: tmpfiles creates unlisted parents as root and then
+    # refuses its own unsafe ownership transition (cutover finding).
     homeDirectories = [
+      ".config"
+      ".config/containers"
       ".config/containers/systemd"
       ".config/portfolio"
       "caddy"
