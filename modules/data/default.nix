@@ -23,9 +23,11 @@ let
   networkUnit = quadlet.mkNetworkUnit {
     name = "llunde-backend-data";
     inherit uid;
-    # Internal=true: no external routing; aardvark DNS still resolves container
-    # names on the network (verify at go-live — documented in the runbook).
-    network.Internal = true;
+    # NOT Internal (go-live finding, the stream-B2 fallback): the backend shares
+    # this network and an Internal network's aardvark answers all DNS without
+    # upstream, killing api.doppler.com/GHCR lookups. Isolation holds via the
+    # user boundary and zero published ports on postgres/valkey.
+    network = { };
     install.WantedBy = [ "default.target" ];
   };
 
