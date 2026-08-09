@@ -78,6 +78,12 @@ in
       gid = t.uid;
     }) cfg;
 
+    # Tenant scripts are FHS-shaped (#!/bin/bash — including sshd forced
+    # commands, which exec the script directly, so "run it via bash" is not
+    # an option). envfs resolves /bin and /usr/bin shebangs from PATH
+    # (cutover finding).
+    services.envfs.enable = true;
+
     systemd.tmpfiles.rules = lib.concatLists (
       lib.mapAttrsToList (
         name: t: map (d: "d /home/${name}/${d} 0700 ${name} ${name} -") t.homeDirectories
