@@ -1,7 +1,7 @@
 # ============================================================
 # pyparser AWS — S3 dataset bucket + IAM. This is the only AWS infra left after
-# the move to Hetzner: compute + Postgres run on the Hetzner box (see hetzner.tf
-# and PROD.md); Cloudflare is managed outside Terraform (see CLOUDFLARE.md).
+# the move to Hetzner: compute + Postgres run on the Hetzner box (see
+# parser-server.tf and docs/pyparser/PROD.md).
 # ============================================================
 
 # ---- S3: harden the EXISTING dataset bucket (reference, don't recreate) ----

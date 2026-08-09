@@ -41,7 +41,7 @@ as a module test bench, not a full dress rehearsal.
 
 ```sh
 cd <repo-root>
-doppler run --project pyparser --config prd -- tofu -chdir=tofu/llunde apply
+doppler run --project pyparser --config prd -- tofu -chdir=tofu apply
 ```
 
 Expected plan (same set proven in phase 1): **1 to import** (`hcloud_server.llunde_01` = existing 132168416), **2 to add** (firewall `llunde-fw` 22/80/443 + attachment), **1 to change** (rename `llunde-cpx22` → `llunde-01`). Nothing here touches disk contents. Confirm `hcloud server describe 132168416 | grep -i name` shows `llunde-01`.
@@ -169,6 +169,6 @@ ssh root@<TAILNET_IP> "podman exec -i -u postgres llunde-postgres psql -U llunde
 
 1. Hetzner Cloud console (web VNC) — always works, no network path needed. `hcloud server request-console <name>` or the dashboard. Root password login is disabled; use the console for single-user/rescue boot, or:
 2. `hcloud server enable-rescue <name> && hcloud server reset <name>` — boots the rescue system with your Hetzner SSH key on public 22 (rescue ignores the cloud firewall's intent by being a different boot target — still gated by the firewall, so pair with step 3).
-3. Re-open 22 temporarily: add the `port = "22"` rule back in `tofu/llunde/firewall.tf` (llunde-01) or `tofu/pyparser/server.tf`'s firewall (llunde-parser), `tofu apply`. **llunde-parser only**: also `ufw allow 22` once you're in. Revert both when done — the closed state is the committed one.
+3. Re-open 22 temporarily: add the `port = "22"` rule back in `tofu/llunde-firewall.tf` (llunde-01) or `tofu/parser-server.tf` (llunde-parser), `tofu apply`. **llunde-parser only**: also `ufw allow 22` once you're in. Revert both when done — the closed state is the committed one.
 
 llunde-01's NixOS host firewall never listed 22 for the public interface after closure (`modules/profiles/server.nix`); `tailscale0` is a trusted interface, so sshd stays reachable over the tailnet regardless.

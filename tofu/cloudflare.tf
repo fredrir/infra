@@ -4,7 +4,7 @@
 provider "cloudflare" {}
 
 module "cloudflare" {
-  source = "../modules/cloudflare"
+  source = "./modules/cloudflare"
 
   zone_id            = "4ae54b24fc4140d4d1c450491645f1c8"
   ipv4               = hcloud_server.llunde_01.ipv4_address

@@ -37,4 +37,4 @@ Rotate by creating a new token and replacing it where it lives (sops-nix file fo
 
 - **Never casually rotate** `TUNNEL_TOKEN` (pyparser `prd`) or the pyparser AWS access key — rotating drops the Cloudflare tunnel / breaks S3 backups. The llunde tunnel token becomes irrelevant when phase 2 retires that tunnel ([docs/cloudflare.md](cloudflare.md)).
 - Doppler injects `DOPPLER_PROJECT/CONFIG/ENVIRONMENT` metadata into every render — harmless extra env vars.
-- pyparser parity check (host file vs Doppler): see `tofu/pyparser/PROD.md`.
+- pyparser parity check (host file vs Doppler): see `docs/pyparser/PROD.md`.
