@@ -102,6 +102,7 @@
         Environment=VALKEY_PORT=6379
         Environment=CORS_ALLOWED_ORIGINS=https://llunde.no
         Environment=JAVA_OPTS=-Xmx640m
+        Environment=HOME=/tmp
         EnvironmentFile=/run/secrets/doppler.env
         EnvironmentFile=/run/secrets/llunde-backend-db.env
         Image=ghcr.io/fredrir/llunde-backend:latest

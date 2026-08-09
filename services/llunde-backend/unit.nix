@@ -37,6 +37,8 @@ rec {
         "VALKEY_PORT=6379"
         "CORS_ALLOWED_ORIGINS=https://llunde.no"
         "JAVA_OPTS=-Xmx640m"
+        # Doppler CLI needs a writable config dir; the image user has no home (go-live finding).
+        "HOME=/tmp"
       ];
       EnvironmentFile = [
         "/run/secrets/doppler.env"
