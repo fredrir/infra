@@ -13,7 +13,7 @@ This directory is the complete plan for rebuilding llunde's infrastructure as a 
 | [`plans/phase-1/`](plans/phase-1/README.md) | **Repo surgery** — full plan (README + tasks) |
 | [`plans/phase-2/`](plans/phase-2/README.md) | **llunde-01 goes live** — full plan (README + tasks) |
 | [`plans/phase-3/`](plans/phase-3/README.md) | **pyparser groundwork, one management plane** — full plan (README + tasks); rescoped after the phase-2 gate |
-| [`plans/phase-3.5/`](plans/phase-3.5/README.md) | **The final push to full NixOS** (llunde-parser incl. pyparser + portfolio tenant) — top-level; detailed after 3 lands |
+| [`plans/phase-3.5/`](plans/phase-3.5/README.md) | **The final push to full NixOS** (llunde-parser incl. pyparser + portfolio tenant) — **full plan** (README + contract + tasks) |
 | [`plans/phase-4/`](plans/phase-4/README.md) | **GitOps, Cloudflare edge, observability collection** — top-level only |
 
 ## Ownership map
