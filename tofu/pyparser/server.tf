@@ -10,8 +10,8 @@ module "server" {
   image         = "ubuntu-24.04"
   firewall_name = "pyparser-parser-fw"
 
-  inbound_rules = [
-    { port = "22", description = "SSH" },
-  ]
+  # No public inbound at all: web ingress is the Cloudflare tunnel (outbound),
+  # SSH rides the tailnet (ADR 015). Re-open procedure: runbook §11.
+  inbound_rules = []
   # delete_protection / rebuild_protection default to true in the module.
 }

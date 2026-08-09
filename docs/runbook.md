@@ -148,7 +148,7 @@ ssh root@<TAILNET_IP> reboot && sleep 90 && curl -s https://api.llunde.no/ready
 ## 9. Update & rollback
 
 - **App images**: pull-based — per-user `podman-auto-update.timer` polls GHCR `:latest` (`AutoUpdate=registry`). Manual poke: §8's `systemctl --user -M <user>@ start podman-auto-update.service`. Pin/rollback an image: set the unit's `Image=` to a digest in `services/<name>/default.nix`, deploy (§6).
-- **Config**: `nixos-rebuild --rollback switch` on the host, or pick the previous generation in the GRUB menu; every deploy is a new generation.
+- **Config**: `nixos-rebuild --rollback switch` on the host, or pick the previous generation in the systemd-boot menu; every deploy is a new generation.
 
 ## 10. Restore from backup (rehearse once at the gate)
 
@@ -161,6 +161,14 @@ ssh root@<TAILNET_IP> "podman exec -i -u postgres llunde-postgres psql -U llunde
 # valkey: stop unit, replace appendonly dir from restore, start unit
 ```
 
-## 11. Break-glass SSH & port-22 closure (post-gate Should)
+## 11. Break-glass SSH & port-22 posture (ADR 015)
 
-Port 22 stays open (keys-only) through go-live. After days of routine Tailscale-only access: remove the `port = "22"` rule from `tofu/llunde/firewall.tf`, `tofu apply`, and update this section to state 22 is closed (re-open the same way if the tailnet ever locks you out — Hetzner console remains the final fallback).
+**Public port 22 is closed on both boxes** (phase 3). Every SSH consumer rides the tailnet: laptop (`ssh root@llunde-01` / `root@llunde-parser.tail0b6cbe.ts.net`), pyparser CI, portfolio CI (each joins per-run with an ephemeral `tag:ci` key).
+
+**Break-glass, per host** (tailnet down or node expired):
+
+1. Hetzner Cloud console (web VNC) — always works, no network path needed. `hcloud server request-console <name>` or the dashboard. Root password login is disabled; use the console for single-user/rescue boot, or:
+2. `hcloud server enable-rescue <name> && hcloud server reset <name>` — boots the rescue system with your Hetzner SSH key on public 22 (rescue ignores the cloud firewall's intent by being a different boot target — still gated by the firewall, so pair with step 3).
+3. Re-open 22 temporarily: add the `port = "22"` rule back in `tofu/llunde/firewall.tf` (llunde-01) or `tofu/pyparser/server.tf`'s firewall (llunde-parser), `tofu apply`. **llunde-parser only**: also `ufw allow 22` once you're in. Revert both when done — the closed state is the committed one.
+
+llunde-01's NixOS host firewall never listed 22 for the public interface after closure (`modules/profiles/server.nix`); `tailscale0` is a trusted interface, so sshd stays reachable over the tailnet regardless.

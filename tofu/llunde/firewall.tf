@@ -1,15 +1,7 @@
-# Target rule set: 22 (break-glass SSH until Tailscale is proven, ADR 008),
-# 80/443 (Caddy, ADR 006). The live firewall is currently SSH-only
-# (research/current-state.md) — 80/443 open when phase 2 applies this.
+# Rule set: 80/443 only (Caddy, ADR 006). Public 22 closed in phase 3 —
+# all SSH rides the tailnet (ADR 015); re-open procedure in runbook §11.
 resource "hcloud_firewall" "llunde_fw" {
   name = "llunde-fw"
-
-  rule {
-    direction  = "in"
-    protocol   = "tcp"
-    port       = "22"
-    source_ips = ["0.0.0.0/0", "::/0"]
-  }
 
   rule {
     direction  = "in"

@@ -11,8 +11,8 @@
   time.timeZone = "UTC";
 
   # Root login stays enabled (keys only) — management is root-over-tailnet
-  # (ADR 008); port 22 is break-glass until the phase-2 gate proves Tailscale,
-  # then the firewall closes it (runbook).
+  # (ADR 008/015). sshd listens, but only the tailnet reaches it: 22 is not
+  # in the public firewall here or in Hetzner's (runbook §11 to re-open).
   services.openssh = {
     enable = true;
     settings = {
@@ -29,7 +29,6 @@
   networking.firewall = {
     enable = true;
     allowedTCPPorts = [
-      22
       80
       443
     ];
