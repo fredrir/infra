@@ -12,7 +12,8 @@ This directory is the complete plan for rebuilding llunde's infrastructure as a 
 | [`../research/`](../research/) | Facts the plan rests on: repo/infra audit, mechanics notes |
 | [`plans/phase-1/`](plans/phase-1/README.md) | **Repo surgery** — full plan (README + tasks) |
 | [`plans/phase-2/`](plans/phase-2/README.md) | **llunde-01 goes live** — full plan (README + tasks) |
-| [`plans/phase-3/`](plans/phase-3/README.md) | **pyparser, carefully, last** — top-level only; detailed after 1–2 land |
+| [`plans/phase-3/`](plans/phase-3/README.md) | **pyparser groundwork, one management plane** — full plan (README + tasks); rescoped after the phase-2 gate |
+| [`plans/phase-3.5/`](plans/phase-3.5/README.md) | **The final push to full NixOS** (llunde-parser incl. pyparser + portfolio tenant) — top-level; detailed after 3 lands |
 | [`plans/phase-4/`](plans/phase-4/README.md) | **GitOps, Cloudflare edge, observability collection** — top-level only |
 
 ## Ownership map
@@ -27,7 +28,8 @@ This directory is the complete plan for rebuilding llunde's infrastructure as a 
 | Ingress / TLS | Caddy under `edge`, only 80/443 public — [ADR 006](../decisions/006-caddy-ingress.md) |
 | Bootstrap secrets | sops-nix (3 secrets only) — [ADR 007](../decisions/007-sops-nix-bootstrap.md) |
 | Runtime secrets | Doppler (host-side wrapper; app reads env) |
-| Management access | Tailscale; staged port-22 closure — [ADR 008](../decisions/008-tailscale-management.md) |
+| Management access | Tailscale for humans and CI; port 22 retired — [ADR 008](../decisions/008-tailscale-management.md), [015](../decisions/015-tailnet-only-management.md) |
+| Self-deploying tenants (portfolio) | Slot only (`modules/tenants/`): user + deps, tenant owns the rest — [ADR 016](../decisions/016-tenant-slots-host-uniformity.md) |
 | CI | Reusable workflows here; pull-based deploy via auto-update — [ADR 010](../decisions/010-shared-ci-reusable-workflows.md) |
 | Backups | restic → S3, per-service module options — [ADR 011](../decisions/011-backups-restic-module.md) |
 | Edge (Cloudflare) | DNS-only now; proxy/WAF phase 4 — [ADR 012](../decisions/012-cloudflare-strategy.md) |
