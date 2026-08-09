@@ -23,7 +23,10 @@ let
   podman = "/run/current-system/sw/bin/podman";
 in
 {
-  config = lib.mkIf config.llunde.backups.enable {
+  # Presence-gated (phase-3.5): this job only exists on hosts that actually run
+  # llunde-backend — backups.enable alone would run `runuser -u llunde-backend`
+  # on llunde-parser, where uid 2001 is pyparser.
+  config = lib.mkIf (config.llunde.backups.enable && (config.llunde.users.services ? llunde-backend)) {
     systemd.tmpfiles.rules = [ "d ${dumpDir} 0700 root root -" ];
 
     llunde.backups.jobs.llunde-backend = {

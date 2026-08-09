@@ -7,6 +7,7 @@
     # and the box hangs before finding its root disk (go-live finding).
     (modulesPath + "/profiles/qemu-guest.nix")
     ./disko.nix
+    ./secrets.nix
     ../../modules/profiles/server.nix
     ../../modules/users
     ../../modules/tailscale
@@ -21,6 +22,12 @@
   ];
 
   networking.hostName = "llunde-01";
+
+  # Caddy's public ports (ADR 006); llunde-parser opens none (ADR 015).
+  llunde.profile.publicTCPPorts = [
+    80
+    443
+  ];
 
   # Fixed uids are contract values (docs/init/plans/phase-2/contract.md);
   # quadlet paths /etc/containers/systemd/users/<uid>/ depend on them.

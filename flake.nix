@@ -140,6 +140,15 @@
         ];
       };
 
+      nixosConfigurations.llunde-parser = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          disko.nixosModules.disko
+          sops-nix.nixosModules.sops
+          ./hosts/llunde-parser
+        ];
+      };
+
       checks.x86_64-linux.mkquadlet-render = mkRenderCheck "x86_64-linux";
       checks.aarch64-linux.mkquadlet-render = mkRenderCheck "aarch64-linux";
     };

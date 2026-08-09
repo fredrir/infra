@@ -20,6 +20,20 @@ in
             default = true;
             description = "Start the user's systemd instance at boot (rootless quadlets).";
           };
+          subUidStart = lib.mkOption {
+            type = lib.types.nullOr lib.types.int;
+            default = null;
+            description = ''
+              Explicit subuid/subgid range start. Set on multi-rootless-user
+              hosts: NixOS auto-allocation begins at 100000 and collides with
+              any explicitly-ranged neighbor (phase-3.5 contract).
+            '';
+          };
+          subUidCount = lib.mkOption {
+            type = lib.types.int;
+            default = 65536;
+            description = "Explicit subuid/subgid range size (with subUidStart).";
+          };
         };
       }
     );
@@ -31,13 +45,35 @@ in
   };
 
   config = {
-    users.users = lib.mapAttrs (name: svc: {
-      uid = svc.uid;
-      isNormalUser = true;
-      group = name;
-      linger = svc.linger;
-      autoSubUidGidRange = true;
-    }) cfg;
+    users.users = lib.mapAttrs (
+      name: svc:
+      {
+        uid = svc.uid;
+        isNormalUser = true;
+        group = name;
+        linger = svc.linger;
+      }
+      // (
+        if svc.subUidStart != null then
+          {
+            autoSubUidGidRange = false;
+            subUidRanges = [
+              {
+                startUid = svc.subUidStart;
+                count = svc.subUidCount;
+              }
+            ];
+            subGidRanges = [
+              {
+                startGid = svc.subUidStart;
+                count = svc.subUidCount;
+              }
+            ];
+          }
+        else
+          { autoSubUidGidRange = true; }
+      )
+    ) cfg;
 
     users.groups = lib.mapAttrs (_name: svc: {
       gid = svc.uid;

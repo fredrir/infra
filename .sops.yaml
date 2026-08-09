@@ -1,13 +1,27 @@
 # sops-nix bootstrap secrets (ADR 007). Recipients are age keys:
 #  - admin: the owner's personal age key (~/.config/sops/age/keys.txt, generated 2026-08-09)
-#  - llunde-01: derived from the host's ssh-ed25519 host key AFTER the phase-2
-#    install (`ssh-keyscan llunde-01 | ssh-to-age`), then re-encrypt with
-#    `sops updatekeys secrets/*.yaml`.
-# Placeholders below are replaced at go-live (tasks.md step 2.2).
+#  - llunde-01: derived from that host's ssh-ed25519 host key (phase-2 install)
+#  - llunde-parser: derived from the PRE-GENERATED host key (phase-3.5 step 0.2;
+#    injected at install via nixos-anywhere --extra-files, same as llunde-01)
+# Per-host rules: a host can only decrypt its own secrets; tailscale.yaml and
+# ghcr.yaml are shared by both. After editing recipients here, re-encrypt with
+# `sops updatekeys secrets/<file>.yaml`.
 keys:
   - &admin age13upkqrd7v97a4gcgerwnkuwvznxh60u2g56x6cj55hemwq68q3lsalynwn
   - &llunde-01 age1thj000t9nt90g7m23tpkz3krt3h5aurj8euayvqs3kq48geaxahs3e0q3r
+  - &llunde-parser age1zap47wruuc6wp387hpqq2chdx0uavt3jt0xystjn29rxgvljmplqectmnz
 creation_rules:
+  - path_regex: secrets/pyparser-.*\.yaml$
+    key_groups:
+      - age:
+          - *admin
+          - *llunde-parser
+  - path_regex: secrets/(tailscale|ghcr)\.yaml$
+    key_groups:
+      - age:
+          - *admin
+          - *llunde-01
+          - *llunde-parser
   - path_regex: secrets/.*\.yaml$
     key_groups:
       - age:
