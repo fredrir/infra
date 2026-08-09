@@ -134,13 +134,13 @@
         [Container]
         AutoUpdate=registry
         ContainerName=pyparser-review
-        NetworkAlias=review
         Environment=PYPARSER_ENV=production
         Environment=PYPARSER_DOCLING_NUM_THREADS=1
         EnvironmentFile=/run/pyparser/secrets.env
         HealthCmd=curl -fsS http://localhost:8081/healthz
         Image=ghcr.io/fredrir/pyparser-review:latest
         Network=pyparser.network
+        NetworkAlias=review
         Volume=pyparser-files:/app/.local/files
 
         [Service]
@@ -228,5 +228,9 @@
 
       checks.x86_64-linux.mkquadlet-render = mkRenderCheck "x86_64-linux";
       checks.aarch64-linux.mkquadlet-render = mkRenderCheck "aarch64-linux";
+      # The laptop is aarch64-darwin: without this, local `nix flake check`
+      # skips the goldens as "incompatible" and passes vacuously — exactly how
+      # a golden drift reached main on the gate's first run (gate finding).
+      checks.aarch64-darwin.mkquadlet-render = mkRenderCheck "aarch64-darwin";
     };
 }
