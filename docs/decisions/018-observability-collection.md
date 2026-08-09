@@ -27,5 +27,6 @@ Measured sizing at this estate's scale (two hosts, ~15 containers, a few thousan
 ## Consequences
 
 - The estate gains metric history, cross-host log search (the Dozzle replacement, better), and its first alerting — the "is it healthy?" question stops requiring a laptop and SSH.
-- llunde-parser becomes operationally load-bearing for observing llunde-01; if llunde-parser is down, so are the dashboards — accepted (alerts about llunde-parser itself must come from a path that does not require it, e.g. a dead-man's-switch style heartbeat, decided at authoring).
+- llunde-parser becomes operationally load-bearing for observing llunde-01; if llunde-parser is down, so are the dashboards. Covered by a **named, gate-tested external dead-man** (second-opinion requirement): the alert pipeline pings an external heartbeat service; a missed ping notifies the owner from outside the estate. The gate proves it: stopping the stack must notify within 15 minutes.
+- **Shared failure domain, stated plainly**: metrics, logs, and management SSH all ride tailscaled — a tailscale outage looks like host-down from inside. The external dead-man plus the public-path blackbox probe (which egresses via the CF edge, not the tailnet) are the disambiguators.
 - Backups: dashboards/alert rules are declarative (provisioned from the repo); Prometheus/Loki data is deliberately NOT backed up — telemetry is rebuildable history, not data of record.

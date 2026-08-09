@@ -22,6 +22,7 @@ ADR 012 rejected tunnel ingress for llunde-01 "for this box" on two grounds: it 
 - **Real client IP**: the same work orange-cloud would have needed, with two traps the plan review pinned down — Caddy's tunnel listener makes `CF-Connecting-IP` the rightmost XFF client entry (unmapped, every bucket keys on cloudflared's 127.0.0.1), **scoped to that listener only** (on the still-open public path the header is attacker-supplied), and sets `X-Forwarded-Proto=https` (the plain-HTTP hop otherwise breaks Secure cookies and CSRF origin checks). The backend's rotating-XFF test proves the whole chain on a Host-overridden test hostname BEFORE the DNS flip. This is the exact bug class the backend's external review caught; the verification is not optional.
 - **WAF/bot filtering**: available on tunneled hostnames exactly as on orange-cloud — the original phase-4 goal arrives as a side effect.
 - **The tunnel token** is a llunde-01 sops secret (env form), never rotated casually (the standing tunnel rule).
+- **The connector image is pinned by digest** (second-opinion requirement): pyparser's `:latest` cloudflared predates this ADR and must not extend to the front door — a broken upstream release would take the site down; updates are deliberate digest bumps. The alternative of keeping certs warm via DNS-01 (custom Caddy build with the CF plugin) was considered and declined — break-glass consciously pays the documented TLS-outage window instead of carrying that complexity.
 
 ## Alternatives considered
 
