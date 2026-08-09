@@ -140,6 +140,10 @@ in rec {
     container = {
       AutoUpdate = "registry";
       ContainerName = "pyparser-review";
+      # The tunnel's remote-managed ingress targets http://review:8081 —
+      # compose's service name (cutover finding, the postgres alias's twin:
+      # Access's edge 302 masked it until the un-Access'd share origin 502'd).
+      NetworkAlias = "review";
       Environment = [
         "PYPARSER_ENV=production"
         "PYPARSER_DOCLING_NUM_THREADS=1"

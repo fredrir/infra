@@ -134,6 +134,7 @@
         [Container]
         AutoUpdate=registry
         ContainerName=pyparser-review
+        NetworkAlias=review
         Environment=PYPARSER_ENV=production
         Environment=PYPARSER_DOCLING_NUM_THREADS=1
         EnvironmentFile=/run/pyparser/secrets.env
