@@ -64,6 +64,11 @@
 
   llunde.tailscale.enable = true;
 
+  # podman's per-user wait-network-online polls the SYSTEM network-online.target
+  # (podman#22197); nothing pulls it in by default with dhcpcd, so every user
+  # quadlet queues forever without this (go-live finding).
+  systemd.targets.network-online.wantedBy = [ "multi-user.target" ];
+
   # Declarative-only user database (ADR 001): every user/group comes from this
   # config; imperative useradd on the box is rejected at the next switch.
   users.mutableUsers = false;
