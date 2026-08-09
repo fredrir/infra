@@ -1,0 +1,153 @@
+# Runbook — bare Hetzner server → serving llunde
+
+Executed literally at the phase-2 go-live and re-executed on any reprovision.
+**Every deviation discovered during execution is a documentation bug — fix it here, on the spot** ([phase-2 tasks 2.4](init/plans/phase-2/tasks.md)).
+
+Values in `<ANGLE_BRACKETS>` are fill-ins; each states its source. Amounts of ceremony that look skippable are not — the order is load-bearing (secrets must exist *before* install because the host key is pre-generated and injected).
+
+---
+
+## 1. Prerequisites (laptop, one-time)
+
+Nix is **not** installed on the Mac; every nix command runs through the podman wrapper used throughout this repo:
+
+```sh
+alias nixc='podman run --rm -v "$PWD":/work -w /work docker.io/nixos/nix:latest \
+  sh -c "git config --global safe.directory /work && nix --extra-experimental-features \"nix-command flakes\" \"\$@\"" --'
+# usage: nixc flake check
+```
+
+1. Tools: `brew install opentofu sops age ssh-to-age awscli` · `hcloud` CLI authenticated (`hcloud server list` shows 132168416) · `doppler` logged in · podman machine running.
+2. Owner age key (one-time, this is a real credential — back it up):
+   ```sh
+   mkdir -p ~/.config/sops/age && age-keygen -o ~/.config/sops/age/keys.txt
+   # note the "public key: age1..." line -> <OWNER_AGE_PUBLIC_KEY>
+   ```
+3. Hetzner token for tofu (from the hcloud CLI config):
+   ```sh
+   export TF_VAR_hcloud_token=$(awk -F'"' '/^[[:space:]]*token/ {print $2; exit}' ~/.config/hcloud/cli.toml)
+   ```
+4. AWS env for the S3 state backend comes from Doppler on every tofu call: prefix commands with `doppler run --project pyparser --config prd --`.
+
+## 2. Provision (tofu apply — safe pre-wipe: rename + firewall only)
+
+```sh
+cd <repo-root>
+doppler run --project pyparser --config prd -- tofu -chdir=tofu/llunde apply
+```
+
+Expected plan (same set proven in phase 1): **1 to import** (`hcloud_server.llunde_01` = existing 132168416), **2 to add** (firewall `llunde-fw` 22/80/443 + attachment), **1 to change** (rename `llunde-cpx22` → `llunde-01`). Nothing here touches disk contents. Confirm `hcloud server describe 132168416 | grep -i name` shows `llunde-01`.
+
+## 3. Pre-generate host identity & secrets (BEFORE install)
+
+The host's SSH key is created *by us* and injected at install, so sops-decryption works from first boot (ADR 007).
+
+1. Generate the host key locally (kept only until injected, then deleted):
+   ```sh
+   mkdir -p /tmp/llunde-01-keys/etc/ssh
+   ssh-keygen -t ed25519 -N "" -C llunde-01 -f /tmp/llunde-01-keys/etc/ssh/ssh_host_ed25519_key
+   ssh-to-age < /tmp/llunde-01-keys/etc/ssh/ssh_host_ed25519_key.pub   # -> <HOST_AGE_PUBLIC_KEY>
+   ```
+2. Edit `.sops.yaml`: replace `age1PLACEHOLDER_OWNER_KEY` → `<OWNER_AGE_PUBLIC_KEY>`, `age1PLACEHOLDER_HOST_KEY` → `<HOST_AGE_PUBLIC_KEY>`.
+3. Create the four secret files (`sops secrets/<name>.yaml` opens an editor; exact keys below are final, from `modules/secrets/default.nix`):
+   - `secrets/doppler.yaml` — key `doppler_token`, value in **env-file form** (it lands as an EnvironmentFile):
+     `DOPPLER_TOKEN=<token>` where the token comes from
+     `doppler configs tokens create llunde-01 --project llunde --config prd --plain --max-age 0`
+   - `secrets/tailscale.yaml` — key `auth_key`, value from the Tailscale admin console → Settings → Keys → *Auth keys* → Generate (reusable: no, ephemeral: no, tags optional).
+   - `secrets/restic.yaml` — two keys: `password` (from `openssl rand -base64 32`) and `env` in env-file form:\n     `AWS_ACCESS_KEY_ID=...`, `AWS_SECRET_ACCESS_KEY=...`, `AWS_DEFAULT_REGION=eu-north-1` — **decision (recorded)**: v1 reuses the `leploy` credentials from Doppler `pyparser/prd` (object-level S3 rights suffice); a dedicated backup IAM user is a hardening follow-up (contract.md).
+   - `secrets/llunde-backend-db.yaml` — key `env`, value in env-file form (contract.md): `POSTGRES_PASSWORD`/`DB_PASSWORD` = `openssl rand -base64 24` (same value), optional `VALKEY_PASSWORD`.
+4. Mirror `DB_PASSWORD` (and `VALKEY_PASSWORD` if set) into Doppler `llunde/prd` so app-level and infra views agree.
+5. `git add -A && git commit -m "phase 2: real sops recipients + secrets"` (ciphertext only — verify `git diff --cached` shows only `sops`-encrypted content).
+
+## 4. Install NixOS (💥 DESTROYS THE BOX — old stack AND openclaw; accepted in ADR 001)
+
+Preconditions: step 2 applied; step 3 committed; you can `ssh root@46.62.214.182` (current alias `ssh llunde`).
+
+```sh
+nixc run github:nix-community/nixos-anywhere -- \
+  --flake .#llunde-01 \
+  --build-on-remote \
+  -i /root/.ssh/id_ed25519 \
+  --extra-files /tmp/llunde-01-keys \
+  root@46.62.214.182
+```
+
+Notes: run inside the podman wrapper with your SSH key mounted (`podman run -v ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro ...` added to the alias for this step); `--build-on-remote` is required (laptop container is aarch64, target is x86_64); nixos-anywhere kexecs into an installer, runs disko (single-disk ext4 wipe of `/dev/sda`), installs the flake's system, copies `--extra-files` (the host key) into place, reboots. ⚠️ Verify-at-execution: exact `-i`/`--extra-files` flag spellings against the nixos-anywhere version pulled.
+
+Afterwards: `rm -rf /tmp/llunde-01-keys` (the host key now lives only on the host). `ssh root@46.62.214.182` must present the ed25519 fingerprint you generated.
+
+## 5. Verify first boot & tailnet join
+
+```sh
+ssh root@46.62.214.182 systemctl --failed          # expect: 0 loaded units listed
+ssh root@46.62.214.182 ls /run/secrets/            # expect the four secrets materialized
+ssh root@46.62.214.182 tailscale status            # expect: joined, hostname llunde-01
+tailscale status | grep llunde-01                  # from the laptop -> <TAILNET_IP> (100.x.y.z)
+ssh root@<TAILNET_IP> true                         # management path works (ADR 008)
+```
+
+## 6. Deploy configuration changes (steady-state loop)
+
+Recommended (push from laptop; works while the repo is private):
+
+```sh
+git push && nixc-ssh nixos-rebuild switch --flake .#llunde-01 \
+  --target-host root@<TAILNET_IP> --build-host root@<TAILNET_IP>
+# nixc-ssh = the nixc alias + `-v ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro`
+```
+
+Alternative (on-host): `nixos-rebuild switch --flake github:fredrir/llunde-infra#llunde-01` — ⚠️ requires the private repo readable from the host (fine-grained PAT in `/etc/nix/netrc`); set that up only if the push flow annoys.
+
+After any change touching quadlet units, confirm regeneration: `ssh root@<TAILNET_IP> systemctl --user -M llunde-backend@ list-units 'llunde-*'` (matches the quadlet module's `systemctl --machine=<user>@ --user` hook).
+
+## 7. DNS cutover (Cloudflare dashboard, zone `llunde.no` = 4ae54b24fc4140d4d1c450491645f1c8)
+
+Precondition: `curl -H "Host: api.llunde.no" http://46.62.214.182/ready` answers (Caddy up; certificate not yet valid — that's expected until DNS).
+
+1. Delete the proxied CNAMEs `llunde.no` and `www.llunde.no` → tunnel `ed8abcdb-...cfargotunnel.com`.
+2. Add **grey-cloud (DNS only)**: `llunde.no` A `46.62.214.182`, AAAA `2a01:4f9:c014:cbe0::1`; `www` CNAME `llunde.no`; `api` A + AAAA same values.
+3. Wait for propagation (`dig +short llunde.no api.llunde.no`), let Caddy obtain Let's Encrypt certs, then run §8.
+4. Only after §8 passes: Zero Trust → Networks → Tunnels → delete the **llunde** tunnel (`ed8abcdb-508c-4d61-85b7-bc3127510e4b`). Do not touch the pyparser tunnel.
+
+## 8. Gate verification (phase-2 README, as commands)
+
+```sh
+curl -s https://api.llunde.no/ready                        # {"database":true,"valkey":true}
+curl -s -o /dev/null -w '%{http_code}\n' https://llunde.no # 200 (frontend)
+for p in metrics health ready; do curl -s -o /dev/null -w "$p %{http_code}\n" https://api.llunde.no/$p; done
+                                                           # blocked publicly (403/404) — except /ready if deliberately allowed: expect per stream C2's Caddyfile
+curl -s http://<TAILNET_IP>:<NODE_EXPORTER_PORT>/metrics | head -1   # reachable over tailnet only
+# auth lifecycle (backend gate, against prod):
+EMAIL="gate-$(date +%s)@example.com"
+curl -s -X POST https://api.llunde.no/auth/register -H 'Origin: https://llunde.no' -H 'X-CSRF-Token: t' \
+  -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"password\":\"correct horse battery\"}"   # 201
+# ...login/me/sessions/logout-all as in the backend runthrough; verify audit log shows YOUR real IP, not a proxy IP
+# isolation:
+ssh root@<TAILNET_IP> "sudo -u llunde-frontend curl -s --max-time 3 http://llunde-postgres:5432 || echo ISOLATED"
+# auto-update: push a trivial backend image change to main, wait for the timer (or poke:
+ssh root@<TAILNET_IP> systemctl --user -M llunde-backend@ start podman-auto-update.service
+# backups: force one run, list snapshots, restore one dump into a scratch db (stream D2's unit names):
+ssh root@<TAILNET_IP> systemctl start restic-backups-llunde-backend.service   # upstream restic module naming, confirmed
+# reboot test:
+ssh root@<TAILNET_IP> reboot && sleep 90 && curl -s https://api.llunde.no/ready
+```
+
+## 9. Update & rollback
+
+- **App images**: pull-based — per-user `podman-auto-update.timer` polls GHCR `:latest` (`AutoUpdate=registry`). Manual poke: §8's `systemctl --user -M <user>@ start podman-auto-update.service`. Pin/rollback an image: set the unit's `Image=` to a digest in `services/<name>/default.nix`, deploy (§6).
+- **Config**: `nixos-rebuild --rollback switch` on the host, or pick the previous generation in the GRUB menu; every deploy is a new generation.
+
+## 10. Restore from backup (rehearse once at the gate)
+
+```sh
+export RESTIC_REPOSITORY="s3:s3.eu-north-1.amazonaws.com/llunde-pyparser-bucket/<RESTIC_PREFIX>"   # from modules/backups
+restic snapshots            # password + AWS env from secrets/restic.yaml values
+restic restore latest --target /tmp/restore
+# postgres (dump file path per stream D2's preHook):
+ssh root@<TAILNET_IP> "podman exec -i -u postgres llunde-postgres psql -U llunde llunde" < /tmp/restore/<DUMP_PATH>
+# valkey: stop unit, replace appendonly dir from restore, start unit
+```
+
+## 11. Break-glass SSH & port-22 closure (post-gate Should)
+
+Port 22 stays open (keys-only) through go-live. After days of routine Tailscale-only access: remove the `port = "22"` rule from `tofu/llunde/firewall.tf`, `tofu apply`, and update this section to state 22 is closed (re-open the same way if the tailnet ever locks you out — Hetzner console remains the final fallback).
