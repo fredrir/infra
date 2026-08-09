@@ -7,7 +7,9 @@ Doppler is the source of truth for **application runtime secrets**. It is delibe
 | Project | `dev` | `prd` | `ci` |
 |---|---|---|---|
 | `llunde` | backend + frontend local dev | prod runtime env | build-time values for CI (e.g. `VITE_*` args) |
-| `pyparser` | local dev | prod runtime env (host-rendered) | deploy SSH host/key for the legacy workflow |
+| `pyparser` | local dev | prod runtime env (host-rendered) | deploy SSH host/key + Tailscale CI auth key for the deploy workflow |
+
+`llunde` also has an `ops` config (laptop-only operator secrets, phase 3): `CLOUDFLARE_API_TOKEN` — the zone-scoped DNS token tofu reads as an env var (`doppler secrets get CLOUDFLARE_API_TOKEN --project llunde --config ops --plain`). Never a host or CI secret.
 
 - `dev`/`prd` hold app runtime secrets; `ci` holds only what CI genuinely needs.
 - Tokens are read-only and scoped per config: a **host** gets a `prd` service token, **GitHub Actions** gets a `ci` token as a repo secret (`DOPPLER_TOKEN_LLUNDE_CI`, `DOPPLER_TOKEN_PYPARSER_CI`). A `prd` token cannot read `ci` secrets and vice versa.
