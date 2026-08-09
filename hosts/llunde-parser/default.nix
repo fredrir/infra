@@ -20,6 +20,11 @@
 
   networking.hostName = "llunde-parser";
 
+  # portfolio's install.sh probes `command -v cosign` in a ROOT shell and
+  # curl-installs into /usr/local/bin when missing — a path that cannot exist
+  # here. System-wide cosign keeps the guard true (cutover finding).
+  environment.systemPackages = [ pkgs.cosign ];
+
   # No public inbound at all (ADR 015): web ingress is the Cloudflare tunnel
   # (outbound), SSH rides the tailnet. publicTCPPorts stays its default [].
 
