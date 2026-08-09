@@ -208,11 +208,21 @@ reusable reprovision knowledge.
     root@<LLUNDE_PARSER_IP>
   ```
   ⚠️ **CRITICAL, before the new install's `tailscale up`** (i.e. immediately
-  after the wipe starts, [tasks 3.3](init/plans/phase-3.5/tasks.md)): delete
-  the stale `llunde-parser` node in the Tailscale admin console. The old
-  non-ephemeral record holds the MagicDNS name; skip this and the new box
-  joins as `llunde-parser-1` while every consumer (pyparser CI host secret,
-  portfolio's `DEPLOY_HOST`) resolves a corpse.
+  after the wipe starts, [tasks 3.3](init/plans/phase-3.5/tasks.md)): free the
+  `llunde-parser` MagicDNS name. **As executed (no console needed)**: from the
+  old box itself, `tailscale set --hostname llunde-parser-old` — the record
+  renames live, the name frees instantly (verify: the old FQDN stops
+  resolving), and the corpse record can be deleted from the console at
+  leisure. Skip this and the new box joins as `llunde-parser-1` while every
+  consumer (portfolio's `DEPLOY_HOST`, ssh aliases) resolves a corpse.
+
+  ⚠️ **The installer needs public 22** — after kexec the box runs the
+  nixos-anywhere installer, which has no tailscaled: an install over the
+  tailnet IP dies mid-flight. As executed: temporarily
+  `hcloud firewall add-rule` 22 (+ `ufw allow 22` while the old OS is still
+  Ubuntu), install against the **public** IP, then
+  `hcloud firewall replace-rules … <([])` back to zero-inbound once the new
+  system is up (the NixOS host firewall opens nothing regardless).
 - **§5 Verify**: same checks with hostname `llunde-parser` (four secrets in
   `/run/secrets/`, tailscale joined as **exactly** `llunde-parser`). Extra,
   per the zero-public-ports posture: `ss -tlnp` on the box shows no public
