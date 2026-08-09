@@ -13,7 +13,7 @@ managed out-of-band (`CLOUDFLARE.md`).
 > decommissioned. The S3 bucket + IAM policy are the only AWS pieces that carried over.
 
 ## Host facts
-- **SSH**: `root` (ssh alias `letzner`) for admin; `leploy` (alias `leploy`, in the
+- **SSH**: `root` (ssh alias `pyparser`, over the tailnet) for admin; `leploy` (alias `leploy`, in the
   `docker` group) owns `/opt/pyparser` and runs the stack. Key-only
   (`PasswordAuthentication no`); root is `prohibit-password`.
 - **Firewall**: Hetzner Cloud firewall (inbound SSH-only, Terraform-managed) + in-OS
@@ -83,8 +83,8 @@ migrations (0019+) are intended for prod.
   so `pyparser-sync` reaches it over an SSH local-forward. On your laptop set
   `PYPARSER_PROD_DATABASE_URL=postgres://pyparser:<pw>@postgres:5432/pyparser_llunde`
   (user/pw/dbname real; host/port are placeholders the tunnel rewrites) +
-  `PYPARSER_PROD_SSH_HOST=letzner`, then e.g. `pyparser-sync db diff dev prod` or
-  `pyparser-sync db pull prod`. `ssh letzner` must work non-interactively (ssh agent
+  `PYPARSER_PROD_SSH_HOST=pyparser`, then e.g. `pyparser-sync db diff dev prod` or
+  `pyparser-sync db pull prod`. `ssh pyparser` must work non-interactively (ssh agent
   or keyfile — the tunnel uses `BatchMode`). Override per-run with `--ssh <host>`.
 - **Terraform**: `export TF_VAR_hcloud_token=…; terraform plan` should report
   "No changes." The server is `prevent_destroy` + Hetzner `delete_protection` — see
