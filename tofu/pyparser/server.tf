@@ -2,7 +2,7 @@
 # Adopted via terraform import; see ../README.md and PROD.md. Args mirror the
 # live box exactly so `plan` stays a clean "No changes".
 module "server" {
-  source = "../modules/hetzner-server"
+  source = "../modules/hetzner"
 
   name          = "llunde-parser"
   server_type   = "ccx23"

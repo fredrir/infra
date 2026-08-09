@@ -1,0 +1,47 @@
+# Repo CI: the flake must evaluate to a real llunde-01 system closure and every
+# tofu root must validate. No credentials in CI — a credentialed `tofu plan` job
+# (TF_VAR_hcloud_token + AWS state backend) is a phase-2+ follow-up.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Flake check
+        run: nix flake check
+
+      - name: Evaluate llunde-01 system closure
+        run: nix eval .#nixosConfigurations.llunde-01.config.system.build.toplevel.drvPath
+
+  tofu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+
+      - name: Validate llunde root
+        run: |
+          tofu -chdir=tofu/llunde init -backend=false -input=false
+          tofu -chdir=tofu/llunde validate
+
+      - name: Validate pyparser root
+        run: |
+          tofu -chdir=tofu/pyparser init -backend=false -input=false
+          tofu -chdir=tofu/pyparser validate
+
+      - name: Format check
+        run: tofu fmt -check -recursive tofu/
