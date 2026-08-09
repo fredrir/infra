@@ -1,8 +1,11 @@
 # Host = diffs only (ADR 003): everything shared lives in modules/; this file
 # says what llunde-01 IS — its services, its users, its disk.
-{ ... }:
+{ modulesPath, ... }:
 {
   imports = [
+    # Hetzner Cloud is QEMU/KVM: without this the initrd lacks virtio drivers
+    # and the box hangs before finding its root disk (go-live finding).
+    (modulesPath + "/profiles/qemu-guest.nix")
     ./disko.nix
     ../../modules/profiles/server.nix
     ../../modules/users
