@@ -24,8 +24,8 @@ resource "hcloud_server" "llunde_01" {
 
   image = "ubuntu-24.04"
 
-  # Off during phase-2 bring-up so the wipe/reinstall cycle stays unblocked;
-  # both flip to true once the cutover gate closes.
-  delete_protection  = false
-  rebuild_protection = false
+  # On since the phase-2 cutover gate closed (2026-08-09); they were off only
+  # to keep the wipe/reinstall cycle unblocked during bring-up.
+  delete_protection  = true
+  rebuild_protection = true
 }
