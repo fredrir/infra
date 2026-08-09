@@ -1,0 +1,42 @@
+# The phase-4 gate (workstream G, ADR 019 guardrail 1): every PR and every
+# main push must eval the flake, build BOTH host closures, and validate the
+# flat tofu root — with zero credentials. This REPLACED the phase-1-era
+# ci.yml, which validated tofu roots deleted in the phase-3 unnesting and had
+# been permanently red (second-opinion finding: alarm-fatigue conditions).
+# All actions SHA-pinned: this gate is what the credentialed apply workflow
+# will trust (ADR 019), so its supply chain is load-bearing.
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
+      - name: Flake check (goldens + eval)
+        run: nix flake check
+      - name: Build llunde-01 closure
+        run: nix build .#nixosConfigurations.llunde-01.config.system.build.toplevel --no-link
+      - name: Build llunde-parser closure
+        run: nix build .#nixosConfigurations.llunde-parser.config.system.build.toplevel --no-link
+
+  tofu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
+      - name: fmt
+        run: nix run nixpkgs#opentofu -- -chdir=tofu fmt -check -recursive
+      - name: validate (no backend, no credentials)
+        run: |
+          nix run nixpkgs#opentofu -- -chdir=tofu init -backend=false -input=false
+          nix run nixpkgs#opentofu -- -chdir=tofu validate
