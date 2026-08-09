@@ -3,6 +3,11 @@
 Executed literally at the phase-2 go-live and re-executed on any reprovision.
 **Every deviation discovered during execution is a documentation bug — fix it here, on the spot** ([phase-2 tasks 2.4](init/plans/phase-2/tasks.md)).
 
+As of phase 3.5 the estate is **two hosts**. §§1–10 are written against
+`llunde-01` and stay as executed; §11 already covers both; **§12 lists the
+per-host deltas for `llunde-parser`** — read it alongside the matching section
+before running anything there.
+
 Values in `<ANGLE_BRACKETS>` are fill-ins; each states its source. Amounts of ceremony that look skippable are not — the order is load-bearing (secrets must exist *before* install because the host key is pre-generated and injected).
 
 ---
@@ -172,3 +177,67 @@ ssh root@<TAILNET_IP> "podman exec -i -u postgres llunde-postgres psql -U llunde
 3. Re-open 22 temporarily: add the `port = "22"` rule back in `tofu/llunde-firewall.tf` (llunde-01) or `tofu/parser-server.tf` (llunde-parser), `tofu apply`. **llunde-parser only**: also `ufw allow 22` once you're in. Revert both when done — the closed state is the committed one.
 
 llunde-01's NixOS host firewall never listed 22 for the public interface after closure (`modules/profiles/server.nix`); `tailscale0` is a trusted interface, so sshd stays reachable over the tailnet regardless.
+
+## 12. llunde-parser (phase 3.5) — per-host deltas
+
+Same runbook, second host. Only the differences from §§2–10 are listed; the
+full cutover choreography (freeze, rehearsal, restore order, gate metrics)
+lives in [phase-3.5 tasks](init/plans/phase-3.5/tasks.md) — this section is the
+reusable reprovision knowledge.
+
+- **§2 Provision — nothing to do.** The server exists (Hetzner 141119325,
+  CCX23, adopted in tofu during phase 3); no tofu changes are needed for the
+  reinstall and `tofu plan` must stay "No changes." throughout — the wipe is
+  invisible to the cloud API.
+- **§3 Identity & secrets**: host key pre-generated at
+  `/tmp/llunde-parser-keys/etc/ssh/ssh_host_ed25519_key` (phase-3.5 step 0.2 —
+  done *before* the rehearsal, not at cutover, because the rehearsal box
+  decrypts with the same key). Secret files per the phase-3.5 contract:
+  `secrets/pyparser-doppler.yaml` + `secrets/pyparser-restic.yaml` (new),
+  `secrets/tailscale.yaml` + `secrets/ghcr.yaml` (shared — `sops updatekeys`
+  after adding the host recipient to `.sops.yaml`'s per-host creation rules).
+  No DB-password sops file: `POSTGRES_PASSWORD` is single-sourced from the
+  Doppler `pyparser/prd` render.
+- **§4 Install** (💥 destroys the box — both tenants down for the window):
+  ```sh
+  nix run github:nix-community/nixos-anywhere -- \
+    --flake .#llunde-parser \
+    --build-on-remote \
+    -i ~/.ssh/id_ed25519 \
+    --extra-files /tmp/llunde-parser-keys \
+    root@<LLUNDE_PARSER_IP>
+  ```
+  ⚠️ **CRITICAL, before the new install's `tailscale up`** (i.e. immediately
+  after the wipe starts, [tasks 3.3](init/plans/phase-3.5/tasks.md)): delete
+  the stale `llunde-parser` node in the Tailscale admin console. The old
+  non-ephemeral record holds the MagicDNS name; skip this and the new box
+  joins as `llunde-parser-1` while every consumer (pyparser CI host secret,
+  portfolio's `DEPLOY_HOST`) resolves a corpse.
+- **§5 Verify**: same checks with hostname `llunde-parser` (four secrets in
+  `/run/secrets/`, tailscale joined as **exactly** `llunde-parser`). Extra,
+  per the zero-public-ports posture: `ss -tlnp` on the box shows no public
+  listeners at all — not even 80/443 (ingress is the Cloudflare tunnels,
+  outbound). And both tenants exist:
+  `systemctl --user -M pyparser@ list-units 'pyparser-*'` for the stack;
+  `id portfolio` (uid 3000) + `grep portfolio /etc/subuid` (100000:65536) +
+  linger for the slot.
+- **§6 Deploy loop**: identical, with `.#llunde-parser` and this host's
+  tailnet address as `--target-host`/`--build-host`. Quadlet check:
+  `systemctl --user -M pyparser@ list-units 'pyparser-*'`.
+- **§§7–8 do not apply** (no DNS cutover — both hostnames stay on their
+  tunnels; the phase-3.5 gate metrics are `parser.llunde.no`,
+  `external.llunde.no`, `hansteen.dev`).
+- **§9 Update & rollback**: same pull-based model; the pyparser digest-pin
+  lever lives in `services/pyparser/`. Details in
+  [docs/pyparser/PROD.md](pyparser/PROD.md).
+- **§10 Restore**: `<RESTIC_PREFIX>` = `restic/llunde-parser`. pyparser only —
+  `restic restore latest --target /tmp/restore`, then the custom-format dump
+  goes through `pg_restore` (not psql):
+  ```sh
+  runuser -u pyparser -- env XDG_RUNTIME_DIR=/run/user/2001 \
+    podman exec -i pyparser-postgres pg_restore --clean --if-exists \
+    -U pyparser -d pyparser_llunde < /tmp/restore/var/backup/pyparser/pyparser_llunde.dump
+  # files: copy the restored pyparser-files/_data contents back into the volume
+  ```
+  **portfolio restores itself** from its own S3 backups per its own DR
+  runbooks — llunde-infra hands off at the slot boundary (ADR 016).

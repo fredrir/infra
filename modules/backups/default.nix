@@ -22,7 +22,10 @@ let
   cfg = config.llunde.backups;
 in
 {
-  imports = [ ./llunde-backend.nix ];
+  imports = [
+    ./llunde-backend.nix
+    ./pyparser.nix
+  ];
 
   options.llunde.backups = {
     enable = lib.mkOption {
