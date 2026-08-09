@@ -39,6 +39,12 @@
       python3
       rsync
     ];
+    # bootstrap.sh parity (its install.sh expects these to exist).
+    homeDirectories = [
+      ".config/containers/systemd"
+      ".config/portfolio"
+      "caddy"
+    ];
   };
 
   llunde.backups = {

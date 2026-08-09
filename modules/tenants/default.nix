@@ -36,6 +36,15 @@ in
             default = true;
             description = "Tenant may log in over SSH (tailnet-only like everything else); its own authorized_keys governs.";
           };
+          homeDirectories = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [ ];
+            description = ''
+              $HOME-relative directories pre-created (0700, tenant-owned) —
+              the declarative twin of what the tenant's imperative bootstrap
+              script would mkdir. Content stays tenant-owned.
+            '';
+          };
         };
       }
     );
@@ -68,5 +77,11 @@ in
     users.groups = lib.mapAttrs (_name: t: {
       gid = t.uid;
     }) cfg;
+
+    systemd.tmpfiles.rules = lib.concatLists (
+      lib.mapAttrsToList (
+        name: t: map (d: "d /home/${name}/${d} 0700 ${name} ${name} -") t.homeDirectories
+      ) cfg
+    );
   };
 }
