@@ -1,8 +1,12 @@
 # Base profile every llunde host imports (ADR 003: hosts carry only diffs).
 { ... }:
 {
-  # Grub device list comes from disko (EF02 partition registers the disk).
-  boot.loader.grub.enable = true;
+  # The Hetzner VM boots UEFI (go-live finding — the old docs' BIOS assumption
+  # was wrong): systemd-boot on the ESP, no EFI variables (bootctl installs the
+  # EFI/BOOT fallback path, so firmware NVRAM persistence doesn't matter).
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = false;
+  boot.loader.grub.enable = false;
 
   time.timeZone = "UTC";
 

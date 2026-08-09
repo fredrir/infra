@@ -7,10 +7,6 @@
     content = {
       type = "gpt";
       partitions = {
-        bios = {
-          size = "1M";
-          type = "EF02";
-        };
         esp = {
           size = "512M";
           type = "EF00";
