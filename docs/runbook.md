@@ -104,9 +104,9 @@ ssh root@<TAILNET_IP> true                         # management path works (ADR 
 Recommended (push from laptop; works while the repo is private):
 
 ```sh
-git push && nixc-ssh nixos-rebuild switch --flake .#llunde-01 \
+git push && nix run nixpkgs#nixos-rebuild -- switch --flake .#llunde-01 \
   --target-host root@<TAILNET_IP> --build-host root@<TAILNET_IP>
-# nixc-ssh = the nixc alias + `-v ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro`
+# native nix (no container wrapper); --build-host keeps the build on the box
 ```
 
 Alternative (on-host): `nixos-rebuild switch --flake github:fredrir/llunde-infra#llunde-01` — ⚠️ requires the private repo readable from the host (fine-grained PAT in `/etc/nix/netrc`); set that up only if the push flow annoys.
