@@ -1,7 +1,66 @@
-# Caddy ingress under the `edge` user — the only public 80/443 (ADR 006).
-# Option surface only in phase 1; phase 2 implements the Caddy quadlet +
-# sysctl net.ipv4.ip_unprivileged_port_start=80 + ops-endpoint blocking.
-{ lib, ... }:
+# Caddy ingress under the `edge` user (uid 2000) — the host's only public
+# 80/443 (ADR 006), automatic Let's Encrypt TLS, grey-cloud DNS (ADR 012).
+#
+# Networking choice: the Caddy container runs with Network=host. The upstream
+# contract publishes every service on host loopback ONLY (127.0.0.1:8080/8081,
+# ADR 005), and a rootless bridge-networked container cannot reach host
+# loopback — host.containers.internal resolves to a routable host address,
+# which 127.0.0.1-bound sockets deliberately do not answer. Host networking
+# makes the loopback upstreams work verbatim and binds 80/443 directly
+# (allowed by ip_unprivileged_port_start=80, set in the base profile).
+# Isolation is intact: other users' podman networks live inside their own
+# rootless network namespaces and are unreachable from the host namespace, so
+# the only cross-user surface remains the deliberately published loopback
+# ports — exactly the ADR 005 contract. PublishPort is meaningless under host
+# networking and therefore absent.
+#
+# Ops endpoints (/metrics, /health, /ready) are blocked on the public vhosts
+# (ADR 013 / backend phase-3 finding). They stay reachable for operators over
+# the tailnet via host access (`ssh llunde-01 -- curl 127.0.0.1:8080/ready`);
+# node-level metrics bind the tailscale IP in modules/observability. If
+# browser access is ever wanted, add a Caddy listener bound to the tailscale
+# IP — deliberately not done now (keep the public surface minimal).
+{
+  config,
+  lib,
+  ...
+}:
+let
+  cfg = config.llunde.ingress;
+  quadlet = import ../quadlet/mk-quadlet.nix { inherit lib; };
+
+  acmeEmail = "fhansteen@gmail.com";
+
+  opsBlock = ''
+    	@ops path /metrics /health /ready
+    	respond @ops 403
+  '';
+
+  vhostBlock =
+    name: vhost:
+    if vhost.redirectTo != null then
+      ''
+        ${name} {
+        	redir ${vhost.redirectTo}{uri} permanent
+        }
+      ''
+    else
+      ''
+        ${name} {
+        	encode gzip
+        ${lib.optionalString vhost.blockOpsEndpoints opsBlock}	reverse_proxy ${vhost.upstream}
+        }
+      '';
+
+  caddyfile =
+    ''
+      {
+      	email ${acmeEmail}
+      }
+
+    ''
+    + lib.concatStringsSep "\n" (lib.mapAttrsToList vhostBlock cfg.virtualHosts);
+in
 {
   options.llunde.ingress = {
     enable = lib.mkOption {
@@ -15,8 +74,15 @@
           options = {
             upstream = lib.mkOption {
               type = lib.types.str;
+              default = "";
               example = "127.0.0.1:8080";
               description = "Loopback upstream this vhost proxies to (ADR 005 wiring).";
+            };
+            redirectTo = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              example = "https://llunde.no";
+              description = "Redirect-only vhost (e.g. www -> apex); upstream is ignored.";
             };
             blockOpsEndpoints = lib.mkOption {
               type = lib.types.bool;
@@ -29,5 +95,48 @@
       default = { };
       description = "Public vhosts, e.g. llunde.no and api.llunde.no.";
     };
+  };
+
+  config = lib.mkIf cfg.enable {
+    # Contract defaults (docs/init/plans/phase-2/contract.md); hosts may override.
+    llunde.ingress.virtualHosts = {
+      "llunde.no" = {
+        upstream = lib.mkDefault "127.0.0.1:8081";
+        # A SPA answers every path itself; only the API has real ops endpoints.
+        blockOpsEndpoints = lib.mkDefault false;
+      };
+      "api.llunde.no" = {
+        upstream = lib.mkDefault "127.0.0.1:8080";
+        blockOpsEndpoints = lib.mkDefault true;
+      };
+      "www.llunde.no" = {
+        redirectTo = lib.mkDefault "https://llunde.no";
+      };
+    };
+
+    environment.etc =
+      quadlet.mkContainerUnit {
+        name = "caddy";
+        uid = 2000;
+        unit.Description = "Caddy public ingress (ADR 006)";
+        container = {
+          Image = "docker.io/library/caddy:2";
+          Network = "host";
+          Volume = [
+            "/etc/llunde/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
+            # Named volumes: certificate storage must survive container replacement.
+            "caddy-data:/data"
+            "caddy-config:/config"
+          ];
+        };
+        service = {
+          Restart = "always";
+          MemoryMax = "256M";
+        };
+        install.WantedBy = [ "default.target" ];
+      }
+      // {
+        "llunde/caddy/Caddyfile".text = caddyfile;
+      };
   };
 }

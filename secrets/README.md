@@ -3,10 +3,10 @@
 Encrypted-at-rest in git; decrypted by the host at activation into `/run/secrets/`.
 Contents (see `docs/init/plans/phase-2/contract.md` for the rationale of #4):
 
-1. `doppler.yaml` — Doppler service token(s)
-2. `tailscale.yaml` — Tailscale auth key
-3. `restic.yaml` — restic repository password
-4. `llunde-backend-db.yaml` — Postgres/Valkey internal credentials (env-file form)
+1. `doppler.yaml` — key `doppler_token`, env-file form (`DOPPLER_TOKEN=...`)
+2. `tailscale.yaml` — key `auth_key`
+3. `restic.yaml` — keys `password` and `env` (env-file form: AWS creds for S3)
+4. `llunde-backend-db.yaml` — key `env`, env-file form (`POSTGRES_PASSWORD`/`DB_PASSWORD`)
 
 Nothing lands here until the phase-2 go-live populates real values with real
 recipients (`.sops.yaml` placeholders are replaced first). Never commit a
