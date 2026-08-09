@@ -1,11 +1,11 @@
 # sops-nix bootstrap secrets (ADR 007). Recipients are age keys:
-#  - admin: the owner's personal age key (generate once: `age-keygen`)
+#  - admin: the owner's personal age key (~/.config/sops/age/keys.txt, generated 2026-08-09)
 #  - llunde-01: derived from the host's ssh-ed25519 host key AFTER the phase-2
 #    install (`ssh-keyscan llunde-01 | ssh-to-age`), then re-encrypt with
 #    `sops updatekeys secrets/*.yaml`.
 # Placeholders below are replaced at go-live (tasks.md step 2.2).
 keys:
-  - &admin age1PLACEHOLDER_OWNER_KEY
+  - &admin age13upkqrd7v97a4gcgerwnkuwvznxh60u2g56x6cj55hemwq68q3lsalynwn
   - &llunde-01 age1PLACEHOLDER_HOST_KEY
 creation_rules:
   - path_regex: secrets/.*\.yaml$

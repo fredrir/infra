@@ -7,27 +7,35 @@ Values in `<ANGLE_BRACKETS>` are fill-ins; each states its source. Amounts of ce
 
 ---
 
-## 1. Prerequisites (laptop, one-time)
+## 1. Prerequisites (laptop — DONE as of 2026-08-09, kept for reprovision)
 
-Nix is **not** installed on the Mac; every nix command runs through the podman wrapper used throughout this repo:
+Nix **is** installed natively on the Mac (`nix 2.35.1` via `~/.nix-profile`), alongside the
+Nix devx tools (`nixd`, `statix`, `alejandra`, `deadnix`). Run nix commands directly —
+the podman `nixos/nix` wrapper from the phase-1/2 era is no longer needed.
 
-```sh
-alias nixc='podman run --rm -v "$PWD":/work -w /work docker.io/nixos/nix:latest \
-  sh -c "git config --global safe.directory /work && nix --extra-experimental-features \"nix-command flakes\" \"\$@\"" --'
-# usage: nixc flake check
-```
-
-1. Tools: `brew install opentofu sops age ssh-to-age awscli` · `hcloud` CLI authenticated (`hcloud server list` shows 132168416) · `doppler` logged in · podman machine running.
-2. Owner age key (one-time, this is a real credential — back it up):
-   ```sh
-   mkdir -p ~/.config/sops/age && age-keygen -o ~/.config/sops/age/keys.txt
-   # note the "public key: age1..." line -> <OWNER_AGE_PUBLIC_KEY>
-   ```
+1. Tools (all present): `opentofu`, `sops`, `age`, `awscli` via brew; `ssh-to-age` has no
+   brew formula — use `nix run nixpkgs#ssh-to-age` (or `nix profile install nixpkgs#ssh-to-age`).
+   `hcloud` CLI authenticated (`hcloud server list` shows 132168416) · `doppler` logged in.
+2. Owner age key (generated 2026-08-09, lives at `~/.config/sops/age/keys.txt` — **back it up**):
+   public key `age13upkqrd7v97a4gcgerwnkuwvznxh60u2g56x6cj55hemwq68q3lsalynwn`
+   (already set as the admin recipient in `.sops.yaml`).
 3. Hetzner token for tofu (from the hcloud CLI config):
    ```sh
    export TF_VAR_hcloud_token=$(awk -F'"' '/^[[:space:]]*token/ {print $2; exit}' ~/.config/hcloud/cli.toml)
    ```
-4. AWS env for the S3 state backend comes from Doppler on every tofu call: prefix commands with `doppler run --project pyparser --config prd --`.
+4. AWS env for the S3 state backend comes from Doppler on every tofu call: prefix commands
+   with `doppler run --project pyparser --config prd --`. (An admin AWS profile also exists
+   locally via `aws login` — root credentials; reserve it for phase-3 IAM work and consider
+   replacing with a scoped admin user later.)
+
+### Optional rehearsal: `nixos-dev` VM
+
+A NixOS test VM exists (`ssh nixos-dev` — ProxyJump via the Arch desktop `archie` over
+Tailscale; 4 vCPU/6 GiB, NixOS 26.05 minimal, libvirt NAT). Before wiping prod you can
+rehearse there: build this flake's closure on the VM (`nixos-rebuild build --flake .#llunde-01`
+after rsyncing the repo), or dry-activate individual modules. Hcloud-specific bits (disko
+device names, firewall) and the flake's 25.11 pin vs the VM's 26.05 will differ — treat it
+as a module test bench, not a full dress rehearsal.
 
 ## 2. Provision (tofu apply — safe pre-wipe: rename + firewall only)
 
@@ -48,7 +56,7 @@ The host's SSH key is created *by us* and injected at install, so sops-decryptio
    ssh-keygen -t ed25519 -N "" -C llunde-01 -f /tmp/llunde-01-keys/etc/ssh/ssh_host_ed25519_key
    ssh-to-age < /tmp/llunde-01-keys/etc/ssh/ssh_host_ed25519_key.pub   # -> <HOST_AGE_PUBLIC_KEY>
    ```
-2. Edit `.sops.yaml`: replace `age1PLACEHOLDER_OWNER_KEY` → `<OWNER_AGE_PUBLIC_KEY>`, `age1PLACEHOLDER_HOST_KEY` → `<HOST_AGE_PUBLIC_KEY>`.
+2. Edit `.sops.yaml`: the admin key is already real; replace `age1PLACEHOLDER_HOST_KEY` → `<HOST_AGE_PUBLIC_KEY>` (from `ssh-keyscan -t ed25519 46.62.214.182 | nix run nixpkgs#ssh-to-age`, or the pre-generated key path below).
 3. Create the four secret files (`sops secrets/<name>.yaml` opens an editor; exact keys below are final, from `modules/secrets/default.nix`):
    - `secrets/doppler.yaml` — key `doppler_token`, value in **env-file form** (it lands as an EnvironmentFile):
      `DOPPLER_TOKEN=<token>` where the token comes from
