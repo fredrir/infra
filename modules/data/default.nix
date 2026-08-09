@@ -43,6 +43,10 @@ let
       Exec = "postgres -c shared_buffers=${cfg.postgres.sharedBuffers}";
       Image = "docker.io/library/postgres:17";
       Network = [ "llunde-backend-data.network" ];
+      # Run as the image's postgres user from the start: the entrypoint's
+      # PGDATA mkdir happens as uid 999, so :U must chown the bind mount to
+      # THAT uid, not container-root (go-live finding).
+      User = "postgres";
       Volume = [ "${dataRoot}/postgres:/var/lib/postgresql/data:U" ];
     };
     service = {
