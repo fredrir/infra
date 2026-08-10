@@ -1,0 +1,48 @@
+// Tailscale tailnet policy — SOURCE OF TRUTH (phase-4 review C1/H7).
+// Applied via the Tailscale admin console (login.tailscale.com/admin/acls);
+// see ./README.md for the SAFE phased apply order — do NOT paste-and-save this
+// restrictive form while the hosts are still untagged (that is an instant
+// default-deny lockout of host<->host scraping + CI SSH).
+//
+// Reviewed independently before first apply. Rules are minimal for the verified
+// connectivity graph; the danger is in tagging mechanics/order, not the rules.
+{
+  "tagOwners": {
+    "tag:server": ["autogroup:member"],
+    "tag:ci":     ["autogroup:member"]
+  },
+
+  "acls": [
+    // Your own (untagged, member-owned) devices — macie/archie/linode/iphone —
+    // reach everything. Lockout-proof management. NOTE: this trusts ALL your
+    // devices, not just the laptop; tighten with a tag:admin only after cutover.
+    { "action": "accept", "src": ["autogroup:member"], "dst": ["*:*"] },
+
+    // Estate hosts reach ONLY each other's scrape/push ports. UNION of both
+    // directions (verified against services/observability/unit.nix + modules/
+    // observability): parser->llunde-01 {9100 node, 9101 backend metrics + the
+    // blackbox /ready probe}; llunde-01->parser {3100 Loki push, 4317/4318 OTLP}.
+    { "action": "accept", "src": ["tag:server"], "dst": ["tag:server:9100,9101,3100,4317,4318"] },
+
+    // CI over SSH only. The infra GitOps auto-apply (ADR 019) SSHes BOTH hosts;
+    // portfolio's deploy SSHes parser. Nothing else. (Effective ONLY once the CI
+    // runners actually advertise tag:ci — otherwise they fall under the member
+    // rule above; confirm before relying on this for isolation.)
+    { "action": "accept", "src": ["tag:ci"], "dst": ["tag:server:22"] }
+  ],
+
+  // Guardrails: the console REJECTS a policy that breaks these. Assert the whole
+  // lockout surface — SSH to BOTH hosts, the PUSH port 3100, and the node ports.
+  // If the console rejects "autogroup:member" inside a test src, replace those
+  // two src values with your login (e.g. "you@github"); the acls stay as-is.
+  "tests": [
+    { "src": "autogroup:member",
+      "accept": ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.109.80.121:9101"] },
+    { "src": "tag:server",
+      "accept": ["100.109.80.121:9100","100.92.219.50:9100","100.109.80.121:9101","100.92.219.50:3100","100.92.219.50:4317"],
+      "deny":   ["100.92.219.50:3000","100.109.80.121:22"] },
+    { "src": "tag:ci",
+      "accept": ["100.109.80.121:22","100.92.219.50:22"],
+      "deny":   ["100.92.219.50:3000","100.92.219.50:3100","100.92.219.50:9100"] }
+  ]
+}
