@@ -177,6 +177,9 @@
     observabilityUnits = import ./services/observability/unit.nix {inherit lib;};
     renderedObsPrometheus = observabilityUnits.prometheus.text;
     renderedObsScrapeConfig = observabilityUnits.prometheusConfig;
+    # C1 (phase-4 review): lock the grafana auth posture (anon=Viewer,
+    # basic-auth off) so it cannot silently regress to anonymous admin.
+    renderedObsGrafana = observabilityUnits.grafana.text;
 
     goldenObsPrometheus = ''
       [Container]
@@ -298,6 +301,7 @@
     goldenCaddyfile = builtins.readFile ./tests/golden/llunde-01.Caddyfile;
     goldenCloudflared = builtins.readFile ./tests/golden/cloudflared.container;
     goldenValkey = builtins.readFile ./tests/golden/llunde-valkey.container;
+    goldenObsGrafana = builtins.readFile ./tests/golden/observability-grafana.container;
 
     mkRenderCheck = system:
       assert lib.assertMsg (renderedObsPrometheus == goldenObsPrometheus)
@@ -320,6 +324,8 @@
       "cloudflared unit drifted from golden:\n---rendered---\n${renderedCloudflared}\n---golden---\n${goldenCloudflared}";
       assert lib.assertMsg (renderedValkey == goldenValkey)
       "valkey unit drifted from golden:\n---rendered---\n${renderedValkey}\n---golden---\n${goldenValkey}";
+      assert lib.assertMsg (renderedObsGrafana == goldenObsGrafana)
+      "grafana unit drifted from golden (C1 anon/basic settings — regenerate tests/golden/observability-grafana.container):\n---rendered---\n${renderedObsGrafana}\n---golden---\n${goldenObsGrafana}";
         nixpkgs.legacyPackages.${system}.writeText "mkquadlet-render-ok" renderedContainer;
   in {
     nixosConfigurations.llunde-01 = nixpkgs.lib.nixosSystem {
