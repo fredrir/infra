@@ -282,6 +282,23 @@
               replacement: observability-blackbox:9115
     '';
 
+    # Phase-4 review (H3, C2): golden the rendered artifacts that had NO
+    # coverage and where a silent drift is dangerous — the Caddyfile (the B1
+    # ops-block globs, the XFF mapping, the M1 CF-Connecting-IP guard, bind
+    # 127.0.0.1), the cloudflared unit (digest pin, EnvironmentFile,
+    # Network=host) and the valkey unit (the --save "" flag order, digest pin,
+    # no :U). Read from the REAL host config (via self) so the golden IS the
+    # deployed text; the tab-heavy artifacts live in tests/golden/ (they are
+    # unmaintainable as inline Nix strings). Regenerate on an intended change:
+    #   nix eval --raw '.#nixosConfigurations.llunde-01.config.environment.etc."llunde/caddy/Caddyfile".text' > tests/golden/llunde-01.Caddyfile
+    hostEtc = self.nixosConfigurations.llunde-01.config.environment.etc;
+    renderedCaddyfile = hostEtc."llunde/caddy/Caddyfile".text;
+    renderedCloudflared = hostEtc."containers/systemd/users/2000/cloudflared.container".text;
+    renderedValkey = hostEtc."containers/systemd/users/2001/llunde-valkey.container".text;
+    goldenCaddyfile = builtins.readFile ./tests/golden/llunde-01.Caddyfile;
+    goldenCloudflared = builtins.readFile ./tests/golden/cloudflared.container;
+    goldenValkey = builtins.readFile ./tests/golden/llunde-valkey.container;
+
     mkRenderCheck = system:
       assert lib.assertMsg (renderedObsPrometheus == goldenObsPrometheus)
       "observability prometheus unit drifted from golden:\n---rendered---\n${renderedObsPrometheus}\n---golden---\n${goldenObsPrometheus}";
@@ -297,6 +314,12 @@
       "mkNetworkUnit rendering drifted from golden:\n---rendered---\n${renderedNetwork}\n---golden---\n${goldenNetwork}";
       assert lib.assertMsg (renderedBackend == goldenBackend)
       "backend unit rendering drifted from golden:\n---rendered---\n${renderedBackend}\n---golden---\n${goldenBackend}";
+      assert lib.assertMsg (renderedCaddyfile == goldenCaddyfile)
+      "llunde-01 Caddyfile drifted from golden (regenerate tests/golden/llunde-01.Caddyfile):\n---rendered---\n${renderedCaddyfile}\n---golden---\n${goldenCaddyfile}";
+      assert lib.assertMsg (renderedCloudflared == goldenCloudflared)
+      "cloudflared unit drifted from golden:\n---rendered---\n${renderedCloudflared}\n---golden---\n${goldenCloudflared}";
+      assert lib.assertMsg (renderedValkey == goldenValkey)
+      "valkey unit drifted from golden:\n---rendered---\n${renderedValkey}\n---golden---\n${goldenValkey}";
         nixpkgs.legacyPackages.${system}.writeText "mkquadlet-render-ok" renderedContainer;
   in {
     nixosConfigurations.llunde-01 = nixpkgs.lib.nixosSystem {

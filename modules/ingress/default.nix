@@ -120,6 +120,18 @@
   tunnelSite = ''
     http://:8085 {
     	bind 127.0.0.1
+    	# M1 (phase-4 review): reject any request that reaches this listener
+    	# without a CF-Connecting-IP. cloudflared always sets it; its absence means
+    	# the request is not tunnel-origin. Otherwise the header_up below Sets an
+    	# EMPTY X-Forwarded-For, Ktor falls back to the loopback peer ("localhost"),
+    	# and every such request collapses into ONE rate-limit bucket. `handle`
+    	# blocks match in written order, so this guard MUST precede the host blocks.
+    	@nocf {
+    		not header_regexp CF-Connecting-IP .
+    	}
+    	handle @nocf {
+    		respond 400
+    	}
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList tunnelHostBlock cfg.virtualHosts)}
     	handle {
     		respond 404
