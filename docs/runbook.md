@@ -118,6 +118,13 @@ Alternative (on-host): `nixos-rebuild switch --flake github:fredrir/llunde-infra
 
 After any change touching quadlet units, confirm regeneration: `ssh root@<TAILNET_IP> systemctl --user -M llunde-backend@ list-units 'llunde-*'` (matches the quadlet module's `systemctl --machine=<user>@ --user` hook).
 
+**Changes to the `edge` units (Caddyfile, cloudflared) need an explicit restart — the reload hook is not enough.** The activation hook only `daemon-reload`s each `serviceUsers` manager; it does **not** recreate containers. Caddy's `/etc/caddy/Caddyfile` is a bind mount that podman resolves at container *creation*, so even an in-container `caddy reload` re-reads the *old* file — only a recreate picks up a new Caddyfile. This is the difference between "I closed the hole" and "I believe I closed the hole" (phase-4 review B4). After a switch that changed the Caddyfile or the cloudflared unit:
+
+```sh
+ssh root@<TAILNET_IP> systemctl --user -M edge@ restart caddy cloudflared
+ssh root@<TAILNET_IP> systemctl --user -M edge@ show caddy cloudflared -p ActiveEnterTimestamp   # expect fresh timestamps
+```
+
 ## 7. DNS cutover (Cloudflare dashboard, zone `llunde.no` = 4ae54b24fc4140d4d1c450491645f1c8)
 
 Precondition: `curl -H "Host: api.llunde.no" http://46.62.214.182/ready` answers (Caddy up; certificate not yet valid — that's expected until DNS).

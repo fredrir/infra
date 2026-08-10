@@ -29,8 +29,24 @@
 
   acmeEmail = "fhansteen@gmail.com";
 
+  # The trailing `*` is load-bearing — do NOT "tidy" these back to exact paths.
+  # Caddy's `path` matcher is exact, and its cleanPath (caddyhttp.go) deliberately
+  # PRESERVES a trailing slash, so `/metrics/` cleans to `/metrics/` and misses a
+  # bare `path /metrics`. The route is skipped and reverse_proxy then forwards the
+  # RAW, unnormalised path upstream. Verified against caddy v2.11.4: `/metrics/`,
+  # `/health/`, `/ready/`, `/metrics%2f`, `/metrics//`, `/metrics;x=1`, `/metrics.`
+  # all reached the backend through the bare form; all 403 with the glob. Nothing
+  # leaks today only because Ktor routes `/metrics` and `/metrics/` separately by
+  # default — one `install(IgnoreTrailingSlash)` in the (out-of-repo, :latest)
+  # backend would publish the whole scrape with no diff here. A deny-list on an
+  # exact matcher is fail-open by construction; the glob makes it fail closed.
+  #
+  # `path` (not `path_regexp`) is deliberate too: `path` is case-INsensitive, so
+  # `/METRICS` is covered, and Ktor's routing is likewise case-insensitive. A bare
+  # `path_regexp ^/(metrics|health|ready)(/|$)` is case-SENSITIVE and would reopen
+  # exactly that vector.
   opsBlock = ''
-    @ops path /metrics /health /ready
+    @ops path /metrics* /health* /ready*
     respond @ops 403
   '';
 
@@ -90,7 +106,7 @@
     else ''
       	${m} host ${name}
       	handle ${m} {
-      ${lib.optionalString vhost.blockOpsEndpoints "\t\t@ops_${lib.replaceStrings ["."] ["_"] name} path /metrics /health /ready\n\t\trespond @ops_${lib.replaceStrings ["."] ["_"] name} 403\n"}		reverse_proxy ${vhost.upstream} {
+      ${lib.optionalString vhost.blockOpsEndpoints "\t\t@ops_${lib.replaceStrings ["."] ["_"] name} path /metrics* /health* /ready*\n\t\trespond @ops_${lib.replaceStrings ["."] ["_"] name} 403\n"}		reverse_proxy ${vhost.upstream} {
       			${tunnelHeaderUp}
       		}
       	}
@@ -174,7 +190,7 @@ in {
             blockOpsEndpoints = lib.mkOption {
               type = lib.types.bool;
               default = true;
-              description = "Deny /metrics, /health, /ready publicly (tailnet-only per ADR 013).";
+              description = "Deny /metrics, /health, /ready and any path under them publicly (tailnet-only per ADR 013).";
             };
           };
         }
@@ -185,6 +201,27 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
+    # B4 (phase-4 pre-cutover review): register the `edge` user so the
+    # switch-time reload hook (modules/quadlet `llundeQuadletReload`, which
+    # iterates `serviceUsers`) actually reaches caddy + cloudflared. Without
+    # this edge (2000) is absent from the list, so a rebuild rewrites the
+    # Caddyfile / cloudflared unit, exits 0, and the front door keeps running
+    # the OLD unit until reboot or a manual restart — a rebuild that lies.
+    # autoUpdate = false is deliberate and load-bearing: the public front door
+    # never auto-pulls (caddy is :2-pinned, cloudflared is digest-pinned);
+    # image bumps are deliberate edits, never a 5-minute registry poll.
+    # NB the hook only `daemon-reload`s; a Caddyfile CONTENT change is
+    # bind-mounted and resolved at container CREATION, so a deploy touching it
+    # still needs an explicit `systemctl --user -M edge@ restart caddy`
+    # (documented in runbook §6).
+    llunde.quadlet.serviceUsers = [
+      {
+        name = "edge";
+        uid = 2000;
+        autoUpdate = false;
+      }
+    ];
+
     # Contract defaults (docs/init/plans/phase-2/contract.md); hosts may override.
     llunde.ingress.virtualHosts = {
       "llunde.no" = {
