@@ -78,6 +78,6 @@ resource "cloudflare_dns_record" "dmarc" {
   zone_id = var.zone_id
   name    = "_dmarc.llunde.no"
   type    = "TXT"
-  content = "\"v=DMARC1; p=none; rua=mailto:fhansteen@gmail.com\""
+  content = "\"v=DMARC1; p=quarantine; rua=mailto:fhansteen@gmail.com\""
   ttl     = 1
 }

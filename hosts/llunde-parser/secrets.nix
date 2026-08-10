@@ -37,6 +37,15 @@
     };
   };
 
+  # Grafana's SES SMTP credential (GF_SMTP_USER/GF_SMTP_PASSWORD env form) —
+  # send-only IAM user, From-pinned to alerts@llunde.no (phase-4 O5 rework).
+  sops.secrets."observability-smtp" = {
+    sopsFile = ../../secrets/observability-smtp.yaml;
+    key = "env";
+    owner = "observability";
+    path = "/run/secrets/observability-smtp.env";
+  };
+
   users.groups.ghcr.members = ["pyparser"];
 
   llunde.secrets = {

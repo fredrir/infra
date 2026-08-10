@@ -179,7 +179,14 @@ in rec {
         "GF_AUTH_ANONYMOUS_ORG_ROLE=Admin"
         "GF_AUTH_DISABLE_LOGIN_FORM=true"
         "GF_ANALYTICS_REPORTING_ENABLED=false"
+        # SES SMTP (plan-default delivery; owner-confirmed). User/password
+        # are the scoped llunde-alerts-smtp IAM credential, sops-rendered.
+        "GF_SMTP_ENABLED=true"
+        "GF_SMTP_HOST=email-smtp.eu-north-1.amazonaws.com:587"
+        "GF_SMTP_FROM_ADDRESS=alerts@llunde.no"
+        "GF_SMTP_FROM_NAME=llunde alerts"
       ];
+      EnvironmentFile = ["/run/secrets/observability-smtp.env"];
       Image = "docker.io/grafana/grafana:13.1.3";
       Network = ["observability.network"];
       PublishPort = ["0.0.0.0:3000:3000"];
