@@ -171,13 +171,20 @@ in rec {
     container = {
       ContainerName = "observability-grafana";
       Environment = [
-        # Anonymous admin is deliberate: the tailnet IS the perimeter
-        # (ADR 008/015) and this port has no public surface — same trust
-        # model as root-over-tailnet SSH. No login form, no accounts to
-        # rotate, dashboards one click away.
+        # C1 (phase-4 review): the tailnet is the perimeter, but it is NOT
+        # single-user — ephemeral tag:ci runners join it (ADR 015) and the
+        # portfolio tenant has a shell ON this box — so anonymous ADMIN was a
+        # privilege-escalation primitive (SSRF pivot via datasource proxy + an
+        # SES relay via the contact-point test). Anonymous is now read-only
+        # Viewer; basic auth is OFF (kills the admin:admin default that was live
+        # independent of the hidden login form); the admin password is
+        # sops-provided (observability-grafana.env) as a break-glass backstop.
+        # Alerting + dashboards are fully file-provisioned — nothing legitimate
+        # needs Admin. Dashboards stay one click away (anonymous Viewer).
         "GF_AUTH_ANONYMOUS_ENABLED=true"
-        "GF_AUTH_ANONYMOUS_ORG_ROLE=Admin"
+        "GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer"
         "GF_AUTH_DISABLE_LOGIN_FORM=true"
+        "GF_AUTH_BASIC_ENABLED=false"
         "GF_ANALYTICS_REPORTING_ENABLED=false"
         # SES SMTP (plan-default delivery; owner-confirmed). User/password
         # are the scoped llunde-alerts-smtp IAM credential, sops-rendered.
@@ -186,7 +193,10 @@ in rec {
         "GF_SMTP_FROM_ADDRESS=alerts@llunde.no"
         "GF_SMTP_FROM_NAME=llunde alerts"
       ];
-      EnvironmentFile = ["/run/secrets/observability-smtp.env"];
+      EnvironmentFile = [
+        "/run/secrets/observability-smtp.env"
+        "/run/secrets/observability-grafana.env"
+      ];
       Image = "docker.io/grafana/grafana:13.1.3";
       Network = ["observability.network"];
       PublishPort = ["0.0.0.0:3000:3000"];

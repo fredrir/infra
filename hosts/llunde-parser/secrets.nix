@@ -46,6 +46,18 @@
     path = "/run/secrets/observability-smtp.env";
   };
 
+  # Grafana admin password (GF_SECURITY_ADMIN_PASSWORD env form) — defense in
+  # depth for C1: basic auth is off and the login form hidden, so there is no
+  # auth path to admin in normal ops; this kills the admin:admin default if a
+  # login method is ever re-enabled for break-glass. Retrieve with
+  # `sops -d secrets/observability-grafana.yaml`.
+  sops.secrets."observability-grafana" = {
+    sopsFile = ../../secrets/observability-grafana.yaml;
+    key = "env";
+    owner = "observability";
+    path = "/run/secrets/observability-grafana.env";
+  };
+
   users.groups.ghcr.members = ["pyparser"];
 
   llunde.secrets = {
