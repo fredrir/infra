@@ -63,7 +63,14 @@
     container = {
       ContainerName = "llunde-valkey";
       # noeviction: sessions must fail loudly rather than silently evict (ADR 005).
-      Exec = "valkey-server --appendonly yes --maxmemory ${cfg.valkey.maxMemory} --maxmemory-policy noeviction";
+      # save "": disable RDB snapshots. AOF (appendonly) is this session store's
+      # durability path; the RDB temp file is written to /data's ROOT, owned by
+      # the service user not the container's mapped uid, so BGSAVE hits
+      # "Permission denied" and — with the default stop-writes-on-bgsave-error —
+      # takes ALL writes down (live incident 2026-08-10: every auth write 500'd
+      # on a MISCONF error). AOF writes into appendonlydir/ which the container
+      # DOES own, so it is unaffected; sessions are TTL'd ephemeral data anyway.
+      Exec = ''valkey-server --appendonly yes --save "" --maxmemory ${cfg.valkey.maxMemory} --maxmemory-policy noeviction'';
       Image = "docker.io/valkey/valkey:8";
       Network = ["llunde-backend-data.network"];
       Volume = ["${dataRoot}/valkey:/data:U"];
