@@ -71,9 +71,22 @@
       # on a MISCONF error). AOF writes into appendonlydir/ which the container
       # DOES own, so it is unaffected; sessions are TTL'd ephemeral data anyway.
       Exec = ''valkey-server --appendonly yes --save "" --maxmemory ${cfg.valkey.maxMemory} --maxmemory-policy noeviction'';
-      Image = "docker.io/valkey/valkey:8";
+      # Digest-pinned (C2, phase-4 review): valkey 8.1.9. A data store must not
+      # ride a floating tag; bumps are deliberate edits.
+      Image = "docker.io/valkey/valkey@sha256:495e4fecdc98ee48a20b207726caa5ab6451e0fac3642a9be10d9e70b3068df6";
       Network = ["llunde-backend-data.network"];
-      Volume = ["${dataRoot}/valkey:/data:U"];
+      # No :U (C2, phase-4 review). :U recursively chowns the bind mount to the
+      # container's mapped root (host uid ${toString uid}) on every start; the
+      # valkey image has no USER, so nothing then re-owns /data ROOT to the
+      # valkey user — only appendonlydir/ (which the server creates) ends up
+      # valkey-owned. AOF *rewrite* writes temp-rewriteaof-*.aof to the /data
+      # ROOT via a bare relative path, which the valkey user then cannot create
+      # -> aof_last_bgrewrite_status:err and the INCR AOF never compacts. The
+      # image entrypoint chowns /data to valkey on start (find . ! -user valkey
+      # -exec chown); the create-only tmpfiles rule below stops a later
+      # systemd-tmpfiles-resetup from clobbering that back. (postgres is immune:
+      # it writes under the pgdata/ SUBDIR, not the mount root.)
+      Volume = ["${dataRoot}/valkey:/data"];
     };
     service = {
       MemoryMax = "384M";
@@ -118,6 +131,11 @@ in {
     systemd.tmpfiles.rules =
       ["d ${dataRoot} 0750 ${owner} ${owner} -"]
       ++ lib.optional cfg.postgres.enable "d ${dataRoot}/postgres 0700 ${owner} ${owner} -"
-      ++ lib.optional cfg.valkey.enable "d ${dataRoot}/valkey 0700 ${owner} ${owner} -";
+      # Create-only (the ':' prefixes): mode/owner set ONLY at creation, never
+      # re-asserted on an existing dir. A plain `d ... 0700 owner` re-chowns the
+      # LIVE inode to the service user on every systemd-tmpfiles-resetup (i.e.
+      # after each switch) — which is exactly what stole /data ROOT back from the
+      # valkey user mid-run (C2). The container entrypoint owns runtime ownership.
+      ++ lib.optional cfg.valkey.enable "d ${dataRoot}/valkey :0700 :${owner} :${owner} -";
   };
 }
