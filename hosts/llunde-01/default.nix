@@ -37,6 +37,11 @@
   };
 
   llunde.ingress.enable = true;
+  # Phase-4 workstream E (ADR 017): serve the vhosts through the llunde tunnel.
+  llunde.ingress.tunnel = {
+    enable = true;
+    tokenFile = "/run/secrets/llunde-tunnel.env";
+  };
   llunde.backups.enable = true;
   llunde.observability = {
     enable = true;

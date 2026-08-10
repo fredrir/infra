@@ -49,6 +49,15 @@
     };
   };
 
+  # Env-file form (TUNNEL_TOKEN=...): the llunde tunnel's connector token
+  # (phase-4 workstream E, ADR 017). Never rotated casually.
+  sops.secrets."llunde-tunnel" = {
+    sopsFile = ../../secrets/llunde-tunnel.yaml;
+    key = "env";
+    owner = "edge";
+    path = "/run/secrets/llunde-tunnel.env";
+  };
+
   users.groups.ghcr.members = [
     "llunde-backend"
     "llunde-frontend"

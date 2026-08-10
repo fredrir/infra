@@ -59,6 +59,52 @@
     }
   '';
 
+  # Tunnel listener (phase-4 workstream E, ADR 017): cloudflared (host-network)
+  # dials this plain-HTTP loopback site; Cloudflare's edge terminated TLS. The
+  # three load-bearing properties from the plan review, in one place:
+  #   (a) X-Forwarded-Proto is forced to https — this hop is plain HTTP and
+  #       would otherwise report http, breaking Secure cookies + CSRF origin
+  #       checks in the backend;
+  #   (b) X-Forwarded-For is REPLACED with CF-Connecting-IP, making it the
+  #       rightmost (trusted) entry the backend keys rate-limit buckets and
+  #       audit rows on — unmapped, everything would key on cloudflared's
+  #       127.0.0.1; client-supplied XFF is discarded by the replacement, and
+  #       the mapping lives ONLY on this listener because on the public :443
+  #       path (until E6 closes it) CF-Connecting-IP is attacker-supplied;
+  #   (c) the same @ops 403s as the public vhosts — the tunnel must not
+  #       re-expose /metrics & friends.
+  tunnelHeaderUp = ''
+    header_up X-Forwarded-Proto https
+    			header_up X-Forwarded-For {header.CF-Connecting-IP}'';
+
+  tunnelHostBlock = name: vhost: let
+    m = "@t_" + lib.replaceStrings ["." "-"] ["_" "_"] name;
+  in
+    if vhost.redirectTo != null
+    then ''
+      ${m} host ${name}
+      handle ${m} {
+      	redir ${vhost.redirectTo}{uri} permanent
+      }
+    ''
+    else ''
+      	${m} host ${name}
+      	handle ${m} {
+      ${lib.optionalString vhost.blockOpsEndpoints "\t\t@ops_${lib.replaceStrings ["."] ["_"] name} path /metrics /health /ready\n\t\trespond @ops_${lib.replaceStrings ["."] ["_"] name} 403\n"}		reverse_proxy ${vhost.upstream} {
+      			${tunnelHeaderUp}
+      		}
+      	}
+    '';
+
+  tunnelSite = ''
+    http://127.0.0.1:8085 {
+    ${lib.concatStringsSep "\n" (lib.mapAttrsToList tunnelHostBlock cfg.virtualHosts)}
+    	handle {
+    		respond 404
+    	}
+    }
+  '';
+
   vhostBlock = name: vhost:
     if vhost.redirectTo != null
     then ''
@@ -82,13 +128,26 @@
     ''
     + lib.concatStringsSep "\n" (lib.mapAttrsToList vhostBlock cfg.virtualHosts)
     + "\n"
-    + metricsSite;
+    + metricsSite
+    + lib.optionalString cfg.tunnel.enable ("\n" + tunnelSite);
 in {
   options.llunde.ingress = {
     enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
       description = "Run Caddy as the host's sole public ingress/TLS terminator.";
+    };
+    tunnel = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Serve the vhosts through a Cloudflare Tunnel (ADR 017): cloudflared quadlet + the :8085 loopback listener.";
+      };
+      tokenFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        description = "EnvironmentFile with TUNNEL_TOKEN= (sops-rendered). Never rotated casually — the standing tunnel rule.";
+      };
     };
     virtualHosts = lib.mkOption {
       type = lib.types.attrsOf (
@@ -165,6 +224,27 @@ in {
       }
       // {
         "llunde/caddy/Caddyfile".text = caddyfile;
-      };
+      }
+      // lib.optionalAttrs cfg.tunnel.enable (quadlet.mkContainerUnit {
+        name = "cloudflared";
+        uid = 2000;
+        unit.Description = "Cloudflare tunnel connector for the llunde vhosts (ADR 017)";
+        container = {
+          ContainerName = "llunde-cloudflared";
+          # Host networking: it dials Caddy's 127.0.0.1:8085 — a podman-networked
+          # container's localhost is its own (phase-3.5 cutover lesson).
+          Network = "host";
+          # Digest-pinned (second-opinion requirement): the front door never
+          # rides an unpinned :latest; updates are deliberate digest bumps.
+          Image = "docker.io/cloudflare/cloudflared@sha256:e39ee8da81ad5e05d77f38d2f51c60ca51bf2a8450ac3abab50c17fdb91d91bf";
+          Exec = "tunnel --no-autoupdate run";
+          EnvironmentFile = [cfg.tunnel.tokenFile];
+        };
+        service = {
+          Restart = "always";
+          MemoryMax = "256M";
+        };
+        install.WantedBy = ["default.target"];
+      });
   };
 }
