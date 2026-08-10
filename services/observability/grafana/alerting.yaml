@@ -9,6 +9,12 @@
 # (5 m on the reachability rules).
 apiVersion: 1
 
+# The interim ntfy contact point survives in Grafana's DB even after leaving
+# this file (file-provisioned resources need explicit deletion): remove it.
+deleteContactPoints:
+  - orgId: 1
+    uid: ntfy-webhook
+
 contactPoints:
   - orgId: 1
     name: email
