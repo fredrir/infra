@@ -96,8 +96,14 @@
       	}
     '';
 
+  # NB: the address is HOSTLESS (http://:8085) with an explicit loopback bind —
+  # an address like http://127.0.0.1:8085 would make "127.0.0.1" the site's
+  # HOST matcher, and every tunnel request (Host: api.llunde.no etc.) would
+  # match no site at all, yielding Caddy's default empty 200 (E-workstream
+  # execution finding).
   tunnelSite = ''
-    http://127.0.0.1:8085 {
+    http://:8085 {
+    	bind 127.0.0.1
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList tunnelHostBlock cfg.virtualHosts)}
     	handle {
     		respond 404
