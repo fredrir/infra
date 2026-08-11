@@ -18,6 +18,7 @@
     ../../modules/tenants
     ../../modules/backups
     ../../modules/observability
+    ../../modules/gitops-pull
     ../../services/pyparser
     ../../services/observability
   ];

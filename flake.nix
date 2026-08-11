@@ -303,6 +303,41 @@
     goldenValkey = builtins.readFile ./tests/golden/llunde-valkey.container;
     goldenObsGrafana = builtins.readFile ./tests/golden/observability-grafana.container;
 
+    # gitops-pull script check (workstream A phase 2): the module lands with
+    # enable = false on both hosts, so nothing in the gate would ever
+    # instantiate its writeShellApplication — and shellcheck runs at BUILD
+    # time. This throwaway enabled config forces the script derivation via the
+    # ExecStart string's context, so `nix flake check` in CI builds and lints
+    # it before rehearsal ever touches a box. x86_64-linux only: the script's
+    # runtime closure (iproute2) does not evaluate on darwin.
+    gitopsPullScriptCheck = system: let
+      sys = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
+          ./modules/gitops-pull
+          {
+            networking.hostName = "gitops-check";
+            llunde.gitopsPull = {
+              enable = true;
+              sshKeyFile = "/run/secrets/gitops-deploy-key";
+              requireHeartbeat = false;
+              heartbeatUrlFile = "/run/secrets/gitops-heartbeat-url";
+              probePeer = "100.64.0.1";
+              reconcile.dummy = {
+                uid = 999;
+                units.dummy = {
+                  watch = ["/etc/dummy.container"];
+                  check = "true";
+                };
+              };
+            };
+          }
+        ];
+      };
+    in
+      nixpkgs.legacyPackages.${system}.writeText "gitops-pull-script-ok"
+      sys.config.systemd.services.gitops-pull.serviceConfig.ExecStart;
+
     mkRenderCheck = system:
       assert lib.assertMsg (renderedObsPrometheus == goldenObsPrometheus)
       "observability prometheus unit drifted from golden:\n---rendered---\n${renderedObsPrometheus}\n---golden---\n${goldenObsPrometheus}";
@@ -370,6 +405,7 @@
     };
 
     checks.x86_64-linux.mkquadlet-render = mkRenderCheck "x86_64-linux";
+    checks.x86_64-linux.gitops-pull-script = gitopsPullScriptCheck "x86_64-linux";
     checks.aarch64-linux.mkquadlet-render = mkRenderCheck "aarch64-linux";
     # The laptop is aarch64-darwin: without this, local `nix flake check`
     # skips the goldens as "incompatible" and passes vacuously — exactly how
