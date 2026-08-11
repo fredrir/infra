@@ -47,6 +47,40 @@ data "aws_iam_policy_document" "dataset_access" {
     actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
     resources = ["${data.aws_s3_bucket.dataset.arn}/*"]
   }
+
+  # C1/C3 fence (phase-4 review, step 0.1a). `leploy` is today one shared key
+  # used by the pyparser dataset app AND both hosts' restic (secrets/restic.yaml,
+  # secrets/pyparser-restic.yaml) with whole-bucket access — so root on either
+  # internet-facing host can reach the OpenTofu STATE and both hosts' backups.
+  # Ahead of the full per-host restic split, deny the two catastrophic vectors:
+  #   1. NEVER touch tofu-state/* — a poisoned tfstate turns the manual `tofu
+  #      apply` into the attacker's weapon (the state is a lower-assurance
+  #      principal than GitHub Actions, sitting on two public boxes).
+  #   2. NEVER permanently destroy backups — bucket versioning (parser-aws.tf
+  #      versioning block) IS the recovery, so deny version-deletes and any
+  #      change to lifecycle/versioning that would defeat it.
+  # Both are safe for leploy's legitimate use: the dataset app and restic never
+  # touch tofu-state, never delete object *versions* (restic's DeleteObject
+  # leaves recoverable delete-markers), and never reconfigure the bucket.
+  statement {
+    sid       = "DenyTofuState"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = ["${data.aws_s3_bucket.dataset.arn}/tofu-state/*"]
+  }
+  statement {
+    sid    = "DenyPermanentDestroy"
+    effect = "Deny"
+    actions = [
+      "s3:DeleteObjectVersion",
+      "s3:PutLifecycleConfiguration",
+      "s3:PutBucketVersioning",
+    ]
+    resources = [
+      data.aws_s3_bucket.dataset.arn,
+      "${data.aws_s3_bucket.dataset.arn}/*",
+    ]
+  }
 }
 
 resource "aws_iam_policy" "dataset_access" {
