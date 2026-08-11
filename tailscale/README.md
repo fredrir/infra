@@ -51,6 +51,29 @@ default-allow, tag state is irrelevant, so everything is reachable again.
 Untagging a host is a *separate, reauth-gated* operation — not the quick revert.
 Ultimate fallback: Hetzner web console + `hcloud server enable-rescue` (runbook §11).
 
+## Management scoping (second apply, 2026-08-11) — two-step order
+
+The member rule was narrowed from `*:*` to the personal mesh, with estate
+reach moved to the two management devices (`hosts` aliases macie/archie, by
+node IP — deliberately not a tag; see the comment in policy.hujson). Applying
+it is TWO pastes, so there is never a moment where the narrowing is live
+before the management rule is proven:
+
+1. **Additive paste**: current policy PLUS the `hosts` block and the
+   management rule, with rule 1 still `member → *:*` and the OLD tests.
+   Verify from the laptop: SSH both hosts, Grafana `:3000`, Prometheus
+   `:9090` all work (they now match the management rule first).
+2. **Final paste**: this repo's `policy.hujson` verbatim (rule 1 narrowed,
+   new tests). Re-verify the laptop paths, then the deny side: from the
+   PHONE (a generic member device), Grafana/`:9090` must now be unreachable.
+   Belt-and-suspenders: trigger a portfolio deploy (its runner is `tag:ci` —
+   gotcha 2 below — so rule 3 covers it; this proves that stayed true).
+
+**Revert**: re-paste the pre-narrowing policy (git history of this file).
+If a management device is reinstalled/rejoins as a new node, update its IP
+in `hosts` and re-paste — until then that device has no estate reach (the
+other device, or the Hetzner console, is the path in the meantime).
+
 ## Gotchas hit on the first apply (resolved — kept as lessons)
 
 1. **Autogroups are rejected in a test `src`** — confirmed for both
