@@ -81,6 +81,18 @@ data "aws_iam_policy_document" "dataset_access" {
       "${data.aws_s3_bucket.dataset.arn}/*",
     ]
   }
+
+  # C1/C3 completion (0.1b): both hosts now use their own per-host restic keys
+  # (restic-<host>, migrated + verified with live backups), so leploy — which is
+  # ONLY the pyparser dataset app now — never needs restic access. Fence it off
+  # so a compromise of the dataset credential can't read or touch either host's
+  # backups.
+  statement {
+    sid       = "DenyRestic"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = ["${data.aws_s3_bucket.dataset.arn}/restic/*"]
+  }
 }
 
 resource "aws_iam_policy" "dataset_access" {
