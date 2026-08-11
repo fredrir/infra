@@ -11,6 +11,12 @@ keys:
   - &llunde-01 age1thj000t9nt90g7m23tpkz3krt3h5aurj8euayvqs3kq48geaxahs3e0q3r
   - &llunde-parser age1zap47wruuc6wp387hpqq2chdx0uavt3jt0xystjn29rxgvljmplqectmnz
 creation_rules:
+  # BEFORE the catch-all: parser's gitops secrets must encrypt to parser.
+  - path_regex: secrets/gitops-llunde-parser\.yaml$
+    key_groups:
+      - age:
+          - *admin
+          - *llunde-parser
   - path_regex: secrets/(pyparser|observability)-.*\.yaml$
     key_groups:
       - age:
