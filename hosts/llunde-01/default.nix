@@ -16,6 +16,7 @@
     ../../modules/ingress
     ../../modules/backups
     ../../modules/observability
+    ../../modules/gitops-pull
     ../../services/llunde-backend
     ../../services/llunde-frontend
   ];
