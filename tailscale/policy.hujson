@@ -24,10 +24,14 @@
   },
 
   "acls": [
-    // Personal mesh: member devices reach EACH OTHER, not the estate. The
-    // phone or the linode box being lost no longer means reading Prometheus
-    // (:9090 is unauthenticated) or pushing into Loki.
-    { "action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:member:*"] },
+    // Personal mesh: member devices reach the SAME USER's devices, not the
+    // estate. The phone or the linode box being lost no longer means reading
+    // Prometheus (:9090 is unauthenticated) or pushing into Loki.
+    // autogroup:SELF, not autogroup:member — console arbitration (2026-08-11,
+    // second apply): a dst of autogroup:member does NOT match (test wanted
+    // Accept on archie:22, engine said Drop); self is the canonical dst form
+    // and identical in meaning on a solo tailnet.
+    { "action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"] },
 
     // Estate management is scoped to the two management devices (laptop +
     // desktop; two so losing one is not lockout — and the Hetzner console
@@ -63,13 +67,11 @@
   // Guardrails: the console REJECTS a policy that breaks these. Assert the whole
   // lockout surface — SSH to BOTH hosts, the PUSH port 3100, and the node ports.
   // NOTES: the console rejects autogroups inside a test src (concrete login
-  // instead). Two save-time unknowns, arbitrated by the console (a rejected
-  // save is atomic and safe): (1) if it rejects the host-alias src ("macie"),
-  // strip that test and rely on the README's live verification; (2) if the
-  // fredrir@github DENY fails at save citing the mgmt devices, the console
-  // enumerates the user's devices — then drop the estate denies from that
-  // test too (no "member-except-X" selector exists) and the phone spot-check
-  // in the README becomes the only deny proof. Record which way it went here.
+  // instead). Save-time arbitration results (2026-08-11, second apply):
+  // host-alias test srcs ("macie") ARE accepted; user-src tests do RULE
+  // matching, not device enumeration (the estate denies pass even though
+  // macie-by-IP can reach); and autogroup:member in an acl DST does not
+  // match — the mesh rule uses autogroup:self (see its comment).
   "tests": [
     // Management device: full estate reach.
     { "src": "macie",
