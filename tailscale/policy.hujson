@@ -31,12 +31,23 @@
     { "action": "accept", "src": ["tag:ci"], "dst": ["tag:server:22"] }
   ],
 
+  // Tailscale SSH is governed HERE, separately from the acls above. Overwriting
+  // the built-in default policy drops Tailscale's default self-SSH rule, and
+  // without this block `ssh archie` (any device with `tailscale up --ssh`) fails
+  // "tailnet policy does not permit you to SSH". This restores it: any of your
+  // devices may SSH your OWN devices (autogroup:self). The estate hosts run
+  // REGULAR sshd (governed by the acls, rule 1), NOT this. Swap "check" ->
+  // "accept" to drop the periodic browser re-auth.
+  "ssh": [
+    { "action": "check", "src": ["autogroup:member"], "dst": ["autogroup:self"], "users": ["autogroup:nonroot", "root"] }
+  ],
+
   // Guardrails: the console REJECTS a policy that breaks these. Assert the whole
   // lockout surface — SSH to BOTH hosts, the PUSH port 3100, and the node ports.
-  // If the console rejects "autogroup:member" inside a test src, replace those
-  // two src values with your login (e.g. "you@github"); the acls stay as-is.
+  // NOTE: the console rejects autogroups (autogroup:member/owner) inside a test
+  // src, so the management test uses the concrete login.
   "tests": [
-    { "src": "autogroup:member",
+    { "src": "fredrir@github",
       "accept": ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.109.80.121:9101"] },
     { "src": "tag:server",
       "accept": ["100.109.80.121:9100","100.92.219.50:9100","100.109.80.121:9101","100.92.219.50:3100","100.92.219.50:4317"],

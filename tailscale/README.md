@@ -21,7 +21,11 @@ Save this in the console (it defines tag ownership but restricts nothing):
 ```jsonc
 {
   "tagOwners": { "tag:server": ["autogroup:member"], "tag:ci": ["autogroup:member"] },
-  "acls": [ { "action": "accept", "src": ["*"], "dst": ["*:*"] } ]
+  "acls": [ { "action": "accept", "src": ["*"], "dst": ["*:*"] } ],
+  // Keep Tailscale SSH to your own --ssh devices working — the acls do NOT
+  // govern Tailscale SSH; without this, `ssh archie` breaks the moment any
+  // custom policy is saved.
+  "ssh": [ { "action": "check", "src": ["autogroup:member"], "dst": ["autogroup:self"], "users": ["autogroup:nonroot", "root"] } ]
 }
 ```
 
@@ -47,16 +51,20 @@ default-allow, tag state is irrelevant, so everything is reachable again.
 Untagging a host is a *separate, reauth-gated* operation — not the quick revert.
 Ultimate fallback: Hetzner web console + `hcloud server enable-rescue` (runbook §11).
 
-## Before Phase 4 — two gates
+## Gotchas hit on the first apply (resolved — kept as lessons)
 
-1. **`autogroup:member` in test `src`.** If the console rejects it, swap the two
-   test `src` values for your login (Users page, e.g. `you@github`).
-2. **How CI joins the tailnet.** The `tag:ci` rule only isolates CI *if the
-   runners advertise `tag:ci`*. If a CI runner (esp. portfolio's deploy) joins
-   as your member account instead, it stays under the member rule (works, but
-   unrestricted); if it joins under a *different* tag, Phase 4 **denies it and
-   breaks that deploy**. Confirm portfolio's + infra CI tailnet identity before
-   Phase 4, or apply Phase 4 in a window where you can watch a deploy and revert.
+1. **Autogroups are rejected in a test `src`** — confirmed for both
+   `autogroup:owner` and `autogroup:member`. The management test uses the
+   concrete login `fredrir@github`; the `acls` keep `autogroup:member` (valid
+   there).
+2. **CI identity confirmed.** Both CI auth keys (`ci-portfolio`, `ci-pyparser`)
+   carry `tag:ci`, and the infra repo's CI never joins the tailnet — so rule 3
+   covers portfolio deploys AND isolates them. (`tag:ci` only isolates CI *if*
+   the runners advertise it; they do.)
+3. **Tailscale SSH needs its own `ssh` block.** Replacing the default policy
+   dropped Tailscale's built-in self-SSH rule, which broke `ssh archie` (a
+   `--ssh`-enabled device). The estate hosts run regular sshd (unaffected). The
+   policy now carries the self-SSH block, and so does the Phase-1 snippet above.
 
 ## Codification (reinstall-safety follow-up)
 
