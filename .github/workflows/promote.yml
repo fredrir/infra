@@ -1,0 +1,60 @@
+# GitOps PULL substrate (workstream A, ADR 019 revised push -> pull): when the
+# Check gate passes on a push to main, fast-forward the `deploy` pointer to that
+# commit. The hosts pull `deploy`, never `main`, so they only ever apply a commit
+# the gate has already green-lit — closing the ungated-apply race that a raw
+# `github:...#<host>` timer tracking main would have.
+#
+# Kept SEPARATE from check.yml on purpose: a bug here can never affect the
+# required gate. The only credential is the ephemeral GITHUB_TOKEN, scoped to
+# move exactly one ref — no standing secret reaches the estate (that is the whole
+# point of pull).
+#
+#   Central pause : disable this workflow -> deploy freezes -> both hosts freeze.
+#   Rollback      : `git push -f <good-sha>:deploy` from the laptop (works with
+#                   the tailnet down; deploy is deliberately UNPROTECTED so this
+#                   force-push is always available).
+name: Promote to deploy
+
+on:
+  workflow_run:
+    workflows: ["Check"]
+    types: [completed]
+
+# Serialize promotes; never cancel one mid-flight.
+concurrency:
+  group: promote-deploy
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    # Only a GREEN gate, on a push to main (never PR runs).
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Fast-forward deploy -> gated main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          echo "Check passed on main @ $SHA"
+          CUR="$(gh api "repos/$REPO/git/ref/heads/deploy" -q '.object.sha' 2>/dev/null || true)"
+          if [ -z "$CUR" ]; then
+            echo "deploy ref missing — creating it at $SHA"
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/heads/deploy" -f sha="$SHA"
+          elif [ "$CUR" = "$SHA" ]; then
+            echo "deploy already at $SHA — nothing to do"
+          else
+            # force=false => FAST-FORWARD ONLY: deploy can never diverge from
+            # main's gated history; a non-fast-forward fails loudly instead of
+            # clobbering (e.g. if deploy was manually rolled back to a commit
+            # that is not an ancestor of $SHA).
+            echo "fast-forwarding deploy $CUR -> $SHA"
+            gh api -X PATCH "repos/$REPO/git/refs/heads/deploy" -f sha="$SHA" -F force=false
+          fi
