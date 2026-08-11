@@ -104,26 +104,42 @@ tailscale status | grep llunde-01                  # from the laptop -> <TAILNET
 ssh root@<TAILNET_IP> true                         # management path works (ADR 008)
 ```
 
-## 6. Deploy configuration changes (steady-state loop)
+## 6. Deploy configuration changes (steady-state loop — PULL, ADR 020)
 
-Recommended (push from laptop; works while the repo is private):
+**Merging to `main` IS the deploy.** The gate (`Check`) passes → `promote.yml`
+fast-forwards `deploy` → each host applies itself (`modules/gitops-pull`):
+
+- **llunde-01** within ~5 min of promotion (the canary)
+- **llunde-parser** +30 min behind (refuses younger revs)
 
 ```sh
-git push && nix run nixpkgs#nixos-rebuild -- switch --flake .#llunde-01 \
+ssh root@<TAILNET_IP> journalctl -fu gitops-pull      # watch a rollout
+ssh root@<TAILNET_IP> cat /var/lib/gitops-pull/applied  # which rev is live
+```
+(also `gitops_pull_applied_info` / `gitops_pull_last_success_timestamp` in Prometheus)
+
+The pull loop **subsumes the old post-switch restart step** (phase-4 review
+B4): units whose quadlet file or bind-mounted config changed (Caddyfile,
+cloudflared, prometheus.yml, …) are restarted by the module's reconcile map
+(`llunde.gitopsPull.reconcile` in each host file). **A NEW quadlet unit or
+bind-mounted config MUST be added to that map** — otherwise its config changes
+land on disk but never go live: NixOS's switch only daemon-reloads user
+managers, and podman resolves bind mounts at container *creation*.
+
+Manual deploy (the recovery route — must always work, unchanged mechanics):
+
+```sh
+ssh root@<TAILNET_IP> systemctl stop gitops-pull.timer   # pause the loop FIRST
+nix run nixpkgs#nixos-rebuild -- switch --flake .#<host> \
   --target-host root@<TAILNET_IP> --build-host root@<TAILNET_IP>
-# native nix (no container wrapper); --build-host keeps the build on the box
+# ...restart affected user units per the reconcile map, then:
+ssh root@<TAILNET_IP> systemctl start gitops-pull.timer
 ```
 
-Alternative (on-host): `nixos-rebuild switch --flake github:fredrir/llunde-infra#llunde-01` — ⚠️ requires the private repo readable from the host (fine-grained PAT in `/etc/nix/netrc`); set that up only if the push flow annoys.
-
-After any change touching quadlet units, confirm regeneration: `ssh root@<TAILNET_IP> systemctl --user -M llunde-backend@ list-units 'llunde-*'` (matches the quadlet module's `systemctl --machine=<user>@ --user` hook).
-
-**Changes to the `edge` units (Caddyfile, cloudflared) need an explicit restart — the reload hook is not enough.** The activation hook only `daemon-reload`s each `serviceUsers` manager; it does **not** recreate containers. Caddy's `/etc/caddy/Caddyfile` is a bind mount that podman resolves at container *creation*, so even an in-container `caddy reload` re-reads the *old* file — only a recreate picks up a new Caddyfile. This is the difference between "I closed the hole" and "I believe I closed the hole" (phase-4 review B4). After a switch that changed the Caddyfile or the cloudflared unit:
-
-```sh
-ssh root@<TAILNET_IP> systemctl --user -M edge@ restart caddy cloudflared
-ssh root@<TAILNET_IP> systemctl --user -M edge@ show caddy cloudflared -p ActiveEnterTimestamp   # expect fresh timestamps
-```
+⚠️ The loop converges to `deploy`: a manually deployed rev that is NOT the
+`deploy` tip gets rolled back to it on the next cycle. Keep the timer stopped
+until your change is merged **and promoted** (this bit during the 2c
+bootstrap: the enable-commit's own promotion raced the first poll).
 
 ## 7. DNS cutover (Cloudflare dashboard, zone `llunde.no` = 4ae54b24fc4140d4d1c450491645f1c8)
 
@@ -160,7 +176,13 @@ ssh root@<TAILNET_IP> reboot && sleep 90 && curl -s https://api.llunde.no/ready
 ## 9. Update & rollback
 
 - **App images**: pull-based — per-user `podman-auto-update.timer` polls GHCR `:latest` (`AutoUpdate=registry`). Manual poke: §8's `systemctl --user -M <user>@ start podman-auto-update.service`. Pin/rollback an image: set the unit's `Image=` to a digest in `services/<name>/default.nix`, deploy (§6).
-- **Config**: `nixos-rebuild --rollback switch` on the host, or pick the previous generation in the systemd-boot menu; every deploy is a new generation.
+- **Config — roll back the estate**: `git push -f <good-sha>:deploy` from the laptop. Works with the tailnet down (`deploy` is deliberately unprotected so this lever always exists); hosts converge within a cycle (llunde-01) / after the 30-min lag (parser). Then fix forward on main via PR — the next green merge fast-forwards `deploy` back onto main's history.
+- **Pause all applies**: GitHub → Actions → *Promote to deploy* → Disable workflow (freezes `deploy`, both hosts hold). Per host: `systemctl stop gitops-pull.timer`.
+- **After a deadman rollback** (host rebooted into the previous generation; you got the healthchecks `/fail` email): the offending rev is **HELD** on that host — no reboot loop. Fix forward on main; the newly promoted rev clears the hold automatically. To force-retry the same rev instead: `rm /var/lib/gitops-pull/attempting` on the host.
+- **Sticky reconcile failure** (`/var/lib/gitops-pull/reconcile_failed` exists, heartbeat failing while "converged"): a unit restart failed after a switch. Fix the unit; any successful apply clears the marker (or remove it by hand).
+- **Host unreachable and the deadman didn't fire**: `hcloud server reset <name>` — boots the previous boot-default generation (the loop never moves the boot default before its probes pass). Rehearsed 2026-08-11.
+- **Host won't BOOT** (kernel/initrd/bootloader — the accepted boot-plane residual, ADR 020): Hetzner console (web VNC) → systemd-boot menu → select the previous generation.
+- **Emergency local rollback** (on a reachable host): `nixos-rebuild --rollback switch` still works — but remember the loop will re-converge to `deploy` unless you stop the timer.
 
 ## 10. Restore from backup (rehearse once at the gate)
 

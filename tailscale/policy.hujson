@@ -24,11 +24,13 @@
     // blackbox /ready probe}; llunde-01->parser {3100 Loki push, 4317/4318 OTLP}.
     { "action": "accept", "src": ["tag:server"], "dst": ["tag:server:9100,9101,3100,4317,4318"] },
 
-    // CI over SSH only. The infra GitOps auto-apply (ADR 019) SSHes BOTH hosts;
-    // portfolio's deploy SSHes parser. Nothing else. (Effective ONLY once the CI
-    // runners actually advertise tag:ci — otherwise they fall under the member
-    // rule above; confirm before relying on this for isolation.)
-    { "action": "accept", "src": ["tag:ci"], "dst": ["tag:server:22"] }
+    // CI over SSH, parser ONLY: portfolio's deploy is the sole remaining
+    // tailnet CI consumer — infra deploys are PULL (ADR 020, hosts fetch from
+    // GitHub; no CI ever SSHes them) and pyparser is pull-based (build.yml
+    // only). Narrowed from tag:server:22 when ADR 019's push design died.
+    // (Effective ONLY once the CI runners actually advertise tag:ci —
+    // otherwise they fall under the member rule above.)
+    { "action": "accept", "src": ["tag:ci"], "dst": ["100.92.219.50:22"] }
   ],
 
   // Tailscale SSH is governed HERE, separately from the acls above. Overwriting
@@ -53,7 +55,7 @@
       "accept": ["100.109.80.121:9100","100.92.219.50:9100","100.109.80.121:9101","100.92.219.50:3100","100.92.219.50:4317"],
       "deny":   ["100.92.219.50:3000","100.109.80.121:22"] },
     { "src": "tag:ci",
-      "accept": ["100.109.80.121:22","100.92.219.50:22"],
-      "deny":   ["100.92.219.50:3000","100.92.219.50:3100","100.92.219.50:9100"] }
+      "accept": ["100.92.219.50:22"],
+      "deny":   ["100.109.80.121:22","100.92.219.50:3000","100.92.219.50:3100","100.92.219.50:9100"] }
   ]
 }

@@ -1,6 +1,6 @@
 # ADR 019: GitOps — Full Auto-Apply on Merge
 
-**Status**: Accepted · **Date**: 2026-08-09 (phase-4 re-evaluation) · Executes the revisit [ADR 010](010-shared-ci-reusable-workflows.md) deferred
+**Status**: Superseded by [ADR 020](020-gitops-pull-auto-apply.md) (2026-08-11 — the owner rejected this push design's credential posture before implementation; nothing here was ever built) · **Date**: 2026-08-09 (phase-4 re-evaluation) · Executes the revisit [ADR 010](010-shared-ci-reusable-workflows.md) deferred
 
 ## Context
 
