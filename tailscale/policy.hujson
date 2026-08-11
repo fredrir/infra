@@ -76,9 +76,12 @@
     // Management device: full estate reach.
     { "src": "macie",
       "accept": ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.109.80.121:9101"] },
-    // A GENERIC member device (phone, linode): personal mesh yes, estate NO.
+    // A GENERIC member device (phone, linode): estate NO. The personal-mesh
+    // ACCEPT cannot be asserted here — the test framework cannot evaluate
+    // autogroup dsts (tailscale/tailscale#4416; two live rejections proved it
+    // for both member and self on 2026-08-11). The mesh proof is the README's
+    // live check: `ssh archie` from the laptop after every paste.
     { "src": "fredrir@github",
-      "accept": ["100.126.231.24:22"],
       "deny":   ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.92.219.50:9090","100.92.219.50:3100"] },
     { "src": "tag:server",
       "accept": ["100.109.80.121:9100","100.92.219.50:9100","100.109.80.121:9101","100.92.219.50:3100","100.92.219.50:4317"],
