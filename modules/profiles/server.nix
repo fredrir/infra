@@ -21,6 +21,11 @@
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = false;
     boot.loader.grub.enable = false;
+    # The ESP is 512M (disko): ~10 mixed-kernel generations would overflow it.
+    # 5 keeps the boot menu (the boot-plane recovery path, ADR 020 residual)
+    # usable without filling the partition. Rollback depth beyond that rides
+    # `git push -f deploy`, not the bootloader.
+    boot.loader.systemd-boot.configurationLimit = 5;
 
     time.timeZone = "UTC";
 
@@ -58,8 +63,10 @@
       dockerCompat = false;
     };
 
-    # No system.autoUpgrade on purpose: NixOS updates flow through git (ADR 001) —
-    # a new generation is always an explicit `nixos-rebuild switch --flake`.
+    # No system.autoUpgrade on purpose — but the estate is NOT manually
+    # deployed either: modules/gitops-pull (ADR 020) applies the gate-green
+    # `deploy` pointer on each host. autoUpgrade would track a channel/flakeref
+    # tip with none of the gate/promoter/deadman machinery around it.
 
     nix = {
       settings = {
