@@ -544,7 +544,10 @@ in {
         MemoryHigh = "1792M";
         MemoryMax = "2304M";
         CPUWeight = 30;
-        RuntimeMaxSec = 2700;
+        # Runaway cap. NOT RuntimeMaxSec: systemd ignores it for Type=oneshot
+        # (rehearsal journal finding). On expiry the apply is killed mid-flight
+        # and the armed deadman does exactly what it is for.
+        TimeoutStartSec = 2700;
         Environment = ["HOME=/root"];
       };
       onFailure = ["gitops-pull-failed.service"];

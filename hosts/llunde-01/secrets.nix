@@ -58,6 +58,18 @@
     path = "/run/secrets/llunde-tunnel.env";
   };
 
+  # GitOps pull (ADR 020, workstream A phase 2c): the read-only deploy key and
+  # this host's external heartbeat URL. In sops on purpose — NOT the obs
+  # deadman's out-of-band /var/lib file pattern (review B6).
+  sops.secrets."gitops-deploy-key" = {
+    sopsFile = ../../secrets/gitops-llunde-01.yaml;
+    key = "deploy_key";
+  };
+  sops.secrets."gitops-heartbeat-url" = {
+    sopsFile = ../../secrets/gitops-llunde-01.yaml;
+    key = "heartbeat_url";
+  };
+
   users.groups.ghcr.members = [
     "llunde-backend"
     "llunde-frontend"
