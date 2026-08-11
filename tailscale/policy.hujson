@@ -12,11 +12,27 @@
     "tag:ci":     ["autogroup:member"]
   },
 
+  // Management devices, by tailnet node IP. Deliberately NOT a tag:admin:
+  // tagging macie/archie would strip their member-ness — breaking the personal
+  // mesh (rule 1) and the ssh self-rule below (tagged devices have no "self"),
+  // the same mechanics class that caused the `ssh archie` outage on the first
+  // apply. Cost of the IP form: update here if a management device ever
+  // re-joins the tailnet as a new node.
+  "hosts": {
+    "macie":  "100.75.71.79",
+    "archie": "100.126.231.24"
+  },
+
   "acls": [
-    // Your own (untagged, member-owned) devices — macie/archie/linode/iphone —
-    // reach everything. Lockout-proof management. NOTE: this trusts ALL your
-    // devices, not just the laptop; tighten with a tag:admin only after cutover.
-    { "action": "accept", "src": ["autogroup:member"], "dst": ["*:*"] },
+    // Personal mesh: member devices reach EACH OTHER, not the estate. The
+    // phone or the linode box being lost no longer means reading Prometheus
+    // (:9090 is unauthenticated) or pushing into Loki.
+    { "action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:member:*"] },
+
+    // Estate management is scoped to the two management devices (laptop +
+    // desktop; two so losing one is not lockout — and the Hetzner console
+    // remains the true break-glass, no tailnet needed).
+    { "action": "accept", "src": ["macie", "archie"], "dst": ["tag:server:*"] },
 
     // Estate hosts reach ONLY each other's scrape/push ports. UNION of both
     // directions (verified against services/observability/unit.nix + modules/
@@ -38,19 +54,30 @@
   // without this block `ssh archie` (any device with `tailscale up --ssh`) fails
   // "tailnet policy does not permit you to SSH". This restores it: any of your
   // devices may SSH your OWN devices (autogroup:self). The estate hosts run
-  // REGULAR sshd (governed by the acls, rule 1), NOT this. Swap "check" ->
-  // "accept" to drop the periodic browser re-auth.
+  // REGULAR sshd (governed by the acls — the management-device rule), NOT
+  // this. Swap "check" -> "accept" to drop the periodic browser re-auth.
   "ssh": [
     { "action": "check", "src": ["autogroup:member"], "dst": ["autogroup:self"], "users": ["autogroup:nonroot", "root"] }
   ],
 
   // Guardrails: the console REJECTS a policy that breaks these. Assert the whole
   // lockout surface — SSH to BOTH hosts, the PUSH port 3100, and the node ports.
-  // NOTE: the console rejects autogroups (autogroup:member/owner) inside a test
-  // src, so the management test uses the concrete login.
+  // NOTES: the console rejects autogroups inside a test src (concrete login
+  // instead). Two save-time unknowns, arbitrated by the console (a rejected
+  // save is atomic and safe): (1) if it rejects the host-alias src ("macie"),
+  // strip that test and rely on the README's live verification; (2) if the
+  // fredrir@github DENY fails at save citing the mgmt devices, the console
+  // enumerates the user's devices — then drop the estate denies from that
+  // test too (no "member-except-X" selector exists) and the phone spot-check
+  // in the README becomes the only deny proof. Record which way it went here.
   "tests": [
-    { "src": "fredrir@github",
+    // Management device: full estate reach.
+    { "src": "macie",
       "accept": ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.109.80.121:9101"] },
+    // A GENERIC member device (phone, linode): personal mesh yes, estate NO.
+    { "src": "fredrir@github",
+      "accept": ["100.126.231.24:22"],
+      "deny":   ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.92.219.50:9090","100.92.219.50:3100"] },
     { "src": "tag:server",
       "accept": ["100.109.80.121:9100","100.92.219.50:9100","100.109.80.121:9101","100.92.219.50:3100","100.92.219.50:4317"],
       "deny":   ["100.92.219.50:3000","100.109.80.121:22"] },
