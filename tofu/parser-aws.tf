@@ -101,3 +101,70 @@ resource "aws_iam_user_policy_attachment" "leploy_dataset" {
   user       = aws_iam_user.leploy.name
   policy_arn = aws_iam_policy.dataset_access.arn
 }
+
+# ---- Per-host restic keys (C1/C3 step 0.1b) ----
+# The full split: each host gets a key scoped to its OWN restic prefix — it can
+# read/write its backups and manage its own locks, but CANNOT delete backup
+# DATA. So a compromised host cannot ransomware its own or (crucially) the other
+# host's backups; llunde-01's key is useless against restic/llunde-parser/*.
+# `restic forget --prune` (the only thing that deletes data) moves to a
+# delete-capable, prefix-scoped operator run FROM THE LAPTOP.
+#
+# Rollout is staged (a naive apply would break live backups): apply creates
+# these users inert → create an access key for each out-of-band (like leploy) →
+# rewire each host's sops restic-env + drop `pruneOpts` in ONE rebuild → verify a
+# real backup runs green → only THEN deny leploy on restic/* (separate PR).
+# Access keys are deliberately NOT managed here (unrecoverable secret; rotating
+# via tofu would break the live restic-env — same rule as leploy).
+
+locals {
+  restic_hosts = toset(["llunde-01", "llunde-parser"])
+}
+
+data "aws_iam_policy_document" "restic_host" {
+  for_each = local.restic_hosts
+
+  statement {
+    sid       = "ListOwnResticRepo"
+    actions   = ["s3:ListBucket", "s3:GetBucketLocation"]
+    resources = [data.aws_s3_bucket.dataset.arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["restic/${each.key}/*"]
+    }
+  }
+
+  statement {
+    sid       = "ReadWriteOwnResticObjects"
+    actions   = ["s3:GetObject", "s3:PutObject"]
+    resources = ["${data.aws_s3_bucket.dataset.arn}/restic/${each.key}/*"]
+  }
+
+  # Delete ONLY lock objects: restic acquires+releases a lock every run and
+  # cannot operate if it can't remove its own lock. Backup DATA (data/, index/,
+  # snapshots/) is not deletable with this key — that is the ransomware fence.
+  statement {
+    sid       = "DeleteOwnResticLocksOnly"
+    actions   = ["s3:DeleteObject"]
+    resources = ["${data.aws_s3_bucket.dataset.arn}/restic/${each.key}/locks/*"]
+  }
+}
+
+resource "aws_iam_user" "restic_host" {
+  for_each = local.restic_hosts
+  name     = "restic-${each.key}"
+}
+
+resource "aws_iam_policy" "restic_host" {
+  for_each    = local.restic_hosts
+  name_prefix = "restic-${each.key}-"
+  description = "Append-only restic access to restic/${each.key}/* (own locks deletable)"
+  policy      = data.aws_iam_policy_document.restic_host[each.key].json
+}
+
+resource "aws_iam_user_policy_attachment" "restic_host" {
+  for_each   = local.restic_hosts
+  user       = aws_iam_user.restic_host[each.key].name
+  policy_arn = aws_iam_policy.restic_host[each.key].arn
+}
