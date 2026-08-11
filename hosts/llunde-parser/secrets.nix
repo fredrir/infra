@@ -68,4 +68,16 @@
   };
 
   llunde.tailscale.authKeyFile = lib.mkDefault config.sops.secrets."tailscale-auth-key".path;
+
+  # GitOps pull (ADR 020, phase 2d): read-only deploy key + this host's
+  # external heartbeat URL — the heartbeat matters MOST here: the obs stack
+  # lives on this box, nothing else watches it.
+  sops.secrets."gitops-deploy-key" = {
+    sopsFile = ../../secrets/gitops-llunde-parser.yaml;
+    key = "deploy_key";
+  };
+  sops.secrets."gitops-heartbeat-url" = {
+    sopsFile = ../../secrets/gitops-llunde-parser.yaml;
+    key = "heartbeat_url";
+  };
 }
