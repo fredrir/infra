@@ -235,14 +235,33 @@ for p in metrics metrics/ metrics// metrics%2f METRICS metrics/x health health/ 
   printf '%-12s %s\n' "$p" "$(curl -sS --path-as-is -o /dev/null -w '%{http_code}' "https://api.llunde.no/$p")"
 done                                                   # every one 403
 
-# 5. the real-IP contract, end to end (ADR 017's non-optional verification)
+# 5. the real-IP contract, end to end (ADR 017's non-optional verification).
+#    NB: there is NO audit table and the backend logs no client IPs — the schema
+#    is flyway_schema_history + users, nothing else (checked at the E5 cutover).
+#    Earlier drafts of this section said to read an audit row; that check cannot
+#    be run. The RATE LIMITER is the observable proof, and it is a better one:
+#    it exercises the same keying the buckets actually use.
 EMAIL="cutover-$(date +%s)@example.com"
 curl -sS -i -X POST https://api.llunde.no/auth/register -H 'Origin: https://llunde.no' \
   -H 'X-CSRF-Token: t' -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"correct horse battery\"}"
-#    -> 201, and Set-Cookie carries `Secure` (proves X-Forwarded-Proto=https survives the plain-HTTP hop)
-#    -> the backend audit row for this registration shows YOUR public IP, not 127.0.0.1 and not a CF address
-#    -> forged headers are discarded: repeat with -H 'X-Forwarded-For: 9.9.9.9' and the audit IP is unchanged
+  -d "{\"email\":\"$EMAIL\",\"password\":\"correct horse battery\"}"          # 201
+curl -sS -i -X POST https://api.llunde.no/auth/login -H 'Origin: https://llunde.no' \
+  -H 'X-CSRF-Token: t' -H 'Content-Type: application/json' \
+  -d "{\"email\":\"$EMAIL\",\"password\":\"correct horse battery\"}" | grep -i set-cookie
+#    -> 200 and the cookie carries `Secure` — proof that X-Forwarded-Proto=https
+#       survives the plain-HTTP tunnel hop (registration alone sets no cookie).
+
+# 20 failed logins, each with a DIFFERENT forged X-Forwarded-For:
+for i in $(seq 1 20); do
+  curl -sS -o /dev/null -w '%{http_code} ' -H "X-Forwarded-For: 203.0.113.$i" \
+    -H 'Origin: https://llunde.no' -H 'X-CSRF-Token: t' -H 'Content-Type: application/json' \
+    -X POST https://api.llunde.no/auth/login -d '{"email":"nobody@example.com","password":"wrong"}'
+done; echo
+#    -> a few 401s then 429s. They all share ONE bucket despite rotating forged
+#       XFF, which is only possible if Caddy REPLACED X-Forwarded-For with
+#       CF-Connecting-IP and discarded the client's. If forged XFF were trusted
+#       each request would be its own bucket and no 429 would ever appear.
+#       Observed at the 2026-08-13 cutover: 401 x5, then 429 x15.
 
 # 6. the collectors agree
 curl -s http://100.92.219.50:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.labels.job) \(.health)"' | sort
