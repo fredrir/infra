@@ -10,6 +10,32 @@ still owes itself.
 — handover written 2026-08-12, owner-gated. M3 (cutover-visible CF-Ray probe)
 lands WITH E5, not from this list.
 
+## CI resilience
+
+- **Providers via nix** — make the gate fully offline for OpenTofu providers by
+  building them through nixpkgs (`opentofu.withPlugins` / `terraform-providers.*`)
+  instead of letting `init` fetch from GitHub release assets on every run.
+
+  *Provenance*: on 2026-08-12 the `tofu` job failed twice on main (503, then
+  `context deadline exceeded`) fetching provider `SHA256SUMS` from
+  `github.com/…/releases/download/…`, while the same URLs returned 200 from the
+  laptop and GitHub's status page read "Actions: Normal" — release-asset
+  delivery is a separate component, and transient throttling of runner egress
+  never becomes a declared incident. Under pull auto-apply a red gate means no
+  deploys, so an upstream CDN wobble froze the estate; `deploy` had to be moved
+  by hand after verifying the tree locally.
+
+  A `TF_PLUGIN_CACHE_DIR` cache landed as the cheap fix and keeps the current
+  shape, but it only *reduces* registry contact — a cold cache still reaches
+  out. The nix route removes the dependency entirely and fits the estate's
+  everything-through-nix grain.
+
+  *Why parked*: nixpkgs' provider versions must agree with
+  `tofu/.terraform.lock.hcl`, so adopting it means either pinning nixpkgs to
+  versions that match or re-locking against whatever nixpkgs ships — a
+  version-management commitment, not a one-line change. Not worth doing mid-
+  cutover.
+
 ## Security / hardening (phase-4 review residue)
 
 - **H2** — strip `X-Forwarded-Port` / `X-Forwarded-Ssl` / `Front-End-Https`

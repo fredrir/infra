@@ -31,12 +31,31 @@ jobs:
 
   tofu:
     runs-on: ubuntu-latest
+    # Every `init` otherwise re-downloads all three providers from GitHub's
+    # release assets. On 2026-08-12 that path returned 503 and then timed out
+    # for ~15 minutes while GitHub's own status page read "Actions: Normal" —
+    # release-asset delivery is a different component, and transient egress
+    # throttling of runners never shows up as an incident at all. Under pull
+    # auto-apply a red gate means NO DEPLOYS, so an upstream CDN wobble froze
+    # the estate. The cache turns that from an outage into a slow run.
+    env:
+      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
+      # Keyed on the lock file: a provider bump misses the cache and refetches,
+      # which is exactly right. SHA-pinned like every other action here — this
+      # gate is what the deploy pointer trusts.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ github.workspace }}/.tofu-plugin-cache
+          key: tofu-providers-${{ hashFiles('tofu/.terraform.lock.hcl') }}
+          restore-keys: tofu-providers-
       - name: fmt
         run: nix run nixpkgs#opentofu -- -chdir=tofu fmt -check -recursive
       - name: validate (no backend, no credentials)
         run: |
+          # The cache dir must exist before init or the setting is ignored.
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
           nix run nixpkgs#opentofu -- -chdir=tofu init -backend=false -input=false
           nix run nixpkgs#opentofu -- -chdir=tofu validate
