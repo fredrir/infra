@@ -8,9 +8,11 @@
     type = lib.types.listOf lib.types.port;
     default = [];
     description = ''
-      TCP ports open on public interfaces. llunde-01 opens 80/443 for Caddy;
-      llunde-parser opens nothing (tunnel ingress, tailnet SSH — ADR 015).
-      The tailnet is always trusted regardless.
+      TCP ports open on public interfaces. Since phase-4 E6 (ADR 017) BOTH
+      hosts leave this empty: all web ingress arrives through Cloudflare
+      tunnels the hosts dial outbound, and SSH rides the tailnet (ADR 015).
+      The estate has zero public inbound. The tailnet is always trusted
+      regardless, which is what keeps 9100/9101 reachable for scraping.
     '';
   };
 
@@ -55,7 +57,10 @@
       trustedInterfaces = ["tailscale0"];
     };
 
-    # Rootless Caddy (uid 2000) binds 80/443 directly (ADR 005/006).
+    # Rootless Caddy (uid 2000) binds 80/443 directly (ADR 005/006). Still
+    # required after E6: the sockets are bound, they are simply unreachable
+    # from outside, and break-glass re-opens the firewall rather than
+    # reconfiguring Caddy.
     boot.kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
 
     virtualisation.podman = {

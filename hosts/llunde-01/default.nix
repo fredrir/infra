@@ -27,11 +27,16 @@
 
   networking.hostName = "llunde-01";
 
-  # Caddy's public ports (ADR 006); llunde-parser opens none (ADR 015).
-  llunde.profile.publicTCPPorts = [
-    80
-    443
-  ];
+  # E6 (ADR 017): ZERO public inbound, estate-wide. Caddy still BINDS 80/443 —
+  # nothing reaches them. Public traffic arrives through the tunnel, which
+  # cloudflared dials outbound, and the listeners stay so that re-opening the
+  # cloud firewall is the only step break-glass needs (runbook §7.5).
+  #
+  # The Hetzner firewall was emptied first and separately (B5): the hcloud
+  # provider cannot delete a firewall's LAST rules — its update omits the field
+  # and silently no-ops while printing "Apply complete". This line is the NixOS
+  # half of a close that already happened at the cloud edge.
+  llunde.profile.publicTCPPorts = [];
 
   # Fixed uids are contract values (docs/init/plans/phase-2/contract.md);
   # quadlet paths /etc/containers/systemd/users/<uid>/ depend on them.
