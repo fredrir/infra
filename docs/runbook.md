@@ -148,14 +148,200 @@ ssh root@<TAILNET_IP> systemctl start gitops-pull.timer
 until your change is merged **and promoted** (this bit during the 2c
 bootstrap: the enable-commit's own promotion raced the first poll).
 
-## 7. DNS cutover (Cloudflare dashboard, zone `llunde.no` = 4ae54b24fc4140d4d1c450491645f1c8)
+## 7. Edge cutover — llunde.no onto the tunnel, then zero public inbound (phase-4 E5/B5/E6, ADR 017)
 
-Precondition: `curl -H "Host: api.llunde.no" http://46.62.214.182/ready` answers (Caddy up; certificate not yet valid — that's expected until DNS).
+> Direction matters. This section used to describe the **phase-2** cutover, which
+> moved llunde.no *off* the retired `ed8abcdb` tunnel onto direct A/AAAA records.
+> That tunnel is gone. This is the **phase-4** cutover, which moves llunde.no
+> *onto* the new `c0cdd9b5` tunnel and then closes 80/443 — the estate's last
+> public inbound ports. Zone `llunde.no` = `4ae54b24fc4140d4d1c450491645f1c8`.
 
-1. Delete the proxied CNAMEs `llunde.no` and `www.llunde.no` → tunnel `ed8abcdb-...cfargotunnel.com`.
-2. Add **grey-cloud (DNS only)**: `llunde.no` A `46.62.214.182`, AAAA `2a01:4f9:c014:cbe0::1`; `www` CNAME `llunde.no`; `api` A + AAAA same values.
-3. Wait for propagation (`dig +short llunde.no api.llunde.no`), let Caddy obtain Let's Encrypt certs, then run §8.
-4. Only after §8 passes: Zero Trust → Networks → Tunnels → delete the **llunde** tunnel (`ed8abcdb-508c-4d61-85b7-bc3127510e4b`). Do not touch the pyparser tunnel.
+Tofu is **manual and owner-run** — it is deliberately not on the pull loop (§6).
+Env for every `tofu` call in this section:
+
+```sh
+eval "$(aws configure export-credentials --format env)"          # S3 state; session expires — re-auth is yours
+export TF_VAR_hcloud_token=$(awk -F'"' '/^[[:space:]]*token/ {print $2; exit}' ~/.config/hcloud/cli.toml)
+export CLOUDFLARE_API_TOKEN=$(doppler secrets get CLOUDFLARE_API_TOKEN --project llunde --config ops --plain)
+tofu -chdir=tofu plan       # ALWAYS read the plan before apply
+```
+
+Stale S3 lock (a killed apply): `tofu force-unlock <id>` — only after confirming
+nothing is actually running.
+
+**Preconditions** (all four, verified before step 1):
+
+- H1 is live: Caddy issues via **DNS-01** (§13) — certs stay warm with 80/443
+  closed, so rollback never waits on Let's Encrypt.
+- The tunnel's ingress map covers all three hostnames (§13 reads it out of the
+  connector's own log — the dashboard is not the only place to look).
+- `blackbox-cfray` is deployed on llunde-parser and **RED**. That is correct
+  before the flip: it asserts CF-Ray on `https://llunde.no`, which direct A
+  records cannot produce. It turning green IS the cutover's success signal.
+- The pull loop stays **RUNNING** throughout. E5 and B5 touch no repo file, E6
+  must ride the loop to be declarative, and both rollback levers (`git revert` +
+  merge, `git push -f <sha>:deploy`) need it running. Just don't merge anything
+  unrelated during the window.
+
+### 7.1 E5a — drop the AAAA records (tofu apply #1)
+
+A CNAME cannot coexist with an A **or** AAAA record at the same name, and tofu
+gives **no ordering guarantee** between an unrelated create and destroy in the
+same apply. Written as one apply, E5 can die on Cloudflare error 81053 ("An A,
+AAAA, or CNAME record with that host already exists") — and *may* pass once and
+fail on a re-run. So the v6 records go first, on their own.
+
+```sh
+tofu -chdir=tofu apply                       # plan: 3 to destroy (aaaa: llunde.no, www, api)
+for h in llunde.no www.llunde.no api.llunde.no; do dig +short AAAA "$h"; done   # all empty
+curl -s -o /dev/null -w '%{http_code}\n' https://llunde.no    # 200, still direct over v4
+```
+
+IPv6-only clients lose the site between 7.1 and 7.2 — minutes. CF restores v6 at
+the edge in 7.2, so v6 reachability is net *better* afterwards.
+
+**Rollback**: `git revert` the PR, apply. Records return.
+
+### 7.2 E5b — A → proxied CNAME (tofu apply #2) 💥 THE FLIP
+
+The `moved {}` block keeps the same resource address, so tofu updates the
+existing record ids in place instead of create-before-destroy.
+
+```sh
+tofu -chdir=tofu apply     # plan: 3 to change (A 46.62.214.182 -> CNAME <tunnel>.cfargotunnel.com, proxied)
+```
+
+Proxied records propagate in seconds — CF answers authoritatively and the TTL is
+already `auto` (300 s). Budget **≤5 min** for resolver caches; anything still
+resolving `46.62.214.182` after that is a stale local resolver, not a failure.
+
+Verify, in order — **stop and roll back on the first failure**:
+
+```sh
+# 1. the records moved
+dig +short llunde.no www.llunde.no api.llunde.no      # CF anycast (104.21.x/172.67.x), NOT 46.62.214.182
+
+# 2. traffic rides the CF edge (this is what blackbox-cfray asserts continuously)
+for h in llunde.no www.llunde.no api.llunde.no; do
+  printf '%-16s %s\n' "$h" "$(curl -sS -o /dev/null -D - "https://$h" | grep -ci '^cf-ray:')"
+done                                                   # each -> 1
+
+# 3. www -> apex redirect survives the tunnel
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://www.llunde.no/x   # 301 https://llunde.no/x
+
+# 4. ops endpoints 403 THROUGH THE EDGE — the variants, not just the bare paths.
+#    A 404 means the request reached the backend; only a 403 proves Caddy blocked it.
+for p in metrics metrics/ metrics// metrics%2f METRICS metrics/x health health/ ready ready/; do
+  printf '%-12s %s\n' "$p" "$(curl -sS --path-as-is -o /dev/null -w '%{http_code}' "https://api.llunde.no/$p")"
+done                                                   # every one 403
+
+# 5. the real-IP contract, end to end (ADR 017's non-optional verification)
+EMAIL="cutover-$(date +%s)@example.com"
+curl -sS -i -X POST https://api.llunde.no/auth/register -H 'Origin: https://llunde.no' \
+  -H 'X-CSRF-Token: t' -H 'Content-Type: application/json' \
+  -d "{\"email\":\"$EMAIL\",\"password\":\"correct horse battery\"}"
+#    -> 201, and Set-Cookie carries `Secure` (proves X-Forwarded-Proto=https survives the plain-HTTP hop)
+#    -> the backend audit row for this registration shows YOUR public IP, not 127.0.0.1 and not a CF address
+#    -> forged headers are discarded: repeat with -H 'X-Forwarded-For: 9.9.9.9' and the audit IP is unchanged
+
+# 6. the collectors agree
+curl -s http://100.92.219.50:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.labels.job) \(.health)"' | sort
+#    blackbox-cfray -> up AND probe_success 1 (it was 0 before the flip)
+```
+
+**Rollback** (any failure above): `git revert` the 7.2 PR, `tofu apply`. The A
+records return, Caddy serves them with certs that are still valid (H1), and
+80/443 are still open because B5 has not run yet. Total: one apply + propagation.
+
+### 7.3 B5 — close 80/443 at the Hetzner cloud firewall (NOT tofu)
+
+⚠️ **The hcloud provider cannot delete a firewall's last rules.** `llunde-fw` has
+exactly two (80, 443); an apply that removes both omits the rules field entirely,
+silently no-ops, and prints "Apply complete" — a lie. Same trap documented in
+`tofu/parser-server.tf`, where going to zero was also done out-of-band.
+
+```sh
+hcloud firewall describe llunde-fw                       # confirm: exactly the 80 + 443 rules
+hcloud firewall replace-rules llunde-fw --rules-file <(echo '[]')
+hcloud firewall describe llunde-fw                       # Rules: (empty)
+
+# instantly verify from OFF the tailnet — the origin must stop answering
+curl -sS --max-time 8 http://46.62.214.182/  ; echo "exit=$? (expect 28 = timeout)"
+curl -sS --max-time 8 https://46.62.214.182/ ; echo "exit=$? (expect 28 = timeout)"
+curl -s -o /dev/null -w '%{http_code}\n' https://llunde.no    # 200 — the tunnel path is unaffected
+```
+
+⚠️ **`--rules-file <([])`, as first recorded in `tofu/parser-server.tf`, is a
+typo** — `[]` is not a command, so the process substitution hands hcloud an
+**empty file** while the shell still exits 0. Use `<(echo '[]')`, or write the
+file first (`printf '[]' > /tmp/no-rules.json`) if you would rather see it. The
+tofu comment is corrected to match.
+
+Then reconcile tofu so the next plan is clean (the rules are gone from the API but
+still in state):
+
+```sh
+tofu -chdir=tofu apply -refresh-only     # state learns the firewall has no rules
+tofu -chdir=tofu plan                    # after the E6 PR lands the HCL: "No changes."
+```
+
+🚧 **Between 7.3 and the 7.4 merge, do not run a plain `tofu apply`.** The HCL
+still declares the 80/443 rules, so an apply would re-open them at the cloud edge
+— quietly undoing the step you just took. `-refresh-only` is safe; a full apply
+is not, until 7.4's PR has removed the rules from `tofu/llunde-firewall.tf`.
+
+**Rollback** (seconds, and it works with the tailnet down — the firewall name is
+positional and goes last):
+
+```sh
+hcloud firewall add-rule --direction in --protocol tcp --port 80  --source-ips 0.0.0.0/0,::/0 llunde-fw
+hcloud firewall add-rule --direction in --protocol tcp --port 443 --source-ips 0.0.0.0/0,::/0 llunde-fw
+```
+
+### 7.4 E6 — close 80/443 in NixOS (rides the pull loop)
+
+The PR removes `80`/`443` from `llunde.profile.publicTCPPorts` in
+`hosts/llunde-01/default.nix` and drops the two `rule` blocks from
+`tofu/llunde-firewall.tf` (matching what 7.3 already did to the API). Merge →
+gate → promote → llunde-01 self-applies within ~5 min.
+
+**This cannot trigger the deadman.** Its probes are management-plane only —
+tailnet online (or peer ping), `sshd` listening on 22, `git ls-remote` fetchable —
+and none of them traverses 80/443. `tailscale0` stays a trusted interface, so SSH
+is unaffected. Verified against `modules/gitops-pull/default.nix`, not assumed.
+
+```sh
+ssh root@100.109.80.121 journalctl -fu gitops-pull        # watch it land
+ssh root@100.109.80.121 cat /var/lib/gitops-pull/applied  # == the merged sha
+# NixOS's firewall here is IPTABLES, not nftables (`nft list ruleset` is empty on
+# these hosts) — the chain is nixos-fw, and both families must be checked:
+ssh root@100.109.80.121 'iptables -S nixos-fw | grep -E "dport (80|443)"'   # no output
+ssh root@100.109.80.121 'ip6tables -S nixos-fw | grep -E "dport (80|443)"'  # no output
+ssh root@100.109.80.121 'ss -ltn | grep -E ":(80|443) "'  # Caddy STILL BINDS them — the firewall is what closed
+curl -s -o /dev/null -w '%{http_code}\n' https://llunde.no                                # 200
+ssh root@100.92.219.50 cat /var/lib/gitops-pull/applied   # parser follows +30 min; heartbeats green on both
+```
+
+**Rollback**: `git revert` + merge — auto-applies in ~5 min. If you need it faster
+or the gate is red: `git push -f <good-sha>:deploy`. Neither restores the *cloud*
+firewall — 7.3's `hcloud firewall add-rule` is the lever for that, and it is the
+one that actually matters.
+
+### 7.5 Full break-glass (tunnel or Cloudflare itself is broken)
+
+Certs are warm (H1/DNS-01, renewed independently of any open port), so this is
+DNS + firewall only, in this order:
+
+1. `hcloud firewall add-rule` ×2 (7.3's rollback) — the origin answers again.
+2. `git revert` the E6 PR + merge — the NixOS firewall follows within ~5 min.
+   (Steps 1 and 2 are both needed; either layer alone still blocks.)
+3. `git revert` the 7.2 PR + `tofu apply` — A records return, grey-cloud.
+4. Optionally revert 7.1 to restore AAAA.
+
+Neither Caddy nor the CF edge sets HSTS (verified 2026-08-12), so browsers can
+click through any interim TLS error — the window is degraded, not hard-failed.
+Step 3 requires the Cloudflare **DNS API** to work; it does not require the CF
+proxy or tunnel to work, which is exactly the outage this path is for.
 
 ## 8. Gate verification (phase-2 README, as commands)
 
@@ -270,9 +456,12 @@ reusable reprovision knowledge.
 - **§6 Deploy loop**: identical, with `.#llunde-parser` and this host's
   tailnet address as `--target-host`/`--build-host`. Quadlet check:
   `systemctl --user -M pyparser@ list-units 'pyparser-*'`.
-- **§§7–8 do not apply** (no DNS cutover — both hostnames stay on their
-  tunnels; the phase-3.5 gate metrics are `parser.llunde.no`,
-  `external.llunde.no`, `hansteen.dev`).
+- **§7 does not apply** — llunde-parser never had a DNS cutover; both its
+  hostnames were already on the pyparser tunnel, and it has had zero public
+  inbound since phase 3. **§13 does apply**, with the pyparser tunnel id
+  (`e77d6ebf-…`), uid 2001, and the `:latest`/shared-network connector shape —
+  read the table there for what differs. **§8**'s gate metrics here are
+  `parser.llunde.no`, `external.llunde.no`, `hansteen.dev`.
 - **§9 Update & rollback**: same pull-based model; the pyparser digest-pin
   lever lives in `services/pyparser/`. Details in
   [docs/pyparser/PROD.md](pyparser/PROD.md).
@@ -287,3 +476,102 @@ reusable reprovision knowledge.
   ```
   **portfolio restores itself** from its own S3 backups per its own DR
   runbooks — llunde-infra hands off at the slot boundary (ADR 016).
+
+## 13. cloudflared & the tunnel edge — ops (ADR 017)
+
+The llunde tunnel is **`c0cdd9b5-fa97-42a1-bca7-95da236ea949`**, terminated by the
+`cloudflared` quadlet under `edge` (uid 2000) on llunde-01: `Network=host`,
+**digest-pinned**, token from `/run/secrets/llunde-tunnel.env`. It dials Caddy's
+plain-HTTP `:8085` loopback listener; Cloudflare terminates public TLS.
+Do **not** confuse it with pyparser's tunnel `e77d6ebf-…` (parser/external
+hostnames, llunde-parser) — that one is not ours to touch.
+
+⚠️ **Never rotate the tunnel token casually.** A tunnel's token embeds its
+secret; regenerating it drops the live connectors — i.e. the front door — until
+the new token is deployed through sops + a switch.
+
+### 13.1 Is the edge healthy?
+
+```sh
+# connectors (expect 4, one per CF colo the daemon picked)
+cd / && ssh root@100.109.80.121 'cd / && runuser -u edge -- env XDG_RUNTIME_DIR=/run/user/2000 \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2000/bus \
+  journalctl --user -u cloudflared -n 200 --no-pager | grep -c "Registered tunnel connection"'
+
+# the container itself (NB: quadlet names it systemd-caddy / llunde-cloudflared)
+ssh root@100.109.80.121 'cd / && runuser -u edge -- env XDG_RUNTIME_DIR=/run/user/2000 \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2000/bus podman ps --format "{{.Names}} | {{.Image}}"'
+
+# from outside: CF-Ray present == the request rode the edge
+curl -sS -o /dev/null -D - https://llunde.no | grep -i '^cf-ray:'
+```
+
+`runuser` needs a cwd the target user can read — hence the `cd /`. Without it you
+get `cannot chdir to /root: Permission denied`, which looks like a podman failure
+and is not.
+
+### 13.2 What ingress map is the tunnel actually serving?
+
+The hostname→service map is **remote** (Cloudflare-side) config that the connector
+fetches at startup and on change. The connector's own log is the ground truth for
+what it is running right now:
+
+```sh
+ssh root@100.109.80.121 'cd / && runuser -u edge -- env XDG_RUNTIME_DIR=/run/user/2000 \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2000/bus \
+  journalctl --user -u cloudflared --no-pager | grep "Updated to new configuration" | tail -1'
+```
+
+The contract (all three vhosts land on the one Caddy listener, which routes by
+`Host`):
+
+```json
+{"ingress":[{"hostname":"llunde.no","service":"http://localhost:8085"},
+            {"hostname":"www.llunde.no","service":"http://localhost:8085"},
+            {"hostname":"api.llunde.no","service":"http://localhost:8085"},
+            {"service":"http_status:404"}],
+ "warp-routing":{"enabled":false}}
+```
+
+Cloudflare-side view (needs the ops token's `Account:Cloudflare Tunnel:Read`):
+
+```sh
+export CLOUDFLARE_API_TOKEN=$(doppler secrets get CLOUDFLARE_API_TOKEN --project llunde --config ops --plain)
+curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/8786559b30fcebd08d0c594b6e899eef/cfd_tunnel/c0cdd9b5-fa97-42a1-bca7-95da236ea949/configurations" \
+  | jq '.result.config.ingress'
+```
+
+A `401`/`10000 Authentication error` here means you are holding the **old
+DNS-only** ops token — not that the tunnel is broken.
+
+### 13.3 Changing the connector
+
+The ingress map is tofu-managed (`tofu/modules/cloudflare/`) — a dashboard edit
+is drift and will be reverted by the next apply. Config changes reach the running
+connector within seconds without a restart (it re-fetches; you'll see a new
+`Updated to new configuration … version=N` line).
+
+The **unit** (image digest, memory) is NixOS-declared: edit `modules/ingress/`,
+regenerate `tests/golden/cloudflared.container`, PR → merge → the pull loop
+restarts it via the reconcile map (`hosts/llunde-01/default.nix`). The front door
+never auto-updates: `autoUpdate = false` for `edge` is deliberate, and image
+bumps are deliberate digest edits.
+
+Hand restart (only off the loop — stop `gitops-pull.timer` first, §6):
+
+```sh
+ssh root@100.109.80.121 'cd / && runuser -u edge -- env XDG_RUNTIME_DIR=/run/user/2000 \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2000/bus systemctl --user restart cloudflared'
+```
+
+### 13.4 Failure modes, in the order they actually happen
+
+| Symptom | Cause | Move |
+|---|---|---|
+| Site 502/1033, connectors 0 | connector down or token invalid | `systemctl --user status cloudflared`; check `/run/secrets/llunde-tunnel.env` materialized |
+| Site 404 (empty body) on every hostname | Caddy's `:8085` site address grew a host — `http://127.0.0.1:8085` makes `127.0.0.1` the **Host matcher** and nothing matches | address must be hostless `http://:8085` + `bind 127.0.0.1` (goldened; the golden is the guard) |
+| One hostname 404s, others fine | that hostname missing from the ingress map | §13.2, then fix in tofu |
+| `400` on everything through the tunnel | M1 guard: no `CF-Connecting-IP` — the request did not come from CF | expected for a direct hand-probe of `:8085`; add `-H 'CF-Connecting-IP: 1.2.3.4'` to test |
+| Rate limits key on one bucket / audit shows `127.0.0.1` | the XFF←`CF-Connecting-IP` mapping was lost | `tests/golden/llunde-01.Caddyfile` diff; it cannot regress silently |
+| Cloudflare itself is down | — | §7.5 full break-glass |
