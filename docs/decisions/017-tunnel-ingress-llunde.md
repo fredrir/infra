@@ -22,7 +22,22 @@ ADR 012 rejected tunnel ingress for llunde-01 "for this box" on two grounds: it 
 - **Real client IP**: the same work orange-cloud would have needed, with two traps the plan review pinned down — Caddy's tunnel listener makes `CF-Connecting-IP` the rightmost XFF client entry (unmapped, every bucket keys on cloudflared's 127.0.0.1), **scoped to that listener only** (on the still-open public path the header is attacker-supplied), and sets `X-Forwarded-Proto=https` (the plain-HTTP hop otherwise breaks Secure cookies and CSRF origin checks). The backend's rotating-XFF test proves the whole chain on a Host-overridden test hostname BEFORE the DNS flip. This is the exact bug class the backend's external review caught; the verification is not optional.
 - **WAF/bot filtering**: available on tunneled hostnames exactly as on orange-cloud — the original phase-4 goal arrives as a side effect.
 - **The tunnel token** is a llunde-01 sops secret (env form), never rotated casually (the standing tunnel rule).
-- **The connector image is pinned by digest** (second-opinion requirement): pyparser's `:latest` cloudflared predates this ADR and must not extend to the front door — a broken upstream release would take the site down; updates are deliberate digest bumps. The alternative of keeping certs warm via DNS-01 (custom Caddy build with the CF plugin) was considered and declined — break-glass consciously pays the documented TLS-outage window instead of carrying that complexity.
+- **The connector image is pinned by digest** (second-opinion requirement): pyparser's `:latest` cloudflared predates this ADR and must not extend to the front door — a broken upstream release would take the site down; updates are deliberate digest bumps. ~~The alternative of keeping certs warm via DNS-01 (custom Caddy build with the CF plugin) was considered and declined — break-glass consciously pays the documented TLS-outage window instead of carrying that complexity.~~ **Reversed 2026-08-12 — see the amendment below.**
+
+## Amendment (2026-08-12): certificates renew via DNS-01
+
+The decision above declined DNS-01 and accepted stale certificates. At execution the owner reversed it, and the reversal is recorded here rather than left implicit in a commit.
+
+**What changed.** Caddy runs an image built by this repo (`images/caddy`) with `caddy-dns/cloudflare` compiled in, and `acme_dns cloudflare` in the global block makes DNS-01 the default challenge for all three names. A host-scoped `Zone:DNS:Edit` token reaches it via sops.
+
+**Why the original reasoning didn't survive contact.** It weighed only complexity. Two things it did not price:
+
+- **The window is not bounded by us.** Break-glass would have meant re-opening 80/443 *and then* racing Let's Encrypt — issuance, plus whatever failed-validation rate limit the preceding weeks of doomed renewals had consumed. Warm certs make the grey-flip a DNS change and nothing else.
+- **The front door was never actually pinned.** It ran the floating `docker.io/library/caddy:2` tag, held still only by quadlet's `Pull=missing` and a warm image cache. Building our own image was already the fix for that; the DNS-01 plugin rides along at no extra structural cost.
+
+**The residual this buys, stated plainly.** A `Zone:DNS:Edit` credential now lives on the internet-facing host. A compromise of `edge` is takeover of the whole `llunde.no` zone — **including MX/SPF/DKIM, i.e. email** — because Cloudflare cannot scope DNS-edit below the zone. That is strictly worse than the tunnel token already there, and it is accepted knowingly. It is *not* the laptop's ops token, which additionally carries account-wide Cloudflare Tunnel rights over the portfolio and pyparser tenants' tunnels (ADR 016 boundary) and must never reach a host.
+
+**A trap this created.** With `acme_dns cloudflare` in the config, the reconcile map's pre-restart `caddy validate` must run the **container image**, not `pkgs.caddy`. A nixpkgs caddy carrying the plugin would happily validate a config the *running* image cannot parse, and reconcile would then restart the front door into a crash-loop. Validating with the binary that will serve is the only variant that fails safe; proven on llunde-01 (exit 0 on the current config, exit 1 on a DNS-01 config against a plugin-less image).
 
 ## Alternatives considered
 

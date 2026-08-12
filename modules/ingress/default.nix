@@ -22,12 +22,28 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   cfg = config.llunde.ingress;
   quadlet = import ../quadlet/mk-quadlet.nix {inherit lib;};
 
   acmeEmail = "fhansteen@gmail.com";
+
+  # Built by this repo (images/caddy) because upstream ships no DNS-01 provider
+  # and caddy cannot load plugins at runtime — H1, ADR 017 amended.
+  # Digest-pinned like cloudflared; CI asserts the version and the presence of
+  # dns.providers.cloudflare on every build before this digest may move.
+  # Referenced by BOTH the quadlet and the reconcile check below, so the config
+  # can never be validated against a different caddy than the one that serves.
+  caddyImage = "ghcr.io/fredrir/llunde-caddy@sha256:4c9de100f63866a9e7efdfbb69a97902e62b14d577f2ceea818ef7973ef524ee";
+
+  # A format-valid but obviously fake token: the cloudflare provider rejects an
+  # EMPTY one at provision time, which would make `caddy validate` fail for a
+  # reason that has nothing to do with the Caddyfile. Validation never calls the
+  # API, so a real credential would buy nothing and put a live token in a
+  # world-readable command line.
+  acmeCheckDummyToken = "0123456789abcdef0123456789abcdef01234567";
 
   # The trailing `*` is load-bearing — do NOT "tidy" these back to exact paths.
   # Caddy's `path` matcher is exact, and its cleanPath (caddyhttp.go) deliberately
@@ -153,11 +169,25 @@
       }
     '';
 
+  # ACME challenge selection (H1, ADR 017 amended — that ADR originally DECLINED
+  # DNS-01). Once E6 closes 80/443 there is no inbound path for http-01 or
+  # tls-alpn-01, so renewals for all three names would fail from ~2026-10-08
+  # (certs issued 2026-08-09, expire 2026-11-07). DNS-01 needs no open port.
+  #
+  # `acme_dns` in the global block makes it the default challenge for every site
+  # here. The token argument is REQUIRED — a bare `acme_dns cloudflare` is
+  # rejected at parse time — and the provider validates the token's FORMAT at
+  # provision time, so `caddy validate` needs a plausible value in the
+  # environment even though it never calls the API.
+  acmeDnsLine = lib.optionalString (cfg.acmeDnsTokenFile != null) ''
+    	acme_dns cloudflare {env.CF_API_TOKEN}
+  '';
+
   caddyfile =
     ''
       {
       	email ${acmeEmail}
-      }
+      ${acmeDnsLine}}
 
     ''
     + lib.concatStringsSep "\n" (lib.mapAttrsToList vhostBlock cfg.virtualHosts)
@@ -182,6 +212,35 @@ in {
         default = null;
         description = "EnvironmentFile with TUNNEL_TOKEN= (sops-rendered). Never rotated casually — the standing tunnel rule.";
       };
+    };
+    acmeDnsTokenFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        EnvironmentFile providing CF_API_TOKEN for the ACME DNS-01 challenge
+        (H1, ADR 017 amended). Setting it switches every vhost's default
+        challenge to DNS-01, which is the only kind that survives 80/443 being
+        closed. A SEPARATE, host-scoped Zone:DNS:Edit token — never the laptop's
+        ops token, which also carries account-wide tunnel rights.
+      '';
+    };
+    caddyfileCheck = lib.mkOption {
+      type = lib.types.str;
+      readOnly = true;
+      description = ''
+        Pre-restart validation command for the gitops reconcile map. Lives here
+        rather than in the host file so it cannot drift from the image digest it
+        must run.
+
+        It validates using the CONTAINER — the exact binary that will serve —
+        not a nixpkgs caddy. That is not a stylistic choice: with `acme_dns
+        cloudflare` in the config, a nixpkgs caddy carrying the plugin would
+        VALIDATE a config the running image cannot parse, and reconcile would
+        then restart the front door into a crash-loop. Checking with the binary
+        that will run is the only variant that fails safe on that ordering.
+        Proven on llunde-01: exit 0 against the current config, exit 1 against a
+        DNS-01 config on a plugin-less image.
+      '';
     };
     virtualHosts = lib.mkOption {
       type = lib.types.attrsOf (
@@ -254,6 +313,25 @@ in {
       };
     };
 
+    # Rendered here (not in the host file) so it always names the same image the
+    # quadlet runs. runuser needs a cwd the target user can read — gitops-pull's
+    # unit sets WorkingDirectory=/, which satisfies that; run by hand from /root
+    # it fails with "cannot chdir". --network=none because validation must never
+    # reach the network, least of all Cloudflare's API.
+    llunde.ingress.caddyfileCheck = let
+      podman = config.virtualisation.podman.package;
+    in
+      lib.concatStringsSep " " [
+        "${pkgs.util-linux}/bin/runuser -u edge --"
+        "${pkgs.coreutils}/bin/env XDG_RUNTIME_DIR=/run/user/2000"
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2000/bus"
+        "${podman}/bin/podman run --rm --network=none"
+        "-e CF_API_TOKEN=${acmeCheckDummyToken}"
+        "-v /etc/llunde/caddy/Caddyfile:/cf:ro"
+        caddyImage
+        "caddy validate --adapter caddyfile --config /cf"
+      ];
+
     # Same belt-and-suspenders scoping as node_exporter's 9100
     # (modules/observability): tailscale0 is already a trusted interface, but
     # the explicit rule documents the intended reach of :9101 and survives if
@@ -266,12 +344,13 @@ in {
         uid = 2000;
         unit.Description = "Caddy public ingress (ADR 006)";
         container = {
-          # Built by this repo (images/caddy) because upstream ships no DNS-01
-          # provider and caddy cannot load plugins at runtime — H1, ADR 017
-          # amended. Digest-pinned like cloudflared; CI asserts the version and
-          # `dns.providers.cloudflare` on every build before this digest moves.
-          Image = "ghcr.io/fredrir/llunde-caddy@sha256:4c9de100f63866a9e7efdfbb69a97902e62b14d577f2ceea818ef7973ef524ee";
+          Image = caddyImage;
           Network = "host";
+          # CF_API_TOKEN for the DNS-01 challenge. In [Container], NOT [Service]:
+          # caddy reads it INSIDE the container. (REGISTRY_AUTH_FILE below is the
+          # opposite case — podman itself reads that, before any container
+          # exists, so it belongs in [Service].)
+          EnvironmentFile = lib.optionals (cfg.acmeDnsTokenFile != null) [cfg.acmeDnsTokenFile];
           Volume = [
             "/etc/llunde/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
             # Named volumes: certificate storage must survive container replacement.
