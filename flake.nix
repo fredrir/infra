@@ -318,8 +318,15 @@
     hostEtc = self.nixosConfigurations.llunde-01.config.environment.etc;
     renderedCaddyfile = hostEtc."llunde/caddy/Caddyfile".text;
     renderedCloudflared = hostEtc."containers/systemd/users/2000/cloudflared.container".text;
+    # H1: the caddy UNIT joins the goldens now that its image is a digest pin
+    # carrying a compiled-in ACME provider. The Caddyfile golden proves what
+    # caddy is told to do; this proves WHICH caddy is told to do it — and a
+    # silent revert to a floating tag, or a lost REGISTRY_AUTH_FILE, is exactly
+    # the drift that would only surface at a renewal weeks later.
+    renderedCaddy = hostEtc."containers/systemd/users/2000/caddy.container".text;
     renderedValkey = hostEtc."containers/systemd/users/2001/llunde-valkey.container".text;
     goldenCaddyfile = builtins.readFile ./tests/golden/llunde-01.Caddyfile;
+    goldenCaddy = builtins.readFile ./tests/golden/caddy.container;
     goldenCloudflared = builtins.readFile ./tests/golden/cloudflared.container;
     goldenValkey = builtins.readFile ./tests/golden/llunde-valkey.container;
     goldenObsGrafana = builtins.readFile ./tests/golden/observability-grafana.container;
@@ -400,6 +407,8 @@
       "backend unit rendering drifted from golden:\n---rendered---\n${renderedBackend}\n---golden---\n${goldenBackend}";
       assert lib.assertMsg (renderedCaddyfile == goldenCaddyfile)
       "llunde-01 Caddyfile drifted from golden (regenerate tests/golden/llunde-01.Caddyfile):\n---rendered---\n${renderedCaddyfile}\n---golden---\n${goldenCaddyfile}";
+      assert lib.assertMsg (renderedCaddy == goldenCaddy)
+      "caddy unit drifted from golden — image digest / REGISTRY_AUTH_FILE / TimeoutStartSec are load-bearing (regenerate tests/golden/caddy.container):\n---rendered---\n${renderedCaddy}\n---golden---\n${goldenCaddy}";
       assert lib.assertMsg (renderedCloudflared == goldenCloudflared)
       "cloudflared unit drifted from golden:\n---rendered---\n${renderedCloudflared}\n---golden---\n${goldenCloudflared}";
       assert lib.assertMsg (renderedValkey == goldenValkey)

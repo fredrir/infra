@@ -58,6 +58,21 @@
     path = "/run/secrets/llunde-tunnel.env";
   };
 
+  # containers-auth.json for `edge` alone (H1, ADR 017 amended): the front door
+  # now runs an image built by THIS repo, ghcr.io/fredrir/llunde-caddy, which is
+  # private like the repo. Deliberately NOT the shared `ghcr` group secret above:
+  # that credential is also the backend's and frontend's, and the internet-facing
+  # user should hold its own revocable copy rather than the one everything else
+  # depends on. GHCR accepts only CLASSIC PATs and `read:packages` cannot be
+  # scoped per-package, so the reach is the same either way — what this buys is
+  # independent rotation, and no other scopes on the token.
+  sops.secrets."llunde-caddy-ghcr" = {
+    sopsFile = ../../secrets/llunde-caddy-ghcr.yaml;
+    key = "auth_json";
+    owner = "edge";
+    path = "/run/secrets/llunde-caddy-ghcr.json";
+  };
+
   # GitOps pull (ADR 020, workstream A phase 2c): the read-only deploy key and
   # this host's external heartbeat URL. In sops on purpose — NOT the obs
   # deadman's out-of-band /var/lib file pattern (review B6).
