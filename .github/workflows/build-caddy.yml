@@ -77,7 +77,11 @@ jobs:
           echo "dns.providers.cloudflare: present"
 
           # 3. the digest, which is what modules/ingress pins. Tags are not pins.
+          #    Echoed to STDOUT as well as the summary: the package is private
+          #    and the laptop's gh PAT deliberately has no read:packages, so the
+          #    job LOG is the only place the digest can be read back later.
           DIGEST=$(docker buildx imagetools inspect "$IMAGE" --format '{{.Manifest.Digest}}')
+          echo "digest: $DIGEST"
           echo "## caddy image built" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "$VERSION" >> "$GITHUB_STEP_SUMMARY"

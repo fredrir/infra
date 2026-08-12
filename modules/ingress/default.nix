@@ -220,8 +220,12 @@ in {
     # Caddyfile / cloudflared unit, exits 0, and the front door keeps running
     # the OLD unit until reboot or a manual restart — a rebuild that lies.
     # autoUpdate = false is deliberate and load-bearing: the public front door
-    # never auto-pulls (caddy is :2-pinned, cloudflared is digest-pinned);
-    # image bumps are deliberate edits, never a 5-minute registry poll.
+    # never auto-pulls — BOTH images are digest-pinned now; image bumps are
+    # deliberate edits, never a 5-minute registry poll. (Until H1 this comment
+    # claimed caddy was ":2-pinned". A floating major tag is not a pin: it held
+    # still only because quadlet's Pull=missing let the local image cache hide
+    # the drift, so a reprovision or a `podman image prune` could have changed
+    # the front-door binary with no diff in this repo.)
     # NB the hook only `daemon-reload`s; a Caddyfile CONTENT change is
     # bind-mounted and resolved at container CREATION, so a deploy touching it
     # still needs an explicit `systemctl --user -M edge@ restart caddy`
@@ -262,7 +266,11 @@ in {
         uid = 2000;
         unit.Description = "Caddy public ingress (ADR 006)";
         container = {
-          Image = "docker.io/library/caddy:2";
+          # Built by this repo (images/caddy) because upstream ships no DNS-01
+          # provider and caddy cannot load plugins at runtime — H1, ADR 017
+          # amended. Digest-pinned like cloudflared; CI asserts the version and
+          # `dns.providers.cloudflare` on every build before this digest moves.
+          Image = "ghcr.io/fredrir/llunde-caddy@sha256:4c9de100f63866a9e7efdfbb69a97902e62b14d577f2ceea818ef7973ef524ee";
           Network = "host";
           Volume = [
             "/etc/llunde/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
@@ -272,8 +280,16 @@ in {
           ];
         };
         service = {
+          # Private image, so the pull needs credentials — edge's own, not the
+          # shared ghcr group secret (hosts/llunde-01/secrets.nix explains why).
+          Environment = "REGISTRY_AUTH_FILE=/run/secrets/llunde-caddy-ghcr.json";
           Restart = "always";
           MemoryMax = "256M";
+          # The first start after this switch PULLS a new image; the user
+          # manager's 90 s default would kill it mid-pull (llunde-backend and
+          # the whole observability stack carry the same bound for the same
+          # reason). Reconcile calls `systemctl restart`, which blocks on this.
+          TimeoutStartSec = 300;
         };
         install.WantedBy = ["default.target"];
       }
