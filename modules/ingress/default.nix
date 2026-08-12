@@ -1,5 +1,10 @@
-# Caddy ingress under the `edge` user (uid 2000) — the host's only public
-# 80/443 (ADR 006), automatic Let's Encrypt TLS, grey-cloud DNS (ADR 012).
+# Caddy ingress under the `edge` user (uid 2000) — ADR 006, with Let's Encrypt
+# certificates renewed over DNS-01 (ADR 017 as amended).
+#
+# Since phase-4 E5/E6 no traffic reaches this host's 80/443: llunde.no, www and
+# api are proxied CNAMEs onto the llunde tunnel, and the cloud firewall admits
+# nothing. Caddy still binds those ports deliberately — they are the break-glass
+# path, live again the moment the firewall re-opens.
 #
 # Networking choice: the Caddy container runs with Network=host. The upstream
 # contract publishes every service on host loopback ONLY (127.0.0.1:8080/8081,
@@ -18,7 +23,8 @@
 # (ADR 013 / backend phase-3 finding). Off-box they are reachable ONLY via
 # the tailnet-scoped :9101 listener below (phase 4 — Prometheus scrapes
 # /metrics, blackbox probes /ready); node-level metrics stay with
-# modules/observability. The public surface remains 80/443.
+# modules/observability. There is no public surface: the ports Caddy binds are
+# firewalled off at the cloud edge (E6) and traffic arrives via the tunnel.
 {
   config,
   lib,
