@@ -1,0 +1,85 @@
+# Build the front door's caddy image (H1, ADR 017 amended).
+#
+# The estate's images are built in their service repos (ADR 010); this is the one
+# exception, because the artifact IS infrastructure — a caddy with the Cloudflare
+# DNS-01 provider compiled in, which no upstream image ships. Rationale and the
+# version pins live in images/caddy/Containerfile.
+#
+# PRs build WITHOUT pushing: a broken Containerfile fails here rather than at the
+# next `podman pull` on llunde-01. Only main pushes.
+#
+# The `verify` job is the point of this file. It asserts the two properties the
+# whole H1 design rests on — the caddy version matches the pin, and the DNS
+# provider is actually in the binary — and then prints the DIGEST, because the
+# quadlet pins by digest and nothing else may. A silently-plugin-less image would
+# look perfectly healthy until a renewal failed weeks later.
+#
+# No third-party actions in `verify` on purpose: this image is the binary that
+# terminates llunde.no, so its build path carries as little supply chain as it
+# can. `docker` and `gh` are preinstalled on the runner.
+name: Build caddy image
+
+on:
+  pull_request:
+    paths:
+      - "images/caddy/**"
+      - ".github/workflows/build-caddy.yml"
+  push:
+    branches: [main]
+    paths:
+      - "images/caddy/**"
+      - ".github/workflows/build-caddy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: build-caddy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image: ghcr.io/fredrir/llunde-caddy
+      context: images/caddy
+      push: ${{ github.event_name != 'pull_request' }}
+
+  verify:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Assert the image is a pinned caddy WITH the DNS-01 provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ghcr.io/fredrir/llunde-caddy:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker pull -q "$IMAGE"
+
+          # 1. the runtime binary is the version images/caddy/Containerfile pins.
+          #    Both FROMs take the same ARG, but xcaddy compiling a DIFFERENT
+          #    caddy than the image around it is exactly the failure this catches.
+          VERSION=$(docker run --rm "$IMAGE" caddy version)
+          echo "caddy version: $VERSION"
+          grep -q 'v2.11.4' <<<"$VERSION"
+
+          # 2. the whole reason this image exists. Without the module, ACME
+          #    silently falls back to challenges that CANNOT work once 80/443
+          #    are closed — and the failure surfaces only at renewal.
+          docker run --rm "$IMAGE" caddy list-modules | grep -qx 'dns.providers.cloudflare'
+          echo "dns.providers.cloudflare: present"
+
+          # 3. the digest, which is what modules/ingress pins. Tags are not pins.
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE" --format '{{.Manifest.Digest}}')
+          echo "## caddy image built" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image = \"ghcr.io/fredrir/llunde-caddy@$DIGEST\"" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
