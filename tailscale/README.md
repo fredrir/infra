@@ -64,8 +64,11 @@ before the management rule is proven:
    Verify from the laptop: SSH both hosts, Grafana `:3000`, Prometheus
    `:9090` all work (they now match the management rule first).
 2. **Final paste**: this repo's `policy.hujson` verbatim (rule 1 narrowed,
-   new tests). Re-verify the laptop paths, then the deny side: from the
-   PHONE (a generic member device), Grafana/`:9090` must now be unreachable.
+   new tests). Re-verify the laptop paths **and `ssh archie`** (the personal
+   mesh cannot be asserted in the tests block — the test framework cannot
+   evaluate autogroup dsts, tailscale/tailscale#4416 — so this live check IS
+   the mesh proof). Then the deny side: from the PHONE (a generic member
+   device), Grafana/`:9090` must now be unreachable.
    Belt-and-suspenders: trigger a portfolio deploy (its runner is `tag:ci` —
    gotcha 2 below — so rule 3 covers it; this proves that stayed true).
 
