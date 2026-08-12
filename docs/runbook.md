@@ -143,6 +143,17 @@ nix run nixpkgs#nixos-rebuild -- switch --flake .#<host> \
 ssh root@<TAILNET_IP> systemctl start gitops-pull.timer
 ```
 
+⚠️ **A rev that changes BOTH a reconcile `check` command AND the config that
+check validates will be graded by the OLD check.** gitops-pull runs from the
+RUNNING generation (`restartIfChanged = false`, the self-deploying-deployer
+guard), so a new check string only takes effect on the NEXT run. H1b hit this:
+its `acme_dns` Caddyfile was validated by the previous `pkgs.caddy` check, which
+lacked the DNS provider, so the restart was skipped and the deploy stalled with
+a sticky `reconcile_failed` while the old container kept serving. **Land a check
+change in its own rev first** — it is a no-op against the old config — then the
+config change. Recovery if it bites: run the new check by hand, restart the unit,
+`rm /var/lib/gitops-pull/reconcile_failed`, `systemctl start gitops-pull`.
+
 ⚠️ The loop converges to `deploy`: a manually deployed rev that is NOT the
 `deploy` tip gets rolled back to it on the next cycle. Keep the timer stopped
 until your change is merged **and promoted** (this bit during the 2c
@@ -281,7 +292,7 @@ silently no-ops, and prints "Apply complete" — a lie. Same trap documented in
 
 ```sh
 hcloud firewall describe llunde-fw                       # confirm: exactly the 80 + 443 rules
-hcloud firewall replace-rules llunde-fw --rules-file <(echo '[]')
+echo '[]' | hcloud firewall replace-rules --rules-file - llunde-fw
 hcloud firewall describe llunde-fw                       # Rules: (empty)
 
 # instantly verify from OFF the tailnet — the origin must stop answering
@@ -290,11 +301,11 @@ curl -sS --max-time 8 https://46.62.214.182/ ; echo "exit=$? (expect 28 = timeou
 curl -s -o /dev/null -w '%{http_code}\n' https://llunde.no    # 200 — the tunnel path is unaffected
 ```
 
-⚠️ **`--rules-file <([])`, as first recorded in `tofu/parser-server.tf`, is a
-typo** — `[]` is not a command, so the process substitution hands hcloud an
-**empty file** while the shell still exits 0. Use `<(echo '[]')`, or write the
-file first (`printf '[]' > /tmp/no-rules.json`) if you would rather see it. The
-tofu comment is corrected to match.
+⚠️ **`--rules-file` takes `-` for stdin — use it.** The originally recorded
+`--rules-file <([])` is a typo: `[]` is not a command, so the process
+substitution hands hcloud an **empty file** while the shell still exits 0.
+`<(echo '[]')` works, but piping to `-` is unambiguous across shells and has no
+process-substitution trap at all. Executed that way at the 2026-08-13 cutover.
 
 Then reconcile tofu so the next plan is clean (the rules are gone from the API but
 still in state):
@@ -390,6 +401,18 @@ ssh root@<TAILNET_IP> reboot && sleep 90 && curl -s https://api.llunde.no/ready
 - **App images**: pull-based — per-user `podman-auto-update.timer` polls GHCR `:latest` (`AutoUpdate=registry`). Manual poke: §8's `systemctl --user -M <user>@ start podman-auto-update.service`. Pin/rollback an image: set the unit's `Image=` to a digest in `services/<name>/default.nix`, deploy (§6).
 - **Config — roll back the estate**: `git push -f <good-sha>:deploy` from the laptop. Works with the tailnet down (`deploy` is deliberately unprotected so this lever always exists); hosts converge within a cycle (llunde-01) / after the 30-min lag (parser). Then fix forward on main via PR — the next green merge fast-forwards `deploy` back onto main's history.
 - **Pause all applies**: GitHub → Actions → *Promote to deploy* → Disable workflow (freezes `deploy`, both hosts hold). Per host: `systemctl stop gitops-pull.timer`.
+- **Gate wedged by a GitHub outage, deploys blocked** (precedent 2026-08-12): the
+  `tofu` job failed twice fetching provider `SHA256SUMS` from GitHub release
+  assets (503, then a timeout) while GitHub's status page read "Actions: Normal"
+  — release-asset delivery is a different component. Under pull auto-apply a red
+  gate means NO deploys, so this freezes the estate. `deploy` was advanced by
+  hand: `git push origin <sha>:deploy`. **Only with evidence the gate is lying**
+  — there, main's TREE was byte-identical to a PR head whose Check was fully
+  green, the diff touched no tofu at all, and `nix flake check` + `tofu fmt` +
+  `tofu validate` were re-run locally on the merged commit first. This BYPASSES
+  ADR 020's gate-green invariant; it is a break-glass lever, not a shortcut. The
+  provider cache added to the gate afterwards makes the failure mode much less
+  likely.
 - **After a deadman rollback** (host rebooted into the previous generation; you got the healthchecks `/fail` email): the offending rev is **HELD** on that host — no reboot loop. Fix forward on main; the newly promoted rev clears the hold automatically. To force-retry the same rev instead: `rm /var/lib/gitops-pull/attempting` on the host.
 - **Sticky reconcile failure** (`/var/lib/gitops-pull/reconcile_failed` exists, heartbeat failing while "converged"): a unit restart failed after a switch. Fix the unit; any successful apply clears the marker (or remove it by hand).
 - **Host unreachable and the deadman didn't fire**: `hcloud server reset <name>` — boots the previous boot-default generation (the loop never moves the boot default before its probes pass). Rehearsed 2026-08-11.
@@ -407,9 +430,18 @@ ssh root@<TAILNET_IP> "podman exec -i -u postgres llunde-postgres psql -U llunde
 # valkey: stop unit, replace appendonly dir from restore, start unit
 ```
 
-## 11. Break-glass SSH & port-22 posture (ADR 015)
+## 11. Break-glass SSH & public-port posture (ADR 015 + ADR 017)
 
-**Public port 22 is closed on both boxes** (phase 3). Every SSH consumer rides the tailnet: laptop (`ssh root@llunde-01` / `root@llunde-parser.tail0b6cbe.ts.net`), pyparser CI, portfolio CI (each joins per-run with an ephemeral `tag:ci` key).
+**The estate has ZERO public inbound ports.** Port 22 closed in phase 3; llunde-01's 80/443 closed at the phase-4 E6 cutover (2026-08-13). Every SSH consumer rides the tailnet: laptop (`ssh root@llunde-01` / `root@llunde-parser.tail0b6cbe.ts.net`), pyparser CI, portfolio CI (each joins per-run with an ephemeral `tag:ci` key). All web ingress arrives through Cloudflare tunnels the hosts dial outbound.
+
+**Re-opening 80/443** (the web half of break-glass — see §7.5 for the full sequence):
+
+```sh
+hcloud firewall add-rule --direction in --protocol tcp --port 80  --source-ips 0.0.0.0/0,::/0 llunde-fw
+hcloud firewall add-rule --direction in --protocol tcp --port 443 --source-ips 0.0.0.0/0,::/0 llunde-fw
+```
+
+Caddy never stopped binding those ports, so the origin serves the moment the rule lands — and its certificates are valid, because renewal runs over DNS-01 and never needed an inbound port. Restoring the NixOS half (`publicTCPPorts`) is a `git revert` of the E6 commit; both layers must be open for public traffic to arrive.
 
 **Break-glass, per host** (tailnet down or node expired):
 

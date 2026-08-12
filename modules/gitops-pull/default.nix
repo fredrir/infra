@@ -49,6 +49,15 @@
 # gitops-pull.timer` per host. Rollback: `git push -f <good-sha>:deploy`.
 # Manual deploys: stop the timer first (runbook).
 #
+# ⚠️ THE RECONCILE MAP APPLIED IS THE OLD ONE. This script runs from the RUNNING
+# generation (restartIfChanged = false, just below), so a rev that changes a
+# `check` command AND the config that check validates gets the NEW config graded
+# by the OLD check. H1b hit exactly that: an `acme_dns` Caddyfile validated by
+# the previous pkgs.caddy check, which had no DNS provider — restart skipped,
+# sticky reconcile_failed, deploy stalled while the old container kept serving
+# (fail-safe, but stalled). Land a check change in its OWN rev first; against
+# the old config it is a no-op, and the next rev then has the check it needs.
+#
 # Residual accepted with eyes open: a config that ACTIVATES fine but fails to
 # BOOT (kernel/initrd/bootloader) is outside this loop's reach — no boot
 # counting in nixos-25.11. Recovery: Hetzner web console -> boot menu ->

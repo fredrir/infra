@@ -44,6 +44,32 @@ The decision above declined DNS-01 and accepted stale certificates. At execution
 - **Orange-cloud proxy** (ADR 012's sketch) — same real-IP work, keeps LE and a trivial proxy-off rollback, but leaves 80/443 open and origin IP public. The conservative middle; rejected in favor of the uniform zero-inbound estate.
 - **Stay grey-direct** — zero work, no WAF, public origin. Rejected: the estate's last public ports for no benefit.
 
+## Executed (2026-08-13)
+
+The cutover ran as E5a (drop AAAA) → E5b (A → proxied CNAME) → B5 (empty the
+Hetzner firewall) → E6 (`publicTCPPorts = []`). **The estate now has zero public
+inbound ports.** No record in the `llunde.no` zone resolves to a host address.
+
+Proven at the edge rather than assumed: `CF-Ray` on all three names; the `@ops`
+403 holding through the edge across every traversal variant (`/metrics/`,
+`/metrics//`, `/metrics%2f`, `/METRICS`, `/metrics/x`); `Secure` surviving the
+plain-HTTP tunnel hop; and the real-IP contract shown by 20 failed logins with
+20 *different* forged `X-Forwarded-For` values collapsing into ONE rate-limit
+bucket (401×5 then 429×15) — only possible if Caddy replaced the header with
+`CF-Connecting-IP`. The origin's 80/443 went from answering `308` to timing out.
+
+Two things the plan got wrong, worth keeping:
+
+- The A→CNAME change is a **replacement**, not an in-place update. The `moved`
+  block still earned its place: it kept the same resource address, so the
+  replacement is destroy-then-create at one address rather than a create into a
+  name that still holds an A record (CF error 81053). There is a seconds-long
+  NXDOMAIN window between the two, and no way around it — create-before-destroy
+  would collide.
+- Removing the AAAA records had to be its **own apply**. tofu gives no ordering
+  guarantee between an unrelated create and destroy, so a single apply could
+  have failed, and failed non-deterministically.
+
 ## Consequences
 
 - Cloudflare becomes a hard availability dependency for llunde.no — as it already is for `parser.llunde.no` and `hansteen.dev`; two-thirds of the estate trusted it before this ADR.
