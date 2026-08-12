@@ -23,17 +23,17 @@ import {
 }
 
 import {
-  to = module.cloudflare.cloudflare_dns_record.a["llunde.no"]
+  to = module.cloudflare.cloudflare_dns_record.llunde_tunnel_cname["llunde.no"]
   id = "${local.cf_zone}/e257b8b6cfdc0b530f5b9179a519f82d"
 }
 
 import {
-  to = module.cloudflare.cloudflare_dns_record.a["www.llunde.no"]
+  to = module.cloudflare.cloudflare_dns_record.llunde_tunnel_cname["www.llunde.no"]
   id = "${local.cf_zone}/9417d77e16d3f3262abdaa7ee4ec051e"
 }
 
 import {
-  to = module.cloudflare.cloudflare_dns_record.a["api.llunde.no"]
+  to = module.cloudflare.cloudflare_dns_record.llunde_tunnel_cname["api.llunde.no"]
   id = "${local.cf_zone}/56c731500066e7e3d03baa85775eefbf"
 }
 
