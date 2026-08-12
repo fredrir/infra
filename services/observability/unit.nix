@@ -91,6 +91,27 @@ in rec {
           - target_label: __address__
             replacement: observability-blackbox:9115
 
+      # M3: the cutover assertion. Same URL as blackbox-public, a DIFFERENT
+      # question — not "is the site up" but "is the site reached THROUGH
+      # Cloudflare". Two jobs on purpose: one probe answering both questions
+      # could not tell "site down" from "site up but bypassing the edge", and
+      # bypassing the edge is silent by construction. Red until E5 flips DNS
+      # (runbook §7.2); named outside the blackbox-public.* family until then so
+      # PublicEdgeDown does not page on it.
+      - job_name: blackbox-cfray
+        metrics_path: /probe
+        params:
+          module: [http_2xx_cfray]
+        static_configs:
+          - targets: ["https://llunde.no"]
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: observability-blackbox:9115
+
       # The public edge answering 403 on the backend's ops path IS the healthy
       # signal — Caddy's @ops block responding proves DNS, tunnel and Caddy
       # are all alive (module http_403 accepts only 403).
