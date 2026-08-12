@@ -1,5 +1,6 @@
 {
 	email fhansteen@gmail.com
+	acme_dns cloudflare {env.CF_API_TOKEN}
 }
 
 api.llunde.no {

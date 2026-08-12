@@ -1,8 +1,8 @@
 # Host = diffs only (ADR 003): everything shared lives in modules/; this file
 # says what llunde-01 IS — its services, its users, its disk.
 {
+  config,
   modulesPath,
-  pkgs,
   ...
 }: {
   imports = [
@@ -47,6 +47,10 @@
     enable = true;
     tokenFile = "/run/secrets/llunde-tunnel.env";
   };
+  # H1 (ADR 017 amended): ACME moves to DNS-01 so certificates keep renewing
+  # once E6 closes 80/443 — warm certs are what make the break-glass grey-flip
+  # fast instead of a race with Let's Encrypt.
+  llunde.ingress.acmeDnsTokenFile = "/run/secrets/llunde-caddy-acme.env";
   # GitOps pull auto-apply (ADR 020, phase 2c): this host is the CANARY —
   # applies promoted revs immediately; llunde-parser follows 30min behind.
   # Rehearsed end-to-end on a throwaway box first (happy path, build-fail,
@@ -66,9 +70,12 @@
               "/etc/llunde/caddy/Caddyfile"
             ];
             # PR #12's lesson carried into automation: never bounce the front
-            # door onto a Caddyfile that cannot load (version skew between
-            # pkgs.caddy and the pinned container is fine for syntax checks).
-            check = "${pkgs.caddy}/bin/caddy validate --adapter caddyfile --config /etc/llunde/caddy/Caddyfile";
+            # door onto a Caddyfile that cannot load. The command validates
+            # using the CONTAINER IMAGE, not pkgs.caddy — see the option's docs
+            # in modules/ingress. Version skew used to be "fine for syntax
+            # checks"; it stopped being fine the moment the config referenced a
+            # MODULE that only one of the two builds contains.
+            check = config.llunde.ingress.caddyfileCheck;
           };
           cloudflared.watch = ["/etc/containers/systemd/users/2000/cloudflared.container"];
         };

@@ -73,6 +73,24 @@
     path = "/run/secrets/llunde-caddy-ghcr.json";
   };
 
+  # Env-file form (CF_API_TOKEN=...): the ACME DNS-01 credential (H1, ADR 017
+  # amended). Scoped Zone:DNS:Edit on llunde.no and NOTHING else — verified to
+  # create and delete a TXT record, and verified to be REFUSED account tunnel
+  # access. Deliberately not the laptop's ops token, which also carries
+  # account-wide Cloudflare Tunnel rights over the portfolio and pyparser
+  # tenants' tunnels (ADR 016 boundary) and must never reach a host.
+  #
+  # Residual, accepted with eyes open (ADR 017): this is zone-write authority
+  # living on the internet-facing box, so a compromise of `edge` is takeover of
+  # llunde.no — including MX/SPF/DKIM, i.e. email. Cloudflare cannot scope DNS
+  # edit below the zone.
+  sops.secrets."llunde-caddy-acme" = {
+    sopsFile = ../../secrets/llunde-caddy-acme.yaml;
+    key = "env";
+    owner = "edge";
+    path = "/run/secrets/llunde-caddy-acme.env";
+  };
+
   # GitOps pull (ADR 020, workstream A phase 2c): the read-only deploy key and
   # this host's external heartbeat URL. In sops on purpose — NOT the obs
   # deadman's out-of-band /var/lib file pattern (review B6).
