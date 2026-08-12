@@ -24,8 +24,19 @@ Dashboard edits are drift and get reverted by the next apply.
 | `parser.llunde.no`, `external.llunde.no` | proxied CNAMEs → pyparser tunnel `e77d6ebf-dcfb-4ade-b4eb-2be0d9e165a9` on **llunde-parser** |
 | SES DKIM / SPF / DMARC | grey, imported verbatim during the phase-3 audit |
 
-`hansteen.dev` (portfolio) runs its **own** tunnel in its own Cloudflare account
-and is not managed here (ADR 016 slot boundary).
+`hansteen.dev` (portfolio) is portfolio's **own zone with its own tunnel in THIS
+SAME Cloudflare account**, managed by its own terraform — permanently outside
+this repo's scope (ADR 016, [phase-3 mapping](research/phase-3-mapping.md)).
+
+> ⚠️ **A Cloudflare *Tunnel* API permission cannot be scoped to one tunnel.** It
+> is account-wide, and this account holds three: `llunde`,
+> `hansteen-portfolio-origin` and `pyparser-review`. Verified 2026-08-12 — a
+> token with that permission reads and rewrites the ingress of all three,
+> straight across the ADR 016 tenant boundary. So any token carrying it belongs
+> on the owner's laptop and **never on a host**: a host-resident copy hands the
+> internet-facing service user control of the other tenants' front doors. The
+> DNS-01 token in sops is `Zone:DNS:Edit` on llunde.no **only**, for exactly
+> this reason.
 
 Zone-level posture, verified 2026-08-12 against the already-proxied
 `parser.llunde.no`: **Always Use HTTPS on**, `CF-Ray` on every proxied response
