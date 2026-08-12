@@ -32,6 +32,13 @@ the podman `nixos/nix` wrapper from the phase-1/2 era is no longer needed.
    with `doppler run --project pyparser --config prd --`. (An admin AWS profile also exists
    locally via `aws login` — root credentials; reserve it for phase-3 IAM work and consider
    replacing with a scoped admin user later.)
+5. GitHub CLI auth (hardened 2026-08-12): `gh` runs a **fine-grained PAT** scoped to the
+   five llunde repos — Contents RW, Pull requests RW, Actions read, Metadata — with
+   **deliberately NO Administration** (deploy keys) **and NO Workflows** permissions.
+   Repo pushes ride SSH (`git@github.com`), which sidesteps the workflow-file push
+   restriction; PR merges of workflow changes work without it (proven). If a task needs
+   deploy-key or workflow-file API writes, mint a *transient* token — don't broaden this
+   one. ⏰ **90-day expiry: renewal due ~2026-11-10** (then every 90 days).
 
 ### Optional rehearsal: `nixos-dev` VM
 
