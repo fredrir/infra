@@ -91,6 +91,30 @@ other device, or the Hetzner console, is the path in the meantime).
    dropped Tailscale's built-in self-SSH rule, which broke `ssh archie` (a
    `--ssh`-enabled device). The estate hosts run regular sshd (unaffected). The
    policy now carries the self-SSH block, and so does the Phase-1 snippet above.
+4. **A stale tag strands a device — and the tests are the smoke alarm**
+   (second apply, 2026-08-12). archie carried a `tag:admin` from an old
+   experiment (console: "Managed by tag:admin … tag was deleted from the
+   policy file, never removed from this machine"). Tagged devices have no
+   user, so ownership-based dsts (`autogroup:member`/`autogroup:self`) can
+   NEVER match them — it only ever worked while rule 1's dst was `*:*`.
+   Symptoms: absent from every peer's netmap, MagicDNS NXDOMAIN, and policy
+   tests "want: Accept, got: Drop" against its IP. The test engine resolves
+   dst ownership and was RIGHT — it was misdiagnosed twice (as a test-framework
+   limitation, then as a deleted node) before anyone opened the machine page.
+   Check the console's machine page before theorizing.
+   **Remote rescue runbook (proven):** the console cannot remove a machine's
+   LAST tag — reauth only. (1) Temp-paste three additions: the stale tag in
+   `tagOwners`, `{src: [<mgmt device>], dst: ["<stranded-IP>:*"]}`, and an ssh
+   rule `{action: accept, src: [autogroup:member], dst: [<the tag>], users:
+   [autogroup:nonroot, root]}` (a tagged dst never matches `autogroup:self`;
+   `accept` not `check` — no browser loop mid-rescue). (2) ssh in;
+   `tailscale up --force-reauth` errors with the exact flag set to restate
+   (e.g. `--ssh --hostname=…`) — run that. (3) Open the printed auth URL on
+   ANY device and authenticate as the owner: the authenticating user becomes
+   the manager, which strips the tag; the node keeps its IP and the SSH
+   session survives. (4) Approve under Device Approval if held. (5) Re-paste
+   the final policy to unwind the temp blocks; verify the mesh (`ssh` to the
+   device) and the estate paths.
 
 ## Codification (reinstall-safety follow-up)
 
