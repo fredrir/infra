@@ -33,11 +33,6 @@ variable "ipv4" {
   type        = string
 }
 
-variable "ipv6" {
-  description = "Public IPv6 address for the direct records — llunde-01."
-  type        = string
-}
-
 variable "pyparser_tunnel_id" {
   description = <<-EOT
     Tunnel id behind parser/external CNAMEs. The tunnel itself is deliberately

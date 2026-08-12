@@ -8,6 +8,19 @@ locals {
   tunnel_hosts = toset(["parser.llunde.no", "external.llunde.no"])
 }
 
+# E5a (phase-4 cutover, step 1 of 2). The AAAA records for these three names are
+# GONE, deliberately and on their own, before E5b turns the A records into
+# proxied CNAMEs on the llunde tunnel.
+#
+# A CNAME cannot coexist with an A *or* an AAAA record at the same name
+# (Cloudflare error 81053), and tofu gives NO ordering guarantee between an
+# unrelated create and destroy in one apply — so doing both at once can fail,
+# and can fail non-deterministically. Splitting it makes each apply a single
+# reviewable fact.
+#
+# IPv6 is not lost, only relocated: after E5b these names resolve through
+# Cloudflare's anycast edge, which is dual-stack. The v6 gap lasts between the
+# two applies. See runbook §7.1.
 resource "cloudflare_dns_record" "a" {
   for_each = local.direct_hosts
 
@@ -17,17 +30,6 @@ resource "cloudflare_dns_record" "a" {
   content = var.ipv4
   proxied = false
   ttl     = 1 # auto
-}
-
-resource "cloudflare_dns_record" "aaaa" {
-  for_each = local.direct_hosts
-
-  zone_id = var.zone_id
-  name    = each.value
-  type    = "AAAA"
-  content = var.ipv6
-  proxied = false
-  ttl     = 1
 }
 
 resource "cloudflare_dns_record" "tunnel_cname" {
