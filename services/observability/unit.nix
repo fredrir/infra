@@ -95,10 +95,11 @@ in rec {
       # question — not "is the site up" but "is the site reached THROUGH
       # Cloudflare". Two jobs on purpose: one probe answering both questions
       # could not tell "site down" from "site up but bypassing the edge", and
-      # bypassing the edge is silent by construction. Red until E5 flips DNS
-      # (runbook §7.2); named outside the blackbox-public.* family until then so
-      # PublicEdgeDown does not page on it.
-      - job_name: blackbox-cfray
+      # bypassing the edge is silent by construction. Was deliberately red until E5
+      # flipped DNS, and named outside the blackbox-public.* family so
+      # PublicEdgeDown would not page on a state we chose. E5 landed 2026-08-13
+      # and green is now the correct state, so it joins the family and alerts.
+      - job_name: blackbox-public-cfray
         metrics_path: /probe
         params:
           module: [http_2xx_cfray]

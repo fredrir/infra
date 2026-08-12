@@ -20,11 +20,12 @@ modules:
   # as an unknown key and the exporter REFUSES TO START, which under the pull
   # loop means a failed reconcile and no probes at all. Hence the gate check.
   #
-  # This probe is DELIBERATELY RED until the E5 flip: llunde.no is still a direct
-  # A record and cannot produce CF-Ray. Turning green IS the cutover's success
-  # signal (runbook §7.2). Its job is named `blackbox-cfray`, outside the
-  # `blackbox-public.*` family, precisely so PublicEdgeDown does not page for
-  # ~57 days on a state we chose; it joins the family once the flip is verified.
+  # This probe was DELIBERATELY RED until the E5 flip (2026-08-13): llunde.no was
+  # a direct A record and could not produce CF-Ray, and turning green WAS the
+  # cutover's success signal. Its job sat outside the `blackbox-public.*` family
+  # until then so PublicEdgeDown could not page on a state we had chosen. Now
+  # that the edge is the only path, a missing CF-Ray means traffic is somehow
+  # bypassing Cloudflare — which is exactly what should page.
   http_2xx_cfray:
     prober: http
     timeout: 10s

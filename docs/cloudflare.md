@@ -9,18 +9,16 @@ Dashboard edits are drift and get reverted by the next apply.
 - Token: `CLOUDFLARE_API_TOKEN`, Doppler `llunde/ops`, laptop-only — never a host
   or CI secret.
 
-> **⏳ Phase-4 edge cutover is in flight** (ADR 017, [runbook §7](runbook.md)).
-> Until E5 applies, `llunde.no`/`www`/`api` are **grey A + AAAA records straight
-> at llunde-01** and Caddy terminates public TLS on open 80/443. E5 turns them
-> into proxied CNAMEs on the llunde tunnel; E6 then closes 80/443, leaving the
-> estate with zero public inbound. Everything below marked *(post-E5)* is the
-> target, not today.
+> **✅ Phase-4 edge cutover executed 2026-08-13** (ADR 017, [runbook §7](runbook.md)).
+> `llunde.no`/`www`/`api` are proxied CNAMEs on the llunde tunnel, 80/443 are
+> closed at both the Hetzner firewall and the NixOS firewall, and **no record in
+> this zone resolves to a host address**. The estate has zero public inbound.
 
 ## Shape
 
 | Names | Served by |
 |---|---|
-| `llunde.no`, `www.llunde.no`, `api.llunde.no` | direct A/AAAA → llunde-01, Caddy + Let's Encrypt · *(post-E5: proxied CNAMEs → llunde tunnel `c0cdd9b5-fa97-42a1-bca7-95da236ea949`)* |
+| `llunde.no`, `www.llunde.no`, `api.llunde.no` | proxied CNAMEs → llunde tunnel `c0cdd9b5-fa97-42a1-bca7-95da236ea949` on **llunde-01** |
 | `parser.llunde.no`, `external.llunde.no` | proxied CNAMEs → pyparser tunnel `e77d6ebf-dcfb-4ade-b4eb-2be0d9e165a9` on **llunde-parser** |
 | SES DKIM / SPF / DMARC | grey, imported verbatim during the phase-3 audit |
 
@@ -50,7 +48,7 @@ error is click-through-able, not a hard failure.
 | Host | llunde-01 | llunde-parser |
 | Connector | `Network=host`, dials Caddy on loopback `:8085` | shared podman network, dials service names |
 | Image | **digest-pinned** — the front door never rides a floating tag | `:latest` (predates ADR 017) |
-| Ingress map | dashboard *(post-E5: tofu, `cloudflare_zero_trust_tunnel_cloudflared_config`)* | dashboard |
+| Ingress map | **tofu** (`cloudflare_zero_trust_tunnel_cloudflared_config`) | dashboard |
 
 The `Network=host` choice is load-bearing and does **not** transfer between them:
 a podman-networked container's `localhost` is its own, so pyparser's shape would
@@ -71,9 +69,14 @@ back on purpose, so the rule stands.
 
 ## Certificates
 
-Today Caddy holds Let's Encrypt certs for the three hostnames and renews them
-over http-01 on the open port 80. *(post-E6: there is no http-01 path, so
-renewal moves to **DNS-01** via a separate host-scoped `Zone:DNS:Edit` token in
-sops — never the ops token. Warm certs are what keep break-glass fast: re-open
-the ports, flip DNS back to A records, and the certs are already valid.)*
-See ADR 017 and runbook §13.
+Caddy holds Let's Encrypt certificates for the three hostnames and renews them
+over **DNS-01**, using a separate host-scoped `Zone:DNS:Edit` token in sops —
+never the ops token, which also carries account-wide tunnel rights. With 80/443
+closed there is no http-01 or tls-alpn-01 path; the running TLS policy carries a
+`dns` challenge and nothing else, for both the Let's Encrypt and ZeroSSL
+issuers. Proven 2026-08-13 by issuing a real certificate for a name with no DNS
+record at all.
+
+Warm certificates are what keep break-glass fast: re-open the ports, flip DNS
+back to A records, and the certificates are already valid rather than racing
+Let's Encrypt during an outage. See ADR 017 and runbook §13.
