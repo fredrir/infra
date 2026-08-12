@@ -38,21 +38,6 @@ import {
 }
 
 import {
-  to = module.cloudflare.cloudflare_dns_record.aaaa["llunde.no"]
-  id = "${local.cf_zone}/5de6fdf8d78da700afc150685ea59ad7"
-}
-
-import {
-  to = module.cloudflare.cloudflare_dns_record.aaaa["www.llunde.no"]
-  id = "${local.cf_zone}/bb5d6bac8e1533638d4934bd4298e59c"
-}
-
-import {
-  to = module.cloudflare.cloudflare_dns_record.aaaa["api.llunde.no"]
-  id = "${local.cf_zone}/e32a05f883f439e8100fe219fa3c5c0d"
-}
-
-import {
   to = module.cloudflare.cloudflare_dns_record.tunnel_cname["parser.llunde.no"]
   id = "${local.cf_zone}/0d50fbb4e9e2f35cbca26553d142e868"
 }
