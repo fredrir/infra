@@ -44,6 +44,51 @@ resource "cloudflare_dns_record" "tunnel_cname" {
   }, each.value, null)
 }
 
+# ---- llunde tunnel ingress map (phase-4 B2, ADR 017) ----
+# The hostname -> origin routing the connector fetches at startup. It was
+# dashboard-created in E1 and is adopted here so the front door's routing is a
+# reviewed diff like everything else, and so the stale `edge-test` hostname from
+# the E3 real-IP proof is removed declaratively rather than by remembering to
+# click it.
+#
+# All three vhosts point at ONE Caddy listener, which routes by Host — that is
+# why the map is this boring. `localhost` (not 127.0.0.1) is verbatim what the
+# live config has carried since E1 and is proven in production: the connector
+# runs Network=host, so this is the host's loopback, and Caddy binds
+# 127.0.0.1:8085. Kept byte-identical on purpose so adopting the config is a
+# no-op apart from dropping edge-test.
+#
+# The catch-all is required and must be last: cloudflared refuses a config whose
+# final rule has a hostname. `service` is required on every rule.
+locals {
+  llunde_tunnel_origin = "http://localhost:8085"
+}
+
+resource "cloudflare_zero_trust_tunnel_cloudflared_config" "llunde" {
+  account_id = var.account_id
+  tunnel_id  = var.llunde_tunnel_id
+
+  config = {
+    ingress = [
+      {
+        hostname = "llunde.no"
+        service  = local.llunde_tunnel_origin
+      },
+      {
+        hostname = "www.llunde.no"
+        service  = local.llunde_tunnel_origin
+      },
+      {
+        hostname = "api.llunde.no"
+        service  = local.llunde_tunnel_origin
+      },
+      {
+        service = "http_status:404"
+      },
+    ]
+  }
+}
+
 # ---- Email (Amazon SES domain identity) ----
 # Found in the zone during the phase-3 import audit; imported verbatim.
 
