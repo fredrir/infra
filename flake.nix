@@ -252,6 +252,27 @@
             - target_label: __address__
               replacement: observability-blackbox:9115
 
+        # M3: the cutover assertion. Same URL as blackbox-public, a DIFFERENT
+        # question — not "is the site up" but "is the site reached THROUGH
+        # Cloudflare". Two jobs on purpose: one probe answering both questions
+        # could not tell "site down" from "site up but bypassing the edge", and
+        # bypassing the edge is silent by construction. Red until E5 flips DNS
+        # (runbook §7.2); named outside the blackbox-public.* family until then so
+        # PublicEdgeDown does not page on it.
+        - job_name: blackbox-cfray
+          metrics_path: /probe
+          params:
+            module: [http_2xx_cfray]
+          static_configs:
+            - targets: ["https://llunde.no"]
+          relabel_configs:
+            - source_labels: [__address__]
+              target_label: __param_target
+            - source_labels: [__param_target]
+              target_label: instance
+            - target_label: __address__
+              replacement: observability-blackbox:9115
+
         # The public edge answering 403 on the backend's ops path IS the healthy
         # signal — Caddy's @ops block responding proves DNS, tunnel and Caddy
         # are all alive (module http_403 accepts only 403).
@@ -338,6 +359,30 @@
       nixpkgs.legacyPackages.${system}.writeText "gitops-pull-script-ok"
       sys.config.systemd.services.gitops-pull.serviceConfig.ExecStart;
 
+    # Config-SYNTAX gate for the observability stack's two hand-written configs
+    # (M3 finding, and it paid for itself in the same PR). The goldens prove the
+    # rendered text did not DRIFT; they cannot prove it is VALID.
+    # `fail_if_header_not_matched` — the plausible misspelling of `..._matches` —
+    # is golden-clean and exporter-fatal: blackbox refuses to start on an unknown
+    # key, so under the pull loop it is a failed reconcile and ZERO probes,
+    # surfaced by an alert instead of by CI. Both binaries were checked to exit
+    # non-zero on a bad file: a gate that cannot fail is worse than no gate (the
+    # vacuous-darwin-check lesson, one comment block down).
+    #
+    # Version skew with the pinned containers (nixpkgs blackbox 0.27.0 /
+    # promtool 3.7.2 vs the deployed v0.28.0 / v3.13.2) is fine for a syntax
+    # check — the same trade the caddy `validate` reconcile check already makes.
+    obsConfigCheck = system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+    in
+      pkgs.runCommand "obs-config-ok" {} ''
+        ${pkgs.prometheus-blackbox-exporter}/bin/blackbox_exporter \
+          --config.file=${./services/observability/blackbox.yml} --config.check
+        ${pkgs.prometheus.cli}/bin/promtool check config \
+          ${pkgs.writeText "prometheus.yml" renderedObsScrapeConfig}
+        touch $out
+      '';
+
     mkRenderCheck = system:
       assert lib.assertMsg (renderedObsPrometheus == goldenObsPrometheus)
       "observability prometheus unit drifted from golden:\n---rendered---\n${renderedObsPrometheus}\n---golden---\n${goldenObsPrometheus}";
@@ -406,10 +451,12 @@
 
     checks.x86_64-linux.mkquadlet-render = mkRenderCheck "x86_64-linux";
     checks.x86_64-linux.gitops-pull-script = gitopsPullScriptCheck "x86_64-linux";
+    checks.x86_64-linux.obs-config = obsConfigCheck "x86_64-linux";
     checks.aarch64-linux.mkquadlet-render = mkRenderCheck "aarch64-linux";
     # The laptop is aarch64-darwin: without this, local `nix flake check`
     # skips the goldens as "incompatible" and passes vacuously — exactly how
     # a golden drift reached main on the gate's first run (gate finding).
     checks.aarch64-darwin.mkquadlet-render = mkRenderCheck "aarch64-darwin";
+    checks.aarch64-darwin.obs-config = obsConfigCheck "aarch64-darwin";
   };
 }

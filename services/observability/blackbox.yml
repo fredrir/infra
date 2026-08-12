@@ -10,6 +10,30 @@ modules:
     http:
       preferred_ip_protocol: ip4
 
+  # M3 (phase-4 cutover assertion): 200 AND proof the response actually came
+  # through Cloudflare's edge. CF stamps `CF-Ray` on every proxied response
+  # (verified against parser.llunde.no, 2026-08-12); a direct-to-origin answer
+  # from Caddy has none. `fail_if_header_not_matches` treats a MISSING header as
+  # a failure — `allow_missing` defaults to false — which is exactly the
+  # assertion we want, so it stays unset rather than being spelled out.
+  # NB the field is `..._matches`, not `..._matched`: the wrong spelling parses
+  # as an unknown key and the exporter REFUSES TO START, which under the pull
+  # loop means a failed reconcile and no probes at all. Hence the gate check.
+  #
+  # This probe is DELIBERATELY RED until the E5 flip: llunde.no is still a direct
+  # A record and cannot produce CF-Ray. Turning green IS the cutover's success
+  # signal (runbook §7.2). Its job is named `blackbox-cfray`, outside the
+  # `blackbox-public.*` family, precisely so PublicEdgeDown does not page for
+  # ~57 days on a state we chose; it joins the family once the flip is verified.
+  http_2xx_cfray:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+      fail_if_header_not_matches:
+        - header: CF-Ray
+          regexp: ".+"
+
   # 403 IS the healthy answer (contract): https://api.llunde.no/health is
   # blocked by Caddy's @ops rules on the public vhost, so a 403 arriving
   # through the edge proves the WHOLE public chain — DNS, CF, tunnel, Caddy —
