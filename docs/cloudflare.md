@@ -1,22 +1,79 @@
 # Cloudflare — llunde.no zone
 
-The `llunde.no` zone lives on Cloudflare and is currently managed **out-of-band** (dashboard/API). [ADR 012](decisions/012-cloudflare-strategy.md) sets the target: DNS-only (grey-cloud) through the phase-2 cutover, the zone brought under OpenTofu as a Should, and proxy/WAF (orange-cloud) deliberately deferred to phase 4 because it changes real-IP handling end-to-end.
+The zone is **under OpenTofu** (ADR 012 part 2, executed phase-3 step 2):
+`tofu/modules/cloudflare/main.tf` is the source of truth for every record, and
+`tofu -chdir=tofu plan` is the audit — a clean plan means the zone matches git.
+Dashboard edits are drift and get reverted by the next apply.
 
-- Account: `8786559b30fcebd08d0c594b6e899eef` · Zone (`llunde.no`): `4ae54b24fc4140d4d1c450491645f1c8`
+- Account `8786559b30fcebd08d0c594b6e899eef` · Zone (`llunde.no`) `4ae54b24fc4140d4d1c450491645f1c8`
+- Token: `CLOUDFLARE_API_TOKEN`, Doppler `llunde/ops`, laptop-only — never a host
+  or CI secret.
 
-## Current records (reality, 2026-08)
+> **⏳ Phase-4 edge cutover is in flight** (ADR 017, [runbook §7](runbook.md)).
+> Until E5 applies, `llunde.no`/`www`/`api` are **grey A + AAAA records straight
+> at llunde-01** and Caddy terminates public TLS on open 80/443. E5 turns them
+> into proxied CNAMEs on the llunde tunnel; E6 then closes 80/443, leaving the
+> estate with zero public inbound. Everything below marked *(post-E5)* is the
+> target, not today.
 
-| Record | Points at | Status |
+## Shape
+
+| Names | Served by |
+|---|---|
+| `llunde.no`, `www.llunde.no`, `api.llunde.no` | direct A/AAAA → llunde-01, Caddy + Let's Encrypt · *(post-E5: proxied CNAMEs → llunde tunnel `c0cdd9b5-fa97-42a1-bca7-95da236ea949`)* |
+| `parser.llunde.no`, `external.llunde.no` | proxied CNAMEs → pyparser tunnel `e77d6ebf-dcfb-4ade-b4eb-2be0d9e165a9` on **llunde-parser** |
+| SES DKIM / SPF / DMARC | grey, imported verbatim during the phase-3 audit |
+
+`hansteen.dev` (portfolio) is portfolio's **own zone with its own tunnel in THIS
+SAME Cloudflare account**, managed by its own terraform — permanently outside
+this repo's scope (ADR 016, [phase-3 mapping](research/phase-3-mapping.md)).
+
+> ⚠️ **A Cloudflare *Tunnel* API permission cannot be scoped to one tunnel.** It
+> is account-wide, and this account holds three: `llunde`,
+> `hansteen-portfolio-origin` and `pyparser-review`. Verified 2026-08-12 — a
+> token with that permission reads and rewrites the ingress of all three,
+> straight across the ADR 016 tenant boundary. So any token carrying it belongs
+> on the owner's laptop and **never on a host**: a host-resident copy hands the
+> internet-facing service user control of the other tenants' front doors. The
+> DNS-01 token in sops is `Zone:DNS:Edit` on llunde.no **only**, for exactly
+> this reason.
+
+Zone-level posture, verified 2026-08-12 against the already-proxied
+`parser.llunde.no`: **Always Use HTTPS on**, `CF-Ray` on every proxied response
+(what the `blackbox-cfray` probe asserts), and **no HSTS** — so a break-glass TLS
+error is click-through-able, not a hard failure.
+
+## The two llunde tunnels are not symmetric
+
+| | llunde `c0cdd9b5` | pyparser `e77d6ebf` |
 |---|---|---|
-| `llunde.no`, `www.llunde.no` | proxied CNAME → llunde tunnel `ed8abcdb-508c-4d61-85b7-bc3127510e4b` | **Retired by phase 2** |
-| `parser.llunde.no`, `external.llunde.no` | proxied CNAME → pyparser tunnel | Untouched until phase 3 — see `docs/pyparser/CLOUDFLARE.md` |
+| Host | llunde-01 | llunde-parser |
+| Connector | `Network=host`, dials Caddy on loopback `:8085` | shared podman network, dials service names |
+| Image | **digest-pinned** — the front door never rides a floating tag | `:latest` (predates ADR 017) |
+| Ingress map | dashboard *(post-E5: tofu, `cloudflare_zero_trust_tunnel_cloudflared_config`)* | dashboard |
 
-The llunde tunnel fronts the old stack (cloudflared → nginx on the origin's internal network; the Hetzner firewall is SSH-only, so nothing on 80/443 reaches the box directly today). This is why the [phase-2 cutover](init/plans/phase-2/README.md) is a DNS change, not just a process swap: open 80/443 in the new firewall, repoint `llunde.no`/`www` to direct A/AAAA records (grey-cloud) for `llunde-01`, add `api.llunde.no`, let Caddy take Let's Encrypt from there, then delete the llunde tunnel.
+The `Network=host` choice is load-bearing and does **not** transfer between them:
+a podman-networked container's `localhost` is its own, so pyparser's shape would
+never reach Caddy's 127.0.0.1 listener (phase-3.5 cutover lesson).
+
+Day-to-day tunnel operations — connector health, reading the live ingress map,
+digest bumps, failure modes — are [runbook §13](runbook.md).
 
 ## ⚠️ While tunnels are live
 
-Do not rotate tunnel tokens. A tunnel's token embeds its secret — regenerating it drops the live connectors (site outage) until the new token is deployed. This constraint dies for llunde with the phase-2 tunnel retirement; it remains real for pyparser.
+**Never rotate a tunnel token casually.** A tunnel's token embeds its secret —
+regenerating it drops the live connectors (site outage) until the new token is
+deployed. This is permanent for both tunnels. The phase-2-era note that the
+constraint would "die with the llunde tunnel retirement" referred to the
+**retired** `ed8abcdb-508c-4d61-85b7-bc3127510e4b` tunnel, which fronted the
+pre-NixOS stack and was deleted at the phase-2 cutover; ADR 017 brought a tunnel
+back on purpose, so the rule stands.
 
-## Bringing the zone into OpenTofu (phase 3, step 2)
+## Certificates
 
-Scheduled: [phase-3 tasks](init/plans/phase-3/tasks.md) step 2 ([ADR 012](decisions/012-cloudflare-strategy.md)). When the zone moves under `tofu/`: import the existing records rather than recreating, keep the pyparser tunnel records pinned with `lifecycle { ignore_changes }` on anything embedding secrets, and mind the Cloudflare provider v4→v5 restructuring (`cloudflare_record` → `cloudflare_dns_record`, Zero Trust resources renamed) noted in `docs/pyparser/CLOUDFLARE.md`.
+Today Caddy holds Let's Encrypt certs for the three hostnames and renews them
+over http-01 on the open port 80. *(post-E6: there is no http-01 path, so
+renewal moves to **DNS-01** via a separate host-scoped `Zone:DNS:Edit` token in
+sops — never the ops token. Warm certs are what keep break-glass fast: re-open
+the ports, flip DNS back to A records, and the certs are already valid.)*
+See ADR 017 and runbook §13.
