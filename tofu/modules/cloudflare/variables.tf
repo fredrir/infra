@@ -28,11 +28,6 @@ variable "llunde_tunnel_id" {
   type        = string
 }
 
-variable "ipv4" {
-  description = "Public IPv4 the direct (grey-cloud) records point at — llunde-01."
-  type        = string
-}
-
 variable "pyparser_tunnel_id" {
   description = <<-EOT
     Tunnel id behind parser/external CNAMEs. The tunnel itself is deliberately

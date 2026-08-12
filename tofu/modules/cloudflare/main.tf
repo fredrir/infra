@@ -1,10 +1,14 @@
-# llunde.no zone records (ADR 012). DNS-only (grey) for the hosts Caddy serves
-# with Let's Encrypt; the phase-4 orange-cloud decision is a reviewed diff of
-# `proxied` here — never a dashboard click. parser/external stay proxied CNAMEs
-# to the pyparser tunnel until phase 3.5 touches that box's ingress.
+# llunde.no zone records (ADR 012). Every name in the zone is now a proxied
+# CNAME onto a tunnel: llunde.no/www/api onto the llunde tunnel (ADR 017, E5),
+# parser/external onto pyparser's. No record points at a host address any more,
+# which is the point — the origin IP is no longer public.
+#
+# ADR 012 planned orange-cloud proxying of direct A records as the phase-4 edge;
+# ADR 017 superseded that with tunnel ingress, so the "reviewed diff of
+# `proxied`" this file used to anticipate became a change of record TYPE.
 
 locals {
-  direct_hosts = toset(["llunde.no", "www.llunde.no", "api.llunde.no"])
+  llunde_hosts = toset(["llunde.no", "www.llunde.no", "api.llunde.no"])
   tunnel_hosts = toset(["parser.llunde.no", "external.llunde.no"])
 }
 
@@ -21,14 +25,26 @@ locals {
 # IPv6 is not lost, only relocated: after E5b these names resolve through
 # Cloudflare's anycast edge, which is dual-stack. The v6 gap lasts between the
 # two applies. See runbook §7.1.
-resource "cloudflare_dns_record" "a" {
-  for_each = local.direct_hosts
+# The address the records point at is no longer llunde-01's — it is the tunnel.
+# Renamed rather than replaced: a `moved` block carries the STATE across, so
+# tofu updates the existing record ids in place instead of create-before-destroy
+# into a name that still holds an A record (Cloudflare error 81053).
+moved {
+  from = cloudflare_dns_record.a
+  to   = cloudflare_dns_record.llunde_tunnel_cname
+}
+
+resource "cloudflare_dns_record" "llunde_tunnel_cname" {
+  for_each = local.llunde_hosts
 
   zone_id = var.zone_id
   name    = each.value
-  type    = "A"
-  content = var.ipv4
-  proxied = false
+  type    = "CNAME"
+  content = "${var.llunde_tunnel_id}.cfargotunnel.com"
+  # MUST be proxied: a cfargotunnel.com target only resolves through
+  # Cloudflare's edge. Grey-clouding these is the break-glass move and it
+  # requires putting the A records back first (runbook §7.5).
+  proxied = true
   ttl     = 1 # auto
 }
 
