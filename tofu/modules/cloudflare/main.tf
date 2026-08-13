@@ -26,9 +26,17 @@ locals {
 # Cloudflare's anycast edge, which is dual-stack. The v6 gap lasts between the
 # two applies. See runbook §7.1.
 # The address the records point at is no longer llunde-01's — it is the tunnel.
-# Renamed rather than replaced: a `moved` block carries the STATE across, so
-# tofu updates the existing record ids in place instead of create-before-destroy
-# into a name that still holds an A record (Cloudflare error 81053).
+#
+# ⚠️ Corrected against what E5b actually did (ADR 017 §Executed): this is a
+# REPLACEMENT, not an in-place update. Changing an A record's `type` forces
+# replacement, so tofu destroys and re-creates, and there is a seconds-long
+# NXDOMAIN window between the two that no configuration can remove —
+# create-before-destroy would collide with the record it is replacing.
+#
+# The `moved` block still earns its place: it carries the STATE across so the
+# replacement happens at ONE resource address, rather than tofu planning a
+# create into a name that still holds an A record (Cloudflare error 81053) and
+# a separate destroy of the old one.
 moved {
   from = cloudflare_dns_record.a
   to   = cloudflare_dns_record.llunde_tunnel_cname

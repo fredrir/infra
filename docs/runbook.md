@@ -626,3 +626,56 @@ ssh root@100.109.80.121 'cd / && runuser -u edge -- env XDG_RUNTIME_DIR=/run/use
 | `400` on everything through the tunnel | M1 guard: no `CF-Connecting-IP` — the request did not come from CF | expected for a direct hand-probe of `:8085`; add `-H 'CF-Connecting-IP: 1.2.3.4'` to test |
 | Rate limits key on one bucket / audit shows `127.0.0.1` | the XFF←`CF-Connecting-IP` mapping was lost | `tests/golden/llunde-01.Caddyfile` diff; it cannot regress silently |
 | Cloudflare itself is down | — | §7.5 full break-glass |
+
+### 13.5 `OriginCertExpiring` — the DNS-01 renewal stopped working
+
+**Read this before touching anything: the site is NOT down.** Public traffic
+never sees Caddy's certificates — cloudflared dials `:8085` in plain HTTP and
+Cloudflare presents its own edge certificate. What this alert says is that
+**break-glass has gone cold**: §7.5 and §11 both assume that re-opening 80/443
+serves valid TLS immediately, and that assumption is the thing expiring.
+
+That invisibility is why the alert exists. No probe anywhere else in the estate
+looks at an origin certificate (`probe_ssl_earliest_cert_expiry` on the
+`blackbox-public*` jobs is Cloudflare's edge cert, not this one), so before the
+phase-4 closeout a renewal failure would have surfaced only at the moment
+break-glass needed it. The stamp comes from `caddy-cert-expiry.timer` on
+llunde-01 (hourly, `modules/ingress`), lands as a node_exporter textfile metric,
+and fires at **21 days remaining** — Caddy starts renewing at ~30, so crossing 21
+means renewal has been failing for over a week.
+
+```sh
+# what the alert is reading
+ssh root@100.109.80.121 'cat /var/lib/node-exporter-text/caddy_cert_expiry.prom'
+
+# ground truth, the same handshake break-glass would get
+ssh root@100.109.80.121 "curl -sSv --max-time 8 --resolve llunde.no:443:127.0.0.1 \
+  https://llunde.no/ -o /dev/null 2>&1 | grep -E 'subject:|expire date|issuer:'"
+
+# run the stamp by hand (it exits non-zero if a name serves no certificate)
+ssh root@100.109.80.121 'systemctl start caddy-cert-expiry && \
+  journalctl -u caddy-cert-expiry -n 20 --no-pager'
+```
+
+Then find out why renewal failed — the answer is nearly always the DNS-01 token:
+
+```sh
+# Caddy's own account of it
+ssh root@100.109.80.121 'cd / && runuser -u edge -- env XDG_RUNTIME_DIR=/run/user/2000 \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2000/bus \
+  journalctl --user -u caddy --no-pager | grep -iE "obtain|renew|acme|challenge" | tail -40'
+
+# the token must be materialized AND still valid at Cloudflare
+ssh root@100.109.80.121 'test -s /run/secrets/llunde-caddy-acme.env && echo "secret present"'
+```
+
+| Symptom in the caddy log | Cause | Move |
+|---|---|---|
+| `dns` challenge, `Authentication error (10000)` | the host-scoped `Zone:DNS:Edit` token was revoked or expired | mint a new one, `sops secrets/llunde-caddy-acme.yaml`, PR → merge → the reconcile map restarts caddy |
+| `no solvers available` / falls back to `http-01` | the running image lost the DNS provider — i.e. the digest moved to a plugin-less build | `tests/golden/caddy.container` diff; CI's `verify` job asserts `dns.providers.cloudflare` on every build |
+| Renewals never attempted at all | `acmeDnsTokenFile` is null, so `acme_dns` never rendered | `tests/golden/llunde-01.Caddyfile` must contain `acme_dns cloudflare` |
+
+**If it is going to expire before you can fix it**, the fallback is the old path:
+re-open 80/443 (§11), which restores an http-01 route Let's Encrypt can use. That
+is a deliberate, temporary retreat from zero-public-inbound — close it again the
+moment DNS-01 issues cleanly.

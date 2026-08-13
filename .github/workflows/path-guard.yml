@@ -31,17 +31,54 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          # No checkout: the file list comes from the API.
+          # No checkout: the file list AND the patches come from the API.
           FILES=$(gh api "repos/$REPO/pulls/$PR/files" --paginate -q '.[].filename')
           MATCHED=$(echo "$FILES" | grep -E \
             '^(modules/(tailscale|profiles|secrets|gitops-pull)/|secrets/|tailscale/|hosts/[^/]+/secrets\.nix$|flake\.lock$|\.github/workflows/)' \
             || true)
+
+          # H1b guard. A reconcile `check` runs from the RUNNING generation
+          # (modules/gitops-pull sets restartIfChanged = false — the
+          # self-deploying-deployer guard), so a rev that changes a check AND
+          # the config that check validates gets the NEW config graded by the
+          # OLD check: the restart is skipped, reconcile_failed goes sticky, and
+          # the deploy stalls while the old container keeps serving. H1b lost a
+          # deploy to exactly this and the rule has been written down three
+          # times since; this is the first thing that puts it in front of the
+          # author at the moment it matters.
+          #
+          # Matched on the PATCH, not the file list: check strings live in
+          # hosts/*/default.nix and modules/ingress/default.nix, both of which
+          # change constantly for innocent reasons. Only a changed +/- line
+          # carrying a `check =` assignment (or the caddyfileCheck that renders
+          # one) counts. File headers (+++/---) are excluded so a path merely
+          # containing "check" cannot trip it.
+          CHECKS=$(gh api "repos/$REPO/pulls/$PR/files" --paginate -q '
+            .[]
+            | .filename as $f
+            | ((.patch // "") | split("\n")[])
+            | select(startswith("+") or startswith("-"))
+            | select((startswith("+++") or startswith("---")) | not)
+            | select(test("check[[:space:]]*=|caddyfileCheck"))
+            | $f' | sort -u || true)
+
           MARKER='<!-- path-guard -->'
-          if [ -z "$MATCHED" ]; then
-            echo "no plane-sensitive paths touched"
+          if [ -z "$MATCHED" ] && [ -z "$CHECKS" ]; then
+            echo "nothing to flag"
             exit 0
           fi
-          BODY=$(printf '%s\n⚠️ **Network/deploy-plane change** — this PR touches:\n\n```\n%s\n```\n\nUnder pull auto-apply, merging deploys this to llunde-01 within ~5min and llunde-parser +30min. If this can sever tailscale/sshd or the pull loop itself, consider:\n- watching the first apply (`journalctl -fu gitops-pull` on the host), or\n- pausing first: disable the *Promote to deploy* workflow, merge, verify manually, re-enable.\n\nThe deadman rolls back a severed activation in ≤10min; a deliberate pause is still cheaper. *(Advisory only — see ADR 020.)*' "$MARKER" "$MATCHED")
+          {
+            printf '%s\n' "$MARKER"
+            if [ -n "$MATCHED" ]; then
+              printf '⚠️ **Network/deploy-plane change** — this PR touches:\n\n```\n%s\n```\n\nUnder pull auto-apply, merging deploys this to llunde-01 within ~5min and llunde-parser +30min. If this can sever tailscale/sshd or the pull loop itself, consider:\n- watching the first apply (`journalctl -fu gitops-pull` on the host), or\n- pausing first: disable the *Promote to deploy* workflow, merge, verify manually, re-enable.\n\nThe deadman rolls back a severed activation in ≤10min; a deliberate pause is still cheaper.\n' "$MATCHED"
+            fi
+            if [ -n "$MATCHED" ] && [ -n "$CHECKS" ]; then printf '\n---\n\n'; fi
+            if [ -n "$CHECKS" ]; then
+              printf '🧊 **A reconcile `check` changed** — in:\n\n```\n%s\n```\n\n**The check that will grade this deploy is the OLD one.** gitops-pull runs from the *running* generation, so a new check string only takes effect on the NEXT rev. If this PR also changes a config that this check validates, the new config gets graded by the old check — restart skipped, sticky `reconcile_failed`, deploy stalled (H1b).\n\n**Land the check change in its own rev first** — against the old config it is a no-op — then the config change. See `modules/gitops-pull/default.nix` header and runbook §6.\n' "$CHECKS"
+            fi
+            printf '\n*(Advisory only — see ADR 020.)*\n'
+          } > guard-body.md
+          BODY=$(cat guard-body.md)
           # Upsert: one comment per PR, edited in place on subsequent pushes.
           EXISTING=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
             -q ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)

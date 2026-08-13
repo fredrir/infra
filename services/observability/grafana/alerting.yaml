@@ -178,6 +178,57 @@ groups:
                   reducer: { type: last, params: [] }
                   type: query
 
+      # Origin-certificate expiry (phase-4 closeout). The only watch on Caddy's
+      # OWN certificates: production traffic never sees them (cloudflared dials
+      # plain HTTP, and the `probe_ssl_earliest_cert_expiry` the blackbox-public
+      # jobs report is Cloudflare's edge certificate), so a DNS-01 renewal
+      # failure would otherwise stay silent until break-glass needed a warm
+      # certificate. Stamp written hourly by modules/ingress.
+      #
+      # 21 days: Let's Encrypt issues for 90 and Caddy starts renewing at ~30
+      # days remaining, so crossing 21 means renewal has been failing for over a
+      # week — late enough that a healthy renewal never trips it, early enough
+      # to fix by hand (runbook §13.5) with three weeks of runway left.
+      #
+      # noDataState Alerting, unlike every other rule in this file: for this one
+      # SILENCE IS THE FAILURE. `for: 6h` absorbs reboots and the gap between a
+      # fresh switch and the first hourly stamp. The metric is an absolute
+      # deadline, so even a stale stamp keeps counting down correctly.
+      - uid: cert-expiry
+        title: OriginCertExpiring
+        condition: B
+        for: 6h
+        noDataState: Alerting
+        execErrState: Error
+        annotations:
+          summary: "origin certificate for {{ $labels.name }} expires in under 21 days — DNS-01 renewal is not working (runbook §13.5)"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: (caddy_cert_expiry_timestamp - time()) / 86400
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange: { from: 0, to: 0 }
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [21] }
+                  operator: { type: and }
+                  query: { params: [B] }
+                  reducer: { type: last, params: [] }
+                  type: query
+
       # Freshness in days from the textfile stamps modules/backups writes on
       # every SUCCESSFUL restic run. noDataState OK, deliberately softer than
       # the rest: the stamp only exists after the first post-deploy weekly

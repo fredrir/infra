@@ -31,6 +31,14 @@ Backend tracing wiring (backend repo follow-up once the collector exists). pypar
 
 ## Exit criteria (gate)
 
+> **✅ Gate CLOSED 2026-08-13 on `f82ae3a`.** All six walked with live evidence in
+> [tasks.md § Executed](tasks.md#executed--gate-closed-2026-08-13), including the
+> two criteria that closed with a stated deviation rather than cleanly: #1 (the
+> gate cannot be a *required* check on a private repo) and #2 (O5 landed 3 of its
+> 5 alerts; `unit-failed` and portfolio-backup freshness are backlog H4). #4 was
+> met under ADR 020's pull design, which superseded the push design this
+> criterion was written against.
+
 1. CI gate red-blocks a deliberately broken flake on a test PR; green on main.
 2. Grafana (tailnet) shows live dashboards for both hosts + the backend; Loki answers a cross-host journal query; one alert fires end-to-end on a forced condition (e.g. stopped unit) and reaches the owner; **the public-path blackbox probe is green through the CF edge; stopping the observability stack notifies the owner within 15 minutes via the external dead-man** (second-opinion additions — the alerting-is-dark case and the public path were previously unwatched).
 3. `llunde.no`/`www`/`api` serve through the tunnel with the XFF/rate-limit verification green; `ss` and the Hetzner firewall show **zero public inbound on both hosts**; origin A/AAAA records gone from DNS; break-glass procedure written and its tofu diffs pre-staged.

@@ -388,6 +388,17 @@
           --config.file=${./services/observability/blackbox.yml} --config.check
         ${pkgs.prometheus.cli}/bin/promtool check config \
           ${pkgs.writeText "prometheus.yml" renderedObsScrapeConfig}
+        # Grafana ships no offline validator for provisioning files, so a YAML
+        # PARSE is the honest ceiling here — it cannot check the rule schema.
+        # It still earns its place: alerting.yaml is hand-written nested YAML,
+        # a mis-indented rule is the failure that actually happens, and
+        # observability-grafana's reconcile entry watches this file with NO
+        # `check` — so a malformed edit restarts Grafana into a crash-loop and
+        # stalls the deploy behind a sticky reconcile_failed. yq exits 1 on
+        # unparseable YAML and 0 on valid (verified, per the rule that a gate
+        # which cannot fail is worse than no gate).
+        ${pkgs.yq-go}/bin/yq eval '.' \
+          ${./services/observability/grafana/alerting.yaml} >/dev/null
         touch $out
       '';
 
