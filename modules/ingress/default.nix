@@ -36,6 +36,12 @@
 
   acmeEmail = "fhansteen@gmail.com";
 
+  # Shared with modules/backups' restic stamps and read by node_exporter's
+  # textfile collector (modules/observability). Named here rather than imported
+  # so this module carries no dependency on observability being enabled — the
+  # stamp script mkdir -p's it, exactly as the restic one does.
+  textfileDir = "/var/lib/node-exporter-text";
+
   # Built by this repo (images/caddy) because upstream ships no DNS-01 provider
   # and caddy cannot load plugins at runtime — H1, ADR 017 amended.
   # Digest-pinned like cloudflared; CI asserts the version and the presence of
@@ -185,6 +191,14 @@
   # rejected at parse time — and the provider validates the token's FORMAT at
   # provision time, so `caddy validate` needs a plausible value in the
   # environment even though it never calls the API.
+  # ⚠️ The leading TAB is Caddyfile content, not Nix indentation, and `alejandra`
+  # (i.e. `nix fmt`) strips it — an indented-string literal's common prefix is
+  # removed at parse time, so re-indenting the literal REWRITES the rendered
+  # config. Harmless here (Caddy does not care), but it is a silent edit to a
+  # generated artifact from a formatter run nobody thinks of as a change. The
+  # Caddyfile golden catches it — verified at the phase-4 closeout, `nix flake
+  # check` fails with "Caddyfile drifted" — so if a formatter run ever reddens
+  # the gate on this line, that is the guard working. Leave the tab.
   acmeDnsLine = lib.optionalString (cfg.acmeDnsTokenFile != null) ''
     	acme_dns cloudflare {env.CF_API_TOKEN}
   '';
@@ -200,6 +214,70 @@
     + "\n"
     + metricsSite
     + lib.optionalString cfg.tunnel.enable ("\n" + tunnelSite);
+
+  # Origin-certificate expiry stamp (phase-4 closeout finding). This is the ONLY
+  # watch on Caddy's own certificates, and without it a DNS-01 renewal failure
+  # is invisible everywhere: cloudflared dials :8085 in PLAIN HTTP, so no
+  # production request ever sees an origin certificate, and the
+  # `probe_ssl_earliest_cert_expiry` the public blackbox probes report is
+  # CLOUDFLARE's edge certificate, not this one. The failure would surface at
+  # break-glass — precisely when runbook §11 promises the certificates are
+  # already warm and the re-open is instant.
+  #
+  # Measured with a real TLS handshake against loopback :443 rather than by
+  # reading Caddy's admin API or its /data store: the handshake is what a
+  # browser does the moment the cloud firewall re-opens, so it tests the
+  # property break-glass actually depends on rather than a proxy for it. E6
+  # closed the firewall, not the listener, so nothing has to be re-opened to
+  # ask the question.
+  #
+  # Why not a blackbox probe from llunde-parser, where every other probe lives:
+  # the tailnet ACL scopes tag:server -> tag:server to 9100,9101,3100,4317,4318
+  # (tailscale/policy.hujson), so llunde-parser cannot reach :443 here —
+  # verified at the closeout, it times out. Widening that ACL to watch a
+  # certificate would trade a real reduction in blast radius for a monitor; a
+  # textfile stamp needs no ACL change at all and follows the restic precedent
+  # in modules/backups.
+  #
+  # The metric is an ABSOLUTE deadline, not a freshness counter, which makes it
+  # fail-safe in a way a "last run" stamp is not: if this timer itself breaks,
+  # the last value written keeps counting down and the alert still fires on
+  # time. A per-name handshake failure is deliberately NOT this stamp's job —
+  # that means the vhost is not being served at all, which the public probes
+  # (blackbox-public*) already catch far faster.
+  certStampScript = pkgs.writeShellApplication {
+    name = "caddy-cert-expiry-stamp";
+    runtimeInputs = [pkgs.openssl pkgs.coreutils];
+    text = ''
+      mkdir -p ${textfileDir}
+      tmp="${textfileDir}/.caddy_cert_expiry.prom.tmp"
+      rc=0
+
+      {
+        echo '# HELP caddy_cert_expiry_timestamp Unix time the certificate Caddy serves on this host for this name expires.'
+        echo '# TYPE caddy_cert_expiry_timestamp gauge'
+      } > "$tmp"
+
+      for name in ${lib.concatStringsSep " " (lib.attrNames cfg.virtualHosts)}; do
+        # -servername picks the vhost; </dev/null keeps s_client from hanging
+        # waiting for stdin after the handshake.
+        if end=$(openssl s_client -connect 127.0.0.1:443 -servername "$name" </dev/null 2>/dev/null \
+                   | openssl x509 -noout -enddate 2>/dev/null) \
+           && epoch=$(date -d "''${end#notAfter=}" +%s 2>/dev/null); then
+          printf 'caddy_cert_expiry_timestamp{name="%s"} %s\n' "$name" "$epoch" >> "$tmp"
+        else
+          echo "no usable certificate served for $name on 127.0.0.1:443" >&2
+          rc=1
+        fi
+      done
+
+      # Write-then-rename so the exporter never reads a torn file (restic
+      # precedent). Partial results still land: a name that failed is missing,
+      # the others keep counting down.
+      mv "$tmp" "${textfileDir}/caddy_cert_expiry.prom"
+      exit "$rc"
+    '';
+  };
 in {
   options.llunde.ingress = {
     enable = lib.mkOption {
@@ -343,6 +421,26 @@ in {
     # the explicit rule documents the intended reach of :9101 and survives if
     # that blanket trust is ever narrowed.
     networking.firewall.interfaces."tailscale0".allowedTCPPorts = [9101];
+
+    # Hourly, not daily: a certificate deadline moves once every ~60 days, but a
+    # loopback handshake costs nothing and an hourly cadence keeps the window in
+    # which a freshly-switched host has no stamp yet short. Persistent so a box
+    # that was down over a window stamps on boot rather than waiting.
+    systemd.services.caddy-cert-expiry = {
+      description = "Stamp the expiry of the certificates Caddy serves on :443 (origin certs, ADR 017 / H1)";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = lib.getExe certStampScript;
+      };
+    };
+
+    systemd.timers.caddy-cert-expiry = {
+      wantedBy = ["timers.target"];
+      timerConfig = {
+        OnCalendar = "hourly";
+        Persistent = true;
+      };
+    };
 
     environment.etc =
       quadlet.mkContainerUnit {

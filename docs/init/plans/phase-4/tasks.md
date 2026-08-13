@@ -44,3 +44,71 @@ House rules as ever: declarative files in parallel; live surfaces (DNS, firewall
 ## Gate
 
 [README](README.md) exit criteria walked top-to-bottom; owner review closes the phase.
+
+## Executed — gate CLOSED 2026-08-13
+
+Walked top-to-bottom on `f82ae3a`, with `main` = `deploy` = `applied` on both
+hosts and zero failed units. Every claim below was checked against the running
+estate, not against the plan. **Phase 4 is complete.**
+
+| # | Criterion | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Gate red-blocks a broken flake; green on main | ✅ *with a stated limit* | PR #9 went properly red and was closed unmerged; green `Check` on every merge since. **Not enforceable as a required check** — GitHub gates branch protection on private repos behind Pro (403). `promote.yml` depends on it structurally (`workflow_run` + `conclusion == 'success'`), so a red gate still means no deploy; only "cannot click merge" is advisory. Revisit if the repo goes Pro/public |
+| 2 | Grafana live, Loki cross-host, alert end-to-end, blackbox green, dead-man ≤15 min | ✅ *3 of 5 contract alerts* | 7 scrape targets up, 4 probes `probe_success = 1`, promtail shipping from both hosts. `observability-deadman.timer` pings a real healthchecks.io URL every 5 min. **Carve-out below** |
+| 3 | Tunnel serving, XFF verified, zero public inbound, origin records gone, break-glass staged | ✅ | ADR 017 §Executed. Re-verified at closeout: `llunde.no` 200 + `CF-Ray`, `api/health` 403, all eight `@ops` traversal variants 403, origin `:80` **and** `:443` exit 28, `nixos-fw` carries no 80/443 rule in either family, no name in the zone resolves to a host address |
+| 4 | Trivial merge applies itself to both hosts; failing apply stops + alerts; manual path still works | ✅ *under ADR 020's shape* | The criterion describes ADR 019's **push** design, which ADR 020 superseded with **pull** before it was built. Pull equivalents all proven: rehearsed on a throwaway box (happy path, build-fail, two deadman rollbacks, hold semantics, `hcloud reset`), then live — this closeout itself rode the loop to both hosts untouched. The failure path was exercised **in production**, not only in rehearsal: H1b's stalled reconcile went sticky and fail-pinged exactly as designed |
+| 5 | tofu plan clean; goldens extended where load-bearing | ✅ | `tofu plan` → *"No changes."* Goldens now cover the Caddyfile, caddy unit, cloudflared unit, valkey, grafana and the prometheus unit + scrape config; blackbox/prometheus/alerting configs carry syntax gates |
+| 6 | Owner review | ✅ **closed 2026-08-13** | This block |
+
+### Deviations, recorded rather than smoothed over
+
+- **O5 landed 3 of its 5 alerts.** Live: `InstanceDown`, `ReadyProbeFailed`,
+  `PublicEdgeDown`, `DiskHigh`, `ResticStale` — five rules, but not the five O5
+  names. **`unit-failed` (both hosts) and portfolio-backup freshness were not
+  built** and are parked as [backlog](../../../backlog.md) H4. The data for
+  unit-failed is already being collected (node_exporter runs with
+  `enabledCollectors = ["systemd"]` on both hosts), so it is a rule, not a
+  project — and under auto-apply it is arguably the most load-bearing of the
+  five, since reconcile failures deliberately never reboot. Criterion 2 is
+  closed **with that carve-out explicit**, not with the gap implied away.
+- **A forward `git push <sha>:deploy`** moved the estate by hand on 2026-08-12
+  when a GitHub release-CDN outage wedged the `tofu` job and froze all deploys.
+  Bypasses ADR 020's gate-green invariant; justified by a tree byte-identical to
+  a gate-green PR head, no tofu in the diff, and the gate re-run locally on the
+  merged commit. It stayed structurally safe because a `<sha>:deploy` push is a
+  fast-forward, so `promote.yml`'s FF-only invariant was never violated and the
+  next green promote simply continued from it. Runbook §9; root cause fixed
+  (provider cache) plus a backlog item (providers via nix).
+- **A stalled reconcile was hand-recovered** during H1b: the check ran from the
+  old generation and graded the new Caddyfile with a plugin-less caddy. Fail-safe
+  (old container kept serving) but stalled. The rule — *land a check change in
+  its own rev first* — is now **enforced**, not just written down: `path-guard`
+  flags a PR whose patch changes a reconcile `check` (regression-tested against
+  PR #34, the PR that caused it, which trips it; #33/#39/#40 stay clean).
+
+### Landed with this closeout
+
+- **`OriginCertExpiring`** — the one gap that would have turned a proven
+  rollback into an unproven one. Caddy's certificates are never presented to
+  production traffic (cloudflared dials `:8085` in plain HTTP; the
+  `probe_ssl_earliest_cert_expiry` on the public probes is *Cloudflare's* edge
+  cert), so the first real DNS-01 renewal — around **2026-10-08** — could have
+  failed in complete silence and surfaced only when break-glass needed a warm
+  cert. `caddy-cert-expiry.timer` on llunde-01 now handshakes loopback `:443`
+  hourly and stamps `caddy_cert_expiry_timestamp`; the rule fires at 21 days
+  remaining, `noDataState: Alerting` because silence is the failure. Runbook
+  §13.5. *Not a blackbox probe from llunde-parser: the tailnet ACL scopes
+  `tag:server → tag:server` to 9100,9101,3100,4317,4318 and `:443` times out —
+  widening that ACL to watch a certificate is the wrong trade.*
+- A YAML parse gate on `alerting.yaml` (it is reconcile-watched with no `check`,
+  so a mis-indent crash-loops Grafana), and ADR 017's A→CNAME correction carried
+  back into the tofu comment that still contradicted it.
+
+### Still open, deliberately
+
+`docs/backlog.md` carries H2/H4–H8, the CI-providers-via-nix item and the
+housekeeping list. Two things named here because they are **not** in that file:
+the closed-port residual (external callers on the raw IP are invisible from
+inside; a day of quiet is the only evidence available and `hcloud firewall
+add-rule` is the instant undo — correctly sized, no further spend), and
+`README.md`, which still describes the pre-phase-3 repo layout.
