@@ -1,7 +1,7 @@
 # Per-service rootless podman users (ADR 005): fixed uid, own group (gid = uid),
-# lingering user manager so quadlets start at boot, auto subuid/subgid ranges for
-# rootless podman. Cross-user traffic is loopback-only — rootless podman networks
-# cannot span users.
+# lingering user manager so quadlets start at boot, and subuid/subgid ranges for
+# rootless podman — auto by default, explicit where a host runs more than one
+# such user.
 {
   config,
   lib,
@@ -28,7 +28,7 @@ in {
             description = ''
               Explicit subuid/subgid range start. Set on multi-rootless-user
               hosts: NixOS auto-allocation begins at 100000 and collides with
-              any explicitly-ranged neighbor (phase-3.5 contract).
+              any explicitly-ranged neighbor.
             '';
           };
           subUidCount = lib.mkOption {

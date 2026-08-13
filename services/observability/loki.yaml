@@ -1,6 +1,6 @@
 # Loki single-binary, filesystem storage (ADR 018 sizing: two hosts, a few
-# thousand series of logs — no object store, no microservices mode). Mounted
-# at /etc/loki/loki.yaml; the unit passes -config.file explicitly.
+# thousand series — no object store, no microservices mode). Mounted at
+# /etc/loki/loki.yaml; the unit passes -config.file explicitly.
 auth_enabled: false
 
 server:
@@ -19,7 +19,7 @@ common:
     kvstore:
       store: inmemory
 
-# v13/tsdb from day one (contract) — no legacy schema to migrate away from.
+# v13/tsdb from day one — no legacy schema to migrate away from.
 schema_config:
   configs:
     - from: "2026-08-01"
@@ -30,7 +30,7 @@ schema_config:
         prefix: index_
         period: 24h
 
-# Retention enforced by the compactor, not hope (ADR 018: 30 d to start).
+# Retention enforced by the compactor, not hope (ADR 018: 30 d).
 compactor:
   working_directory: /loki/compactor
   retention_enabled: true

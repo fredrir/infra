@@ -8,8 +8,8 @@
     type = lib.types.listOf lib.types.port;
     default = [];
     description = ''
-      TCP ports open on public interfaces. Since phase-4 E6 (ADR 017) BOTH
-      hosts leave this empty: all web ingress arrives through Cloudflare
+      TCP ports open on public interfaces. BOTH hosts leave this empty
+      (ADR 017): all web ingress arrives through Cloudflare
       tunnels the hosts dial outbound, and SSH rides the tailnet (ADR 015).
       The estate has zero public inbound. The tailnet is always trusted
       regardless, which is what keeps 9100/9101 reachable for scraping.
@@ -17,28 +17,26 @@
   };
 
   config = {
-    # The Hetzner VM boots UEFI (go-live finding — the old docs' BIOS assumption
-    # was wrong): systemd-boot on the ESP, no EFI variables (bootctl installs the
-    # EFI/BOOT fallback path, so firmware NVRAM persistence doesn't matter).
+    # The Hetzner VM boots UEFI: systemd-boot on the ESP, no EFI variables —
+    # bootctl installs the EFI/BOOT fallback path, so firmware NVRAM
+    # persistence does not matter.
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = false;
     boot.loader.grub.enable = false;
     # The ESP is 512M (disko): ~10 mixed-kernel generations would overflow it.
-    # 5 keeps the boot menu (the boot-plane recovery path, ADR 020 residual)
-    # usable without filling the partition. Rollback depth beyond that rides
-    # `git push -f deploy`, not the bootloader.
+    # 5 keeps the boot menu — the boot-plane recovery path (ADR 020 residual) —
+    # usable. Deeper rollback rides `git push -f deploy`, not the bootloader.
     boot.loader.systemd-boot.configurationLimit = 5;
 
     time.timeZone = "UTC";
 
-    # Root login stays enabled (keys only) — management is root-over-tailnet
-    # (ADR 008/015). sshd listens, but only the tailnet reaches it: 22 is not
-    # in the public firewall here or in Hetzner's (runbook §11 to re-open).
+    # Root login stays enabled (keys only): management is root-over-tailnet
+    # (ADR 008/015). sshd listens, but 22 is in neither this firewall nor
+    # Hetzner's — runbook §11 re-opens it.
     services.openssh = {
       enable = true;
-      # sshd listens but the module must NOT punch 22 into the host firewall
-      # (its default does): tailnet SSH arrives via the trusted tailscale0
-      # interface; public 22 stays closed at both layers (ADR 015).
+      # The module default would punch 22 into the host firewall; tailnet SSH
+      # arrives on the trusted tailscale0 interface instead (ADR 015).
       openFirewall = false;
       settings = {
         PasswordAuthentication = false;
@@ -58,9 +56,8 @@
     };
 
     # Rootless Caddy (uid 2000) binds 80/443 directly (ADR 005/006). Still
-    # required after E6: the sockets are bound, they are simply unreachable
-    # from outside, and break-glass re-opens the firewall rather than
-    # reconfiguring Caddy.
+    # required with zero public inbound: the sockets stay bound but unreachable,
+    # and break-glass re-opens the firewall rather than reconfiguring Caddy.
     boot.kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
 
     virtualisation.podman = {
@@ -68,10 +65,10 @@
       dockerCompat = false;
     };
 
-    # No system.autoUpgrade on purpose — but the estate is NOT manually
-    # deployed either: modules/gitops-pull (ADR 020) applies the gate-green
-    # `deploy` pointer on each host. autoUpgrade would track a channel/flakeref
-    # tip with none of the gate/promoter/deadman machinery around it.
+    # No system.autoUpgrade, and no manual deploys either: modules/gitops-pull
+    # (ADR 020) applies the gate-green `deploy` pointer on each host, whereas
+    # autoUpgrade would track a channel/flakeref tip with none of the
+    # gate/promoter/deadman machinery around it.
 
     nix = {
       settings = {
@@ -90,13 +87,13 @@
 
     llunde.tailscale.enable = true;
 
-    # podman's per-user wait-network-online polls the SYSTEM network-online.target
-    # (podman#22197); nothing pulls it in by default with dhcpcd, so every user
-    # quadlet queues forever without this (go-live finding).
+    # podman's per-user wait-network-online polls the SYSTEM
+    # network-online.target (podman#22197), which nothing pulls in by default
+    # under dhcpcd — without this, every user quadlet queues forever.
     systemd.targets.network-online.wantedBy = ["multi-user.target"];
 
     # Declarative-only user database (ADR 001): every user/group comes from this
-    # config; imperative useradd on the box is rejected at the next switch.
+    # config, and an imperative useradd is undone at the next switch.
     users.mutableUsers = false;
   };
 }

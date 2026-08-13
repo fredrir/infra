@@ -1,9 +1,8 @@
-# Observability service slice (phase 4, ADR 018): Prometheus + Grafana +
-# Loki + OTel collector + blackbox-exporter as rootless quadlets under the
-# observability user (uid 2002) on llunde-parser, plus the root-level
-# external dead-man (O7). Unit text lives in ./unit.nix so the flake can
-# golden-test it; static configs live beside this file and land as
-# environment.etc entries that the units bind-mount.
+# Observability slice (ADR 018): Prometheus + Grafana + Loki + OTel collector +
+# blackbox-exporter as rootless quadlets under the observability user (uid 2002)
+# on llunde-parser, plus the root-level external dead-man. Unit text lives in
+# ./unit.nix for golden-testing; the configs beside this file land as
+# environment.etc entries the units bind-mount.
 {
   config,
   lib,
@@ -12,9 +11,9 @@
 }: let
   units = import ./unit.nix {inherit lib;};
 in {
-  # Rehearsal guard (lead integration, mirrors the pyparser tunnel flag): a
-  # scratch box booting this slice would fire real alerts at the real ntfy
-  # topic and probe the real public URLs. NEVER true on a rehearsal machine.
+  # Rehearsal guard (mirrors the pyparser tunnel flag): a scratch box booting
+  # this slice fires real alerts and probes the real public URLs. NEVER true on
+  # a rehearsal machine.
   options.llunde.observability.stack.enable = lib.mkOption {
     type = lib.types.bool;
     default = true;
@@ -24,10 +23,8 @@ in {
   config = lib.mkIf config.llunde.observability.stack.enable {
     llunde.quadlet = {
       units = units.fragments;
-      # autoUpdate = false is the point (contract): NO AutoUpdate labels
-      # anywhere in this stack — a broken upstream release must never take
-      # the estate's only alerting down; image bumps are deliberate edits to
-      # unit.nix.
+      # autoUpdate = false is the point: no AutoUpdate labels anywhere in this
+      # stack (see unit.nix); image bumps are deliberate edits.
       serviceUsers = [
         {
           name = "observability";
@@ -48,18 +45,14 @@ in {
       "llunde/observability/grafana/overview.json".source = ./grafana/overview.json;
     };
 
-    # External dead-man (O7, ADR 018): llunde-parser is now operationally
-    # load-bearing for observing llunde-01 — if this stack is dark, all
-    # alerting is dark, and only something OUTSIDE the estate can say so.
-    # Every 5 minutes: verify Prometheus AND Grafana answer their health
-    # endpoints (published ports reach host loopback), then ping the
-    # heartbeat URL in /var/lib/deadman/url. The URL is a pending owner
-    # input (a healthchecks.io check); until the owner installs the file the
-    # unit logs one line and exits 0.
-    #
-    # Gate test (phase-4 exit criterion 2): stop the observability stack →
-    # the health checks fail → pings stop → healthchecks.io notifies the
-    # owner within 15 minutes, from outside the estate.
+    # External dead-man (ADR 018): llunde-parser observes llunde-01, so if this
+    # stack is dark all alerting is dark and only something OUTSIDE the estate
+    # can say so. Every 5 minutes: verify Prometheus AND Grafana answer their
+    # health endpoints (published ports reach host loopback), then ping the
+    # heartbeat URL in /var/lib/deadman/url — a pending owner input (a
+    # healthchecks.io check); until that file exists the unit logs one line and
+    # exits 0. Gate test: stop the stack → checks fail → pings stop →
+    # healthchecks.io notifies the owner within 15 minutes.
     systemd.services.observability-deadman = {
       description = "Dead-man heartbeat: ping the external monitor while the stack is healthy";
       serviceConfig.Type = "oneshot";
@@ -79,8 +72,8 @@ in {
       wantedBy = ["timers.target"];
       timerConfig = {
         OnCalendar = "*:0/5";
-        # No Persistent=: a missed window while the box is down is exactly
-        # the signal the external service exists to catch.
+        # No Persistent=: a missed window while the box is down is the signal
+        # the external service exists to catch.
       };
     };
 

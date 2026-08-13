@@ -1,8 +1,7 @@
-# Bootstrap-secrets MECHANISM via sops-nix (ADR 007): options + host-key
-# decryption only. Each host declares its own sops.secrets set in
-# hosts/<host>/secrets.nix and fills these paths (phase-3.5 stream A —
-# llunde-01's five and llunde-parser's four differ, so the sets cannot
-# live here).
+# Bootstrap-secrets MECHANISM via sops-nix (ADR 007): options plus host-key
+# decryption, nothing more. Each host declares its own sops.secrets set in
+# hosts/<host>/secrets.nix and fills these paths — llunde-01's five and
+# llunde-parser's four differ, so the sets cannot live here.
 {lib, ...}: {
   options.llunde.secrets = {
     dopplerTokenFile = lib.mkOption {

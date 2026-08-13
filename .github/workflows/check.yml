@@ -1,10 +1,7 @@
-# The phase-4 gate (workstream G, ADR 019 guardrail 1): every PR and every
-# main push must eval the flake, build BOTH host closures, and validate the
-# flat tofu root — with zero credentials. This REPLACED the phase-1-era
-# ci.yml, which validated tofu roots deleted in the phase-3 unnesting and had
-# been permanently red (second-opinion finding: alarm-fatigue conditions).
-# All actions SHA-pinned: this gate is what the credentialed apply workflow
-# will trust (ADR 019), so its supply chain is load-bearing.
+# The gate (ADR 019 guardrail 1): every PR and every main push evals the flake,
+# builds BOTH host closures, and validates the flat tofu root — with zero
+# credentials. All actions are SHA-pinned: this gate is what the `deploy`
+# pointer trusts, so its supply chain is load-bearing.
 name: Check
 
 on:
@@ -31,21 +28,17 @@ jobs:
 
   tofu:
     runs-on: ubuntu-latest
-    # Every `init` otherwise re-downloads all three providers from GitHub's
-    # release assets. On 2026-08-12 that path returned 503 and then timed out
-    # for ~15 minutes while GitHub's own status page read "Actions: Normal" —
-    # release-asset delivery is a different component, and transient egress
-    # throttling of runners never shows up as an incident at all. Under pull
-    # auto-apply a red gate means NO DEPLOYS, so an upstream CDN wobble froze
-    # the estate. The cache turns that from an outage into a slow run.
+    # Without this, every `init` re-downloads all three providers from GitHub's
+    # release assets — and an outage there is invisible on GitHub's status page,
+    # which tracks a different component. A red gate means NO DEPLOYS, so one
+    # such outage froze the estate; the cache turns that into a slow run.
     env:
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
       # Keyed on the lock file: a provider bump misses the cache and refetches,
-      # which is exactly right. SHA-pinned like every other action here — this
-      # gate is what the deploy pointer trusts.
+      # which is right. SHA-pinned like every action here.
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ github.workspace }}/.tofu-plugin-cache

@@ -1,6 +1,10 @@
 # ADR 010: Shared CI as Reusable Workflows; Pull-Based Deploys
 
-**Status**: Accepted · **Date**: 2026-08-09
+**Status**: Accepted · **Date**: 2026-08-09 · Host applies resolved by [ADR 020](020-gitops-pull-auto-apply.md)
+
+> The deferred question — should CI apply host configuration — was answered in a
+> way that keeps this ADR's central property intact: hosts poll a gate-green
+> `deploy` ref and apply themselves, so CI still holds no production access.
 
 ## Context
 

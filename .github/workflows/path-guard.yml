@@ -1,12 +1,10 @@
-# Advisory network/deploy-plane path guard (workstream A, phase 3.3).
-# ADVISORY ON PURPOSE — a PR comment, never a host veto: path lists are both
-# under- and over-inclusive, and a same-repo guard can always be edited by the
-# same PR it guards. Its job is to make the author pause, not to gate.
+# Advisory network/deploy-plane path guard — a PR comment, never a veto, on
+# purpose: path lists are both under- and over-inclusive, and a same-repo guard
+# can always be edited by the same PR it guards. It makes the author pause.
 #
-# Under pull auto-apply, a merge to main IS a deploy to both hosts (llunde-01
-# ~5min, llunde-parser +30min). Changes touching the paths below can sever the
-# management plane or the deploy loop itself; the deadman self-heals a severed
-# activation, but a deliberate pause beats a rollback.
+# A merge to main IS a deploy to both hosts (llunde-01 ~5min, llunde-parser
+# +30min), and these paths can sever the management plane or the deploy loop.
+# The deadman self-heals a severed activation, but a deliberate pause is cheaper.
 name: Path guard
 
 on:
@@ -37,22 +35,18 @@ jobs:
             '^(modules/(tailscale|profiles|secrets|gitops-pull)/|secrets/|tailscale/|hosts/[^/]+/secrets\.nix$|flake\.lock$|\.github/workflows/)' \
             || true)
 
-          # H1b guard. A reconcile `check` runs from the RUNNING generation
-          # (modules/gitops-pull sets restartIfChanged = false — the
-          # self-deploying-deployer guard), so a rev that changes a check AND
-          # the config that check validates gets the NEW config graded by the
-          # OLD check: the restart is skipped, reconcile_failed goes sticky, and
-          # the deploy stalls while the old container keeps serving. H1b lost a
-          # deploy to exactly this and the rule has been written down three
-          # times since; this is the first thing that puts it in front of the
-          # author at the moment it matters.
+          # Reconcile-check guard. A reconcile `check` runs from the RUNNING
+          # generation (modules/gitops-pull sets restartIfChanged = false — the
+          # self-deploying-deployer guard), so a rev changing a check AND the
+          # config it validates grades the NEW config with the OLD check: restart
+          # skipped, reconcile_failed sticky, deploy stalled on the old container.
           #
           # Matched on the PATCH, not the file list: check strings live in
-          # hosts/*/default.nix and modules/ingress/default.nix, both of which
-          # change constantly for innocent reasons. Only a changed +/- line
-          # carrying a `check =` assignment (or the caddyfileCheck that renders
-          # one) counts. File headers (+++/---) are excluded so a path merely
-          # containing "check" cannot trip it.
+          # hosts/*/default.nix and modules/ingress/default.nix, which change
+          # constantly for innocent reasons. Only a changed +/- line carrying a
+          # `check =` assignment (or the caddyfileCheck that renders one) counts;
+          # +++/--- headers are excluded so a path containing "check" cannot
+          # trip it.
           CHECKS=$(gh api "repos/$REPO/pulls/$PR/files" --paginate -q '
             .[]
             | .filename as $f
@@ -74,7 +68,7 @@ jobs:
             fi
             if [ -n "$MATCHED" ] && [ -n "$CHECKS" ]; then printf '\n---\n\n'; fi
             if [ -n "$CHECKS" ]; then
-              printf '🧊 **A reconcile `check` changed** — in:\n\n```\n%s\n```\n\n**The check that will grade this deploy is the OLD one.** gitops-pull runs from the *running* generation, so a new check string only takes effect on the NEXT rev. If this PR also changes a config that this check validates, the new config gets graded by the old check — restart skipped, sticky `reconcile_failed`, deploy stalled (H1b).\n\n**Land the check change in its own rev first** — against the old config it is a no-op — then the config change. See `modules/gitops-pull/default.nix` header and runbook §6.\n' "$CHECKS"
+              printf '🧊 **A reconcile `check` changed** — in:\n\n```\n%s\n```\n\n**The check that will grade this deploy is the OLD one.** gitops-pull runs from the *running* generation, so a new check string only takes effect on the NEXT rev. If this PR also changes a config that this check validates, the new config gets graded by the old check — restart skipped, sticky `reconcile_failed`, deploy stalled.\n\n**Land the check change in its own rev first** — against the old config it is a no-op — then the config change. See `modules/gitops-pull/default.nix` header and runbook §6.\n' "$CHECKS"
             fi
             printf '\n*(Advisory only — see ADR 020.)*\n'
           } > guard-body.md

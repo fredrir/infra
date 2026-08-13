@@ -1,6 +1,6 @@
 # Tailscale as the single management overlay (ADR 008): auto-join via the
 # sops-provided auth key. MagicDNS picks up networking.hostName, so the box is
-# `ssh llunde-01` on the tailnet; port 22 closure is staged post-gate (runbook).
+# `ssh llunde-01` on the tailnet; public port 22 stays closed (runbook).
 {
   config,
   lib,

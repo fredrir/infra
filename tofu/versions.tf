@@ -16,10 +16,10 @@ terraform {
     }
   }
 
-  # Remote state (ADR 002): one flat root, one state, since phase-3 step 7.
-  # The per-project keys (tofu-state/llunde.tfstate, tofu-state/pyparser.tfstate)
-  # remain in the versioned bucket as the merge's rollback anchors.
-  # Credentials come from the environment (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY).
+  # Remote state (ADR 002): one flat root, one state. The per-project keys
+  # (tofu-state/llunde.tfstate, tofu-state/pyparser.tfstate) stay in the
+  # versioned bucket as the merge's rollback anchors. Credentials come from
+  # AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY in the environment.
   backend "s3" {
     bucket       = "llunde-pyparser-bucket"
     key          = "tofu-state/infra.tfstate"

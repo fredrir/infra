@@ -1,8 +1,7 @@
-# Pure fragment for the backend container unit — consumed by BOTH the service
-# module and the flake's golden render check. Every value comes from
-# docs/init/plans/phase-2/contract.md; changing one is a lead decision.
+# Pure fragment for the backend container unit — used by the service module and
+# the flake golden; changing a value is a lead decision.
 #
-# Secret path contract with modules/secrets (stream A2):
+# Secret paths (modules/secrets):
 #   /run/secrets/doppler.env            DOPPLER_TOKEN=...   (owner llunde-backend)
 #   /run/secrets/llunde-backend-db.env  POSTGRES_PASSWORD=... DB_PASSWORD=...
 {lib}: let
@@ -35,7 +34,7 @@ in rec {
         "VALKEY_PORT=6379"
         "CORS_ALLOWED_ORIGINS=https://llunde.no"
         "JAVA_OPTS=-Xmx640m"
-        # Doppler CLI needs a writable config dir; the image user has no home (go-live finding).
+        # Doppler CLI needs a writable config dir; the image user has no home.
         "HOME=/tmp"
       ];
       EnvironmentFile = [
@@ -52,7 +51,7 @@ in rec {
       PublishPort = ["127.0.0.1:8080:8080"];
     };
     service = {
-      # Auth for pulling the private GHCR image (podman-process env, not container env).
+      # Pull auth for the private GHCR image: podman-process env, not container env.
       Environment = "REGISTRY_AUTH_FILE=/run/secrets/ghcr-auth.json";
       MemoryMax = "1G";
       Restart = "always";

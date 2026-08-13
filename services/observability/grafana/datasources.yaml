@@ -1,6 +1,6 @@
-# Datasources as code (O2: provisioned from the repo, not clicked). Fixed
-# uids — the dashboard JSON and the provisioned alert rules reference them.
-# URLs use container names on the shared observability network (aardvark DNS).
+# Datasources as code, provisioned from the repo, not clicked. Fixed uids — the
+# dashboard JSON and the alert rules reference them. URLs use container names on
+# the shared observability network (aardvark DNS).
 apiVersion: 1
 
 datasources:

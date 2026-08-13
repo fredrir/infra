@@ -1,6 +1,6 @@
-# llunde-parser's bootstrap secrets (phase-3.5 contract: FOUR files — no sops
-# DB password; POSTGRES_PASSWORD is single-sourced from the Doppler render).
-# Mechanism lives in modules/secrets; recipients in .sops.yaml (per-host rules).
+# llunde-parser's bootstrap secrets: no sops DB password — POSTGRES_PASSWORD is
+# single-sourced from the Doppler render. Mechanism lives in modules/secrets;
+# recipients in .sops.yaml (per-host rules).
 {
   config,
   lib,
@@ -37,8 +37,8 @@
     };
   };
 
-  # Grafana's SES SMTP credential (GF_SMTP_USER/GF_SMTP_PASSWORD env form) —
-  # send-only IAM user, From-pinned to alerts@llunde.no (phase-4 O5 rework).
+  # Grafana's SES SMTP credential (GF_SMTP_USER/GF_SMTP_PASSWORD env form):
+  # send-only IAM user, From-pinned to alerts@llunde.no.
   sops.secrets."observability-smtp" = {
     sopsFile = ../../secrets/observability-smtp.yaml;
     key = "env";
@@ -47,9 +47,9 @@
   };
 
   # Grafana admin password (GF_SECURITY_ADMIN_PASSWORD env form) — defense in
-  # depth for C1: basic auth is off and the login form hidden, so there is no
-  # auth path to admin in normal ops; this kills the admin:admin default if a
-  # login method is ever re-enabled for break-glass. Retrieve with
+  # depth: basic auth is off and the login form hidden, so no auth path to admin
+  # exists in normal ops, but this kills the admin:admin default if login is
+  # ever re-enabled for break-glass. Read it with
   # `sops -d secrets/observability-grafana.yaml`.
   sops.secrets."observability-grafana" = {
     sopsFile = ../../secrets/observability-grafana.yaml;
@@ -69,9 +69,9 @@
 
   llunde.tailscale.authKeyFile = lib.mkDefault config.sops.secrets."tailscale-auth-key".path;
 
-  # GitOps pull (ADR 020, phase 2d): read-only deploy key + this host's
-  # external heartbeat URL — the heartbeat matters MOST here: the obs stack
-  # lives on this box, nothing else watches it.
+  # GitOps pull (ADR 020): read-only deploy key + this host's external heartbeat
+  # URL. The heartbeat matters MOST here — the obs stack lives on this box, so
+  # nothing else is watching.
   sops.secrets."gitops-deploy-key" = {
     sopsFile = ../../secrets/gitops-llunde-parser.yaml;
     key = "deploy_key";

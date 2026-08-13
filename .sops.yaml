@@ -1,11 +1,9 @@
-# sops-nix bootstrap secrets (ADR 007). Recipients are age keys:
-#  - admin: the owner's personal age key (~/.config/sops/age/keys.txt, generated 2026-08-09)
-#  - llunde-01: derived from that host's ssh-ed25519 host key (phase-2 install)
-#  - llunde-parser: derived from the PRE-GENERATED host key (phase-3.5 step 0.2;
-#    injected at install via nixos-anywhere --extra-files, same as llunde-01)
-# Per-host rules: a host can only decrypt its own secrets; tailscale.yaml and
-# ghcr.yaml are shared by both. After editing recipients here, re-encrypt with
-# `sops updatekeys secrets/<file>.yaml`.
+# sops-nix bootstrap secrets (ADR 007). Recipients are age keys: admin is the
+# owner's personal key (~/.config/sops/age/keys.txt); each host's is derived from
+# its ssh-ed25519 host key (llunde-parser's was pre-generated and injected at
+# install via nixos-anywhere --extra-files). A host decrypts only its own
+# secrets; tailscale.yaml and ghcr.yaml are shared. After editing recipients,
+# re-encrypt with `sops updatekeys secrets/<file>.yaml`.
 keys:
   - &admin age13upkqrd7v97a4gcgerwnkuwvznxh60u2g56x6cj55hemwq68q3lsalynwn
   - &llunde-01 age1thj000t9nt90g7m23tpkz3krt3h5aurj8euayvqs3kq48geaxahs3e0q3r
