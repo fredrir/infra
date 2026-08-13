@@ -16,6 +16,31 @@ dead-man. Deploys are **pull** (§6) — no CI ever SSHes a host.
 `<ANGLE_BRACKETS>` are fill-ins; each states its source. **Any deviation you hit is a
 documentation bug — fix it here, on the spot.**
 
+## Start here — symptom index
+
+Most of what is worth knowing in this file is a trap that looks like something else. Find your
+symptom first; the section has the detail.
+
+| What you are seeing | What it actually is | Go to |
+|---|---|---|
+| `hcloud firewall replace-rules` printed **"Apply complete"**, rules unchanged | The provider **cannot delete a firewall's last rules**; it omits the field and no-ops | §7.3 |
+| `--rules-file <([])` appeared to work, firewall untouched | `[]` is not a command — process substitution hands hcloud an **empty file**, shell still exits 0. Use `--rules-file -` | §7.3 |
+| Deploy "converged" but the container still runs the old config | Switch only daemon-reloads user managers; podman resolves bind mounts at **container creation** | §6 |
+| Deploy stalled, sticky `reconcile_failed`, old container still serving | A rev changed a reconcile `check` **and** the config it validates — the check that ran is the **OLD** one | §6 |
+| A rev you deployed by hand got reverted ~5 min later | The loop converges to `deploy`; a rev that is not the `deploy` tip is rolled back | §6 |
+| Host rebooted itself into the previous generation | Deadman fired — the rev is now **held** on that host, no reboot loop | §9 |
+| `nixos-anywhere` dies mid-install against a tailnet IP | The installer has **no tailscaled** — it needs public 22 | §4, §12 |
+| Ops endpoint returns **404** instead of 403 | Not "blocked" — the request **reached the backend**. Only 403 proves Caddy blocked it | §7.2 |
+| Rate limits all key on one bucket / logs show `127.0.0.1` | The `X-Forwarded-For` ← `CF-Connecting-IP` mapping was lost | §13.4 |
+| You want the real client IP from an audit log | **There is no audit table** and no client IPs are logged. The rate limiter is the proof | §7.2 |
+| `runuser … podman` fails with "cannot chdir" | `runuser` needs a cwd the target user can read — prefix `cd /` | §13.1 |
+| Site 502/1033, zero connectors | Connector down or token invalid — **never rotate the tunnel token casually** | §13, §13.4 |
+| Every hostname returns an empty 200 | Caddy's `:8085` address grew a host, so nothing matches | §13.4 |
+| `OriginCertExpiring` fired | The site is **not** down; DNS-01 renewal stopped and break-glass has gone cold | §13.5 |
+| restic fails with AccessDenied after a rebuild | `leploy` is denied on `restic/*` — each host uses its own `restic-<host>` key | §3 |
+| A red CI gate is blocking all deploys | Under pull auto-apply a red gate means no deploys — the forward-push lever and its evidence bar | §9 |
+| `tofu apply` after an out-of-band firewall change | It will try to re-add rules you removed by hand — reconcile with `-refresh-only` first | §7.3 |
+
 ---
 
 ## 1. Laptop prerequisites
@@ -57,6 +82,19 @@ The other clock: Caddy's origin certificates renew over DNS-01 at ~30 days remai
 .#llunde-01` after rsyncing the repo) or dry-activate modules. Hcloud specifics (disko device
 names, firewall) and the flake's 25.11 pin vs the VM's 26.05 differ — test bench, not replica.
 
+---
+
+# Rebuilding a host (§§2–5)
+
+**Nothing in §§2–5 runs in steady state** — this is the disaster-recovery path: a host is gone,
+unrecoverable, or being replaced. Run them in order; each assumes the one before it is done. The
+ordering is not stylistic: **secrets must exist before the install**, because the host's SSH key
+is pre-generated and injected during it, and a host that boots without its key decrypts nothing.
+
+For a host that is merely broken, try the cheaper levers first: `hcloud server reset <name>` boots
+the previous generation (§9), and the Hetzner web console's boot menu reaches older generations
+without any of this.
+
 ## 2. Provision (tofu)
 
 Both servers exist in tofu state: `llunde-01` (Hetzner 132168416), `llunde-parser` (141119325,
@@ -85,8 +123,8 @@ actually running.
 
 ## 3. Host identity & secrets — BEFORE install
 
-The host's SSH key is created *by us* and injected at install, so sops decrypts from first boot
-(ADR 007).
+The host's SSH key is generated here and injected during the install, so sops decrypts from first
+boot (ADR 007). Skip this and the host comes up unable to read any secret.
 
 1. Generate it locally (kept only until injected, then deleted):
    ```sh
@@ -107,9 +145,13 @@ The host's SSH key is created *by us* and injected at install, so sops decrypts 
    - `secrets/tailscale.yaml` — key `auth_key`, from the Tailscale admin console → Settings →
      Keys → *Auth keys* → Generate (reusable: no, ephemeral: no, tags optional).
    - `secrets/restic.yaml` — `password` (`openssl rand -base64 32`) and `env` in env-file form:
-     `AWS_ACCESS_KEY_ID=…`, `AWS_SECRET_ACCESS_KEY=…`, `AWS_DEFAULT_REGION=eu-north-1`. Reuses the
-     `leploy` credentials from Doppler `pyparser/prd` (object-level S3 rights suffice); a
-     dedicated backup IAM user is a hardening follow-up.
+     `AWS_ACCESS_KEY_ID=…`, `AWS_SECRET_ACCESS_KEY=…`, `AWS_DEFAULT_REGION=eu-north-1`.
+     ⚠️ **Use the host's OWN key — IAM user `restic-<host>`** (`restic-llunde-01`,
+     `restic-llunde-parser`; declared in `tofu/parser-aws.tf`, access keys minted by hand in the
+     console). **Not `leploy`**: it carries an explicit `DenyRestic` on `restic/*`, so a repo
+     configured with it fails every operation with AccessDenied. Each host's key reaches only
+     `restic/<host>/*` — it cannot read the other host's backups, and it can delete objects (so
+     prune runs on the host) but not object *versions*.
    - `secrets/llunde-backend-db.yaml` — key `env`, env-file form:
      `POSTGRES_PASSWORD`/`DB_PASSWORD` = `openssl rand -base64 24` (same value), optional
      `VALKEY_PASSWORD`.
@@ -156,6 +198,10 @@ ssh root@46.62.214.182 tailscale status            # expect: joined, hostname ll
 tailscale status | grep llunde-01                  # from the laptop -> <TAILNET_IP> (100.x.y.z)
 ssh root@<TAILNET_IP> true                         # management path works (ADR 008)
 ```
+
+---
+
+# Steady state (§6 onwards)
 
 ## 6. Deploy — the pull loop (ADR 020)
 
@@ -208,21 +254,23 @@ so break-glass is one rule away and never waits on Let's Encrypt. History: ADR 0
 
 ### 7.1 The records
 
-Tofu-managed in `tofu/modules/cloudflare/`. Two constraints bite anyone editing them:
+Tofu-managed in `tofu/modules/cloudflare/`. Relevant if you ever move **another** hostname onto
+the tunnel:
 
-- **A CNAME cannot coexist with an A *or* AAAA record at the same name**, and tofu gives **no
-  ordering guarantee** between an unrelated create and destroy in one apply. Moving a name onto
-  the tunnel therefore takes **two applies**: drop AAAA on its own first, then flip A → CNAME. As
-  one apply it can die on Cloudflare error 81053 ("An A, AAAA, or CNAME record with that host
-  already exists") — and *may* pass once and fail on a re-run.
-- The `moved {}` block keeps the same resource address, so tofu updates existing record ids **in
-  place** instead of create-before-destroy.
+- **A CNAME cannot coexist with an A *or* AAAA record at the same name** (Cloudflare error 81053),
+  and tofu gives **no ordering guarantee** between an unrelated create and destroy in one apply.
+  So it takes **two applies**: drop AAAA on its own, then flip A → CNAME. As one apply it can die
+  — and can pass once, then fail on a re-run.
+- ⚠️ **Changing a record's `type` forces REPLACEMENT, not an in-place update.** Tofu destroys and
+  re-creates, and there is a seconds-long **NXDOMAIN window** in between that no configuration
+  removes (create-before-destroy would collide with the record it is replacing). A `moved {}`
+  block does not avoid this — what it buys is keeping the same resource address, so the
+  replacement happens at one address instead of a create colliding with the old record.
 
-Between those two applies IPv6-only clients lose the site (minutes); CF restores v6 at the edge on
-the flip, so v6 reachability is net better afterwards. Proxied records propagate in seconds (CF
-answers authoritatively; TTL `auto`, 300 s) — budget **≤5 min** for resolver caches; anything
-still resolving `46.62.214.182` after that is a stale local resolver, not a failure.
-**Undo**: `git revert` the PR, `tofu apply`.
+Between the two applies, IPv6-only clients lose the name; CF restores v6 at the edge on the flip,
+so v6 reachability ends up better than it started. Proxied records propagate in seconds (CF answers authoritatively; TTL `auto`) — budget **≤5 min**
+for resolver caches; anything still resolving `46.62.214.182` after that is a stale local
+resolver, not a failure. **Undo**: `git revert` the PR, `tofu apply`.
 
 ### 7.2 Edge verification — the reusable battery
 
@@ -371,7 +419,8 @@ checks are §7.2.
 curl -s https://api.llunde.no/ready                        # {"database":true,"valkey":true}
 curl -s -o /dev/null -w '%{http_code}\n' https://llunde.no # 200 (frontend)
 for p in metrics health ready; do curl -s -o /dev/null -w "$p %{http_code}\n" https://api.llunde.no/$p; done
-                                                           # blocked publicly (403/404) — except /ready if the Caddyfile deliberately allows it
+                                                           # every one 403. A 404 is a FAILURE here: it means the
+                                                           # request reached the backend instead of being blocked (§7.2)
 curl -s http://<TAILNET_IP>:<NODE_EXPORTER_PORT>/metrics | head -1   # reachable over tailnet only
 # auth lifecycle (backend, against prod):
 EMAIL="gate-$(date +%s)@example.com"
