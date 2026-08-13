@@ -1,8 +1,6 @@
-# blackbox-exporter modules (O6). Mounted over the image's default
-# --config.file path (/etc/blackbox_exporter/config.yml).
-#
-# ip4 preferred: the probes' verdicts must not depend on whether the CF edge
-# and the tailnet happen to have working v6 paths from this box.
+# blackbox-exporter modules, mounted over the image's default --config.file path
+# (/etc/blackbox_exporter/config.yml). ip4 preferred: verdicts must not depend
+# on whether the CF edge and the tailnet have working v6 paths from this box.
 modules:
   http_2xx:
     prober: http
@@ -10,22 +8,14 @@ modules:
     http:
       preferred_ip_protocol: ip4
 
-  # M3 (phase-4 cutover assertion): 200 AND proof the response actually came
-  # through Cloudflare's edge. CF stamps `CF-Ray` on every proxied response
-  # (verified against parser.llunde.no, 2026-08-12); a direct-to-origin answer
-  # from Caddy has none. `fail_if_header_not_matches` treats a MISSING header as
-  # a failure — `allow_missing` defaults to false — which is exactly the
-  # assertion we want, so it stays unset rather than being spelled out.
-  # NB the field is `..._matches`, not `..._matched`: the wrong spelling parses
+  # 200 AND proof the answer came through Cloudflare's edge: CF stamps `CF-Ray`
+  # on every proxied response, a direct-to-origin answer from Caddy has none, so
+  # a missing CF-Ray means traffic bypassing the edge — which must page.
+  # `fail_if_header_not_matches` asserts exactly that, failing on a MISSING
+  # header because `allow_missing` defaults to false; hence it stays unset.
+  # NB the field is `..._matches`, not `..._matched` — the wrong spelling parses
   # as an unknown key and the exporter REFUSES TO START, which under the pull
   # loop means a failed reconcile and no probes at all. Hence the gate check.
-  #
-  # This probe was DELIBERATELY RED until the E5 flip (2026-08-13): llunde.no was
-  # a direct A record and could not produce CF-Ray, and turning green WAS the
-  # cutover's success signal. Its job sat outside the `blackbox-public.*` family
-  # until then so PublicEdgeDown could not page on a state we had chosen. Now
-  # that the edge is the only path, a missing CF-Ray means traffic is somehow
-  # bypassing Cloudflare — which is exactly what should page.
   http_2xx_cfray:
     prober: http
     timeout: 10s
@@ -35,11 +25,10 @@ modules:
         - header: CF-Ray
           regexp: ".+"
 
-  # 403 IS the healthy answer (contract): https://api.llunde.no/health is
-  # blocked by Caddy's @ops rules on the public vhost, so a 403 arriving
-  # through the edge proves the WHOLE public chain — DNS, CF, tunnel, Caddy —
-  # is alive. Anything else (200 included) means the ops block regressed or
-  # the chain is broken.
+  # 403 IS the healthy answer: Caddy's @ops rules block
+  # https://api.llunde.no/health on the public vhost, so a 403 through the edge
+  # proves the WHOLE chain — DNS, CF, tunnel, Caddy — alive. Anything else (200
+  # included) means the ops block regressed or the chain is broken.
   http_403:
     prober: http
     timeout: 10s

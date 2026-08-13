@@ -1,17 +1,13 @@
-# restic -> S3 with per-service job options (ADR 011). Thin layer over the
-# upstream services.restic.backups module: it already provides paths,
-# timerConfig, backupPrepareCommand, S3 env and forget --prune, so our options
-# only add the per-service shape and this repo's conventions (retention,
-# monthly check, secrets paths).
+# restic -> S3 with per-service job options (ADR 011). Thin layer over upstream
+# services.restic.backups — paths, timerConfig, backupPrepareCommand, S3 env and
+# forget --prune are already there; this adds the per-service shape and repo
+# conventions (retention, monthly check, secrets paths).
 #
-# Secrets contract (extends docs/init/plans/phase-2/contract.md — flagged to
-# the lead): restic needs AWS credentials, not just the repo password.
-# secrets/restic.yaml therefore carries TWO sops values:
-#   restic/password -> passwordFile    (plain password string)
-#   restic/env      -> environmentFile (env-file form: AWS_ACCESS_KEY_ID=...,
-#                      AWS_SECRET_ACCESS_KEY=..., AWS_DEFAULT_REGION=eu-north-1)
-# The sops wiring itself lives in modules/secrets (stream A2); this module only
-# consumes the rendered paths below.
+# restic needs AWS credentials as well as the repo password, so
+# secrets/restic.yaml carries TWO sops values: restic/password -> passwordFile
+# (plain string) and restic/env -> environmentFile (AWS_ACCESS_KEY_ID,
+# AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION=eu-north-1). modules/secrets wires
+# sops; this module consumes the rendered paths.
 {
   config,
   lib,
@@ -20,14 +16,12 @@
 }: let
   cfg = config.llunde.backups;
 
-  # Backup freshness for Prometheus (phase-4 workstream O): every job stamps
-  # its last SUCCESS into the node_exporter textfile dir
-  # (modules/observability enables the collector and owns the tmpfiles rule;
-  # mkdir -p only covers hosts where backups outrun observability). Wired as
-  # ExecStartPost on the generated unit rather than the upstream
-  # backupCleanupCommand: cleanup runs from postStop, i.e. also after FAILED
-  # runs — a success stamp must only ever record success. Write-then-rename so
-  # the exporter never reads a torn file.
+  # Backup freshness for Prometheus: each job stamps its last SUCCESS into the
+  # node_exporter textfile dir (modules/observability owns the tmpfiles rule;
+  # mkdir -p covers hosts where backups outrun it). ExecStartPost, NOT the
+  # upstream backupCleanupCommand — that runs from postStop, i.e. after FAILED
+  # runs too, and a success stamp must only ever record success.
+  # Write-then-rename so the exporter never reads a torn file.
   textfileDir = "/var/lib/node-exporter-text";
   successStamp = pkgs.writeShellScript "restic-success-stamp" ''
     set -euo pipefail
@@ -87,14 +81,14 @@ in {
         }
       );
       default = {};
-      description = "Per-service backup jobs (llunde-backend in phase 2, pyparser in phase 3).";
+      description = "Per-service backup jobs (llunde-backend, pyparser).";
     };
   };
 
   config = lib.mkIf cfg.enable {
-    # Backup timers run as root at the SYSTEM level on purpose: root reads
-    # /run/secrets and can reach into rootless-podman containers via runuser
-    # (see llunde-backend.nix), which per-user timers cannot do for postgres.
+    # Root, SYSTEM-level timers on purpose: root reads /run/secrets and can
+    # enter rootless-podman containers via runuser (see llunde-backend.nix),
+    # which a per-user timer cannot do for postgres.
     services.restic.backups =
       lib.mapAttrs (_name: job: {
         initialize = true;
@@ -117,10 +111,9 @@ in {
       cfg.jobs;
 
     systemd.services =
-      # Success stamps onto the upstream-generated units (see successStamp
-      # above): ExecStartPost only runs once every ExecStart — backup AND
-      # forget --prune — exited 0, which is exactly the "last good backup"
-      # ResticStale (services/observability) alerts on.
+      # Stamps onto the upstream-generated units. ExecStartPost fires only once
+      # every ExecStart — backup AND forget --prune — exited 0: exactly the
+      # "last good backup" ResticStale (services/observability) alerts on.
       lib.mapAttrs' (
         name: _job:
           lib.nameValuePair "restic-backups-${name}" {
@@ -129,8 +122,8 @@ in {
       )
       cfg.jobs
       // {
-        # Repository integrity check, monthly, independent of the backup timers so
-        # a wedged backup unit cannot silently skip verification.
+        # Monthly, independent of the backup timers so a wedged backup unit
+        # cannot silently skip verification.
         restic-check = {
           description = "restic repository integrity check";
           serviceConfig = {

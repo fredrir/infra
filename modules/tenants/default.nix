@@ -1,9 +1,9 @@
-# Tenant slots (ADR 016): workloads that deploy THEMSELVES. llunde-infra
-# declares only the slot — user, uid, explicit subuid range, linger, and the
-# host binaries the tenant documents needing. Everything inside $HOME
-# (quadlets in ~/.config/containers/systemd/, env files, deploy scripts,
-# tunnel tokens) is the tenant's own, placed by the tenant's own pipeline.
-# This module never references tenant internals.
+# Tenant slots (ADR 016): workloads that deploy THEMSELVES. This repo declares
+# only the slot — user, uid, explicit subuid range, linger, and the host
+# binaries the tenant documents needing. Everything inside $HOME (quadlets in
+# ~/.config/containers/systemd/, env files, deploy scripts, tunnel tokens) is
+# the tenant's, placed by its own pipeline; this module never references tenant
+# internals.
 {
   config,
   lib,
@@ -84,10 +84,9 @@ in {
       })
       cfg;
 
-    # Tenant scripts are FHS-shaped (#!/bin/bash — including sshd forced
-    # commands, which exec the script directly, so "run it via bash" is not
-    # an option). envfs resolves /bin and /usr/bin shebangs from PATH
-    # (cutover finding).
+    # Tenant scripts are FHS-shaped (#!/bin/bash), including sshd forced
+    # commands, which exec the script directly — "run it via bash" is not an
+    # option. envfs resolves /bin and /usr/bin shebangs from PATH.
     services.envfs.enable = true;
 
     systemd.tmpfiles.rules = lib.concatLists (

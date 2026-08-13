@@ -1,34 +1,28 @@
-# Pure fragments for the pyparser stack — consumed by BOTH the service module
-# and the flake's golden render checks. Every value comes from
-# docs/init/plans/phase-3.5/contract.md (compose → quadlet mapping table);
-# changing one is a lead decision. Source being ported:
-# llunde-pyparser's docker-compose.prod.yml.
-#
-# Secret path contract (host secrets.nix + the render oneshot in default.nix):
+# Pure fragments for the pyparser stack — used by the service module and the
+# flake goldens; the values map llunde-pyparser's docker-compose.prod.yml onto
+# quadlets, so changing one is a lead decision. Secret paths (host secrets.nix
+# plus the render oneshot in default.nix):
 #   /run/pyparser/secrets.env     Doppler pyparser/prd render — compose's
 #                                 env_file; POSTGRES_PASSWORD and TUNNEL_TOKEN
-#                                 arrive ONLY this way (single-sourced).
+#                                 arrive ONLY here (single-sourced).
 #   /run/secrets/ghcr-auth.json   read-only GHCR PAT (pyparser-review is private).
 {lib}: let
   quadlet = import ../../modules/quadlet/mk-quadlet.nix {inherit lib;};
   uid = 2001;
 
-  # One app image for review, both workers AND migrate — the contract's
-  # same-image invariant is what makes `alembic upgrade head` migrate to
-  # exactly the schema the code expects.
+  # One image for review, both workers AND migrate: that same-image invariant
+  # makes `alembic upgrade head` produce the schema the code expects.
   appImage = "ghcr.io/fredrir/pyparser-review:latest";
 
-  # Every container consumes the Doppler render (compose's env_file did the
-  # same for every service).
+  # Every container consumes the Doppler render (compose's env_file).
   secretsEnv = "/run/pyparser/secrets.env";
 
-  # Auth for pulling the private GHCR image (podman-process env, not container env).
+  # Pull auth for the private GHCR image: podman-process env, not container env.
   registryAuth = "REGISTRY_AUTH_FILE=/run/secrets/ghcr-auth.json";
 
   filesVolume = "pyparser-files:/app/.local/files";
 
-  # Cold starts pull a multi-GB ML image; the user manager's 90s default
-  # start timeout would kill the pull (llunde-backend precedent).
+  # Cold starts pull a multi-GB ML image; the 90s default timeout would kill it.
   pullTimeout = 300;
 
   mkContainer = args: rec {
@@ -41,9 +35,9 @@ in rec {
     args = {
       name = "pyparser";
       inherit uid;
-      # NOT Internal (go-live fix 7): an Internal network's aardvark answers
-      # all DNS without upstream, killing GHCR/Cloudflare lookups. Isolation
-      # holds via the user boundary and zero published ports.
+      # NOT Internal: Internal aardvark answers all DNS without upstream,
+      # killing GHCR/Cloudflare lookups. Isolation holds via the user boundary
+      # and zero published ports.
       network = {};
       install.WantedBy = ["default.target"];
     };
@@ -56,33 +50,32 @@ in rec {
     inherit uid;
     container = {
       ContainerName = "pyparser-postgres";
-      # The Doppler-rendered PYPARSER_LLUNDE_DATABASE_URL says @postgres:5432 —
-      # compose's service name, which prod compose keeps using until cutover.
-      # Quadlet DNS resolves ContainerName, so alias the old name rather than
-      # fork the Doppler value (rehearsal finding: alembic could not resolve
-      # 'postgres' and the whole app chain failed its dependency start).
+      # PYPARSER_LLUNDE_DATABASE_URL (Doppler) says @postgres:5432, compose's
+      # service name; quadlet DNS resolves ContainerName, so alias it rather
+      # than fork Doppler — else alembic cannot resolve 'postgres' and no app
+      # starts.
       NetworkAlias = "postgres";
       Environment = [
         "POSTGRES_USER=pyparser"
         "POSTGRES_DB=pyparser_llunde"
-        # POSTGRES_PASSWORD comes from secrets.env (contract: single-sourced).
+        # POSTGRES_PASSWORD comes from secrets.env (single-sourced).
       ];
       EnvironmentFile = [secretsEnv];
       HealthCmd = "pg_isready -U pyparser -d pyparser_llunde";
       HealthInterval = "5s";
       HealthRetries = 10;
       HealthTimeout = "5s";
-      # PINNED, deliberately NO AutoUpdate: unattended DB image swaps are a
-      # data hazard (contract). Bumping the major is a lead decision.
+      # PINNED, deliberately NO AutoUpdate: unattended DB image swaps are a data
+      # hazard. Bumping the major is a lead decision.
       Image = "docker.io/library/postgres:17-alpine";
       Network = ["pyparser.network"];
-      # sd_notify READY only once the healthcheck passes, so After= on this
-      # unit means compose's `condition: service_healthy`, not just "spawned".
+      # sd_notify READY only once the healthcheck passes, so After= here means
+      # compose's `condition: service_healthy`, not just "spawned".
       Notify = "healthy";
       ShmSize = "256m";
-      # Run as the image's postgres user from the start: the entrypoint's
-      # PGDATA setup happens as that uid, so :U must chown the volume to
-      # THAT uid, not container-root (go-live fix 5, modules/data pattern).
+      # Run as the image's postgres user from the start: the entrypoint's PGDATA
+      # setup happens as that uid, so :U must chown the volume to THAT uid, not
+      # container-root (modules/data).
       User = "postgres";
       Volume = ["pyparser-pgdata:/var/lib/postgresql/data:U"];
     };
@@ -90,17 +83,14 @@ in rec {
     install.WantedBy = ["default.target"];
   };
 
-  # Deploy-ordering mechanism (contract): this oneshot is PartOf= review, so
-  # every stop/restart of pyparser-review — including the `systemctl --user
-  # restart` podman auto-update issues on a new image — propagates a restart
-  # to migrate IN THE SAME TRANSACTION. The app units' Requires=+After= on
-  # this unit then do the rest: a oneshot's start job only completes when
-  # Exec exits, so review (and any worker restarting alongside) starts
-  # strictly after `alembic upgrade head` returned 0; if it fails, Requires=
-  # keeps the apps down instead of serving against a half-migrated schema.
-  # Known wrinkle: auto-update restarts units one at a time, so a worker
-  # restarted before review may briefly run new code on the old schema until
-  # review's restart re-runs migrate.
+  # Deploy ordering: this oneshot is PartOf= review, so every stop/restart of
+  # pyparser-review — including the `systemctl --user restart` podman
+  # auto-update issues on a new image — restarts migrate IN THE SAME
+  # TRANSACTION. A oneshot's start job completes only when Exec exits, so the
+  # apps' Requires=+After= start them strictly after `alembic upgrade head`
+  # returned 0, and on failure keep them down rather than serving a half-migrated
+  # schema. Wrinkle: auto-update restarts one unit at a time, so a worker may
+  # briefly run new code on the old schema until review's restart re-runs migrate.
   migrate = mkContainer {
     name = "pyparser-migrate";
     inherit uid;
@@ -114,14 +104,14 @@ in rec {
       EnvironmentFile = [secretsEnv];
       Exec = "alembic upgrade head";
       # Same image as review; NO AutoUpdate label — oneshot --rm containers
-      # confuse `podman auto-update` (contract); it rides along via PartOf=.
+      # confuse `podman auto-update`; it rides along via PartOf=.
       Image = appImage;
       Network = ["pyparser.network"];
     };
     service = {
       Environment = registryAuth;
-      # Stays active after alembic exits so the apps' Requires= is satisfied
-      # for the rest of the boot; PartOf= resets it on every app deploy.
+      # Stays active after alembic exits so the apps' Requires= holds for the
+      # rest of the boot; PartOf= resets it on every app deploy.
       RemainAfterExit = true;
       # Pull + migration both live inside this start job.
       TimeoutStartSec = 600;
@@ -140,18 +130,16 @@ in rec {
     container = {
       AutoUpdate = "registry";
       ContainerName = "pyparser-review";
-      # The tunnel's remote-managed ingress targets http://review:8081 —
-      # compose's service name (cutover finding, the postgres alias's twin:
-      # Access's edge 302 masked it until the un-Access'd share origin 502'd).
+      # The tunnel's remote-managed ingress targets http://review:8081,
+      # compose's service name — the postgres alias's twin.
       NetworkAlias = "review";
       Environment = [
         "PYPARSER_ENV=production"
         "PYPARSER_DOCLING_NUM_THREADS=1"
       ];
       EnvironmentFile = [secretsEnv];
-      # compose `expose: 8081` — the port stays on the pod network only, no
-      # PublishPort anywhere (contract): ingress is cloudflared dialing
-      # pyparser-review:8081 over this network.
+      # compose `expose: 8081` — the port stays on the network, no PublishPort
+      # anywhere: ingress is cloudflared dialing pyparser-review:8081 here.
       HealthCmd = "curl -fsS http://localhost:8081/healthz";
       Image = appImage;
       Network = ["pyparser.network"];
@@ -166,9 +154,9 @@ in rec {
   };
 
   # EXTRACT lane: memory-capped so a pathological PDF OOM-kills THIS container
-  # only (restart + reaper recover the job), cpu-capped so a burst never
-  # starves review/cloudflared. TimeoutStopSec must exceed the drain timeout
-  # so deploys end with a fenced PENDING row, not a SIGKILL orphan.
+  # only (restart + reaper recover the job), cpu-capped so a burst never starves
+  # review/cloudflared. TimeoutStopSec must exceed the drain timeout, or deploys
+  # leave a SIGKILL orphan instead of a fenced PENDING row.
   workerExtract = mkContainer {
     name = "pyparser-worker-extract";
     inherit uid;
@@ -191,8 +179,8 @@ in rec {
       ];
       EnvironmentFile = [secretsEnv];
       Exec = "pyparser-worker";
-      # compose `healthcheck: disable` — the image's baked-in server
-      # healthcheck is meaningless in worker mode; `none` switches it off.
+      # compose `healthcheck: disable` — the image's baked-in server healthcheck
+      # is meaningless in worker mode; `none` switches it off.
       HealthCmd = "none";
       Image = appImage;
       Network = ["pyparser.network"];
@@ -243,9 +231,9 @@ in rec {
     install.WantedBy = ["default.target"];
   };
 
-  # Token-only connector; TUNNEL_TOKEN arrives via secrets.env. No AutoUpdate
-  # (contract) and self-update disabled — connector bumps are deliberate.
-  # Masked on rehearsal boxes (ops runbook, not code).
+  # Token-only connector; TUNNEL_TOKEN arrives via secrets.env. No AutoUpdate,
+  # self-update disabled — connector bumps are deliberate. Masked on rehearsal
+  # boxes (ops runbook, not code).
   cloudflared = mkContainer {
     name = "pyparser-cloudflared";
     inherit uid;

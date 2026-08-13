@@ -1,18 +1,14 @@
-# GitOps PULL substrate (workstream A, ADR 019 revised push -> pull): when the
-# Check gate passes on a push to main, fast-forward the `deploy` pointer to that
-# commit. The hosts pull `deploy`, never `main`, so they only ever apply a commit
-# the gate has already green-lit — closing the ungated-apply race that a raw
-# `github:...#<host>` timer tracking main would have.
-#
-# Kept SEPARATE from check.yml on purpose: a bug here can never affect the
-# required gate. The only credential is the ephemeral GITHUB_TOKEN, scoped to
-# move exactly one ref — no standing secret reaches the estate (that is the whole
-# point of pull).
+# GitOps PULL substrate (ADR 019): a green Check on a push to main fast-forwards
+# the `deploy` pointer to that commit. Hosts pull `deploy`, never `main`, so they
+# only apply gate-approved commits — closing the ungated-apply race a raw
+# `github:...#<host>` timer on main would have. Kept SEPARATE from check.yml so a
+# bug here cannot affect the required gate. The only credential is the ephemeral
+# GITHUB_TOKEN, scoped to move one ref: no standing secret reaches the estate.
 #
 #   Central pause : disable this workflow -> deploy freezes -> both hosts freeze.
 #   Rollback      : `git push -f <good-sha>:deploy` from the laptop (works with
-#                   the tailnet down; deploy is deliberately UNPROTECTED so this
-#                   force-push is always available).
+#                   the tailnet down; deploy is deliberately UNPROTECTED so the
+#                   force-push lever always exists).
 name: Promote to deploy
 
 on:
@@ -52,9 +48,8 @@ jobs:
             echo "deploy already at $SHA — nothing to do"
           else
             # force=false => FAST-FORWARD ONLY: deploy can never diverge from
-            # main's gated history; a non-fast-forward fails loudly instead of
-            # clobbering (e.g. if deploy was manually rolled back to a commit
-            # that is not an ancestor of $SHA).
+            # main's gated history. A non-fast-forward fails loudly instead of
+            # clobbering — e.g. after a manual rollback to a non-ancestor.
             echo "fast-forwarding deploy $CUR -> $SHA"
             gh api -X PATCH "repos/$REPO/git/refs/heads/deploy" -f sha="$SHA" -F force=false
           fi

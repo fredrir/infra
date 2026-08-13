@@ -1,23 +1,18 @@
-// Tailscale tailnet policy — SOURCE OF TRUTH (phase-4 review C1/H7).
-// Applied via the Tailscale admin console (login.tailscale.com/admin/acls);
-// see ./README.md for the SAFE phased apply order — do NOT paste-and-save this
-// restrictive form while the hosts are still untagged (that is an instant
-// default-deny lockout of host<->host scraping + CI SSH).
-//
-// Reviewed independently before first apply. Rules are minimal for the verified
-// connectivity graph; the danger is in tagging mechanics/order, not the rules.
+// Tailscale tailnet policy — SOURCE OF TRUTH, applied by hand in the admin
+// console (login.tailscale.com/admin/acls). ./README.md holds the SAFE phased
+// apply order: do NOT paste this restrictive form while the hosts are untagged,
+// which is an instant default-deny lockout of host<->host scraping and CI SSH.
+// The rules are minimal; the danger is in tagging mechanics and order.
 {
   "tagOwners": {
     "tag:server": ["autogroup:member"],
     "tag:ci":     ["autogroup:member"]
   },
 
-  // Management devices, by tailnet node IP. Deliberately NOT a tag:admin:
-  // tagging macie/archie would strip their member-ness — breaking the personal
-  // mesh (rule 1) and the ssh self-rule below (tagged devices have no "self"),
-  // the same mechanics class that caused the `ssh archie` outage on the first
-  // apply. Cost of the IP form: update here if a management device ever
-  // re-joins the tailnet as a new node.
+  // Management devices, by tailnet node IP. Deliberately NOT a tag:admin —
+  // tagging macie/archie strips their member-ness, breaking the personal mesh
+  // (rule 1) and the ssh self-rule below (tagged devices have no "self"). Cost
+  // of the IP form: update here whenever such a device rejoins as a new node.
   "hosts": {
     "macie":  "100.75.71.79",
     "archie": "100.126.231.24"
@@ -25,62 +20,54 @@
 
   "acls": [
     // Personal mesh: member devices reach the SAME USER's devices, not the
-    // estate. The phone or the linode box being lost no longer means reading
-    // Prometheus (:9090 is unauthenticated) or pushing into Loki.
-    // autogroup:SELF, not autogroup:member — console arbitration (2026-08-11,
-    // second apply): a dst of autogroup:member does NOT match (test wanted
-    // Accept on archie:22, engine said Drop); self is the canonical dst form
-    // and identical in meaning on a solo tailnet.
+    // estate — a lost phone or linode box no longer reads Prometheus (:9090 is
+    // unauthenticated) or pushes into Loki. The dst must be autogroup:SELF: a
+    // member dst does NOT match (the console arbitrates it as Drop), and self
+    // means the same thing on a solo tailnet.
     { "action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"] },
 
-    // Estate management is scoped to the two management devices (laptop +
+    // Estate management, scoped to the two management devices (laptop +
     // desktop; two so losing one is not lockout — and the Hetzner console
     // remains the true break-glass, no tailnet needed).
     { "action": "accept", "src": ["macie", "archie"], "dst": ["tag:server:*"] },
 
-    // Estate hosts reach ONLY each other's scrape/push ports. UNION of both
-    // directions (verified against services/observability/unit.nix + modules/
-    // observability): parser->llunde-01 {9100 node, 9101 backend metrics + the
+    // Estate hosts reach ONLY each other's scrape/push ports — the UNION of
+    // both directions: parser->llunde-01 {9100 node, 9101 backend metrics + the
     // blackbox /ready probe}; llunde-01->parser {3100 Loki push, 4317/4318 OTLP}.
     { "action": "accept", "src": ["tag:server"], "dst": ["tag:server:9100,9101,3100,4317,4318"] },
 
-    // CI over SSH, parser ONLY: portfolio's deploy is the sole remaining
-    // tailnet CI consumer — infra deploys are PULL (ADR 020, hosts fetch from
-    // GitHub; no CI ever SSHes them) and pyparser is pull-based (build.yml
-    // only). Narrowed from tag:server:22 when ADR 019's push design died.
-    // (Effective ONLY once the CI runners actually advertise tag:ci —
-    // otherwise they fall under the member rule above.)
+    // CI over SSH, parser ONLY: portfolio's deploy is the sole tailnet CI
+    // consumer — infra deploys are PULL (ADR 020, hosts fetch from GitHub; no
+    // CI ever SSHes them) and pyparser is pull-based (build.yml only). Effective
+    // ONLY while the runners advertise tag:ci; untagged, they fall under rule 1.
     { "action": "accept", "src": ["tag:ci"], "dst": ["100.92.219.50:22"] }
   ],
 
-  // Tailscale SSH is governed HERE, separately from the acls above. Overwriting
-  // the built-in default policy drops Tailscale's default self-SSH rule, and
-  // without this block `ssh archie` (any device with `tailscale up --ssh`) fails
-  // "tailnet policy does not permit you to SSH". This restores it: any of your
-  // devices may SSH your OWN devices (autogroup:self). The estate hosts run
-  // REGULAR sshd (governed by the acls — the management-device rule), NOT
-  // this. Swap "check" -> "accept" to drop the periodic browser re-auth.
+  // Tailscale SSH is governed HERE, separately from the acls above. Saving any
+  // custom policy drops Tailscale's built-in self-SSH rule; without this block
+  // `ssh archie` (any device with `tailscale up --ssh`) fails "tailnet policy
+  // does not permit you to SSH". Restored below: your devices may SSH your OWN
+  // devices (autogroup:self). The estate hosts run REGULAR sshd, governed by
+  // the acls' management-device rule, NOT by this. Swap "check" -> "accept" to
+  // drop the periodic browser re-auth.
   "ssh": [
     { "action": "check", "src": ["autogroup:member"], "dst": ["autogroup:self"], "users": ["autogroup:nonroot", "root"] }
   ],
 
-  // Guardrails: the console REJECTS a policy that breaks these. Assert the whole
-  // lockout surface — SSH to BOTH hosts, the PUSH port 3100, and the node ports.
-  // NOTES: the console rejects autogroups inside a test src (concrete login
-  // instead). Save-time arbitration results (2026-08-11, second apply):
-  // host-alias test srcs ("macie") ARE accepted; user-src tests do RULE
-  // matching, not device enumeration (the estate denies pass even though
-  // macie-by-IP can reach); and autogroup:member in an acl DST does not
-  // match — the mesh rule uses autogroup:self (see its comment).
+  // Guardrails: the console REJECTS a policy that breaks these, so they cover
+  // the whole lockout surface — SSH to BOTH hosts, the PUSH port 3100, the node
+  // ports. Mechanics: autogroups are rejected in a test src (use a concrete
+  // login), host aliases like "macie" ARE accepted, and a user src does RULE
+  // matching rather than device enumeration — hence the estate denies below
+  // passing even though macie-by-IP can reach.
   "tests": [
     // Management device: full estate reach.
     { "src": "macie",
       "accept": ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.109.80.121:9101"] },
     // A GENERIC member device (phone, linode): estate NO. The personal-mesh
-    // ACCEPT cannot be asserted here — the test framework cannot evaluate
-    // autogroup dsts (tailscale/tailscale#4416; two live rejections proved it
-    // for both member and self on 2026-08-11). The mesh proof is the README's
-    // live check: `ssh archie` from the laptop after every paste.
+    // ACCEPT cannot be asserted here — the framework cannot evaluate autogroup
+    // dsts, member or self (tailscale/tailscale#4416). Its proof is the
+    // README's live check: `ssh archie` from the laptop after a paste.
     { "src": "fredrir@github",
       "deny":   ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.92.219.50:9090","100.92.219.50:3100"] },
     { "src": "tag:server",

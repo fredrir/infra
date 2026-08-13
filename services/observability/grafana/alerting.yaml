@@ -1,16 +1,13 @@
-# Grafana-managed alerting as code (O5): contact point, root notification
-# policy and the five contract rules in one provisioning file. Delivery is
-# EMAIL via SES (the plan's default, restored at the owner's call — the
-# interim public ntfy topic was a capability URL committed to git, i.e.
-# burned; SMTP creds arrive via sops as GF_SMTP_* env, never this file).
-#
-# Rule shape: query A against the prometheus datasource (fixed uid), then a
-# threshold expression B — non-zero B fires. `for` debounces per contract
-# (5 m on the reachability rules).
+# Grafana-managed alerting as code: contact point, root policy and the rules in
+# one provisioning file. Delivery is EMAIL via SES; SMTP creds arrive via sops
+# as GF_SMTP_* env, never this file — the public ntfy topic it replaced was a
+# capability URL committed to git, i.e. burned. Rule shape: query A against the
+# prometheus datasource (fixed uid), then threshold expression B — non-zero B
+# fires; `for` debounces (5 m on the reachability rules).
 apiVersion: 1
 
-# The interim ntfy contact point survives in Grafana's DB even after leaving
-# this file (file-provisioned resources need explicit deletion): remove it.
+# File-provisioned resources survive removal from this file, so the old ntfy
+# contact point needs an explicit deletion to leave Grafana's DB.
 deleteContactPoints:
   - orgId: 1
     uid: ntfy-webhook
@@ -178,22 +175,17 @@ groups:
                   reducer: { type: last, params: [] }
                   type: query
 
-      # Origin-certificate expiry (phase-4 closeout). The only watch on Caddy's
-      # OWN certificates: production traffic never sees them (cloudflared dials
-      # plain HTTP, and the `probe_ssl_earliest_cert_expiry` the blackbox-public
-      # jobs report is Cloudflare's edge certificate), so a DNS-01 renewal
-      # failure would otherwise stay silent until break-glass needed a warm
-      # certificate. Stamp written hourly by modules/ingress.
-      #
-      # 21 days: Let's Encrypt issues for 90 and Caddy starts renewing at ~30
-      # days remaining, so crossing 21 means renewal has been failing for over a
-      # week — late enough that a healthy renewal never trips it, early enough
-      # to fix by hand (runbook §13.5) with three weeks of runway left.
-      #
-      # noDataState Alerting, unlike every other rule in this file: for this one
-      # SILENCE IS THE FAILURE. `for: 6h` absorbs reboots and the gap between a
-      # fresh switch and the first hourly stamp. The metric is an absolute
-      # deadline, so even a stale stamp keeps counting down correctly.
+      # The only watch on Caddy's OWN certificates: production never sees them
+      # (cloudflared dials plain HTTP, and the `probe_ssl_earliest_cert_expiry`
+      # the blackbox-public jobs report is Cloudflare's edge cert), so a DNS-01
+      # renewal failure stays silent until break-glass needs a warm certificate.
+      # modules/ingress stamps the metric hourly. 21 days: Let's Encrypt issues
+      # for 90 and Caddy renews at ~30 left, so crossing 21 means renewal has
+      # failed for over a week — late enough that healthy renewal never trips it,
+      # early enough to fix by hand (runbook §13.5). noDataState Alerting, unlike
+      # every other rule here: SILENCE IS THE FAILURE. `for: 6h` absorbs reboots
+      # and the gap before the first hourly stamp; the metric is an absolute
+      # deadline, so a stale stamp still counts down correctly.
       - uid: cert-expiry
         title: OriginCertExpiring
         condition: B
@@ -229,10 +221,10 @@ groups:
                   reducer: { type: last, params: [] }
                   type: query
 
-      # Freshness in days from the textfile stamps modules/backups writes on
-      # every SUCCESSFUL restic run. noDataState OK, deliberately softer than
-      # the rest: the stamp only exists after the first post-deploy weekly
-      # run, and a dead exporter is already InstanceDown's job.
+      # Freshness in days from the stamps modules/backups writes on every
+      # SUCCESSFUL restic run. noDataState OK, softer than the rest: the stamp
+      # appears only after the first weekly run, and a dead exporter is already
+      # InstanceDown's job.
       - uid: restic-stale
         title: ResticStale
         condition: B

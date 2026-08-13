@@ -31,12 +31,11 @@ http://:9101 {
 
 http://:8085 {
 	bind 127.0.0.1
-	# M1 (phase-4 review): reject any request that reaches this listener
-	# without a CF-Connecting-IP. cloudflared always sets it; its absence means
-	# the request is not tunnel-origin. Otherwise the header_up below Sets an
-	# EMPTY X-Forwarded-For, Ktor falls back to the loopback peer ("localhost"),
-	# and every such request collapses into ONE rate-limit bucket. `handle`
-	# blocks match in written order, so this guard MUST precede the host blocks.
+	# Reject requests without a CF-Connecting-IP: cloudflared always sets it,
+	# so its absence means the request is not tunnel-origin. Otherwise header_up
+	# Sets an EMPTY X-Forwarded-For, Ktor falls back to the loopback peer
+	# ("localhost") and every such request collapses into ONE rate-limit bucket.
+	# `handle` blocks match in written order: this guard MUST precede the hosts.
 	@nocf {
 		not header_regexp CF-Connecting-IP .
 	}

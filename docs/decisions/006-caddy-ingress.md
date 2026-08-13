@@ -1,6 +1,12 @@
 # ADR 006: Caddy as the Single Public Ingress
 
-**Status**: Accepted · **Date**: 2026-08-09
+**Status**: Accepted · **Date**: 2026-08-09 · Ingress path amended by [ADR 017](017-tunnel-ingress-llunde.md)
+
+> Caddy is still the single ingress and still terminates the routing, but it is no
+> longer reached over public 80/443: requests arrive through a Cloudflare Tunnel
+> the host dials outbound. The real-IP mechanism below was decided differently in
+> the event — `CF-Connecting-IP` replaces the forwarded chain on the tunnel
+> listener only, rather than `trusted_proxies` over a public port. See ADR 017.
 
 ## Context
 

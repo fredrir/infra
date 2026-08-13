@@ -1,18 +1,13 @@
 # Per-host observability sources (ADR 013 exporters; ADR 018 collection).
 #
-# Exposure model (three rings, no public scrape surface):
-#   1. Hetzner cloud firewall (tofu) admits at most 22/80/443.
-#   2. This host firewall opens 9100 ONLY on tailscale0 (interface-scoped rule
-#      below) — the exporter may bind the wildcard, but nothing outside the
-#      tailnet can reach it even if ring 1 ever loosens.
-#   3. The app's /metrics is blocked at Caddy on the public vhost (stream C2);
-#      off-box scraping goes through Caddy's tailnet-only :9101 listener
-#      (modules/ingress, phase-4 plan-review finding — the loopback bind was
-#      never reachable off-box on its own).
+# No public scrape surface: Hetzner's cloud firewall (tofu) has no inbound
+# rules, and the rule below opens 9100 on tailscale0 ONLY — the exporter's
+# wildcard bind stays unreachable if that ever loosens. Caddy blocks /metrics
+# on the public vhost and serves scrapes on its tailnet-only :9101
+# (modules/ingress); a loopback bind would not be reachable off-box.
 #
-# Phase 4 placed the collector (services/observability on llunde-parser,
-# ADR 018): Prometheus scrapes 9100 over the tailnet, and lokiUrl below turns
-# on the journal shipper feeding the central Loki from every host.
+# Collector: services/observability on llunde-parser (ADR 018). Prometheus
+# scrapes 9100 over the tailnet; lokiUrl starts this host's journal shipper.
 {
   config,
   lib,
@@ -20,8 +15,8 @@
 }: let
   cfg = config.llunde.observability;
   nodeExporterPort = 9100;
-  # Success stamps from modules/backups (restic freshness) and anything else
-  # a root job wants Prometheus to see land here as *.prom files.
+  # *.prom drop dir: anything a root job wants Prometheus to see — restic
+  # freshness stamps (modules/backups) today.
   textfileDir = "/var/lib/node-exporter-text";
 in {
   options.llunde.observability = {
@@ -59,11 +54,9 @@ in {
     # the reader is the exporter's unprivileged user.
     systemd.tmpfiles.rules = ["d ${textfileDir} 0755 root root -"];
 
-    # Journal shipper (phase-4 O3): NixOS-native promtail on every host,
-    # pushing this host's journal to the central Loki over the tailnet. The
-    # journal stays the single log home (ring 3 above) — promtail only tails
-    # it; max_age bounds backfill to roughly the current boot instead of
-    # re-shipping a week of history on first start.
+    # promtail only tails the journal — still the single log home — and pushes
+    # to the central Loki over the tailnet. max_age bounds backfill to roughly
+    # the current boot instead of re-shipping a week of history on first start.
     services.promtail = lib.mkIf (cfg.lokiUrl != null) {
       enable = true;
       configuration = {
@@ -95,8 +88,7 @@ in {
       };
     };
 
-    # Hard cap (ADR 018: every observability unit carries MemoryMax; the
-    # shipper budget is ~100 MB per host).
+    # ADR 018: every observability unit carries MemoryMax; ~100 MB per shipper.
     systemd.services.promtail = lib.mkIf (cfg.lokiUrl != null) {
       serviceConfig.MemoryMax = "128M";
     };
@@ -110,8 +102,8 @@ in {
       })
     ];
 
-    # Containers log JSON to stdout -> journald is the single log home; cap it
-    # so logs cannot crowd the 80 GB disk.
+    # journald is the single log home (containers log JSON to stdout); capped so
+    # logs cannot crowd the 80 GB disk.
     services.journald.extraConfig = ''
       SystemMaxUse=1G
     '';

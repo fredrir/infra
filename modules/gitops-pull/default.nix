@@ -1,67 +1,36 @@
-# GitOps PULL auto-apply (workstream A, ADR 019 revised push -> pull): each
-# host polls the gate-green `deploy` pointer (moved only by promote.yml,
-# FF-only), builds the rev-pinned closure itself over git+ssh with a read-only
-# deploy key, and applies it through a self-healing sequence:
+# GitOps PULL auto-apply (ADR 019, revised push -> pull). Each host polls the
+# gate-green `deploy` pointer (moved FF-only by promote.yml) and builds the
+# rev-pinned closure itself over git+ssh with a read-only deploy key.
 #
-#   ls-remote deploy -> rev            skip if already applied (converged
-#                                      heartbeat), HOLD if this exact rev
-#                                      previously severed the host (see below)
-#   nix build (rev-pinned, GC-rooted)  fail-closed; damped retry on transients
-#   write attempting=<rev>             the failure memory: if we die past this
-#                                      point the next run refuses this rev
-#   arm deadman (transient timer)      fires in deadmanMinutes unless disarmed:
-#                                      plain reboot — `test` never touches the
-#                                      bootloader, so the boot default IS the
-#                                      rollback; escalation reboot -> reboot -f
-#                                      -> sysrq-b for a wedged userspace
-#   switch-to-configuration test       activate WITHOUT changing the bootloader
-#   probe reachability                 management plane only: tailnet up (or
-#                                      peer ping), sshd listening, repo
-#                                      fetchable — "can the operator and the
-#                                      next fix still reach this box". App
-#                                      health is Prometheus's job on purpose:
-#                                      every probe added here is a new way to
-#                                      reboot prod on a flake. The probes
-#                                      decide the rollback — NOT the stc exit
-#                                      code (stc exits nonzero for any failed
-#                                      unit, including pre-existing flakes).
-#   switch + disarm                    make it the boot default, record applied
-#   reconcile user quadlets            NixOS switch daemon-reloads user
-#                                      managers but never restarts changed user
-#                                      services, and bind mounts (Caddyfile,
-#                                      prometheus.yml) resolve at container
-#                                      CREATION (phase-4 review B4) — under
-#                                      manual deploys the runbook's human does
-#                                      the restart; here the module hashes the
-#                                      declared watch-set across the switch and
-#                                      restarts exactly what changed. Reconcile
-#                                      failures fail-ping but never reboot: the
-#                                      new gen is already the boot default, a
-#                                      reboot cannot help (app-plane, alerting
-#                                      territory).
-#   heartbeat                          ping the per-host healthchecks.io check;
-#                                      failures curl <url>/fail with a journal
-#                                      tail. The external dead-man is what
-#                                      watches llunde-parser — the obs stack
-#                                      lives THERE, nothing else watches it.
+# Cycle: ls-remote -> rev; skip if already applied, HOLD if this exact rev
+# previously severed the host. Build. Write attempting=<rev>, the failure
+# memory: dying past this point makes the next run refuse this rev. Arm the
+# deadman. `switch-to-configuration test` activates WITHOUT touching the
+# bootloader, so the boot default is still the rollback. Probe reachability,
+# management plane ONLY: tailnet, sshd, repo fetchable — can the operator and
+# the next fix still reach this box. App health is Prometheus's job on purpose;
+# every probe added here is a new way to reboot prod on a flake. The probes
+# decide the rollback, NOT the stc exit code, which goes nonzero for any failed
+# unit including pre-existing flakes. On two clean passes: `switch` (boot
+# default), disarm, record applied, reconcile the user quadlets, heartbeat —
+# the only watch on llunde-parser, which is where the obs stack itself lives.
+# Reconcile failures fail-ping but never reboot: the new generation is already
+# the boot default, so a reboot cannot help.
 #
 # Central pause: disable promote.yml (freezes deploy) or `systemctl stop
-# gitops-pull.timer` per host. Rollback: `git push -f <good-sha>:deploy`.
-# Manual deploys: stop the timer first (runbook).
+# gitops-pull.timer` per host. Rollback: `git push -f <good-sha>:deploy`. Manual
+# deploys: stop the timer first (runbook).
 #
-# ⚠️ THE RECONCILE MAP APPLIED IS THE OLD ONE. This script runs from the RUNNING
-# generation (restartIfChanged = false, just below), so a rev that changes a
-# `check` command AND the config that check validates gets the NEW config graded
-# by the OLD check. H1b hit exactly that: an `acme_dns` Caddyfile validated by
-# the previous pkgs.caddy check, which had no DNS provider — restart skipped,
-# sticky reconcile_failed, deploy stalled while the old container kept serving
-# (fail-safe, but stalled). Land a check change in its OWN rev first; against
+# ⚠️ THE RECONCILE MAP APPLIED IS THE OLD ONE: this script runs from the RUNNING
+# generation (restartIfChanged = false, below), so a rev that changes a `check`
+# AND the config that check validates gets the NEW config graded by the OLD
+# check — restart skipped, reconcile_failed sticky, the deploy stalled while the
+# old container keeps serving. Land a check change in its OWN rev first; against
 # the old config it is a no-op, and the next rev then has the check it needs.
 #
-# Residual accepted with eyes open: a config that ACTIVATES fine but fails to
-# BOOT (kernel/initrd/bootloader) is outside this loop's reach — no boot
-# counting in nixos-25.11. Recovery: Hetzner web console -> boot menu ->
-# previous generation.
+# Residual accepted with eyes open: a config that ACTIVATES but fails to BOOT
+# (kernel/initrd/bootloader) is outside this loop's reach — no boot counting in
+# nixos-25.11. Recovery: Hetzner web console -> boot menu -> previous generation.
 {
   config,
   lib,
@@ -73,10 +42,9 @@
   stateDir = "/var/lib/gitops-pull";
   textfileDir = "/var/lib/node-exporter-text";
 
-  # The deadman is a store-path script from the RUNNING (old) generation, so it
-  # works no matter how broken the new one is. Plain reboot: the bootloader
-  # still defaults to the old generation (only `switch` changes that, and the
-  # deadman is disarmed right after `switch` returns).
+  # A store-path script from the RUNNING (old) generation, so it works however
+  # broken the new one is. Plain reboot: only `switch` moves the boot default,
+  # and the deadman is disarmed the moment `switch` returns.
   deadmanScript = pkgs.writeShellApplication {
     name = "gitops-deadman";
     runtimeInputs = [pkgs.curl pkgs.coreutils pkgs.systemd];
@@ -86,9 +54,8 @@
         curl -fsS -m 10 --data-raw "gitops deadman fired: rolling back via reboot" \
           "$(cat ${cfg.heartbeatUrlFile})/fail" || true
       ''}
-      # Escalation ladder: graceful -> skip unit shutdown -> raw sysrq. A
-      # severed box must come back; data services are crash-consistent
-      # (postgres WAL, valkey AOF).
+      # Escalate graceful -> skip unit shutdown -> raw sysrq: a severed box must
+      # come back; data services are crash-consistent (postgres WAL, valkey AOF).
       systemctl reboot || true
       sleep 60
       systemctl reboot --force || true
@@ -210,9 +177,8 @@
         printf '%s' "$acc" | sha256sum | cut -d' ' -f1
       }
 
-      # runuser needs a cwd the target user can read (unit sets /) and the
-      # user-bus env pair — the estate's proven pattern; `systemctl --machine`
-      # is flaky in non-interactive contexts on these boxes (B4 gotcha).
+      # runuser needs a cwd the target user can read (the unit sets /) plus the
+      # user-bus env pair; `systemctl --machine` is flaky here non-interactively.
       user_restart() {
         local user="$1" uid="$2" unit="$3"
         runuser -u "$user" -- env "XDG_RUNTIME_DIR=/run/user/$uid" \
@@ -231,9 +197,8 @@
       }
 
       probe_once() {
-        # Tailnet: control says we're online, OR the data path to the peer
-        # works (control can be down while the tailnet is fine — don't roll
-        # back a good config for a Tailscale outage).
+        # Control says online, OR the peer data path works: a Tailscale control
+        # outage with the tailnet still fine must not roll back a good config.
         if ! tailscale status --json 2>/dev/null | jq -e '.Self.Online == true' >/dev/null; then
           if [ -n "$PEER" ]; then
             tailscale ping -c 1 --timeout 5s "$PEER" >/dev/null 2>&1 || return 1
@@ -255,9 +220,8 @@
 
       # ---- poll ----
       if ! REV=$(git ls-remote "$REPO" "refs/heads/$BRANCH" | cut -f1) || [ -z "$REV" ]; then
-        # Transient (network/GitHub): stay quiet — a persistent inability to
-        # poll stops the success heartbeat and the external grace period
-        # surfaces it.
+        # Transient (network/GitHub): stay quiet. A persistent inability to poll
+        # stops the success heartbeat and the external grace period surfaces it.
         echo "ls-remote for $BRANCH failed — skipping this cycle"
         exit 0
       fi
@@ -298,7 +262,7 @@
       fi
       find "$STATE" -name 'first_seen.*' -mmin +10080 -delete 2>/dev/null || true
 
-      # ---- build (fail-closed; the gate already built this rev in CI) ----
+      # ---- build (fail-closed, damped retry; the gate already built this rev) ----
       # --out-link keeps a GC root: weekly nix.gc must not race the apply.
       FLAKEREF="$FLAKE_BASE?ref=$BRANCH&rev=$REV"
       echo "building $FLAKEREF#$HOST_ATTR"
@@ -357,11 +321,10 @@
       "$OUT/bin/switch-to-configuration" switch || STC_RC=$?
       disarm_deadman
 
-      # Belt: the one thing `switch` MUST have done is point the boot default
-      # at the confirmed generation — otherwise a later unrelated reboot
-      # silently reverts to the old config. A definite mismatch retries the
-      # whole cycle next tick; a missing loader.conf stays out of it (format
-      # drift must never become a reboot-retry loop).
+      # `switch` MUST have repointed the boot default at the confirmed
+      # generation, or a later unrelated reboot silently reverts to the old
+      # config. A definite mismatch retries the whole cycle next tick; a missing
+      # loader.conf does not — format drift must never become a reboot-retry loop.
       GEN=$(readlink /nix/var/nix/profiles/system | grep -o '[0-9]\+' || true)
       if [ -n "$GEN" ] && [ -r /boot/loader/loader.conf ] \
         && ! grep -q "nixos-generation-''${GEN}\.conf" /boot/loader/loader.conf; then
@@ -374,7 +337,7 @@
       rm -f "$STATE/attempting" "$STATE/reconcile_failed"
       sync "$STATE/applied"
 
-      # ---- reconcile user quadlets (B4 under automation) ----
+      # ---- reconcile user quadlets ----
       RECONCILE_FAILED=""
       ${reconcileSnippets}
 
@@ -423,9 +386,9 @@ in {
       default = "git+ssh://git@github.com/fredrir/llunde-infra";
       description = ''
         Flakeref base. git+ssh on purpose: the `github:` scheme is the HTTPS
-        tarball API and cannot authenticate with a deploy key (netrc 404s,
-        access-tokens leak into world-readable nix.conf — phase-2 planning
-        findings). Rev-pinning also sidesteps tarball-ttl staleness entirely.
+        tarball API and cannot authenticate with a deploy key: netrc 404s, and
+        access-tokens leak into a world-readable nix.conf. Rev-pinning also
+        sidesteps tarball-ttl staleness entirely.
       '';
     };
     sshKeyFile = lib.mkOption {
@@ -504,7 +467,7 @@ in {
         Post-switch restart map, per service user. NixOS's switch reloads user
         managers but restarts nothing of theirs, and podman resolves bind
         mounts at container creation — without this, auto-apply silently ships
-        config changes that never go live (runbook §6 / review B4). NOTE: a
+        config changes that never go live (runbook §6). NOTE: a
         NEW quadlet unit must be registered here or its config changes are
         unreconciled — flagged in the module docs and the runbook.
       '';
@@ -537,25 +500,22 @@ in {
       description = "GitOps pull-apply of the gated deploy pointer";
       after = ["network-online.target" "tailscaled.service"];
       wants = ["network-online.target"];
-      # The self-deploying-deployer trap: without this, the first deploy that
-      # changes THIS module has the switch restart the unit that is running
-      # the switch, killing the apply mid-flight. The new definition simply
-      # takes effect on the next timer fire.
+      # The self-deploying-deployer trap: without this, a deploy that changes
+      # THIS module has the switch restart the unit running the switch, killing
+      # the apply mid-flight. The new definition takes effect next timer fire.
       restartIfChanged = false;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${pullScript}/bin/gitops-pull";
         WorkingDirectory = "/";
-        # Nix eval needs ~1.5-2G; llunde-01 has 3.7G, no swap, and a JVM to
-        # protect. High throttles the eval, Max fails the build (fail-closed,
-        # retried next cycle) instead of letting the global OOM killer pick
-        # the backend.
+        # Nix eval needs ~1.5-2G; llunde-01 has 3.7G, no swap and a JVM to
+        # protect. High throttles the eval; Max fails the build (fail-closed,
+        # retried next cycle) instead of letting the OOM killer pick the backend.
         MemoryHigh = "1792M";
         MemoryMax = "2304M";
         CPUWeight = 30;
-        # Runaway cap. NOT RuntimeMaxSec: systemd ignores it for Type=oneshot
-        # (rehearsal journal finding). On expiry the apply is killed mid-flight
-        # and the armed deadman does exactly what it is for.
+        # Runaway cap. NOT RuntimeMaxSec: systemd ignores that for Type=oneshot.
+        # On expiry the apply is killed mid-flight and the armed deadman fires.
         TimeoutStartSec = 2700;
         Environment = ["HOME=/root"];
       };
@@ -581,9 +541,9 @@ in {
       timerConfig = {
         OnCalendar = cfg.interval;
         RandomizedDelaySec = 30;
-        # Persistent=false: after the deadman's rollback reboot the next
-        # calendar tick (<=5min) re-polls, sees the hold marker and alerts —
-        # no catch-up burst racing boot.
+        # Persistent=false: after a deadman rollback reboot the next tick
+        # (<=5min) re-polls, sees the hold marker and alerts — no catch-up burst
+        # racing boot.
         Persistent = false;
       };
     };

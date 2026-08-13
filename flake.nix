@@ -22,9 +22,8 @@
     lib = nixpkgs.lib;
     quadlet = import ./modules/quadlet/mk-quadlet.nix {inherit lib;};
 
-    # Golden render proof for mkQuadlet (ADR 004): asserted at EVAL time, so
-    # `nix flake check` fails on rendering drift for every system without
-    # needing to build anything beyond a writeText.
+    # Golden render proof for mkQuadlet (ADR 004), asserted at EVAL time: drift
+    # fails `nix flake check` on every system, building nothing but a writeText.
     renderedContainer =
       (quadlet.mkContainerUnit {
         name = "dummy";
@@ -77,8 +76,7 @@
       WantedBy=default.target
     '';
 
-    # Real-unit golden (phase 2): the backend container as deployed, from the
-    # same pure fragment the service module consumes.
+    # The backend container as deployed, from the pure fragment the module uses.
     renderedBackend = (import ./services/llunde-backend/unit.nix {inherit lib;}).text;
 
     goldenBackend = ''
@@ -118,8 +116,8 @@
       WantedBy=default.target
     '';
 
-    # Phase-3.5 goldens: the two pyparser units whose SHAPE is load-bearing —
-    # review (auto-update + migrate coupling) and migrate (oneshot ordering).
+    # The two pyparser units whose SHAPE is load-bearing: review (auto-update +
+    # migrate coupling) and migrate (oneshot ordering).
     pyparserUnits = import ./services/pyparser/unit.nix {inherit lib;};
     renderedPyparserReview = pyparserUnits.review.text;
     renderedPyparserMigrate = pyparserUnits.migrate.text;
@@ -170,15 +168,14 @@
       Type=oneshot
     '';
 
-    # Phase-4 goldens (workstream O): the prometheus unit — retention flag,
-    # version pin, wildcard publish and the absence of AutoUpdate are all
-    # load-bearing — and the scrape config, the stack's topology contract
-    # (tasks.md O2 proof).
+    # Prometheus unit — retention flag, version pin, wildcard publish and the
+    # absence of AutoUpdate are all load-bearing — plus the scrape config, the
+    # stack's topology contract.
     observabilityUnits = import ./services/observability/unit.nix {inherit lib;};
     renderedObsPrometheus = observabilityUnits.prometheus.text;
     renderedObsScrapeConfig = observabilityUnits.prometheusConfig;
-    # C1 (phase-4 review): lock the grafana auth posture (anon=Viewer,
-    # basic-auth off) so it cannot silently regress to anonymous admin.
+    # Locks the grafana auth posture (anon=Viewer, basic-auth off) so it cannot
+    # silently regress to anonymous admin.
     renderedObsGrafana = observabilityUnits.grafana.text;
 
     goldenObsPrometheus = ''
@@ -206,11 +203,9 @@
         evaluation_interval: 30s
 
       scrape_configs:
-        # Host metrics over the tailnet: 9100 is interface-scoped to tailscale0
-        # on both hosts (modules/observability). honor_labels because the restic
-        # textfile stamps carry their own job="<backup job>" label
-        # (modules/backups) which must survive the scrape instead of being
-        # renamed exported_job.
+        # 9100 is tailscale0-scoped on both hosts (modules/observability), and
+        # honor_labels keeps restic's own job="<backup job>" textfile-stamp label
+        # off exported_job (modules/backups).
         - job_name: node
           honor_labels: true
           static_configs:
@@ -221,9 +216,8 @@
               labels:
                 host: llunde-parser
 
-        # Backend JVM/HTTP metrics via Caddy's tailnet-only :9101 listener
-        # (modules/ingress): the app binds 127.0.0.1:8080 on llunde-01, so that
-        # listener is the only off-box path (phase-4 plan-review finding).
+        # Backend JVM/HTTP via Caddy's tailnet-only :9101 (modules/ingress): the
+        # app binds 127.0.0.1:8080, so that listener is the only off-box path.
         - job_name: llunde-backend
           metrics_path: /metrics
           static_configs:
@@ -231,13 +225,10 @@
               labels:
                 host: llunde-01
 
-        # Blackbox probes (O6) address the exporter by CONTAINER NAME on the
-        # shared network (aardvark DNS) — never a host port. Standard blackbox
-        # indirection: the probed URL moves into ?target=, instance keeps the
-        # URL, and the scrape itself hits the exporter.
-        #
-        # blackbox-public exercises the WHOLE public chain the tailnet-side
-        # checks can't see: egress to the CF edge and back through the tunnel.
+        # Blackbox indirection: the probed URL moves into ?target=, instance keeps
+        # the URL, the scrape hits the exporter by CONTAINER NAME on the shared
+        # network (aardvark DNS), never a host port. blackbox-public covers the
+        # WHOLE public chain the tailnet checks miss: CF edge egress, then tunnel.
         - job_name: blackbox-public
           metrics_path: /probe
           params:
@@ -252,14 +243,10 @@
             - target_label: __address__
               replacement: observability-blackbox:9115
 
-        # M3: the cutover assertion. Same URL as blackbox-public, a DIFFERENT
-        # question — not "is the site up" but "is the site reached THROUGH
-        # Cloudflare". Two jobs on purpose: one probe answering both questions
-        # could not tell "site down" from "site up but bypassing the edge", and
-        # bypassing the edge is silent by construction. Was deliberately red until E5
-        # flipped DNS, and named outside the blackbox-public.* family so
-        # PublicEdgeDown would not page on a state we chose. E5 landed 2026-08-13
-        # and green is now the correct state, so it joins the family and alerts.
+        # Same URL as blackbox-public, a DIFFERENT question: not "is the site up"
+        # but "is it reached THROUGH Cloudflare". Two jobs because one could not
+        # tell "site down" from "site up, bypassing the edge" — and bypassing is
+        # silent by construction. Named into blackbox-public.*: PublicEdgeDown pages.
         - job_name: blackbox-public-cfray
           metrics_path: /probe
           params:
@@ -274,9 +261,8 @@
             - target_label: __address__
               replacement: observability-blackbox:9115
 
-        # The public edge answering 403 on the backend's ops path IS the healthy
-        # signal — Caddy's @ops block responding proves DNS, tunnel and Caddy
-        # are all alive (module http_403 accepts only 403).
+        # 403 on the backend's ops path IS the healthy signal: Caddy's @ops block
+        # answering proves DNS, tunnel and Caddy alive (http_403 accepts only 403).
         - job_name: blackbox-public-403
           metrics_path: /probe
           params:
@@ -307,23 +293,20 @@
               replacement: observability-blackbox:9115
     '';
 
-    # Phase-4 review (H3, C2): golden the rendered artifacts that had NO
-    # coverage and where a silent drift is dangerous — the Caddyfile (the B1
-    # ops-block globs, the XFF mapping, the M1 CF-Connecting-IP guard, bind
-    # 127.0.0.1), the cloudflared unit (digest pin, EnvironmentFile,
-    # Network=host) and the valkey unit (the --save "" flag order, digest pin,
-    # no :U). Read from the REAL host config (via self) so the golden IS the
-    # deployed text; the tab-heavy artifacts live in tests/golden/ (they are
-    # unmaintainable as inline Nix strings). Regenerate on an intended change:
+    # Rendered artifacts where a silent drift is dangerous: the Caddyfile
+    # (ops-block globs, XFF mapping, CF-Connecting-IP guard, bind 127.0.0.1),
+    # the cloudflared unit (digest pin, EnvironmentFile, Network=host), the
+    # valkey unit (--save "" flag order, digest pin, no :U). Read via self from
+    # the REAL host config, so the golden IS the deployed text; too tab-heavy to
+    # inline, so they live in tests/golden/. Regenerate on an intended change:
     #   nix eval --raw '.#nixosConfigurations.llunde-01.config.environment.etc."llunde/caddy/Caddyfile".text' > tests/golden/llunde-01.Caddyfile
     hostEtc = self.nixosConfigurations.llunde-01.config.environment.etc;
     renderedCaddyfile = hostEtc."llunde/caddy/Caddyfile".text;
     renderedCloudflared = hostEtc."containers/systemd/users/2000/cloudflared.container".text;
-    # H1: the caddy UNIT joins the goldens now that its image is a digest pin
-    # carrying a compiled-in ACME provider. The Caddyfile golden proves what
-    # caddy is told to do; this proves WHICH caddy is told to do it — and a
-    # silent revert to a floating tag, or a lost REGISTRY_AUTH_FILE, is exactly
-    # the drift that would only surface at a renewal weeks later.
+    # The Caddyfile golden proves what caddy is told to do; this proves WHICH
+    # caddy — a digest pin carrying a compiled-in ACME provider. A silent revert
+    # to a floating tag, or a lost REGISTRY_AUTH_FILE, would only surface at a
+    # renewal weeks later.
     renderedCaddy = hostEtc."containers/systemd/users/2000/caddy.container".text;
     renderedValkey = hostEtc."containers/systemd/users/2001/llunde-valkey.container".text;
     goldenCaddyfile = builtins.readFile ./tests/golden/llunde-01.Caddyfile;
@@ -332,13 +315,11 @@
     goldenValkey = builtins.readFile ./tests/golden/llunde-valkey.container;
     goldenObsGrafana = builtins.readFile ./tests/golden/observability-grafana.container;
 
-    # gitops-pull script check (workstream A phase 2): the module lands with
-    # enable = false on both hosts, so nothing in the gate would ever
-    # instantiate its writeShellApplication — and shellcheck runs at BUILD
+    # The module lands with enable = false on both hosts, so nothing else in the
+    # gate instantiates its writeShellApplication — and shellcheck runs at BUILD
     # time. This throwaway enabled config forces the script derivation via the
-    # ExecStart string's context, so `nix flake check` in CI builds and lints
-    # it before rehearsal ever touches a box. x86_64-linux only: the script's
-    # runtime closure (iproute2) does not evaluate on darwin.
+    # ExecStart string's context, so CI lints it. x86_64-linux only: the runtime
+    # closure (iproute2) does not evaluate on darwin.
     gitopsPullScriptCheck = system: let
       sys = nixpkgs.lib.nixosSystem {
         inherit system;
@@ -367,19 +348,15 @@
       nixpkgs.legacyPackages.${system}.writeText "gitops-pull-script-ok"
       sys.config.systemd.services.gitops-pull.serviceConfig.ExecStart;
 
-    # Config-SYNTAX gate for the observability stack's two hand-written configs
-    # (M3 finding, and it paid for itself in the same PR). The goldens prove the
-    # rendered text did not DRIFT; they cannot prove it is VALID.
-    # `fail_if_header_not_matched` — the plausible misspelling of `..._matches` —
-    # is golden-clean and exporter-fatal: blackbox refuses to start on an unknown
-    # key, so under the pull loop it is a failed reconcile and ZERO probes,
-    # surfaced by an alert instead of by CI. Both binaries were checked to exit
-    # non-zero on a bad file: a gate that cannot fail is worse than no gate (the
-    # vacuous-darwin-check lesson, one comment block down).
-    #
-    # Version skew with the pinned containers (nixpkgs blackbox 0.27.0 /
-    # promtool 3.7.2 vs the deployed v0.28.0 / v3.13.2) is fine for a syntax
-    # check — the same trade the caddy `validate` reconcile check already makes.
+    # Config-SYNTAX gate for the stack's two hand-written configs: the goldens
+    # prove the rendered text did not DRIFT, not that it is VALID.
+    # `fail_if_header_not_matched`, the plausible misspelling of `..._matches`,
+    # is golden-clean and exporter-fatal — blackbox refuses to start on an
+    # unknown key, so the pull loop gets a failed reconcile and ZERO probes,
+    # alerted rather than caught by CI. Both binaries were verified to exit
+    # non-zero on a bad file: a gate that cannot fail is worse than no gate.
+    # Version skew (nixpkgs blackbox 0.27.0 / promtool 3.7.2 vs deployed v0.28.0
+    # / v3.13.2) is fine for syntax — the trade caddy's `validate` check makes.
     obsConfigCheck = system: let
       pkgs = nixpkgs.legacyPackages.${system};
     in
@@ -388,15 +365,12 @@
           --config.file=${./services/observability/blackbox.yml} --config.check
         ${pkgs.prometheus.cli}/bin/promtool check config \
           ${pkgs.writeText "prometheus.yml" renderedObsScrapeConfig}
-        # Grafana ships no offline validator for provisioning files, so a YAML
-        # PARSE is the honest ceiling here — it cannot check the rule schema.
-        # It still earns its place: alerting.yaml is hand-written nested YAML,
-        # a mis-indented rule is the failure that actually happens, and
-        # observability-grafana's reconcile entry watches this file with NO
-        # `check` — so a malformed edit restarts Grafana into a crash-loop and
-        # stalls the deploy behind a sticky reconcile_failed. yq exits 1 on
-        # unparseable YAML and 0 on valid (verified, per the rule that a gate
-        # which cannot fail is worse than no gate).
+        # Grafana ships no offline validator, so a YAML PARSE is the ceiling; it
+        # cannot check the rule schema. Still worth it: alerting.yaml is
+        # hand-written nested YAML, a mis-indented rule is the failure that
+        # happens, and observability-grafana's reconcile entry watches it with NO
+        # `check` — a malformed edit crash-loops Grafana and stalls the deploy on
+        # a sticky reconcile_failed. yq exits 1 on unparseable YAML, 0 on valid.
         ${pkgs.yq-go}/bin/yq eval '.' \
           ${./services/observability/grafana/alerting.yaml} >/dev/null
         touch $out
@@ -426,7 +400,7 @@
       assert lib.assertMsg (renderedValkey == goldenValkey)
       "valkey unit drifted from golden:\n---rendered---\n${renderedValkey}\n---golden---\n${goldenValkey}";
       assert lib.assertMsg (renderedObsGrafana == goldenObsGrafana)
-      "grafana unit drifted from golden (C1 anon/basic settings — regenerate tests/golden/observability-grafana.container):\n---rendered---\n${renderedObsGrafana}\n---golden---\n${goldenObsGrafana}";
+      "grafana unit drifted from golden (anonymous/basic-auth posture — regenerate tests/golden/observability-grafana.container):\n---rendered---\n${renderedObsGrafana}\n---golden---\n${goldenObsGrafana}";
         nixpkgs.legacyPackages.${system}.writeText "mkquadlet-render-ok" renderedContainer;
   in {
     nixosConfigurations.llunde-01 = nixpkgs.lib.nixosSystem {
@@ -447,11 +421,10 @@
       ];
     };
 
-    # Rehearsal variant (phase-3.5 tasks 2.1): the same host config with the
-    # identity guards ON — no tunnel connector (a second one would take real
-    # production traffic), no production tailnet identity, no backups into
-    # the prod restic prefix — and public SSH open (scratch boxes have no
-    # cloud firewall; without this the install would be unreachable).
+    # Rehearsal variant: the host config with the identity guards ON — no tunnel
+    # connector (a second one would take real production traffic), no production
+    # tailnet identity, no backups into the prod restic prefix — and public SSH
+    # open (scratch boxes have no cloud firewall; without it, unreachable).
     nixosConfigurations.llunde-parser-rehearsal = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
@@ -463,7 +436,7 @@
           llunde.pyparser.tunnel.enable = false;
           llunde.tailscale.enable = lib.mkForce false;
           llunde.backups.enable = lib.mkForce false;
-          # No live alerting/probing from a scratch box (workstream-O guard).
+          # No live alerting/probing from a scratch box.
           llunde.observability.stack.enable = false;
           services.openssh.openFirewall = lib.mkForce true;
         }
@@ -474,9 +447,8 @@
     checks.x86_64-linux.gitops-pull-script = gitopsPullScriptCheck "x86_64-linux";
     checks.x86_64-linux.obs-config = obsConfigCheck "x86_64-linux";
     checks.aarch64-linux.mkquadlet-render = mkRenderCheck "aarch64-linux";
-    # The laptop is aarch64-darwin: without this, local `nix flake check`
-    # skips the goldens as "incompatible" and passes vacuously — exactly how
-    # a golden drift reached main on the gate's first run (gate finding).
+    # The laptop is aarch64-darwin: without these, a local `nix flake check`
+    # skips the goldens as "incompatible" and passes VACUOUSLY.
     checks.aarch64-darwin.mkquadlet-render = mkRenderCheck "aarch64-darwin";
     checks.aarch64-darwin.obs-config = obsConfigCheck "aarch64-darwin";
   };

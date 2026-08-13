@@ -1,14 +1,13 @@
 # Reusable image build (ADR 010): service repos own their Containerfile and call
 # this with a ~10-line workflow. Deployment is pull-based (podman auto-update on
-# the host) — no ssh, no rsync, nothing deploy-shaped in CI.
+# the host) — no ssh, no rsync, nothing deploy-shaped in CI. Callers need
+# `permissions: { contents: read, packages: write }`: a reusable workflow cannot
+# exceed the caller's GITHUB_TOKEN permissions.
 #
-# Callers need `permissions: { contents: read, packages: write }` on the calling
-# job — a reusable workflow cannot exceed the caller's GITHUB_TOKEN permissions.
-#
-# doppler-build-args is for build-time-PUBLIC values only (e.g. Vite site keys
-# baked into a frontend bundle): build args land in image metadata/history, so
-# never pass true runtime secrets here — those stay in Doppler and reach the
-# container at run time (backend ADR 009).
+# doppler-build-args takes build-time-PUBLIC values only (e.g. Vite site keys
+# baked into a frontend bundle). Build args land in image metadata/history, so
+# never pass runtime secrets here — those stay in Doppler and reach the container
+# at run time (backend ADR 009).
 name: Build image
 
 on:
