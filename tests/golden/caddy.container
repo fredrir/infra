@@ -1,6 +1,3 @@
-[Unit]
-Description=Caddy public ingress
-
 [Container]
 EnvironmentFile=/run/secrets/llunde-caddy-acme.env
 Image=ghcr.io/fredrir/llunde-caddy@sha256:4c9de100f63866a9e7efdfbb69a97902e62b14d577f2ceea818ef7973ef524ee

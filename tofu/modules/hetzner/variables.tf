@@ -1,27 +1,27 @@
 variable "name" {
-  type        = string
+  type = string
 }
 
 variable "server_type" {
-  type        = string
+  type = string
 }
 
 variable "location" {
-  type        = string
+  type = string
 }
 
 variable "image" {
-  type        = string
-  default     = "ubuntu-24.04"
+  type    = string
+  default = "ubuntu-24.04"
 }
 
 variable "ssh_keys" {
-  type        = list(string)
-  default     = []
+  type    = list(string)
+  default = []
 }
 
 variable "firewall_name" {
-  type        = string
+  type = string
 }
 
 variable "inbound_rules" {
@@ -32,11 +32,11 @@ variable "inbound_rules" {
 }
 
 variable "delete_protection" {
-  type        = bool
-  default     = true
+  type    = bool
+  default = true
 }
 
 variable "rebuild_protection" {
-  type        = bool
-  default     = true
+  type    = bool
+  default = true
 }

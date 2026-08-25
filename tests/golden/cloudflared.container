@@ -1,6 +1,3 @@
-[Unit]
-Description=Cloudflare tunnel connector
-
 [Container]
 ContainerName=llunde-cloudflared
 EnvironmentFile=/run/secrets/llunde-tunnel.env

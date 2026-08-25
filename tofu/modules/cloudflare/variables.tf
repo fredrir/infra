@@ -4,13 +4,13 @@ variable "zone_id" {
 }
 
 variable "account_id" {
-  type        = string
+  type = string
 }
 
 variable "llunde_tunnel_id" {
-  type        = string
+  type = string
 }
 
 variable "pyparser_tunnel_id" {
-  type        = string
+  type = string
 }

@@ -86,7 +86,7 @@
     '';
 
   acmeDnsLine = lib.optionalString (cfg.acmeDnsTokenFile != null) ''
-    acme_dns cloudflare {env.CF_API_TOKEN}
+    	acme_dns cloudflare {env.CF_API_TOKEN}
   '';
 
   caddyfile =

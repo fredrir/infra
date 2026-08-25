@@ -6,7 +6,7 @@ import {
 resource "hcloud_server" "llunde_01" {
   name        = "llunde-01"
   server_type = "cpx22"
-  location = "hel1"
+  location    = "hel1"
 
   lifecycle {
     ignore_changes = [image]
