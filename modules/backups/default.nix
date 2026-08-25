@@ -26,22 +26,18 @@ in {
     enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Enable the restic backup engine (repo password via sops, ADR 007/011).";
     };
     repository = lib.mkOption {
       type = lib.types.str;
       default = "s3:s3.eu-north-1.amazonaws.com/llunde-pyparser-bucket/restic/llunde-01";
-      description = "restic repository URL (S3-compatible).";
     };
     passwordFile = lib.mkOption {
       type = lib.types.str;
       default = "/run/secrets/restic-password";
-      description = "Path to the restic repository password (sops-rendered).";
     };
     environmentFile = lib.mkOption {
       type = lib.types.str;
       default = "/run/secrets/restic-env";
-      description = "Env file with AWS credentials for the S3 repository (sops-rendered).";
     };
     jobs = lib.mkOption {
       type = lib.types.attrsOf (
@@ -50,23 +46,19 @@ in {
             paths = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [];
-              description = "Paths snapshotted for this service.";
             };
             schedule = lib.mkOption {
               type = lib.types.str;
               default = "weekly";
-              description = "systemd OnCalendar expression (weekly to start, per owner).";
             };
             preHook = lib.mkOption {
               type = lib.types.lines;
               default = "";
-              description = "Runs before snapshot, e.g. pg_dump into a staged path.";
             };
           };
         }
       );
       default = {};
-      description = "Per-service backup jobs (llunde-backend, pyparser).";
     };
   };
 
@@ -84,7 +76,7 @@ in {
           Persistent = true;
           RandomizedDelaySec = "1h";
         };
-        # Retention enforced after every backup
+
         pruneOpts = [
           "--keep-weekly 4"
           "--keep-monthly 6"

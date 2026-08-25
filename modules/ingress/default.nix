@@ -134,33 +134,24 @@ in {
     enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Run Caddy as the host's sole public ingress/TLS terminator.";
     };
     tunnel = {
       enable = lib.mkOption {
         type = lib.types.bool;
         default = false;
-        description = "Serve the vhosts through a Cloudflare Tunnel (ADR 017): cloudflared quadlet + the :8085 loopback listener.";
       };
       tokenFile = lib.mkOption {
         type = lib.types.nullOr lib.types.path;
         default = null;
-        description = "EnvironmentFile with TUNNEL_TOKEN= (sops-rendered). Never rotated casually — the standing tunnel rule.";
       };
     };
     acmeDnsTokenFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
-      description = ''
-        EnvironmentFile providing CF_API_TOKEN
-      '';
     };
     caddyfileCheck = lib.mkOption {
       type = lib.types.str;
       readOnly = true;
-      description = ''
-        Pre-restart validation command for the gitops reconcile map.
-      '';
     };
     virtualHosts = lib.mkOption {
       type = lib.types.attrsOf (
@@ -170,24 +161,20 @@ in {
               type = lib.types.str;
               default = "";
               example = "127.0.0.1:8080";
-              description = "Loopback upstream this vhost proxies to (ADR 005 wiring).";
             };
             redirectTo = lib.mkOption {
               type = lib.types.nullOr lib.types.str;
               default = null;
               example = "https://llunde.no";
-              description = "Redirect-only vhost (e.g. www -> apex); upstream is ignored.";
             };
             blockOpsEndpoints = lib.mkOption {
               type = lib.types.bool;
               default = true;
-              description = "Deny /metrics, /health, /ready and any path under them publicly (tailnet-only per ADR 013).";
             };
           };
         }
       );
       default = {};
-      description = "Public vhosts, e.g. llunde.no and api.llunde.no.";
     };
   };
 
@@ -200,11 +187,9 @@ in {
       }
     ];
 
-    # Contract defaults; hosts may override.
     llunde.ingress.virtualHosts = {
       "llunde.no" = {
         upstream = lib.mkDefault "127.0.0.1:8081";
-        # A SPA answers every path itself; only the API has real ops endpoints.
         blockOpsEndpoints = lib.mkDefault false;
       };
       "api.llunde.no" = {
@@ -233,7 +218,6 @@ in {
     networking.firewall.interfaces."tailscale0".allowedTCPPorts = [9101];
 
     systemd.services.caddy-cert-expiry = {
-      description = "Stamp the expiry of the origin certificates Caddy serves on :443 (ADR 017)";
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe certStampScript;
@@ -252,14 +236,12 @@ in {
       quadlet.mkContainerUnit {
         name = "caddy";
         uid = 2000;
-        unit.Description = "Caddy public ingress (ADR 006)";
         container = {
           Image = caddyImage;
           Network = "host";
           EnvironmentFile = lib.optionals (cfg.acmeDnsTokenFile != null) [cfg.acmeDnsTokenFile];
           Volume = [
             "/etc/llunde/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
-            # Named volumes: certificate storage must survive container replacement.
             "caddy-data:/data"
             "caddy-config:/config"
           ];
@@ -278,7 +260,6 @@ in {
       // lib.optionalAttrs cfg.tunnel.enable (quadlet.mkContainerUnit {
         name = "cloudflared";
         uid = 2000;
-        unit.Description = "Cloudflare tunnel connector for the llunde vhosts (ADR 017)";
         container = {
           ContainerName = "llunde-cloudflared";
           Network = "host";
