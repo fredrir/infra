@@ -1,9 +1,3 @@
-# OTel collector (ADR 018: exists from day one; wiring the backend's Java agent
-# to 4317/4318 is a backend-repo follow-up), mounted over the contrib image's
-# default --config path (/etc/otelcol-contrib/config.yaml). Minimal by design:
-# receive OTLP, batch, log basic counts — a real trace backend (Tempo, or
-# traces-to-Loki) waits until traces flow. memory_limiter sits under the unit's
-# MemoryMax=256M, so the collector refuses data instead of being OOM-killed.
 receivers:
   otlp:
     protocols:

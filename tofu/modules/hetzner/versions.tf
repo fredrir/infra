@@ -6,5 +6,4 @@ terraform {
       version = "~> 1.48"
     }
   }
-  # No provider block here — providers are configured in the calling root module.
 }

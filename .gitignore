@@ -10,7 +10,7 @@
 result
 result-*
 
-# Secrets that must never land unencrypted
+# Secrets
 *.pem
 *.age
 !*.sops.*

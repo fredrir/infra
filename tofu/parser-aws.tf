@@ -1,8 +1,4 @@
-# pyparser AWS: the S3 dataset bucket + IAM, all that is left after the move to
-# Hetzner — compute and Postgres run on the Hetzner box (parser-server.tf,
-# docs/pyparser/PROD.md).
-
-# ---- S3: harden the EXISTING dataset bucket (reference, don't recreate) ----
+# ---- S3 ----
 
 data "aws_s3_bucket" "dataset" {
   bucket = var.dataset_bucket_name
@@ -32,7 +28,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "dataset" {
   }
 }
 
-# ---- IAM: least-privilege read/write policy for the dataset bucket ----
+# ---- IAM ----
 
 data "aws_iam_policy_document" "dataset_access" {
   statement {
@@ -46,13 +42,7 @@ data "aws_iam_policy_document" "dataset_access" {
     resources = ["${data.aws_s3_bucket.dataset.arn}/*"]
   }
 
-  # Deny fences on `leploy`, the pyparser dataset app's key. Neither touches its
-  # legitimate use.
-  #   1. tofu-state/* — a poisoned tfstate turns the manual `tofu apply` into
-  #      the attacker's weapon (a lower-assurance principal than GitHub
-  #      Actions, sitting on two public boxes).
-  #   2. Permanent backup destruction — versioning (above) IS the recovery, so
-  #      deny version-deletes and any lifecycle/versioning change defeating it.
+  # Deny fences
   statement {
     sid       = "DenyTofuState"
     effect    = "Deny"
@@ -73,8 +63,6 @@ data "aws_iam_policy_document" "dataset_access" {
     ]
   }
 
-  # Hosts use their own restic keys (below), so leploy needs no restic access:
-  # a compromised dataset credential cannot reach either host's backups.
   statement {
     sid       = "DenyRestic"
     effect    = "Deny"
@@ -89,10 +77,6 @@ resource "aws_iam_policy" "dataset_access" {
   policy      = data.aws_iam_policy_document.dataset_access.json
 }
 
-# The IAM user whose access key the Hetzner stack uses for S3 (AWS_ACCESS_KEY_ID
-# in the host secrets.env). The KEY is deliberately unmanaged — its secret is
-# unrecoverable and rotating it via tofu would break the live secrets.env.
-# Manage it out-of-band (AWS console / CLI).
 resource "aws_iam_user" "leploy" {
   name = "leploy"
 }
@@ -103,14 +87,6 @@ resource "aws_iam_user_policy_attachment" "leploy_dataset" {
 }
 
 # ---- Per-host restic keys ----
-# Each key is scoped to its own restic/<host>/* prefix: full read/write/delete
-# there so prune stays on the host, useless against the other host's prefix.
-# DeleteObject but NOT DeleteObjectVersion, and the leploy denials above lock
-# versioning on — so a compromised host leaves only recoverable delete-markers
-# and backup *versions* always survive. Preferred over append-only + laptop
-# prune, which moves prune off the host for no added protection. Access keys
-# unmanaged here, same reason as leploy.
-
 locals {
   restic_hosts = toset(["llunde-01", "llunde-parser"])
 }
@@ -129,9 +105,6 @@ data "aws_iam_policy_document" "restic_host" {
     }
   }
 
-  # DeleteObject so prune runs on the host; NOT DeleteObjectVersion, so with
-  # versioning locked on a compromised host can only leave recoverable
-  # delete-markers, never permanently destroy a backup.
   statement {
     sid       = "ReadWriteDeleteOwnResticObjects"
     actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]

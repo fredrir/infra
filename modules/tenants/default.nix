@@ -1,9 +1,4 @@
-# Tenant slots (ADR 016): workloads that deploy THEMSELVES. This repo declares
-# only the slot — user, uid, explicit subuid range, linger, and the host
-# binaries the tenant documents needing. Everything inside $HOME (quadlets in
-# ~/.config/containers/systemd/, env files, deploy scripts, tunnel tokens) is
-# the tenant's, placed by its own pipeline; this module never references tenant
-# internals.
+# Workloads that deploy themselves (TODO: fold these projects into to this repo)
 {
   config,
   lib,
@@ -17,41 +12,30 @@ in {
         options = {
           uid = lib.mkOption {
             type = lib.types.int;
-            description = "Fixed uid (contract: tenants use the 3000+ block).";
           };
           subUidStart = lib.mkOption {
             type = lib.types.int;
-            description = "Explicit subuid/subgid range start (never auto — collision hazard).";
           };
           subUidCount = lib.mkOption {
             type = lib.types.int;
             default = 65536;
-            description = "Subuid/subgid range size.";
           };
           packages = lib.mkOption {
             type = lib.types.listOf lib.types.package;
             default = [];
-            description = "Host binaries the tenant's documented tooling needs (on its PATH).";
           };
           sshAccess = lib.mkOption {
             type = lib.types.bool;
             default = true;
-            description = "Tenant may log in over SSH (tailnet-only like everything else); its own authorized_keys governs.";
           };
           homeDirectories = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [];
-            description = ''
-              $HOME-relative directories pre-created (0700, tenant-owned) —
-              the declarative twin of what the tenant's imperative bootstrap
-              script would mkdir. Content stays tenant-owned.
-            '';
           };
         };
       }
     );
     default = {};
-    description = "Self-deploying tenant slots (ADR 016). portfolio is the first.";
   };
 
   config = lib.mkIf (cfg != {}) {
@@ -84,9 +68,6 @@ in {
       })
       cfg;
 
-    # Tenant scripts are FHS-shaped (#!/bin/bash), including sshd forced
-    # commands, which exec the script directly — "run it via bash" is not an
-    # option. envfs resolves /bin and /usr/bin shebangs from PATH.
     services.envfs.enable = true;
 
     systemd.tmpfiles.rules = lib.concatLists (

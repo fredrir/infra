@@ -1,8 +1,3 @@
-# Observability slice (ADR 018): Prometheus + Grafana + Loki + OTel collector +
-# blackbox-exporter as rootless quadlets under the observability user (uid 2002)
-# on llunde-parser, plus the root-level external dead-man. Unit text lives in
-# ./unit.nix for golden-testing; the configs beside this file land as
-# environment.etc entries the units bind-mount.
 {
   config,
   lib,
@@ -11,9 +6,6 @@
 }: let
   units = import ./unit.nix {inherit lib;};
 in {
-  # Rehearsal guard (mirrors the pyparser tunnel flag): a scratch box booting
-  # this slice fires real alerts and probes the real public URLs. NEVER true on
-  # a rehearsal machine.
   options.llunde.observability.stack.enable = lib.mkOption {
     type = lib.types.bool;
     default = true;
@@ -23,8 +15,6 @@ in {
   config = lib.mkIf config.llunde.observability.stack.enable {
     llunde.quadlet = {
       units = units.fragments;
-      # autoUpdate = false is the point: no AutoUpdate labels anywhere in this
-      # stack (see unit.nix); image bumps are deliberate edits.
       serviceUsers = [
         {
           name = "observability";
@@ -45,16 +35,8 @@ in {
       "llunde/observability/grafana/overview.json".source = ./grafana/overview.json;
     };
 
-    # External dead-man (ADR 018): llunde-parser observes llunde-01, so if this
-    # stack is dark all alerting is dark and only something OUTSIDE the estate
-    # can say so. Every 5 minutes: verify Prometheus AND Grafana answer their
-    # health endpoints (published ports reach host loopback), then ping the
-    # heartbeat URL in /var/lib/deadman/url — a pending owner input (a
-    # healthchecks.io check); until that file exists the unit logs one line and
-    # exits 0. Gate test: stop the stack → checks fail → pings stop →
-    # healthchecks.io notifies the owner within 15 minutes.
     systemd.services.observability-deadman = {
-      description = "Dead-man heartbeat: ping the external monitor while the stack is healthy";
+      description = "Dead-man heartbeat";
       serviceConfig.Type = "oneshot";
       script = ''
         set -euo pipefail
@@ -72,8 +54,6 @@ in {
       wantedBy = ["timers.target"];
       timerConfig = {
         OnCalendar = "*:0/5";
-        # No Persistent=: a missed window while the box is down is the signal
-        # the external service exists to catch.
       };
     };
 

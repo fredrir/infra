@@ -1,7 +1,3 @@
-# Dashboards load from files the unit bind-mounts under /etc/grafana/dashboards,
-# outside /var/lib/grafana so the JSON never collides with the grafana-data
-# volume. UI edits do not persist: edit grafana/overview.json, the source of
-# truth.
 apiVersion: 1
 
 providers:

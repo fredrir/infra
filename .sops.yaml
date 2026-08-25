@@ -1,15 +1,9 @@
-# sops-nix bootstrap secrets (ADR 007). Recipients are age keys: admin is the
-# owner's personal key (~/.config/sops/age/keys.txt); each host's is derived from
-# its ssh-ed25519 host key (llunde-parser's was pre-generated and injected at
-# install via nixos-anywhere --extra-files). A host decrypts only its own
-# secrets; tailscale.yaml and ghcr.yaml are shared. After editing recipients,
-# re-encrypt with `sops updatekeys secrets/<file>.yaml`.
+
 keys:
   - &admin age13upkqrd7v97a4gcgerwnkuwvznxh60u2g56x6cj55hemwq68q3lsalynwn
   - &llunde-01 age1thj000t9nt90g7m23tpkz3krt3h5aurj8euayvqs3kq48geaxahs3e0q3r
   - &llunde-parser age1zap47wruuc6wp387hpqq2chdx0uavt3jt0xystjn29rxgvljmplqectmnz
 creation_rules:
-  # BEFORE the catch-all: parser's gitops secrets must encrypt to parser.
   - path_regex: secrets/gitops-llunde-parser\.yaml$
     key_groups:
       - age:

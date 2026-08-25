@@ -7,3 +7,4 @@
 | parser.llunde.no   | [llunde-pyparser](github.com/fredrir/llunde-pyparser) |
 | external.llunde.no | [llunde-pyparser](github.com/fredrir/llunde-pyparser) |
 | hansteen.dev       | [portfolio](github.com/fredrir/portfolio)             |
+| yeeter.no          | (Y)[github.com/fredrir/Y]                             |

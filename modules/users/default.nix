@@ -1,7 +1,4 @@
-# Per-service rootless podman users (ADR 005): fixed uid, own group (gid = uid),
-# lingering user manager so quadlets start at boot, and subuid/subgid ranges for
-# rootless podman — auto by default, explicit where a host runs more than one
-# such user.
+# Per-service rootless podman users:
 {
   config,
   lib,
@@ -15,35 +12,23 @@ in {
         options = {
           uid = lib.mkOption {
             type = lib.types.int;
-            description = "Fixed uid — also the /etc/containers/systemd/users/<uid>/ key.";
           };
           linger = lib.mkOption {
             type = lib.types.bool;
             default = true;
-            description = "Start the user's systemd instance at boot (rootless quadlets).";
           };
           subUidStart = lib.mkOption {
             type = lib.types.nullOr lib.types.int;
             default = null;
-            description = ''
-              Explicit subuid/subgid range start. Set on multi-rootless-user
-              hosts: NixOS auto-allocation begins at 100000 and collides with
-              any explicitly-ranged neighbor.
-            '';
           };
           subUidCount = lib.mkOption {
             type = lib.types.int;
             default = 65536;
-            description = "Explicit subuid/subgid range size (with subUidStart).";
           };
         };
       }
     );
     default = {};
-    description = ''
-      Rootless service users (llunde-backend, llunde-frontend, edge). Cross-user
-      traffic is loopback-only: rootless podman networks cannot span users.
-    '';
   };
 
   config = {

@@ -22,8 +22,6 @@
     lib = nixpkgs.lib;
     quadlet = import ./modules/quadlet/mk-quadlet.nix {inherit lib;};
 
-    # Golden render proof for mkQuadlet (ADR 004), asserted at EVAL time: drift
-    # fails `nix flake check` on every system, building nothing but a writeText.
     renderedContainer =
       (quadlet.mkContainerUnit {
         name = "dummy";
@@ -116,8 +114,6 @@
       WantedBy=default.target
     '';
 
-    # The two pyparser units whose SHAPE is load-bearing: review (auto-update +
-    # migrate coupling) and migrate (oneshot ordering).
     pyparserUnits = import ./services/pyparser/unit.nix {inherit lib;};
     renderedPyparserReview = pyparserUnits.review.text;
     renderedPyparserMigrate = pyparserUnits.migrate.text;
@@ -168,14 +164,9 @@
       Type=oneshot
     '';
 
-    # Prometheus unit — retention flag, version pin, wildcard publish and the
-    # absence of AutoUpdate are all load-bearing — plus the scrape config, the
-    # stack's topology contract.
     observabilityUnits = import ./services/observability/unit.nix {inherit lib;};
     renderedObsPrometheus = observabilityUnits.prometheus.text;
     renderedObsScrapeConfig = observabilityUnits.prometheusConfig;
-    # Locks the grafana auth posture (anon=Viewer, basic-auth off) so it cannot
-    # silently regress to anonymous admin.
     renderedObsGrafana = observabilityUnits.grafana.text;
 
     goldenObsPrometheus = ''
@@ -203,9 +194,6 @@
         evaluation_interval: 30s
 
       scrape_configs:
-        # 9100 is tailscale0-scoped on both hosts (modules/observability), and
-        # honor_labels keeps restic's own job="<backup job>" textfile-stamp label
-        # off exported_job (modules/backups).
         - job_name: node
           honor_labels: true
           static_configs:
@@ -216,8 +204,6 @@
               labels:
                 host: llunde-parser
 
-        # Backend JVM/HTTP via Caddy's tailnet-only :9101 (modules/ingress): the
-        # app binds 127.0.0.1:8080, so that listener is the only off-box path.
         - job_name: llunde-backend
           metrics_path: /metrics
           static_configs:
@@ -225,10 +211,6 @@
               labels:
                 host: llunde-01
 
-        # Blackbox indirection: the probed URL moves into ?target=, instance keeps
-        # the URL, the scrape hits the exporter by CONTAINER NAME on the shared
-        # network (aardvark DNS), never a host port. blackbox-public covers the
-        # WHOLE public chain the tailnet checks miss: CF edge egress, then tunnel.
         - job_name: blackbox-public
           metrics_path: /probe
           params:
@@ -243,10 +225,6 @@
             - target_label: __address__
               replacement: observability-blackbox:9115
 
-        # Same URL as blackbox-public, a DIFFERENT question: not "is the site up"
-        # but "is it reached THROUGH Cloudflare". Two jobs because one could not
-        # tell "site down" from "site up, bypassing the edge" — and bypassing is
-        # silent by construction. Named into blackbox-public.*: PublicEdgeDown pages.
         - job_name: blackbox-public-cfray
           metrics_path: /probe
           params:
@@ -261,8 +239,6 @@
             - target_label: __address__
               replacement: observability-blackbox:9115
 
-        # 403 on the backend's ops path IS the healthy signal: Caddy's @ops block
-        # answering proves DNS, tunnel and Caddy alive (http_403 accepts only 403).
         - job_name: blackbox-public-403
           metrics_path: /probe
           params:
@@ -277,7 +253,6 @@
             - target_label: __address__
               replacement: observability-blackbox:9115
 
-        # Full backend readiness (DB, valkey, …) via the same Caddy listener.
         - job_name: blackbox-ready
           metrics_path: /probe
           params:
@@ -293,20 +268,10 @@
               replacement: observability-blackbox:9115
     '';
 
-    # Rendered artifacts where a silent drift is dangerous: the Caddyfile
-    # (ops-block globs, XFF mapping, CF-Connecting-IP guard, bind 127.0.0.1),
-    # the cloudflared unit (digest pin, EnvironmentFile, Network=host), the
-    # valkey unit (--save "" flag order, digest pin, no :U). Read via self from
-    # the REAL host config, so the golden IS the deployed text; too tab-heavy to
-    # inline, so they live in tests/golden/. Regenerate on an intended change:
-    #   nix eval --raw '.#nixosConfigurations.llunde-01.config.environment.etc."llunde/caddy/Caddyfile".text' > tests/golden/llunde-01.Caddyfile
     hostEtc = self.nixosConfigurations.llunde-01.config.environment.etc;
     renderedCaddyfile = hostEtc."llunde/caddy/Caddyfile".text;
     renderedCloudflared = hostEtc."containers/systemd/users/2000/cloudflared.container".text;
-    # The Caddyfile golden proves what caddy is told to do; this proves WHICH
-    # caddy — a digest pin carrying a compiled-in ACME provider. A silent revert
-    # to a floating tag, or a lost REGISTRY_AUTH_FILE, would only surface at a
-    # renewal weeks later.
+
     renderedCaddy = hostEtc."containers/systemd/users/2000/caddy.container".text;
     renderedValkey = hostEtc."containers/systemd/users/2001/llunde-valkey.container".text;
     goldenCaddyfile = builtins.readFile ./tests/golden/llunde-01.Caddyfile;
@@ -315,11 +280,6 @@
     goldenValkey = builtins.readFile ./tests/golden/llunde-valkey.container;
     goldenObsGrafana = builtins.readFile ./tests/golden/observability-grafana.container;
 
-    # The module lands with enable = false on both hosts, so nothing else in the
-    # gate instantiates its writeShellApplication — and shellcheck runs at BUILD
-    # time. This throwaway enabled config forces the script derivation via the
-    # ExecStart string's context, so CI lints it. x86_64-linux only: the runtime
-    # closure (iproute2) does not evaluate on darwin.
     gitopsPullScriptCheck = system: let
       sys = nixpkgs.lib.nixosSystem {
         inherit system;
@@ -348,15 +308,6 @@
       nixpkgs.legacyPackages.${system}.writeText "gitops-pull-script-ok"
       sys.config.systemd.services.gitops-pull.serviceConfig.ExecStart;
 
-    # Config-SYNTAX gate for the stack's two hand-written configs: the goldens
-    # prove the rendered text did not DRIFT, not that it is VALID.
-    # `fail_if_header_not_matched`, the plausible misspelling of `..._matches`,
-    # is golden-clean and exporter-fatal — blackbox refuses to start on an
-    # unknown key, so the pull loop gets a failed reconcile and ZERO probes,
-    # alerted rather than caught by CI. Both binaries were verified to exit
-    # non-zero on a bad file: a gate that cannot fail is worse than no gate.
-    # Version skew (nixpkgs blackbox 0.27.0 / promtool 3.7.2 vs deployed v0.28.0
-    # / v3.13.2) is fine for syntax — the trade caddy's `validate` check makes.
     obsConfigCheck = system: let
       pkgs = nixpkgs.legacyPackages.${system};
     in
@@ -365,12 +316,6 @@
           --config.file=${./services/observability/blackbox.yml} --config.check
         ${pkgs.prometheus.cli}/bin/promtool check config \
           ${pkgs.writeText "prometheus.yml" renderedObsScrapeConfig}
-        # Grafana ships no offline validator, so a YAML PARSE is the ceiling; it
-        # cannot check the rule schema. Still worth it: alerting.yaml is
-        # hand-written nested YAML, a mis-indented rule is the failure that
-        # happens, and observability-grafana's reconcile entry watches it with NO
-        # `check` — a malformed edit crash-loops Grafana and stalls the deploy on
-        # a sticky reconcile_failed. yq exits 1 on unparseable YAML, 0 on valid.
         ${pkgs.yq-go}/bin/yq eval '.' \
           ${./services/observability/grafana/alerting.yaml} >/dev/null
         touch $out
@@ -421,10 +366,6 @@
       ];
     };
 
-    # Rehearsal variant: the host config with the identity guards ON — no tunnel
-    # connector (a second one would take real production traffic), no production
-    # tailnet identity, no backups into the prod restic prefix — and public SSH
-    # open (scratch boxes have no cloud firewall; without it, unreachable).
     nixosConfigurations.llunde-parser-rehearsal = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
@@ -436,7 +377,6 @@
           llunde.pyparser.tunnel.enable = false;
           llunde.tailscale.enable = lib.mkForce false;
           llunde.backups.enable = lib.mkForce false;
-          # No live alerting/probing from a scratch box.
           llunde.observability.stack.enable = false;
           services.openssh.openFirewall = lib.mkForce true;
         }
@@ -447,8 +387,6 @@
     checks.x86_64-linux.gitops-pull-script = gitopsPullScriptCheck "x86_64-linux";
     checks.x86_64-linux.obs-config = obsConfigCheck "x86_64-linux";
     checks.aarch64-linux.mkquadlet-render = mkRenderCheck "aarch64-linux";
-    # The laptop is aarch64-darwin: without these, a local `nix flake check`
-    # skips the goldens as "incompatible" and passes VACUOUSLY.
     checks.aarch64-darwin.mkquadlet-render = mkRenderCheck "aarch64-darwin";
     checks.aarch64-darwin.obs-config = obsConfigCheck "aarch64-darwin";
   };

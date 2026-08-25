@@ -1,15 +1,11 @@
 # ---- Hetzner Cloud ----
-
-# Read & Write API token. Supplied via the environment, NOT terraform.tfvars:
-#   export TF_VAR_hcloud_token="..."
 variable "hcloud_token" {
   description = "Hetzner Cloud API token (Read & Write)."
   type        = string
   sensitive   = true
 }
 
-# ---- AWS (pyparser dataset bucket + IAM) ----
-
+# ---- AWS ----
 variable "region" {
   description = "AWS region."
   type        = string

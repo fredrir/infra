@@ -1,5 +1,5 @@
 [Unit]
-Description=Caddy public ingress (ADR 006)
+Description=Caddy public ingress
 
 [Container]
 EnvironmentFile=/run/secrets/llunde-caddy-acme.env

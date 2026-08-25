@@ -1,16 +1,3 @@
-# Build the front door's caddy image (ADR 017 amended). Images normally build in
-# their service repos (ADR 010); this is the exception, because the artifact IS
-# infrastructure — a caddy with the Cloudflare DNS-01 provider compiled in, which
-# no upstream image ships. Rationale and pins: images/caddy/Containerfile. PRs
-# build WITHOUT pushing, so a broken Containerfile fails here rather than at the
-# next `podman pull` on llunde-01.
-#
-# `verify` is the point of this file: it asserts the caddy version matches the
-# pin and the DNS provider is really in the binary, then prints the DIGEST, since
-# the quadlet pins by digest and nothing else may. A silently plugin-less image
-# looks healthy until a renewal fails weeks later. No third-party actions in
-# `verify` — this image terminates llunde.no, so its build path carries as little
-# supply chain as it can; `docker` and `gh` are preinstalled.
 name: Build caddy image
 
 on:
@@ -57,23 +44,13 @@ jobs:
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker pull -q "$IMAGE"
 
-          # 1. the runtime binary is the version images/caddy/Containerfile pins.
-          #    Both FROMs take the same ARG; xcaddy compiling a DIFFERENT caddy
-          #    than the image around it is the failure this catches.
           VERSION=$(docker run --rm "$IMAGE" caddy version)
           echo "caddy version: $VERSION"
           grep -q 'v2.11.4' <<<"$VERSION"
 
-          # 2. the reason this image exists: without the module ACME silently
-          #    falls back to challenges that CANNOT work with 80/443 closed,
-          #    and the failure surfaces only at renewal.
           docker run --rm "$IMAGE" caddy list-modules | grep -qx 'dns.providers.cloudflare'
           echo "dns.providers.cloudflare: present"
 
-          # 3. the digest, which is what modules/ingress pins. Tags are not pins.
-          #    Echoed to STDOUT as well as the summary: the package is private
-          #    and the laptop PAT has no read:packages, so the job LOG is the
-          #    only place to read it back later.
           DIGEST=$(docker buildx imagetools inspect "$IMAGE" --format '{{.Manifest.Digest}}')
           echo "digest: $DIGEST"
           echo "## caddy image built" >> "$GITHUB_STEP_SUMMARY"

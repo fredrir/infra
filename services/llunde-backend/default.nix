@@ -1,5 +1,3 @@
-# llunde-backend service slice (ADR 002/005): the backend container plus its
-# data stores under the llunde-backend user (uid 2001), API on 127.0.0.1:8080.
 {lib, ...}: let
   unitDef = import ./unit.nix {inherit lib;};
 in {

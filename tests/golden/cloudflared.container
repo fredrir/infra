@@ -1,5 +1,5 @@
 [Unit]
-Description=Cloudflare tunnel connector for the llunde vhosts (ADR 017)
+Description=Cloudflare tunnel connector
 
 [Container]
 ContainerName=llunde-cloudflared

@@ -1,13 +1,5 @@
-# Grafana-managed alerting as code: contact point, root policy and the rules in
-# one provisioning file. Delivery is EMAIL via SES; SMTP creds arrive via sops
-# as GF_SMTP_* env, never this file — the public ntfy topic it replaced was a
-# capability URL committed to git, i.e. burned. Rule shape: query A against the
-# prometheus datasource (fixed uid), then threshold expression B — non-zero B
-# fires; `for` debounces (5 m on the reachability rules).
 apiVersion: 1
 
-# File-provisioned resources survive removal from this file, so the old ntfy
-# contact point needs an explicit deletion to leave Grafana's DB.
 deleteContactPoints:
   - orgId: 1
     uid: ntfy-webhook
@@ -175,17 +167,7 @@ groups:
                   reducer: { type: last, params: [] }
                   type: query
 
-      # The only watch on Caddy's OWN certificates: production never sees them
-      # (cloudflared dials plain HTTP, and the `probe_ssl_earliest_cert_expiry`
-      # the blackbox-public jobs report is Cloudflare's edge cert), so a DNS-01
-      # renewal failure stays silent until break-glass needs a warm certificate.
-      # modules/ingress stamps the metric hourly. 21 days: Let's Encrypt issues
-      # for 90 and Caddy renews at ~30 left, so crossing 21 means renewal has
-      # failed for over a week — late enough that healthy renewal never trips it,
-      # early enough to fix by hand (runbook §13.5). noDataState Alerting, unlike
-      # every other rule here: SILENCE IS THE FAILURE. `for: 6h` absorbs reboots
-      # and the gap before the first hourly stamp; the metric is an absolute
-      # deadline, so a stale stamp still counts down correctly.
+
       - uid: cert-expiry
         title: OriginCertExpiring
         condition: B
@@ -221,10 +203,6 @@ groups:
                   reducer: { type: last, params: [] }
                   type: query
 
-      # Freshness in days from the stamps modules/backups writes on every
-      # SUCCESSFUL restic run. noDataState OK, softer than the rest: the stamp
-      # appears only after the first weekly run, and a dead exporter is already
-      # InstanceDown's job.
       - uid: restic-stale
         title: ResticStale
         condition: B

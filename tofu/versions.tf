@@ -15,11 +15,6 @@ terraform {
       version = "~> 5.0"
     }
   }
-
-  # Remote state (ADR 002): one flat root, one state. The per-project keys
-  # (tofu-state/llunde.tfstate, tofu-state/pyparser.tfstate) stay in the
-  # versioned bucket as the merge's rollback anchors. Credentials come from
-  # AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY in the environment.
   backend "s3" {
     bucket       = "llunde-pyparser-bucket"
     key          = "tofu-state/infra.tfstate"
@@ -37,8 +32,6 @@ provider "aws" {
   region  = var.region
   profile = var.aws_profile != "" ? var.aws_profile : null
 
-  # All AWS resources here are pyparser's (dataset bucket + IAM); the tags
-  # predate the flat root and are kept verbatim to avoid churn.
   default_tags {
     tags = {
       Project   = "pyparser"

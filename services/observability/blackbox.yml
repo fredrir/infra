@@ -1,6 +1,3 @@
-# blackbox-exporter modules, mounted over the image's default --config.file path
-# (/etc/blackbox_exporter/config.yml). ip4 preferred: verdicts must not depend
-# on whether the CF edge and the tailnet have working v6 paths from this box.
 modules:
   http_2xx:
     prober: http
@@ -8,14 +5,7 @@ modules:
     http:
       preferred_ip_protocol: ip4
 
-  # 200 AND proof the answer came through Cloudflare's edge: CF stamps `CF-Ray`
-  # on every proxied response, a direct-to-origin answer from Caddy has none, so
-  # a missing CF-Ray means traffic bypassing the edge — which must page.
-  # `fail_if_header_not_matches` asserts exactly that, failing on a MISSING
-  # header because `allow_missing` defaults to false; hence it stays unset.
-  # NB the field is `..._matches`, not `..._matched` — the wrong spelling parses
-  # as an unknown key and the exporter REFUSES TO START, which under the pull
-  # loop means a failed reconcile and no probes at all. Hence the gate check.
+
   http_2xx_cfray:
     prober: http
     timeout: 10s
@@ -25,10 +15,6 @@ modules:
         - header: CF-Ray
           regexp: ".+"
 
-  # 403 IS the healthy answer: Caddy's @ops rules block
-  # https://api.llunde.no/health on the public vhost, so a 403 through the edge
-  # proves the WHOLE chain — DNS, CF, tunnel, Caddy — alive. Anything else (200
-  # included) means the ops block regressed or the chain is broken.
   http_403:
     prober: http
     timeout: 10s

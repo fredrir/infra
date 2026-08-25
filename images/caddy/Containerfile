@@ -1,34 +1,7 @@
-# Caddy + the Cloudflare DNS-01 provider — the estate's only in-repo image build.
-#
-# WHY IT EXISTS (ADR 017). With 80/443 closed, Caddy can answer neither an
-# http-01 nor a tls-alpn-01 ACME challenge, so Let's Encrypt renewal for
-# llunde.no / www / api breaks. DNS-01 is the only challenge type that needs no
-# inbound port, and it needs a provider module compiled IN: the official image
-# ships none and Caddy has no runtime plugin loading.
-#
-# Warm certs are what keep break-glass cheap: re-open the ports, flip DNS back to
-# the A records, and the origin already holds valid certificates for all three
-# names instead of racing Let's Encrypt during an outage. `OriginCertExpiring`
-# is the alert that catches renewal failing here (runbook §13.5) — nothing else
-# watches these certificates, since no production request ever sees one.
-#
-# It also closes a gap this work uncovered: the front door was running the
-# FLOATING `docker.io/library/caddy:2` tag while cloudflared beside it was
-# digest-pinned. It was stable only by accident — quadlet's `Pull=missing` meant
-# the local image cache hid the drift, so a reprovision or a `podman image prune`
-# could have swapped the front-door binary with no diff anywhere in this repo.
-#
-# TWO STAGES, ONE VERSION. Argument-less `xcaddy build` compiles the version in
-# the builder image's CADDY_VERSION env, and the runtime image supplies the
-# entrypoint, /etc/caddy layout and /data storage. Pinning only one side would
-# quietly produce a caddy that does not match the image built around it — so both
-# FROMs take the same ARG, and CI asserts `caddy version` after the build.
 ARG CADDY_VERSION=2.11.4
 
 FROM docker.io/library/caddy:${CADDY_VERSION}-builder AS builder
 
-# Version-pinned like every other dependency in this estate; bumps are deliberate
-# edits, never a floating fetch at build time.
 RUN xcaddy build --with github.com/caddy-dns/cloudflare@v0.2.4
 
 FROM docker.io/library/caddy:${CADDY_VERSION}

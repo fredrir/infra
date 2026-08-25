@@ -1,8 +1,3 @@
-# Reusable adoption of an already-running Hetzner server + a network firewall in
-# front of it. Imported, never created from scratch: prevent_destroy + broad
-# ignore_changes keep the stateful box un-rebuildable. Outbound is left
-# unrestricted (no outbound rules) so cloudflared/egress keep working.
-
 resource "hcloud_server" "this" {
   name        = var.name
   server_type = var.server_type

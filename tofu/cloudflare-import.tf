@@ -1,17 +1,9 @@
-# Declarative imports of the pre-existing llunde.no records. Ids are
-# <zone_id>/<record_id> from the zone listing; kept after the apply as the audit
-# trail, same as the server import block.
-
 locals {
   cf_zone       = "4ae54b24fc4140d4d1c450491645f1c8"
   cf_account    = "8786559b30fcebd08d0c594b6e899eef"
   llunde_tunnel = "c0cdd9b5-fa97-42a1-bca7-95da236ea949"
 }
 
-# Adopts the llunde tunnel's ingress map, originally dashboard-created. Id form
-# here is <account_id>/<tunnel_id> — no record id, the config is a singleton per
-# tunnel. The HCL matches the live config, so anything appearing in a plan means
-# the live config drifted and must be read (runbook §13.2) before applying.
 import {
   to = module.cloudflare.cloudflare_zero_trust_tunnel_cloudflared_config.llunde
   id = "${local.cf_account}/${local.llunde_tunnel}"

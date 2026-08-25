@@ -1,5 +1,4 @@
 # ---- llunde-01 ----
-
 output "ipv4" {
   description = "Public IPv4 of llunde-01"
   value       = hcloud_server.llunde_01.ipv4_address
@@ -11,7 +10,6 @@ output "ipv6" {
 }
 
 # ---- llunde-parser (pyparser) ----
-
 output "server_ipv4" {
   description = "Public IPv4 of the pyparser server."
   value       = module.parser.ipv4_address

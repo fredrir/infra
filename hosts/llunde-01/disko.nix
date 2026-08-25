@@ -1,4 +1,3 @@
-# Single-disk ext4 with a UEFI ESP, Hetzner Cloud x86 (ADR 001).
 {...}: {
   disko.devices.disk.main = {
     device = "/dev/sda";

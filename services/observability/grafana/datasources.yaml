@@ -1,6 +1,3 @@
-# Datasources as code, provisioned from the repo, not clicked. Fixed uids — the
-# dashboard JSON and the alert rules reference them. URLs use container names on
-# the shared observability network (aardvark DNS).
 apiVersion: 1
 
 datasources:
@@ -11,7 +8,7 @@ datasources:
     url: http://observability-prometheus:9090
     isDefault: true
     jsonData:
-      timeInterval: 30s # matches prometheus.yml scrape_interval
+      timeInterval: 30s
 
   - name: Loki
     uid: loki

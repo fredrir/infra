@@ -1,9 +1,3 @@
-# Pure fragment for the backend container unit — used by the service module and
-# the flake golden; changing a value is a lead decision.
-#
-# Secret paths (modules/secrets):
-#   /run/secrets/doppler.env            DOPPLER_TOKEN=...   (owner llunde-backend)
-#   /run/secrets/llunde-backend-db.env  POSTGRES_PASSWORD=... DB_PASSWORD=...
 {lib}: let
   quadlet = import ../../modules/quadlet/mk-quadlet.nix {inherit lib;};
   uid = 2001;
@@ -34,7 +28,6 @@ in rec {
         "VALKEY_PORT=6379"
         "CORS_ALLOWED_ORIGINS=https://llunde.no"
         "JAVA_OPTS=-Xmx640m"
-        # Doppler CLI needs a writable config dir; the image user has no home.
         "HOME=/tmp"
       ];
       EnvironmentFile = [
@@ -42,8 +35,6 @@ in rec {
         "/run/secrets/llunde-backend-db.env"
       ];
       Image = "ghcr.io/fredrir/llunde-backend:latest";
-      # Data network for postgres/valkey DNS + default network for egress
-      # (Doppler, GHCR). Repeated Network= is Quadlet's multi-network syntax.
       Network = [
         "llunde-backend-data.network"
         "podman"
@@ -51,7 +42,6 @@ in rec {
       PublishPort = ["127.0.0.1:8080:8080"];
     };
     service = {
-      # Pull auth for the private GHCR image: podman-process env, not container env.
       Environment = "REGISTRY_AUTH_FILE=/run/secrets/ghcr-auth.json";
       MemoryMax = "1G";
       Restart = "always";
