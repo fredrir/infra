@@ -11,6 +11,9 @@ on:
       dockerfile:
         type: string
         default: Dockerfile
+      build-args:
+        type: string
+        default: ''
       recipe:
         type: string
         default: ''
@@ -87,6 +90,7 @@ jobs:
         CONTEXT: ${{ inputs.context }}
         DOCKERFILE: ${{ inputs.dockerfile }}
         REGISTRY_TOKEN: ${{ github.token }}
+        BUILD_ARGS: ${{ inputs.build-args }}
       run: |
         set -euo pipefail
         DOCKERFILE="${SHARED_DOCKERFILE:-$DOCKERFILE}"
@@ -97,7 +101,8 @@ jobs:
         jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
         unset REGISTRY_TOKEN
         export BUILDKITD_FLAGS="$BUILDKITD_FLAGS --oci-worker-net=host"
-        buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        source .infra-build-recipe/scripts/ci/build-args.sh
+        buildctl-daemonless.sh build --frontend dockerfile.v0 "${build_args[@]}" \
           --local "context=$CONTEXT" --local "dockerfile=$(dirname "$DOCKERFILE")" \
           --opt "filename=$(basename "$DOCKERFILE")" --opt platform=linux/amd64 \
           --opt attest:provenance=mode=min,version=v1 \
