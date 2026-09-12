@@ -1,0 +1,13 @@
+issuer: https://token.actions.githubusercontent.com
+subject_pattern: ^repo:fredrir(@114402558)?/Y(@900286164)?:ref:refs/heads/main$
+claim_pattern:
+  repository_id: ^900286164$
+  repository_owner_id: ^114402558$
+  event_name: ^push$
+  ref: ^refs/heads/main$
+  runner_environment: ^self-hosted$
+  job_workflow_ref: ^fredrir/infra/\.github/workflows/build-image\.yml@b286b57de9ed47a6dddf4e55467bcc9340b7dc56$
+  job_workflow_sha: ^b286b57de9ed47a6dddf4e55467bcc9340b7dc56$
+permissions:
+  contents: write
+  pull_requests: write
