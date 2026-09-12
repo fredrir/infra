@@ -27,7 +27,7 @@ def fixture():
         "awsAccountId": "123456789012",
         "region": "eu-north-1",
         "iamUser": "fredrir-platform-alerts-smtp",
-        "doppler": {"project": "llunde", "config": "ops", **mail.KEYS},
+        "doppler": {"project": "infra", "config": "ops", **mail.KEYS},
         "watchdog": {
             "targets": [{"name": "public", "url": "https://example.com/"}],
             "alertEmail": {

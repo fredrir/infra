@@ -11,7 +11,7 @@ spec:
     branch: platform/shared-infrastructure
   secretRef:
     name: flux-system
-  url: ssh://git@github.com/fredrir/llunde-infra
+  url: ssh://git@github.com/fredrir/infra
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

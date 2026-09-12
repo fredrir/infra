@@ -113,7 +113,7 @@ def settings(path):
         "Dedicated regional SMTP identity required",
     )
     require(
-        value["doppler"] == {"project": "llunde", "config": "ops", **KEYS},
+        value["doppler"] == {"project": "infra", "config": "ops", **KEYS},
         "Scoped Doppler keys required",
     )
     config = value["watchdog"]
@@ -230,7 +230,7 @@ class Services:
                 "secrets",
                 *arguments,
                 "--project",
-                "llunde",
+                "infra",
                 "--config",
                 "ops",
                 "--no-read-env",
