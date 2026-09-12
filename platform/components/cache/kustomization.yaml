@@ -8,3 +8,8 @@ resources:
 - tunnel.yaml
 - tunnel.secret.sops.yaml
 - reader.secret.sops.yaml
+- backup.yaml
+- backup.secret.sops.yaml
+components:
+- ../backup-job
+namespace: nix-cache

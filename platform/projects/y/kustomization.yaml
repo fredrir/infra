@@ -12,3 +12,7 @@ resources:
 - ghcr.secret.sops.yaml
 - tunnel.yaml
 - tunnel.secret.sops.yaml
+- backup.yaml
+- backup.secret.sops.yaml
+components:
+- ../../components/backup-job

@@ -231,7 +231,6 @@ spec:
   path: ./platform/components/backups
   prune: true
   wait: true
-  suspend: true
   serviceAccountName: platform-reconciler
   postBuild:
     substituteFrom:
@@ -242,7 +241,7 @@ spec:
     secretRef:
       name: sops-age
   dependsOn:
-  - name: platform-secrets
+  - name: platform-policy
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

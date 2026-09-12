@@ -13,3 +13,7 @@ resources:
 - database.secret.sops.yaml
 - tunnel.secret.sops.yaml
 - ghcr.secret.sops.yaml
+- backup.yaml
+- backup.secret.sops.yaml
+components:
+- ../../components/backup-job

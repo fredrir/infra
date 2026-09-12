@@ -1,0 +1,61 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-backups
+spec:
+  groups:
+  - name: platform-backups
+    rules:
+    - alert: HourlyBackupOverdue
+      expr: |
+        (time() - kube_cronjob_status_last_successful_time{namespace=~"portfolio|nix-cache",cronjob="data-backup"} > 7200)
+        and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: Hourly application backup is overdue
+    - alert: ApplicationBackupOverdue
+      expr: |
+        (time() - kube_cronjob_status_last_successful_time{namespace=~"llunde-pyparser|y",cronjob="data-backup"} > 28800)
+        and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: Application data backup is overdue
+    - alert: BackupHasNeverSucceeded
+      expr: |
+        (kube_cronjob_info{cronjob=~"data-backup|repository-maintenance"}
+        unless on(namespace,cronjob) kube_cronjob_status_last_successful_time)
+        and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
+      for: 30m
+      labels:
+        severity: critical
+      annotations:
+        summary: Enabled backup schedule has no successful run
+    - alert: BackupIntegrityOverdue
+      expr: |
+        (time() - kube_cronjob_status_last_successful_time{cronjob="repository-maintenance"} > 691200)
+        and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: Weekly backup integrity check is overdue
+    - alert: ControlRecoveryBackupOverdue
+      expr: |
+        time() - platform_control_backup_last_success_timestamp_seconds{node="fredrir-07"} > 28800
+        or absent(platform_control_backup_last_success_timestamp_seconds{node="fredrir-07"})
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: Control-plane recovery backup is overdue or missing
+    - alert: ControlRecoveryBackupFailed
+      expr: platform_control_backup_last_run_success{node="fredrir-07"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: Native control-plane recovery backup failed

@@ -226,6 +226,8 @@ spec:
       enabled: true
     prometheus-node-exporter:
       namespaceOverride: node-exporter
+      extraArgs:
+      - --collector.textfile.directory=/host/root/var/lib/node_exporter/textfile_collector
       hostNetwork: false
       hostPID: false
       resources:
