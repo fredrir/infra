@@ -144,17 +144,21 @@ def containers(commands, images):
                 "podman",
                 "inspect",
                 "--format",
-                "{{json .Id}} {{json .Image}} {{json .State.Running}}",
+                "{{json .ID}} {{json .Image}} {{json .State.Running}}",
                 name,
             ],
             maximum=1024,
         )
-        identifier, image, running = raw.decode().split()
-        identifier, image = json.loads(identifier), json.loads(image)
+        identifier, image, running = (
+            json.loads(value) for value in raw.decode().split()
+        )
         require(
-            re.fullmatch("[a-f0-9]{64}", identifier)
-            and image == expected
-            and running == "true",
+            isinstance(identifier, str)
+            and re.fullmatch("[a-f0-9]{64}", identifier)
+            and isinstance(image, str)
+            and re.fullmatch(r"(?:sha256:)?[a-f0-9]{64}", image)
+            and image.removeprefix("sha256:") == expected.removeprefix("sha256:")
+            and running is True,
             "Running datastore identity differs",
         )
         result[name] = identifier

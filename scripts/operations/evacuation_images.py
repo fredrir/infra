@@ -730,6 +730,13 @@ def load_image(directory, plan_path, service):
 
 
 def translate_candidates(directory, destination):
+    from evacuation_staging import (
+        candidate_files,
+        upgrade_network_contents,
+        validate_networks,
+        validate_plan,
+    )
+
     root = private_directory(directory, os.geteuid())
     plan = read_json(root / "staging.json", os.geteuid())
     require(set(plan["services"]) == set(SERVICE_USERS), "All six services required")
@@ -737,9 +744,8 @@ def translate_candidates(directory, destination):
         service: verify_bundle(root / "images" / service, plan, service)
         for service in SERVICE_USERS
     }
-    expected = {
-        f"units/{user}/{service}.container" for service, user in SERVICE_USERS.items()
-    } | {"units/Caddyfile", "units/llunde-backend/llunde-backend-data.network"}
+    legacy_networks = set(plan["unitSHA256"]) == candidate_files(legacy_networks=True)
+    expected = candidate_files(legacy_networks=legacy_networks)
     require(set(plan["unitSHA256"]) == expected, "Unexpected candidate inventory")
     require(
         not any(path.is_symlink() for path in (root / "units").rglob("*")),
@@ -754,6 +760,7 @@ def translate_candidates(directory, destination):
         == expected,
         "Unexpected candidate files",
     )
+    validate_networks(root, legacy_networks=legacy_networks)
     translated, contents = copy.deepcopy(plan), {}
     for name in sorted(expected):
         path = root / name
@@ -790,6 +797,13 @@ def translate_candidates(directory, destination):
     translated["sourceCandidateSHA256"] = hashlib.sha256(
         (root / "staging.json").read_bytes()
     ).hexdigest()
+    if legacy_networks:
+        contents = upgrade_network_contents(contents)
+        translated["sourceNetworkCandidateSHA256"] = translated["sourceCandidateSHA256"]
+        translated["unitSHA256"] = {
+            name: hashlib.sha256(data).hexdigest()
+            for name, data in sorted(contents.items())
+        }
     destination = Path(destination)
     require(
         not destination.exists() and not destination.is_symlink(),
@@ -806,6 +820,7 @@ def translate_candidates(directory, destination):
             ) as stream:
                 stream.write(data)
         write_json(candidate / "staging.json", translated)
+        validate_plan(candidate)
         os.rename(candidate, destination)
     return {
         "translatedServices": len(receipts),

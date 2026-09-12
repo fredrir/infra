@@ -60,15 +60,21 @@ def fixture_plan(root):
             contents += (
                 "ConditionPathExists=/var/lib/infra-evacuation/llunde/source-fenced\n"
             )
-        contents += (
-            f"[Container]\nImage={service['image']}\n[Service]\nMemoryMax=256M\n"
-        )
+        contents += f"[Container]\nImage={service['image']}\n"
+        if name in ("llunde-postgres", "llunde-valkey", "llunde-backend"):
+            contents += "Network=llunde-backend-data.network\n"
+        if name == "llunde-backend":
+            contents += "Network=llunde-backend-egress.network\n"
+        contents += "[Service]\nMemoryMax=256M\n"
         path.write_text(contents)
     (root / "units/Caddyfile").write_text(
         "http://:8085 {\n bind 127.0.0.1\n respond 200\n}\n"
     )
     (root / "units/llunde-backend/llunde-backend-data.network").write_text(
         "[Network]\nInternal=true\n"
+    )
+    (root / "units/llunde-backend/llunde-backend-egress.network").write_text(
+        staging.EGRESS_CONTENT
     )
     for path in (root / "units").rglob("*"):
         if path.is_file():
@@ -149,6 +155,133 @@ class StagingPlanTests(unittest.TestCase):
         ):
             with self.subTest(mapping=bad), self.assertRaises(staging.StagingError):
                 staging.validate_accounts(self.plan, "", "", bad, existing)
+
+    def test_data_parent_creation_preserves_existing_private_data(self):
+        parent = self.root / "service-home"
+        parent.mkdir(mode=0o750)
+        fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
+        self.addCleanup(os.close, fd)
+        with patch.object(staging.os, "fchown", wraps=os.fchown) as chown:
+            result = staging.prepare_data_child(fd, os.geteuid(), os.getegid())
+            self.assertTrue(result["created"])
+            self.assertEqual(result["mode"], "0700")
+            self.assertEqual(chown.call_count, 1)
+            sentinel = parent / "data/postgres"
+            sentinel.write_bytes(b"existing datastore")
+            before = sentinel.stat()
+            again = staging.prepare_data_child(fd, os.geteuid(), os.getegid())
+            self.assertFalse(again["created"])
+            self.assertEqual(chown.call_count, 1)
+            self.assertEqual(sentinel.read_bytes(), b"existing datastore")
+            self.assertEqual(sentinel.stat().st_ino, before.st_ino)
+
+    def test_data_parent_rejects_existing_symlink_wrong_owner_group_and_mode(self):
+        parent = self.root / "service-home"
+        parent.mkdir(mode=0o750)
+        fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
+        self.addCleanup(os.close, fd)
+        outside = self.root / "outside"
+        outside.mkdir(mode=0o755)
+        (outside / "sentinel").write_bytes(b"untouched")
+        (parent / "data").symlink_to(outside)
+        with self.assertRaises(OSError):
+            staging.prepare_data_child(fd, os.geteuid(), os.getegid())
+        self.assertEqual(stat.S_IMODE(outside.stat().st_mode), 0o755)
+        (parent / "data").unlink()
+        (parent / "data").mkdir(mode=0o755)
+        for owner, group, mode in (
+            (os.geteuid(), os.getegid(), 0o755),
+            (os.geteuid() + 1, os.getegid(), 0o700),
+            (os.geteuid(), os.getegid() + 1, 0o700),
+        ):
+            with self.subTest(owner=owner, group=group, mode=mode):
+                (parent / "data").chmod(mode)
+                with self.assertRaises(staging.StagingError):
+                    staging.prepare_data_child(fd, owner, group)
+                self.assertEqual(stat.S_IMODE((parent / "data").stat().st_mode), mode)
+        self.assertEqual((outside / "sentinel").read_bytes(), b"untouched")
+
+    def test_rehashed_network_changes_cannot_break_dns_or_datastore_isolation(self):
+        backend = "units/llunde-backend/llunde-backend.container"
+        egress = "units/llunde-backend/llunde-backend-egress.network"
+        changes = [
+            (backend, "Network=llunde-backend-egress.network", "Network=podman"),
+            (
+                backend,
+                "Network=llunde-backend-egress.network",
+                "Network=llunde-backend-egress.network\nDNS=1.1.1.1",
+            ),
+            (egress, "DisableDNS=false", "DisableDNS=true"),
+            (egress, "Internal=false", "Internal=true"),
+            (egress, "Driver=bridge", "Driver=macvlan"),
+            (backend, "[Container]", "[Container]\nPodmanArgs=--network=host"),
+            (backend, "[Container]", "[Container]\nGlobalArgs=--network=host"),
+            (backend, "[Container]", "[Container]\nPod=outside.pod"),
+            (
+                "units/llunde-backend/llunde-backend-data.network",
+                "Internal=true",
+                "Internal=false",
+            ),
+            (
+                "units/llunde-backend/llunde-valkey.container",
+                "Network=llunde-backend-data.network",
+                "Network=llunde-backend-data.network\nNetwork=llunde-backend-egress.network",
+            ),
+        ]
+        for name, before, after in changes:
+            with self.subTest(name=name, after=after):
+                path = self.root / name
+                original = path.read_text()
+                path.write_text(original.replace(before, after))
+                self.plan["unitSHA256"][name] = hashlib.sha256(
+                    path.read_bytes()
+                ).hexdigest()
+                self.save()
+                with self.assertRaises(staging.StagingError):
+                    staging.validate_plan(self.root)
+                path.write_text(original)
+                self.plan["unitSHA256"][name] = hashlib.sha256(
+                    path.read_bytes()
+                ).hexdigest()
+                self.save()
+
+    def test_fresh_legacy_upgrade_preserves_inputs_and_all_other_unit_bytes(self):
+        name = "units/llunde-backend/llunde-backend-egress.network"
+        (self.root / name).unlink()
+        self.plan["unitSHA256"].pop(name)
+        backend = "units/llunde-backend/llunde-backend.container"
+        path = self.root / backend
+        path.write_text(
+            path.read_text().replace(
+                "Network=llunde-backend-egress.network", "Network=podman"
+            )
+        )
+        self.plan["unitSHA256"][backend] = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.save()
+        before = {
+            name: (self.root / name).read_bytes() for name in self.plan["unitSHA256"]
+        }
+        before["staging.json"] = (self.root / "staging.json").read_bytes()
+        for name in before:
+            (self.root / name).chmod(0o600)
+        digest = hashlib.sha256(before["staging.json"]).hexdigest()
+        with self.assertRaises(staging.StagingError):
+            staging.validate_plan(self.root)
+        with self.assertRaises(staging.StagingError):
+            staging.prepare_networks(self.root, self.root / "wrong", "0" * 64)
+        self.assertFalse((self.root / "wrong").exists())
+        destination = self.root / "updated"
+        result = staging.prepare_networks(self.root, destination, digest)
+        self.assertEqual(result["unitCount"], 9)
+        updated = staging.validate_plan(destination)
+        self.assertEqual(updated["services"], self.plan["services"])
+        self.assertEqual(updated["sourceNetworkCandidateSHA256"], digest)
+        for name, raw in before.items():
+            self.assertEqual((self.root / name).read_bytes(), raw)
+            if name not in (backend, "staging.json"):
+                self.assertEqual((destination / name).read_bytes(), raw)
+        with self.assertRaises(staging.StagingError):
+            staging.prepare_networks(self.root, destination, digest)
 
     def test_user_and_group_collisions_are_rejected(self):
         for passwd, group in (

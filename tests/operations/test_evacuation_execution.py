@@ -182,6 +182,113 @@ class ExecutionTests(unittest.TestCase):
                     100,
                 )
 
+    def test_name_filtered_events_reject_replacement_container_after_original_clean_exit(
+        self,
+    ):
+        events = [
+            {
+                "id": "a" * 64,
+                "type": "container",
+                "status": "died",
+                "exitCode": 0,
+                "timeNano": 101000000000,
+            },
+            {
+                "id": "b" * 64,
+                "type": "container",
+                "status": "create",
+                "exitCode": None,
+                "timeNano": 102000000000,
+            },
+        ]
+        commands = Replies([b"\n".join(json.dumps(row).encode() for row in events)])
+        with self.assertRaisesRegex(ValueError, "identity differs"):
+            execution.graceful_exit_event(
+                commands, "a" * 64, 100, container_name="llunde-valkey"
+            )
+        self.assertIn("container=llunde-valkey", commands.calls[0][1])
+
+    def test_valkey_shutdown_requires_loaded_inhibition_and_records_client_status(self):
+        record = {
+            "valkeyContainerId": "a" * 64,
+            "valkeyPID": 42,
+            "valkeyProcessIdentity": "123",
+        }
+        output = self.root / "shutdown.json"
+        execution.durable_json(output, record)
+        sequence = []
+        inhibitor = {
+            "container": {
+                "id": "a" * 64,
+                "pid": 42,
+                "running": True,
+                "startIdentity": "123",
+            }
+        }
+        commands = Mock()
+        commands.user.side_effect = lambda *args, **kwargs: (
+            sequence.append("shutdown") or 137,
+            b"",
+        )
+        with (
+            patch.object(
+                execution.restart,
+                "install",
+                side_effect=lambda *args: sequence.append("install") or inhibitor,
+            ),
+            patch.object(
+                execution.restart,
+                "verify",
+                side_effect=lambda *args, **kwargs: sequence.append(
+                    "stopped-proof" if kwargs else "running-proof"
+                ),
+            ),
+            patch.object(
+                execution,
+                "wait_stopped",
+                side_effect=lambda *args, **kwargs: sequence.append("unit-exit"),
+            ),
+            patch.object(
+                execution,
+                "graceful_exit_event",
+                side_effect=lambda *args, **kwargs: (
+                    sequence.append("native-exit") or {"exitCode": 0}
+                ),
+            ),
+        ):
+            execution.shutdown_valkey(commands, record, output)
+        self.assertEqual(
+            sequence,
+            [
+                "install",
+                "running-proof",
+                "shutdown",
+                "unit-exit",
+                "stopped-proof",
+                "native-exit",
+            ],
+        )
+        self.assertEqual(record["valkeyShutdownClientStatus"], 137)
+        self.assertEqual(record["valkeyExitEvent"], {"exitCode": 0})
+        self.assertFalse(commands.user.call_args.kwargs["check"])
+
+    def test_failed_inhibition_never_sends_valkey_shutdown(self):
+        record = {}
+        output = self.root / "shutdown.json"
+        execution.durable_json(output, record)
+        commands = Mock()
+        with (
+            patch.object(
+                execution.restart, "install", side_effect=ValueError("reload failed")
+            ),
+            self.assertRaisesRegex(ValueError, "reload failed"),
+        ):
+            execution.shutdown_valkey(commands, record, output)
+        commands.user.assert_not_called()
+        self.assertEqual(
+            json.loads(output.read_text())["phase"], "inhibit-valkey-restart"
+        )
+
     def test_persistence_preflight_rejects_rewrites_other_clients_or_replicas(self):
         good = b"aof_enabled:1\r\naof_last_write_status:ok\r\naof_rewrite_in_progress:0\r\naof_rewrite_scheduled:0\r\n"
         self.assertEqual(
@@ -391,6 +498,72 @@ class ExecutionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "native lifetime"):
                 target.mounted_profile(value, "sha256:" + "a" * 64, self.root, 768)
 
+    def test_postgres_shutdown_uses_server_exit_instead_of_exec_client_exit(self):
+        pair, manifest = self.pair()
+        name = "infra-final-restore-" + "a" * 12 + "-postgres"
+        for server_exit, oom in ((0, False), (1, False), (137, False), (0, True)):
+            with self.subTest(server_exit=server_exit, oom=oom):
+                with (
+                    patch.object(cutover, "verify_pair", return_value=manifest),
+                    patch.object(target, "validate_plan", return_value={}),
+                ):
+                    restore = target.Restore(
+                        pair, self.root, {}, self.root / "restore.json"
+                    )
+                restore.names = [name]
+
+                def command(arguments, _server_exit=server_exit, _oom=oom, **kwargs):
+                    if "pg_ctl" in arguments:
+                        self.assertFalse(kwargs.get("check", True))
+                        return 137, b""
+                    if arguments[:2] == ["podman", "inspect"]:
+                        return 0, json.dumps(
+                            {
+                                "Running": False,
+                                "ExitCode": _server_exit,
+                                "OOMKilled": _oom,
+                            }
+                        ).encode()
+                    if "--command" in arguments:
+                        return 0, json.dumps({"tables": 2, "constraints": 3}).encode()
+                    return 0, b""
+
+                with (
+                    patch.object(
+                        target, "database_secret", return_value=self.root / "db.env"
+                    ),
+                    patch.object(target, "durable_json"),
+                    patch.object(
+                        target,
+                        "open_private",
+                        side_effect=lambda path, *_: path.open("rb"),
+                    ),
+                    patch.object(restore, "run_container", return_value=name),
+                    patch.object(restore, "data_directory", return_value=self.root),
+                    patch.object(restore, "wait"),
+                    patch.object(restore, "call", side_effect=command) as call,
+                ):
+                    if server_exit == 0 and not oom:
+                        restore.postgres()
+                        self.assertEqual(restore.names, [])
+                        self.assertEqual(call.call_args.args[0], ["podman", "rm", name])
+                    else:
+                        with self.assertRaisesRegex(
+                            ValueError, "Successful native restore shutdown"
+                        ):
+                            restore.postgres()
+                        self.assertEqual(restore.names, [name])
+                        self.assertFalse(
+                            any(
+                                c.args[0][:2] == ["podman", "rm"]
+                                for c in call.call_args_list
+                            )
+                        )
+                self.assertEqual(restore.record["postgresShutdownClientStatus"], 137)
+                self.assertEqual(
+                    restore.record["postgresSchema"], {"tables": 2, "constraints": 3}
+                )
+
     def test_restore_failure_only_removes_its_new_containers_and_retains_data(self):
         pair, manifest = self.pair()
         output = self.root / "restore.json"
@@ -575,6 +748,9 @@ class ExecutionTests(unittest.TestCase):
         (candidate / "units/llunde-backend/llunde-backend-data.network").write_text(
             "[Network]\nInternal=true\n"
         )
+        (candidate / "units/llunde-backend/llunde-backend-egress.network").write_text(
+            "[Network]\nDriver=bridge\nInternal=false\nDisableDNS=false\n"
+        )
         (candidate / "units/Caddyfile").write_text(
             "http://:8085 {\n bind127.0.0.1\n}\n"
         )
@@ -606,7 +782,7 @@ class ExecutionTests(unittest.TestCase):
             result = target.promote_units(candidate, {}, output, commands)
         self.assertTrue(result["completed"])
         self.assertFalse(result["applicationsStarted"])
-        self.assertEqual(len(result["files"]), 8)
+        self.assertEqual(len(result["files"]), 9)
         for path, info in result["files"].items():
             actual = filesystem / path.lstrip("/")
             self.assertEqual(
@@ -680,6 +856,16 @@ class ExecutionTests(unittest.TestCase):
     def test_generated_checkpoint_proof_rejects_missing_negated_or_trigger_only_conditions(
         self,
     ):
+        import evacuation_preflight
+
+        readiness = patch.object(
+            evacuation_preflight,
+            "data_parent_observation",
+            return_value={"readyForPromotion": True},
+        )
+        readiness.start()
+        self.addCleanup(readiness.stop)
+
         def rows(user, unit):
             markers = ["stage-approved"]
             if unit == "llunde-backend.service":

@@ -7,9 +7,10 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/operations"))
 SPEC = importlib.util.spec_from_file_location(
     "evacuation_preflight", ROOT / "scripts/operations/evacuation_preflight.py"
 )
@@ -148,6 +149,65 @@ class PreflightTests(unittest.TestCase):
         result = preflight.directory_state(empty)
         self.assertFalse(result["empty"])
         self.assertNotIn("private fixture", json.dumps(result))
+
+    def test_data_parent_readiness_checks_owner_mode_and_each_ancestor(self):
+        healthy = {
+            name: {
+                "exists": True,
+                "kind": "directory",
+                "uid": uid,
+                "gid": uid,
+                "mode": mode,
+            }
+            for name, uid, mode in (
+                ("/", 0, "0755"),
+                ("/home", 0, "0755"),
+                ("/home/llunde-backend", 2001, "0750"),
+                ("/home/llunde-backend/data", 2001, "0700"),
+            )
+        }
+        with patch.object(
+            preflight, "metadata", side_effect=lambda path, **_: healthy[path]
+        ):
+            self.assertTrue(preflight.data_parent_observation()["readyForPromotion"])
+        for path, change in (
+            ("/home/llunde-backend/data", {"exists": False}),
+            ("/home/llunde-backend/data", {"uid": 0}),
+            ("/home/llunde-backend/data", {"gid": 2002}),
+            ("/home/llunde-backend/data", {"mode": "0755"}),
+            ("/home/llunde-backend", {"kind": "symlink"}),
+            ("/home", {"mode": "0775"}),
+        ):
+            with self.subTest(path=path, change=change):
+                altered = copy.deepcopy(healthy)
+                altered[path].update(change)
+                with patch.object(
+                    preflight,
+                    "metadata",
+                    side_effect=lambda path, _observations=altered, **_: _observations[
+                        path
+                    ],
+                ) as observed:
+                    self.assertFalse(
+                        preflight.data_parent_observation()["readyForPromotion"]
+                    )
+                    self.assertEqual(observed.call_args.args[0], path)
+
+    def test_actual_checkpoint_gate_refuses_missing_parent_before_manager_calls(self):
+        import evacuation_target
+
+        manager = Mock()
+        with (
+            patch.object(
+                preflight,
+                "data_parent_observation",
+                return_value={"readyForPromotion": False},
+            ),
+            patch.dict(sys.modules, {"evacuation_preflight": preflight}),
+            self.assertRaisesRegex(ValueError, "data parent"),
+        ):
+            evacuation_target.checkpoint_proof(manager)
+        manager.conditions.assert_not_called()
 
     def test_drop_in_parent_reports_resolved_symlink_and_readonly_filesystem(self):
         from types import SimpleNamespace

@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 import evacuation_cutover as cutover
+import evacuation_restart as restart
 from evacuation_execution import (
     MARKERS,
     TARGET_BASE,
@@ -19,6 +20,7 @@ from evacuation_execution import (
     backup_gate,
     canonical,
     durable_json,
+    graceful_exit_event,
     guard_state,
     host_identity,
     live_fence,
@@ -189,7 +191,14 @@ def settle_destination(guard_receipt, execution, output, commands=None):
     require(
         postgres_clients(commands) == 0, "PostgreSQL clients remain before shutdown"
     )
-    commands.user(
+    record["postgresRestartInhibitor"] = restart.install(
+        commands, execution, "postgres"
+    )
+    durable_json(output, record, replace=True)
+    restart.verify(commands, execution, "postgres")
+    record["postgresShutdownRequestedAt"] = time.time()
+    durable_json(output, record, replace=True)
+    record["postgresShutdownClientStatus"], _ = commands.user(
         "llunde-backend",
         [
             "podman",
@@ -203,8 +212,16 @@ def settle_destination(guard_receipt, execution, output, commands=None):
             "stop",
         ],
         timeout=35,
+        check=False,
     )
-    wait_stopped(commands, "llunde-postgres.service", "llunde-backend")
+    wait_stopped(commands, "llunde-postgres.service", "llunde-backend", successful=True)
+    restart.verify(commands, execution, "postgres", stopped_required=True)
+    record["postgresExitEvent"] = graceful_exit_event(
+        commands,
+        record["postgresRestartInhibitor"]["container"]["id"],
+        record["postgresShutdownRequestedAt"],
+        container_name="llunde-postgres",
+    )
     record["observation"] = destination_observation(guard_receipt, commands, execution)
     record["completed"] = True
     durable_json(output, record, replace=True)
@@ -238,7 +255,14 @@ def settle_source(guard_receipt, execution, output, commands=None):
         commands.user(user, ["systemctl", "--user", "stop", "--no-block", unit])
         wait_stopped(commands, unit, user)
     require(postgres_clients(commands) == 0, "Source PostgreSQL clients remain")
-    commands.user(
+    record["postgresRestartInhibitor"] = restart.install(
+        commands, execution, "postgres"
+    )
+    durable_json(output, record, replace=True)
+    restart.verify(commands, execution, "postgres")
+    record["postgresShutdownRequestedAt"] = time.time()
+    durable_json(output, record, replace=True)
+    record["postgresShutdownClientStatus"], _ = commands.user(
         "llunde-backend",
         [
             "podman",
@@ -252,8 +276,16 @@ def settle_source(guard_receipt, execution, output, commands=None):
             "stop",
         ],
         timeout=35,
+        check=False,
     )
     wait_stopped(commands, "llunde-postgres.service", "llunde-backend", successful=True)
+    restart.verify(commands, execution, "postgres", stopped_required=True)
+    record["postgresExitEvent"] = graceful_exit_event(
+        commands,
+        record["postgresRestartInhibitor"]["container"]["id"],
+        record["postgresShutdownRequestedAt"],
+        container_name="llunde-postgres",
+    )
     for user, units in cutover.APP_UNITS.items():
         for unit in units:
             require(
@@ -400,6 +432,10 @@ def resume_source_writer(
     }
     durable_json(output, record)
     validate_destination(destination, execution["candidateSHA256"])
+    if execution.get("restartInhibitorsRequired"):
+        record["restartPoliciesRestored"] = restart.restore_all(commands, execution)
+        durable_json(output, record, replace=True)
+        validate_destination(destination, execution["candidateSHA256"])
     remove_owned_marker("source-locked", execution["marker"])
     for user, units in [
         (

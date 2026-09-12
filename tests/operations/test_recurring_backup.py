@@ -15,6 +15,68 @@ from test_evacuation_backup import FakeRestic
 
 
 class RecurringBackupTests(unittest.TestCase):
+    def test_running_datastore_identity_accepts_native_image_id_forms(self):
+        identifier, digest = "a" * 64, "b" * 64
+        commands = Mock()
+        state = {"ActiveState": "active", "SubState": "running", "MainPID": "123"}
+        with patch.object(recurring, "unit_state", return_value=state):
+            for image in (digest, "sha256:" + digest):
+                commands.user.return_value = (
+                    0,
+                    (
+                        json.dumps(identifier) + " " + json.dumps(image) + " true\n"
+                    ).encode(),
+                )
+                self.assertEqual(
+                    recurring.containers(
+                        commands, {"llunde-postgres": "sha256:" + digest}
+                    ),
+                    {"llunde-postgres": identifier},
+                )
+        for call in commands.user.call_args_list:
+            self.assertEqual(
+                call.args,
+                (
+                    "llunde-backend",
+                    [
+                        "podman",
+                        "inspect",
+                        "--format",
+                        "{{json .ID}} {{json .Image}} {{json .State.Running}}",
+                        "llunde-postgres",
+                    ],
+                ),
+            )
+
+    def test_running_datastore_identity_rejects_wrong_or_untyped_projection(self):
+        identifier, digest = "a" * 64, "b" * 64
+        invalid = [
+            (identifier, "c" * 64, True),
+            (identifier, "sha256:sha256:" + digest, True),
+            (identifier, digest[:-1], True),
+            (identifier, None, True),
+            (identifier, digest, False),
+            (identifier, digest, "true"),
+            (identifier, digest, 1),
+            (identifier[:-1], digest, True),
+            (None, digest, True),
+        ]
+        state = {"ActiveState": "active", "SubState": "running", "MainPID": "123"}
+        with patch.object(recurring, "unit_state", return_value=state):
+            for values in invalid:
+                with self.subTest(values=values):
+                    commands = Mock()
+                    commands.user.return_value = (
+                        0,
+                        " ".join(json.dumps(value) for value in values).encode(),
+                    )
+                    with self.assertRaisesRegex(
+                        ValueError, "Running datastore identity"
+                    ):
+                        recurring.containers(
+                            commands, {"llunde-postgres": "sha256:" + digest}
+                        )
+
     def test_declared_export_limit_is_accepted_by_the_actual_streaming_primitive(self):
         for maximum in (recurring.MAX_DUMP, recurring.MAX_RDB):
             code, output = recurring.Commands(5).run(
@@ -239,11 +301,13 @@ class RecurringBackupTests(unittest.TestCase):
         self.assertIn("StrictHostKeyChecking=yes", commands.args)
         self.assertIn("IdentityAgent=none", commands.args)
         self.assertEqual(commands.args[-1], "infra-backup-status@172.232.145.251")
-        with patch.object(commands, "run", return_value=(0, b"wrong acknowledgement")):
-            with self.assertRaises(ValueError):
-                recurring.deliver_status(
-                    commands, receipt, self.manifest, key, hosts, "172.232.145.251"
-                )
+        with (
+            patch.object(commands, "run", return_value=(0, b"wrong acknowledgement")),
+            self.assertRaises(ValueError),
+        ):
+            recurring.deliver_status(
+                commands, receipt, self.manifest, key, hosts, "172.232.145.251"
+            )
 
     def test_failed_upload_sends_no_status_and_delivery_failure_retains_snapshot_receipt(
         self,

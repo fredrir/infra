@@ -32,6 +32,7 @@ from evacuation_target import checkpoint_proof, private_acceptance, verify_unit_
 
 TUNNEL = "c0cdd9b5-fa97-42a1-bca7-95da236ea949"
 ORIGINS = {"fredrir-05": "46.62.214.182", "fredrir-09": "85.190.100.72"}
+IPV6_ORIGINS = {"fredrir-09": "2001:880:0:22::21a"}
 TIMERS = [
     ("root", "gitops-pull.timer"),
     ("root", "restic-backups-llunde-backend.timer"),
@@ -43,12 +44,13 @@ TIMERS = [
 
 def provider_authority(receipt, host, now=None):
     now = time.time() if now is None else now
+    origin = receipt["expectedOriginIP"]
     require(
         receipt["schemaVersion"] == 1
         and receipt["kind"] == "evacuation-cloudflare-origin-observation"
         and receipt["tunnelId"] == TUNNEL
         and receipt["expectedHost"] == host
-        and receipt["expectedOriginIP"] == ORIGINS[host]
+        and origin in (ORIGINS[host], IPV6_ORIGINS.get(host, ORIGINS[host]))
         and receipt["providerInventoryMatches"] is True,
         "Exact provider origin receipt required",
     )
@@ -76,9 +78,7 @@ def provider_authority(receipt, host, now=None):
         require(
             connector["id"] == receipt["expectedConnectorId"]
             and 0 < len(connector["connections"]) <= 16
-            and all(
-                value["originIP"] == ORIGINS[host] for value in connector["connections"]
-            ),
+            and all(value["originIP"] == origin for value in connector["connections"]),
             "Provider connector origin differs",
         )
     require(
@@ -88,7 +88,7 @@ def provider_authority(receipt, host, now=None):
     return {
         "host": host,
         "connectorId": receipt["expectedConnectorId"],
-        "originIP": ORIGINS[host],
+        "originIP": origin,
         "lastObservedAt": times[-1],
         "samples": 3,
     }

@@ -195,6 +195,10 @@
               "type": "string",
               "format": "ipv4"
             },
+            "publicIPv6": {
+              "type": "string",
+              "format": "ipv6"
+            },
             "observedAt": {
               "type": "string",
               "format": "date"

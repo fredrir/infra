@@ -370,6 +370,28 @@
       ];
     };
 
+    nixosConfigurations.fredrir-05 = self.lib.mkPlatformHost {
+      system = "x86_64-linux";
+      hardwareModule = {
+        imports = [disko.nixosModules.disko ./hosts/fredrir-05/hardware.nix];
+      };
+      nodeModule = ./hosts/fredrir-05;
+    };
+
+    checks.aarch64-darwin.fredrir-05 = import ./tests/fredrir-05.nix {
+      inherit nixpkgs;
+      system = "aarch64-darwin";
+      host = self.nixosConfigurations.fredrir-05;
+      legacyHost = self.nixosConfigurations.llunde-01;
+    };
+
+    checks.x86_64-linux.fredrir-05 = import ./tests/fredrir-05.nix {
+      inherit nixpkgs;
+      system = "x86_64-linux";
+      host = self.nixosConfigurations.fredrir-05;
+      legacyHost = self.nixosConfigurations.llunde-01;
+    };
+
     nixosConfigurations.llunde-parser = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [

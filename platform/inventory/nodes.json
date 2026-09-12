@@ -238,6 +238,7 @@
       "observed": {
         "sshAlias": "fredrir-09",
         "publicIPv4": "85.190.100.72",
+        "publicIPv6": "2001:880:0:22::21a",
         "observedAt": "2026-09-12",
         "os": "Ubuntu 26.04 LTS",
         "kernel": "7.0.0-30-generic",

@@ -6,6 +6,7 @@ import json
 import os
 import stat
 import subprocess
+import sys
 import tarfile
 import tempfile
 import types
@@ -14,6 +15,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/operations"))
 SPEC = importlib.util.spec_from_file_location(
     "evacuation_images", ROOT / "scripts/operations/evacuation_images.py"
 )
@@ -508,6 +510,50 @@ class ImageArchiveTests(unittest.TestCase):
         with self.assertRaises(OSError):
             images.translate_candidates(self.root, destination)
         self.assertFalse(destination.exists())
+
+    def test_normal_translation_upgrades_legacy_networks_before_plan_validation(self):
+        staging = self.translation_fixture()
+        metadata = self.root / "staging.json"
+        plan = json.loads(metadata.read_text())
+        backend = self.root / "units/llunde-backend/llunde-backend.container"
+        backend.write_text(
+            backend.read_text().replace(
+                "Network=" + staging.EGRESS_NETWORK, "Network=podman"
+            )
+        )
+        egress = "units/llunde-backend/" + staging.EGRESS_NETWORK
+        (self.root / egress).unlink()
+        del plan["unitSHA256"][egress]
+        plan["unitSHA256"][str(backend.relative_to(self.root))] = hashlib.sha256(
+            backend.read_bytes()
+        ).hexdigest()
+        metadata.write_text(json.dumps(plan))
+        before = {
+            p: p.read_bytes()
+            for p in [metadata, *self.root.glob("units/**/*")]
+            if p.is_file()
+        }
+        destination = self.root / "translated"
+        images.translate_candidates(self.root, destination)
+        compiled = staging.validate_plan(destination)
+        self.assertEqual(len(compiled["unitSHA256"]), 9)
+        self.assertEqual(before, {p: p.read_bytes() for p in before})
+        self.assertEqual(
+            staging.unit_fields(
+                (destination / backend.relative_to(self.root)).read_text(), "Container"
+            )["Network"],
+            [staging.DATA_NETWORK, staging.EGRESS_NETWORK],
+        )
+        for service in ("llunde-postgres", "llunde-valkey"):
+            self.assertEqual(
+                staging.unit_fields(
+                    (
+                        destination / f"units/llunde-backend/{service}.container"
+                    ).read_text(),
+                    "Container",
+                )["Network"],
+                [staging.DATA_NETWORK],
+            )
 
 
 if __name__ == "__main__":

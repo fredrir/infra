@@ -109,6 +109,7 @@ class NativeRestore:
         self.cleanup_commands = None
         self.prepared = False
         self.names = []
+        self.identities = {}
         self.environment = [
             "env",
             "HOME=" + str(home),
@@ -198,12 +199,21 @@ class NativeRestore:
             and re.fullmatch("[a-f0-9]{64}", document["Id"]),
             "Exact owned recovery container required",
         )
+        wanted = self.identities[name]
+        require(
+            document["Image"].removeprefix("sha256:")
+            == wanted["image"].removeprefix("sha256:")
+            and wanted["id"] in (None, document["Id"]),
+            "Recovery container identity changed",
+        )
+        wanted["id"] = document["Id"]
         return document
 
     def start(self, service, memory, extra, command):
         name = self.workspace.name.replace(".", "-") + "-" + service
         image = self.manifest["imageIDs"][service]
         self.names.append(name)
+        self.identities[name] = {"id": None, "image": image}
         args = [
             "run",
             "--detach",
@@ -226,7 +236,13 @@ class NativeRestore:
             image,
             *command,
         ]
-        self.call(args)
+        _, raw = self.call(args)
+        identifier = raw.decode().strip()
+        require(
+            re.fullmatch("[a-f0-9]{64}", identifier),
+            "Created recovery container ID differs",
+        )
+        self.identities[name]["id"] = identifier
         before = self.inspect(name)
         require(
             before["HostConfig"].get("ReadonlyRootfs") is True,
@@ -274,7 +290,7 @@ class NativeRestore:
             "llunde-postgres",
             768,
             [
-                "--tmpfs=/var/run/postgresql:rw,nosuid,nodev,noexec,size=4m,mode=1777",
+                "--tmpfs=/run/postgresql:rw,nosuid,nodev,noexec,size=4m,mode=1777",
                 "--env=POSTGRES_USER=llunde",
                 "--env=POSTGRES_DB=llunde",
                 "--env=POSTGRES_PASSWORD=" + PASSWORD,
@@ -327,9 +343,37 @@ class NativeRestore:
             and value["serverVersion"].startswith("17."),
             "Restored approved PostgreSQL schema differs",
         )
+        shutdown_status, _ = self.call(
+            [
+                "exec",
+                name,
+                "pg_ctl",
+                "--pgdata=/var/lib/postgresql/data/pgdata",
+                "--mode=fast",
+                "--wait",
+                "--timeout=30",
+                "stop",
+            ],
+            check=False,
+            timeout=35,
+        )
+        _, exited = self.call(["wait", name], timeout=35)
+        final = self.inspect(name)
+        require(
+            exited.strip() == b"0"
+            and final["State"]["Running"] is False
+            and final["State"]["ExitCode"] == 0
+            and final["State"].get("OOMKilled") is False,
+            "Restored PostgreSQL did not exit successfully",
+        )
         self.remove(name)
         self.result["postgres"] = dict(
-            value, kernelProof=kernel, nativeRestoreVerified=True
+            value,
+            kernelProof=kernel,
+            nativeRestoreVerified=True,
+            shutdownClientStatus=shutdown_status,
+            serverExitCode=0,
+            serverOOMKilled=False,
         )
 
     def valkey(self):
@@ -385,13 +429,33 @@ class NativeRestore:
 
     def remove(self, name, cleanup=False):
         require(name in self.names, "Owned container required for cleanup")
-        self.call(
-            ["rm", "--force", "--ignore", "--volumes", name],
-            cleanup=cleanup,
-            timeout=15,
-        )
         code, _ = self.call(["container", "exists", name], cleanup=cleanup, check=False)
-        require(code == 1, "Recovery container remains")
+        require(code in (0, 1), "Recovery container lookup failed")
+        if code == 0:
+            _, raw = self.call(["inspect", name], cleanup=cleanup)
+            document = json.loads(raw)[0]
+            wanted = self.identities[name]
+            require(
+                document["Name"].lstrip("/") == name
+                and re.fullmatch("[a-f0-9]{64}", document["Id"])
+                and wanted["id"] in (None, document["Id"])
+                and document["Image"].removeprefix("sha256:")
+                == wanted["image"].removeprefix("sha256:"),
+                "Owned cleanup identity differs",
+            )
+            wanted["id"] = document["Id"]
+            status, _ = self.call(
+                ["rm", "--force", "--ignore", "--volumes", wanted["id"]],
+                cleanup=cleanup,
+                timeout=15,
+                check=False,
+            )
+            self.result.setdefault("removalClientStatus", {})[name] = status
+        for reference in {name, self.identities[name]["id"]} - {None}:
+            code, _ = self.call(
+                ["container", "exists", reference], cleanup=cleanup, check=False
+            )
+            require(code == 1, "Recovery container remains")
         self.names.remove(name)
 
     def cleanup(self):
@@ -399,7 +463,7 @@ class NativeRestore:
         for name in list(self.names):
             try:
                 self.remove(name, cleanup=True)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 failures.append(name)
         self.result["cleanupFailures"] = failures
         self.result["containersRemoved"] = not failures
@@ -426,7 +490,7 @@ class NativeRestore:
                     if code == 0:
                         self.call(["rmi", "--force", image], cleanup=True, timeout=20)
                 self.result["imagesRemoved"] = True
-            except Exception:
+            except Exception:  # noqa: BLE001
                 failures.append("private-data-or-image-cleanup")
         return not failures
 
@@ -447,10 +511,16 @@ def main():
         pilot.postgres()
         pilot.valkey()
         pilot.result["nativeRestoreVerified"] = True
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001
         pilot.result["errorType"] = type(error).__name__
     finally:
-        clean = pilot.cleanup()
+        try:
+            clean = pilot.cleanup()
+        except BaseException as error:  # noqa: BLE001
+            clean = False
+            pilot.result["cleanupErrorType"] = type(error).__name__
+            pilot.result["privateWorkspaceRetained"] = True
+        pilot.result["cleanupVerified"] = clean
         if pilot.prepared:
             backup.write_private(
                 pilot.workspace / "result.json",

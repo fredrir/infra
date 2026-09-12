@@ -380,6 +380,33 @@ def directory_state(path):
     return value
 
 
+def data_parent_observation():
+    observations, ready = {}, True
+    for path, owner in (
+        ("/", 0),
+        ("/home", 0),
+        ("/home/llunde-backend", 2001),
+        ("/home/llunde-backend/data", 2001),
+    ):
+        info = metadata(path, resolve_path=False)
+        observations[path] = info
+        ready = (
+            info["exists"]
+            and info["kind"] == "directory"
+            and info["uid"] == info["gid"] == owner
+            and not int(info["mode"], 8) & 0o022
+        )
+        if path.endswith("/data"):
+            ready = ready and info.get("mode") == "0700"
+        if not ready:
+            break
+    return {
+        "path": "/home/llunde-backend/data",
+        "readyForPromotion": bool(ready),
+        "ancestors": observations,
+    }
+
+
 def writable_parent(path):
     candidate = Path(path)
     existing = candidate
@@ -688,6 +715,7 @@ def collect_host(host, expected):
     STAGE = "lock-metadata"
     result["gitopsLock"] = lock_observation("/var/lib/gitops-pull/lock")
     STAGE = "data-metadata"
+    result["dataParent"] = data_parent_observation()
     result["data"] = {
         name: directory_state("/home/llunde-backend/data/" + name)
         for name in ["postgres", "valkey"]

@@ -288,18 +288,41 @@ Catalog changes require `python scripts/ci/policy.py write-guards`; `check` reje
 
 | Live status, 2026-09-12 | Evidence scope |
 | --- | --- |
-| fredrir-09 preparation | Podman5.7.0; locked rootless users;4GiB aggregate user-slice memory limit; inert candidate units |
+| fredrir-09 preparation | Podman5.7.0; locked rootless users;4GiB aggregate user-slice memory limit; corrected units installed and serving |
 | Images | Six exact source images preloaded; runtime configIDs and `Pull=never`; no registry credential required |
 | Secrets | Three scoped05 runtime secrets relayed over verified SSH into an age-encrypted bundle; regeneration after09 reboot passed |
-| Start guards | Installed on05 and09; eight native manager probes passed; source applications remain healthy; real fence markers absent |
-| Application units | Eight candidate files installed on09; all six services inactive; loaded fence and activation conditions verified |
+| Start guards | Installed on05 and09; eight native manager probes verify manual starts; systemd automatic restarts bypass these conditions and require separate inhibition |
+| Restart inhibition | Native09 probe and fenced05 export passed; owned `Restart=no` prevents Valkey restart; source recovery restores the original policy |
+| Application units | Nine corrected candidate files installed on09; target application and connector started after fresh paired restore; all three user managers have linger enabled |
 | Data rehearsal | PostgreSQL17.10 logical restore and Valkey8.1.9 RDB restore; synthetic stopped AOF preserves bytes, ownership and TTL |
 | Native Valkey shutdown | Disposable09 probe passes zero kernel capabilities, no-new-privileges, bounded private tmpfs, native server exit0 and event verification; container removed and application states unchanged |
 | Frontend routing | Direct frontend and cross-user Caddy responses match; only loopback8081/8085/9101; diagnostic containers removed and ports released |
-| Off-host backup | Bounded09→S3 rehearsal snapshot and independent Mac restore passed; all four file hashes match; native recovery from downloaded bytes remains a separate gate |
-| Recurring backup preparation | Inactive09 service and disabled timer installed; restricted06 status receiver passes command, SFTP, PTY, forwarding and invalid-payload rejection checks; no production backup or success heartbeat sent |
-| Remaining | Native final-export verification, persistent source fence, final paired state transfer, application and boot validation, ongoing target backup/freshness and measured cutover budget |
-| Production boundary | Source applications continue on05; no production backend/cloudflared on09; no K3s activation |
+| Final paired export | Fenced05 PostgreSQL dump and stopped Valkey archive sealed and transferred to09; source and destination hashes match |
+| Off-host backup | Fresh forward and reverse pairs backed up to S3 and independently restored on Mac; archive, files, source manifest and candidate bindings match |
+| Recurring backups | Hourly09 timer enabled; native timer-triggered backup completed and restricted06 receiver matched its snapshot; the next hourly elapse is recorded |
+| Native paired restore | Fresh forward pair restored and promoted on09; fresh reverse pair restored and promoted on05; PostgreSQL schema and Valkey AOF, ownership and byte-preservation checks pass; temporary containers removed |
+| Shutdown verification | PostgreSQL server exit0 accepted despite shutdown client137; actual server failure and OOM remain rejected;26 focused tests pass |
+| Source recovery | Fresh reverse data restored on05; private/public acceptance and sole05 connector verified; user confirmed existing-account sign-in and account content; four source timers restored; conservative full recovery641.4s (10m41.4s); scheduled external monitor passed at07:44:13 UTC |
+| Scheduled updates | Automatic APT upgrade overlapped an earlier cutover attempt; exact requester of09 user-manager stops remains unconfirmed |
+| Update window | Native09 rehearsal passed; actual cutover paused both APT timers and restored their original active/enabled states after recovery |
+| Backend compatibility | Both data and outbound networks were attached, but only the internal data network had DNS enabled; api.doppler.com returned NXDOMAIN and startup failed |
+| Candidate correction | Nine-file candidate adds backend-only DNS-enabled egress; datastore isolation, images, ports and limits preserved; installed without application starts |
+| Native network verification | Original NXDOMAIN reproduced; corrected DNS and verified HTTPS401 passed; internal-only external DNS and routing denied; disposable objects independently confirmed removed |
+| Native backend rehearsal | Isolated09 PostgreSQL and Valkey fixtures pass migrations, registration, sign-in, authenticated identity, logout invalidation and access rejection; actual cookie attributes verified; cleanup independently confirmed; APT timers restored |
+| Rehearsal boundary | Synthetic data and local auth checks; no production-data compatibility, Doppler retrieval, browser transport or target existing-account acceptance |
+| Target reset | Native prepare/finalize passed;36 completed archival/staging events; original database directory identities preserved; old configuration and fences archived; APT timers restored after confirmed completion |
+| Cutover preparation | Frozen corrected bundle delivered to05/09; native preflight verifies source services active, target units dormant, exact images, loaded guards and absent approval/fence markers |
+| Target activation | Fresh paired export restored/promoted on09; off-host backup independently recovered on Mac with exact hashes; private and public routes pass; user confirmed existing-account sign-in and account content on09 |
+| Origin verification | Sole post-reboot connector uses09 public IPv4 `85.190.100.72`; three fresh provider observations match its native identity; pre-reboot IPv6 evidence and rejected address expectations remain separate |
+| Startup persistence | One controlled reboot completed; all six services restarted with exact images; three secrets regenerated before their user managers started; private and public routes passed independent review |
+| Installed-service backup | Native09 job completed successfully; fresh PostgreSQL and Valkey recovery points follow user acceptance; exact snapshot independently downloaded on Mac with matching archive and file hashes; restricted06 receiver matches the snapshot |
+| Native online recovery | Archie restored PostgreSQL17.10 and Valkey8.1.9 from the independently downloaded snapshot; two sessions invalidated in the isolated copy; zero remaining session keys; empty private container/image store, removed data and ended processes independently verified |
+| Pre-reboot recovery point | Fresh installed-service snapshot completed and independently downloaded on Mac; exact archive, three files, candidate/images and06 receiver match; native recovery evidence identifies its earlier snapshot separately |
+| Backup observation | Immediate process check failed after dispatch; native journal independently confirms the single invocation completed successfully; no duplicate start |
+| Preparation checks | Owned private data parent created only when absent and required before cutover; unsafe network overrides rejected;224 evacuation tests pass |
+| Post-reboot recovery | Installed service and restricted06 receiver match the new-boot snapshot; Mac verified all three files; Archie restored both datastores with independently verified cleanup; user confirmed existing-account sign-in and content after reboot |
+| Backup freshness | Independent06 watchdog checks the09 recovery point against a two-hour maximum age; scheduled health check passed with no failures |
+| Production boundary | Target09 serves public routes with verified startup, hourly backups and independent monitoring; source05 remains fenced with its original data preserved; both APT timers restored; no K3s activation |
 
 Private receipts remain under `.infra/evacuation-05/`. Bounded rehearsal timings do not measure production downtime.
 
@@ -310,6 +333,7 @@ Private receipts remain under `.infra/evacuation-05/`. Bounded rehearsal timings
 | Inspect provisioned machines | SSH alias, host key, OS, architecture, disks, routes, kernel features and recovery access |
 | Inventory | Verified node ID, adapter, enrollment addresses and administrative public keys |
 | Host configuration | Nix `mkPlatformHost` or Ansible inventory; private token files available at every boot |
+| fredrir-05 candidate | [Host configuration](../hosts/fredrir-05/default.nix) preserves configured storage, identity and administrator access; local contract passes; Linux closure build and host activation remain pending; K3s is disabled |
 | API transport | Three reachable endpoints; cold bootstrap and endpoint loss tests |
 | Quorum | Existing CPX22 evacuated before becoming the third server; one-server failure test |
 | Worker eligibility | Explicit protected labels after production, stateful and sandbox tests |

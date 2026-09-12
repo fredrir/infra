@@ -506,7 +506,7 @@ class Restore:
             == self.manifest["fenceAfter"]["postgresSchema"],
             "Restored schema differs from final source observation",
         )
-        self.call(
+        self.record["postgresShutdownClientStatus"], _ = self.call(
             [
                 "podman",
                 "exec",
@@ -519,6 +519,7 @@ class Restore:
                 "stop",
             ],
             timeout=35,
+            check=False,
         )
         self.wait_exit(name)
 
@@ -874,7 +875,13 @@ def promote_units(candidate, guard_receipt, output, commands=None):
 
 def checkpoint_proof(manager=None):
     from evacuation_guards import Manager
+    from evacuation_preflight import data_parent_observation
 
+    parent = data_parent_observation()
+    require(
+        parent["readyForPromotion"],
+        "Owned private data parent is required before cutover",
+    )
     manager = manager or Manager()
     proof = {}
     for service, user in SERVICE_USERS.items():
@@ -900,6 +907,7 @@ def allowed_unit_paths():
         for service, user in SERVICE_USERS.items()
     } | {
         "/etc/containers/systemd/users/2001/llunde-backend-data.network",
+        "/etc/containers/systemd/users/2001/llunde-backend-egress.network",
         "/etc/infra-evacuation/llunde/Caddyfile",
     }
 

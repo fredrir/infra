@@ -150,6 +150,13 @@
     shell: /usr/sbin/nologin
   loop: "{{ evacuation_plan.users | dict2items }}"
 
+- name: Prepare owned data parent without altering existing contents
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, -B, /usr/local/libexec/infra-evacuation-staging, prepare-data-parent]
+  register: evacuation_data_parent
+  changed_when: (evacuation_data_parent.stdout | from_json).created
+  when: not ansible_check_mode
+
 - name: Copy inert candidate units outside Quadlet search paths
   ansible.builtin.copy:
     src: "{{ evacuation_artifact_directory }}/units/"

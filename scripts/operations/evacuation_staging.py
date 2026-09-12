@@ -1,4 +1,5 @@
 import argparse
+import copy
 import grp
 import hashlib
 import json
@@ -40,6 +41,9 @@ SECRETS = {
     ),
     "tunnel": ("edge", "tunnel.env", {"TUNNEL_TOKEN"}, "llunde-tunnel.yaml", "env"),
 }
+DATA_NETWORK = "llunde-backend-data.network"
+EGRESS_NETWORK = "llunde-backend-egress.network"
+EGRESS_CONTENT = "[Network]\nDriver=bridge\nInternal=false\nDisableDNS=false\n"
 
 
 def require(condition, message):
@@ -66,7 +70,83 @@ def read_private(path, owner=0):
         os.close(fd)
 
 
-def validate_plan(directory):
+def candidate_files(*, legacy_networks=False):
+    return (
+        {f"units/{user}/{name}.container" for name, user in SERVICE_USERS.items()}
+        | {"units/Caddyfile", f"units/llunde-backend/{DATA_NETWORK}"}
+        | (set() if legacy_networks else {f"units/llunde-backend/{EGRESS_NETWORK}"})
+    )
+
+
+def unit_fields(text, section):
+    current, fields = None, {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        require(not line.endswith("\\"), "Continued network settings forbidden")
+        if line.startswith("["):
+            current = line[1:-1] if line.endswith("]") else None
+        elif current == section or section is None:
+            key, separator, value = line.partition("=")
+            require(separator, "Invalid unit setting")
+            fields.setdefault(key.strip(), []).append(value.strip())
+    return fields
+
+
+def validate_networks(root, *, legacy_networks=False):
+    root = Path(root)
+    for name, internal in ((DATA_NETWORK, "true"), (EGRESS_NETWORK, "false")):
+        if legacy_networks and name == EGRESS_NETWORK:
+            continue
+        text = (root / "units/llunde-backend" / name).read_text()
+        require(
+            not {"PodmanArgs", "GlobalArgs"} & set(unit_fields(text, None)),
+            "Unvalidated bridge overrides forbidden",
+        )
+        fields = unit_fields(text, "Network")
+        require(
+            set(fields) <= {"Driver", "Internal", "DisableDNS"}
+            and fields.get("Driver", ["bridge"]) == ["bridge"]
+            and fields.get("Internal") == [internal]
+            and fields.get("DisableDNS", ["false"]) == ["false"],
+            "Bridge isolation and enabled DNS are required",
+        )
+        if name == EGRESS_NETWORK:
+            require(
+                fields.get("DisableDNS") == ["false"], "Explicit egress DNS required"
+            )
+    for service, user in SERVICE_USERS.items():
+        text = (root / f"units/{user}/{service}.container").read_text()
+        require(
+            not {"PodmanArgs", "GlobalArgs", "Pod"} & set(unit_fields(text, None)),
+            "Unvalidated container network overrides forbidden",
+        )
+        fields = unit_fields(text, "Container")
+        networks = fields.get("Network", [])
+        if service == "llunde-backend":
+            expected = [DATA_NETWORK, "podman" if legacy_networks else EGRESS_NETWORK]
+            require(
+                networks == expected,
+                "Backend requires internal data and DNS-enabled egress networks",
+            )
+            require(
+                not {"DNS", "DNSOption", "DNSSearch"} & set(fields),
+                "Backend must use its registered network resolver",
+            )
+        elif service in ("llunde-postgres", "llunde-valkey"):
+            require(
+                networks == [DATA_NETWORK],
+                "Datastores must remain on the internal network only",
+            )
+        else:
+            require(
+                not {DATA_NETWORK, EGRESS_NETWORK, "podman"} & set(networks),
+                "Backend networks cannot be shared with other services",
+            )
+
+
+def validate_plan(directory, *, legacy_networks=False):
     root = Path(directory).resolve()
     plan = json.loads((root / "staging.json").read_text())
     require(
@@ -159,9 +239,7 @@ def validate_plan(directory):
             is not None,
             "Pinned source image required",
         )
-    expected_files = {
-        f"units/{user}/{name}.container" for name, user in SERVICE_USERS.items()
-    } | {"units/Caddyfile", "units/llunde-backend/llunde-backend-data.network"}
+    expected_files = candidate_files(legacy_networks=legacy_networks)
     actual_files = {
         str(path.relative_to(root))
         for path in (root / "units").rglob("*")
@@ -213,6 +291,7 @@ def validate_plan(directory):
                 "Automatic updates forbidden during relocation",
             )
     backend = (root / "units/llunde-backend/llunde-backend.container").read_text()
+    validate_networks(root, legacy_networks=legacy_networks)
     require(
         "ConditionPathExists=/var/lib/infra-evacuation/llunde/source-fenced" in backend,
         "Source fence checkpoint missing",
@@ -223,6 +302,92 @@ def validate_plan(directory):
         "Unexpected user memory budget",
     )
     return plan
+
+
+def upgrade_network_contents(contents):
+    require(
+        set(contents) == candidate_files(legacy_networks=True),
+        "Exact legacy candidate inventory required",
+    )
+    contents = dict(contents)
+    backend = "units/llunde-backend/llunde-backend.container"
+    require(
+        contents[backend].count(b"\nNetwork=podman\n") == 1,
+        "Exact legacy outbound binding required",
+    )
+    contents[backend] = contents[backend].replace(
+        b"\nNetwork=podman\n", f"\nNetwork={EGRESS_NETWORK}\n".encode()
+    )
+    contents[f"units/llunde-backend/{EGRESS_NETWORK}"] = EGRESS_CONTENT.encode()
+    return contents
+
+
+def prepare_networks(directory, destination, source_sha256):
+    root, destination = Path(directory).absolute(), Path(destination).absolute()
+    require(
+        re.fullmatch(r"[a-f0-9]{64}", source_sha256), "Pinned source candidate required"
+    )
+    source = read_private(root / "staging.json", os.geteuid())
+    require(
+        hashlib.sha256(source).hexdigest() == source_sha256, "Source candidate changed"
+    )
+    plan = validate_plan(root, legacy_networks=True)
+    require(json.loads(source) == plan, "Source metadata changed during validation")
+    contents = {
+        name: read_private(root / name, os.geteuid())
+        for name in candidate_files(legacy_networks=True)
+    }
+    require(
+        all(
+            hashlib.sha256(data).hexdigest() == plan["unitSHA256"][name]
+            for name, data in contents.items()
+        ),
+        "Candidate bytes changed",
+    )
+    contents = upgrade_network_contents(contents)
+    updated = copy.deepcopy(plan)
+    updated["sourceNetworkCandidateSHA256"] = source_sha256
+    updated["unitSHA256"] = {
+        name: hashlib.sha256(data).hexdigest()
+        for name, data in sorted(contents.items())
+    }
+    require(not os.path.lexists(destination), "Fresh network candidate required")
+    parent = destination.parent.lstat()
+    require(
+        stat.S_ISDIR(parent.st_mode)
+        and parent.st_uid == os.geteuid()
+        and stat.S_IMODE(parent.st_mode) == 0o700,
+        "Private candidate output parent required",
+    )
+    with tempfile.TemporaryDirectory(dir=destination.parent) as temporary:
+        candidate = Path(temporary)
+        for name, data in contents.items():
+            output = candidate / name
+            output.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            with os.fdopen(
+                os.open(
+                    output, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
+                ),
+                "wb",
+            ) as stream:
+                stream.write(data)
+        with os.fdopen(
+            os.open(
+                candidate / "staging.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+            ),
+            "w",
+        ) as stream:
+            json.dump(updated, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+        validate_plan(candidate)
+        require(not os.path.lexists(destination), "Candidate destination appeared")
+        os.rename(candidate, destination)
+    return {
+        "sourceCandidateSHA256": source_sha256,
+        "unitCount": len(contents),
+        "applicationStarted": False,
+        "candidate": str(destination),
+    }
 
 
 def validate_accounts(plan, passwd_text, group_text, subuid_text, subgid_text):
@@ -293,6 +458,74 @@ def owned_directory(path, owner, mode):
     finally:
         os.close(fd)
     return path
+
+
+def prepare_data_child(parent_fd, owner, group):
+    created = False
+    try:
+        os.mkdir("data", mode=0o700, dir_fd=parent_fd)
+        created = True
+    except FileExistsError:
+        pass
+    fd = os.open("data", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
+    try:
+        info = os.fstat(fd)
+        if created:
+            require(
+                info.st_uid == os.geteuid()
+                and info.st_gid == os.getegid()
+                and not os.listdir(fd),
+                "New data parent ownership or contents changed",
+            )
+            os.fchmod(fd, 0o700)
+            os.fchown(fd, owner, group)
+            os.fsync(fd)
+            os.fsync(parent_fd)
+        info = os.fstat(fd)
+        require(
+            info.st_uid == owner
+            and info.st_gid == group
+            and stat.S_IMODE(info.st_mode) == 0o700,
+            "Existing data parent ownership or mode mismatch",
+        )
+        current = os.stat("data", dir_fd=parent_fd, follow_symlinks=False)
+        require(
+            (current.st_dev, current.st_ino) == (info.st_dev, info.st_ino),
+            "Data parent was replaced",
+        )
+        return {
+            "created": created,
+            "uid": info.st_uid,
+            "gid": info.st_gid,
+            "mode": "0700",
+            "device": info.st_dev,
+            "inode": info.st_ino,
+        }
+    finally:
+        os.close(fd)
+
+
+def prepare_data_parent():
+    require(os.geteuid() == 0, "Root data preparation required")
+    fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for name, owner in ((None, 0), ("home", 0), ("llunde-backend", 2001)):
+            if name is not None:
+                child = os.open(
+                    name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd
+                )
+                os.close(fd)
+                fd = child
+            info = os.fstat(fd)
+            require(
+                info.st_uid == owner
+                and info.st_gid == owner
+                and not stat.S_IMODE(info.st_mode) & 0o022,
+                "Data parent ancestry is untrusted",
+            )
+        return prepare_data_child(fd, 2001, 2001)
+    finally:
+        os.close(fd)
 
 
 def write_private(path, content, owner):
@@ -476,6 +709,11 @@ def main(argv=None):
     commands.add_parser("check-plan").add_argument("directory")
     commands.add_parser("check-accounts").add_argument("plan")
     commands.add_parser("host-key").add_argument("path")
+    commands.add_parser("prepare-data-parent")
+    network = commands.add_parser("prepare-networks")
+    network.add_argument("directory")
+    network.add_argument("destination")
+    network.add_argument("--source-sha256", required=True)
     prepare = commands.add_parser("prepare-secrets")
     prepare.add_argument("repository")
     prepare.add_argument("recipient")
@@ -500,6 +738,12 @@ def main(argv=None):
             result = {"accountMappings": "compatible"}
         elif args.command == "host-key":
             result = host_key(args.path)
+        elif args.command == "prepare-data-parent":
+            result = prepare_data_parent()
+        elif args.command == "prepare-networks":
+            result = prepare_networks(
+                args.directory, args.destination, args.source_sha256
+            )
         elif args.command == "prepare-secrets":
             result = prepare_secrets(args.repository, args.recipient, args.destination)
         else:

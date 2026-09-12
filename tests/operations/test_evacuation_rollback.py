@@ -1,4 +1,5 @@
 import hashlib
+import json
 import sys
 import tempfile
 import time
@@ -191,6 +192,72 @@ class RollbackTests(unittest.TestCase):
             any(event == ("marker", "reconciliation-locked") for event in events)
         )
 
+    def test_restart_policy_recovery_failure_keeps_source_marker_and_stops_resume(self):
+        self.execution["restartInhibitorsRequired"] = True
+        with (
+            self.context(),
+            patch.object(
+                rollback.restart, "restore_all", side_effect=ValueError("policy drift")
+            ),
+            patch.object(rollback, "remove_owned_marker") as remove,
+        ):
+            with self.assertRaisesRegex(ValueError, "policy drift"):
+                rollback.resume_source_writer(
+                    {},
+                    self.execution,
+                    self.destination(),
+                    self.root / "receipt.json",
+                    commands=self.commands,
+                )
+        remove.assert_not_called()
+        self.commands.user.assert_not_called()
+
+    def test_restart_policy_is_restored_before_source_marker_release(self):
+        self.execution["restartInhibitorsRequired"] = True
+        sequence = []
+        with (
+            self.context(),
+            patch.object(
+                rollback.restart,
+                "restore_all",
+                side_effect=lambda *args: sequence.append("policy") or [],
+            ),
+            patch.object(
+                rollback,
+                "remove_owned_marker",
+                side_effect=lambda *args: sequence.append("marker"),
+            ),
+            patch.object(rollback, "private_acceptance", return_value={}),
+        ):
+            rollback.resume_source_writer(
+                {},
+                self.execution,
+                self.destination(),
+                self.root / "receipt.json",
+                commands=self.commands,
+            )
+        self.assertEqual(sequence, ["policy", "marker"])
+
+    def test_postgres_shutdown_cannot_run_when_restart_inhibition_fails(self):
+        with (
+            self.context(),
+            patch.object(rollback, "live_fence"),
+            patch.object(rollback, "postgres_clients", return_value=0),
+            patch.object(rollback, "wait_stopped"),
+            patch.object(
+                rollback.restart,
+                "install",
+                side_effect=ValueError("inhibitor incomplete"),
+            ),
+        ):
+            with self.assertRaisesRegex(ValueError, "inhibitor incomplete"):
+                rollback.settle_source(
+                    {}, self.execution, self.root / "receipt.json", self.commands
+                )
+        self.assertFalse(
+            any("pg_ctl" in call.args[1] for call in self.commands.user.call_args_list)
+        )
+
     def test_original_resume_refuses_replaced_data_inode(self):
         original = self.root / "postgres"
         original.rename(self.root / "old-postgres")
@@ -252,12 +319,56 @@ class RollbackTests(unittest.TestCase):
         )
         self.assertEqual(result["recovery"]["kind"], "fresh-reverse-copy")
 
+    def test_both_postgres_settle_paths_refuse_native_server_failure_after_client_exit(
+        self,
+    ):
+        for function, host, direction in [
+            (rollback.settle_source, "fredrir-05", "forward"),
+            (rollback.settle_destination, "fredrir-09", "reverse"),
+        ]:
+            with self.subTest(host=host):
+                record = self.execution | {"host": host, "direction": direction}
+                output = self.root / (host + ".json")
+                with (
+                    self.context(),
+                    patch.object(rollback, "live_fence"),
+                    patch.object(rollback, "postgres_clients", return_value=0),
+                    patch.object(rollback, "wait_stopped"),
+                    patch.object(
+                        rollback.restart,
+                        "install",
+                        return_value={"container": {"id": "a" * 64}},
+                    ),
+                    patch.object(rollback.restart, "verify"),
+                    patch.object(
+                        rollback,
+                        "graceful_exit_event",
+                        side_effect=ValueError("server exit was not zero"),
+                    ),
+                ):
+                    with self.assertRaisesRegex(ValueError, "server exit was not zero"):
+                        function({}, record, output, self.commands)
+                self.assertFalse(json.loads(output.read_text())["completed"])
+                call = next(
+                    call
+                    for call in reversed(self.commands.user.call_args_list)
+                    if "pg_ctl" in call.args[1]
+                )
+                self.assertFalse(call.kwargs["check"])
+
     def test_source_settle_stops_only_static_apps_then_native_postgres(self):
         with (
             self.context(),
             patch.object(rollback, "live_fence") as fence,
             patch.object(rollback, "postgres_clients", return_value=0),
             patch.object(rollback, "wait_stopped"),
+            patch.object(
+                rollback.restart,
+                "install",
+                return_value={"container": {"id": "a" * 64}},
+            ),
+            patch.object(rollback.restart, "verify"),
+            patch.object(rollback, "graceful_exit_event", return_value={"exitCode": 0}),
         ):
             result = rollback.settle_source(
                 {}, self.execution, self.root / "settle.json", self.commands

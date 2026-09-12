@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import evacuation_cutover as cutover
+import evacuation_restart as restart
 from evacuation_images import open_private, private_directory, read_json
 from evacuation_preflight import PATH, USERS, as_user
 from evacuation_staging import validate_plan
@@ -475,7 +476,11 @@ def persistence_state(commands):
     return {"aofLastWriteStatus": "ok", "rewriteInactive": True}
 
 
-def graceful_exit_event(commands, container_id, started_at):
+def graceful_exit_event(commands, container_id, started_at, *, container_name=None):
+    require(
+        container_name in (None, "llunde-valkey", "llunde-postgres"),
+        "Fixed datastore event name required",
+    )
     require(
         re.fullmatch(r"[a-f0-9]{64}", container_id),
         "Exact Valkey container identity required",
@@ -491,7 +496,7 @@ def graceful_exit_event(commands, container_id, started_at):
             "--since",
             since,
             "--filter",
-            "container=" + container_id,
+            "container=" + (container_name or container_id),
             "--format",
             template,
         ],
@@ -537,6 +542,40 @@ def wait_stopped(commands, unit, user, *, successful=False, seconds=30):
     raise ValueError("Unit did not stop within deadline")
 
 
+def shutdown_valkey(commands, record, state_path):
+    record["phase"] = "inhibit-valkey-restart"
+    durable_json(state_path, record, replace=True)
+    record["valkeyRestartInhibitor"] = restart.install(commands, record, "valkey")
+    require(
+        record["valkeyRestartInhibitor"]["container"]
+        == {
+            "id": record["valkeyContainerId"],
+            "pid": record["valkeyPID"],
+            "running": True,
+            "startIdentity": record["valkeyProcessIdentity"],
+        },
+        "Valkey changed before restart inhibition",
+    )
+    restart.verify(commands, record, "valkey")
+    record["phase"] = "graceful-valkey-shutdown"
+    record["valkeyShutdownRequestedAt"] = time.time()
+    durable_json(state_path, record, replace=True)
+    record["valkeyShutdownClientStatus"], _ = commands.user(
+        "llunde-backend",
+        ["podman", "exec", "llunde-valkey", "valkey-cli", "SHUTDOWN", "NOSAVE"],
+        timeout=20,
+        check=False,
+    )
+    wait_stopped(commands, "llunde-valkey.service", "llunde-backend", successful=True)
+    restart.verify(commands, record, "valkey", stopped_required=True)
+    record["valkeyExitEvent"] = graceful_exit_event(
+        commands,
+        record["valkeyContainerId"],
+        record["valkeyShutdownRequestedAt"],
+        container_name="llunde-valkey",
+    )
+
+
 def live_fence(commands, receipt, record):
     verified = guard_state(receipt)
     require(verified["host"] == record["host"], "Guard host changed")
@@ -545,6 +584,8 @@ def live_fence(commands, receipt, record):
         require(
             marker_value(MARKERS / marker) == record["marker"], "Fence marker changed"
         )
+    if record.get("restartInhibitorsRequired"):
+        restart.verify(commands, record, "valkey", stopped_required=True)
     for user, unit in [
         ("edge", "cloudflared.service"),
         ("llunde-backend", "llunde-backend.service"),
@@ -575,7 +616,10 @@ def live_fence(commands, receipt, record):
     )
     require(
         graceful_exit_event(
-            commands, record["valkeyContainerId"], record["valkeyShutdownRequestedAt"]
+            commands,
+            record["valkeyContainerId"],
+            record["valkeyShutdownRequestedAt"],
+            container_name="llunde-valkey",
         )
         == record["valkeyExitEvent"],
         "Valkey shutdown history changed",
@@ -676,6 +720,7 @@ def fence_export(
             "executionID": os.urandom(16).hex(),
         },
         "timersBefore": {},
+        "restartInhibitorsRequired": True,
         "originalData": {
             name: {
                 "device": Path("/home/llunde-backend/data", name).stat().st_dev,
@@ -813,21 +858,7 @@ def fence_export(
             record["valkeyProcessIdentity"] is not None,
             "Valkey process identity missing",
         )
-        record["phase"] = "graceful-valkey-shutdown"
-        record["valkeyShutdownRequestedAt"] = time.time()
-        durable_json(state_path, record, replace=True)
-        commands.user(
-            "llunde-backend",
-            ["podman", "exec", "llunde-valkey", "valkey-cli", "SHUTDOWN", "NOSAVE"],
-            timeout=20,
-            check=False,
-        )
-        wait_stopped(
-            commands, "llunde-valkey.service", "llunde-backend", successful=True
-        )
-        record["valkeyExitEvent"] = graceful_exit_event(
-            commands, record["valkeyContainerId"], record["valkeyShutdownRequestedAt"]
-        )
+        shutdown_valkey(commands, record, state_path)
         record["phase"] = "export-pair"
         durable_json(state_path, record, replace=True)
         before = live_fence(commands, receipt, record)

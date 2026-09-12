@@ -70,6 +70,34 @@ class FinalizationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 finalize.provider_authority(provider(), "fredrir-05", now=now)
 
+    def test_only_exact_verified_target_ipv6_is_an_alternate_origin(self):
+        value = provider("fredrir-09")
+        ipv6 = "2001:880:0:22::21a"
+        value["expectedOriginIP"] = ipv6
+        for sample in value["samples"]:
+            sample["connectors"][0]["connections"][0]["originIP"] = ipv6
+        self.assertEqual(
+            finalize.provider_authority(value, "fredrir-09", now=105)["originIP"], ipv6
+        )
+        mixed = copy.deepcopy(value)
+        mixed["samples"][1]["connectors"][0]["connections"].append(
+            {"originIP": finalize.ORIGINS["fredrir-09"]}
+        )
+        with self.assertRaises(ValueError):
+            finalize.provider_authority(mixed, "fredrir-09", now=105)
+        for host, origin in (
+            ("fredrir-05", ipv6),
+            ("fredrir-09", "2001:880:0:22::21b"),
+            ("fredrir-09", "fd7a:115c:a1e0::b33b:a843"),
+            ("fredrir-09", "46.62.214.182"),
+        ):
+            changed = copy.deepcopy(value)
+            changed["expectedHost"], changed["expectedOriginIP"] = host, origin
+            for sample in changed["samples"]:
+                sample["connectors"][0]["connections"][0]["originIP"] = origin
+            with self.assertRaises(ValueError):
+                finalize.provider_authority(changed, host, now=105)
+
     def test_boot_order_requires_exact_files_and_loaded_systemd_dependencies(self):
         expected = b"[Unit]\nRequires=infra-evacuation-secrets.service\nAfter=infra-evacuation-secrets.service\n"
         filesystem = Mock()
