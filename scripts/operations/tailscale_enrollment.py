@@ -13,6 +13,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import PurePosixPath
 
 API = "https://api.tailscale.com/api/v2"
@@ -20,6 +21,7 @@ ROLES = {"control": "tag:platform-control", "worker": "tag:platform-worker"}
 TTL = 600
 KEY_FILE = "/run/secrets/tailscale-auth-key"
 KEY_ID = re.compile(r"[A-Za-z0-9_-]{4,128}")
+REMOTE_PYTHON = "/usr/bin/python3"
 
 
 class EnrollmentError(ValueError):
@@ -98,6 +100,18 @@ def timestamp(value):
         return result.timestamp()
     except ValueError:
         raise EnrollmentError("Key timestamp must include a timezone") from None
+
+
+def validate_remote_python(value):
+    if (
+        not isinstance(value, str)
+        or len(value) > 4096
+        or not re.fullmatch(r"/(?:[A-Za-z0-9_.+-]+/)*[A-Za-z0-9_.+-]+", value)
+        or str(PurePosixPath(value)) != value
+        or any(part in [".", ".."] for part in value.split("/"))
+    ):
+        raise EnrollmentError("Verified absolute remote Python path required")
+    return value
 
 
 def validate_metadata(document, role, description, now, *, fresh=True):
@@ -277,9 +291,11 @@ def remote(
     role,
     *,
     payload=None,
+    remote_python=REMOTE_PYTHON,
     runner=subprocess.run,
     environment=None,
 ):
+    validate_remote_python(remote_python)
     environment = os.environ if environment is None else environment
     child_environment = {
         key: value
@@ -287,14 +303,30 @@ def remote(
         if key in ["PATH", "HOME", "USER", "LOGNAME", "SSH_AUTH_SOCK", "LANG", "LC_ALL"]
     }
     python_command = shlex.join(
-        ["/usr/bin/python3", "-c", remote_program(), mode, key_file, key_id, node, role]
+        [
+            remote_python,
+            "-I",
+            "-B",
+            "-c",
+            remote_program(),
+            mode,
+            key_file,
+            key_id,
+            node,
+            role,
+        ]
+    )
+    uid_command = shlex.join(
+        [remote_python, "-I", "-B", "-c", "import os; print(os.geteuid())"]
     )
     command = (
-        'if [ "$(/usr/bin/id -u)" = 0 ]; then exec '
+        "uid=$("
+        + uid_command
+        + ') || exit $?; case "$uid" in 0) exec '
         + python_command
-        + "; else exec /usr/bin/sudo -n -- "
+        + ' ;; ""|*[!0-9]*) exit 1 ;; *) exec /usr/bin/sudo -n -- '
         + python_command
-        + "; fi"
+        + ";; esac"
     )
     try:
         result = runner(
@@ -516,18 +548,29 @@ def main(argv=None):
     parser.add_argument("--host")
     parser.add_argument("--key-file", default=KEY_FILE)
     parser.add_argument("--key-id")
+    parser.add_argument("--remote-python", default=REMOTE_PYTHON)
     args = parser.parse_args(argv)
     try:
+        transport = partial(
+            remote, remote_python=validate_remote_python(args.remote_python)
+        )
         host = args.host or args.node
         if args.action == "create-deliver":
             if args.key_id:
                 raise EnrollmentError("Key ID is only accepted for revocation")
-            result = create_deliver(args.node, args.role, host, args.key_file)
+            result = create_deliver(
+                args.node, args.role, host, args.key_file, transport=transport
+            )
         else:
             if not args.key_id:
                 raise EnrollmentError("Key ID required for revocation")
             result = revoke_unused(
-                args.node, args.role, host, args.key_file, args.key_id
+                args.node,
+                args.role,
+                host,
+                args.key_file,
+                args.key_id,
+                transport=transport,
             )
         print(json.dumps(result, sort_keys=True))
         return 0

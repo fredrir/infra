@@ -1,7 +1,9 @@
 import copy
 import importlib.util
+import io
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -382,8 +384,197 @@ class EnrollmentTests(unittest.TestCase):
         self.assertNotIn("root@fredrir-09", args)
         self.assertNotIn("-l", args)
         self.assertIn("/usr/bin/sudo -n -- /usr/bin/python3", args[-1])
-        self.assertIn("/usr/bin/id -u", args[-1])
+        self.assertNotIn("/usr/bin/id", args[-1])
+        self.assertIn("import os; print(os.geteuid())", args[-1])
+        self.assertIn("/usr/bin/python3 -I -B -c", args[-1])
         self.assertNotIn("fixture-oauth-secret", " ".join(args))
+
+
+class RemoteInterpreterTests(unittest.TestCase):
+    def test_invalid_interpreters_fail_before_transport_or_api_access(self):
+        invalid = [
+            "",
+            "python3",
+            "/",
+            "//usr/bin/python3",
+            "/usr//bin/python3",
+            "/usr/./bin/python3",
+            "/usr/../bin/python3",
+            "/usr/bin/python3/",
+            "/usr/bin/python3 -I",
+            "/tmp/$(id)",
+            "/tmp/python;id",
+            "/tmp/`id`",
+            "/tmp/python\n",
+            "/tmp/python\x00",
+            "/" + "x" * 4096,
+        ]
+        for interpreter in invalid:
+            with self.subTest(interpreter=interpreter):
+                runner = Mock()
+                with self.assertRaisesRegex(enrollment.EnrollmentError, "absolute"):
+                    enrollment.remote(
+                        "preflight",
+                        "fredrir-05",
+                        enrollment.KEY_FILE,
+                        "",
+                        "fredrir-05",
+                        "control",
+                        remote_python=interpreter,
+                        runner=runner,
+                    )
+                runner.assert_not_called()
+                with (
+                    patch.object(enrollment, "create_deliver") as create,
+                    patch.object(enrollment.resource, "setrlimit"),
+                    patch("sys.stderr", new_callable=io.StringIO) as error,
+                ):
+                    status = enrollment.main(
+                        [
+                            "create-deliver",
+                            "--node",
+                            "fredrir-05",
+                            "--role",
+                            "control",
+                            "--remote-python",
+                            interpreter,
+                        ]
+                    )
+                self.assertEqual(status, 1)
+                create.assert_not_called()
+                self.assertEqual(
+                    error.getvalue(), "Verified absolute remote Python path required\n"
+                )
+
+    def test_cli_binds_the_interpreter_for_delivery_and_cleanup(self):
+        for interpreter in [
+            None,
+            "/nix/store/0123456789abc-python3-3.13.7/bin/python3",
+        ]:
+            for action, function in [
+                ("create-deliver", "create_deliver"),
+                ("revoke-unused", "revoke_unused"),
+            ]:
+                with self.subTest(interpreter=interpreter, action=action):
+                    argv = [action, "--node", "fredrir-05", "--role", "control"]
+                    if interpreter:
+                        argv += ["--remote-python", interpreter]
+                    if action == "revoke-unused":
+                        argv += ["--key-id", "kFixture123"]
+                    with (
+                        patch.object(
+                            enrollment, function, return_value={}
+                        ) as operation,
+                        patch.object(enrollment.resource, "setrlimit"),
+                        patch("sys.stdout", new_callable=io.StringIO),
+                    ):
+                        self.assertEqual(enrollment.main(argv), 0)
+                    transport = operation.call_args.kwargs["transport"]
+                    runner = Mock(
+                        return_value=subprocess.CompletedProcess(
+                            [], 0, b'{"result":"ok"}', b""
+                        )
+                    )
+                    transport(
+                        "preflight",
+                        "fredrir-05",
+                        enrollment.KEY_FILE,
+                        "",
+                        "fredrir-05",
+                        "control",
+                        runner=runner,
+                    )
+                    command = runner.call_args.args[0][-1]
+                    self.assertIn(
+                        (interpreter or "/usr/bin/python3") + " -I -B -c", command
+                    )
+                    if interpreter:
+                        self.assertNotIn("/usr/bin/python3", command)
+
+    def run_shell_boundary(self, uid, probe_status=0):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            python, sudo = root / "python3", root / "sudo"
+            delivered, escalated = root / "delivered.json", root / "escalated.json"
+            python.write_text(
+                f"#!{sys.executable}\nimport json, pathlib, sys\n"
+                "assert sys.argv[1:4] == ['-I', '-B', '-c']\n"
+                "if sys.argv[4] == 'import os; print(os.geteuid())':\n"
+                f"    print({uid!r})\n    sys.exit({probe_status})\n"
+                f"pathlib.Path({str(delivered)!r}).write_text(json.dumps({{'argv': sys.argv[5:], 'payload': json.load(sys.stdin)}}))\n"
+                'print(\'{"result":"ok"}\')\n'
+            )
+            sudo.write_text(
+                f"#!{sys.executable}\nimport json, os, pathlib, sys\n"
+                "assert sys.argv[1:3] == ['-n', '--']\n"
+                f"pathlib.Path({str(escalated)!r}).write_text(json.dumps(sys.argv[1:]))\n"
+                "os.execv(sys.argv[3], sys.argv[3:])\n"
+            )
+            python.chmod(0o700)
+            sudo.chmod(0o700)
+
+            def runner(argv, **kwargs):
+                command = argv[-1].replace(
+                    "exec /usr/bin/sudo -n -- ",
+                    "exec " + shlex.quote(str(sudo)) + " -n -- ",
+                )
+                return subprocess.run(["/bin/sh", "-c", command], check=False, **kwargs)
+
+            error = None
+            try:
+                enrollment.remote(
+                    "deliver",
+                    "fredrir-05",
+                    enrollment.KEY_FILE,
+                    "kFixture123",
+                    "fredrir-05",
+                    "control",
+                    payload={"key": AUTH_KEY},
+                    remote_python=str(python),
+                    runner=runner,
+                    environment=ENVIRONMENT,
+                )
+            except enrollment.EnrollmentError as caught:
+                error = str(caught)
+            return (
+                error,
+                json.loads(delivered.read_text()) if delivered.exists() else None,
+                json.loads(escalated.read_text()) if escalated.exists() else None,
+            )
+
+    def test_root_delivery_preserves_stdin_without_sudo(self):
+        error, delivered, escalated = self.run_shell_boundary("0")
+        self.assertIsNone(error)
+        self.assertIsNone(escalated)
+        self.assertEqual(delivered["payload"], {"key": AUTH_KEY})
+        self.assertEqual(
+            delivered["argv"],
+            ["deliver", enrollment.KEY_FILE, "kFixture123", "fredrir-05", "control"],
+        )
+
+    def test_nonroot_delivery_escalates_once_with_selected_interpreter(self):
+        error, delivered, escalated = self.run_shell_boundary("1000")
+        self.assertIsNone(error)
+        self.assertEqual(escalated[:2], ["-n", "--"])
+        self.assertTrue(escalated[2].endswith("/python3"))
+        self.assertEqual(escalated[3:6], ["-I", "-B", "-c"])
+        self.assertEqual(delivered["payload"], {"key": AUTH_KEY})
+
+    def test_failed_or_malformed_uid_probe_neither_delivers_nor_escalates(self):
+        for uid, status in [
+            ("0", 1),
+            ("", 0),
+            ("not-a-uid", 0),
+            ("0\n1000", 0),
+            ("-1", 0),
+        ]:
+            with self.subTest(uid=uid, status=status):
+                error, delivered, escalated = self.run_shell_boundary(uid, status)
+                self.assertEqual(
+                    error, "SSH runtime key operation failed; output withheld"
+                )
+                self.assertIsNone(delivered)
+                self.assertIsNone(escalated)
 
 
 class RuntimeDeliveryTests(unittest.TestCase):
