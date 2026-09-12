@@ -61,7 +61,6 @@ spec:
   path: ./platform/components/controllers
   prune: true
   wait: true
-  suspend: true
   serviceAccountName: platform-reconciler
   postBuild:
     substituteFrom:
@@ -74,34 +73,6 @@ spec:
   dependsOn:
   - name: platform-policy
   - name: platform-sources
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: platform-secrets
-  namespace: flux-system
-spec:
-  interval: 10m
-  retryInterval: 1m
-  timeout: 15m
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  path: ./platform/components/secrets
-  prune: true
-  wait: true
-  suspend: true
-  serviceAccountName: platform-reconciler
-  postBuild:
-    substituteFrom:
-    - kind: ConfigMap
-      name: platform-settings
-  decryption:
-    provider: sops
-    secretRef:
-      name: sops-age
-  dependsOn:
-  - name: platform-controllers
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -175,7 +146,6 @@ spec:
   path: ./platform/components/runners
   prune: true
   wait: true
-  suspend: true
   serviceAccountName: platform-reconciler
   postBuild:
     substituteFrom:
@@ -187,7 +157,8 @@ spec:
       name: sops-age
   dependsOn:
   - name: platform-controllers
-  - name: platform-secrets
+  - name: platform-policy
+  - name: platform-cache
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

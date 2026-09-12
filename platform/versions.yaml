@@ -14,10 +14,6 @@ charts:
     version: 1.12.1
     repository: https://grafana.github.io/helm-charts
     sha256: cdd1ec39f99c3c506d5b521156d72236ea143c089f50da6b64398f831734829c
-  external-secrets:
-    version: 2.10.0
-    repository: https://charts.external-secrets.io
-    sha256: b96e948fff3674638b5d3f9e43886f3796e04739c4b4127929aed2ddac7d1418
   gha-runner-scale-set-controller:
     version: 0.14.2
     repository: oci://ghcr.io/actions/actions-runner-controller-charts
@@ -49,7 +45,6 @@ images:
 sources:
 - https://grafana.github.io/helm-charts/index.yaml
 - https://prometheus-community.github.io/helm-charts/index.yaml
-- https://charts.external-secrets.io/index.yaml
 - https://traefik.github.io/charts/index.yaml
 - https://github.com/actions/actions-runner-controller/releases/tag/gha-runner-scale-set-0.14.2
 - https://github.com/grafana/tempo/releases/tag/v3.0.3

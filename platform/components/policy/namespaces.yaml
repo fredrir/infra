@@ -31,16 +31,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: external-secrets
-  labels:
-    infra.fredrir.com/managed: 'true'
-    infra.fredrir.com/tier: platform
-    pod-security.kubernetes.io/enforce: restricted
-    pod-security.kubernetes.io/enforce-version: v1.36
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: arc-system
   labels:
     infra.fredrir.com/managed: 'true'

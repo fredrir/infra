@@ -56,33 +56,6 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: namespace-budget
-  namespace: external-secrets
-spec:
-  hard:
-    requests.cpu: '2'
-    requests.memory: 1Gi
-    pods: '12'
-    requests.storage: 200Gi
----
-apiVersion: v1
-kind: LimitRange
-metadata:
-  name: defaults
-  namespace: external-secrets
-spec:
-  limits:
-  - type: Container
-    defaultRequest:
-      cpu: 50m
-      memory: 64Mi
-    default:
-      cpu: '1'
-      memory: 512Mi
----
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: namespace-budget
   namespace: arc-system
 spec:
   hard:

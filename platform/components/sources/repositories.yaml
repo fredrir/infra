@@ -28,15 +28,6 @@ spec:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: external-secrets
-  namespace: flux-system
-spec:
-  interval: 1h
-  url: https://charts.external-secrets.io
----
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
   name: actions
   namespace: flux-system
 spec:
