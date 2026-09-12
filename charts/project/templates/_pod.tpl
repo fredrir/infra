@@ -35,7 +35,7 @@ spec:
               - key: kubernetes.io/arch
                 operator: In
                 values: {{ $workload.architectures | toJson }}
-              - key: node-restriction.kubernetes.io/production
+              - key: node-restriction.kubernetes.io/critical
                 operator: In
                 values: ["true"]
               {{- if or $workload.volume $workload.sharedVolume }}

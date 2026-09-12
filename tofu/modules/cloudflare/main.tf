@@ -34,7 +34,7 @@ resource "cloudflare_dns_record" "tunnel_cname" {
 }
 
 locals {
-  llunde_tunnel_origin = "http://localhost:8085"
+  llunde_tunnel_origin = "http://caddy.llunde.svc.cluster.local:8080"
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared_config" "llunde" {
@@ -95,4 +95,36 @@ resource "cloudflare_dns_record" "dmarc" {
   type    = "TXT"
   content = "\"v=DMARC1; p=quarantine; rua=mailto:fhansteen@gmail.com\""
   ttl     = 1
+}
+
+resource "cloudflare_zero_trust_tunnel_cloudflared_config" "pyparser" {
+  account_id = var.account_id
+  tunnel_id  = var.pyparser_tunnel_id
+
+  config = {
+    origin_request = {}
+    ingress = [
+      {
+        hostname = "parser.llunde.no"
+        path     = "^/logs(/.*)?$"
+        service  = "http://traefik.ingress-system.svc.cluster.local:80"
+      },
+      {
+        hostname = "parser.llunde.no"
+        service  = "http://review:8081"
+      },
+      {
+        hostname = "external.llunde.no"
+        path     = "^/media/share/.*"
+        service  = "http://review:8081"
+      },
+      {
+        hostname = "external.llunde.no"
+        service  = "http_status:404"
+      },
+      {
+        service = "http_status:404"
+      },
+    ]
+  }
 }

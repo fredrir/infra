@@ -118,7 +118,6 @@ spec:
   path: ./platform/components/ingress
   prune: true
   wait: true
-  suspend: true
   serviceAccountName: platform-reconciler
   postBuild:
     substituteFrom:
@@ -129,7 +128,9 @@ spec:
     secretRef:
       name: sops-age
   dependsOn:
-  - name: platform-secrets
+  - name: platform-policy
+  - name: platform-sources
+  - name: platform-observability
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

@@ -45,7 +45,7 @@
           },
           "replicas": {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 0,
             "maximum": 4
           },
           "command": {
@@ -264,7 +264,7 @@
             "then": {
               "properties": {
                 "replicas": {
-                  "const": 1
+                  "enum": [0, 1]
                 },
                 "kind": {
                   "enum": ["web", "worker"]
@@ -279,7 +279,7 @@
             "then": {
               "properties": {
                 "replicas": {
-                  "const": 1
+                  "enum": [0, 1]
                 },
                 "kind": {
                   "enum": ["web", "worker"]

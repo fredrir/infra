@@ -5,7 +5,7 @@ metadata:
   namespace: ingress-system
 spec:
   redirectRegex:
-    regex: ^https?://fredrir\.com/logs/?(?:\?.*)?$
+    regex: ^https?://(?:fredrir\.com|parser\.llunde\.no)/logs(?:/.*)?(?:\?.*)?$
     replacement: https://${GRAFANA_HOST}/explore
     permanent: false
 ---
@@ -19,7 +19,8 @@ spec:
   - web
   routes:
   - kind: Rule
-    match: Host(`fredrir.com`) && (Path(`/logs`) || Path(`/logs/`))
+    match: (Host(`fredrir.com`) || Host(`parser.llunde.no`)) && (Path(`/logs`) ||
+      PathPrefix(`/logs/`))
     middlewares:
     - name: logs-redirect
     services:

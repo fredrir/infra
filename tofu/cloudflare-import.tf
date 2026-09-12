@@ -58,3 +58,8 @@ import {
   to = module.cloudflare.cloudflare_dns_record.dmarc
   id = "${local.cf_zone}/86077ea93a4f19c812c3109de2f3f50c"
 }
+
+import {
+  to = module.cloudflare.cloudflare_zero_trust_tunnel_cloudflared_config.pyparser
+  id = "${local.cf_account}/e77d6ebf-dcfb-4ade-b4eb-2be0d9e165a9"
+}

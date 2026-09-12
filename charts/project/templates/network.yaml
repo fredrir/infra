@@ -1,3 +1,12 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-public-headers
+spec:
+  headers:
+    customRequestHeaders:
+      X-Admin-Origin: ""
+---
 {{- range $name, $workload := .Values.workloads }}
 {{- if eq $workload.kind "web" }}
 ---
@@ -62,7 +71,7 @@ kind: Ingress
 metadata:
   name: {{ $.Release.Name }}-{{ $name }}
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-project-public-headers@kubernetescrd" $.Release.Namespace | quote }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-public-headers@kubernetescrd" $.Release.Namespace $.Release.Name | quote }}
 spec:
   ingressClassName: platform
   rules:

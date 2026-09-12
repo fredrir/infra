@@ -7,3 +7,4 @@ resources:
 - cloudflared.yaml
 - network.yaml
 - shortcuts.yaml
+- tunnel.secret.sops.yaml

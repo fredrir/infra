@@ -82,3 +82,12 @@ spec:
           defaultMode: drop
         queryParameters:
           defaultMode: drop
+    metrics:
+      prometheus:
+        serviceMonitor:
+          enabled: true
+          additionalLabels:
+            release: monitoring
+        service:
+          enabled: true
+  releaseName: traefik
