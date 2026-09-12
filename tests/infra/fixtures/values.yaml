@@ -1,0 +1,89 @@
+project: llunde-backend
+workloads:
+  api:
+    kind: web
+    port: 8080
+    healthPath: /health
+    domains:
+    - api.llunde.no
+    secretKeys:
+    - DATABASE_URL
+    image: ghcr.io/fredrir/llunde-backend@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    sourceRevision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+        ephemeral-storage: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+        ephemeral-storage: 1Gi
+    architectures:
+    - amd64
+    - arm64
+    replicas: 2
+  worker:
+    kind: worker
+    command:
+    - /app/worker
+    image: ghcr.io/fredrir/llunde-backend@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    sourceRevision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+        ephemeral-storage: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+        ephemeral-storage: 1Gi
+    architectures:
+    - amd64
+    replicas: 1
+  cleanup:
+    kind: cron
+    schedule: 0 3 * * *
+    command:
+    - /app/cleanup
+    image: ghcr.io/fredrir/llunde-backend@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    sourceRevision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+        ephemeral-storage: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+        ephemeral-storage: 1Gi
+    architectures:
+    - amd64
+    replicas: 1
+sharedVolumes: {}
+migration:
+  command:
+  - alembic
+  args:
+  - upgrade
+  - head
+  compatibility: backward-compatible
+  secretKeys:
+  - DATABASE_URL
+  retrySafe: true
+  kind: cron
+  image: ghcr.io/fredrir/llunde-backend@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  sourceRevision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+      ephemeral-storage: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 1Gi
+  architectures:
+  - amd64
+  - arm64
+  serviceAccountName: project-migration

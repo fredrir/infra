@@ -1,0 +1,9 @@
+platform_tailscale_version: 1.102.4
+platform_node_name: ""
+platform_tailscale_auth_key_file: ""
+platform_tailscale_bootstrap_approved: false
+platform_tailscale_bootstrap_tags: []
+platform_tailscale_cli: /usr/local/bin/tailscale
+platform_tailscale_sha256:
+  amd64: 50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9
+  arm64: 9dd1e6a592a014bbaea0103167ffe299adeda4ba14e078ce9c2895364f6c4c3f

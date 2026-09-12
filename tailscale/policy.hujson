@@ -1,38 +1,582 @@
 {
   "tagOwners": {
-    "tag:server": ["autogroup:member"],
-    "tag:ci":     ["autogroup:member"]
+    "tag:server": [
+      "autogroup:member"
+    ],
+    "tag:ci": [
+      "autogroup:member"
+    ],
+    "tag:platform-enrollment": [
+      "autogroup:admin"
+    ],
+    "tag:platform-control": [
+      "autogroup:admin",
+      "tag:platform-enrollment"
+    ],
+    "tag:platform-worker": [
+      "autogroup:admin",
+      "tag:platform-enrollment"
+    ]
   },
-
   "hosts": {
-    "macie":  "100.75.71.79",
-    "archie": "100.126.231.24"
+    "macie": "100.75.71.79",
+    "archie": "100.126.231.24",
+    "platform-control-05": "10.60.0.5",
+    "platform-control-07": "10.60.0.7",
+    "platform-control-08": "10.60.0.8",
+    "platform-monitor": "100.86.241.75"
   },
-
   "acls": [
-    { "action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"] },
-
-    { "action": "accept", "src": ["macie", "archie"], "dst": ["tag:server:*"] },
-
-    { "action": "accept", "src": ["tag:server"], "dst": ["tag:server:9100,9101,3100,4317,4318"] },
-
-    { "action": "accept", "src": ["tag:ci"], "dst": ["100.92.219.50:22"] }
+    {
+      "action": "accept",
+      "src": [
+        "autogroup:member"
+      ],
+      "dst": [
+        "autogroup:self:*"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "macie",
+        "archie"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "tag:platform-control:22",
+        "tag:platform-worker:22"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "macie",
+        "archie",
+        "tag:platform-control",
+        "tag:platform-worker"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "platform-control-05:6443",
+        "platform-control-07:6443",
+        "platform-control-08:6443"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "tag:platform-control",
+        "tag:platform-worker"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "tag:platform-control:9100,10250",
+        "tag:platform-worker:9100,10250",
+        "platform-control-05:9100,10250",
+        "platform-control-07:9100,10250",
+        "platform-control-08:9100,10250"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "tag:platform-control",
+        "tag:platform-worker"
+      ],
+      "proto": "udp",
+      "dst": [
+        "tag:platform-control:8472",
+        "tag:platform-worker:8472"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "100.115.121.9",
+        "100.66.14.60",
+        "100.87.168.66"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "platform-monitor:8080"
+      ]
+    }
   ],
-
   "ssh": [
-    { "action": "check", "src": ["autogroup:member"], "dst": ["autogroup:self"], "users": ["autogroup:nonroot", "root"] }
+    {
+      "action": "check",
+      "src": [
+        "autogroup:member"
+      ],
+      "dst": [
+        "autogroup:self"
+      ],
+      "users": [
+        "autogroup:nonroot",
+        "root"
+      ]
+    }
   ],
-
   "tests": [
-    { "src": "macie",
-      "accept": ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.109.80.121:9101"] },
-    { "src": "fredrir@github",
-      "deny":   ["100.109.80.121:22","100.92.219.50:22","100.92.219.50:3000","100.92.219.50:9090","100.92.219.50:3100"] },
-    { "src": "tag:server",
-      "accept": ["100.109.80.121:9100","100.92.219.50:9100","100.109.80.121:9101","100.92.219.50:3100","100.92.219.50:4317"],
-      "deny":   ["100.92.219.50:3000","100.109.80.121:22"] },
-    { "src": "tag:ci",
-      "accept": ["100.92.219.50:22"],
-      "deny":   ["100.109.80.121:22","100.92.219.50:3000","100.92.219.50:3100","100.92.219.50:9100"] }
+    {
+      "src": "tag:platform-enrollment",
+      "proto": "tcp",
+      "deny": [
+        "macie:22",
+        "archie:22",
+        "tag:server:22",
+        "tag:server:3100",
+        "tag:ci:22",
+        "tag:platform-control:22",
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-control:6443",
+        "tag:platform-control:9100",
+        "tag:platform-control:10250",
+        "tag:platform-worker:22",
+        "tag:platform-worker:2379",
+        "tag:platform-worker:2380",
+        "tag:platform-worker:6443",
+        "tag:platform-worker:9100",
+        "tag:platform-worker:10250",
+        "platform-control-05:6443",
+        "platform-control-07:6443",
+        "platform-control-08:6443",
+        "platform-control-05:2379",
+        "platform-control-07:2379",
+        "platform-control-08:2379",
+        "platform-control-05:2380",
+        "platform-control-07:2380",
+        "platform-control-08:2380"
+      ]
+    },
+    {
+      "src": "tag:platform-enrollment",
+      "proto": "udp",
+      "deny": [
+        "tag:platform-control:8472",
+        "tag:platform-worker:8472"
+      ]
+    },
+    {
+      "src": "macie",
+      "proto": "tcp",
+      "accept": [
+        "tag:platform-control:22",
+        "tag:platform-worker:22",
+        "platform-control-05:6443",
+        "platform-control-07:6443",
+        "platform-control-08:6443"
+      ],
+      "deny": [
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-worker:2379",
+        "tag:platform-worker:2380",
+        "platform-control-05:2379",
+        "platform-control-05:2380",
+        "platform-control-07:2379",
+        "platform-control-07:2380",
+        "platform-control-08:2379",
+        "platform-control-08:2380"
+      ]
+    },
+    {
+      "src": "archie",
+      "proto": "tcp",
+      "accept": [
+        "tag:platform-control:22",
+        "tag:platform-worker:22",
+        "platform-control-05:6443",
+        "platform-control-07:6443",
+        "platform-control-08:6443"
+      ],
+      "deny": [
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-worker:2379",
+        "tag:platform-worker:2380",
+        "platform-control-05:2379",
+        "platform-control-05:2380",
+        "platform-control-07:2379",
+        "platform-control-07:2380",
+        "platform-control-08:2379",
+        "platform-control-08:2380"
+      ]
+    },
+    {
+      "src": "tag:platform-control",
+      "proto": "tcp",
+      "accept": [
+        "platform-control-05:6443",
+        "platform-control-07:6443",
+        "platform-control-08:6443",
+        "tag:platform-control:9100",
+        "tag:platform-control:10250",
+        "tag:platform-worker:9100",
+        "tag:platform-worker:10250",
+        "platform-control-05:9100",
+        "platform-control-05:10250",
+        "platform-control-07:9100",
+        "platform-control-07:10250",
+        "platform-control-08:9100",
+        "platform-control-08:10250"
+      ],
+      "deny": [
+        "tag:platform-control:22",
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-control:8472",
+        "tag:platform-worker:22",
+        "tag:platform-worker:2379",
+        "tag:platform-worker:2380",
+        "tag:platform-worker:8472",
+        "platform-control-05:22",
+        "platform-control-05:2379",
+        "platform-control-05:2380",
+        "platform-control-05:8472",
+        "platform-control-07:22",
+        "platform-control-07:2379",
+        "platform-control-07:2380",
+        "platform-control-07:8472",
+        "platform-control-08:22",
+        "platform-control-08:2379",
+        "platform-control-08:2380",
+        "platform-control-08:8472",
+        "macie:22",
+        "archie:22",
+        "10.60.0.9:6443"
+      ]
+    },
+    {
+      "src": "tag:platform-control",
+      "proto": "udp",
+      "accept": [
+        "tag:platform-control:8472",
+        "tag:platform-worker:8472"
+      ],
+      "deny": [
+        "tag:platform-control:6443",
+        "tag:platform-worker:6443",
+        "platform-control-05:6443",
+        "platform-control-07:6443",
+        "platform-control-08:6443"
+      ]
+    },
+    {
+      "src": "tag:platform-worker",
+      "proto": "tcp",
+      "accept": [
+        "platform-control-05:6443",
+        "platform-control-07:6443",
+        "platform-control-08:6443",
+        "tag:platform-control:9100",
+        "tag:platform-control:10250",
+        "tag:platform-worker:9100",
+        "tag:platform-worker:10250",
+        "platform-control-05:9100",
+        "platform-control-05:10250",
+        "platform-control-07:9100",
+        "platform-control-07:10250",
+        "platform-control-08:9100",
+        "platform-control-08:10250"
+      ],
+      "deny": [
+        "tag:platform-control:22",
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-control:8472",
+        "tag:platform-worker:22",
+        "tag:platform-worker:2379",
+        "tag:platform-worker:2380",
+        "tag:platform-worker:8472",
+        "platform-control-05:22",
+        "platform-control-05:2379",
+        "platform-control-05:2380",
+        "platform-control-05:8472",
+        "platform-control-07:22",
+        "platform-control-07:2379",
+        "platform-control-07:2380",
+        "platform-control-07:8472",
+        "platform-control-08:22",
+        "platform-control-08:2379",
+        "platform-control-08:2380",
+        "platform-control-08:8472",
+        "macie:22",
+        "archie:22",
+        "10.60.0.9:6443"
+      ]
+    },
+    {
+      "src": "tag:platform-worker",
+      "proto": "udp",
+      "accept": [
+        "tag:platform-control:8472",
+        "tag:platform-worker:8472"
+      ],
+      "deny": [
+        "tag:platform-control:6443",
+        "tag:platform-worker:6443",
+        "platform-control-05:6443",
+        "platform-control-07:6443",
+        "platform-control-08:6443"
+      ]
+    },
+    {
+      "src": "tag:ci",
+      "proto": "tcp",
+      "deny": [
+        "tag:platform-control:22",
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-control:6443",
+        "tag:platform-control:9100",
+        "tag:platform-control:10250",
+        "tag:platform-worker:22",
+        "tag:platform-worker:2379",
+        "tag:platform-worker:2380",
+        "tag:platform-worker:6443",
+        "tag:platform-worker:9100",
+        "tag:platform-worker:10250",
+        "platform-control-05:22",
+        "platform-control-05:2379",
+        "platform-control-05:2380",
+        "platform-control-05:6443",
+        "platform-control-05:9100",
+        "platform-control-05:10250",
+        "platform-control-07:22",
+        "platform-control-07:2379",
+        "platform-control-07:2380",
+        "platform-control-07:6443",
+        "platform-control-07:9100",
+        "platform-control-07:10250",
+        "platform-control-08:22",
+        "platform-control-08:2379",
+        "platform-control-08:2380",
+        "platform-control-08:6443",
+        "platform-control-08:9100",
+        "platform-control-08:10250"
+      ]
+    },
+    {
+      "src": "tag:ci",
+      "proto": "udp",
+      "deny": [
+        "tag:platform-control:8472",
+        "tag:platform-worker:8472"
+      ]
+    },
+    {
+      "src": "tag:server",
+      "proto": "tcp",
+      "deny": [
+        "tag:platform-control:22",
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-control:6443",
+        "100.115.121.9:9100",
+        "100.96.114.53:9100",
+        "tag:platform-control:10250",
+        "tag:platform-worker:22",
+        "tag:platform-worker:2379",
+        "tag:platform-worker:2380",
+        "tag:platform-worker:6443",
+        "tag:platform-worker:9100",
+        "tag:platform-worker:10250",
+        "platform-control-05:22",
+        "platform-control-05:2379",
+        "platform-control-05:2380",
+        "platform-control-05:6443",
+        "platform-control-05:9100",
+        "platform-control-05:10250",
+        "platform-control-07:22",
+        "platform-control-07:2379",
+        "platform-control-07:2380",
+        "platform-control-07:6443",
+        "platform-control-07:9100",
+        "platform-control-07:10250",
+        "platform-control-08:22",
+        "platform-control-08:2379",
+        "platform-control-08:2380",
+        "platform-control-08:6443",
+        "platform-control-08:9100",
+        "platform-control-08:10250"
+      ]
+    },
+    {
+      "src": "tag:server",
+      "proto": "udp",
+      "deny": [
+        "tag:platform-control:8472",
+        "tag:platform-worker:8472"
+      ]
+    },
+    {
+      "src": "fredrir@github",
+      "proto": "tcp",
+      "deny": [
+        "tag:platform-control:22",
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-control:6443",
+        "tag:platform-control:9100",
+        "tag:platform-control:10250",
+        "tag:platform-worker:22",
+        "tag:platform-worker:2379",
+        "tag:platform-worker:2380",
+        "tag:platform-worker:6443",
+        "tag:platform-worker:9100",
+        "tag:platform-worker:10250",
+        "platform-control-05:22",
+        "platform-control-05:2379",
+        "platform-control-05:2380",
+        "platform-control-05:6443",
+        "platform-control-05:9100",
+        "platform-control-05:10250",
+        "platform-control-07:22",
+        "platform-control-07:2379",
+        "platform-control-07:2380",
+        "platform-control-07:6443",
+        "platform-control-07:9100",
+        "platform-control-07:10250",
+        "platform-control-08:22",
+        "platform-control-08:2379",
+        "platform-control-08:2380",
+        "platform-control-08:6443",
+        "platform-control-08:9100",
+        "platform-control-08:10250"
+      ]
+    },
+    {
+      "src": "fredrir@github",
+      "proto": "udp",
+      "deny": [
+        "tag:platform-control:8472",
+        "tag:platform-worker:8472"
+      ]
+    },
+    {
+      "src": "10.42.0.10",
+      "proto": "tcp",
+      "deny": [
+        "tag:platform-control:22",
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-control:6443",
+        "tag:platform-control:9100",
+        "tag:platform-control:10250",
+        "tag:platform-worker:22",
+        "tag:platform-worker:2379",
+        "tag:platform-worker:2380",
+        "tag:platform-worker:6443",
+        "tag:platform-worker:9100",
+        "tag:platform-worker:10250",
+        "platform-control-05:22",
+        "platform-control-05:2379",
+        "platform-control-05:2380",
+        "platform-control-05:6443",
+        "platform-control-05:9100",
+        "platform-control-05:10250",
+        "platform-control-07:22",
+        "platform-control-07:2379",
+        "platform-control-07:2380",
+        "platform-control-07:6443",
+        "platform-control-07:9100",
+        "platform-control-07:10250",
+        "platform-control-08:22",
+        "platform-control-08:2379",
+        "platform-control-08:2380",
+        "platform-control-08:6443",
+        "platform-control-08:9100",
+        "platform-control-08:10250"
+      ]
+    },
+    {
+      "src": "10.42.0.10",
+      "proto": "udp",
+      "deny": [
+        "tag:platform-control:8472",
+        "tag:platform-worker:8472"
+      ]
+    },
+    {
+      "src": "100.115.121.9",
+      "proto": "tcp",
+      "accept": [
+        "platform-monitor:8080"
+      ],
+      "deny": [
+        "platform-monitor:22",
+        "platform-monitor:443",
+        "platform-monitor:9090"
+      ]
+    },
+    {
+      "src": "100.66.14.60",
+      "proto": "tcp",
+      "accept": [
+        "platform-monitor:8080"
+      ],
+      "deny": [
+        "platform-monitor:22",
+        "platform-monitor:443",
+        "platform-monitor:9090"
+      ]
+    },
+    {
+      "src": "100.87.168.66",
+      "proto": "tcp",
+      "accept": [
+        "platform-monitor:8080"
+      ],
+      "deny": [
+        "platform-monitor:22",
+        "platform-monitor:443",
+        "platform-monitor:9090"
+      ]
+    },
+    {
+      "src": "tag:platform-enrollment",
+      "proto": "tcp",
+      "deny": [
+        "platform-monitor:8080"
+      ]
+    },
+    {
+      "src": "tag:ci",
+      "proto": "tcp",
+      "deny": [
+        "platform-monitor:8080"
+      ]
+    },
+    {
+      "src": "tag:server",
+      "proto": "tcp",
+      "deny": [
+        "platform-monitor:8080"
+      ]
+    },
+    {
+      "src": "100.96.114.53",
+      "proto": "tcp",
+      "deny": [
+        "platform-monitor:8080"
+      ]
+    },
+    {
+      "src": "100.107.74.107",
+      "proto": "tcp",
+      "deny": [
+        "platform-monitor:8080"
+      ]
+    },
+    {
+      "src": "10.42.0.10",
+      "proto": "tcp",
+      "deny": [
+        "platform-monitor:8080"
+      ]
+    }
   ]
 }

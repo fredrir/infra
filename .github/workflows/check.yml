@@ -1,43 +1,50 @@
 name: Check
-
 on:
-  pull_request:
   push:
     branches: [main]
-
+permissions:
+  contents: read
 concurrency:
-  group: check-${{ github.ref }}
-  cancel-in-progress: true
-
+  group: infra-main
+  cancel-in-progress: false
 jobs:
-  flake:
-    runs-on: ubuntu-latest
+  check:
+    if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected
+    runs-on: nix-amd64
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
-      - name: Flake check (goldens + eval)
-        run: nix flake check
-      - name: Build llunde-01 closure
-        run: nix build .#nixosConfigurations.llunde-01.config.system.build.toplevel --no-link
-      - name: Build llunde-parser closure
-        run: nix build .#nixosConfigurations.llunde-parser.config.system.build.toplevel --no-link
-
-  tofu:
-    runs-on: ubuntu-latest
-    env:
-      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ${{ github.workspace }}/.tofu-plugin-cache
-          key: tofu-providers-${{ hashFiles('tofu/.terraform.lock.hcl') }}
-          restore-keys: tofu-providers-
-      - name: fmt
-        run: nix run nixpkgs#opentofu -- -chdir=tofu fmt -check -recursive
-      - name: validate (no backend, no credentials)
-        run: |
-          mkdir -p "$TF_PLUGIN_CACHE_DIR"
-          nix run nixpkgs#opentofu -- -chdir=tofu init -backend=false -input=false
-          nix run nixpkgs#opentofu -- -chdir=tofu validate
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - name: Check native toolchain
+      run: |
+        test "$(uname -m)" = x86_64
+        test ! -e /var/run/secrets/kubernetes.io/serviceaccount/token
+        nix flake check --all-systems --no-build
+        nix build --no-link --print-out-paths > "$RUNNER_TEMP/toolchain-path"
+    - name: Validate
+      run: |
+        nix develop --command bash -euo pipefail <<'SCRIPT'
+          uv sync --frozen --group ci
+          uv run --frozen --group ci python -m unittest discover -s tests/ci -v
+          uv run --frozen --group ci python -m unittest discover -s tests/infra -v
+          uv run --frozen --group ci python -m unittest discover -s ansible/tests -v
+          uv run --frozen --group ci python -m unittest discover -s tests/operations -v
+          ansible-playbook -i localhost, ansible/site.yml --syntax-check
+          actionlint
+          for directory in platform/clusters/production platform/components/* platform/projects/*; do
+            if [ -f "$directory/kustomization.yaml" ]; then kubectl kustomize "$directory" >/dev/null; fi
+          done
+          helm lint charts/project --strict -f tests/infra/fixtures/values.yaml
+          tofu -chdir=tofu fmt -check -recursive
+          tofu -chdir=tofu init -backend=false -lockfile=readonly -input=false
+          tofu -chdir=tofu validate
+        SCRIPT
+    - name: Publish Nix cache
+      run: |
+        echo "::add-mask::$ATTIC_TOKEN"
+        nix develop --command bash -euo pipefail <<'SCRIPT'
+          attic login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
+          attic push "infra:$ATTIC_CACHE" "$(cat "$RUNNER_TEMP/toolchain-path")"
+        SCRIPT

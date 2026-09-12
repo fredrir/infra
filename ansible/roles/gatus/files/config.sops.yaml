@@ -1,0 +1,254 @@
+web:
+    address: 100.86.241.75
+    port: 8080
+concurrency: 2
+storage:
+    type: sqlite
+    path: /var/lib/gatus/gatus.db
+    maximum-number-of-results: 100
+    maximum-number-of-events: 50
+alerting:
+    email:
+        from: alerts@fredrir.com
+        host: email-smtp.eu-north-1.amazonaws.com
+        password: ENC[AES256_GCM,data:QfepW10zjzKRH6Ay5Hrfgf24OPWm8pr08WtyGboasuTaX/hIprisGu6NoZo=,iv:Fw47Z8rCUPPYlMnEWHIhzeIRjkXQ9vLo4AZ3iyqBnDw=,tag:Sy0WAy4TS2SOg4F53Bx+eg==,type:str]
+        port: 587
+        to: fhansteen@gmail.com
+        username: ENC[AES256_GCM,data:klfOVYVD7essuCo06Kb4bYZ6OuM=,iv:TKH4dS7gjspKjtEecdkvImB5AMah5xw9WNTs+B8o+yc=,tag:nNjS2x7g/aIaTlA4di1QRQ==,type:str]
+        client:
+            insecure: false
+        default-alert:
+            failure-threshold: 3
+            success-threshold: 2
+            send-on-resolved: true
+endpoints:
+    - name: llunde
+      group: applications
+      url: https://llunde.no/
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 200'
+      alerts:
+        - type: email
+    - name: llunde-api-auth
+      group: applications
+      url: https://api.llunde.no/health
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 403'
+      alerts:
+        - type: email
+    - name: parser-access
+      group: applications
+      url: https://parser.llunde.no/
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 302'
+      alerts:
+        - type: email
+    - name: parser-external
+      group: applications
+      url: https://external.llunde.no/
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 404'
+      alerts:
+        - type: email
+    - name: portfolio
+      group: applications
+      url: https://hansteen.dev/
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: false
+      conditions:
+        - '[STATUS] == 200'
+      alerts:
+        - type: email
+    - name: portfolio-origin-auth
+      group: applications
+      url: https://origin.hansteen.dev/readyz
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 403'
+      alerts:
+        - type: email
+    - name: "y"
+      group: applications
+      url: https://yeeter.no/
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 200'
+      alerts:
+        - type: email
+    - name: y-health
+      group: applications
+      url: https://yeeter.no/healthz
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 200'
+      alerts:
+        - type: email
+    - name: y-api
+      group: applications
+      url: https://yeeter.no/graphql?query=%7B__typename%7D
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 200'
+        - '[BODY].data.__typename == Query'
+      alerts:
+        - type: email
+      headers:
+        x-apollo-operation-name: health
+    - name: grafana-login
+      group: applications
+      url: https://grafana.fredrir.com/login
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 200'
+      alerts:
+        - type: email
+    - name: grafana-auth
+      group: applications
+      url: https://grafana.fredrir.com/api/user
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 401'
+      alerts:
+        - type: email
+    - name: cache-auth
+      group: applications
+      url: https://cache.fredrir.com/infra/nix-cache-info
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 401'
+      alerts:
+        - type: email
+    - name: logs-redirect
+      group: applications
+      url: https://fredrir.com/logs
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 302'
+      alerts:
+        - type: email
+external-endpoints:
+    - name: parser
+      group: backups
+      token: ENC[AES256_GCM,data:gprXMEz59J/nWvVZ2ft4VLW1eEwJLbS7qDuLXX6ubaQPp6aI0PIuA/oAaQ==,iv:LssEHeJkUOPvEOpeTwZ8RQoM4Vj2ofpPaWMbOhV9N3M=,tag:9iJe2Rgbl04WrF0p+VEriw==,type:str]
+      heartbeat:
+        interval: 8h
+      alerts:
+        - type: email
+          failure-threshold: 1
+          success-threshold: 1
+          send-on-resolved: true
+    - name: "y"
+      group: backups
+      token: ENC[AES256_GCM,data:l4PY1dGWELR+WwNUBv+EyxQishSs4mwj2/o7HEQSaCHCWK0XDa3DBkthnw==,iv:PO4xIevUcrYPllMmoQ8532FL1TidZgW5iGKn+7ktpGw=,tag:0TwM+rN+tLXAfqoYkhOobg==,type:str]
+      heartbeat:
+        interval: 8h
+      alerts:
+        - type: email
+          failure-threshold: 1
+          success-threshold: 1
+          send-on-resolved: true
+    - name: portfolio
+      group: backups
+      token: ENC[AES256_GCM,data:01Oq6F3yWbP6HRdO0XLcl/AdrOUSwEoiJVwD7Xcr0R4GXTOl02a+kgZ8LQ==,iv:BpPBQZRMOiGuTS4/0z+8UCEVeQwT4ns6hhftxI1in70=,tag:BJB4pUEAYFwodBpVEsdtbQ==,type:str]
+      heartbeat:
+        interval: 2h
+      alerts:
+        - type: email
+          failure-threshold: 1
+          success-threshold: 1
+          send-on-resolved: true
+    - name: attic
+      group: backups
+      token: ENC[AES256_GCM,data:cg6Qjm1ws/1GG0QNq3jCZ6CRfn2dIkmGqqdzJfghtZcA8zhgGNaEe53+zQ==,iv:TuT8sx0wVJsrr9/McASlPk5VBbrJubz8hqEW1L5eLKo=,tag:/7F2jbhWoNGJulUALOVXyA==,type:str]
+      heartbeat:
+        interval: 2h
+      alerts:
+        - type: email
+          failure-threshold: 1
+          success-threshold: 1
+          send-on-resolved: true
+    - name: control
+      group: backups
+      token: ENC[AES256_GCM,data:ZAC5sb/4M552t4uDdeRJ4BB23a1RZMfp9eQJBET+io+YjEdAbiFYrlNWjA==,iv:PwZ07O2i8XzVS/gxLtDDbBDgfrmyZkBYGKbyqcsH1mM=,tag:gv4sCNgkjeSRC21UyVa6EQ==,type:str]
+      heartbeat:
+        interval: 8h
+      alerts:
+        - type: email
+          failure-threshold: 1
+          success-threshold: 1
+          send-on-resolved: true
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBrbWsvVmgyUjZBVWp1bTZv
+            SEJ3NkExaGFiTTdMaFlpYmt5WVozRHdrL2pNCmlpL3V5OWRTaURPUDYxNENlU3R3
+            Tm1nODRzYUVMQ3Bsbk5mSE1HOUFTNmMKLS0tIGZRb1F4ajlmVzk4WHdHS3psckd3
+            czAyMEszNmE3b2VGM2FRNWE1K0tlQkEKUhrA1CfsNTRElp98POSkIcPLaiyxu76o
+            8tsl32CQeygZySr7N8nXUr2gqvy/xjtypjUoxeHhq0JjKIvF2kGu1Q==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1eva47ddzjgmvrzjd8mxm7h0n6vvamw5xp94aqvlm2d3yf3uvracqypxu7x
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEMUZGLzRvdXRDSTE4MEE5
+            S0FESFpITEJqU0xCc2MyRS9TZjlqbkhqa3pvCmtndXViTWUvRkQ4ZUpsY0Eva2pI
+            V3Q3LzJkY1RwY2F3YWloR1dtQS85eTgKLS0tIEUxWm9PTDNjUm9Bd2JWN3JjdG1W
+            NTk5TW1QRUdhS1U0aHUwcUlpZWpoeFUKMVvczXmBcBmSPeYGC5b0xPJADLyj1EkT
+            GNGmvnqyzTi9xFeNsVnYRWHq+S4PBSIHgezevg40Fsx/YCudXUEM3g==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1wflp6cynwm97wndq5zxmpaxwz59h62a7dku8qdyue5zm9g4djfnqwj9n0m
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5NEZFRWpxNTdZc3o4K3FD
+            NHBjL1BlaGJnTi9oWDU2djZ3MjZ6SlYrYWhRCkxVVkYxcXhxRzJvc3RxY1RtSldZ
+            dE5zdmJCTWdNR1BnaWlrR3daRmNHMFEKLS0tIEdPeC9MOFUzWFFyUWZqdEw5RUMx
+            ZEtvRWtuRXJKQnNjcE1BTWVKa1FNb0EKn34EFN7XRh1thxFIBiWBKPjjE5q3v1gF
+            8D/TM/LPKPsBiLG7Mnkj0lYAzzu7p/Tltds4gMYTOa8KXu3qxeS4pw==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age15wjewk6yjs5vsezah0sa9vz3gyl569eexwj74l8dvrc2vlsxuq3q7hq52d
+    encrypted_regex: ^(username|password|token)$
+    lastmodified: "2026-09-12T23:06:56Z"
+    mac: ENC[AES256_GCM,data:31Abu6QNSVrqoDJ1pIXQKUb6QOeZRtsnQV+4vIqcSpKY2PTO0JfE/Ojqr4l5QyqtxOHpcIeIfSANHWQ9YBY7q8txeyFeoMxMVeoA04GYGzZr9m/Au0Cb9+7Dukcrqs8Lz5Ql+beLEFXHO3BSVWxbNQfZeBgsCCN9aUkFS0Q9Rkw=,iv:aCsyvD822VGhkVrmi18XuO36J0e96QpdE+mfH8kDJfo=,tag:ErnWsrp32lm5Tvq79E+9Gg==,type:str]
+    version: 3.13.3

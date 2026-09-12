@@ -1,0 +1,124 @@
+- name: Require scoped recovery credentials
+  ansible.builtin.assert:
+    that:
+    - backup_environment.RESTIC_REPOSITORY == 's3:s3.eu-north-1.amazonaws.com/llunde-pyparser-bucket/restic/platform/control'
+    - backup_environment.RESTIC_PASSWORD | length >= 32
+    - backup_environment.AWS_ACCESS_KEY_ID | length > 0
+    - backup_environment.AWS_SECRET_ACCESS_KEY | length > 0
+  no_log: true
+
+- name: Install Restic
+  ansible.builtin.apt:
+    name: restic
+    state: present
+    policy_rc_d: 101
+
+- name: Create private backup directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+  - /etc/platform-backups
+  - /var/lib/platform-backups
+
+- name: Install recovery credentials
+  ansible.builtin.copy:
+    dest: /etc/platform-backups/control.env
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      {% for key, value in backup_environment.items() %}
+      {{ key }}={{ value | to_json }}
+      {% endfor %}
+  no_log: true
+
+- name: Create the hook directory
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the native recovery hook
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../platform/components/backups/control.sh"
+    dest: /usr/local/libexec/platform-control-backup
+    owner: root
+    group: root
+    mode: "0755"
+    validate: /bin/bash -n %s
+
+- name: Create the backup metric directory
+  ansible.builtin.file:
+    path: /var/lib/node_exporter/textfile_collector
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the backup heartbeat hook
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../platform/components/backup-job/heartbeat.sh"
+    dest: /usr/local/libexec/platform-backup-heartbeat
+    owner: root
+    group: root
+    mode: "0755"
+    validate: /bin/bash -n %s
+
+- name: Install the bounded recovery service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/platform-control-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      After=network-online.target k3s.service
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      EnvironmentFile=/etc/platform-backups/control.env
+      Environment=RESTIC_CACHE_DIR=/var/lib/platform-backups/cache
+      ExecStart=/usr/local/libexec/platform-control-backup
+      RuntimeMaxSec=1800
+      TimeoutStartSec=1800
+      TimeoutStopSec=90
+      KillMode=mixed
+      MemoryMax=512M
+      MemorySwapMax=0
+      CPUQuota=100%
+      TasksMax=128
+      NoNewPrivileges=true
+      PrivateTmp=true
+      ProtectHome=true
+      ProtectSystem=strict
+      ReadWritePaths=/var/lib/platform-backups /var/lib/node_exporter/textfile_collector
+      UMask=0077
+
+- name: Install the recovery timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/platform-control-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      [Timer]
+      OnCalendar=*-*-* 00,06,12,18:55:00 UTC
+      Persistent=true
+      RandomizedDelaySec=300
+      [Install]
+      WantedBy=timers.target
+
+- name: Configure the recovery schedule
+  ansible.builtin.systemd_service:
+    name: platform-control-backup.timer
+    enabled: "{{ backup_timer_enabled | default(false) }}"
+    state: "{{ 'started' if backup_timer_enabled | default(false) else 'stopped' }}"
+    daemon_reload: true

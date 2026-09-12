@@ -1,0 +1,5 @@
+cache-dir = "~/.cache/ruff"
+
+[format]
+quote-style = "double"
+line-ending = "lf"

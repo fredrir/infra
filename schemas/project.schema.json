@@ -1,0 +1,358 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "project": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,29}$"
+    },
+    "workloads": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 8,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,19}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": ["web", "worker", "cron"]
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 65535
+          },
+          "healthPath": {
+            "type": "string",
+            "pattern": "^/[^\\s]*$",
+            "maxLength": 256
+          },
+          "domains": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9.-]+$",
+              "maxLength": 253
+            }
+          },
+          "resourceClass": {
+            "enum": ["small", "medium", "large", "compute"]
+          },
+          "architecture": {
+            "enum": ["amd64", "arm64", "multi"]
+          },
+          "replicas": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "maxItems": 64
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "maxItems": 64
+          },
+          "env": {
+            "type": "object",
+            "maxProperties": 64,
+            "propertyNames": {
+              "pattern": "^[A-Z_][A-Z0-9_]*$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "secretKeys": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 64,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z_][A-Z0-9_]*$"
+            }
+          },
+          "egress": {
+            "enum": ["none", "internet"]
+          },
+          "schedule": {
+            "type": "string",
+            "minLength": 9,
+            "maxLength": 100,
+            "pattern": "^[0-9*,/ -]+$"
+          },
+          "volume": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mountPath": {
+                "type": "string",
+                "pattern": "^/(data|app/data)(/[a-zA-Z0-9_-]+)*$"
+              },
+              "sizeClass": {
+                "enum": ["small", "medium", "large"]
+              }
+            },
+            "required": ["mountPath", "sizeClass"]
+          },
+          "component": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,19}$"
+          },
+          "sharedVolume": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "mountPath"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,19}$"
+              },
+              "mountPath": {
+                "type": "string",
+                "pattern": "^(/(data|app/data)(/[a-zA-Z0-9_-]+)*|/app/\\.local/files)$"
+              }
+            }
+          },
+          "readinessPath": {
+            "type": "string",
+            "pattern": "^/[^\\s]*$",
+            "maxLength": 256
+          },
+          "terminationGracePeriodSeconds": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 120
+          }
+        },
+        "required": ["kind"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "web"
+                }
+              }
+            },
+            "then": {
+              "required": ["port", "healthPath"]
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": ["domains"]
+                  },
+                  {
+                    "required": ["port"]
+                  },
+                  {
+                    "required": ["healthPath"]
+                  },
+                  {
+                    "required": ["readinessPath"]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "cron"
+                }
+              }
+            },
+            "then": {
+              "required": ["schedule"],
+              "not": {
+                "required": ["replicas"]
+              }
+            },
+            "else": {
+              "not": {
+                "required": ["schedule"]
+              }
+            }
+          },
+          {
+            "if": {
+              "required": ["sharedVolume"]
+            },
+            "then": {
+              "properties": {
+                "replicas": {
+                  "const": 1
+                },
+                "kind": {
+                  "enum": ["web", "worker"]
+                }
+              },
+              "not": {
+                "required": ["volume"]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "postgres": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sizeClass", "recovery"],
+          "properties": {
+            "sizeClass": {
+              "enum": ["small", "medium", "large"]
+            },
+            "recovery": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["rpoHours", "rtoHours"],
+              "properties": {
+                "rpoHours": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 168
+                },
+                "rtoHours": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 168
+                }
+              }
+            }
+          }
+        },
+        "valkey": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sizeClass", "recovery"],
+          "properties": {
+            "sizeClass": {
+              "enum": ["small", "medium", "large"]
+            },
+            "recovery": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["rpoHours", "rtoHours"],
+              "properties": {
+                "rpoHours": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 168
+                },
+                "rtoHours": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 168
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "sharedVolumes": {
+      "type": "object",
+      "maxProperties": 4,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,19}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sizeClass"],
+        "properties": {
+          "sizeClass": {
+            "enum": ["small", "medium", "large"]
+          }
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "command", "compatibility", "retrySafe"],
+      "properties": {
+        "component": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,19}$"
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "maxItems": 64,
+          "minItems": 1
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "maxItems": 64
+        },
+        "env": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "secretKeys": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          }
+        },
+        "resourceClass": {
+          "enum": ["small", "medium", "large", "compute"]
+        },
+        "compatibility": {
+          "const": "backward-compatible"
+        },
+        "retrySafe": {
+          "const": true
+        }
+      }
+    }
+  },
+  "required": ["schemaVersion", "project", "workloads"],
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

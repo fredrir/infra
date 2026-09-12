@@ -1,0 +1,58 @@
+- name: Install transport prerequisites
+  ansible.builtin.apt:
+    name: [ca-certificates, tar, iproute2, kmod]
+    state: present
+    update_cache: true
+    policy_rc_d: 101
+
+- name: Create transport artifact directory
+  ansible.builtin.file:
+    path: /var/lib/platform
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install verified transport binaries
+  ansible.builtin.include_tasks: tailscale-install.yml
+
+- name: Install transport service
+  ansible.builtin.template:
+    src: tailscaled.service.j2
+    dest: /etc/systemd/system/tailscaled.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart bootstrap Tailscale
+
+- name: Load tunnel support
+  ansible.builtin.command:
+    argv: [modprobe, tun]
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Inspect tunnel device
+  ansible.builtin.stat:
+    path: /dev/net/tun
+    get_checksum: false
+    get_mime: false
+    get_attributes: false
+  register: platform_bootstrap_tun
+  when: not ansible_check_mode
+
+- name: Require kernel tunnel support
+  ansible.builtin.assert:
+    that: platform_bootstrap_tun.stat.ischr | default(false)
+  when: not ansible_check_mode
+
+- name: Apply transport service changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Start transport service
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+

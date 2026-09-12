@@ -1,0 +1,113 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-public-headers
+spec:
+  headers:
+    customRequestHeaders:
+      X-Admin-Origin: ""
+---
+{{- range $name, $workload := .Values.workloads }}
+{{- if eq $workload.kind "web" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $name }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-system
+        - podSelector:
+            matchLabels:
+              infra.fredrir.com/project: {{ $.Values.project }}
+      ports:
+        - protocol: TCP
+          port: {{ $workload.port }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}-internal
+spec:
+  podSelector:
+    matchLabels:
+      infra.fredrir.com/project: {{ $.Values.project }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ $.Release.Name }}
+              app.kubernetes.io/component: {{ $name }}
+      ports:
+        - protocol: TCP
+          port: {{ $workload.port }}
+{{- if $workload.domains }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-public-headers@kubernetescrd" $.Release.Namespace $.Release.Name | quote }}
+spec:
+  ingressClassName: platform
+  rules:
+    {{- range $workload.domains }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Release.Name }}-{{ $name }}
+                port:
+                  name: http
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- if eq (default "none" $workload.egress) "internet" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}-internet
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $name }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 127.0.0.0/8]
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}
+{{- end }}

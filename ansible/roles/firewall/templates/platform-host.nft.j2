@@ -1,0 +1,24 @@
+add table inet platform_host
+flush table inet platform_host
+table inet platform_host {
+  chain input {
+    type filter hook input priority -5; policy drop;
+    iifname "lo" accept
+    ct state invalid drop
+    ct state established,related accept
+    meta l4proto { icmp, ipv6-icmp } accept
+    udp sport 67 udp dport 68 accept
+    ip6 saddr fe80::/10 udp sport 547 udp dport 546 accept
+    udp dport {{ firewall_tailscale_port }} accept
+    iifname "tailscale0" accept
+{% for cidr in firewall_admin_ipv4_cidrs %}
+    ip saddr {{ cidr }} tcp dport 22 accept
+{% endfor %}
+    iifname { "cni0", "flannel.1" } ip saddr {{ firewall_pod_cidr }} tcp dport { 6443, 10250 } accept
+{% if inventory_hostname in groups['server'] %}
+{% for node in groups['server'] %}
+    ip saddr {{ hostvars[node].private_ip | default(hostvars[node].tailscale_ip) }} tcp dport { 2379, 2380, 6443, 10250 } accept
+{% endfor %}
+{% endif %}
+  }
+}

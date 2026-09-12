@@ -1,0 +1,22 @@
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	respond /healthz 200
+	handle_path /api/* {
+		reverse_proxy api:3001
+	}
+	handle /graphql {
+		reverse_proxy api:3001
+	}
+	handle /uploads/* {
+		reverse_proxy api:3001
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

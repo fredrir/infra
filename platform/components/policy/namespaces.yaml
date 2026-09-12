@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flux-system
+  labels:
+    infra.fredrir.com/managed: 'true'
+    infra.fredrir.com/tier: platform
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-system
+  labels:
+    infra.fredrir.com/managed: 'true'
+    infra.fredrir.com/tier: platform
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    infra.fredrir.com/managed: 'true'
+    infra.fredrir.com/tier: platform
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arc-system
+  labels:
+    infra.fredrir.com/managed: 'true'
+    infra.fredrir.com/tier: platform
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-backups
+  labels:
+    infra.fredrir.com/managed: 'true'
+    infra.fredrir.com/tier: platform
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nix-cache
+  labels:
+    infra.fredrir.com/managed: 'true'
+    infra.fredrir.com/tier: platform
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36

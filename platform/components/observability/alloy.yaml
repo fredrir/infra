@@ -1,0 +1,105 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: alloy
+  namespace: observability
+spec:
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: alloy
+      version: 1.12.1
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    alloy:
+      configMap:
+        create: false
+        name: alloy-config
+      extraEnv:
+      - name: NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: '1'
+          memory: 512Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      extraPorts:
+      - name: otlp-grpc
+        port: 4317
+        targetPort: 4317
+        protocol: TCP
+      - name: otlp-http
+        port: 4318
+        targetPort: 4318
+        protocol: TCP
+      mounts:
+        extra:
+        - name: alloy-state
+          mountPath: /tmp/alloy
+    controller:
+      type: daemonset
+      priorityClassName: production
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      volumes:
+        extra:
+        - name: alloy-state
+          emptyDir:
+            sizeLimit: 512Mi
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: monitoring
+    image:
+      registry: docker.io
+      repository: grafana/alloy
+      tag: v1.19.2
+      digest: sha256:b8ec653c44235fbe910879145dac3597d66b0aaecf60bcbbe82580767771a839
+    global:
+      podSecurityContext:
+        runAsUser: 473
+        runAsGroup: 473
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+        fsGroup: 473
+    configReloader:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 50Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+    crds:
+      create: false
+  dependsOn:
+  - name: monitoring
+  releaseName: alloy

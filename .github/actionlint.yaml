@@ -1,0 +1,8 @@
+self-hosted-runner:
+  labels:
+  - buildkit-amd64
+  - nix-amd64
+paths:
+  .github/workflows/build-image.yml:
+    ignore:
+    - 'property "workflow_(sha|repository)" is not defined in object type'

@@ -1,0 +1,83 @@
+logging {
+  level = "info"
+}
+discovery.kubernetes "pods" {
+  role = "pod"
+  selectors {
+    role = "pod"
+    field = "spec.nodeName=" + sys.env("NODE_NAME")
+  }
+}
+discovery.relabel "pods" {
+  targets = discovery.kubernetes.pods.targets
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label = "namespace"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label = "pod"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label = "container"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_node_name"]
+    target_label = "host"
+  }
+}
+loki.source.kubernetes "pods" {
+  targets = discovery.relabel.pods.output
+  forward_to = [loki.write.central.receiver]
+}
+loki.write "central" {
+  endpoint {
+    url = "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
+  }
+}
+otelcol.receiver.otlp "apps" {
+  grpc { endpoint = "0.0.0.0:4317" }
+  http { endpoint = "0.0.0.0:4318" }
+  output { traces = [otelcol.processor.memory_limiter.traces.input] }
+}
+otelcol.processor.memory_limiter "traces" {
+  check_interval = "1s"
+  limit = "256MiB"
+  spike_limit = "64MiB"
+  output { traces = [otelcol.processor.attributes.privacy.input] }
+}
+otelcol.processor.attributes "privacy" {
+  action {
+    key = "http.request.header.authorization"
+    action = "delete"
+  }
+  action {
+    key = "http.request.header.cookie"
+    action = "delete"
+  }
+  action {
+    key = "url.query"
+    action = "delete"
+  }
+  action {
+    key = "db.statement"
+    action = "delete"
+  }
+  output { traces = [otelcol.processor.probabilistic_sampler.traces.input] }
+}
+otelcol.processor.probabilistic_sampler "traces" {
+  sampling_percentage = 10
+  output { traces = [otelcol.processor.batch.traces.input] }
+}
+otelcol.processor.batch "traces" {
+  send_batch_size = 512
+  timeout = "5s"
+  output { traces = [otelcol.exporter.otlp.tempo.input] }
+}
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo.observability.svc.cluster.local:4317"
+    tls { insecure = true }
+  }
+}

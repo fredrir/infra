@@ -1,18 +1,13 @@
-# ---- llunde-01 ----
-output "ipv4" {
-  description = "Public IPv4 of llunde-01"
-  value       = hcloud_server.llunde_01.ipv4_address
+output "control_05_ipv4" {
+  value = hcloud_server.control_05.ipv4_address
 }
 
-output "ipv6" {
-  description = "Public IPv6 network of llunde-01"
-  value       = hcloud_server.llunde_01.ipv6_address
+output "control_05_ipv6_network" {
+  value = hcloud_server.control_05.ipv6_address
 }
 
-# ---- llunde-parser (pyparser) ----
-output "server_ipv4" {
-  description = "Public IPv4 of the pyparser server."
-  value       = module.parser.ipv4_address
+output "worker_04_ipv4" {
+  value = module.worker_04.ipv4_address
 }
 
 output "dataset_bucket" {

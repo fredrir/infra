@@ -1,0 +1,117 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: buildkit
+spec:
+  suspend: false
+  interval: 30m
+  timeout: 5m
+  chart:
+    spec:
+      chart: gha-runner-scale-set
+      version: 0.14.2
+      sourceRef:
+        kind: HelmRepository
+        name: actions
+        namespace: flux-system
+  values:
+    githubConfigUrl: https://github.com/fredrir/infra
+    githubConfigSecret: github-app
+    runnerScaleSetName: buildkit-amd64
+    minRunners: 0
+    maxRunners: 1
+    controllerServiceAccount:
+      name: arc-controller
+      namespace: arc-system
+    listenerTemplate:
+      spec:
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+        - name: listener
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+    template:
+      spec:
+        serviceAccountName: ci-job
+        automountServiceAccountToken: false
+        runtimeClassName: gvisor
+        nodeSelector:
+          node-restriction.kubernetes.io/gvisor: 'true'
+          kubernetes.io/arch: amd64
+        priorityClassName: ci
+        restartPolicy: Never
+        activeDeadlineSeconds: 3600
+        terminationGracePeriodSeconds: 30
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+        - name: runner
+          image: ghcr.io/fredrir/infra-runner-buildkit@sha256:6b400a042682e58da65c25c7fcc16d9f05474714921acfe042603578d5d21667
+          imagePullPolicy: IfNotPresent
+          command:
+          - /home/runner/run.sh
+          env:
+          - name: RUNNER_ALLOW_RUNAS_ROOT
+            value: '1'
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+              add:
+              - CHOWN
+              - DAC_OVERRIDE
+              - FSETID
+              - FOWNER
+              - MKNOD
+              - NET_RAW
+              - SETGID
+              - SETUID
+              - SETFCAP
+              - SETPCAP
+              - NET_BIND_SERVICE
+              - SYS_CHROOT
+              - KILL
+              - AUDIT_WRITE
+              - SYS_ADMIN
+              - NET_ADMIN
+          resources:
+            requests:
+              cpu: '1'
+              memory: 4Gi
+              ephemeral-storage: 1Gi
+            limits:
+              cpu: '2'
+              memory: 4Gi
+              ephemeral-storage: 20Gi
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  infra.fredrir.com/ci-slot: build
+              namespaceSelector:
+                matchLabels:
+                  infra.fredrir.com/tier: ci
+              topologyKey: kubernetes.io/hostname
+      metadata:
+        labels:
+          infra.fredrir.com/ci-slot: build

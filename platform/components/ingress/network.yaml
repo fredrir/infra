@@ -1,0 +1,92 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: edge-egress
+  namespace: ingress-system
+spec:
+  podSelector:
+    matchLabels:
+      app: cloudflared
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - port: 8000
+      protocol: TCP
+  - to:
+    - ipBlock:
+        cidr: 198.41.192.0/24
+    - ipBlock:
+        cidr: 198.41.200.0/24
+    ports:
+    - port: 7844
+      protocol: TCP
+    - port: 7844
+      protocol: UDP
+  - ports:
+    - port: 443
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: traefik
+  namespace: ingress-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: cloudflared
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: llunde-pyparser
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: cloudflared
+          app.kubernetes.io/part-of: llunde-pyparser
+          app.kubernetes.io/component: tunnel
+    ports:
+    - port: 8000
+      protocol: TCP
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    ports:
+    - port: 9100
+      protocol: TCP
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          infra.fredrir.com/tier: project
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    ports:
+    - port: 3000
+      protocol: TCP
+  - ports:
+    - port: 443
+      protocol: TCP
+    - port: 6443
+      protocol: TCP
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: nix-cache
+    ports:
+    - port: 8080
+      protocol: TCP

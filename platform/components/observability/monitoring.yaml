@@ -1,0 +1,258 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: monitoring
+  namespace: observability
+spec:
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: 90.1.1
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    fullnameOverride: monitoring
+    defaultRules:
+      create: true
+    kubeEtcd:
+      enabled: false
+    kubeControllerManager:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeProxy:
+      enabled: false
+    grafana:
+      enabled: true
+      image:
+        tag: 13.2.1
+        sha: f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+      admin:
+        existingSecret: grafana-admin
+        userKey: admin-user
+        passwordKey: admin-password
+      defaultDashboardsEnabled: true
+      persistence:
+        enabled: true
+        storageClassName: ${STORAGE_CLASS}
+        size: 2Gi
+      nodeSelector:
+        node-restriction.kubernetes.io/critical: 'true'
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: '1'
+          memory: 768Mi
+      grafana.ini:
+        server:
+          root_url: https://${GRAFANA_HOST}
+        auth.anonymous:
+          enabled: false
+        auth:
+          disable_login_form: false
+        users:
+          allow_sign_up: false
+        security:
+          cookie_secure: true
+          cookie_samesite: strict
+        analytics:
+          reporting_enabled: false
+      additionalDataSources:
+      - name: Loki
+        uid: loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+        jsonData:
+          derivedFields:
+          - name: TraceID
+            matcherRegex: trace[_]?id[=:]\s*([a-f0-9]{32})
+            datasourceUid: tempo
+            url: $${__value.raw}
+      - name: Tempo
+        uid: tempo
+        type: tempo
+        access: proxy
+        url: http://tempo:3200
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+            spanStartTimeShift: -1m
+            spanEndTimeShift: 1m
+            filterByTraceID: true
+      sidecar:
+        resources:
+          requests:
+            cpu: 20m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        dashboards:
+          enabled: true
+          resource: configmap
+          searchNamespace: observability
+        datasources:
+          enabled: true
+          resource: configmap
+          searchNamespace: observability
+      rbac:
+        namespaced: true
+      initChownData:
+        enabled: false
+    prometheus:
+      prometheusSpec:
+        image:
+          tag: v3.13.2
+          sha: 508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69
+        retention: 15d
+        retentionSize: 18GB
+        resources:
+          requests:
+            cpu: 300m
+            memory: 1Gi
+          limits:
+            cpu: '2'
+            memory: 3Gi
+        nodeSelector:
+          node-restriction.kubernetes.io/critical: 'true'
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: ${STORAGE_CLASS}
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 25Gi
+        ruleSelectorNilUsesHelmValues: false
+        ruleSelector: {}
+        ruleNamespaceSelector: {}
+        serviceMonitorSelectorNilUsesHelmValues: false
+        serviceMonitorSelector: {}
+        serviceMonitorNamespaceSelector: {}
+    alertmanager:
+      alertmanagerSpec:
+        nodeSelector:
+          node-restriction.kubernetes.io/critical: 'true'
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
+        storage:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: local-retain
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+        useExistingSecret: true
+        configSecret: alertmanager-config
+    prometheusOperator:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: '1'
+          memory: 512Mi
+      admissionWebhooks:
+        patch:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: '1'
+              memory: 512Mi
+        enabled: false
+      tls:
+        enabled: false
+    kube-state-metrics:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: '1'
+          memory: 512Mi
+    additionalPrometheusRulesMap:
+      platform:
+        groups:
+        - name: platform-backups
+          rules:
+          - alert: BackupNeverSucceeded
+            expr: restic_expected_job unless on(backup_job, instance) restic_last_success_timestamp
+            for: 30m
+            labels:
+              severity: critical
+            annotations:
+              summary: Expected backup has no successful snapshot
+          - alert: BackupOverdue
+            expr: (time() - restic_last_success_timestamp) > on(backup_job, instance)
+              restic_max_age_seconds
+            for: 15m
+            labels:
+              severity: critical
+            annotations:
+              summary: Backup exceeded its recovery window
+          - alert: CollectorMissing
+            expr: up{job=~".*alloy.*"} == 0
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: Alloy collector unreachable
+    nodeExporter:
+      enabled: true
+    prometheus-node-exporter:
+      namespaceOverride: node-exporter
+      extraArgs:
+      - --collector.textfile.directory=/host/root/var/lib/node_exporter/textfile_collector
+      hostNetwork: false
+      hostPID: false
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      prometheus:
+        monitor:
+          relabelings:
+          - sourceLabels:
+            - __meta_kubernetes_pod_node_name
+            targetLabel: node
+          - sourceLabels:
+            - __meta_kubernetes_pod_node_name
+            targetLabel: instance
+  releaseName: monitoring

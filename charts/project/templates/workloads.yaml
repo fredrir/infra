@@ -1,0 +1,136 @@
+{{- $sharedVolumes := default dict .Values.sharedVolumes -}}
+{{- $consumers := dict -}}
+{{- $architectures := dict -}}
+{{- $independentClaims := dict -}}
+{{- range $name, $workload := .Values.workloads -}}
+  {{- if $workload.volume -}}
+    {{- $_ := set $independentClaims (printf "%s-data" $name) true -}}
+  {{- end -}}
+  {{- with $workload.sharedVolume -}}
+    {{- if not (hasKey $sharedVolumes .name) -}}
+      {{- fail (printf "shared volume not declared: %s" .name) -}}
+    {{- end -}}
+    {{- $_ := set $consumers .name true -}}
+    {{- $common := $workload.architectures -}}
+    {{- if hasKey $architectures .name -}}
+      {{- $common = list -}}
+      {{- range $architecture := get $architectures .name -}}
+        {{- if has $architecture $workload.architectures -}}
+          {{- $common = append $common $architecture -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if eq (len $common) 0 -}}
+      {{- fail (printf "shared volume consumers require a common architecture: %s" .name) -}}
+    {{- end -}}
+    {{- $_ := set $architectures .name $common -}}
+  {{- end -}}
+{{- end -}}
+{{- range $name, $volume := $sharedVolumes -}}
+  {{- if not (hasKey $consumers $name) -}}
+    {{- fail (printf "shared volume is unused: %s" $name) -}}
+  {{- end -}}
+  {{- if hasKey $independentClaims (printf "shared-%s-data" $name) -}}
+    {{- fail (printf "shared volume claim conflicts with workload: %s" $name) -}}
+  {{- end -}}
+{{- end -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}
+automountServiceAccountToken: false
+{{- range $name, $workload := .Values.workloads }}
+{{- if $workload.sharedVolume }}
+{{- $workload = deepCopy $workload }}
+{{- $_ := set $workload "architectures" (get $architectures $workload.sharedVolume.name) }}
+{{- end }}
+---
+{{- if eq $workload.kind "cron" }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+spec:
+  schedule: {{ $workload.schedule | quote }}
+  suspend: {{ eq (int $workload.replicas) 0 }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 3600
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 86400
+      template:
+        {{- include "project.pod" (list $ $name $workload) | nindent 8 }}
+{{- else }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+spec:
+  replicas: {{ $workload.replicas }}
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  {{- if or $workload.volume $workload.sharedVolume }}
+  strategy:
+    type: Recreate
+  {{- else }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    {{- include "project.pod" (list $ $name $workload) | nindent 4 }}
+{{- end }}
+{{- if $workload.volume }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}-data
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-retain
+  resources:
+    requests:
+      storage: {{ $workload.volume.size }}
+{{- end }}
+{{- if and (ne $workload.kind "cron") (gt (int $workload.replicas) 1) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $name }}
+{{- end }}
+{{- end }}
+{{- range $name, $volume := $sharedVolumes }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $.Release.Name }}-shared-{{ $name }}-data
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-retain
+  resources:
+    requests:
+      storage: {{ $volume.size }}
+{{- end }}

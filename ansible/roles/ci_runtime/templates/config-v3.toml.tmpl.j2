@@ -1,0 +1,20 @@
+{% raw %}{{ template "base" . }}{% endraw %}
+
+[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runsc]
+  runtime_type = "io.containerd.runsc.v1"
+  pod_annotations = []
+  container_annotations = []
+  privileged_without_host_devices = true
+
+[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runsc.options]
+  TypeUrl = "io.containerd.runsc.v1.options"
+  ConfigPath = "/etc/containerd/runsc.toml"
+
+[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.kata]
+  runtime_type = "io.containerd.kata.v2"
+  pod_annotations = []
+  container_annotations = []
+  privileged_without_host_devices = true
+
+[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.kata.options]
+  ConfigPath = "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration.toml"

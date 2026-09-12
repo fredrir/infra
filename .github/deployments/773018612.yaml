@@ -1,0 +1,11 @@
+repository: fredrir/portfolio
+images:
+  ghcr.io/fredrir/portfolio-api:
+    path: platform/projects/portfolio
+    mode: kustomize
+  ghcr.io/fredrir/portfolio-web:
+    path: platform/projects/portfolio
+    mode: kustomize
+  ghcr.io/fredrir/portfolio-worker:
+    path: platform/projects/portfolio
+    mode: kustomize

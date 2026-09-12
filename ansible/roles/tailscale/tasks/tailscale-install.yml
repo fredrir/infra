@@ -1,0 +1,24 @@
+- name: Download verified Tailscale archive
+  ansible.builtin.get_url:
+    url: "https://pkgs.tailscale.com/stable/tailscale_{{ platform_tailscale_version }}_{{ platform_architecture }}.tgz"
+    dest: /var/lib/platform/tailscale.tgz
+    checksum: "sha256:{{ platform_tailscale_sha256[platform_architecture] }}"
+    mode: "0600"
+  register: platform_tailscale_archive
+
+- name: Extract Tailscale binaries
+  ansible.builtin.unarchive:
+    src: /var/lib/platform/tailscale.tgz
+    dest: /var/lib/platform
+    remote_src: true
+  when: not ansible_check_mode
+
+- name: Install Tailscale binaries
+  ansible.builtin.copy:
+    remote_src: true
+    src: "/var/lib/platform/tailscale_{{ platform_tailscale_version }}_{{ platform_architecture }}/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: "0755"
+  loop: [tailscale, tailscaled]
+  when: not ansible_check_mode
+  notify: "{{ platform_tailscale_restart_handler | default('Restart bootstrap Tailscale') }}"

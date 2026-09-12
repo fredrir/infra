@@ -1,0 +1,12 @@
+- name: Enroll transport on new hosts
+  hosts: tailscale_bootstrap
+  become: true
+  serial: 1
+  gather_facts: true
+  tasks:
+    - name: Bootstrap tagged Tailscale transport
+      ansible.builtin.include_role:
+        name: tailscale
+      vars:
+        platform_tailscale_restart_handler: Restart bootstrap Tailscale
+        platform_node_name: "{{ inventory_hostname }}"

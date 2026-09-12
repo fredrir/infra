@@ -1,0 +1,14 @@
+[Unit]
+After=network-pre.target
+Wants=network-pre.target
+Before=network.target
+
+[Service]
+ExecStart=/usr/local/bin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock --port=41641
+Restart=on-failure
+RuntimeDirectory=tailscale
+StateDirectory=tailscale
+StateDirectoryMode=0700
+
+[Install]
+WantedBy=multi-user.target

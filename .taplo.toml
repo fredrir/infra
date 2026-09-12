@@ -1,0 +1,6 @@
+[formatting]
+array_trailing_comma = true
+align_entries        = true
+column_width         = 100
+allowed_blank_lines  = 1
+trailing_newline     = false

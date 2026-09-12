@@ -1,18 +1,19 @@
 # Secrets
 
-| File                         | Keys                          | Host          |
-| ---------------------------- | ----------------------------- | ------------- |
-| `doppler.yaml`               | `doppler_token`               | llunde-01     |
-| `pyparser-doppler.yaml`      | `doppler_token`               | llunde-parser |
-| `tailscale.yaml`             | `auth_key`                    | **both**      |
-| `ghcr.yaml`                  | `auth_json`                   | **both**      |
-| `restic.yaml`                | `password`, `env`             | llunde-01     |
-| `pyparser-restic.yaml`       | `password`, `env`             | llunde-parser |
-| `llunde-backend-db.yaml`     | `env`                         | llunde-01     |
-| `llunde-tunnel.yaml`         | `env`                         | llunde-01     |
-| `llunde-caddy-acme.yaml`     | `env`                         | llunde-01     |
-| `llunde-caddy-ghcr.yaml`     | `auth_json`                   | llunde-01     |
-| `observability-smtp.yaml`    | `env`                         | llunde-parser |
-| `observability-grafana.yaml` | `env`                         | llunde-parser |
-| `gitops-llunde-01.yaml`      | `deploy_key`, `heartbeat_url` | llunde-01     |
-| `gitops-llunde-parser.yaml`  | `deploy_key`, `heartbeat_url` | llunde-parser |
+| Scope | Location |
+| --- | --- |
+| Infrastructure APIs, runner App, mail | Doppler `infra → ops` |
+| Application source environments | Each project's existing Doppler configuration |
+| Cluster runtime secrets | `platform/**/*.secret.sops.yaml` |
+| Independent monitoring | `ansible/roles/gatus/files/config.sops.yaml` |
+| Decryption | Macie, Archie and Flux age recipients |
+| Host tokens | Private `/etc/rancher/k3s/server-token` and `agent-token` |
+| Recovery archives | Private `.infra/` on Macie and independent Archie copies |
+| Git | Encrypted values only; private keys and decrypted files stay outside tracked paths |
+
+```sh
+export SOPS_AGE_KEY_FILE=/path/to/age-key.txt
+sops platform/projects/<project>/<name>.secret.sops.yaml
+```
+
+[Platform operation](platform.md) · [Mail credentials](mail-alerts.md)

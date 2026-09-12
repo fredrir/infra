@@ -1,0 +1,5 @@
+repository: fredrir/llunde-pyparser
+images:
+  ghcr.io/fredrir/pyparser-review:
+    path: platform/projects/llunde-pyparser
+    mode: kustomize

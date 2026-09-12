@@ -1,0 +1,100 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: loki
+  namespace: observability
+spec:
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: loki
+      version: 18.13.0
+      sourceRef:
+        kind: HelmRepository
+        name: grafana-community
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    deploymentMode: Monolithic
+    loki:
+      auth_enabled: false
+      image:
+        tag: 3.7.7
+        digest: sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
+      commonConfig:
+        replication_factor: 1
+      storage:
+        type: filesystem
+      schemaConfig:
+        configs:
+        - from: '2024-04-01'
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+      compactor:
+        retention_enabled: true
+        delete_request_store: filesystem
+      limits_config:
+        retention_period: 168h
+        ingestion_rate_mb: 4
+        ingestion_burst_size_mb: 8
+        max_query_series: 1000
+        max_entries_limit_per_query: 5000
+      analytics:
+        reporting_enabled: false
+    singleBinary:
+      replicas: 1
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: '2'
+          memory: 2Gi
+      nodeSelector:
+        node-restriction.kubernetes.io/stateful: 'true'
+        kubernetes.io/hostname: fredrir-09
+      priorityClassName: production
+      persistence:
+        enabled: true
+        storageClass: local-retain
+        size: 40Gi
+        enableStatefulSetAutoDeletePVC: false
+    read:
+      replicas: 0
+    write:
+      replicas: 0
+    backend:
+      replicas: 0
+    gateway:
+      enabled: false
+    lokiCanary:
+      enabled: false
+    test:
+      enabled: false
+    chunksCache:
+      enabled: false
+    resultsCache:
+      enabled: false
+    sidecar:
+      rules:
+        enabled: false
+    monitoring:
+      serviceMonitor:
+        enabled: true
+        labels:
+          release: monitoring
+      dashboards:
+        enabled: true
+  releaseName: loki
+  dependsOn:
+  - name: monitoring

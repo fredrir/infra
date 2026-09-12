@@ -1,0 +1,19 @@
+- name: Configure K3s servers in bootstrap order
+  hosts: server
+  order: inventory
+  serial: 1
+  become: true
+  gather_facts: true
+  vars:
+    k3s_role: server
+  roles:
+    - k3s
+
+- name: Configure K3s workers
+  hosts: agent
+  become: true
+  gather_facts: true
+  vars:
+    k3s_role: agent
+  roles:
+    - k3s
