@@ -1,2 +1,0 @@
-platform_watchdog_enable: false
-platform_watchdog_config_file: /run/secrets/platform-watchdog
