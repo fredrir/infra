@@ -8,5 +8,5 @@ RUN groupadd --gid 30000 nixbld \
     && printf 'experimental-features = nix-command flakes\nsandbox = true\nsandbox-fallback = false\nbuild-users-group = nixbld\nfilter-syscalls = true\nauto-allocate-uids = false\nuse-cgroups = false\nmax-jobs = 1\ncores = 2\n' > /etc/nix/nix.conf
 ENV PATH=/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-ENV RUNNER_ALLOW_RUNAS_ROOT=1
+ENV RUNNER_ALLOW_RUNASROOT=1
 WORKDIR /home/runner

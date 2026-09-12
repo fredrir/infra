@@ -79,7 +79,7 @@ spec:
 
             '
           env:
-          - name: RUNNER_ALLOW_RUNAS_ROOT
+          - name: RUNNER_ALLOW_RUNASROOT
             value: '1'
           - name: ATTIC_SERVER
             value: http://attic.nix-cache.svc.cluster.local:8080

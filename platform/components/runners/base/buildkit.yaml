@@ -68,7 +68,7 @@ spec:
           command:
           - /home/runner/run.sh
           env:
-          - name: RUNNER_ALLOW_RUNAS_ROOT
+          - name: RUNNER_ALLOW_RUNASROOT
             value: '1'
           securityContext:
             privileged: false

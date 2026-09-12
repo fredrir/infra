@@ -5,6 +5,6 @@ USER root
 RUN apt-get update && apt-get install -y --no-install-recommends jq \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=buildkit /usr/bin/buildctl /usr/bin/buildkitd /usr/bin/buildkit-runc /usr/bin/buildctl-daemonless.sh /usr/local/bin/
-ENV RUNNER_ALLOW_RUNAS_ROOT=1
+ENV RUNNER_ALLOW_RUNASROOT=1
 ENV BUILDKITD_FLAGS="--oci-worker=true --containerd-worker=false --oci-worker-snapshotter=native --oci-worker-binary=/usr/local/bin/buildkit-runc"
 WORKDIR /home/runner
