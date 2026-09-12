@@ -3,8 +3,25 @@ all:
     ansible_user: root
     ansible_python_interpreter: /usr/bin/python3
     ansible_ssh_common_args: -o StrictHostKeyChecking=yes -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=10
-    ubuntu_release: "26.04"
-    firewall_admin_ipv4_cidrs: [62.92.106.173/32]
+    ubuntu_release: '26.04'
+    firewall_admin_ipv4_cidrs:
+    - 62.92.106.173/32
+    admin_machines:
+      fredrir-01: macie
+      fredrir-02: archie
+    planned_nodes:
+      fredrir-03:
+        provider: home
+        status: unfinished
+      fredrir-10:
+        provider: home
+        status: unprovisioned
+      hidencloud-arm:
+        provider: hidencloud
+        machine_type: SAR-Torrent
+        architecture: arm64
+        status: unpurchased
+        node_number: null
   children:
     ubuntu:
       children:
@@ -16,25 +33,54 @@ all:
                   ansible_host: 89.167.88.128
                   private_ip: 10.60.0.7
                   tailscale_ip: 100.115.121.9
+                  provider: hetzner
+                  provider_id: '165563054'
+                  machine_type: cx33
+                  architecture: amd64
+                  public_ipv4: 89.167.88.128
                 fredrir-08:
                   ansible_host: 89.167.93.100
                   private_ip: 10.60.0.8
                   tailscale_ip: 100.96.114.53
+                  provider: hetzner
+                  provider_id: '165563055'
+                  machine_type: cx33
+                  architecture: amd64
+                  public_ipv4: 89.167.93.100
                 fredrir-05:
                   ansible_host: 100.107.74.107
                   private_ip: 10.60.0.5
                   tailscale_ip: 100.107.74.107
+                  provider: hetzner
+                  provider_id: '132168416'
+                  machine_type: cpx22
+                  architecture: amd64
+                  public_ipv4: 46.62.214.182
             agent:
               hosts:
                 fredrir-04:
                   ansible_host: 100.66.14.60
                   tailscale_ip: 100.66.14.60
+                  provider: hetzner
+                  provider_id: '141119325'
+                  machine_type: ccx23
+                  architecture: amd64
+                  public_ipv4: 95.217.135.164
                 fredrir-09:
                   ansible_host: 85.190.100.72
                   ansible_user: administrator
                   tailscale_ip: 100.87.168.66
+                  provider: one.com
+                  machine_type: Cloud server XXL
+                  architecture: amd64
+                  public_ipv4: 85.190.100.72
         external:
           hosts:
             fredrir-06:
               ansible_host: 100.86.241.75
-              ansible_ssh_common_args: -o HostKeyAlias=linode -o StrictHostKeyChecking=yes -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=10
+              ansible_ssh_common_args: -o HostKeyAlias=linode -o StrictHostKeyChecking=yes -o ControlMaster=no -o
+                ControlPath=none -o ConnectTimeout=10
+              provider: linode
+              machine_type: Nanode 1 GB
+              architecture: amd64
+              public_ipv4: 172.232.145.251
