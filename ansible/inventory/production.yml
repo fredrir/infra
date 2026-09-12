@@ -78,7 +78,8 @@ all:
           hosts:
             fredrir-06:
               ansible_host: 100.86.241.75
-              ansible_ssh_common_args: -o HostKeyAlias=linode -o StrictHostKeyChecking=yes -o ControlMaster=no -o
+              tailscale_ip: 100.86.241.75
+              ansible_ssh_common_args: -o HostKeyAlias=fredrir-06 -o StrictHostKeyChecking=yes -o ControlMaster=no -o
                 ControlPath=none -o ConnectTimeout=10
               provider: linode
               machine_type: Nanode 1 GB
