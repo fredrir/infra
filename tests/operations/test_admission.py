@@ -87,6 +87,22 @@ class AdmissionTests(unittest.TestCase):
         item["spec"]["initContainers"][0]["securityContext"]["privileged"] = True
         self.assertFalse(admitted("workload-isolation", item))
 
+    def test_init_container_requires_resources_and_no_escalation(self):
+        item = pod()
+        item["spec"]["initContainers"] = [copy.deepcopy(item["spec"]["containers"][0])]
+        self.assertTrue(admitted("workload-isolation", item))
+        item["spec"]["initContainers"][0]["resources"] = {}
+        self.assertFalse(admitted("workload-isolation", item))
+
+    def test_ephemeral_container_cannot_escalate(self):
+        item = pod()
+        container = copy.deepcopy(item["spec"]["containers"][0])
+        del container["resources"]
+        item["spec"]["ephemeralContainers"] = [container]
+        self.assertTrue(admitted("workload-isolation", item))
+        container["securityContext"]["allowPrivilegeEscalation"] = True
+        self.assertFalse(admitted("workload-isolation", item))
+
     def test_host_path_and_control_plane_assignment_are_denied(self):
         for key, value in [
             ("volumes", [{"name": "root", "hostPath": {"path": "/"}}]),
@@ -190,6 +206,37 @@ class AdmissionTests(unittest.TestCase):
         self.assertTrue(admitted("project-network-boundary", item))
         item["spec"]["egress"][0]["ports"][0]["endPort"] = 65535
         self.assertFalse(admitted("project-network-boundary", item))
+
+    def test_tunnel_ports_preserve_private_network_boundary(self):
+        public = {
+            "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": [
+                    "10.0.0.0/8",
+                    "172.16.0.0/12",
+                    "192.168.0.0/16",
+                    "100.64.0.0/10",
+                    "169.254.0.0/16",
+                    "127.0.0.0/8",
+                ],
+            }
+        }
+        for protocol in ["TCP", "UDP"]:
+            item = {
+                "spec": {
+                    "egress": [
+                        {
+                            "to": [copy.deepcopy(public)],
+                            "ports": [{"port": 7844, "protocol": protocol}],
+                        }
+                    ]
+                }
+            }
+            self.assertTrue(admitted("project-network-boundary", item))
+            item["spec"]["egress"][0]["to"][0]["ipBlock"]["except"].remove(
+                "100.64.0.0/10"
+            )
+            self.assertFalse(admitted("project-network-boundary", item))
 
     def test_baseline_delete_requires_platform_identity(self):
         old = {"metadata": {"name": "default-deny"}}

@@ -1,0 +1,173 @@
+- name: Require the supported host and network
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version == ubuntu_release
+      - ansible_facts.architecture in k3s_artifacts
+      - k3s_role in ['server', 'agent']
+      - tailscale_ip in ansible_facts.all_ipv4_addresses
+      - ansible_facts.tailscale0.mtu == 1280
+      - k3s_role != 'server' or private_ip in ansible_facts.all_ipv4_addresses
+      - k3s_server_token_file != k3s_agent_token_file
+
+- name: Inspect protected join credentials
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+    get_checksum: false
+    get_mime: false
+  loop: "{{ [k3s_server_token_file, k3s_agent_token_file] if k3s_role == 'server' else [k3s_agent_token_file] }}"
+  register: k3s_credentials
+
+- name: Require existing private token files
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+      - not item.stat.islnk
+      - item.stat.uid == 0
+      - item.stat.gid == 0
+      - item.stat.mode == '0600'
+      - item.stat.size > 0
+  loop: "{{ k3s_credentials.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Install kernel module configuration
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k3s.conf
+    mode: "0644"
+    content: "overlay\nbr_netfilter\nvxlan\n"
+
+- name: Load kernel modules
+  ansible.builtin.command:
+    argv: [modprobe, "{{ item }}"]
+  loop: [overlay, br_netfilter, vxlan]
+  changed_when: false
+
+- name: Configure Kubernetes kernel settings
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/90-k3s.conf
+    mode: "0644"
+    content: |
+      net.ipv4.ip_forward=1
+      net.bridge.bridge-nf-call-iptables=1
+      net.bridge.bridge-nf-call-ip6tables=1
+      vm.overcommit_memory=1
+      vm.panic_on_oom=0
+      kernel.panic=10
+      kernel.panic_on_oops=1
+  register: k3s_sysctl
+
+- name: Apply Kubernetes kernel settings
+  ansible.builtin.command: sysctl -p /etc/sysctl.d/90-k3s.conf
+  changed_when: true
+  when: k3s_sysctl.changed
+
+- name: Create K3s configuration directory
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Write native K3s configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  register: k3s_configuration
+
+- name: Download the pinned K3s binary
+  ansible.builtin.get_url:
+    url: "https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/{{ k3s_artifacts[ansible_facts.architecture].file }}"
+    dest: /usr/local/bin/k3s
+    checksum: "sha256:{{ k3s_artifacts[ansible_facts.architecture].sha256 }}"
+    owner: root
+    group: root
+    mode: "0755"
+  register: k3s_binary
+
+- name: Download the pinned official installer
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/k3s-io/k3s/{{ k3s_version }}/install.sh"
+    dest: /usr/local/sbin/k3s-install.sh
+    checksum: "sha256:{{ k3s_install_sha256 }}"
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install the upstream systemd service
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/env
+      - -i
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - INSTALL_K3S_SKIP_DOWNLOAD=true
+      - INSTALL_K3S_SKIP_START=true
+      - INSTALL_K3S_SKIP_ENABLE=true
+      - "INSTALL_K3S_EXEC={{ k3s_role }}"
+      - /usr/local/sbin/k3s-install.sh
+  changed_when: true
+
+- name: Create the service dependency directory
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ k3s_service }}.service.d"
+    state: directory
+    mode: "0755"
+
+- name: Order K3s after its existing transport
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ k3s_service }}.service.d/transport.conf"
+    mode: "0644"
+    content: |
+      [Unit]
+      Requires=tailscaled.service
+      After=tailscaled.service network-online.target
+  register: k3s_transport
+
+- name: Enable and reconcile K3s
+  ansible.builtin.systemd_service:
+    name: "{{ k3s_service }}"
+    enabled: true
+    daemon_reload: true
+    state: "{{ 'restarted' if k3s_configuration.changed or k3s_binary.changed or k3s_transport.changed else 'started' }}"
+
+- name: Wait for the node to become ready
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - get
+      - node
+      - "{{ inventory_hostname }}"
+      - "-o=jsonpath={.status.conditions[?(@.type=='Ready')].status}"
+      - --request-timeout=10s
+  delegate_to: "{{ groups['server'][0] }}"
+  changed_when: false
+  register: k3s_ready
+  until: k3s_ready.rc == 0 and k3s_ready.stdout == 'True'
+  retries: 36
+  delay: 5
+  tags: [worker-labels]
+
+- name: Assign worker capabilities through the administrator API
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - label
+      - node
+      - "{{ inventory_hostname }}"
+      - node-restriction.kubernetes.io/critical=true
+      - node-restriction.kubernetes.io/stateful=true
+      - --overwrite
+      - --request-timeout=10s
+  delegate_to: "{{ groups['server'][0] }}"
+  when: k3s_role == 'agent'
+  register: k3s_labels
+  changed_when: "'not labeled' not in k3s_labels.stdout"
+  tags: [worker-labels]

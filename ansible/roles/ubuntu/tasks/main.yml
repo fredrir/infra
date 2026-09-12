@@ -1,0 +1,44 @@
+- name: Require the common Ubuntu release
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version == ubuntu_release
+      - ansible_facts.service_mgr == 'systemd'
+
+- name: Install host prerequisites
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, iproute2, iptables, kmod, openssh-server, policycoreutils]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 60
+    policy_rc_d: 101
+
+- name: Harden SSH authentication
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/00-platform.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload SSH
+
+- name: Validate the complete SSH configuration
+  ansible.builtin.command: /usr/sbin/sshd -t
+  changed_when: false
+
+- name: Inspect effective SSH authentication
+  ansible.builtin.command: /usr/sbin/sshd -T
+  changed_when: false
+  register: ubuntu_ssh_configuration
+
+- name: Require public key authentication
+  ansible.builtin.assert:
+    that:
+      - "'passwordauthentication no' in ubuntu_ssh_configuration.stdout_lines"
+      - "'kbdinteractiveauthentication no' in ubuntu_ssh_configuration.stdout_lines"
+      - "'pubkeyauthentication yes' in ubuntu_ssh_configuration.stdout_lines"

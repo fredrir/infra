@@ -1,0 +1,39 @@
+all:
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_ssh_common_args: -o StrictHostKeyChecking=yes -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=10
+    ubuntu_release: "26.04"
+  children:
+    ubuntu:
+      children:
+        k3s_cluster:
+          children:
+            server:
+              hosts:
+                fredrir-07:
+                  ansible_host: 89.167.88.128
+                  private_ip: 10.60.0.7
+                  tailscale_ip: 100.115.121.9
+                fredrir-08:
+                  ansible_host: 89.167.93.100
+                  private_ip: 10.60.0.8
+                  tailscale_ip: 100.96.114.53
+                fredrir-05:
+                  ansible_host: 100.107.74.107
+                  private_ip: 10.60.0.5
+                  tailscale_ip: 100.107.74.107
+            agent:
+              hosts:
+                fredrir-04:
+                  ansible_host: 100.66.14.60
+                  tailscale_ip: 100.66.14.60
+                fredrir-09:
+                  ansible_host: 85.190.100.72
+                  ansible_user: administrator
+                  tailscale_ip: 100.87.168.66
+        external:
+          hosts:
+            fredrir-06:
+              ansible_host: 100.86.241.75
+              ansible_ssh_common_args: -o HostKeyAlias=linode -o StrictHostKeyChecking=yes -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=10

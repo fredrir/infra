@@ -1,0 +1,6 @@
+- name: Configure Ubuntu hosts
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+  roles:
+    - ubuntu

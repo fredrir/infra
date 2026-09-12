@@ -1,15 +1,2 @@
-- name: Reconcile enrolled platform hosts
-  hosts: platform
-  become: true
-  serial: 1
-  gather_facts: true
-  roles:
-    - platform
-
-- name: Configure external infrastructure checks
-  hosts: platform_external
-  become: true
-  gather_facts: true
-  roles:
-    - role: watchdog
-      when: platform_watchdog_enable | default(false) | bool
+- import_playbook: baseline.yml
+- import_playbook: k3s.yml
