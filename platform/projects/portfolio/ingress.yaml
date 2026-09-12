@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy
+data:
+  Caddyfile: |
+    {
+      admin off
+    }
+    :8080 {
+      handle /healthz {
+        respond "origin alive" 200
+      }
+      @admin host admin.hansteen.dev
+      handle @admin {
+        @root path /
+        redir @root /admin
+        reverse_proxy web:3000 {
+          header_up x-admin-origin 1
+        }
+      }
+      handle /api/* {
+        reverse_proxy api:8080 {
+          header_up -x-admin-origin
+        }
+      }
+      handle /readyz {
+        reverse_proxy api:8080
+      }
+      handle {
+        reverse_proxy web:3000 {
+          header_up -x-admin-origin
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy
+spec:
+  selector: {app: caddy}
+  ports: [{name: http, port: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caddy
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: caddy}
+  template:
+    metadata:
+      labels: {app: caddy}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: caddy
+          image: docker.io/library/caddy@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+          command: [caddy]
+          args: [run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+              add: [NET_BIND_SERVICE]
+          ports: [{name: http, containerPort: 8080}]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          volumeMounts:
+            - {name: configuration, mountPath: /etc/caddy, readOnly: true}
+            - {name: data, mountPath: /data}
+            - {name: config, mountPath: /config}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+      volumes:
+        - name: configuration
+          configMap: {name: caddy}
+        - name: data
+          emptyDir: {sizeLimit: 128Mi}
+        - name: config
+          emptyDir: {sizeLimit: 128Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: cloudflared}
+  template:
+    metadata:
+      labels: {app: cloudflared}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: cloudflared
+          image: docker.io/cloudflare/cloudflared@sha256:e39ee8da81ad5e05d77f38d2f51c60ca51bf2a8450ac3abab50c17fdb91d91bf
+          args: [tunnel, --no-autoupdate, --metrics, "0.0.0.0:2000", run]
+          envFrom: [{secretRef: {name: tunnel}}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          ports: [{name: metrics, containerPort: 2000}]
+          readinessProbe:
+            httpGet: {path: /ready, port: metrics}
+            periodSeconds: 10

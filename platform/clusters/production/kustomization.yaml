@@ -3,5 +3,6 @@ kind: Kustomization
 metadata:
   name: production
 resources:
+- flux-system
 - settings.yaml
 - root.yaml

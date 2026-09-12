@@ -1,0 +1,319 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: review
+  namespace: llunde-pyparser
+spec:
+  selector:
+    app.kubernetes.io/name: review
+    app.kubernetes.io/part-of: llunde-pyparser
+    app.kubernetes.io/component: application
+  ports:
+  - name: http
+    port: 8081
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: review
+  namespace: llunde-pyparser
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: review
+      app.kubernetes.io/part-of: llunde-pyparser
+      app.kubernetes.io/component: application
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: review
+        app.kubernetes.io/part-of: llunde-pyparser
+        app.kubernetes.io/component: application
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-09
+        kubernetes.io/arch: amd64
+      terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+      - name: ghcr
+      containers:
+      - name: review
+        image: ghcr.io/fredrir/pyparser-review@sha256:483d94a9239189f02415541dd3828ae8e8de411d178231da3cd2596e0b1a8e4f
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        envFrom:
+        - secretRef:
+            name: application
+        env:
+        - name: PYPARSER_ENV
+          value: production
+        - name: PYPARSER_DOCLING_NUM_THREADS
+          value: '1'
+        - name: HOME
+          value: /tmp
+        - name: USER
+          value: pyparser
+        - name: LOGNAME
+          value: pyparser
+        - name: XDG_CACHE_HOME
+          value: /var/cache/pyparser
+        - name: DOCTR_CACHE_DIR
+          value: /var/cache/pyparser/doctr
+        - name: HF_HOME
+          value: /var/cache/pyparser/huggingface
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: '2'
+            memory: 2Gi
+        command:
+        - pyparser-review-serve
+        - --host
+        - 0.0.0.0
+        - --port
+        - '8081'
+        volumeMounts:
+        - name: files
+          mountPath: /app/.local/files
+        - name: model-cache
+          mountPath: /var/cache/pyparser
+        ports:
+        - name: http
+          containerPort: 8081
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: files
+        persistentVolumeClaim:
+          claimName: files
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: model-cache
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-extract
+  namespace: llunde-pyparser
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker-extract
+      app.kubernetes.io/part-of: llunde-pyparser
+      app.kubernetes.io/component: application
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: worker-extract
+        app.kubernetes.io/part-of: llunde-pyparser
+        app.kubernetes.io/component: application
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-09
+        kubernetes.io/arch: amd64
+      terminationGracePeriodSeconds: 90
+      imagePullSecrets:
+      - name: ghcr
+      containers:
+      - name: worker-extract
+        image: ghcr.io/fredrir/pyparser-review@sha256:483d94a9239189f02415541dd3828ae8e8de411d178231da3cd2596e0b1a8e4f
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        envFrom:
+        - secretRef:
+            name: application
+        env:
+        - name: PYPARSER_ENV
+          value: production
+        - name: PYPARSER_WORKER_STAGES
+          value: EXTRACT
+        - name: PYPARSER_WORKER_CONCURRENCY
+          value: '1'
+        - name: PYPARSER_WORKER_DRAIN_TIMEOUT_S
+          value: '60'
+        - name: PYPARSER_DOCLING_NUM_THREADS
+          value: '3'
+        - name: PYPARSER_VLM_MODELS
+          value: ''
+        - name: PYPARSER_LLM_MODELS
+          value: ''
+        - name: PYPARSER_DOCTR_KEEP_RESIDENT
+          value: 'true'
+        - name: HOME
+          value: /tmp
+        - name: USER
+          value: pyparser
+        - name: LOGNAME
+          value: pyparser
+        - name: XDG_CACHE_HOME
+          value: /var/cache/pyparser
+        - name: DOCTR_CACHE_DIR
+          value: /var/cache/pyparser/doctr
+        - name: HF_HOME
+          value: /var/cache/pyparser/huggingface
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: '3'
+            memory: 6Gi
+        command:
+        - pyparser-worker
+        volumeMounts:
+        - name: files
+          mountPath: /app/.local/files
+        - name: model-cache
+          mountPath: /var/cache/pyparser
+      volumes:
+      - name: files
+        persistentVolumeClaim:
+          claimName: files
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: model-cache
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-light
+  namespace: llunde-pyparser
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker-light
+      app.kubernetes.io/part-of: llunde-pyparser
+      app.kubernetes.io/component: application
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: worker-light
+        app.kubernetes.io/part-of: llunde-pyparser
+        app.kubernetes.io/component: application
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-09
+        kubernetes.io/arch: amd64
+      terminationGracePeriodSeconds: 45
+      imagePullSecrets:
+      - name: ghcr
+      containers:
+      - name: worker-light
+        image: ghcr.io/fredrir/pyparser-review@sha256:483d94a9239189f02415541dd3828ae8e8de411d178231da3cd2596e0b1a8e4f
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        envFrom:
+        - secretRef:
+            name: application
+        env:
+        - name: PYPARSER_ENV
+          value: production
+        - name: PYPARSER_WORKER_STAGES
+          value: CLASSIFY,BATCH,SPLIT,STRUCTURE_TASK
+        - name: PYPARSER_REAPER_ENABLED
+          value: 'true'
+        - name: PYPARSER_VLM_MODELS
+          value: ''
+        - name: PYPARSER_LLM_MODELS
+          value: ''
+        - name: HOME
+          value: /tmp
+        - name: USER
+          value: pyparser
+        - name: LOGNAME
+          value: pyparser
+        - name: XDG_CACHE_HOME
+          value: /var/cache/pyparser
+        - name: DOCTR_CACHE_DIR
+          value: /var/cache/pyparser/doctr
+        - name: HF_HOME
+          value: /var/cache/pyparser/huggingface
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: '1'
+            memory: 2Gi
+        command:
+        - pyparser-worker
+        volumeMounts:
+        - name: files
+          mountPath: /app/.local/files
+        - name: model-cache
+          mountPath: /var/cache/pyparser
+      volumes:
+      - name: files
+        persistentVolumeClaim:
+          claimName: files
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: model-cache
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
