@@ -1,0 +1,217 @@
+- name: Read reviewed staging inputs
+  ansible.builtin.set_fact:
+    evacuation_plan: "{{ lookup('ansible.builtin.file', evacuation_artifact_directory + '/staging.json') | from_json }}"
+
+- name: Validate target identity and dormant scope
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname == evacuation_plan.target.id
+      - ansible_host == evacuation_plan.target.sshAlias
+      - ansible_facts.hostname == evacuation_plan.target.hostname
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version == '26.04'
+      - ansible_facts.architecture == 'x86_64'
+      - ansible_facts.service_mgr == 'systemd'
+      - evacuation_plan.source.id == 'fredrir-05'
+      - evacuation_plan.target.id == 'fredrir-09'
+      - not evacuation_plan.authorization.sourceStop
+      - not evacuation_plan.authorization.cutover
+      - evacuation_state_directory == '/var/lib/infra-evacuation/llunde'
+      - evacuation_secret_directory == '/etc/infra-evacuation/llunde/secrets'
+      - ansible_password is not defined and ansible_ssh_pass is not defined
+    fail_msg: Verified Ubuntu target and dormant-only scope required
+
+- name: Validate local candidate integrity
+  ansible.builtin.command:
+    argv: ["{{ ansible_playbook_python }}", "{{ role_path }}/../../../scripts/operations/evacuation_staging.py", check-plan, "{{ evacuation_artifact_directory }}"]
+  delegate_to: localhost
+  become: false
+  changed_when: false
+
+- name: Inspect activation checkpoints
+  ansible.builtin.stat:
+    path: "{{ evacuation_state_directory }}/{{ item }}"
+  loop: [stage-approved, restore-approved, source-fenced, edge-approved]
+  register: evacuation_checkpoints
+
+- name: Refuse changes to activated workloads
+  ansible.builtin.assert:
+    that: evacuation_checkpoints.results | selectattr('stat.exists') | list | length == 0
+    fail_msg: Activated standalone workloads require their maintenance workflow
+
+- name: Create host preparation directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /usr/local/libexec
+    - /var/lib/infra-evacuation
+    - "{{ evacuation_state_directory }}"
+    - /etc/infra-evacuation
+    - /etc/infra-evacuation/llunde
+
+- name: Create private staging directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - "{{ evacuation_state_directory }}/candidates"
+    - "{{ evacuation_state_directory }}/identity"
+    - "{{ evacuation_secret_directory }}"
+
+- name: Install staging validation and secret renderer
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../../scripts/operations/evacuation_staging.py"
+    dest: /usr/local/libexec/infra-evacuation-staging
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Copy nonsecret staging metadata
+  ansible.builtin.copy:
+    src: "{{ evacuation_artifact_directory }}/staging.json"
+    dest: "{{ evacuation_state_directory }}/staging.json"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Validate existing account and subordinate mappings
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, /usr/local/libexec/infra-evacuation-staging, check-accounts, "{{ evacuation_state_directory }}/staging.json"]
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Install standalone prerequisites without starting applications
+  ansible.builtin.apt:
+    name: [podman, uidmap, dbus-user-session, passt, age, jq, restic]
+    state: present
+    update_cache: true
+    policy_rc_d: 101
+
+- name: Create service groups
+  ansible.builtin.group:
+    name: "{{ item.key }}"
+    gid: "{{ item.value.gid }}"
+    state: present
+  loop: "{{ evacuation_plan.users | dict2items }}"
+
+- name: Inspect service accounts
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ item.key }}"
+    fail_key: false
+  loop: "{{ evacuation_plan.users | dict2items }}"
+  register: evacuation_accounts
+
+- name: Create locked service accounts without automatic subordinate ranges
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/useradd
+      - --uid
+      - "{{ item.item.value.uid | string }}"
+      - --gid
+      - "{{ item.item.value.gid | string }}"
+      - --create-home
+      - --shell
+      - /usr/sbin/nologin
+      - --no-user-group
+      - -K
+      - SUB_UID_COUNT=0
+      - -K
+      - SUB_GID_COUNT=0
+      - "{{ item.item.key }}"
+  loop: "{{ evacuation_accounts.results }}"
+  when: item.ansible_facts.getent_passwd[item.item.key] == none and not ansible_check_mode
+
+- name: Assign reviewed subordinate user ranges
+  ansible.builtin.lineinfile:
+    path: /etc/subuid
+    regexp: "^{{ item.key }}:"
+    line: "{{ item.key }}:{{ item.value.targetSubIdStart }}:{{ item.value.subIdCount }}"
+  loop: "{{ evacuation_plan.users | dict2items }}"
+
+- name: Assign reviewed subordinate group ranges
+  ansible.builtin.lineinfile:
+    path: /etc/subgid
+    regexp: "^{{ item.key }}:"
+    line: "{{ item.key }}:{{ item.value.targetSubIdStart }}:{{ item.value.subIdCount }}"
+  loop: "{{ evacuation_plan.users | dict2items }}"
+
+- name: Preserve locked service logins
+  ansible.builtin.user:
+    name: "{{ item.key }}"
+    password_lock: true
+    shell: /usr/sbin/nologin
+  loop: "{{ evacuation_plan.users | dict2items }}"
+
+- name: Copy inert candidate units outside Quadlet search paths
+  ansible.builtin.copy:
+    src: "{{ evacuation_artifact_directory }}/units/"
+    dest: "{{ evacuation_state_directory }}/candidates/"
+    owner: root
+    group: root
+    mode: "0600"
+    directory_mode: "0700"
+
+- name: Create persistent host encryption identity
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, /usr/local/libexec/infra-evacuation-staging, host-key, "{{ evacuation_state_directory }}/identity/age.key"]
+  register: evacuation_host_key
+  changed_when: (evacuation_host_key.stdout | from_json).created
+  when: not ansible_check_mode
+
+- name: Report public encryption recipient
+  ansible.builtin.debug:
+    msg: "{{ (evacuation_host_key.stdout | from_json).recipient }}"
+  when: not ansible_check_mode
+
+- name: Install dormant runtime secret service
+  ansible.builtin.template:
+    src: secrets.service.j2
+    dest: /etc/systemd/system/infra-evacuation-secrets.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create user service and slice drop-in directories
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item.1.prefix }}{{ item.0.value.uid }}{{ item.1.suffix }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ (evacuation_plan.users | dict2items) | product([{'prefix': 'user@', 'suffix': '.service.d'}, {'prefix': 'user-', 'suffix': '.slice.d'}]) | list }}"
+
+- name: Require secret rendering before service user managers
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/user@{{ item.value.uid }}.service.d/infra-evacuation.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Requires=infra-evacuation-secrets.service
+      After=infra-evacuation-secrets.service
+  loop: "{{ evacuation_plan.users | dict2items }}"
+
+- name: Bound aggregate standalone user memory
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/user-{{ item.value.uid }}.slice.d/infra-evacuation.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Slice]
+      MemoryMax={{ evacuation_plan.capacity.userSliceMemoryMaxMiB[item.key] }}M
+  loop: "{{ evacuation_plan.users | dict2items }}"
+
+- name: Reload service definitions without starting them
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: not ansible_check_mode

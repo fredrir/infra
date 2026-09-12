@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import urllib.request
 
@@ -132,6 +133,17 @@ def validate(root: Path, cache: Path, helm='helm', kubectl='kubectl', kubeconfor
     data_fixture = list(yaml.load_all(rendered, Loader=Loader))
     chart_resources.extend(data_fixture)
     validate_migration_render(application_fixture, data_fixture, fixture_values)
+    sys.path[:] = [path for path in sys.path if Path(path).resolve() != Path(__file__).resolve().parent]
+    sys.path.insert(0, str(root / 'tools'))
+    from infra.render import render_project
+    document = yaml.safe_load((root / 'tests/infra/fixtures/project.yaml').read_text())
+    record = json.loads((root / 'tests/infra/fixtures/release.json').read_text())
+    fixture_resources = render_project(root, document, record)
+    expected_values = {'./charts/project': fixture_values, './charts/project-data': yaml.safe_load(fixture.read_text())}
+    for item in fixture_resources:
+        if item['kind'] == 'HelmRelease' and item['spec']['values'] != expected_values[item['spec']['chart']['spec']['chart']]:
+            raise ValueError('Canonical project chart fixture differs from compiled release values')
+    compiled.extend(fixture_resources)
     pin = versions['fluxManifest']
     flux_bytes = urllib.request.urlopen(pin['url'], timeout=60).read()
     if hashlib.sha256(flux_bytes).hexdigest() != pin['sha256']:

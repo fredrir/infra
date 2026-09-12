@@ -1,0 +1,14 @@
+- name: Validate transport bootstrap contract
+  ansible.builtin.assert:
+    that:
+      - platform_tailscale_bootstrap_approved | bool
+      - ansible_facts.service_mgr == 'systemd'
+      - (ansible_facts.distribution == 'Ubuntu' and ansible_facts.distribution_version in ['24.04', '26.04']) or (ansible_facts.distribution == 'Debian' and ansible_facts.distribution_major_version == '13')
+      - platform_architecture in ['amd64', 'arm64']
+      - ansible_facts.architecture == ('x86_64' if platform_architecture == 'amd64' else 'aarch64')
+      - platform_tailscale_version == '1.102.4'
+      - platform_node_name is match('^fredrir-[0-9]{2}$')
+      - platform_tailscale_bootstrap_tags in [['tag:platform-control'], ['tag:platform-worker']]
+      - platform_tailscale_auth_key_file is match('^/run/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+$')
+      - ansible_password is not defined and ansible_ssh_pass is not defined
+    fail_msg: Supported host, reviewed role-tag authority and private runtime key path required

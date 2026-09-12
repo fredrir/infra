@@ -65,6 +65,7 @@
       }
     },
     "llunde-pyparser": {
+      "quotaProfile": "parser",
       "repository": "fredrir/llunde-pyparser",
       "repositoryId": 1328252868,
       "namespace": "llunde-pyparser",

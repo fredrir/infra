@@ -3,6 +3,8 @@ import importlib.util
 import json
 import shlex
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -65,6 +67,43 @@ class HostContractTests(unittest.TestCase):
         config = self.render("containerd-v3.toml.j2")
         self.assertIn('{{ template "base" . }}', config)
         self.assertIn('runtime_type = "io.containerd.runsc.v1"', config)
+
+    def test_transport_keeps_control_plane_routes_private_and_role_tagged(self):
+        tasks = yaml.safe_load((ROLE / "tasks/main.yml").read_text())
+        for name in ["Enroll transport with runtime credential", "Configure transport routes"]:
+            task = next(task for task in tasks if task["name"] == name)
+            for role, tag, accepts in [("server", "control", "false"), ("agent", "worker", "true")]:
+                values = self.values | {"platform_role": role}
+                argv = [self.environment.from_string(value).render(values) for value in task["ansible.builtin.command"]["argv"]]
+                self.assertIn(f"--accept-routes={accepts}", argv)
+                if "up" in argv:
+                    self.assertIn(f"--advertise-tags=tag:platform-{tag}", argv)
+                else:
+                    self.assertFalse(any(value.startswith("--advertise-tags=") for value in argv))
+                self.assertIn("--advertise-exit-node=false", argv)
+                self.assertIn("--ssh=false", argv)
+
+    def test_only_control_planes_can_advertise_the_exact_backend_routes(self):
+        contract = yaml.safe_load((ROLE / "tasks/main.yml").read_text())[0]
+        routes = [f"{address}/32" for address in self.values["platform_api_backends"]]
+        values = self.values | {
+            "ansible_facts": {"service_mgr": "systemd", "distribution": "Ubuntu", "distribution_version": "26.04", "architecture": "x86_64"},
+            "platform_preflight_approved": True,
+            "platform_architecture": "amd64",
+            "platform_admin_keys": ["rehearsal-key"],
+        }
+        cases = [("server", [], True), ("agent", [], True), ("server", routes, True), ("agent", routes, False), ("server", ["192.0.2.0/24"], False), ("server", routes[:2], False), ("server", routes + routes[:1], False)]
+        with tempfile.TemporaryDirectory() as directory:
+            playbook = Path(directory) / "contract.yml"
+            for role, advertisements, expected in cases:
+                with self.subTest(role=role, advertisements=advertisements):
+                    playbook.write_text(yaml.safe_dump([{
+                        "hosts": "all", "gather_facts": False,
+                        "vars": values | {"platform_role": role, "platform_advertise_routes": advertisements},
+                        "tasks": [contract],
+                    }]))
+                    result = subprocess.run([str(Path(sys.executable).parent / "ansible-playbook"), "-i", "localhost,", "--connection", "local", str(playbook)], text=True, capture_output=True, timeout=30)
+                    self.assertEqual(result.returncode == 0, expected, result.stdout + result.stderr)
 
     def test_preflight_shell_parses_for_server_and_worker(self):
         for role in ["server", "agent"]:

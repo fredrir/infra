@@ -81,7 +81,7 @@
       "sku": null,
       "architecture": "amd64",
       "osAdapter": "ansible",
-      "currentRole": "external-watchdog",
+      "currentRole": "legacy-applications",
       "desiredRole": "external",
       "capacity": {
         "vCPU": 1,
@@ -95,6 +95,18 @@
         "stateful": false,
         "critical": false,
         "production": false
+      },
+      "observed": {
+        "sshAlias": "linode",
+        "publicIPv4": "172.232.145.251",
+        "tailnetIPv4": "100.86.241.75",
+        "os": "Ubuntu 24.04.2 LTS",
+        "kernel": "6.8.0-137-generic",
+        "hostname": "localhost",
+        "memoryMiB": 961,
+        "diskGiB": 24.04,
+        "tailscaleVersion": "1.102.2",
+        "observedAt": "2026-09-12"
       }
     },
     {
@@ -129,8 +141,30 @@
         "memoryMiB": 7746,
         "diskGiB": 76.3,
         "networkInterfaces": [
-          "eth0"
-        ]
+          "eth0",
+          "enp7s0"
+        ],
+        "privateNetwork": {
+          "id": 12643203,
+          "ipv4": "10.60.0.7",
+          "prefixLength": 32,
+          "interface": "enp7s0",
+          "mtu": 1450,
+          "gateway": "10.60.0.1",
+          "routedCIDRs": [
+            "10.60.0.0/16"
+          ]
+        },
+        "placementGroupId": 1872538,
+        "firewallIds": [
+          11610760
+        ],
+        "protection": {
+          "delete": true,
+          "rebuild": true
+        },
+        "tailnetIPv4": "100.115.121.9",
+        "tailscaleVersion": "1.102.4"
       },
       "providerId": "165563054"
     },
@@ -166,8 +200,30 @@
         "memoryMiB": 7746,
         "diskGiB": 76.3,
         "networkInterfaces": [
-          "eth0"
-        ]
+          "eth0",
+          "enp7s0"
+        ],
+        "privateNetwork": {
+          "id": 12643203,
+          "ipv4": "10.60.0.8",
+          "prefixLength": 32,
+          "interface": "enp7s0",
+          "mtu": 1450,
+          "gateway": "10.60.0.1",
+          "routedCIDRs": [
+            "10.60.0.0/16"
+          ]
+        },
+        "placementGroupId": 1872538,
+        "firewallIds": [
+          11610760
+        ],
+        "protection": {
+          "delete": true,
+          "rebuild": true
+        },
+        "tailnetIPv4": "100.96.114.53",
+        "tailscaleVersion": "1.102.4"
       },
       "providerId": "165563055"
     },
@@ -204,7 +260,9 @@
         "diskGiB": 800,
         "networkInterfaces": [
           "ens3"
-        ]
+        ],
+        "tailnetIPv4": "100.87.168.66",
+        "tailscaleVersion": "1.102.4"
       }
     }
   ],

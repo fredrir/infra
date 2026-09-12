@@ -142,6 +142,7 @@ class ProjectContracts(unittest.TestCase):
             with self.subTest(resource_class=name):
                 value = project()
                 value["workloads"]["web"]["resourceClass"] = name
+                value["workloads"]["web"]["replicas"] = 1
                 validator.validate(application_values(value, release()))
         value = application_values(project(), release())
         value["workloads"]["web"]["resources"]["limits"]["memory"] = "128Gi"

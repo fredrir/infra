@@ -16,6 +16,9 @@ platform_api_backends: []
 platform_pod_cidr: 10.42.0.0/16
 platform_service_cidr: 10.43.0.0/16
 platform_tailscale_auth_key_file: ""
+platform_tailscale_bootstrap_approved: false
+platform_tailscale_bootstrap_tags: []
+platform_tailscale_cli: /usr/local/bin/tailscale
 platform_advertise_routes: []
 platform_server_token_file: /run/secrets/k3s-server-token
 platform_agent_token_file: /run/secrets/k3s-agent-token

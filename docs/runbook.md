@@ -2,9 +2,7 @@
 
 ### Provision
 
-```sh
-doppler run --project pyparser --config prd -- tofu -chdir=tofu apply
-```
+Use the [production OpenTofu inputs and reviewed-plan workflow](platform.md#production-opentofu).
 
 ### Restore from backup
 

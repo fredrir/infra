@@ -141,6 +141,8 @@ def validate_project(root, document):
     unused = set(shared_volumes) - set(shared_architectures)
     if unused:
         raise ContractError(f"shared volumes are unused: {', '.join(sorted(unused))}")
+    from .resources import validate_resource_budget
+    validate_resource_budget(root, project, document)
     return project
 
 

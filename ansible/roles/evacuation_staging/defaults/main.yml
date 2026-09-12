@@ -1,0 +1,3 @@
+evacuation_artifact_directory: "{{ playbook_dir }}/../.infra/evacuation-05"
+evacuation_state_directory: /var/lib/infra-evacuation/llunde
+evacuation_secret_directory: /etc/infra-evacuation/llunde/secrets

@@ -9,6 +9,7 @@
       - ansible_facts.architecture == ('x86_64' if platform_architecture == 'amd64' else 'aarch64')
       - platform_api_backends | length == 3
       - platform_api_backends | unique | length == 3
+      - platform_advertise_routes == [] or (platform_role == 'server' and platform_advertise_routes | sort == platform_api_backends | map('regex_replace', '$', '/32') | sort)
       - platform_node_name is match('^[a-z0-9][a-z0-9-]+$')
       - platform_admin_keys | length > 0
       - ansible_password is not defined and ansible_ssh_pass is not defined
@@ -33,7 +34,7 @@
 
 - name: Install host prerequisites
   ansible.builtin.apt:
-    name: [ca-certificates, curl, haproxy, nftables, iptables, iproute2, kmod, chrony, restic, prometheus-node-exporter]
+    name: [ca-certificates, curl, haproxy, nftables, iptables, iproute2, kmod, chrony, restic, prometheus-node-exporter, jq]
     state: present
     update_cache: true
     policy_rc_d: 101
@@ -129,30 +130,8 @@
     mode: "0755"
   notify: Restart platform K3s
 
-- name: Download verified Tailscale archive
-  ansible.builtin.get_url:
-    url: "https://pkgs.tailscale.com/stable/tailscale_{{ platform_tailscale_version }}_{{ platform_architecture }}.tgz"
-    dest: /var/lib/platform/tailscale.tgz
-    checksum: "sha256:{{ platform_tailscale_sha256[platform_architecture] }}"
-    mode: "0600"
-  register: platform_tailscale_archive
-
-- name: Extract Tailscale binaries
-  ansible.builtin.unarchive:
-    src: /var/lib/platform/tailscale.tgz
-    dest: /var/lib/platform
-    remote_src: true
-  when: not ansible_check_mode
-
-- name: Install Tailscale binaries
-  ansible.builtin.copy:
-    remote_src: true
-    src: "/var/lib/platform/tailscale_{{ platform_tailscale_version }}_{{ platform_architecture }}/{{ item }}"
-    dest: "/usr/local/bin/{{ item }}"
-    mode: "0755"
-  loop: [tailscale, tailscaled]
-  when: not ansible_check_mode
-  notify: Restart platform Tailscale
+- name: Install verified Tailscale binaries
+  ansible.builtin.include_tasks: tailscale-install.yml
 
 - name: Set kernel prerequisites
   ansible.builtin.copy:
@@ -252,7 +231,7 @@
 
 - name: Enroll transport with runtime credential
   ansible.builtin.command:
-    argv: [/usr/local/bin/tailscale, up, "--auth-key=file:{{ platform_tailscale_auth_key_file }}", --accept-routes=true, --ssh=false]
+    argv: [/usr/local/bin/tailscale, up, "--auth-key=file:{{ platform_tailscale_auth_key_file }}", "--accept-routes={{ 'false' if platform_role == 'server' else 'true' }}", "--advertise-tags={{ 'tag:platform-control' if platform_role == 'server' else 'tag:platform-worker' }}", --advertise-routes=, --advertise-exit-node=false, --ssh=false]
   when:
     - not ansible_check_mode
     - (platform_tailscale_status.stdout | from_json).BackendState != 'Running'
@@ -261,7 +240,7 @@
 
 - name: Configure transport routes
   ansible.builtin.command:
-    argv: [/usr/local/bin/tailscale, set, --accept-routes=true, --ssh=false, "--advertise-routes={{ platform_advertise_routes | join(',') }}"]
+    argv: [/usr/local/bin/tailscale, set, "--accept-routes={{ 'false' if platform_role == 'server' else 'true' }}", --ssh=false, "--advertise-routes={{ platform_advertise_routes | join(',') }}", --advertise-exit-node=false]
   changed_when: false
   when: not ansible_check_mode
 

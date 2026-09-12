@@ -5,15 +5,7 @@ from pathlib import Path
 import yaml
 
 from .contracts import ContractError, load_document, validate_project, validate_release
-
-
-RESOURCE_CLASSES = {
-    "small": {"requests": {"cpu": "100m", "memory": "128Mi", "ephemeral-storage": "256Mi"}, "limits": {"cpu": "500m", "memory": "512Mi", "ephemeral-storage": "1Gi"}},
-    "medium": {"requests": {"cpu": "500m", "memory": "512Mi", "ephemeral-storage": "1Gi"}, "limits": {"cpu": "2", "memory": "2Gi", "ephemeral-storage": "4Gi"}},
-    "large": {"requests": {"cpu": "1", "memory": "2Gi", "ephemeral-storage": "2Gi"}, "limits": {"cpu": "4", "memory": "4Gi", "ephemeral-storage": "8Gi"}},
-    "compute": {"requests": {"cpu": "2", "memory": "4Gi", "ephemeral-storage": "2Gi"}, "limits": {"cpu": "4", "memory": "8Gi", "ephemeral-storage": "8Gi"}},
-}
-VOLUME_CLASSES = {"small": "10Gi", "medium": "40Gi", "large": "100Gi"}
+from .resources import RESOURCE_CLASSES, VOLUME_CLASSES, project_quota
 
 
 def resource(kind, name, namespace=None, api="v1", **fields):
@@ -23,7 +15,7 @@ def resource(kind, name, namespace=None, api="v1", **fields):
     return {"apiVersion": api, "kind": kind, "metadata": metadata, **fields}
 
 
-def namespace_resources(project):
+def namespace_resources(project, quota):
     namespace = project["namespace"]
     ns = resource("Namespace", namespace)
     ns["metadata"]["labels"] = {
@@ -59,11 +51,7 @@ def namespace_resources(project):
     data_runtime = resource("ServiceAccount", "project-data", namespace, automountServiceAccountToken=False)
     migration_runtime = resource("ServiceAccount", "project-migration", namespace, automountServiceAccountToken=False)
     public_headers = resource("Middleware", "project-public-headers", namespace, "traefik.io/v1alpha1", spec={"headers": {"customRequestHeaders": {"X-Admin-Origin": ""}}})
-    quota = resource("ResourceQuota", "project", namespace, spec={"hard": {
-        "requests.cpu": "4", "requests.memory": "8Gi", "requests.ephemeral-storage": "64Gi",
-        "limits.cpu": "12", "limits.memory": "16Gi", "limits.ephemeral-storage": "128Gi",
-        "requests.storage": "200Gi", "persistentvolumeclaims": "8", "pods": "24", "services": "12", "count/jobs.batch": "20",
-    }})
+    quota = resource("ResourceQuota", "project", namespace, spec={"hard": quota})
     deny = resource("NetworkPolicy", "default-deny", namespace, "networking.k8s.io/v1", spec={"podSelector": {}, "policyTypes": ["Ingress", "Egress"]})
     dns = resource("NetworkPolicy", "dns", namespace, "networking.k8s.io/v1", spec={"podSelector": {}, "policyTypes": ["Egress"], "egress": [{"to": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}}, "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}}}], "ports": [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}]}]})
     telemetry = resource("NetworkPolicy", "telemetry", namespace, "networking.k8s.io/v1", spec={"podSelector": {}, "policyTypes": ["Egress"], "egress": [{"to": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "observability"}}, "podSelector": {"matchLabels": {"app.kubernetes.io/name": "alloy"}}}], "ports": [{"protocol": "TCP", "port": 4317}, {"protocol": "TCP", "port": 4318}]}]})
@@ -141,7 +129,7 @@ def chart_values(root, document, release=None, releases=None):
 
 def render_project(root, document, release=None, releases=None):
     project = validate_project(root, document)
-    objects = namespace_resources(project)
+    objects = namespace_resources(project, project_quota(root, project))
     secret_keys = sorted({key for workload in document["workloads"].values() for key in workload.get("secretKeys", [])})
     secret_keys += document.get("migration", {}).get("secretKeys", [])
     if "postgres" in document.get("data", {}):

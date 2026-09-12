@@ -91,6 +91,8 @@ class AdmissionTests(unittest.TestCase):
         public = {'ipBlock': {'cidr': '0.0.0.0/0', 'except': ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10', '169.254.0.0/16', '127.0.0.0/8']}}
         item = {'spec': {'egress': [{'to': [public], 'ports': [{'port': 443, 'protocol': 'TCP'}]}, {'to': [{'podSelector': {'matchLabels': {'app': 'database'}}}], 'ports': [{'port': 5432}]}]}}
         self.assertTrue(admitted('project-network-boundary', item))
+        item['spec']['egress'][0]['ports'][0]['endPort'] = 65535
+        self.assertFalse(admitted('project-network-boundary', item))
 
     def test_baseline_delete_requires_platform_identity(self):
         old = {'metadata': {'name': 'default-deny'}}

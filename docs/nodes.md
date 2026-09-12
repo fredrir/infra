@@ -24,7 +24,7 @@
 | `fredrir-06` / linode-one | VPS; independent monitoring candidate | 24/7 |
 | `fredrir-07`, `fredrir-08` | K3s control-plane candidates | SSH and hardware verified; platform enrollment pending |
 | `fredrir-09` | Shared production and CI worker candidate | SSH and hardware verified; platform enrollment pending |
-| Unassigned home server | Planned fourth home computer | Hardware and node number undecided |
+| `fredrir-10` | Reserved for the planned fourth home computer | Hardware and purchase undecided; not provisioned |
 
 | Capacity requirement | Status |
 | --- | --- |

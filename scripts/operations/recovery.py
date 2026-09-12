@@ -200,6 +200,20 @@ def main(argv=None) -> int:
     restore.add_argument("directory", type=Path)
     restore.add_argument("--data-directory", type=Path, required=True)
     restore.add_argument("--k3s-version", required=True)
+    for command in ["volume-export", "volume-verify", "volume-restore"]:
+        volume = sub.add_parser(command)
+        volume.add_argument("--database-bundle", type=Path, required=True)
+        volume.add_argument("--project", required=True)
+        volume.add_argument("--volume", required=True)
+        if command == "volume-export":
+            volume.add_argument("--source", type=Path, required=True)
+            volume.add_argument("--drain-assertion", type=Path, required=True)
+            volume.add_argument("--max-bytes", type=int, required=True)
+        else:
+            volume.add_argument("--directory", type=Path, required=True)
+        if command != "volume-verify":
+            volume.add_argument("--destination", type=Path, required=True)
+            volume.add_argument("--execute", action="store_true", required=True)
     for command in ["postgres-backup", "postgres-restore"]:
         pg = sub.add_parser(command)
         pg.add_argument("--directory", type=Path, required=True)
@@ -229,6 +243,14 @@ def main(argv=None) -> int:
         elif args.command == "backup-metrics":
             backup_metrics(args.file, args.job, args.maximum_age, success=args.success)
             result = {"updated": True}
+        elif args.command.startswith("volume-"):
+            import volume_recovery
+            if args.command == "volume-export":
+                result = volume_recovery.export_volume(args.source, args.destination, args.database_bundle, args.drain_assertion, args.project, args.volume, args.max_bytes)
+            elif args.command == "volume-verify":
+                result = volume_recovery.verify_volume(args.directory, args.database_bundle, args.project, args.volume)
+            else:
+                result = volume_recovery.restore_volume(args.directory, args.database_bundle, args.destination, args.project, args.volume)
         else:
             env = postgres_environment(args.pgpass_file, args.host, args.database, args.user, args.port)
             if args.command == "postgres-backup":
@@ -238,7 +260,7 @@ def main(argv=None) -> int:
                 result = {"restoreChecksPassed": True}
         print(json.dumps(result, indent=2))
         return 0
-    except (RecoveryError, OSError, ValueError) as exc:
+    except (RecoveryError, OSError, ValueError, KeyError, TypeError, tarfile.TarError) as exc:
         print(f"Recovery operation refused: {exc}", file=sys.stderr)
         return 1
 

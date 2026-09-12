@@ -1,0 +1,90 @@
+- name: Inspect current transport identity
+  ansible.builtin.command:
+    argv: ["{{ platform_tailscale_cli }}", status, --json]
+  register: platform_bootstrap_status
+  changed_when: false
+  failed_when: platform_bootstrap_status.rc not in [0, 1]
+  no_log: true
+
+- name: Refuse adoption of another transport identity
+  ansible.builtin.assert:
+    that: (platform_bootstrap_status.stdout | from_json).Self.Tags | default([]) | sort == platform_tailscale_bootstrap_tags | sort
+    fail_msg: Existing identity must already have exactly the reviewed bootstrap role tag
+  when: (platform_bootstrap_status.stdout | from_json).BackendState == 'Running'
+
+- name: Verify authorized transport identity
+  block:
+    - name: Enroll transport with runtime credential
+      ansible.builtin.command:
+        argv:
+          - "{{ platform_tailscale_cli }}"
+          - up
+          - "--auth-key=file:{{ platform_tailscale_auth_key_file }}"
+          - "--accept-routes={{ 'true' if platform_tailscale_bootstrap_tags == ['tag:platform-worker'] else 'false' }}"
+          - --ssh=false
+          - --advertise-routes=
+          - --advertise-exit-node=false
+          - "--advertise-tags={{ platform_tailscale_bootstrap_tags | join(',') }}"
+          - "--hostname={{ platform_node_name }}"
+          - --timeout=30s
+      when: (platform_bootstrap_status.stdout | from_json).BackendState != 'Running'
+      no_log: true
+
+    - name: Wait for connected transport identity
+      ansible.builtin.command:
+        argv: ["{{ platform_tailscale_cli }}", status, --json]
+      register: platform_bootstrap_verified
+      changed_when: false
+      retries: 10
+      delay: 2
+      until: platform_bootstrap_verified.rc == 0 and (platform_bootstrap_verified.stdout | from_json).BackendState == 'Running'
+      no_log: true
+
+    - name: Require the approved role tag
+      ansible.builtin.assert:
+        that: (platform_bootstrap_verified.stdout | from_json).Self.Tags | default([]) | sort == platform_tailscale_bootstrap_tags | sort
+        fail_msg: Tailscale did not authorize exactly the reviewed bootstrap role tag
+  rescue:
+    - name: Disconnect unverified transport
+      ansible.builtin.command:
+        argv: ["{{ platform_tailscale_cli }}", down]
+      no_log: true
+
+    - name: Refuse unverified transport identity
+      ansible.builtin.fail:
+        msg: Transport disconnected because tagged enrollment verification failed
+
+- name: Inspect transport preferences
+  ansible.builtin.command:
+    argv: ["{{ platform_tailscale_cli }}", get, --json]
+  register: platform_bootstrap_preferences
+  changed_when: false
+  no_log: true
+
+- name: Reconcile restricted transport preferences
+  ansible.builtin.command:
+    argv:
+      - "{{ platform_tailscale_cli }}"
+      - set
+      - "--accept-routes={{ 'true' if platform_tailscale_bootstrap_tags == ['tag:platform-worker'] else 'false' }}"
+      - --ssh=false
+      - --advertise-routes=
+      - --advertise-exit-node=false
+      - "--hostname={{ platform_node_name }}"
+  when: >-
+    (platform_bootstrap_preferences.stdout | from_json)['ssh'] != false or
+    (platform_bootstrap_preferences.stdout | from_json)['accept-routes'] != (platform_tailscale_bootstrap_tags == ['tag:platform-worker']) or
+    (platform_bootstrap_preferences.stdout | from_json)['advertise-routes'] != '' or
+    (platform_bootstrap_preferences.stdout | from_json)['advertise-exit-node'] != false or
+    (platform_bootstrap_preferences.stdout | from_json)['hostname'] != platform_node_name
+  no_log: true
+
+- name: Read assigned transport IPv4 address
+  ansible.builtin.command:
+    argv: ["{{ platform_tailscale_cli }}", ip, -4]
+  register: platform_bootstrap_ipv4
+  changed_when: false
+
+- name: Report transport address for inventory review
+  ansible.builtin.debug:
+    msg: "Tailscale IPv4: {{ platform_bootstrap_ipv4.stdout | trim }}"

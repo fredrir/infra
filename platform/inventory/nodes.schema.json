@@ -277,6 +277,83 @@
             },
             "tailscaleVersion": {
               "type": "string"
+            },
+            "privateNetwork": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "ipv4",
+                "prefixLength",
+                "interface",
+                "mtu",
+                "gateway",
+                "routedCIDRs"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "ipv4": {
+                  "type": "string",
+                  "format": "ipv4"
+                },
+                "prefixLength": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 32
+                },
+                "interface": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_.-]{1,15}$"
+                },
+                "mtu": {
+                  "type": "integer",
+                  "minimum": 576,
+                  "maximum": 65535
+                },
+                "gateway": {
+                  "type": "string",
+                  "format": "ipv4"
+                },
+                "routedCIDRs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "placementGroupId": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "firewallIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "protection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "delete",
+                "rebuild"
+              ],
+              "properties": {
+                "delete": {
+                  "type": "boolean"
+                },
+                "rebuild": {
+                  "type": "boolean"
+                }
+              }
             }
           }
         },

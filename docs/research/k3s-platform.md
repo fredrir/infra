@@ -48,7 +48,7 @@
 | Workload interface | Shared Helm chart plus Kustomize composition | Typed capabilities; no arbitrary resource injection |
 | Scheduling | Kubernetes scheduler | Requests, affinity, taints, topology spread and priority classes |
 | CI | Actions Runner Controller | Repository-scoped ephemeral runners for the personal account |
-| Build isolation | gVisor `systrap` candidate with ARC job containers | Validate real Nix/container builds on both architectures; no privileged DinD or host daemon mounts on shared workers |
+| Build isolation | Configured gVisor `systrap` profile is blocked by Nix compatibility evidence; Kata is an unselected alternative | Validate real Nix/container builds on both architectures; no privileged DinD or host daemon mounts on shared workers |
 | Cross-repository releases | OctoSTS | Scoped release requests; ARC uses its own GitHub App authentication |
 | Images | GHCR | Digest-based publication and deployment; registry replacement remains possible |
 | Nix cache | Attic candidate | Adoption depends on maturity review, restore checks and signing isolation |
@@ -224,7 +224,8 @@ A schema validates shape; authentication and admission establish authority.
 
 | Sandbox gate | Required result |
 | --- | --- |
-| Candidate | gVisor `runsc` with `systrap` on x86_64 and ARM64; no nested virtualization requirement |
+| Configured runtime | gVisor `runsc` with `systrap`; the pinned Nix pairing fails ordinary sandboxed builds on amd64 |
+| Alternative under review | Kata with a standard Linux guest on independently verified KVM-capable workers; no runtime or production selection |
 | Runtime installation | Host adapter explicitly configures containerd shim/template; do not assume K3s auto-detects `runsc` |
 | Runtime enforcement | Platform admission enforces RuntimeClass on runner-created job, action, build and service pods |
 | Workload restrictions | No host paths, host namespaces, host Docker/containerd sockets or host-privileged build pods |
@@ -238,6 +239,8 @@ A schema validates shape; authentication and admission establish authority.
 Priorities and CPU quotas do not bound disk I/O; combined production/build load must meet the workload's latency and recovery limits before shared CI is enabled.
 
 [gVisor platforms](https://gvisor.dev/docs/user_guide/platforms/) and [architecture support](https://gvisor.dev/docs/user_guide/faq/) establish a candidate, not verified ARC/Nix compatibility. [K3s runtime configuration](https://docs.k3s.io/advanced) needs explicit integration. Documented ARC DinD requires privileged pods even in its rootless variant; upstream rootless BuildKit examples also relax container security settings. [ARC deployment](https://docs.github.com/en/actions/how-tos/manage-runners/use-actions-runner-controller/deploy-runner-scale-sets), [BuildKit limitations](https://github.com/moby/buildkit/blob/master/docs/rootless.md)
+
+The [CI runtime pilot](ci-runtime-pilot.md) records the observed gVisor failures and fredrir-09 KVM instruction test. Neither result establishes ARC/K3s compatibility or native ARM support.
 
 [K3s tokens](https://docs.k3s.io/cli/token) default agent enrollment to the server token unless separated. Nix's default sandbox fallback must be disabled for the pilot. [Nix configuration](https://nix.dev/manual/nix/2.35/command-ref/conf-file.html)
 

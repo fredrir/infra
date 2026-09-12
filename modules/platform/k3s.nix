@@ -12,7 +12,7 @@
     else cfg.agentTokenFile;
   preflight = pkgs.writeShellApplication {
     name = "platform-preflight";
-    runtimeInputs = [pkgs.coreutils pkgs.gnugrep pkgs.iproute2 pkgs.util-linux pkgs.kmod];
+    runtimeInputs = [pkgs.coreutils pkgs.gnugrep pkgs.iproute2 pkgs.util-linux pkgs.kmod pkgs.jq config.services.tailscale.package];
     text = ''
       test "$(id -u)" = 0
       test -d /run/systemd/system
@@ -25,11 +25,13 @@
       test -z "$(swapon --noheadings --show=NAME)"
       ip address show dev ${lib.escapeShellArg cfg.transportInterface} | grep -q 'inet '
       ip address show | grep -Fq ${lib.escapeShellArg cfg.nodeIP}
+      tailscale status --json | jq -e --arg role ${lib.escapeShellArg (if server then "tag:platform-control" else "tag:platform-worker")} '.BackendState == "Running" and .Self.Tags == [$role]' >/dev/null
       test -s ${lib.escapeShellArg tokenFile}
       test "$(stat -c %u ${lib.escapeShellArg tokenFile})" = 0
       stat -c %a ${lib.escapeShellArg tokenFile} | grep -Eq '^(400|600)$'
       test "$(findmnt -T /var/lib/rancher -no FSTYPE)" != overlay
       ${lib.optionalString server ''
+        ${lib.concatMapStringsSep "\n" (address: "ip route get ${lib.escapeShellArg address} | grep -Fq ${lib.escapeShellArg " dev ${cfg.privateInterface} "}") (lib.filter (address: address != cfg.privateIP) cfg.apiBackends)}
         test -s ${lib.escapeShellArg cfg.agentTokenFile}
         test "$(stat -c %u ${lib.escapeShellArg cfg.agentTokenFile})" = 0
         stat -c %a ${lib.escapeShellArg cfg.agentTokenFile} | grep -Eq '^(400|600)$'

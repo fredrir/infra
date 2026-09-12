@@ -223,16 +223,16 @@ spec:
   - expression: '!has(object.spec.egress) || object.spec.egress.all(r, has(r.to) && r.to.all(p, (has(p.podSelector)
       && !has(p.namespaceSelector) && !has(p.ipBlock)) || (has(p.ipBlock) && p.ipBlock.cidr == "0.0.0.0/0" && has(p.ipBlock.except)
       && ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "127.0.0.0/8"].all(cidr,
-      cidr in p.ipBlock.except) && has(r.ports) && r.ports.all(port, has(port.port) && port.port == 443 && (!has(port.protocol)
+      cidr in p.ipBlock.except) && has(r.ports) && r.ports.all(port, has(port.port) && !has(port.endPort) && port.port == 443 && (!has(port.protocol)
       || port.protocol == "TCP"))) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
       in p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
       == "kube-system" && has(p.podSelector) && has(p.podSelector.matchLabels) && "k8s-app" in p.podSelector.matchLabels
       && p.podSelector.matchLabels["k8s-app"] == "kube-dns" && has(r.ports) && r.ports.all(port, has(port.port)
-      && port.port == 53)) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
+      && !has(port.endPort) && port.port == 53)) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
       in p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
       == "observability" && has(p.podSelector) && has(p.podSelector.matchLabels) && "app.kubernetes.io/name" in
       p.podSelector.matchLabels && p.podSelector.matchLabels["app.kubernetes.io/name"] == "alloy" && has(r.ports)
-      && r.ports.all(port, has(port.port) && port.port in [4317,4318] && (!has(port.protocol) || port.protocol ==
+      && r.ports.all(port, has(port.port) && !has(port.endPort) && port.port in [4317,4318] && (!has(port.protocol) || port.protocol ==
       "TCP")))))'
     message: Project egress may reach its own pods, DNS, Alloy or public HTTPS only
   - expression: '!has(object.spec.ingress) || object.spec.ingress.all(r, has(r.from) && r.from.all(p, (has(p.podSelector)
