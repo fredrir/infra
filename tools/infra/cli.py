@@ -17,7 +17,11 @@ def repository_root(value=None):
     if value:
         root = Path(value).resolve()
     else:
-        root = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip())
+        root = Path(
+            subprocess.check_output(
+                ["git", "rev-parse", "--show-toplevel"], text=True
+            ).strip()
+        )
     if not (root / "platform/catalog/projects.json").is_file():
         raise ContractError("infrastructure checkout required; use --root")
     return root
@@ -52,13 +56,17 @@ def onboarding(root, args):
         raise ContractError("repository must be owner/name")
     if not re.fullmatch(r"[a-f0-9]{40}", args.workflow_ref):
         raise ContractError("workflow-ref must be a full commit SHA")
-    identity = json.loads(subprocess.check_output(["gh", "api", f"repos/{args.repository}"], text=True))
+    identity = json.loads(
+        subprocess.check_output(["gh", "api", f"repos/{args.repository}"], text=True)
+    )
     catalog = load_document(root / "platform/catalog/projects.json")
     if identity["owner"]["id"] != catalog["ownerId"]:
         raise ContractError("repository owner not approved")
     project_name = args.project or identity["name"].lower()
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,29}", project_name):
-        raise ContractError("project must be a lowercase DNS name of at most 30 characters")
+        raise ContractError(
+            "project must be a lowercase DNS name of at most 30 characters"
+        )
     workload = {"kind": args.kind, "architecture": args.architecture}
     if args.kind == "web":
         workload.update(port=args.port, healthPath=args.health_path)
@@ -69,36 +77,82 @@ def onboarding(root, args):
     elif args.readiness_path:
         raise ContractError("readiness-path requires a web workload")
     if args.termination_grace_period_seconds is not None:
-        workload["terminationGracePeriodSeconds"] = args.termination_grace_period_seconds
+        workload["terminationGracePeriodSeconds"] = (
+            args.termination_grace_period_seconds
+        )
     if args.kind == "cron":
         if not args.schedule:
             raise ContractError("cron schedule required")
         workload["schedule"] = args.schedule
-    document = {"schemaVersion": 1, "project": project_name, "workloads": {"app": workload}}
+    document = {
+        "schemaVersion": 1,
+        "project": project_name,
+        "workloads": {"app": workload},
+    }
     approved = catalog["projects"].get(project_name)
     if approved:
-        if approved["repositoryId"] != identity["id"] or approved["repository"] != identity["full_name"]:
+        if (
+            approved["repositoryId"] != identity["id"]
+            or approved["repository"] != identity["full_name"]
+        ):
             raise ContractError("repository identity conflicts with catalog")
         validate_project(root, document)
     else:
         from .contracts import validate_schema
+
         validate_schema(root, "project", document)
-    architectures = ["amd64", "arm64"] if args.architecture == "multi" else [args.architecture]
+    architectures = (
+        ["amd64", "arm64"] if args.architecture == "multi" else [args.architecture]
+    )
     caller = {
-        "name": "Project CI", "on": {"push": {"branches": ["main"]}},
-        "permissions": {"contents": "read", "packages": "write", "id-token": "write", "attestations": "write"},
-        "jobs": {"project": {
-            "if": f"github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected && github.repository_id == '{identity['id']}' && github.repository_owner_id == '{catalog['ownerId']}'",
-            "uses": f"{catalog['infrastructureRepository']}/.github/workflows/project-ci.yml@{args.workflow_ref}",
-            "with": {"project": project_name, "platforms": json.dumps(["linux/" + arch for arch in architectures]), "test-command": args.test_command},
-        }},
+        "name": "Project CI",
+        "on": {"push": {"branches": ["main"]}},
+        "permissions": {
+            "contents": "read",
+            "packages": "write",
+            "id-token": "write",
+            "attestations": "write",
+        },
+        "jobs": {
+            "project": {
+                "if": f"github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected && github.repository_id == '{identity['id']}' && github.repository_owner_id == '{catalog['ownerId']}'",
+                "uses": f"{catalog['infrastructureRepository']}/.github/workflows/project-ci.yml@{args.workflow_ref}",
+                "with": {
+                    "project": project_name,
+                    "platforms": json.dumps(
+                        ["linux/" + arch for arch in architectures]
+                    ),
+                    "test-command": args.test_command,
+                },
+            }
+        },
     }
     output = Path(args.output).resolve()
-    paths = [output / "project.yaml", output / ".github/workflows/ci.yml", output / "onboarding-request.json"]
+    paths = [
+        output / "project.yaml",
+        output / ".github/workflows/ci.yml",
+        output / "onboarding-request.json",
+    ]
     if any(path.exists() for path in paths):
         raise ContractError("onboarding output already exists")
-    request = {"schemaVersion": 1, "project": project_name, "repository": identity["full_name"], "repositoryId": identity["id"], "ownerId": identity["owner"]["id"], "domains": args.domain or [], "architectures": architectures, "catalogApproved": bool(approved)}
-    for path, content in zip(paths, [yaml.safe_dump(document, sort_keys=False), yaml.safe_dump(caller, sort_keys=False), json.dumps(request, indent=2) + "\n"]):
+    request = {
+        "schemaVersion": 1,
+        "project": project_name,
+        "repository": identity["full_name"],
+        "repositoryId": identity["id"],
+        "ownerId": identity["owner"]["id"],
+        "domains": args.domain or [],
+        "architectures": architectures,
+        "catalogApproved": bool(approved),
+    }
+    for path, content in zip(
+        paths,
+        [
+            yaml.safe_dump(document, sort_keys=False),
+            yaml.safe_dump(caller, sort_keys=False),
+            json.dumps(request, indent=2) + "\n",
+        ],
+    ):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
     print(f"Generated onboarding files: {output}")
@@ -119,7 +173,17 @@ def check_render(root):
             current = target.read_text() if target.exists() else ""
             if current != expected:
                 mismatch = True
-                print("".join(difflib.unified_diff(current.splitlines(True), expected.splitlines(True), fromfile=str(target), tofile=str(relative))), end="")
+                print(
+                    "".join(
+                        difflib.unified_diff(
+                            current.splitlines(True),
+                            expected.splitlines(True),
+                            fromfile=str(target),
+                            tofile=str(relative),
+                        )
+                    ),
+                    end="",
+                )
         if mismatch:
             raise ContractError("generated resources differ; run infra render")
 
@@ -141,7 +205,9 @@ def main(argv=None):
     onboard.add_argument("--readiness-path")
     onboard.add_argument("--termination-grace-period-seconds", type=int)
     onboard.add_argument("--domain", action="append")
-    onboard.add_argument("--architecture", choices=["amd64", "arm64", "multi"], default="amd64")
+    onboard.add_argument(
+        "--architecture", choices=["amd64", "arm64", "multi"], default="amd64"
+    )
     onboard.add_argument("--schedule")
     onboard.add_argument("--test-command", required=True)
     onboard.add_argument("--workflow-ref", required=True)
@@ -159,15 +225,26 @@ def main(argv=None):
                 check_render(root)
                 print("Generated resources match.")
             else:
-                entries = render_all(root, Path(args.output) if args.output else root / "platform/projects")
+                entries = render_all(
+                    root,
+                    Path(args.output) if args.output else root / "platform/projects",
+                )
                 print(f"Rendered {len(entries)} project configurations.")
         elif args.command == "onboard":
             onboarding(root, args)
         elif args.command == "validate-release":
             validate_release(root, load_document(args.file), args.project)
-            print("Release contract valid; signature verification is a separate promotion gate.")
+            print(
+                "Release contract valid; signature verification is a separate promotion gate."
+            )
         return 0
-    except (ContractError, OSError, subprocess.CalledProcessError, KeyError, json.JSONDecodeError) as error:
+    except (
+        ContractError,
+        OSError,
+        subprocess.CalledProcessError,
+        KeyError,
+        json.JSONDecodeError,
+    ) as error:
         print(f"infra: {error}", file=sys.stderr)
         return 1
 

@@ -1,8 +1,7 @@
 import ipaddress
 import json
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ROLES = ("tag:platform-control", "tag:platform-worker")
@@ -87,8 +86,13 @@ class TailnetBoundaryTests(unittest.TestCase):
             protocols = [case["proto"]] if "proto" in case else ["tcp", "udp"]
             for result in ("accept", "deny"):
                 for destination in case.get(result, []):
-                    with self.subTest(source=case["src"], destination=destination, result=result):
-                        access = any(allowed(self.policy, case["src"], destination, protocol) for protocol in protocols)
+                    with self.subTest(
+                        source=case["src"], destination=destination, result=result
+                    ):
+                        access = any(
+                            allowed(self.policy, case["src"], destination, protocol)
+                            for protocol in protocols
+                        )
                         self.assertEqual(access, result == "accept")
 
     def test_admin_ssh_and_private_api_access_do_not_grant_etcd(self):
@@ -106,20 +110,36 @@ class TailnetBoundaryTests(unittest.TestCase):
                 self.assertTrue(allowed(self.policy, source, f"{target}:8472", "udp"))
                 self.assertFalse(allowed(self.policy, source, f"{target}:8472", "tcp"))
                 for port in (9100, 10250):
-                    self.assertTrue(allowed(self.policy, source, f"{target}:{port}", "tcp"))
-                    self.assertFalse(allowed(self.policy, source, f"{target}:{port}", "udp"))
+                    self.assertTrue(
+                        allowed(self.policy, source, f"{target}:{port}", "tcp")
+                    )
+                    self.assertFalse(
+                        allowed(self.policy, source, f"{target}:{port}", "udp")
+                    )
 
     def test_ci_legacy_nodes_and_pods_do_not_inherit_node_transport(self):
         for source in ("tag:ci", "tag:server", "fredrir@github", "10.42.0.10"):
             for target in (*ROLES, *BACKENDS):
                 for port in (22, 2379, 2380, 6443, 8472, 9100, 10250):
                     for protocol in ("tcp", "udp"):
-                        with self.subTest(source=source, target=target, port=port, protocol=protocol):
-                            self.assertFalse(allowed(self.policy, source, f"{target}:{port}", protocol))
+                        with self.subTest(
+                            source=source, target=target, port=port, protocol=protocol
+                        ):
+                            self.assertFalse(
+                                allowed(
+                                    self.policy, source, f"{target}:{port}", protocol
+                                )
+                            )
 
     def test_private_access_does_not_expand_to_other_hosts_or_ports(self):
         for source in (*ROLES, "macie", "archie"):
-            for address in ("10.60.0.1", "10.60.0.6", "10.60.0.9", "10.60.1.7", "192.0.2.1"):
+            for address in (
+                "10.60.0.1",
+                "10.60.0.6",
+                "10.60.0.9",
+                "10.60.1.7",
+                "192.0.2.1",
+            ):
                 for port in (22, 2379, 2380, 6443, 9100, 10250):
                     self.assertFalse(allowed(self.policy, source, f"{address}:{port}"))
             for target in (*ROLES, *BACKENDS):
@@ -134,11 +154,22 @@ class TailnetBoundaryTests(unittest.TestCase):
     def test_role_ownership_and_routes_require_admin_review(self):
         self.assertEqual(self.policy["tagOwners"][ENROLLMENT], ["autogroup:admin"])
         for role in ROLES:
-            self.assertEqual(self.policy["tagOwners"][role], ["autogroup:admin", ENROLLMENT])
-        self.assertEqual({tag for tag, owners in self.policy["tagOwners"].items() if ENROLLMENT in owners}, set(ROLES))
+            self.assertEqual(
+                self.policy["tagOwners"][role], ["autogroup:admin", ENROLLMENT]
+            )
+        self.assertEqual(
+            {
+                tag
+                for tag, owners in self.policy["tagOwners"].items()
+                if ENROLLMENT in owners
+            },
+            set(ROLES),
+        )
         self.assertNotIn("autoApprovers", self.policy)
         self.assertNotIn("grants", self.policy)
-        self.assertEqual(set(self.policy), {"tagOwners", "hosts", "acls", "ssh", "tests"})
+        self.assertEqual(
+            set(self.policy), {"tagOwners", "hosts", "acls", "ssh", "tests"}
+        )
 
     def test_enrollment_authority_has_no_network_or_ssh_grants(self):
         self.assertNotIn(ENROLLMENT, json.dumps(self.policy["acls"]))
@@ -147,16 +178,52 @@ class TailnetBoundaryTests(unittest.TestCase):
             for port in (22, 2379, 2380, 3100, 6443, 8472, 9100, 10250):
                 for protocol in ("tcp", "udp"):
                     with self.subTest(peer=peer, port=port, protocol=protocol):
-                        self.assertFalse(allowed(self.policy, ENROLLMENT, f"{peer}:{port}", protocol))
-                        self.assertFalse(allowed(self.policy, peer, f"{ENROLLMENT}:{port}", protocol))
+                        self.assertFalse(
+                            allowed(self.policy, ENROLLMENT, f"{peer}:{port}", protocol)
+                        )
+                        self.assertFalse(
+                            allowed(self.policy, peer, f"{ENROLLMENT}:{port}", protocol)
+                        )
 
     def test_native_regressions_cover_every_new_role_and_untrusted_source(self):
         cases = self.policy["tests"]
-        for source in (*ROLES, ENROLLMENT, "macie", "archie", "tag:ci", "tag:server", "fredrir@github", "10.42.0.10"):
-            self.assertTrue(any(case["src"] == source and case.get("proto") == "tcp" and case.get("deny") for case in cases))
+        for source in (
+            *ROLES,
+            ENROLLMENT,
+            "macie",
+            "archie",
+            "tag:ci",
+            "tag:server",
+            "fredrir@github",
+            "10.42.0.10",
+        ):
+            self.assertTrue(
+                any(
+                    case["src"] == source
+                    and case.get("proto") == "tcp"
+                    and case.get("deny")
+                    for case in cases
+                )
+            )
         for source in ROLES:
-            self.assertTrue(any(case["src"] == source and case.get("proto") == "udp" and case.get("accept") and case.get("deny") for case in cases))
-        self.assertTrue(any(case["src"] == ENROLLMENT and case.get("proto") == "udp" and case.get("deny") and not case.get("accept") for case in cases))
+            self.assertTrue(
+                any(
+                    case["src"] == source
+                    and case.get("proto") == "udp"
+                    and case.get("accept")
+                    and case.get("deny")
+                    for case in cases
+                )
+            )
+        self.assertTrue(
+            any(
+                case["src"] == ENROLLMENT
+                and case.get("proto") == "udp"
+                and case.get("deny")
+                and not case.get("accept")
+                for case in cases
+            )
+        )
 
 
 if __name__ == "__main__":

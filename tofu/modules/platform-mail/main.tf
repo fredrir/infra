@@ -8,9 +8,12 @@ locals {
   sending_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["ses:SendRawEmail"]
-      Resource = [aws_sesv2_email_identity.sender.arn]
+      Effect = "Allow"
+      Action = ["ses:SendRawEmail"]
+      Resource = [
+        aws_sesv2_email_identity.sender.arn,
+        replace(aws_sesv2_email_identity.sender.arn, "/${var.domain}", "/${var.recipient}"),
+      ]
       Condition = {
         StringEquals                = { "ses:FromAddress" = var.sender }
         "ForAllValues:StringEquals" = { "ses:Recipients" = [var.recipient] }

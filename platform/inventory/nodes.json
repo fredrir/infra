@@ -140,10 +140,7 @@
         "hostname": "ubuntu-8gb-hel1-1",
         "memoryMiB": 7746,
         "diskGiB": 76.3,
-        "networkInterfaces": [
-          "eth0",
-          "enp7s0"
-        ],
+        "networkInterfaces": ["eth0", "enp7s0"],
         "privateNetwork": {
           "id": 12643203,
           "ipv4": "10.60.0.7",
@@ -151,14 +148,10 @@
           "interface": "enp7s0",
           "mtu": 1450,
           "gateway": "10.60.0.1",
-          "routedCIDRs": [
-            "10.60.0.0/16"
-          ]
+          "routedCIDRs": ["10.60.0.0/16"]
         },
         "placementGroupId": 1872538,
-        "firewallIds": [
-          11610760
-        ],
+        "firewallIds": [11610760],
         "protection": {
           "delete": true,
           "rebuild": true
@@ -199,10 +192,7 @@
         "hostname": "ubuntu-8gb-hel1-2",
         "memoryMiB": 7746,
         "diskGiB": 76.3,
-        "networkInterfaces": [
-          "eth0",
-          "enp7s0"
-        ],
+        "networkInterfaces": ["eth0", "enp7s0"],
         "privateNetwork": {
           "id": 12643203,
           "ipv4": "10.60.0.8",
@@ -210,14 +200,10 @@
           "interface": "enp7s0",
           "mtu": 1450,
           "gateway": "10.60.0.1",
-          "routedCIDRs": [
-            "10.60.0.0/16"
-          ]
+          "routedCIDRs": ["10.60.0.0/16"]
         },
         "placementGroupId": 1872538,
-        "firewallIds": [
-          11610760
-        ],
+        "firewallIds": [11610760],
         "protection": {
           "delete": true,
           "rebuild": true
@@ -258,9 +244,7 @@
         "hostname": "cloud-server-10643982",
         "memoryMiB": 32087,
         "diskGiB": 800,
-        "networkInterfaces": [
-          "ens3"
-        ],
+        "networkInterfaces": ["ens3"],
         "tailnetIPv4": "100.87.168.66",
         "tailscaleVersion": "1.102.4"
       }

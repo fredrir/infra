@@ -71,7 +71,9 @@ def validate_schedule(schedule):
                 raise ContractError("cron step outside field bounds")
             if value != "*":
                 values = [int(item) for item in value.split("-")]
-                if not all(minimum <= item <= maximum for item in values) or values != sorted(values):
+                if not all(
+                    minimum <= item <= maximum for item in values
+                ) or values != sorted(values):
                     raise ContractError("cron value outside field bounds")
 
 
@@ -86,14 +88,20 @@ def validate_project(root, document):
     if shared_volumes and "shared-volume" not in project["capabilities"]:
         raise ContractError("shared-volume capability not approved")
     shared_architectures = {}
-    independent_claims = {f"{name}-data" for name, value in document["workloads"].items() if value.get("volume")}
+    independent_claims = {
+        f"{name}-data"
+        for name, value in document["workloads"].items()
+        if value.get("volume")
+    }
     migration = document.get("migration")
     if migration:
         if "postgres" not in document.get("data", {}):
             raise ContractError("migration requires postgres data")
         if "migration" in document["workloads"]:
             raise ContractError("reserved workload name: migration")
-        if migration["component"] not in (project.get("images") or {"app": project["image"]}):
+        if migration["component"] not in (
+            project.get("images") or {"app": project["image"]}
+        ):
             raise ContractError("migration component not approved")
         if set(migration.get("env", {})) & set(migration.get("secretKeys", [])):
             raise ContractError("migration has duplicate environment and secret keys")
@@ -102,7 +110,9 @@ def validate_project(root, document):
     for name, workload in document["workloads"].items():
         if workload["kind"] == "cron":
             validate_schedule(workload["schedule"])
-        if workload.get("component", "app") not in (project.get("images") or {"app": project["image"]}):
+        if workload.get("component", "app") not in (
+            project.get("images") or {"app": project["image"]}
+        ):
             raise ContractError(f"{name}: component not approved")
         if name in {"postgres", "valkey"}:
             raise ContractError(f"reserved workload name: {name}")
@@ -120,28 +130,46 @@ def validate_project(root, document):
             if domain in claimed_domains:
                 raise ContractError(f"duplicate domain: {domain}")
             claimed_domains.add(domain)
-        for field, capability in (("volume", "volume"), ("sharedVolume", "shared-volume"), ("secretKeys", "secrets")):
+        for field, capability in (
+            ("volume", "volume"),
+            ("sharedVolume", "shared-volume"),
+            ("secretKeys", "secrets"),
+        ):
             if workload.get(field) and capability not in project["capabilities"]:
                 raise ContractError(f"{name}: {capability} capability not approved")
-        if workload.get("egress", "none") == "internet" and "internet" not in project["capabilities"]:
+        if (
+            workload.get("egress", "none") == "internet"
+            and "internet" not in project["capabilities"]
+        ):
             raise ContractError(f"{name}: internet egress not approved")
-        if (workload.get("volume") or workload.get("sharedVolume")) and workload.get("replicas", 1) != 1:
+        if (workload.get("volume") or workload.get("sharedVolume")) and workload.get(
+            "replicas", 1
+        ) != 1:
             raise ContractError(f"{name}: local storage requires one replica")
         if workload.get("volume") and workload["kind"] == "cron":
-            raise ContractError(f"{name}: persistent cron storage requires a platform extension")
+            raise ContractError(
+                f"{name}: persistent cron storage requires a platform extension"
+            )
         if workload.get("sharedVolume"):
             volume = workload["sharedVolume"]["name"]
             if volume not in shared_volumes:
                 raise ContractError(f"{name}: shared volume not declared: {volume}")
             if f"shared-{volume}-data" in independent_claims:
-                raise ContractError(f"shared volume claim conflicts with workload: {volume}")
-            shared_architectures[volume] = shared_architectures.get(volume, selected) & selected
+                raise ContractError(
+                    f"shared volume claim conflicts with workload: {volume}"
+                )
+            shared_architectures[volume] = (
+                shared_architectures.get(volume, selected) & selected
+            )
             if not shared_architectures[volume]:
-                raise ContractError(f"shared volume consumers require a common architecture: {volume}")
+                raise ContractError(
+                    f"shared volume consumers require a common architecture: {volume}"
+                )
     unused = set(shared_volumes) - set(shared_architectures)
     if unused:
         raise ContractError(f"shared volumes are unused: {', '.join(sorted(unused))}")
     from .resources import validate_resource_budget
+
     validate_resource_budget(root, project, document)
     return project
 
@@ -153,7 +181,9 @@ def validate_release(root, document, project_name=None):
     catalog, project = catalog_project(root, document["project"])
     if document["environment"] not in project["environments"]:
         raise ContractError("release environment not approved")
-    image = (project.get("images") or {"app": project["image"]}).get(document.get("component", "app"))
+    image = (project.get("images") or {"app": project["image"]}).get(
+        document.get("component", "app")
+    )
     if document["image"].split("@", 1)[0] != image:
         raise ContractError("release image not approved")
     provenance = document["provenance"]
@@ -163,6 +193,8 @@ def validate_release(root, document, project_name=None):
         raise ContractError("release workflow repository mismatch")
     if provenance["workflowPath"] != ".github/workflows/project-ci.yml":
         raise ContractError("release workflow path mismatch")
-    if not {p.removeprefix("linux/") for p in provenance["platforms"]}.issubset(project["architectures"]):
+    if not {p.removeprefix("linux/") for p in provenance["platforms"]}.issubset(
+        project["architectures"]
+    ):
         raise ContractError("release architecture not approved")
     return project

@@ -7,7 +7,7 @@
 | Private input | Sensitive `platform_mail_recipient`; required whenever enabled |
 | Resources | One SES domain identity, three DKIM CNAMEs, one IAM user, one sending policy and attachment |
 | Signing | AWS-managed Easy DKIM, RSA 2048; no private signing key in state |
-| SMTP authority | `ses:SendRawEmail`, exact identity ARN, exact From, every To/CC/BCC recipient |
+| SMTP authority | `ses:SendRawEmail`, sending-domain and exact verified-recipient identity ARNs, exact From, every To/CC/BCC recipient |
 | Transport | Verified STARTTLS or implicit TLS in the watchdog; SES requires SMTP TLS |
 | IAM boundary | The same sending policy limits and grants the user's permissions |
 | Credentials | Create and rotate SMTP access keys outside OpenTofu; deliver through private runtime credentials |
@@ -17,6 +17,8 @@
 | Deletion | Identity, selectors, policy and user have `prevent_destroy`; user access keys are not force-deleted |
 
 SES SMTP needs `SendRawEmail`; IAM supports exact From and recipient restrictions, including CC/BCC. [SES IAM](https://docs.aws.amazon.com/ses/latest/dg/control-user-access.html)
+
+The sandbox SMTP test evaluated the verified recipient identity as well as the sending domain. Both exact ARNs retain the same From and recipient conditions; adding the recipient resource does not permit sending from that recipient address. Validate both resources in IAM simulation and confirm delivery with an actual SMTP test.
 
 The watchdog requires verified TLS before SMTP authentication; SES also requires encrypted SMTP connections. [SES protocols](https://docs.aws.amazon.com/ses/latest/dg/security-protocols.html)
 

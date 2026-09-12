@@ -1,22 +1,51 @@
 import copy
-from decimal import Decimal
 import json
-from pathlib import Path
 import re
+from decimal import Decimal
+from pathlib import Path
 
 from .contracts import ContractError
 
-
 RESOURCE_CLASSES = {
-    "small": {"requests": {"cpu": "100m", "memory": "128Mi", "ephemeral-storage": "256Mi"}, "limits": {"cpu": "500m", "memory": "512Mi", "ephemeral-storage": "1Gi"}},
-    "medium": {"requests": {"cpu": "500m", "memory": "512Mi", "ephemeral-storage": "1Gi"}, "limits": {"cpu": "2", "memory": "2Gi", "ephemeral-storage": "4Gi"}},
-    "large": {"requests": {"cpu": "1", "memory": "2Gi", "ephemeral-storage": "2Gi"}, "limits": {"cpu": "4", "memory": "4Gi", "ephemeral-storage": "8Gi"}},
-    "compute": {"requests": {"cpu": "2", "memory": "4Gi", "ephemeral-storage": "2Gi"}, "limits": {"cpu": "4", "memory": "8Gi", "ephemeral-storage": "8Gi"}},
+    "small": {
+        "requests": {"cpu": "100m", "memory": "128Mi", "ephemeral-storage": "256Mi"},
+        "limits": {"cpu": "500m", "memory": "512Mi", "ephemeral-storage": "1Gi"},
+    },
+    "medium": {
+        "requests": {"cpu": "500m", "memory": "512Mi", "ephemeral-storage": "1Gi"},
+        "limits": {"cpu": "2", "memory": "2Gi", "ephemeral-storage": "4Gi"},
+    },
+    "large": {
+        "requests": {"cpu": "1", "memory": "2Gi", "ephemeral-storage": "2Gi"},
+        "limits": {"cpu": "4", "memory": "4Gi", "ephemeral-storage": "8Gi"},
+    },
+    "compute": {
+        "requests": {"cpu": "2", "memory": "4Gi", "ephemeral-storage": "2Gi"},
+        "limits": {"cpu": "4", "memory": "8Gi", "ephemeral-storage": "8Gi"},
+    },
 }
 VOLUME_CLASSES = {"small": "10Gi", "medium": "40Gi", "large": "100Gi"}
-DATA_RESOURCES = {"requests": {"cpu": "250m", "memory": "512Mi", "ephemeral-storage": "256Mi"}, "limits": {"cpu": "2", "memory": "1Gi", "ephemeral-storage": "1Gi"}}
-BACKUP_RESOURCES = {"requests": {"cpu": "100m", "memory": "256Mi", "ephemeral-storage": "20Gi"}, "limits": {"cpu": "1", "memory": "1Gi", "ephemeral-storage": "20Gi"}}
-QUOTA_KEYS = {"requests.cpu", "requests.memory", "requests.ephemeral-storage", "limits.cpu", "limits.memory", "limits.ephemeral-storage", "requests.storage", "persistentvolumeclaims", "pods", "services", "count/jobs.batch"}
+DATA_RESOURCES = {
+    "requests": {"cpu": "250m", "memory": "512Mi", "ephemeral-storage": "256Mi"},
+    "limits": {"cpu": "2", "memory": "1Gi", "ephemeral-storage": "1Gi"},
+}
+BACKUP_RESOURCES = {
+    "requests": {"cpu": "100m", "memory": "256Mi", "ephemeral-storage": "20Gi"},
+    "limits": {"cpu": "1", "memory": "1Gi", "ephemeral-storage": "20Gi"},
+}
+QUOTA_KEYS = {
+    "requests.cpu",
+    "requests.memory",
+    "requests.ephemeral-storage",
+    "limits.cpu",
+    "limits.memory",
+    "limits.ephemeral-storage",
+    "requests.storage",
+    "persistentvolumeclaims",
+    "pods",
+    "services",
+    "count/jobs.batch",
+}
 
 
 def quantity(value):
@@ -24,11 +53,23 @@ def quantity(value):
     if not match:
         raise ContractError(f"unsupported resource quantity: {value}")
     number, suffix = match.groups()
-    return Decimal(number) * {None: 1, "m": Decimal("0.001"), "Ki": 1024, "Mi": 1024**2, "Gi": 1024**3, "Ti": 1024**4}[suffix]
+    return (
+        Decimal(number)
+        * {
+            None: 1,
+            "m": Decimal("0.001"),
+            "Ki": 1024,
+            "Mi": 1024**2,
+            "Gi": 1024**3,
+            "Ti": 1024**4,
+        }[suffix]
+    )
 
 
 def project_quota(root, project):
-    profiles = json.loads((Path(root) / "platform/catalog/resource-quotas.json").read_text())
+    profiles = json.loads(
+        (Path(root) / "platform/catalog/resource-quotas.json").read_text()
+    )
     profile = project.get("quotaProfile", "standard")
     if profile not in profiles or set(profiles[profile]) != QUOTA_KEYS:
         raise ContractError("unknown or incomplete catalog quota profile")
@@ -57,7 +98,9 @@ def resource_budget(document):
             steady["count/jobs.batch"] += 4
             continue
         local = workload.get("volume") or workload.get("sharedVolume")
-        replicas = workload.get("replicas", 2 if workload["kind"] == "web" and not local else 1)
+        replicas = workload.get(
+            "replicas", 2 if workload["kind"] == "web" and not local else 1
+        )
         add(steady, resources, replicas)
         if not local:
             add(surge, resources)
@@ -65,7 +108,9 @@ def resource_budget(document):
         if workload["kind"] == "web":
             steady["services"] += 1
         if workload.get("volume"):
-            steady["requests.storage"] += quantity(VOLUME_CLASSES[workload["volume"]["sizeClass"]])
+            steady["requests.storage"] += quantity(
+                VOLUME_CLASSES[workload["volume"]["sizeClass"]]
+            )
             steady["persistentvolumeclaims"] += 1
     for data in document.get("data", {}).values():
         add(steady, DATA_RESOURCES)
@@ -83,10 +128,15 @@ def resource_budget(document):
     phases = {"steady-state": steady, "concurrent-jobs": jobs}
     if document.get("migration"):
         migration = copy.deepcopy(jobs)
-        add(migration, RESOURCE_CLASSES[document["migration"].get("resourceClass", "small")])
+        add(
+            migration,
+            RESOURCE_CLASSES[document["migration"].get("resourceClass", "small")],
+        )
         phases["migration"] = migration
     phases["rollout-surge"] = {key: value + surge[key] for key, value in jobs.items()}
-    phases["rollout-termination"] = {key: value + surge[key] + terminating[key] for key, value in jobs.items()}
+    phases["rollout-termination"] = {
+        key: value + surge[key] + terminating[key] for key, value in jobs.items()
+    }
     return phases
 
 
@@ -95,5 +145,7 @@ def validate_resource_budget(root, project, document):
     for phase, resources in resource_budget(document).items():
         for name, amount in sorted(resources.items()):
             if amount > quantity(quota[name]):
-                raise ContractError(f"{phase} exceeds project quota {name} ({quota[name]}); reduce demand or request catalog quota approval")
+                raise ContractError(
+                    f"{phase} exceeds project quota {name} ({quota[name]}); reduce demand or request catalog quota approval"
+                )
     return quota

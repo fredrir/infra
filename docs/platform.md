@@ -10,6 +10,7 @@
 | Existing applications | Legacy host definitions remain active until individual cutovers |
 | ARM capacity | HidenCloud SAR-Torrent remains unpurchased and unverified |
 | Repository visibility | Private until publication review is complete |
+| GitHub Actions | Infrastructure, portfolio and Y disabled; no active infrastructure runs when disabled |
 
 ## Ownership
 
@@ -142,6 +143,7 @@ Cleanup handles unused, expired or already-consumed keys. Revoking a key [does n
 | Policy | [policy.hujson](../tailscale/policy.hujson); enrollment tag owned only by `autogroup:admin`; node roles owned by admins and the enrollment tag |
 | Private routes | Optional `10.60.0.5/32`, `10.60.0.7/32`, `10.60.0.8/32`; complete identical set on reviewed control routers |
 | Route approval | Manual; no automatic approvers, pod/service CIDRs or exit-node routes |
+| Transport verification |07/08 routes approved;09 reached both private TCP6443 fixtures through either router; controlled advertisement withdrawal passed, fixtures removed |
 | Control-plane routing | Reject imported routes; preflight requires each private peer route to use the private interface |
 | Runtime boundary | Host tags identify machines; CI NetworkPolicy must block node/API egress before NAT can inherit a host identity |
 | Activation | Compare current remote policy, retain unrelated rules, run native policy validation, review the diff and apply within the authorized scope using the current ETag |
@@ -161,7 +163,7 @@ uv sync --frozen --group ci
 uv run --frozen infra validate
 uv run --frozen infra render --check
 uv run --frozen --group ci python scripts/ci/policy.py check
-uv run --frozen --group ci python scripts/operations/platform.py check
+uv run --frozen --group ci python scripts/operations/platform_cli.py check
 uv run --frozen --group ci python -m unittest discover -s tests/infra -v
 uv run --frozen --group ci python -m unittest discover -s tests/ci -v
 uv run --frozen --group ci python -m unittest discover -s tests/operations -v
@@ -273,11 +275,33 @@ The CI image bootstrap command is `scripts/ci/bootstrap-image.sh` on a trusted n
 | Pinned gVisor, diagnostic guest-root profile | BuildKit passes Dockerfile `RUN`, non-root `USER`, numeric ownership and OCI export; this profile is not admitted by current policy |
 | Nix 2.35.2 with pinned gVisor | Ordinary sandboxed derivations fail on unsupported `SIOCSIFFLAGS`; additional capabilities do not resolve the missing syscall interface |
 | fredrir-09 KVM | One vCPU executes `MOV AX,42; HLT`; KVM exit reason 5 and AX 42; temporary resources released |
-| Kata | Candidate only; no installation, VM build test, ARC integration or production selection |
+| Kata Nix sandbox | Offline amd64 VM passes ordinary derivation, UID/GID mapping and read-only store-input checks |
+| Kata guest keyrings | Required join, describe and permission operations pass; key reading and add/request-key remain denied |
+| Kata BuildKit | COPY passes; nested runc's cgroup device-filter query is blocked by the guest BPF policy before RUN |
+| Kata lifecycle | Native teardown reports a busy cgroup; outer cleanup removes all owned processes, mounts and files; no ARC integration or production selection |
 
 [CI runtime pilot](research/ci-runtime-pilot.md) records scope, security-version review and remaining gates. Private logs and source hashes are retained under `.infra/ci-kata-pilot/evidence/`. No ordinary-runtime, disabled-sandbox or software-emulation fallback is authorized by these results.
 
 Catalog changes require `python scripts/ci/policy.py write-guards`; `check` rejects guard drift. Optional cache callers explicitly map `NIX_CACHE_READ_TOKEN` and `NIX_CACHE_UPLOAD_TOKEN`; tokens belong to one project cache and signing keys remain outside CI.
+
+## Temporary fredrir-05 evacuation target
+
+| Live status, 2026-09-12 | Evidence scope |
+| --- | --- |
+| fredrir-09 preparation | Podman5.7.0; locked rootless users;4GiB aggregate user-slice memory limit; inert candidate units |
+| Images | Six exact source images preloaded; runtime configIDs and `Pull=never`; no registry credential required |
+| Secrets | Three scoped05 runtime secrets relayed over verified SSH into an age-encrypted bundle; regeneration after09 reboot passed |
+| Start guards | Installed on05 and09; eight native manager probes passed; source applications remain healthy; real fence markers absent |
+| Application units | Eight candidate files installed on09; all six services inactive; loaded fence and activation conditions verified |
+| Data rehearsal | PostgreSQL17.10 logical restore and Valkey8.1.9 RDB restore; synthetic stopped AOF preserves bytes, ownership and TTL |
+| Native Valkey shutdown | Disposable09 probe passes zero kernel capabilities, no-new-privileges, bounded private tmpfs, native server exit0 and event verification; container removed and application states unchanged |
+| Frontend routing | Direct frontend and cross-user Caddy responses match; only loopback8081/8085/9101; diagnostic containers removed and ports released |
+| Off-host backup | Bounded09→S3 rehearsal snapshot and independent Mac restore passed; all four file hashes match; native recovery from downloaded bytes remains a separate gate |
+| Recurring backup preparation | Inactive09 service and disabled timer installed; restricted06 status receiver passes command, SFTP, PTY, forwarding and invalid-payload rejection checks; no production backup or success heartbeat sent |
+| Remaining | Native final-export verification, persistent source fence, final paired state transfer, application and boot validation, ongoing target backup/freshness and measured cutover budget |
+| Production boundary | Source applications continue on05; no production backend/cloudflared on09; no K3s activation |
+
+Private receipts remain under `.infra/evacuation-05/`. Bounded rehearsal timings do not measure production downtime.
 
 ## Host enrollment and activation
 
@@ -285,7 +309,7 @@ Catalog changes require `python scripts/ci/policy.py write-guards`; `check` reje
 | --- | --- |
 | Inspect provisioned machines | SSH alias, host key, OS, architecture, disks, routes, kernel features and recovery access |
 | Inventory | Verified node ID, adapter, enrollment addresses and administrative public keys |
-| Host configuration | Nix `mkPlatformHost` or Ansible inventory; private runtime token files |
+| Host configuration | Nix `mkPlatformHost` or Ansible inventory; private token files available at every boot |
 | API transport | Three reachable endpoints; cold bootstrap and endpoint loss tests |
 | Quorum | Existing CPX22 evacuated before becoming the third server; one-server failure test |
 | Worker eligibility | Explicit protected labels after production, stateful and sandbox tests |
@@ -294,15 +318,25 @@ Catalog changes require `python scripts/ci/policy.py write-guards`; `check` reje
 | Application cutover | Restore rehearsal, stop/fence old writer, final transfer, health check and DNS cutover |
 
 ```sh
-uv run --frozen --group ci python scripts/operations/platform.py bootstrap-plan \
+uv run --frozen --group ci python scripts/operations/platform_cli.py bootstrap-plan \
   --repository https://github.com/fredrir/llunde-infra.git \
   --revision "$workflow_revision"
 
-uv run --frozen --group ci python scripts/operations/platform.py activation-plan \
+uv run --frozen --group ci python scripts/operations/platform_cli.py activation-plan \
   .infra/activation.json
 ```
 
 Both commands produce reviewable output without applying it. Activation evidence binds the K3s version, host configuration hashes and CI image. Kernel, runtime, network or pipeline-image changes invalidate the corresponding pilot assumptions.
+
+| K3s credential | Storage |
+| --- | --- |
+| Ansible hosts | `/var/lib/platform/credentials/k3s-server-token` and `k3s-agent-token`; root0700 directory, root0400/0600 files supplied separately |
+| NixOS hosts | `/run/secrets/k3s-server-token` and `k3s-agent-token`; secret provisioning must regenerate them before K3s at each boot |
+| Worker authority | Agent token only; no server credential delivered |
+| Joining nodes | Secure token format containing the verified cluster CA hash; first-server initialization uses separate random short server/agent credentials |
+| Recovery | Encrypted off-host copy of the server token with each matching etcd snapshot; never put token values in inventory, Ansible variables or command arguments |
+
+K3s writes secure server and agent tokens after initialization. Retrieve them privately from the first server for subsequent joins; the [server token is also required to decrypt datastore bootstrap data during recovery](https://docs.k3s.io/cli/token). Runtime-only files on Ansible hosts require an explicit boot-time provider if overriding the persistent defaults.
 
 | Activation input | Value |
 | --- | --- |
@@ -311,12 +345,12 @@ Both commands produce reviewable output without applying it. Activation evidence
 | `secrets` | Namespace, name and key metadata; no credential values |
 | `runnerRepositories` | Numeric repository IDs; begin with one pilot repository |
 | `runnerArchitectures` | `amd64` initially; add verified `arm64` capacity separately |
-| Host evidence | `platform.py host-contract` supplies expected inventory/adapter hashes and API ranges |
+| Host evidence | `platform_cli.py host-contract` supplies expected inventory/adapter hashes and API ranges |
 | CI evidence | Selected native architectures, sandbox enforcement, API/production isolation and approved image |
 | Shared concurrency | Aggregate contention, disk-pressure and node-loss evidence before multiple repository pools |
 | Source handoff | Verified `deploy` revision before changing Flux from its bootstrap commit |
 
-The external watchdog uses `platform.watchdog` on NixOS or the `platform_external` Ansible group. Its private runtime config contains HTTPS health targets, optional timestamped heartbeat endpoints, exactly one email/webhook alert transport and an optional independent deadman URL. It has no listener or cluster credentials.
+The external watchdog uses `platform.watchdog` on NixOS or the `platform_external` Ansible group. Its private runtime config contains HTTPS health targets, optional timestamped heartbeat endpoints, exactly one email/webhook alert transport and an optional independent deadman URL. It has no listener or cluster credentials. [Email credential and deployment commands](mail-alerts.md).
 
 | Watchdog configuration | Value |
 | --- | --- |
@@ -327,12 +361,12 @@ The external watchdog uses `platform.watchdog` on NixOS or the `platform_externa
 | `alertEmail.host` | SMTP hostname; no URL, embedded port or credential |
 | `alertEmail.port` | Explicit integer1–65535; typically465 for implicitTLS or587 for STARTTLS |
 | `alertEmail.tls` | `implicit` or `starttls`; certificate and hostname verification required, TLS1.2 minimum, no cleartext fallback |
-| `alertEmail.username` | SMTP user from private credential source; existing Grafana key `GF_SMTP_USER` maps here |
-| `alertEmail.password` | SMTP password from private credential source; existing Grafana key `GF_SMTP_PASSWORD` maps here |
+| `alertEmail.username` | Doppler `llunde/ops/PLATFORM_WATCHDOG_SMTP_USERNAME` |
+| `alertEmail.password` | Doppler `llunde/ops/PLATFORM_WATCHDOG_SMTP_PASSWORD` |
 | `alertEmail.from` | `alerts@fredrir.com`; SES identity and sender permission must be verified before delivery |
 | `alertEmail.to` | One bare ASCII operator address; no display name, list or custom headers |
-| SMTP endpoint | `email-smtp.eu-north-1.amazonaws.com`, port587, `starttls`; existing credential source `/run/secrets/observability-smtp.env` on04 |
-| Existing source metadata | `secrets/observability-smtp.yaml`, key `env`; SES SMTP IAM permission is not declared in this repository |
+| SMTP endpoint | `email-smtp.eu-north-1.amazonaws.com`, port587, `starttls` |
+| IAM / secret ownership | OpenTofu `module.platform_mail` owns the scoped IAM user; SMTP credentials remain outside state in Doppler |
 | `deadmanURL` | Optional independent HTTPS confirmation endpoint; called only when every check is healthy |
 | Delivery bounds | SMTP socket timeout5s, message16KiB, entire watchdog service180s |
 | Delivery acknowledgement | Failure changes and recovery trigger alerts; failed delivery leaves prior state intact for retry; SMTP acceptance requires a separate inbox test |
@@ -345,7 +379,7 @@ SMTP uses Python's [TLS-capable SMTP clients](https://docs.python.org/3/library/
 | Priority | Capability | Implemented entrypoint | Live acceptance |
 | --- | --- | --- | --- |
 | Must | Central ownership | Inventory, catalog, host adapters, DNS import map | Transfer external project Terraform ownership without duplicate state |
-| Must | Three K3s servers | Host modules, Ansible and optional provider declarations | Import new CX33s; evacuate CPX22; quorum test |
+| Must | Three K3s servers | Host modules, Ansible and provider declarations | CX33 adoption complete; evacuate CPX22, complete transport and test quorum |
 | Must | CI boundary | Workflow guards, ARC, gVisor and admission | Both native architectures pass real build and isolation tests |
 | Must | Portability | Common inventory, mixed OS adapters, Restic/native recovery | Provider/network qualification and alternate-provider restore |
 | Must | Project contract | JSON schemas, `infra`, shared chart | Onboard and cut over each application |

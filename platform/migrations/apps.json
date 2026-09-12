@@ -26,9 +26,7 @@
           "dockerfile": "Containerfile",
           "context": ".",
           "port": 8080,
-          "entrypoint": [
-            "/app/entrypoint.sh"
-          ],
+          "entrypoint": ["/app/entrypoint.sh"],
           "health": {
             "livenessPath": "/health",
             "readinessPath": "/ready"
@@ -66,16 +64,12 @@
         {
           "engine": "postgres",
           "majorVersion": 17,
-          "consumers": [
-            "app"
-          ],
+          "consumers": ["app"],
           "recovery": "Restore the existing database with a verified compatible dump before cutover."
         },
         {
           "engine": "valkey",
-          "consumers": [
-            "app"
-          ],
+          "consumers": ["app"],
           "authenticationSupported": true,
           "recovery": "Classify durable/session/cache data before selecting restore or explicit session invalidation."
         }
@@ -91,9 +85,7 @@
         }
       ],
       "routing": {
-        "publicDomains": [
-          "api.llunde.no"
-        ],
+        "publicDomains": ["api.llunde.no"],
         "containerPort": 8080,
         "legacyPublishedHostPort": 8080
       },
@@ -133,11 +125,7 @@
           "revision": "89a35d29bef9c175fc0333a44214fb10454899cb",
           "path": "Containerfile",
           "url": "https://github.com/fredrir/llunde-backend/blob/89a35d29bef9c175fc0333a44214fb10454899cb/Containerfile",
-          "lines": [
-            31,
-            32,
-            33
-          ]
+          "lines": [31, 32, 33]
         },
         {
           "repository": "fredrir/llunde-backend",
@@ -150,27 +138,14 @@
           "revision": "89a35d29bef9c175fc0333a44214fb10454899cb",
           "path": "src/main/kotlin/infra/database/Database.kt",
           "url": "https://github.com/fredrir/llunde-backend/blob/89a35d29bef9c175fc0333a44214fb10454899cb/src/main/kotlin/infra/database/Database.kt",
-          "lines": [
-            36,
-            37,
-            38,
-            39,
-            40,
-            41
-          ]
+          "lines": [36, 37, 38, 39, 40, 41]
         },
         {
           "repository": "fredrir/llunde-backend",
           "revision": "89a35d29bef9c175fc0333a44214fb10454899cb",
           "path": "src/main/kotlin/plugins/Monitoring.kt",
           "url": "https://github.com/fredrir/llunde-backend/blob/89a35d29bef9c175fc0333a44214fb10454899cb/src/main/kotlin/plugins/Monitoring.kt",
-          "lines": [
-            27,
-            60,
-            61,
-            62,
-            63
-          ]
+          "lines": [27, 60, 61, 62, 63]
         }
       ]
     },
@@ -190,13 +165,8 @@
             "candidatePath": "/",
             "dedicatedEndpointVerified": false
           },
-          "publicBuildArgumentKeys": [
-            "VITE_TURNSTILE_SITE_KEY"
-          ],
-          "environmentKeys": [
-            "XDG_CONFIG_HOME",
-            "XDG_DATA_HOME"
-          ],
+          "publicBuildArgumentKeys": ["VITE_TURNSTILE_SITE_KEY"],
+          "environmentKeys": ["XDG_CONFIG_HOME", "XDG_DATA_HOME"],
           "legacyMemoryLimit": "256M",
           "secretValuesRecorded": false
         }
@@ -204,10 +174,7 @@
       "data": [],
       "migrations": [],
       "routing": {
-        "publicDomains": [
-          "llunde.no",
-          "www.llunde.no"
-        ],
+        "publicDomains": ["llunde.no", "www.llunde.no"],
         "containerPort": 8080,
         "legacyPublishedHostPort": 8081,
         "fallback": "Caddy serves the SPA index for unknown paths."
@@ -233,33 +200,21 @@
         {
           "path": "services/llunde-frontend/default.nix",
           "sha256": "c5b266009bc04e9a9c6b196f34483c3208b3eaccbc335b3b03078aa1ee617fa0",
-          "lines": [
-            18,
-            23
-          ]
+          "lines": [18, 23]
         },
         {
           "repository": "fredrir/llunde-frontend",
           "revision": "869faeda197bd67e28a2db7a1d5cab51b727a3c8",
           "path": "Containerfile",
           "url": "https://github.com/fredrir/llunde-frontend/blob/869faeda197bd67e28a2db7a1d5cab51b727a3c8/Containerfile",
-          "lines": [
-            9,
-            21,
-            22
-          ]
+          "lines": [9, 21, 22]
         },
         {
           "repository": "fredrir/llunde-frontend",
           "revision": "869faeda197bd67e28a2db7a1d5cab51b727a3c8",
           "path": "docker/Caddyfile",
           "url": "https://github.com/fredrir/llunde-frontend/blob/869faeda197bd67e28a2db7a1d5cab51b727a3c8/docker/Caddyfile",
-          "lines": [
-            8,
-            9,
-            11,
-            12
-          ]
+          "lines": [8, 9, 11, 12]
         }
       ]
     },
@@ -306,9 +261,7 @@
           "component": "app",
           "dockerfile": "Dockerfile",
           "context": ".",
-          "command": [
-            "pyparser-worker"
-          ],
+          "command": ["pyparser-worker"],
           "sharedVolume": "files",
           "legacyMemoryLimit": "6G",
           "legacyCpuQuotaPercent": 300,
@@ -332,9 +285,7 @@
           "component": "app",
           "dockerfile": "Dockerfile",
           "context": ".",
-          "command": [
-            "pyparser-worker"
-          ],
+          "command": ["pyparser-worker"],
           "sharedVolume": "files",
           "legacyMemoryLimit": "2G",
           "terminationGracePeriodSeconds": 45,
@@ -356,11 +307,7 @@
           "kind": "shared-files",
           "legacyVolume": "pyparser-files",
           "mountPath": "/app/.local/files",
-          "consumers": [
-            "review",
-            "extract",
-            "light"
-          ],
+          "consumers": ["review", "extract", "light"],
           "requiredSemantics": "All three processes observe the same files on one retained local PVC and remain colocated on its node.",
           "recovery": "Quiesce all producers, restore files and PostgreSQL from one consistent recovery point, then run migrations before starting consumers."
         },
@@ -370,12 +317,7 @@
           "majorVersion": 17,
           "legacyVolume": "pyparser-pgdata",
           "mountPath": "/var/lib/postgresql/data",
-          "consumers": [
-            "review",
-            "extract",
-            "light",
-            "migrate"
-          ],
+          "consumers": ["review", "extract", "light", "migrate"],
           "environmentKeys": [
             "POSTGRES_USER",
             "POSTGRES_DB",
@@ -388,11 +330,7 @@
           "name": "migrate",
           "execution": "ordered-one-shot",
           "component": "app",
-          "command": [
-            "alembic",
-            "upgrade",
-            "head"
-          ],
+          "command": ["alembic", "upgrade", "head"],
           "workingDirectory": "/app",
           "path": "sql/alembic",
           "legacyTimeoutSeconds": 600,
@@ -400,11 +338,7 @@
             "postgres-ready",
             "consistent-restored-files-and-database"
           ],
-          "blocks": [
-            "review",
-            "extract",
-            "light"
-          ],
+          "blocks": ["review", "extract", "light"],
           "safeUpgradeSequence": [
             "drain-and-stop-all-app-writers",
             "verify-recovery-point",
@@ -475,12 +409,7 @@
           "revision": "55f6cefba4b1a98962c28e1ad0f9cf4fe16591bd",
           "path": "Dockerfile",
           "url": "https://github.com/fredrir/llunde-pyparser/blob/55f6cefba4b1a98962c28e1ad0f9cf4fe16591bd/Dockerfile",
-          "lines": [
-            94,
-            109,
-            111,
-            112
-          ]
+          "lines": [94, 109, 111, 112]
         },
         {
           "repository": "fredrir/llunde-pyparser",
@@ -505,12 +434,7 @@
           "revision": "55f6cefba4b1a98962c28e1ad0f9cf4fe16591bd",
           "path": "src/pyparser/review/serve.py",
           "url": "https://github.com/fredrir/llunde-pyparser/blob/55f6cefba4b1a98962c28e1ad0f9cf4fe16591bd/src/pyparser/review/serve.py",
-          "lines": [
-            29,
-            30,
-            32,
-            33
-          ]
+          "lines": [29, 30, 32, 33]
         },
         {
           "repository": "fredrir/llunde-pyparser",
@@ -542,21 +466,14 @@
           "dockerfile": "apps/web/Dockerfile",
           "context": ".",
           "port": 3000,
-          "command": [
-            "node",
-            ".output/server/index.mjs"
-          ],
+          "command": ["node", ".output/server/index.mjs"],
           "publicBuildArgumentKeys": [
             "VITE_RECAPTCHA_SITE_KEY",
             "VITE_POSTHOG_KEY",
             "VITE_POSTHOG_HOST",
             "VITE_APP_VERSION"
           ],
-          "environmentKeys": [
-            "API_URL",
-            "ADMIN_TOKEN",
-            "ALLOW_LOCAL_ADMIN"
-          ],
+          "environmentKeys": ["API_URL", "ADMIN_TOKEN", "ALLOW_LOCAL_ADMIN"],
           "health": {
             "candidatePath": "/",
             "dedicatedEndpointVerified": false
@@ -569,13 +486,8 @@
           "dockerfile": "apps/api/Dockerfile",
           "context": ".",
           "port": 8080,
-          "command": [
-            "/usr/local/bin/portfolio-api"
-          ],
-          "publicBuildArgumentKeys": [
-            "GIT_SHA",
-            "APP_VERSION"
-          ],
+          "command": ["/usr/local/bin/portfolio-api"],
+          "publicBuildArgumentKeys": ["GIT_SHA", "APP_VERSION"],
           "health": {
             "livenessPath": "/healthz",
             "readinessPath": "/readyz"
@@ -613,9 +525,7 @@
           "component": "worker",
           "dockerfile": "apps/worker/Dockerfile",
           "context": ".",
-          "command": [
-            "/usr/local/bin/portfolio-worker"
-          ],
+          "command": ["/usr/local/bin/portfolio-worker"],
           "environmentKeys": [
             "DATABASE_URL",
             "AWS_ACCESS_KEY_ID",
@@ -637,17 +547,11 @@
           "majorVersion": 17,
           "legacyComposeVolume": "db-data",
           "mountPath": "/var/lib/postgresql/data",
-          "consumers": [
-            "api",
-            "worker"
-          ]
+          "consumers": ["api", "worker"]
         },
         {
           "engine": "s3-compatible-object-storage",
-          "consumers": [
-            "api",
-            "worker"
-          ],
+          "consumers": ["api", "worker"],
           "environmentKeys": [
             "MEDIA_BUCKET",
             "MEDIA_PUBLIC_BASE_URL",
@@ -657,12 +561,8 @@
         },
         {
           "engine": "sqs-compatible-queue",
-          "consumers": [
-            "worker"
-          ],
-          "environmentKeys": [
-            "MEDIA_QUEUE_URL"
-          ],
+          "consumers": ["worker"],
+          "environmentKeys": ["MEDIA_QUEUE_URL"],
           "productionProviderVerified": false
         }
       ],
@@ -673,29 +573,21 @@
           "component": "api",
           "path": "apps/api/migrations",
           "source": "apps/api/src/main.rs",
-          "sourceLines": [
-            23,
-            24,
-            25
-          ],
+          "sourceLines": [23, 24, 25],
           "before": "api-serving-traffic",
           "commandOverrideRequired": false,
           "workerStartupGateRequired": true
         }
       ],
       "routing": {
-        "publicDomains": [
-          "hansteen.dev"
-        ],
+        "publicDomains": ["hansteen.dev"],
         "reservedDomainExcluded": "fredrir.com",
         "webToApi": "Server-side API_URL can use the internal API Service; exact existing public API/media routes must be confirmed before cutover.",
         "adminSourceHostname": "admin.hansteen.dev",
         "adminHostnameCatalogApproved": false,
         "adminHeader": "x-admin-origin",
         "adminAuthBoundary": "Cloudflare Access authenticates the admin hostname, the trusted ingress sets x-admin-origin only there, and web server functions attach ADMIN_TOKEN to API requests.",
-        "mandatoryPublicHeaderRemoval": [
-          "x-admin-origin"
-        ]
+        "mandatoryPublicHeaderRemoval": ["x-admin-origin"]
       },
       "gates": [
         {
@@ -819,9 +711,7 @@
           "kind": "web",
           "componentApprovalRequired": true,
           "port": 3001,
-          "environmentKeys": [
-            "MONGODB_URI"
-          ],
+          "environmentKeys": ["MONGODB_URI"],
           "declaredStartCommand": "node dist/index.ts",
           "declaredBuildCommand": "tsc -p . && cpy src/schema/**/* dist/schema --parents",
           "productionContainerVerified": false,
@@ -838,9 +728,7 @@
       "data": [
         {
           "engine": "mongodb",
-          "consumers": [
-            "backend"
-          ],
+          "consumers": ["backend"],
           "managedPlatformContractAvailable": false,
           "productionProviderVerified": false
         }

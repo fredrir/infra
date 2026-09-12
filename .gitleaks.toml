@@ -3,7 +3,7 @@ useDefault = true
 
 [[allowlists]]
 targetRules = ["generic-api-key"]
-condition = "AND"
+condition   = "AND"
 regexTarget = "line"
-paths = ['''(^|/)modules/ingress/default\.nix$''']
-regexes = ['''^\s*acmeCheckDummyToken = "0123456789abcdef0123456789abcdef01234567";\s*$''']
+paths       = ['''(^|/)modules/ingress/default\.nix$''']
+regexes     = ['''^\s*acmeCheckDummyToken = "0123456789abcdef0123456789abcdef01234567";\s*$''']

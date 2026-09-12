@@ -1,40 +1,80 @@
-import copy
 import hashlib
 import importlib.util
 import json
 import os
-from pathlib import Path
 import shutil
 import stat
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location("evacuation_staging", ROOT / "scripts/operations/evacuation_staging.py")
+SPEC = importlib.util.spec_from_file_location(
+    "evacuation_staging", ROOT / "scripts/operations/evacuation_staging.py"
+)
 staging = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(staging)
 
 
 def fixture_plan(root):
-    users = {name: {"uid": uid, "gid": uid, "targetSubIdStart": 165536 + (uid - 2000) * 65536, "subIdCount": 65536} for name, uid in staging.USERS.items()}
-    services = {name: {"user": user, "image": "ghcr.io/fredrir/fixture@sha256:" + "a" * 64, "memoryMaxBytes": 256 * 1024**2} for name, user in staging.SERVICE_USERS.items()}
-    plan = {"source": {"id": "fredrir-05", "providerId": 132168416}, "target": {"id": "fredrir-09", "architecture": "amd64"}, "authorization": {"targetInstall": True, "sourceStop": False, "cutover": False}, "users": users, "services": services, "capacity": {"preservedAggregateServiceMemoryMaxBytes": 6 * 256 * 1024**2, "userSliceMemoryMaxMiB": {"edge": 768, "llunde-backend": 2560, "llunde-frontend": 768}}, "unitSHA256": {}}
+    users = {
+        name: {
+            "uid": uid,
+            "gid": uid,
+            "targetSubIdStart": 165536 + (uid - 2000) * 65536,
+            "subIdCount": 65536,
+        }
+        for name, uid in staging.USERS.items()
+    }
+    services = {
+        name: {
+            "user": user,
+            "image": "ghcr.io/fredrir/fixture@sha256:" + "a" * 64,
+            "memoryMaxBytes": 256 * 1024**2,
+        }
+        for name, user in staging.SERVICE_USERS.items()
+    }
+    plan = {
+        "source": {"id": "fredrir-05", "providerId": 132168416},
+        "target": {"id": "fredrir-09", "architecture": "amd64"},
+        "authorization": {"targetInstall": True, "sourceStop": False, "cutover": False},
+        "users": users,
+        "services": services,
+        "capacity": {
+            "preservedAggregateServiceMemoryMaxBytes": 6 * 256 * 1024**2,
+            "userSliceMemoryMaxMiB": {
+                "edge": 768,
+                "llunde-backend": 2560,
+                "llunde-frontend": 768,
+            },
+        },
+        "unitSHA256": {},
+    }
     for name, service in services.items():
         path = root / "units" / service["user"] / f"{name}.container"
         path.parent.mkdir(parents=True, exist_ok=True)
         contents = "[Unit]\nConditionPathExists=/var/lib/infra-evacuation/llunde/stage-approved\n"
         if name == "llunde-backend":
-            contents += "ConditionPathExists=/var/lib/infra-evacuation/llunde/source-fenced\n"
-        contents += f"[Container]\nImage={service['image']}\n[Service]\nMemoryMax=256M\n"
+            contents += (
+                "ConditionPathExists=/var/lib/infra-evacuation/llunde/source-fenced\n"
+            )
+        contents += (
+            f"[Container]\nImage={service['image']}\n[Service]\nMemoryMax=256M\n"
+        )
         path.write_text(contents)
-    (root / "units/Caddyfile").write_text("http://:8085 {\n bind 127.0.0.1\n respond 200\n}\n")
-    (root / "units/llunde-backend/llunde-backend-data.network").write_text("[Network]\nInternal=true\n")
+    (root / "units/Caddyfile").write_text(
+        "http://:8085 {\n bind 127.0.0.1\n respond 200\n}\n"
+    )
+    (root / "units/llunde-backend/llunde-backend-data.network").write_text(
+        "[Network]\nInternal=true\n"
+    )
     for path in (root / "units").rglob("*"):
         if path.is_file():
-            plan["unitSHA256"][str(path.relative_to(root))] = hashlib.sha256(path.read_bytes()).hexdigest()
+            plan["unitSHA256"][str(path.relative_to(root))] = hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
     (root / "staging.json").write_text(json.dumps(plan))
     return plan
 
@@ -72,44 +112,85 @@ class StagingPlanTests(unittest.TestCase):
     def test_rehashed_candidate_cannot_remove_fence_or_change_memory(self):
         path = self.root / "units/llunde-backend/llunde-backend.container"
         original = path.read_text()
-        for modified in (original.replace("ConditionPathExists=/var/lib/infra-evacuation/llunde/source-fenced\n", ""), original.replace("MemoryMax=256M", "MemoryMax=1024M")):
+        for modified in (
+            original.replace(
+                "ConditionPathExists=/var/lib/infra-evacuation/llunde/source-fenced\n",
+                "",
+            ),
+            original.replace("MemoryMax=256M", "MemoryMax=1024M"),
+        ):
             with self.subTest(contents=modified):
                 path.write_text(modified)
-                self.plan["unitSHA256"][str(path.relative_to(self.root))] = hashlib.sha256(path.read_bytes()).hexdigest()
+                self.plan["unitSHA256"][str(path.relative_to(self.root))] = (
+                    hashlib.sha256(path.read_bytes()).hexdigest()
+                )
                 self.save()
                 with self.assertRaises(staging.StagingError):
                     staging.validate_plan(self.root)
 
     def test_existing_subordinate_ranges_are_preserved_or_refused(self):
         existing = "administrator:100000:65536\n"
-        staging.validate_accounts(self.plan, "administrator:x:1000:1000::/home/administrator:/bin/bash\n", "administrator:x:1000:\n", existing, existing)
-        complete = existing + "".join(f"{name}:{user['targetSubIdStart']}:65536\n" for name, user in self.plan["users"].items())
+        staging.validate_accounts(
+            self.plan,
+            "administrator:x:1000:1000::/home/administrator:/bin/bash\n",
+            "administrator:x:1000:\n",
+            existing,
+            existing,
+        )
+        complete = existing + "".join(
+            f"{name}:{user['targetSubIdStart']}:65536\n"
+            for name, user in self.plan["users"].items()
+        )
         staging.validate_accounts(self.plan, "", "", complete, complete)
-        for bad in ("other:200000:65536\n", "edge:100000:65536\n", complete + "edge:500000:65536\n"):
+        for bad in (
+            "other:200000:65536\n",
+            "edge:100000:65536\n",
+            complete + "edge:500000:65536\n",
+        ):
             with self.subTest(mapping=bad), self.assertRaises(staging.StagingError):
                 staging.validate_accounts(self.plan, "", "", bad, existing)
 
     def test_user_and_group_collisions_are_rejected(self):
-        for passwd, group in (("other:x:2000:2000::/home/other:/bin/sh", ""), ("edge:x:2000:1000::/home/edge:/bin/sh", ""), ("edge:x:2000:2000::/home/unrelated:/bin/sh", ""), ("", "other:x:2001:")):
-            with self.subTest(passwd=passwd, group=group), self.assertRaises(staging.StagingError):
+        for passwd, group in (
+            ("other:x:2000:2000::/home/other:/bin/sh", ""),
+            ("edge:x:2000:1000::/home/edge:/bin/sh", ""),
+            ("edge:x:2000:2000::/home/unrelated:/bin/sh", ""),
+            ("", "other:x:2001:"),
+        ):
+            with (
+                self.subTest(passwd=passwd, group=group),
+                self.assertRaises(staging.StagingError),
+            ):
                 staging.validate_accounts(self.plan, passwd, group, "", "")
 
 
-@unittest.skipUnless(shutil.which("age") and shutil.which("age-keygen"), "age tools required")
+@unittest.skipUnless(
+    shutil.which("age") and shutil.which("age-keygen"), "age tools required"
+)
 class SecretBundleTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.key = self.root / "identity.key"
-        subprocess.run(["age-keygen", "-o", str(self.key)], capture_output=True, check=True)
+        subprocess.run(
+            ["age-keygen", "-o", str(self.key)], capture_output=True, check=True
+        )
         self.key.chmod(0o600)
-        self.recipient = subprocess.run(["age-keygen", "-y", str(self.key)], capture_output=True, check=True).stdout.decode().strip()
+        self.recipient = (
+            subprocess.run(
+                ["age-keygen", "-y", str(self.key)], capture_output=True, check=True
+            )
+            .stdout.decode()
+            .strip()
+        )
         (self.root / "secrets").mkdir()
         self.plaintext = {}
         for name, (_, _, keys, source, _) in staging.SECRETS.items():
             (self.root / "secrets" / source).write_text("encrypted-source-fixture")
-            self.plaintext[source] = "".join(f"{key}=fixture-{name}\n" for key in sorted(keys)).encode()
+            self.plaintext[source] = "".join(
+                f"{key}=fixture-{name}\n" for key in sorted(keys)
+            ).encode()
         self.bundle = self.root / "bundle"
         self.runtime = self.root / "run/llunde"
         self.real_run = staging.run_private
@@ -124,13 +205,17 @@ class SecretBundleTests(unittest.TestCase):
             return staging.prepare_secrets(self.root, self.recipient, self.bundle)
 
     def render(self):
-        return staging.render_secrets(self.key, self.bundle, self.runtime, os.geteuid(), os.getegid())
+        return staging.render_secrets(
+            self.key, self.bundle, self.runtime, os.geteuid(), os.getegid()
+        )
 
     def test_encrypted_roundtrip_regenerates_runtime_and_is_idempotent(self):
         self.assertTrue(self.prepare()["changed"])
         original = {p.name: p.read_bytes() for p in self.bundle.iterdir()}
         self.assertFalse(self.prepare()["changed"])
-        self.assertEqual(original, {p.name: p.read_bytes() for p in self.bundle.iterdir()})
+        self.assertEqual(
+            original, {p.name: p.read_bytes() for p in self.bundle.iterdir()}
+        )
         for _ in range(2):
             self.assertEqual(self.render(), {"renderedFiles": 3})
             for _, (user, filename, _, source, _) in staging.SECRETS.items():
@@ -194,7 +279,7 @@ class SecretBundleTests(unittest.TestCase):
             os.umask(previous)
         self.assertEqual(stat.S_IMODE(self.runtime.parent.stat().st_mode), 0o755)
         self.assertEqual(stat.S_IMODE(self.runtime.stat().st_mode), 0o755)
-        for user in ('edge', 'llunde-backend'):
+        for user in ("edge", "llunde-backend"):
             self.assertEqual(stat.S_IMODE((self.runtime / user).stat().st_mode), 0o750)
 
     def test_existing_restricted_runtime_directory_is_not_silently_relaxed(self):

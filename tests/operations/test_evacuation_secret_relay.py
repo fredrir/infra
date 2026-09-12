@@ -1,24 +1,22 @@
 import base64
 import contextlib
-from datetime import datetime, timezone
 import io
 import json
 import os
-from pathlib import Path
 import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import patch
-
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/operations"))
 import evacuation_secret_relay as relay
 import evacuation_staging as staging
-
 
 VALUES = {
     "doppler": b"DOPPLER_TOKEN=synthetic-fixture\n",
@@ -28,8 +26,34 @@ VALUES = {
 
 
 def source_fixture():
-    metadata = {"uid": 0, "gid": 96, "mode": "0751", "device": 1, "inode": 2, "size": 80, "mtimeNs": 1, "ctimeNs": 1, "links": 1}
-    return {"schemaVersion": 1, "hostname": "llunde-01", "capturedAt": datetime.now(timezone.utc).isoformat(), "generation": "/run/secrets.d/48", "directories": {"secrets.d": metadata.copy(), "generation": metadata.copy()}, "files": {name: {"path": f"/run/secrets/{filename}", "resolvedPath": f"/run/secrets.d/48/{filename}", "metadata": metadata | {"uid": owner, "mode": "0400", "size": len(VALUES[name])}, "data": base64.b64encode(VALUES[name]).decode()} for name, (filename, owner) in relay.SOURCE_FILES.items()}}
+    metadata = {
+        "uid": 0,
+        "gid": 96,
+        "mode": "0751",
+        "device": 1,
+        "inode": 2,
+        "size": 80,
+        "mtimeNs": 1,
+        "ctimeNs": 1,
+        "links": 1,
+    }
+    return {
+        "schemaVersion": 1,
+        "hostname": "llunde-01",
+        "capturedAt": datetime.now(UTC).isoformat(),
+        "generation": "/run/secrets.d/48",
+        "directories": {"secrets.d": metadata.copy(), "generation": metadata.copy()},
+        "files": {
+            name: {
+                "path": f"/run/secrets/{filename}",
+                "resolvedPath": f"/run/secrets.d/48/{filename}",
+                "metadata": metadata
+                | {"uid": owner, "mode": "0400", "size": len(VALUES[name])},
+                "data": base64.b64encode(VALUES[name]).decode(),
+            }
+            for name, (filename, owner) in relay.SOURCE_FILES.items()
+        },
+    }
 
 
 class RuntimeReaderTests(unittest.TestCase):
@@ -50,8 +74,19 @@ class RuntimeReaderTests(unittest.TestCase):
             path.chmod(0o400)
 
     def invoke(self, prefix="", **overrides):
-        parameters = {"runtime_root": str(self.root), "root_uid": os.geteuid(), "root_gid": os.getegid(), "directory_gid": os.getegid(), "hostname": socket.gethostname(), "owners": {name: os.geteuid() for name in VALUES}} | overrides
-        return subprocess.run([sys.executable, "-I", "-c", prefix + relay.source_program(**parameters)], capture_output=True, timeout=10)
+        parameters = {
+            "runtime_root": str(self.root),
+            "root_uid": os.geteuid(),
+            "root_gid": os.getegid(),
+            "directory_gid": os.getegid(),
+            "hostname": socket.gethostname(),
+            "owners": {name: os.geteuid() for name in VALUES},
+        } | overrides
+        return subprocess.run(
+            [sys.executable, "-I", "-c", prefix + relay.source_program(**parameters)],
+            capture_output=True,
+            timeout=10,
+        )
 
     def refused(self, **overrides):
         result = self.invoke(**overrides)
@@ -111,7 +146,15 @@ class RuntimeReaderTests(unittest.TestCase):
 
 class RelayBoundaryTests(unittest.TestCase):
     def test_rejects_extra_keys_wrong_owner_size_and_stale_observation(self):
-        for mutate in [lambda d: d["files"]["doppler"]["metadata"].update(uid=2000), lambda d: d["files"]["doppler"]["metadata"].update(size=1), lambda d: d["files"]["doppler"].update(data=base64.b64encode(b"OTHER=value\n").decode()), lambda d: d.update(capturedAt="2000-01-01T00:00:00+00:00"), lambda d: d["directories"]["generation"].update(secret="forbidden")]:
+        for mutate in [
+            lambda d: d["files"]["doppler"]["metadata"].update(uid=2000),
+            lambda d: d["files"]["doppler"]["metadata"].update(size=1),
+            lambda d: d["files"]["doppler"].update(
+                data=base64.b64encode(b"OTHER=value\n").decode()
+            ),
+            lambda d: d.update(capturedAt="2000-01-01T00:00:00+00:00"),
+            lambda d: d["directories"]["generation"].update(secret="forbidden"),
+        ]:
             document = source_fixture()
             mutate(document)
             with self.assertRaises(staging.StagingError):
@@ -119,10 +162,23 @@ class RelayBoundaryTests(unittest.TestCase):
 
     def test_transport_pins_host_key_alias_and_filters_environment(self):
         seen = {}
+
         def runner(argv, **kwargs):
             seen.update(argv=argv, **kwargs)
-            return subprocess.CompletedProcess(argv, 0, json.dumps(source_fixture()).encode(), b"")
-        relay.read_source(runner=runner, environment={"PATH": "/usr/bin:/bin", "HOME": "/fixture", "SSH_AUTH_SOCK": "/socket", "DOPPLER_TOKEN": "not-forwarded", "PYTHONPATH": "not-forwarded"})
+            return subprocess.CompletedProcess(
+                argv, 0, json.dumps(source_fixture()).encode(), b""
+            )
+
+        relay.read_source(
+            runner=runner,
+            environment={
+                "PATH": "/usr/bin:/bin",
+                "HOME": "/fixture",
+                "SSH_AUTH_SOCK": "/socket",
+                "DOPPLER_TOKEN": "not-forwarded",
+                "PYTHONPATH": "not-forwarded",
+            },
+        )
         self.assertEqual(seen["argv"][-2], "fredrir-05")
         self.assertIn("StrictHostKeyChecking=yes", seen["argv"])
         self.assertIn("ForwardAgent=no", seen["argv"])
@@ -131,40 +187,78 @@ class RelayBoundaryTests(unittest.TestCase):
         self.assertEqual(seen["input"], b"")
 
     def test_accepts_existing_nix_python_and_rejects_arbitrary_executables(self):
-        source_python = "/nix/store/vm6nxpp97fxgczw00bwkxdqdm2an3n95-python3-3.13.12/bin/python3"
+        source_python = (
+            "/nix/store/vm6nxpp97fxgczw00bwkxdqdm2an3n95-python3-3.13.12/bin/python3"
+        )
+
         def runner(argv, **kwargs):
             self.assertIn(source_python + " -I -c", argv[-1])
-            return subprocess.CompletedProcess(argv, 0, json.dumps(source_fixture()).encode(), b"")
+            return subprocess.CompletedProcess(
+                argv, 0, json.dumps(source_fixture()).encode(), b""
+            )
+
         relay.read_source(source_python=source_python, runner=runner)
-        for bad in ["python3 -c unwanted", "/tmp/python3", source_python + ";id", source_python.replace("/bin/python3", "/bin/../bin/python3")]:
+        for bad in [
+            "python3 -c unwanted",
+            "/tmp/python3",
+            source_python + ";id",
+            source_python.replace("/bin/python3", "/bin/../bin/python3"),
+        ]:
             with self.subTest(path=bad), self.assertRaises(staging.StagingError):
-                relay.read_source(source_python=bad, runner=lambda *args, **kwargs: self.fail("Invalid interpreter must not execute"))
+                relay.read_source(
+                    source_python=bad,
+                    runner=lambda *args, **kwargs: self.fail(
+                        "Invalid interpreter must not execute"
+                    ),
+                )
 
     def test_command_and_cli_errors_withhold_sensitive_output(self):
         def runner(argv, **kwargs):
-            return subprocess.CompletedProcess(argv, 1, b"private-value", b"private-value")
-        with self.assertRaisesRegex(staging.StagingError, "^Private relay command failed$"):
+            return subprocess.CompletedProcess(
+                argv, 1, b"private-value", b"private-value"
+            )
+
+        with self.assertRaisesRegex(
+            staging.StagingError, "^Private relay command failed$"
+        ):
             relay.read_source(runner=runner)
         output = io.StringIO()
-        with patch.object(relay, "prepare_relay", side_effect=ValueError("private-value")), contextlib.redirect_stdout(output):
+        with (
+            patch.object(
+                relay, "prepare_relay", side_effect=ValueError("private-value")
+            ),
+            contextlib.redirect_stdout(output),
+        ):
             self.assertEqual(relay.main(["recipient", "destination"]), 1)
         self.assertNotIn("private-value", output.getvalue())
 
 
-@unittest.skipUnless(shutil.which("age") and shutil.which("age-keygen"), "age tools required")
+@unittest.skipUnless(
+    shutil.which("age") and shutil.which("age-keygen"), "age tools required"
+)
 class EncryptedRelayTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.key = self.root / "identity.key"
-        subprocess.run(["age-keygen", "-o", str(self.key)], capture_output=True, check=True)
+        subprocess.run(
+            ["age-keygen", "-o", str(self.key)], capture_output=True, check=True
+        )
         self.key.chmod(0o600)
-        self.recipient = subprocess.run(["age-keygen", "-y", str(self.key)], capture_output=True, check=True).stdout.decode().strip()
+        self.recipient = (
+            subprocess.run(
+                ["age-keygen", "-y", str(self.key)], capture_output=True, check=True
+            )
+            .stdout.decode()
+            .strip()
+        )
         self.destination = self.root / "bundle"
 
     def test_ciphertext_bundle_works_with_existing_renderer_without_source_hashes(self):
-        receipt = relay.prepare_relay(self.recipient, self.destination, source_reader=source_fixture)
+        receipt = relay.prepare_relay(
+            self.recipient, self.destination, source_reader=source_fixture
+        )
         self.assertFalse(receipt["repositorySecretProvenance"])
         manifest = json.loads((self.destination / "manifest.json").read_bytes())
         self.assertEqual(manifest["source"]["type"], "runtime-ssh")
@@ -174,14 +268,20 @@ class EncryptedRelayTests(unittest.TestCase):
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertNotIn(b"synthetic-fixture", path.read_bytes())
         runtime = self.root / "run/llunde"
-        staging.render_secrets(self.key, self.destination, runtime, os.geteuid(), os.getegid())
+        staging.render_secrets(
+            self.key, self.destination, runtime, os.geteuid(), os.getegid()
+        )
         for name, (user, filename, _, _, _) in staging.SECRETS.items():
             self.assertEqual((runtime / user / filename).read_bytes(), VALUES[name])
 
     def test_refuses_existing_destination_without_reading_source(self):
         self.destination.mkdir(mode=0o700)
         with self.assertRaises(staging.StagingError):
-            relay.prepare_relay(self.recipient, self.destination, source_reader=lambda: self.fail("Source should not be read"))
+            relay.prepare_relay(
+                self.recipient,
+                self.destination,
+                source_reader=lambda: self.fail("Source should not be read"),
+            )
         self.assertEqual(list(self.destination.iterdir()), [])
 
     def test_failed_encryption_writes_no_bundle_and_leaks_no_plaintext_to_argv(self):
@@ -190,8 +290,18 @@ class EncryptedRelayTests(unittest.TestCase):
             self.assertIn(kwargs["input"], VALUES.values())
             self.assertNotIn("DOPPLER_TOKEN", kwargs["env"])
             return subprocess.CompletedProcess(argv, 1, b"", b"synthetic-fixture")
+
         with self.assertRaises(staging.StagingError):
-            relay.prepare_relay(self.recipient, self.destination, source_reader=source_fixture, runner=runner, environment={"PATH": os.environ["PATH"], "DOPPLER_TOKEN": "not-forwarded"})
+            relay.prepare_relay(
+                self.recipient,
+                self.destination,
+                source_reader=source_fixture,
+                runner=runner,
+                environment={
+                    "PATH": os.environ["PATH"],
+                    "DOPPLER_TOKEN": "not-forwarded",
+                },
+            )
         self.assertFalse(self.destination.exists())
 
 

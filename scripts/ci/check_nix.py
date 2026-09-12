@@ -17,19 +17,35 @@ def native_system():
 def host_targets(hosts, system):
     if any(not re.fullmatch(r"[A-Za-z0-9_-]+", name) for name in hosts):
         raise PolicyError("unsafe NixOS configuration name")
-    return [f".#nixosConfigurations.{name}.config.system.build.toplevel" for name, target in sorted(hosts.items()) if target == system]
+    return [
+        f".#nixosConfigurations.{name}.config.system.build.toplevel"
+        for name, target in sorted(hosts.items())
+        if target == system
+    ]
 
 
 def main():
     system = native_system()
     subprocess.run(["nix", "flake", "check", "--no-update-lock-file"], check=True)
-    result = subprocess.run([
-        "nix", "eval", "--json", ".#nixosConfigurations", "--no-update-lock-file", "--apply",
-        "hosts: builtins.mapAttrs (_: host: host.config.nixpkgs.hostPlatform.system) hosts",
-    ], check=True, capture_output=True, text=True)
+    result = subprocess.run(
+        [
+            "nix",
+            "eval",
+            "--json",
+            ".#nixosConfigurations",
+            "--no-update-lock-file",
+            "--apply",
+            "hosts: builtins.mapAttrs (_: host: host.config.nixpkgs.hostPlatform.system) hosts",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     targets = host_targets(json.loads(result.stdout), system)
     if targets:
-        subprocess.run(["nix", "build", "--no-link", "--no-update-lock-file", *targets], check=True)
+        subprocess.run(
+            ["nix", "build", "--no-link", "--no-update-lock-file", *targets], check=True
+        )
 
 
 if __name__ == "__main__":

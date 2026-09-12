@@ -2,12 +2,12 @@
 
 | Package    | Version |
 | ---------- | ------- |
-| nixos      | 2.35.1  |
+| nix        | 2.35.2  |
 | nixd       |         |
 | statix     |         |
 | alejandra  |         |
 | deadnix    |         |
-| opentofu   |         |
+| opentofu   | 1.12.6  |
 | sops       |         |
 | age        |         |
 | awscli     |         |

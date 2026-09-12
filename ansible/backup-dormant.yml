@@ -1,0 +1,102 @@
+- name: Prepare dormant standalone backups
+  hosts: backup_nodes
+  gather_facts: false
+  become: true
+  serial: 1
+  vars:
+    backup_action: stage
+    backup_public_key: ""
+  tasks:
+    - name: Check bounded operation
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname in ['fredrir-09', 'fredrir-06']
+          - backup_action in ['stage', 'install', 'rollback']
+          - backup_remote is match('^/var/lib/infra-evacuation/llunde/recurring-backup-deploy-[0-9TZ]+$')
+          - backup_manifest_sha256 is match('^[a-f0-9]{64}$')
+          - backup_action != 'install' or inventory_hostname != 'fredrir-06' or backup_public_key is match('^ssh-ed25519 [A-Za-z0-9+/]+={0,2}$')
+    - name: Read current machine identity
+      ansible.builtin.command:
+        argv: [/usr/bin/hostname]
+      register: backup_hostname
+      changed_when: false
+    - name: Check machine identity
+      ansible.builtin.assert:
+        that:
+          - backup_hostname.stdout == backup_expected_hostname
+    - name: Check fresh staging destination
+      ansible.builtin.stat:
+        path: "{{ backup_remote }}"
+        follow: false
+      register: backup_destination
+      when: backup_action == 'stage'
+    - name: Refuse existing staging destination
+      ansible.builtin.assert:
+        that: not backup_destination.stat.exists
+      when: backup_action == 'stage'
+    - name: Prepare fixed staging ancestors
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -I
+          - -c
+          - |
+            import json, os, stat
+            fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
+            created, path = [], ''
+            try:
+                for name in ('var', 'lib', 'infra-evacuation', 'llunde'):
+                    path += '/' + name
+                    try:
+                        os.mkdir(name, 0o700, dir_fd=fd)
+                        created.append(path)
+                    except FileExistsError:
+                        pass
+                    child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+                    os.close(fd)
+                    fd = child
+                    info = os.fstat(fd)
+                    assert info.st_uid == 0 and stat.S_IMODE(info.st_mode) & 0o022 == 0
+            finally:
+                os.close(fd)
+            print(json.dumps({'createdDirectories': created}))
+      when: backup_action == 'stage'
+      register: backup_staging_parents
+      changed_when: (backup_staging_parents.stdout | from_json).createdDirectories | length > 0
+    - name: Create private staging directory
+      ansible.builtin.file:
+        path: "{{ backup_remote }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+      when: backup_action == 'stage'
+    - name: Deliver immutable preparation files
+      ansible.builtin.copy:
+        src: "{{ backup_local }}/"
+        dest: "{{ backup_remote }}/"
+        owner: root
+        group: root
+        mode: "0600"
+        directory_mode: "0700"
+      when: backup_action == 'stage'
+    - name: Verify every delivered byte before importing helpers
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -I
+          - -c
+          - "{{ lookup('ansible.builtin.file', playbook_dir + '/../scripts/operations/recurring_backup_delivery.py') }}"
+          - "{{ backup_remote }}"
+          - "{{ backup_manifest_sha256 }}"
+      changed_when: false
+    - name: Execute bounded dormant operation
+      ansible.builtin.command:
+        argv: "{{ ['/usr/bin/systemd-run', '--collect', '--wait', '--pipe', '--service-type=exec', '--unit=infra-backup-' + backup_action + '-' + inventory_hostname + '-' + backup_manifest_sha256[:12], '--property=RuntimeMaxSec=300s', '--property=TimeoutStopSec=15s', '--property=KillMode=control-group', '--property=MemoryMax=256M', '--property=CPUQuota=100%', '--property=TasksMax=64', '--property=NoNewPrivileges=true', '/usr/bin/python3', '-B', backup_remote + '/helpers/recurring_backup_install.py', backup_action, inventory_hostname, '--bundle', backup_remote, '--manifest-sha256', backup_manifest_sha256] + (['--public-key', backup_public_key] if backup_action == 'install' and inventory_hostname == 'fredrir-06' else []) }}"
+      register: backup_operation
+      when: backup_action != 'stage'
+      changed_when: true
+    - name: Report bounded operation status
+      ansible.builtin.debug:
+        var: backup_operation.stdout_lines
+      when: backup_action != 'stage'

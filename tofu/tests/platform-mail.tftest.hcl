@@ -29,9 +29,12 @@ run "scoped_smtp_identity" {
     condition = (
       length(jsondecode(aws_iam_policy.sender.policy).Statement) == 1 &&
       jsondecode(aws_iam_policy.sender.policy).Statement[0].Action == ["ses:SendRawEmail"] &&
-      jsondecode(aws_iam_policy.sender.policy).Statement[0].Resource == ["arn:aws:ses:eu-north-1:123456789012:identity/example.com"]
+      jsondecode(aws_iam_policy.sender.policy).Statement[0].Resource == [
+        "arn:aws:ses:eu-north-1:123456789012:identity/example.com",
+        "arn:aws:ses:eu-north-1:123456789012:identity/operator@example.net",
+      ]
     )
-    error_message = "The SMTP sender may only send raw email using its own domain identity."
+    error_message = "SMTP authority must contain only the sending domain and exact verified recipient identity in the same account and region."
   }
   assert {
     condition = (

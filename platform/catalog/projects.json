@@ -9,13 +9,8 @@
       "repositoryId": 1327945675,
       "namespace": "llunde-backend",
       "image": "ghcr.io/fredrir/llunde-backend",
-      "domains": [
-        "api.llunde.no"
-      ],
-      "architectures": [
-        "amd64",
-        "arm64"
-      ],
+      "domains": ["api.llunde.no"],
+      "architectures": ["amd64", "arm64"],
       "capabilities": [
         "web",
         "worker",
@@ -25,9 +20,7 @@
         "postgres",
         "valkey"
       ],
-      "environments": [
-        "production"
-      ],
+      "environments": ["production"],
       "images": {
         "app": "ghcr.io/fredrir/llunde-backend"
       }
@@ -37,31 +30,15 @@
       "repositoryId": 1328144104,
       "namespace": "llunde-frontend",
       "image": "ghcr.io/fredrir/llunde-frontend",
-      "domains": [
-        "llunde.no",
-        "www.llunde.no"
-      ],
-      "architectures": [
-        "amd64",
-        "arm64"
-      ],
-      "capabilities": [
-        "web",
-        "worker",
-        "cron",
-        "secrets",
-        "internet"
-      ],
-      "environments": [
-        "production"
-      ],
+      "domains": ["llunde.no", "www.llunde.no"],
+      "architectures": ["amd64", "arm64"],
+      "capabilities": ["web", "worker", "cron", "secrets", "internet"],
+      "environments": ["production"],
       "images": {
         "app": "ghcr.io/fredrir/llunde-frontend"
       },
       "publicBuildArguments": {
-        "app": [
-          "VITE_TURNSTILE_SITE_KEY"
-        ]
+        "app": ["VITE_TURNSTILE_SITE_KEY"]
       }
     },
     "llunde-pyparser": {
@@ -71,10 +48,7 @@
       "namespace": "llunde-pyparser",
       "image": "ghcr.io/fredrir/pyparser-review",
       "domains": [],
-      "architectures": [
-        "amd64",
-        "arm64"
-      ],
+      "architectures": ["amd64", "arm64"],
       "capabilities": [
         "web",
         "worker",
@@ -86,9 +60,7 @@
         "valkey",
         "shared-volume"
       ],
-      "environments": [
-        "production"
-      ],
+      "environments": ["production"],
       "images": {
         "app": "ghcr.io/fredrir/pyparser-review"
       }
@@ -98,13 +70,8 @@
       "repositoryId": 773018612,
       "namespace": "portfolio",
       "image": "ghcr.io/fredrir/portfolio",
-      "domains": [
-        "hansteen.dev"
-      ],
-      "architectures": [
-        "amd64",
-        "arm64"
-      ],
+      "domains": ["hansteen.dev"],
+      "architectures": ["amd64", "arm64"],
       "capabilities": [
         "web",
         "worker",
@@ -113,9 +80,7 @@
         "internet",
         "postgres"
       ],
-      "environments": [
-        "production"
-      ],
+      "environments": ["production"],
       "images": {
         "app": "ghcr.io/fredrir/portfolio",
         "web": "ghcr.io/fredrir/portfolio-web",
@@ -129,10 +94,7 @@
           "VITE_POSTHOG_HOST",
           "VITE_APP_VERSION"
         ],
-        "api": [
-          "GIT_SHA",
-          "APP_VERSION"
-        ]
+        "api": ["GIT_SHA", "APP_VERSION"]
       }
     },
     "y": {
@@ -141,20 +103,9 @@
       "namespace": "y",
       "image": "ghcr.io/fredrir/y",
       "domains": [],
-      "architectures": [
-        "amd64",
-        "arm64"
-      ],
-      "capabilities": [
-        "web",
-        "worker",
-        "cron",
-        "secrets",
-        "internet"
-      ],
-      "environments": [
-        "production"
-      ],
+      "architectures": ["amd64", "arm64"],
+      "capabilities": ["web", "worker", "cron", "secrets", "internet"],
+      "environments": ["production"],
       "images": {
         "app": "ghcr.io/fredrir/y"
       }
@@ -165,14 +116,9 @@
       "namespace": "platform-ingress",
       "image": "ghcr.io/fredrir/llunde-caddy",
       "domains": [],
-      "architectures": [
-        "amd64",
-        "arm64"
-      ],
+      "architectures": ["amd64", "arm64"],
       "capabilities": [],
-      "environments": [
-        "production"
-      ],
+      "environments": ["production"],
       "images": {
         "app": "ghcr.io/fredrir/llunde-caddy"
       }

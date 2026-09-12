@@ -6,23 +6,51 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from jsonschema import Draft7Validator
-
 from infra.cli import main
-from infra.contracts import ContractError, catalog_project, load_document, validate_project, validate_release
+from infra.contracts import (
+    ContractError,
+    catalog_project,
+    load_document,
+    validate_project,
+    validate_release,
+)
 from infra.render import RESOURCE_CLASSES, chart_values, render_project
-
+from jsonschema import Draft7Validator
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def project():
-    return {"schemaVersion": 1, "project": "portfolio", "workloads": {"web": {"kind": "web", "port": 3000, "healthPath": "/", "domains": ["hansteen.dev"]}}}
+    return {
+        "schemaVersion": 1,
+        "project": "portfolio",
+        "workloads": {
+            "web": {
+                "kind": "web",
+                "port": 3000,
+                "healthPath": "/",
+                "domains": ["hansteen.dev"],
+            }
+        },
+    }
 
 
 def release():
-    return {"schemaVersion": 1, "project": "portfolio", "environment": "production", "image": "ghcr.io/fredrir/portfolio@sha256:" + "a" * 64, "sourceRevision": "b" * 40,
-        "provenance": {"workflowRepository": "fredrir/llunde-infra", "workflowRevision": "c" * 40, "workflowPath": ".github/workflows/project-ci.yml", "repositoryId": 773018612, "runId": 123, "platforms": ["linux/amd64"]}}
+    return {
+        "schemaVersion": 1,
+        "project": "portfolio",
+        "environment": "production",
+        "image": "ghcr.io/fredrir/portfolio@sha256:" + "a" * 64,
+        "sourceRevision": "b" * 40,
+        "provenance": {
+            "workflowRepository": "fredrir/llunde-infra",
+            "workflowRevision": "c" * 40,
+            "workflowPath": ".github/workflows/project-ci.yml",
+            "repositoryId": 773018612,
+            "runId": 123,
+            "platforms": ["linux/amd64"],
+        },
+    }
 
 
 def application_values(document, record):
@@ -36,7 +64,9 @@ class ProjectContracts(unittest.TestCase):
         for mutate in [
             lambda p: p["workloads"]["web"].update(domains=["grafana.fredrir.com"]),
             lambda p: p.update(namespace="kube-system"),
-            lambda p: p["workloads"]["web"].update(securityContext={"privileged": True}),
+            lambda p: p["workloads"]["web"].update(
+                securityContext={"privileged": True}
+            ),
             lambda p: p.update(extraObjects=[{"kind": "ClusterRoleBinding"}]),
         ]:
             with self.subTest(mutate=mutate):
@@ -54,7 +84,12 @@ class ProjectContracts(unittest.TestCase):
 
     def test_rejects_data_without_catalog_capability(self):
         value = project()
-        value["data"] = {"valkey": {"sizeClass": "small", "recovery": {"rpoHours": 24, "rtoHours": 4}}}
+        value["data"] = {
+            "valkey": {
+                "sizeClass": "small",
+                "recovery": {"rpoHours": 24, "rtoHours": 4},
+            }
+        }
         with self.assertRaisesRegex(ContractError, "data capability"):
             validate_project(ROOT, value)
 
@@ -62,12 +97,18 @@ class ProjectContracts(unittest.TestCase):
         value = project()
         value["project"] = "llunde-pyparser"
         value["workloads"]["web"].pop("domains")
-        value["workloads"]["web"].update(volume={"mountPath": "/data", "sizeClass": "small"}, replicas=2)
+        value["workloads"]["web"].update(
+            volume={"mountPath": "/data", "sizeClass": "small"}, replicas=2
+        )
         with self.assertRaisesRegex(ContractError, "one replica"):
             validate_project(ROOT, value)
 
     def test_release_identity_and_mutable_images_rejected(self):
-        for field, bad in [("image", "ghcr.io/fredrir/portfolio:latest"), ("image", "ghcr.io/fredrir/llunde-backend@sha256:" + "a" * 64), ("project", "llunde-backend")]:
+        for field, bad in [
+            ("image", "ghcr.io/fredrir/portfolio:latest"),
+            ("image", "ghcr.io/fredrir/llunde-backend@sha256:" + "a" * 64),
+            ("project", "llunde-backend"),
+        ]:
             with self.subTest(field=field, bad=bad):
                 value = release()
                 value[field] = bad
@@ -89,9 +130,14 @@ class ProjectContracts(unittest.TestCase):
         value["workloads"]["web"]["component"] = "web"
         value["workloads"]["worker"] = {"kind": "worker", "component": "worker"}
         web = release()
-        web.update(component="web", image="ghcr.io/fredrir/portfolio-web@sha256:" + "d" * 64)
+        web.update(
+            component="web", image="ghcr.io/fredrir/portfolio-web@sha256:" + "d" * 64
+        )
         worker = release()
-        worker.update(component="worker", image="ghcr.io/fredrir/portfolio-worker@sha256:" + "e" * 64)
+        worker.update(
+            component="worker",
+            image="ghcr.io/fredrir/portfolio-worker@sha256:" + "e" * 64,
+        )
         with self.assertRaisesRegex(ContractError, "component release required"):
             chart_values(ROOT, value, releases={"web": web})
         rendered = chart_values(ROOT, value, releases={"web": web, "worker": worker})
@@ -111,7 +157,13 @@ class ProjectContracts(unittest.TestCase):
         namespace = next(item for item in resources if item["kind"] == "Namespace")
         self.assertEqual(namespace["metadata"]["name"], "portfolio")
         role = next(item for item in resources if item["kind"] == "Role")
-        self.assertTrue(all("roles" not in rule["resources"] and "rolebindings" not in rule["resources"] for rule in role["rules"]))
+        self.assertTrue(
+            all(
+                "roles" not in rule["resources"]
+                and "rolebindings" not in rule["resources"]
+                for rule in role["rules"]
+            )
+        )
 
     def test_component_catalog_does_not_require_legacy_image(self):
         catalog, approved = catalog_project(ROOT, "portfolio")
@@ -160,7 +212,10 @@ class ProjectContracts(unittest.TestCase):
             value["workloads"]["web"]["component"] = "web"
             value["workloads"]["worker"] = {"kind": "worker", "component": "worker"}
             record = release()
-            record.update(component="web", image="ghcr.io/fredrir/portfolio-web@sha256:" + "d" * 64)
+            record.update(
+                component="web",
+                image="ghcr.io/fredrir/portfolio-web@sha256:" + "d" * 64,
+            )
             (location / "project.yaml").write_text(json.dumps(value))
             (location / "releases/web.json").write_text(json.dumps(record))
             self.assertEqual(main(["--root", str(root), "validate"]), 1)
@@ -174,13 +229,29 @@ class ProjectContracts(unittest.TestCase):
         self.assertEqual(helm["spec"]["upgrade"]["remediation"]["strategy"], "rollback")
 
     def test_cron_requires_schedule(self):
-        value = {"schemaVersion": 1, "project": "portfolio", "workloads": {"task": {"kind": "cron"}}}
+        value = {
+            "schemaVersion": 1,
+            "project": "portfolio",
+            "workloads": {"task": {"kind": "cron"}},
+        }
         with self.assertRaises(ContractError):
             validate_project(ROOT, value)
 
     def test_cron_rejects_invalid_time_fields(self):
-        value = {"schemaVersion": 1, "project": "portfolio", "workloads": {"task": {"kind": "cron"}}}
-        for schedule in ["65 * * * *", "0 24 * * *", "*/0 * * * *", "* * * * * *", "0 0 0 * *", "0 0 * 13 *", "0 0 * * 6-1"]:
+        value = {
+            "schemaVersion": 1,
+            "project": "portfolio",
+            "workloads": {"task": {"kind": "cron"}},
+        }
+        for schedule in [
+            "65 * * * *",
+            "0 24 * * *",
+            "*/0 * * * *",
+            "* * * * * *",
+            "0 0 0 * *",
+            "0 0 * 13 *",
+            "0 0 * * 6-1",
+        ]:
             with self.subTest(schedule=schedule):
                 value["workloads"]["task"]["schedule"] = schedule
                 with self.assertRaises(ContractError):
@@ -189,9 +260,38 @@ class ProjectContracts(unittest.TestCase):
         validate_project(ROOT, value)
 
     def test_onboarding_verifies_repository_and_pins_workflow(self):
-        identity = {"id": 773018612, "name": "portfolio", "full_name": "fredrir/portfolio", "owner": {"id": 114402558}}
-        with tempfile.TemporaryDirectory() as directory, patch("infra.cli.subprocess.check_output", return_value=json.dumps(identity)):
-            code = main(["--root", str(ROOT), "onboard", "fredrir/portfolio", "--domain", "hansteen.dev", "--readiness-path", "/ready", "--termination-grace-period-seconds", "45", "--workflow-ref", "d" * 40, "--test-command", "npm test", "--output", directory])
+        identity = {
+            "id": 773018612,
+            "name": "portfolio",
+            "full_name": "fredrir/portfolio",
+            "owner": {"id": 114402558},
+        }
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch(
+                "infra.cli.subprocess.check_output", return_value=json.dumps(identity)
+            ),
+        ):
+            code = main(
+                [
+                    "--root",
+                    str(ROOT),
+                    "onboard",
+                    "fredrir/portfolio",
+                    "--domain",
+                    "hansteen.dev",
+                    "--readiness-path",
+                    "/ready",
+                    "--termination-grace-period-seconds",
+                    "45",
+                    "--workflow-ref",
+                    "d" * 40,
+                    "--test-command",
+                    "npm test",
+                    "--output",
+                    directory,
+                ]
+            )
             self.assertEqual(code, 0)
             caller = load_document(Path(directory) / ".github/workflows/ci.yml")
             self.assertEqual(caller["on"], {"push": {"branches": ["main"]}})
@@ -199,7 +299,9 @@ class ProjectContracts(unittest.TestCase):
             self.assertNotIn("secrets", caller["jobs"]["project"])
             generated = load_document(Path(directory) / "project.yaml")
             self.assertEqual(generated["workloads"]["app"]["readinessPath"], "/ready")
-            self.assertEqual(generated["workloads"]["app"]["terminationGracePeriodSeconds"], 45)
+            self.assertEqual(
+                generated["workloads"]["app"]["terminationGracePeriodSeconds"], 45
+            )
 
 
 if __name__ == "__main__":

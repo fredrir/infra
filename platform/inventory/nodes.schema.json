@@ -2,12 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "cluster",
-    "nodes",
-    "candidates"
-  ],
+  "required": ["schemaVersion", "cluster", "nodes", "candidates"],
   "properties": {
     "schemaVersion": {
       "const": 1
@@ -15,13 +10,7 @@
     "cluster": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "name",
-        "apiName",
-        "podCIDR",
-        "serviceCIDR",
-        "k3sVersion"
-      ],
+      "required": ["name", "apiName", "podCIDR", "serviceCIDR", "k3sVersion"],
       "properties": {
         "name": {
           "const": "production"
@@ -60,11 +49,7 @@
     "capacity": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "vCPU",
-        "memoryGiB",
-        "diskGiB"
-      ],
+      "required": ["vCPU", "memoryGiB", "diskGiB"],
       "properties": {
         "vCPU": {
           "type": "integer",
@@ -75,10 +60,7 @@
           "exclusiveMinimum": 0
         },
         "diskGiB": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": ["number", "null"],
           "exclusiveMinimum": 0
         }
       }
@@ -86,13 +68,7 @@
     "capabilities": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "verified",
-        "production",
-        "ci",
-        "stateful",
-        "critical"
-      ],
+      "required": ["verified", "production", "ci", "stateful", "critical"],
       "properties": {
         "verified": {
           "type": "boolean"
@@ -114,12 +90,7 @@
     "enrollment": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "sshAddress",
-        "hostname",
-        "nodeIP",
-        "adminKeys"
-      ],
+      "required": ["sshAddress", "hostname", "nodeIP", "adminKeys"],
       "properties": {
         "sshAddress": {
           "type": "string",
@@ -178,35 +149,19 @@
           "minLength": 1
         },
         "location": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "sku": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "architecture": {
-          "enum": [
-            "amd64",
-            "arm64"
-          ]
+          "enum": ["amd64", "arm64"]
         },
         "osAdapter": {
-          "enum": [
-            "nixos",
-            "ansible"
-          ]
+          "enum": ["nixos", "ansible"]
         },
         "desiredRole": {
-          "enum": [
-            "server",
-            "worker",
-            "external"
-          ]
+          "enum": ["server", "worker", "external"]
         },
         "capacity": {
           "$ref": "#/$defs/capacity"
@@ -231,11 +186,7 @@
         "observed": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "sshAlias",
-            "publicIPv4",
-            "observedAt"
-          ],
+          "required": ["sshAlias", "publicIPv4", "observedAt"],
           "properties": {
             "sshAlias": {
               "type": "string"
@@ -342,10 +293,7 @@
             "protection": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "delete",
-                "rebuild"
-              ],
+              "required": ["delete", "rebuild"],
               "properties": {
                 "delete": {
                   "type": "boolean"
@@ -377,10 +325,7 @@
           "then": {
             "properties": {
               "enrollment": {
-                "required": [
-                  "privateIP",
-                  "privateInterface"
-                ]
+                "required": ["privateIP", "privateInterface"]
               }
             }
           }
@@ -411,42 +356,26 @@
           "type": "null"
         },
         "status": {
-          "enum": [
-            "proposed",
-            "provisioned-unenrolled"
-          ]
+          "enum": ["proposed", "provisioned-unenrolled"]
         },
         "provider": {
           "type": "string",
           "minLength": 1
         },
         "location": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "sku": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "architecture": {
-          "enum": [
-            "amd64",
-            "arm64"
-          ]
+          "enum": ["amd64", "arm64"]
         },
         "osAdapter": {
           "type": "null"
         },
         "desiredRole": {
-          "enum": [
-            "server",
-            "worker",
-            "external"
-          ]
+          "enum": ["server", "worker", "external"]
         },
         "capacity": {
           "$ref": "#/$defs/capacity"

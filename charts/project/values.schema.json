@@ -2,10 +2,7 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "project",
-    "workloads"
-  ],
+  "required": ["project", "workloads"],
   "properties": {
     "project": {
       "type": "string",
@@ -24,11 +21,7 @@
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "enum": [
-              "web",
-              "worker",
-              "cron"
-            ]
+            "enum": ["web", "worker", "cron"]
           },
           "port": {
             "type": "integer",
@@ -92,10 +85,7 @@
             }
           },
           "egress": {
-            "enum": [
-              "none",
-              "internet"
-            ]
+            "enum": ["none", "internet"]
           },
           "schedule": {
             "type": "string",
@@ -106,21 +96,14 @@
           "volume": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "mountPath",
-              "size"
-            ],
+            "required": ["mountPath", "size"],
             "properties": {
               "mountPath": {
                 "type": "string",
                 "pattern": "^/(data|app/data)(/[a-zA-Z0-9_-]+)*$"
               },
               "size": {
-                "enum": [
-                  "10Gi",
-                  "40Gi",
-                  "100Gi"
-                ]
+                "enum": ["10Gi", "40Gi", "100Gi"]
               }
             }
           },
@@ -129,10 +112,7 @@
             "minItems": 1,
             "uniqueItems": true,
             "items": {
-              "enum": [
-                "amd64",
-                "arm64"
-              ]
+              "enum": ["amd64", "arm64"]
             }
           },
           "resources": {
@@ -198,10 +178,7 @@
           "sharedVolume": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "name",
-              "mountPath"
-            ],
+            "required": ["name", "mountPath"],
             "properties": {
               "name": {
                 "type": "string",
@@ -242,33 +219,22 @@
               }
             },
             "then": {
-              "required": [
-                "port",
-                "healthPath"
-              ]
+              "required": ["port", "healthPath"]
             },
             "else": {
               "not": {
                 "anyOf": [
                   {
-                    "required": [
-                      "domains"
-                    ]
+                    "required": ["domains"]
                   },
                   {
-                    "required": [
-                      "port"
-                    ]
+                    "required": ["port"]
                   },
                   {
-                    "required": [
-                      "healthPath"
-                    ]
+                    "required": ["healthPath"]
                   },
                   {
-                    "required": [
-                      "readinessPath"
-                    ]
+                    "required": ["readinessPath"]
                   }
                 ]
               }
@@ -283,23 +249,17 @@
               }
             },
             "then": {
-              "required": [
-                "schedule"
-              ]
+              "required": ["schedule"]
             },
             "else": {
               "not": {
-                "required": [
-                  "schedule"
-                ]
+                "required": ["schedule"]
               }
             }
           },
           {
             "if": {
-              "required": [
-                "volume"
-              ]
+              "required": ["volume"]
             },
             "then": {
               "properties": {
@@ -307,19 +267,14 @@
                   "const": 1
                 },
                 "kind": {
-                  "enum": [
-                    "web",
-                    "worker"
-                  ]
+                  "enum": ["web", "worker"]
                 }
               }
             }
           },
           {
             "if": {
-              "required": [
-                "sharedVolume"
-              ]
+              "required": ["sharedVolume"]
             },
             "then": {
               "properties": {
@@ -327,16 +282,11 @@
                   "const": 1
                 },
                 "kind": {
-                  "enum": [
-                    "web",
-                    "worker"
-                  ]
+                  "enum": ["web", "worker"]
                 }
               },
               "not": {
-                "required": [
-                  "volume"
-                ]
+                "required": ["volume"]
               }
             }
           }
@@ -353,16 +303,10 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "size"
-        ],
+        "required": ["size"],
         "properties": {
           "size": {
-            "enum": [
-              "10Gi",
-              "40Gi",
-              "100Gi"
-            ]
+            "enum": ["10Gi", "40Gi", "100Gi"]
           }
         }
       }
@@ -447,10 +391,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "enum": [
-              "amd64",
-              "arm64"
-            ]
+            "enum": ["amd64", "arm64"]
           }
         },
         "command": {

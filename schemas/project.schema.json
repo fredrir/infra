@@ -22,11 +22,7 @@
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "enum": [
-              "web",
-              "worker",
-              "cron"
-            ]
+            "enum": ["web", "worker", "cron"]
           },
           "port": {
             "type": "integer",
@@ -49,19 +45,10 @@
             }
           },
           "resourceClass": {
-            "enum": [
-              "small",
-              "medium",
-              "large",
-              "compute"
-            ]
+            "enum": ["small", "medium", "large", "compute"]
           },
           "architecture": {
-            "enum": [
-              "amd64",
-              "arm64",
-              "multi"
-            ]
+            "enum": ["amd64", "arm64", "multi"]
           },
           "replicas": {
             "type": "integer",
@@ -105,10 +92,7 @@
             }
           },
           "egress": {
-            "enum": [
-              "none",
-              "internet"
-            ]
+            "enum": ["none", "internet"]
           },
           "schedule": {
             "type": "string",
@@ -125,17 +109,10 @@
                 "pattern": "^/(data|app/data)(/[a-zA-Z0-9_-]+)*$"
               },
               "sizeClass": {
-                "enum": [
-                  "small",
-                  "medium",
-                  "large"
-                ]
+                "enum": ["small", "medium", "large"]
               }
             },
-            "required": [
-              "mountPath",
-              "sizeClass"
-            ]
+            "required": ["mountPath", "sizeClass"]
           },
           "component": {
             "type": "string",
@@ -144,10 +121,7 @@
           "sharedVolume": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "name",
-              "mountPath"
-            ],
+            "required": ["name", "mountPath"],
             "properties": {
               "name": {
                 "type": "string",
@@ -170,9 +144,7 @@
             "maximum": 120
           }
         },
-        "required": [
-          "kind"
-        ],
+        "required": ["kind"],
         "allOf": [
           {
             "if": {
@@ -183,33 +155,22 @@
               }
             },
             "then": {
-              "required": [
-                "port",
-                "healthPath"
-              ]
+              "required": ["port", "healthPath"]
             },
             "else": {
               "not": {
                 "anyOf": [
                   {
-                    "required": [
-                      "domains"
-                    ]
+                    "required": ["domains"]
                   },
                   {
-                    "required": [
-                      "port"
-                    ]
+                    "required": ["port"]
                   },
                   {
-                    "required": [
-                      "healthPath"
-                    ]
+                    "required": ["healthPath"]
                   },
                   {
-                    "required": [
-                      "readinessPath"
-                    ]
+                    "required": ["readinessPath"]
                   }
                 ]
               }
@@ -224,28 +185,20 @@
               }
             },
             "then": {
-              "required": [
-                "schedule"
-              ],
+              "required": ["schedule"],
               "not": {
-                "required": [
-                  "replicas"
-                ]
+                "required": ["replicas"]
               }
             },
             "else": {
               "not": {
-                "required": [
-                  "schedule"
-                ]
+                "required": ["schedule"]
               }
             }
           },
           {
             "if": {
-              "required": [
-                "sharedVolume"
-              ]
+              "required": ["sharedVolume"]
             },
             "then": {
               "properties": {
@@ -253,16 +206,11 @@
                   "const": 1
                 },
                 "kind": {
-                  "enum": [
-                    "web",
-                    "worker"
-                  ]
+                  "enum": ["web", "worker"]
                 }
               },
               "not": {
-                "required": [
-                  "volume"
-                ]
+                "required": ["volume"]
               }
             }
           }
@@ -276,25 +224,15 @@
         "postgres": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "sizeClass",
-            "recovery"
-          ],
+          "required": ["sizeClass", "recovery"],
           "properties": {
             "sizeClass": {
-              "enum": [
-                "small",
-                "medium",
-                "large"
-              ]
+              "enum": ["small", "medium", "large"]
             },
             "recovery": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "rpoHours",
-                "rtoHours"
-              ],
+              "required": ["rpoHours", "rtoHours"],
               "properties": {
                 "rpoHours": {
                   "type": "integer",
@@ -313,25 +251,15 @@
         "valkey": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "sizeClass",
-            "recovery"
-          ],
+          "required": ["sizeClass", "recovery"],
           "properties": {
             "sizeClass": {
-              "enum": [
-                "small",
-                "medium",
-                "large"
-              ]
+              "enum": ["small", "medium", "large"]
             },
             "recovery": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "rpoHours",
-                "rtoHours"
-              ],
+              "required": ["rpoHours", "rtoHours"],
               "properties": {
                 "rpoHours": {
                   "type": "integer",
@@ -359,16 +287,10 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "sizeClass"
-        ],
+        "required": ["sizeClass"],
         "properties": {
           "sizeClass": {
-            "enum": [
-              "small",
-              "medium",
-              "large"
-            ]
+            "enum": ["small", "medium", "large"]
           }
         }
       }
@@ -376,12 +298,7 @@
     "migration": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "component",
-        "command",
-        "compatibility",
-        "retrySafe"
-      ],
+      "required": ["component", "command", "compatibility", "retrySafe"],
       "properties": {
         "component": {
           "type": "string",
@@ -425,12 +342,7 @@
           }
         },
         "resourceClass": {
-          "enum": [
-            "small",
-            "medium",
-            "large",
-            "compute"
-          ]
+          "enum": ["small", "medium", "large", "compute"]
         },
         "compatibility": {
           "const": "backward-compatible"
@@ -441,10 +353,6 @@
       }
     }
   },
-  "required": [
-    "schemaVersion",
-    "project",
-    "workloads"
-  ],
+  "required": ["schemaVersion", "project", "workloads"],
   "$schema": "https://json-schema.org/draft/2020-12/schema"
 }

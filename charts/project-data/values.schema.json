@@ -2,10 +2,7 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "project",
-    "data"
-  ],
+  "required": ["project", "data"],
   "properties": {
     "project": {
       "type": "string",
@@ -18,18 +15,10 @@
         "postgres": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "size",
-            "image",
-            "recovery"
-          ],
+          "required": ["size", "image", "recovery"],
           "properties": {
             "size": {
-              "enum": [
-                "10Gi",
-                "40Gi",
-                "100Gi"
-              ]
+              "enum": ["10Gi", "40Gi", "100Gi"]
             },
             "image": {
               "const": "docker.io/library/postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0"
@@ -37,10 +26,7 @@
             "recovery": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "rpoHours",
-                "rtoHours"
-              ],
+              "required": ["rpoHours", "rtoHours"],
               "properties": {
                 "rpoHours": {
                   "type": "integer",
@@ -59,18 +45,10 @@
         "valkey": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "size",
-            "image",
-            "recovery"
-          ],
+          "required": ["size", "image", "recovery"],
           "properties": {
             "size": {
-              "enum": [
-                "10Gi",
-                "40Gi",
-                "100Gi"
-              ]
+              "enum": ["10Gi", "40Gi", "100Gi"]
             },
             "image": {
               "const": "docker.io/valkey/valkey@sha256:d2e18f3410b6f616de1417f570fa55261af2898b9c5b2cfb6781ce2373ea43d1"
@@ -78,10 +56,7 @@
             "recovery": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "rpoHours",
-                "rtoHours"
-              ],
+              "required": ["rpoHours", "rtoHours"],
               "properties": {
                 "rpoHours": {
                   "type": "integer",

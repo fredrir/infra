@@ -46,7 +46,7 @@
     owner: root
     group: root
     mode: "0700"
-  loop: [/var/lib/platform, /var/lib/rancher, /etc/rancher/k3s, /etc/platform]
+  loop: [/var/lib/platform, /var/lib/platform/credentials, /var/lib/rancher, /etc/rancher/k3s, /etc/platform]
 
 - name: Create exporter metric directories
   ansible.builtin.file:

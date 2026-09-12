@@ -46,7 +46,7 @@ jobs:
 
         uv run --frozen --group ci python -m tools.infra.cli render --check
 
-        uv run --frozen --group ci python scripts/operations/platform.py check
+        uv run --frozen --group ci python scripts/operations/platform_cli.py check
 
         uv run --frozen --group ci python -m unittest discover -s tests/operations -v
 

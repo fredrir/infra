@@ -5,7 +5,6 @@ import urllib.error
 from pipeline import api
 from policy import INFRA_ID, OWNER_ID, SHA, PolicyError
 
-
 if (
     os.environ.get("GITHUB_REPOSITORY_ID") != str(INFRA_ID)
     or os.environ.get("GITHUB_REPOSITORY_OWNER_ID") != str(OWNER_ID)
@@ -24,7 +23,15 @@ try:
 except urllib.error.HTTPError as error:
     if error.code != 404:
         raise
-    api("POST", f"repos/{repository}/git/refs", {"ref": "refs/heads/deploy", "sha": revision})
+    api(
+        "POST",
+        f"repos/{repository}/git/refs",
+        {"ref": "refs/heads/deploy", "sha": revision},
+    )
 else:
     if current["object"]["sha"] != revision:
-        api("PATCH", f"repos/{repository}/git/refs/heads/deploy", {"sha": revision, "force": False})
+        api(
+            "PATCH",
+            f"repos/{repository}/git/refs/heads/deploy",
+            {"sha": revision, "force": False},
+        )

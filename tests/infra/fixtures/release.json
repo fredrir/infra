@@ -10,9 +10,6 @@
     "workflowPath": ".github/workflows/project-ci.yml",
     "repositoryId": 1327945675,
     "runId": 1,
-    "platforms": [
-      "linux/amd64",
-      "linux/arm64"
-    ]
+    "platforms": ["linux/amd64", "linux/arm64"]
   }
 }
