@@ -1,9 +1,9 @@
 import {
-  to = hcloud_server.llunde_01
+  to = hcloud_server.control_05
   id = "132168416"
 }
 
-resource "hcloud_server" "llunde_01" {
+resource "hcloud_server" "control_05" {
   name        = "fredrir-05"
   server_type = "cpx22"
   location    = "hel1"
@@ -13,7 +13,7 @@ resource "hcloud_server" "llunde_01" {
     ignore_changes  = [image]
   }
 
-  image = "ubuntu-24.04"
+  image = "ubuntu-26.04"
 
   delete_protection  = true
   rebuild_protection = true
