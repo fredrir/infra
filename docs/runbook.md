@@ -1,49 +1,30 @@
 # Runbook
 
-### Provision
-
-Use the [production OpenTofu inputs and reviewed-plan workflow](platform.md#production-opentofu).
-
-### Restore from backup
-
-| Backend restore | Value |
+| Operation | Entry point |
 | --- | --- |
-| Service user | `llunde-backend` |
-| Runtime directory | `/run/user/2001` |
-| Container | `llunde-postgres` |
-| Archive | `var/backup/llunde-backend/llunde.dump` |
-| Destination | New `llunde_restore` database |
-| Cutover | After schema, data, and application verification |
+| Provision or adopt a server | [Provider resources](platform.md#provider-resources) |
+| Configure or update a host | [Host operation](platform.md#host-operation) |
+| Add a project | [Onboarding](platform.md#onboarding) |
+| Deploy or roll back | [CI and deployments](platform.md#ci-and-deployments) |
+| Recover data | [Backups and recovery](platform.md#backups-and-recovery) |
+| Inspect independent alerts | [Gatus and email](mail-alerts.md) |
 
 ```sh
-export RESTIC_REPOSITORY="s3:s3.eu-north-1.amazonaws.com/llunde-pyparser-bucket/<RESTIC_PREFIX>"
-restic snapshots
-restic restore <SNAPSHOT_ID> --target /tmp/restore
-ssh root@<TAILNET_IP> \
-  'cd / && runuser -u llunde-backend -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus /run/current-system/sw/bin/podman exec llunde-postgres createdb -U llunde llunde_restore'
-ssh root@<TAILNET_IP> \
-  'cd / && runuser -u llunde-backend -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus /run/current-system/sw/bin/podman exec -i llunde-postgres pg_restore --exit-on-error -U llunde -d llunde_restore' \
-  < /tmp/restore/var/backup/llunde-backend/llunde.dump
+export KUBECONFIG=/path/to/private/kubeconfig
+kubectl get nodes
+flux get kustomizations --all-namespaces
+flux get helmreleases --all-namespaces
+kubectl get pods --all-namespaces
+kubectl get cronjobs --all-namespaces
 ```
 
+| Recovery step | Required result |
+| --- | --- |
+| Stop or fence the old writer | No competing database or media writer |
+| Select a verified Restic snapshot | Matching application, credentials and recovery timestamp |
+| Restore into separate storage | Existing recovery source retained |
+| Check native data | Database counts/integrity, media hashes and application access |
+| Change deployment storage and image | Reviewed Git change; Flux health checks pass |
+| Resume writes | One active writer; fresh backup succeeds |
 
-### Manual deploy
-
-```sh
-ssh root@<TAILNET_IP> systemctl stop gitops-pull.timer   # pause the loop FIRST
-nix run nixpkgs#nixos-rebuild -- switch --flake .#<host> \
-  --target-host root@<TAILNET_IP> --build-host root@<TAILNET_IP>
-# ...restart affected user units per the reconcile map, then:
-ssh root@<TAILNET_IP> systemctl start gitops-pull.timer
-```
-
-### Install NixOS
-
-```sh
-nix run github:nix-community/nixos-anywhere -- \
-  --flake .#fredrir-<id> \
-  --build-on-remote \
-  -i ~/.ssh/id_ed25519 \
-  --extra-files ./ssh/admin_keys.csv \ # TODO Fix Syntax of this command
-  root@46.62.214.182
-```
+Etcd recovery requires the snapshot's matching K3s version and server token. Application volumes need their own restore.

@@ -2,7 +2,7 @@
 
 | Name | Value |
 | --- | --- |
-| Status | Accepted architecture; [implementation and live acceptance](../platform.md); platform activation pending |
+| Status | Architecture research; current configuration and operation are in [platform.md](../platform.md) |
 | Scope | All projects; three dedicated control-plane servers; shared production/CI workers; built-in Kubernetes scheduling |
 | Inventory | [Nodes](../nodes.md), [domains](../domains.md) |
 | Fleet research | [Provider offers, capacity and purchase gates](fleet-research.md) |

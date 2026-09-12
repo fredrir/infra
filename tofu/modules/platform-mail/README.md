@@ -8,7 +8,7 @@
 | Resources | One SES domain identity, three DKIM CNAMEs, one IAM user, one sending policy and attachment |
 | Signing | AWS-managed Easy DKIM, RSA 2048; no private signing key in state |
 | SMTP authority | `ses:SendRawEmail`, sending-domain and exact verified-recipient identity ARNs, exact From, every To/CC/BCC recipient |
-| Transport | Verified STARTTLS or implicit TLS in the watchdog; SES requires SMTP TLS |
+| Transport | Verified STARTTLS or implicit TLS in Alertmanager and Gatus; SES requires SMTP TLS |
 | IAM boundary | The same sending policy limits and grants the user's permissions |
 | Credentials | Create and rotate SMTP access keys outside OpenTofu; deliver through private runtime credentials |
 | Existing DNS | No apex, MX, SPF, DMARC, MAIL FROM or other zone records managed here |
@@ -20,7 +20,7 @@ SES SMTP needs `SendRawEmail`; IAM supports exact From and recipient restriction
 
 The sandbox SMTP test evaluated the verified recipient identity as well as the sending domain. Both exact ARNs retain the same From and recipient conditions; adding the recipient resource does not permit sending from that recipient address. Validate both resources in IAM simulation and confirm delivery with an actual SMTP test.
 
-The watchdog requires verified TLS before SMTP authentication; SES also requires encrypted SMTP connections. [SES protocols](https://docs.aws.amazon.com/ses/latest/dg/security-protocols.html)
+Alertmanager and Gatus require verified TLS before SMTP authentication; SES also requires encrypted SMTP connections. [SES protocols](https://docs.aws.amazon.com/ses/latest/dg/security-protocols.html)
 
 Default SES MAIL FROM has SPF; a custom subdomain requires its own MX and SPF records. Verify DKIM alignment before delivery and review existing mail policy before adding DMARC or a custom MAIL FROM. [SES MAIL FROM](https://docs.aws.amazon.com/ses/latest/dg/mail-from.html)
 

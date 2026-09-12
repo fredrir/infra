@@ -12,7 +12,7 @@
 
 | Server | Published specification | Verification |
 | --- | --- | --- |
-| Hetzner CX33 (`fredrir-07`, `fredrir-08`) | Each: 4 shared x86 vCPU, 8 GB RAM, 80 GB NVMe | Read-only API/SSH confirms `hel1`, Ubuntu 26.04.1, no private network or placement group; IDs and observations recorded in [machine inventory](../../platform/inventory/nodes.json). [CX specifications](https://www.hetzner.com/cloud/cost-optimized/) |
+| Hetzner CX33 (`fredrir-07`, `fredrir-08`) | Each: 4 shared x86 vCPU, 8 GB RAM, 80 GB NVMe | Read-only API/SSH confirms `hel1`, Ubuntu 26.04.1, no private network or placement group; IDs and observations recorded in [machine inventory](../../ansible/inventory/production.yml). [CX specifications](https://www.hetzner.com/cloud/cost-optimized/) |
 | Existing Hetzner CPX22 (`fredrir-05`) | 2 shared x86 vCPU, 4 GB RAM, 80 GB disk | Existing [inventory](../nodes.md); proposed third control-plane server after application and database evacuation. [CPU allocation](https://docs.hetzner.com/cloud/servers/faq/) |
 | Existing Hetzner CCX23 (`fredrir-04`) | 4 dedicated x86 vCPU, 16 GB RAM, 160 GB NVMe | Proposed worker; a dedicated vCPU is one physical-core thread, not an entire physical core. [CCX specifications](https://www.hetzner.com/cloud/general-purpose/), [CPU allocation](https://docs.hetzner.com/cloud/servers/faq/) |
 | one.com Cloud server XXL (`fredrir-09`) | 16 vCPU, 32 GB RAM, 800 GB NVMe, 1 Gbit/s, unlimited traffic; AMD EPYC advertised | Read-only SSH confirms Ubuntu 26.04, x86, 16 vCPU, 32,087 MiB RAM and 800 GiB disk; transport remains unenrolled. Regional CPU entitlement and IOPS remain unverified. [Unmanaged VPS](https://www.one.com/en-gb/vps/) |

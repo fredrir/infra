@@ -1,16 +1,18 @@
 # Requirements
 
-| Package    | Version |
-| ---------- | ------- |
-| nix        | 2.35.2  |
-| nixd       |         |
-| statix     |         |
-| alejandra  |         |
-| deadnix    |         |
-| opentofu   | 1.12.6  |
-| sops       |         |
-| age        |         |
-| awscli     |         |
-| ssh-to-age |         |
-| hcloud     |         |
-| doppler    |         |
+| Scope | Tools |
+| --- | --- |
+| Native development shell | `nix develop`; dependencies pinned by `flake.lock` |
+| Host configuration | Ansible from `uv sync --frozen --group ci` |
+| Cluster | kubectl, Flux, Helm and Kustomize |
+| Provider resources | OpenTofu, AWS CLI and provider credentials |
+| Secrets | SOPS, age and Doppler |
+| Repository and releases | Git, GitHub CLI, actionlint |
+| Recovery | Restic and matching native database tools |
+
+```sh
+nix develop
+uv sync --frozen --group ci
+```
+
+[Toolchain](../flake.nix) · [Version pins](../platform/versions.yaml) · [Operation](platform.md)
