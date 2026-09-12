@@ -6,3 +6,6 @@ configMapGenerator:
 - name: backup-hook
   files:
   - backup.sh
+generatorOptions:
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled
