@@ -8,6 +8,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in
       with pkgs; [
+        actionlint
         age
         alejandra
         ansible
@@ -27,6 +28,7 @@
         (python3.withPackages (python: [python.pyyaml python.jsonschema]))
         restic
         sops
+        uv
         yq-go
       ];
   in {
