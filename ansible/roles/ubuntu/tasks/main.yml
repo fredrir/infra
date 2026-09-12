@@ -5,6 +5,10 @@
       - ansible_facts.distribution_version == ubuntu_release
       - ansible_facts.service_mgr == 'systemd'
 
+- name: Set the inventory hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
 - name: Install host prerequisites
   ansible.builtin.apt:
     name: [ca-certificates, curl, iproute2, iptables, kmod, openssh-server, policycoreutils]

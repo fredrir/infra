@@ -4,6 +4,7 @@ all:
     ansible_python_interpreter: /usr/bin/python3
     ansible_ssh_common_args: -o StrictHostKeyChecking=yes -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=10
     ubuntu_release: "26.04"
+    firewall_admin_ipv4_cidrs: [62.92.106.173/32]
   children:
     ubuntu:
       children:
