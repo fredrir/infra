@@ -1,0 +1,37 @@
+- name: Download verified gVisor archive
+  ansible.builtin.get_url:
+    url: "https://github.com/google/gvisor/releases/download/release-{{ platform_gvisor_version }}/gvisor-{{ platform_gvisor_artifacts[platform_architecture].architecture }}.tar.bz2"
+    dest: /var/lib/platform/gvisor.tar.bz2
+    checksum: "sha256:{{ platform_gvisor_artifacts[platform_architecture].sha256 }}"
+    mode: "0600"
+
+- name: Install gVisor and companion binaries
+  ansible.builtin.unarchive:
+    src: /var/lib/platform/gvisor.tar.bz2
+    dest: /usr/local/bin
+    remote_src: true
+  when: not ansible_check_mode
+  notify: Restart platform K3s
+
+- name: Create runtime configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: [/etc/containerd, /var/lib/rancher/k3s/agent/etc/containerd]
+
+- name: Configure gVisor systrap
+  ansible.builtin.copy:
+    dest: /etc/containerd/runsc.toml
+    content: |
+      [runsc_config]
+        platform = "systrap"
+    mode: "0644"
+  notify: Restart platform K3s
+
+- name: Configure containerd runtime
+  ansible.builtin.template:
+    src: containerd-v3.toml.j2
+    dest: /var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.tmpl
+    mode: "0644"
+  notify: Restart platform K3s

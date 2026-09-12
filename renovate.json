@@ -1,21 +1,54 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "enabledManagers": [
+    "github-actions",
+    "dockerfile",
+    "flux",
+    "terraform",
+    "pep621",
+    "nix"
+  ],
+  "automerge": false,
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 3,
+  "rangeStrategy": "pin",
+  "packageRules": [
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "pinDigests": true
+    },
+    {
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions"
+    },
+    {
+      "matchManagers": [
+        "terraform"
+      ],
+      "groupName": "tofu providers"
+    }
+  ],
   "nix": {
     "enabled": true
   },
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 6am on monday"]
-  },
-  "packageRules": [
-    {
-      "matchManagers": ["github-actions"],
-      "groupName": "github actions"
-    },
-    {
-      "matchManagers": ["terraform"],
-      "groupName": "tofu providers"
-    }
-  ]
+    "schedule": [
+      "before 6am on monday"
+    ]
+  }
 }

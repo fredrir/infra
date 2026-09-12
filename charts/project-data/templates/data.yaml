@@ -1,0 +1,179 @@
+{{- range $name, $data := .Values.data }}
+{{- $postgres := eq $name "postgres" }}
+{{- $port := ternary 5432 6379 $postgres }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.project }}-{{ $name }}
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/instance: {{ $.Values.project }}
+    app.kubernetes.io/component: {{ $name }}
+  ports:
+    - name: database
+      port: {{ $port }}
+      targetPort: database
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $.Values.project }}-{{ $name }}
+  annotations:
+    infra.fredrir.com/rpo-hours: {{ $data.recovery.rpoHours | quote }}
+    infra.fredrir.com/rto-hours: {{ $data.recovery.rtoHours | quote }}
+spec:
+  serviceName: {{ $.Values.project }}-{{ $name }}
+  replicas: 1
+  updateStrategy:
+    type: OnDelete
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Values.project }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ $.Values.project }}
+        app.kubernetes.io/component: {{ $name }}
+        infra.fredrir.com/project: {{ $.Values.project }}
+    spec:
+      serviceAccountName: project-data
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      priorityClassName: production
+      terminationGracePeriodSeconds: 120
+      nodeSelector:
+        node-restriction.kubernetes.io/stateful: "true"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ ternary 999 10001 $postgres }}
+        runAsGroup: {{ ternary 999 10001 $postgres }}
+        fsGroup: {{ ternary 999 10001 $postgres }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: database
+          image: {{ $data.image | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          {{- if $postgres }}
+          env:
+            - name: PGDATA
+              value: /data/pgdata
+            {{- range list "POSTGRES_USER" "POSTGRES_PASSWORD" "POSTGRES_DB" }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: project-runtime
+                  key: {{ . }}
+            {{- end }}
+          readinessProbe:
+            exec:
+              command: [/bin/sh, -ec, 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
+            periodSeconds: 10
+          {{- else }}
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              umask 077
+              test -n "$VALKEY_PASSWORD"
+              password_hash="$(printf %s "$VALKEY_PASSWORD" | sha256sum | cut -d ' ' -f 1)"
+              printf 'user default on #%s ~* &* +@all\ndir /data\nappendonly yes\nmaxmemory 384mb\nmaxmemory-policy noeviction\n' "$password_hash" > /tmp/valkey.conf
+              exec valkey-server /tmp/valkey.conf
+          env:
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: project-runtime
+                  key: VALKEY_PASSWORD
+          readinessProbe:
+            exec:
+              command: [/bin/sh, -ec, 'VALKEYCLI_AUTH="$VALKEY_PASSWORD" valkey-cli ping | grep -q PONG']
+            periodSeconds: 10
+          {{- end }}
+          ports:
+            - name: database
+              containerPort: {{ $port }}
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+              ephemeral-storage: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+              ephemeral-storage: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: temporary
+              mountPath: /tmp
+            {{- if $postgres }}
+            - name: socket
+              mountPath: /var/run/postgresql
+            {{- end }}
+      volumes:
+        - name: temporary
+          emptyDir:
+            sizeLimit: 256Mi
+        {{- if $postgres }}
+        - name: socket
+          emptyDir:
+            sizeLimit: 16Mi
+        {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: local-retain
+        resources:
+          requests:
+            storage: {{ $data.size }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $.Values.project }}-{{ $name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Values.project }}
+      app.kubernetes.io/component: {{ $name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ $.Values.project }}
+      ports:
+        - protocol: TCP
+          port: {{ $port }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $.Values.project }}-{{ $name }}-clients
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Values.project }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ $.Values.project }}
+              app.kubernetes.io/component: {{ $name }}
+      ports:
+        - protocol: TCP
+          port: {{ $port }}
+{{- end }}

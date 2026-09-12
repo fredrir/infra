@@ -1,43 +1,103 @@
 name: Check
-
-on:
-  pull_request:
+'on':
   push:
-    branches: [main]
-
+    branches:
+    - main
+permissions:
+  contents: read
 concurrency:
-  group: check-${{ github.ref }}
-  cancel-in-progress: true
-
+  group: infra-check-main
+  cancel-in-progress: false
 jobs:
-  flake:
-    runs-on: ubuntu-latest
+  validate:
+    if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.event_name ==
+      'push' && github.ref == 'refs/heads/main' && github.ref_protected == true && startsWith(vars.INFRA_CI_IMAGE,
+      'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES || '[]'), 'amd64')
+    runs-on: ${{ format('infra-{0}-{1}', github.repository_id, 'amd64') }}
+    container: &id001
+      image: ${{ vars.INFRA_CI_IMAGE }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
-      - name: Flake check (goldens + eval)
-        run: nix flake check
-      - name: Build llunde-01 closure
-        run: nix build .#nixosConfigurations.llunde-01.config.system.build.toplevel --no-link
-      - name: Build llunde-parser closure
-        run: nix build .#nixosConfigurations.llunde-parser.config.system.build.toplevel --no-link
+    - &id002
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - id: availability
+      env:
+        CI_AVAILABLE_ARCHITECTURES: ${{ vars.INFRA_CI_ARCHITECTURES }}
+      run: python3 scripts/ci/policy.py available
+    - run: 'uv sync --frozen --group ci
 
-  tofu:
-    runs-on: ubuntu-latest
-    env:
-      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
+        uv run --frozen --group ci python scripts/ci/policy.py check
+
+        uv run --frozen --group ci python -m unittest discover -s tests/ci -v
+
+        uv run --frozen --group ci python -m unittest discover -s tests/infra -v
+
+        uv run --frozen --group ci python -m unittest discover -s ansible/tests -v
+
+        uv run --frozen --group ci ansible-playbook -i localhost, ansible/site.yml --syntax-check
+
+        uv run --frozen --group ci python -m tools.infra.cli validate
+
+        uv run --frozen --group ci python -m tools.infra.cli render --check
+
+        uv run --frozen --group ci python scripts/operations/platform.py check
+
+        uv run --frozen --group ci python -m unittest discover -s tests/operations -v
+
+        actionlint
+
+        nix shell --inputs-from . nixpkgs#kubernetes-helm nixpkgs#kubectl nixpkgs#kubeconform --command uv run --frozen
+        --group ci python scripts/operations/validate_manifests.py'
+    - run: 'nix run --inputs-from . nixpkgs#opentofu -- -chdir=tofu fmt -check -recursive
+
+        nix run --inputs-from . nixpkgs#opentofu -- -chdir=tofu init -backend=false -lockfile=readonly -input=false
+
+        nix run --inputs-from . nixpkgs#opentofu -- -chdir=tofu validate'
+    - env:
+        GHCR_TOKEN: ${{ github.token }}
+      run: python3 scripts/ci/check_releases.py
+    outputs:
+      architectures: ${{ steps.availability.outputs.architectures }}
+  promote:
+    if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.event_name ==
+      'push' && github.ref == 'refs/heads/main' && github.ref_protected == true && startsWith(vars.INFRA_CI_IMAGE,
+      'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES || '[]'), 'amd64')
+    runs-on: ${{ format('infra-{0}-{1}', github.repository_id, 'amd64') }}
+    container:
+      image: ${{ vars.INFRA_CI_IMAGE }}
+    timeout-minutes: 45
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ${{ github.workspace }}/.tofu-plugin-cache
-          key: tofu-providers-${{ hashFiles('tofu/.terraform.lock.hcl') }}
-          restore-keys: tofu-providers-
-      - name: fmt
-        run: nix run nixpkgs#opentofu -- -chdir=tofu fmt -check -recursive
-      - name: validate (no backend, no credentials)
-        run: |
-          mkdir -p "$TF_PLUGIN_CACHE_DIR"
-          nix run nixpkgs#opentofu -- -chdir=tofu init -backend=false -input=false
-          nix run nixpkgs#opentofu -- -chdir=tofu validate
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - env:
+        GH_TOKEN: ${{ github.token }}
+      run: python3 scripts/ci/promote.py
+    needs:
+    - validate
+    - native
+  native:
+    if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.event_name ==
+      'push' && github.ref == 'refs/heads/main' && github.ref_protected == true && startsWith(vars.INFRA_CI_IMAGE,
+      'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES || '[]'), 'amd64')
+    container: *id001
+    timeout-minutes: 45
+    runs-on: ${{ format('infra-{0}-{1}', github.repository_id, matrix.architecture) }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        architecture: ${{ fromJSON(needs.validate.outputs.architectures) }}
+    steps:
+    - *id002
+    - run: python3 scripts/ci/check_nix.py
+    needs: validate

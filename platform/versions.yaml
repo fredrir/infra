@@ -1,0 +1,54 @@
+reviewed: '2026-09-12'
+kubernetes: 1.36.3
+flux: 2.9.5
+charts:
+  traefik:
+    version: 41.5.0
+    repository: https://traefik.github.io/charts
+    sha256: 30f8db73182019b2764179d7fc0a7efc9505670204f847ffc3a779bacaae3a1a
+  kube-prometheus-stack:
+    version: 90.1.1
+    repository: https://prometheus-community.github.io/helm-charts
+    sha256: b0d0bf4bfcb7784d09dbf5854c863f4850e14dae4aa0f1a4237f74ca1b9365b3
+  alloy:
+    version: 1.12.1
+    repository: https://grafana.github.io/helm-charts
+    sha256: cdd1ec39f99c3c506d5b521156d72236ea143c089f50da6b64398f831734829c
+  external-secrets:
+    version: 2.10.0
+    repository: https://charts.external-secrets.io
+    sha256: b96e948fff3674638b5d3f9e43886f3796e04739c4b4127929aed2ddac7d1418
+  gha-runner-scale-set-controller:
+    version: 0.14.2
+    repository: oci://ghcr.io/actions/actions-runner-controller-charts
+    ociDigest: sha256:3081ba15c41f0aa791058dedd2a7406fece24c9aeaa94956c268e5099427a452
+  gha-runner-scale-set:
+    version: 0.14.2
+    repository: oci://ghcr.io/actions/actions-runner-controller-charts
+    ociDigest: sha256:579e3a1bdf4032b3c3de3e9b0880a4a6d3c1989a67c06010f680c1cc49524d11
+images:
+  loki: docker.io/grafana/loki:3.7.7@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
+  tempo: docker.io/grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
+  alloy: docker.io/grafana/alloy:v1.19.2@sha256:b8ec653c44235fbe910879145dac3597d66b0aaecf60bcbbe82580767771a839
+  cloudflared: docker.io/cloudflare/cloudflared:2026.9.1@sha256:b269e8abd07a5bf6f3f4be65d5050b2174eca89c56a0241a8ff32a16aec454e4
+  runner: ghcr.io/actions/actions-runner:2.334.0@sha256:b6614fce332517f74d0a76e7c762fb08e4f2ff13dcf333183397c8a5725b6e8e
+  grafana: docker.io/grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+  restic: docker.io/restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510
+  prometheus: docker.io/prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69
+  otel: docker.io/otel/opentelemetry-collector-contrib:0.160.0@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6
+  blackbox: docker.io/prom/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc
+sources:
+- https://grafana.github.io/helm-charts/index.yaml
+- https://prometheus-community.github.io/helm-charts/index.yaml
+- https://charts.external-secrets.io/index.yaml
+- https://traefik.github.io/charts/index.yaml
+- https://github.com/actions/actions-runner-controller/releases/tag/gha-runner-scale-set-0.14.2
+- https://github.com/grafana/tempo/releases/tag/v3.0.3
+- https://github.com/grafana/loki/releases/tag/v3.7.7
+- https://github.com/cloudflare/cloudflared/releases/tag/2026.9.1
+fluxManifest:
+  url: https://github.com/fluxcd/flux2/releases/download/v2.9.5/install.yaml
+  sha256: cc3dcd743af16215838b6937e1fce83745bf24c0dcc6c59737c59df15429caaf
+crdSchema:
+  url: https://raw.githubusercontent.com/kubernetes/kubernetes/v1.36.3/api/openapi-spec/v3/apis__apiextensions.k8s.io__v1_openapi.json
+  sha256: 1c7dd621bece6661867bcc29471f774a46b36c02567d59815c7c72f6d08aa512

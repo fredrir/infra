@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: observability
+resources:
+- monitoring.yaml
+- loki.yaml
+- tempo.yaml
+- alloy.yaml
+- ingress.yaml
+- network.yaml
+configMapGenerator:
+- name: alloy-config
+  namespace: observability
+  files:
+  - config.alloy=alloy.alloy
+generatorOptions:
+  disableNameSuffixHash: true

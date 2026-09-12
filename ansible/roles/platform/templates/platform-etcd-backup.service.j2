@@ -1,0 +1,9 @@
+[Unit]
+Requires=k3s.service
+After=k3s.service
+
+[Service]
+Type=oneshot
+EnvironmentFile={{ platform_backup_environment_file }}
+ExecStart=/usr/local/bin/platform-etcd-backup
+UMask=0077

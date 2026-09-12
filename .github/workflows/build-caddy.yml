@@ -1,60 +1,29 @@
 name: Build caddy image
-
-on:
-  pull_request:
-    paths:
-      - "images/caddy/**"
-      - ".github/workflows/build-caddy.yml"
+'on':
   push:
-    branches: [main]
+    branches:
+    - main
     paths:
-      - "images/caddy/**"
-      - ".github/workflows/build-caddy.yml"
-  workflow_dispatch:
-
-concurrency:
-  group: build-caddy-${{ github.ref }}
-  cancel-in-progress: true
-
+    - images/caddy/**
+    - .github/workflows/build-caddy.yml
+    - .github/workflows/project-ci.yml
+    - scripts/ci/**
+permissions:
+  contents: read
 jobs:
   build:
+    if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.event_name ==
+      'push' && github.ref == 'refs/heads/main' && github.ref_protected == true && startsWith(vars.INFRA_CI_IMAGE,
+      'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES || '[]'), 'amd64')
+    uses: ./.github/workflows/project-ci.yml
     permissions:
       contents: read
       packages: write
-    uses: ./.github/workflows/build-image.yml
+      id-token: write
     with:
-      image: ghcr.io/fredrir/llunde-caddy
+      project: caddy
+      platforms: '["linux/amd64","linux/arm64"]'
       context: images/caddy
-      push: ${{ github.event_name != 'pull_request' }}
-
-  verify:
-    needs: build
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - name: Assert the image is a pinned caddy WITH the DNS-01 provider
-        env:
-          GH_TOKEN: ${{ github.token }}
-          IMAGE: ghcr.io/fredrir/llunde-caddy:${{ github.sha }}
-        run: |
-          set -euo pipefail
-          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker pull -q "$IMAGE"
-
-          VERSION=$(docker run --rm "$IMAGE" caddy version)
-          echo "caddy version: $VERSION"
-          grep -q 'v2.11.4' <<<"$VERSION"
-
-          docker run --rm "$IMAGE" caddy list-modules | grep -qx 'dns.providers.cloudflare'
-          echo "dns.providers.cloudflare: present"
-
-          DIGEST=$(docker buildx imagetools inspect "$IMAGE" --format '{{.Manifest.Digest}}')
-          echo "digest: $DIGEST"
-          echo "## caddy image built" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "$VERSION" >> "$GITHUB_STEP_SUMMARY"
-          echo "Image = \"ghcr.io/fredrir/llunde-caddy@$DIGEST\"" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      dockerfile: images/caddy/Containerfile
+      test-command: python3 -m unittest discover -s tests/ci -v
+      request-release: false

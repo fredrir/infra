@@ -1,0 +1,27 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: logs-redirect
+  namespace: ingress-system
+spec:
+  redirectRegex:
+    regex: ^https?://fredrir\.com/logs/?(?:\?.*)?$
+    replacement: https://${GRAFANA_HOST}/explore
+    permanent: false
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: logs-shortcut
+  namespace: ingress-system
+spec:
+  entryPoints:
+  - web
+  routes:
+  - kind: Rule
+    match: Host(`fredrir.com`) && (Path(`/logs`) || Path(`/logs/`))
+    middlewares:
+    - name: logs-redirect
+    services:
+    - name: noop@internal
+      kind: TraefikService

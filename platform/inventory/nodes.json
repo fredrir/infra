@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 1,
+  "cluster": {
+    "name": "production",
+    "apiName": "k3s-api.internal",
+    "podCIDR": "10.42.0.0/16",
+    "serviceCIDR": "10.43.0.0/16",
+    "k3sVersion": "v1.36.3+k3s1"
+  },
+  "nodes": [
+    {
+      "id": "fredrir-04",
+      "provider": "hetzner",
+      "location": "hel1",
+      "sku": "ccx23",
+      "architecture": "amd64",
+      "osAdapter": "nixos",
+      "currentRole": "legacy-applications",
+      "desiredRole": "worker",
+      "capacity": {
+        "vCPU": 4,
+        "memoryGiB": 16,
+        "diskGiB": 160
+      },
+      "enrollment": null,
+      "capabilities": {
+        "verified": false,
+        "ci": false,
+        "stateful": false,
+        "critical": false,
+        "production": false
+      },
+      "providerId": "141119325",
+      "observed": {
+        "sshAlias": "fredrir-04",
+        "publicIPv4": "95.217.135.164",
+        "tailnetIPv4": "100.92.219.50",
+        "os": "NixOS 25.11",
+        "kernel": "6.12.93",
+        "tailscaleVersion": "1.90.9",
+        "observedAt": "2026-09-12"
+      }
+    },
+    {
+      "id": "fredrir-05",
+      "provider": "hetzner",
+      "location": "hel1",
+      "sku": "cpx22",
+      "architecture": "amd64",
+      "osAdapter": "nixos",
+      "currentRole": "legacy-applications",
+      "desiredRole": "server",
+      "capacity": {
+        "vCPU": 2,
+        "memoryGiB": 4,
+        "diskGiB": 80
+      },
+      "enrollment": null,
+      "capabilities": {
+        "verified": false,
+        "ci": false,
+        "stateful": false,
+        "critical": false,
+        "production": false
+      },
+      "providerId": "132168416",
+      "observed": {
+        "sshAlias": "fredrir-05",
+        "publicIPv4": "46.62.214.182",
+        "tailnetIPv4": "100.109.80.121",
+        "os": "NixOS 25.11",
+        "kernel": "6.12.93",
+        "tailscaleVersion": "1.90.9",
+        "observedAt": "2026-09-12"
+      }
+    },
+    {
+      "id": "fredrir-06",
+      "provider": "linode",
+      "location": null,
+      "sku": null,
+      "architecture": "amd64",
+      "osAdapter": "ansible",
+      "currentRole": "external-watchdog",
+      "desiredRole": "external",
+      "capacity": {
+        "vCPU": 1,
+        "memoryGiB": 1,
+        "diskGiB": null
+      },
+      "enrollment": null,
+      "capabilities": {
+        "verified": false,
+        "ci": false,
+        "stateful": false,
+        "critical": false,
+        "production": false
+      }
+    },
+    {
+      "id": "fredrir-07",
+      "provider": "hetzner",
+      "location": "hel1",
+      "sku": "cx33",
+      "architecture": "amd64",
+      "osAdapter": "ansible",
+      "desiredRole": "server",
+      "capacity": {
+        "vCPU": 4,
+        "memoryGiB": 8,
+        "diskGiB": 80
+      },
+      "currentRole": "provisioned-unenrolled",
+      "enrollment": null,
+      "capabilities": {
+        "verified": false,
+        "production": false,
+        "ci": false,
+        "stateful": false,
+        "critical": false
+      },
+      "observed": {
+        "sshAlias": "fredrir-07",
+        "publicIPv4": "89.167.88.128",
+        "observedAt": "2026-09-12",
+        "os": "Ubuntu 26.04.1 LTS",
+        "kernel": "7.0.0-30-generic",
+        "hostname": "ubuntu-8gb-hel1-1",
+        "memoryMiB": 7746,
+        "diskGiB": 76.3,
+        "networkInterfaces": [
+          "eth0"
+        ]
+      },
+      "providerId": "165563054"
+    },
+    {
+      "id": "fredrir-08",
+      "provider": "hetzner",
+      "location": "hel1",
+      "sku": "cx33",
+      "architecture": "amd64",
+      "osAdapter": "ansible",
+      "desiredRole": "server",
+      "capacity": {
+        "vCPU": 4,
+        "memoryGiB": 8,
+        "diskGiB": 80
+      },
+      "currentRole": "provisioned-unenrolled",
+      "enrollment": null,
+      "capabilities": {
+        "verified": false,
+        "production": false,
+        "ci": false,
+        "stateful": false,
+        "critical": false
+      },
+      "observed": {
+        "sshAlias": "fredrir-08",
+        "publicIPv4": "89.167.93.100",
+        "observedAt": "2026-09-12",
+        "os": "Ubuntu 26.04.1 LTS",
+        "kernel": "7.0.0-30-generic",
+        "hostname": "ubuntu-8gb-hel1-2",
+        "memoryMiB": 7746,
+        "diskGiB": 76.3,
+        "networkInterfaces": [
+          "eth0"
+        ]
+      },
+      "providerId": "165563055"
+    },
+    {
+      "id": "fredrir-09",
+      "provider": "one.com",
+      "location": null,
+      "sku": "Cloud server XXL",
+      "architecture": "amd64",
+      "osAdapter": "ansible",
+      "desiredRole": "worker",
+      "capacity": {
+        "vCPU": 16,
+        "memoryGiB": 32,
+        "diskGiB": 800
+      },
+      "currentRole": "provisioned-unenrolled",
+      "enrollment": null,
+      "capabilities": {
+        "verified": false,
+        "production": false,
+        "ci": false,
+        "stateful": false,
+        "critical": false
+      },
+      "observed": {
+        "sshAlias": "fredrir-09",
+        "publicIPv4": "85.190.100.72",
+        "observedAt": "2026-09-12",
+        "os": "Ubuntu 26.04 LTS",
+        "kernel": "7.0.0-30-generic",
+        "hostname": "cloud-server-10643982",
+        "memoryMiB": 32087,
+        "diskGiB": 800,
+        "networkInterfaces": [
+          "ens3"
+        ]
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "key": "hidencloud-worker",
+      "id": null,
+      "status": "proposed",
+      "provider": "hidencloud",
+      "location": null,
+      "sku": "SAR-Torrent",
+      "architecture": "arm64",
+      "osAdapter": null,
+      "desiredRole": "worker",
+      "capacity": {
+        "vCPU": 16,
+        "memoryGiB": 32,
+        "diskGiB": 320
+      }
+    }
+  ]
+}

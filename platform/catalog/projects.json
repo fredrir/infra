@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "ownerId": 114402558,
+  "infrastructureRepository": "fredrir/llunde-infra",
+  "infrastructureRepositoryId": 1328085692,
+  "projects": {
+    "llunde-backend": {
+      "repository": "fredrir/llunde-backend",
+      "repositoryId": 1327945675,
+      "namespace": "llunde-backend",
+      "image": "ghcr.io/fredrir/llunde-backend",
+      "domains": [
+        "api.llunde.no"
+      ],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "capabilities": [
+        "web",
+        "worker",
+        "cron",
+        "secrets",
+        "internet",
+        "postgres",
+        "valkey"
+      ],
+      "environments": [
+        "production"
+      ],
+      "images": {
+        "app": "ghcr.io/fredrir/llunde-backend"
+      }
+    },
+    "llunde-frontend": {
+      "repository": "fredrir/llunde-frontend",
+      "repositoryId": 1328144104,
+      "namespace": "llunde-frontend",
+      "image": "ghcr.io/fredrir/llunde-frontend",
+      "domains": [
+        "llunde.no",
+        "www.llunde.no"
+      ],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "capabilities": [
+        "web",
+        "worker",
+        "cron",
+        "secrets",
+        "internet"
+      ],
+      "environments": [
+        "production"
+      ],
+      "images": {
+        "app": "ghcr.io/fredrir/llunde-frontend"
+      },
+      "publicBuildArguments": {
+        "app": [
+          "VITE_TURNSTILE_SITE_KEY"
+        ]
+      }
+    },
+    "llunde-pyparser": {
+      "repository": "fredrir/llunde-pyparser",
+      "repositoryId": 1328252868,
+      "namespace": "llunde-pyparser",
+      "image": "ghcr.io/fredrir/pyparser-review",
+      "domains": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "capabilities": [
+        "web",
+        "worker",
+        "cron",
+        "secrets",
+        "internet",
+        "volume",
+        "postgres",
+        "valkey",
+        "shared-volume"
+      ],
+      "environments": [
+        "production"
+      ],
+      "images": {
+        "app": "ghcr.io/fredrir/pyparser-review"
+      }
+    },
+    "portfolio": {
+      "repository": "fredrir/portfolio",
+      "repositoryId": 773018612,
+      "namespace": "portfolio",
+      "image": "ghcr.io/fredrir/portfolio",
+      "domains": [
+        "hansteen.dev"
+      ],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "capabilities": [
+        "web",
+        "worker",
+        "cron",
+        "secrets",
+        "internet",
+        "postgres"
+      ],
+      "environments": [
+        "production"
+      ],
+      "images": {
+        "app": "ghcr.io/fredrir/portfolio",
+        "web": "ghcr.io/fredrir/portfolio-web",
+        "api": "ghcr.io/fredrir/portfolio-api",
+        "worker": "ghcr.io/fredrir/portfolio-worker"
+      },
+      "publicBuildArguments": {
+        "web": [
+          "VITE_RECAPTCHA_SITE_KEY",
+          "VITE_POSTHOG_KEY",
+          "VITE_POSTHOG_HOST",
+          "VITE_APP_VERSION"
+        ],
+        "api": [
+          "GIT_SHA",
+          "APP_VERSION"
+        ]
+      }
+    },
+    "y": {
+      "repository": "fredrir/Y",
+      "repositoryId": 900286164,
+      "namespace": "y",
+      "image": "ghcr.io/fredrir/y",
+      "domains": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "capabilities": [
+        "web",
+        "worker",
+        "cron",
+        "secrets",
+        "internet"
+      ],
+      "environments": [
+        "production"
+      ],
+      "images": {
+        "app": "ghcr.io/fredrir/y"
+      }
+    },
+    "caddy": {
+      "repository": "fredrir/llunde-infra",
+      "repositoryId": 1328085692,
+      "namespace": "platform-ingress",
+      "image": "ghcr.io/fredrir/llunde-caddy",
+      "domains": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "capabilities": [],
+      "environments": [
+        "production"
+      ],
+      "images": {
+        "app": "ghcr.io/fredrir/llunde-caddy"
+      }
+    }
+  }
+}

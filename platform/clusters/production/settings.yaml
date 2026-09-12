@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-settings
+  namespace: flux-system
+data:
+  PLATFORM_ACTIVATED: 'false'
+  STORAGE_CLASS: local-retain
+  GRAFANA_HOST: grafana.fredrir.com
+  CACHE_HOST: cache.fredrir.com
+  OTLP_HOST: otel.fredrir.com
+  S3_ENDPOINT: ''
+  S3_REGION: ''
+  LOKI_BUCKET: ''
+  TEMPO_BUCKET: ''
+  TUNNEL_ID: ''
+  CI_IMAGE: ''
+  ATTIC_IMAGE: ''
+  KUBERNETES_API_CIDR: ''
+  HOST_SCRAPE_CIDR: ''
+  LOKI_CLUSTER_IP: 10.43.0.50

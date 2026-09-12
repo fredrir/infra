@@ -1,8 +1,8 @@
 {
-  description = "llunde infrastructure — Git describes desired state";
+  description = "Personal infrastructure";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     disko = {
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -173,7 +173,7 @@
       [Container]
       ContainerName=observability-prometheus
       Exec=--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=60d
-      Image=docker.io/prom/prometheus:v3.13.2
+      Image=docker.io/prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69
       Network=observability.network
       PublishPort=0.0.0.0:9090:9090
       Volume=/etc/llunde/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -348,11 +348,24 @@
       "grafana unit drifted from golden (anonymous/basic-auth posture — regenerate tests/golden/observability-grafana.container):\n---rendered---\n${renderedObsGrafana}\n---golden---\n${goldenObsGrafana}";
         nixpkgs.legacyPackages.${system}.writeText "mkquadlet-render-ok" renderedContainer;
   in {
+    nixosModules.platform = import ./modules/platform;
+
+    lib.mkPlatformHost = {
+      system,
+      hardwareModule,
+      nodeModule,
+    }:
+      nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [self.nixosModules.platform sops-nix.nixosModules.sops hardwareModule nodeModule];
+      };
+
     nixosConfigurations.llunde-01 = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         disko.nixosModules.disko
         sops-nix.nixosModules.sops
+        ./modules/platform/security-baseline.nix
         ./hosts/llunde-01
       ];
     };
@@ -362,6 +375,7 @@
       modules = [
         disko.nixosModules.disko
         sops-nix.nixosModules.sops
+        ./modules/platform/security-baseline.nix
         ./hosts/llunde-parser
       ];
     };
@@ -371,6 +385,7 @@
       modules = [
         disko.nixosModules.disko
         sops-nix.nixosModules.sops
+        ./modules/platform/security-baseline.nix
         ./hosts/llunde-parser
         {
           networking.hostName = lib.mkForce "llunde-parser-rehearsal";
@@ -384,10 +399,22 @@
     };
 
     checks.x86_64-linux.mkquadlet-render = mkRenderCheck "x86_64-linux";
+    checks.x86_64-linux.platform-host = import ./modules/platform/checks.nix {
+      inherit nixpkgs;
+      system = "x86_64-linux";
+    };
     checks.x86_64-linux.gitops-pull-script = gitopsPullScriptCheck "x86_64-linux";
     checks.x86_64-linux.obs-config = obsConfigCheck "x86_64-linux";
     checks.aarch64-linux.mkquadlet-render = mkRenderCheck "aarch64-linux";
+    checks.aarch64-linux.platform-host = import ./modules/platform/checks.nix {
+      inherit nixpkgs;
+      system = "aarch64-linux";
+    };
     checks.aarch64-darwin.mkquadlet-render = mkRenderCheck "aarch64-darwin";
+    checks.aarch64-darwin.platform-host = import ./modules/platform/checks.nix {
+      inherit nixpkgs;
+      system = "aarch64-darwin";
+    };
     checks.aarch64-darwin.obs-config = obsConfigCheck "aarch64-darwin";
   };
 }

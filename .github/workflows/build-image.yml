@@ -1,84 +1,65 @@
 name: Build image
-
-on:
+'on':
   workflow_call:
     inputs:
-      image:
-        description: "Full image name, e.g. ghcr.io/fredrir/llunde-backend"
+      project:
         required: true
         type: string
+      test-command:
+        required: true
+        type: string
+      platforms:
+        type: string
+        default: '["linux/amd64"]'
       context:
-        description: "Build context directory"
         type: string
-        default: "."
-      containerfile:
-        description: "Containerfile path relative to the context"
+        default: .
+      dockerfile:
         type: string
-        default: "Containerfile"
-      push:
-        description: "Push to GHCR (PRs typically build without pushing)"
+        default: Dockerfile
+      nix-target:
+        type: string
+        default: ''
+      request-release:
         type: boolean
         default: true
-      platforms:
-        description: "Target platforms"
+      component:
         type: string
-        default: "linux/amd64"
-      doppler-build-args:
-        description: "Space-separated Doppler secret NAMES to pass as build args"
+        default: app
+      build-arguments:
         type: string
-        default: ""
+        default: '{}'
+    outputs:
+      image:
+        value: ${{ jobs.build.outputs.image }}
     secrets:
-      DOPPLER_TOKEN:
-        description: "Doppler service token; only needed with doppler-build-args"
+      NIX_CACHE_READ_TOKEN:
         required: false
-
+      NIX_CACHE_UPLOAD_TOKEN:
+        required: false
+permissions:
+  contents: read
 jobs:
   build:
-    runs-on: ubuntu-latest
+    if: github.repository_owner_id == '114402558' && contains(fromJSON('["773018612","900286164","1327945675","1328085692","1328144104","1328252868"]'),
+      github.repository_id) && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
+      == true && startsWith(vars.INFRA_CI_IMAGE, 'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES
+      || '[]'), 'amd64')
+    uses: ./.github/workflows/project-ci.yml
     permissions:
       contents: read
       packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: dopplerhq/cli-action@v3
-        if: inputs.doppler-build-args != ''
-
-      - name: Collect Doppler build args
-        id: doppler-args
-        if: inputs.doppler-build-args != ''
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
-        run: |
-          set -euo pipefail
-          test -n "$DOPPLER_TOKEN" || { echo "doppler-build-args set but DOPPLER_TOKEN secret missing" >&2; exit 1; }
-          {
-            echo 'args<<EOF'
-            for name in ${{ inputs.doppler-build-args }}; do
-              value="$(doppler secrets get "$name" --plain)"
-              echo "::add-mask::$value"
-              echo "$name=$value"
-            done
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - uses: docker/build-push-action@v6
-        with:
-          context: ${{ inputs.context }}
-          file: ${{ inputs.context }}/${{ inputs.containerfile }}
-          push: ${{ inputs.push }}
-          platforms: ${{ inputs.platforms }}
-          tags: |
-            ${{ inputs.image }}:${{ github.sha }}
-            ${{ inputs.image }}:latest
-          build-args: ${{ steps.doppler-args.outputs.args }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      id-token: write
+    with:
+      project: ${{ inputs.project }}
+      test-command: ${{ inputs.test-command }}
+      platforms: ${{ inputs.platforms }}
+      context: ${{ inputs.context }}
+      dockerfile: ${{ inputs.dockerfile }}
+      nix-target: ${{ inputs.nix-target }}
+      request-release: ${{ inputs.request-release }}
+      component: ${{ inputs.component }}
+      build-arguments: ${{ inputs.build-arguments }}
+    secrets:
+      NIX_CACHE_READ_TOKEN: ${{ secrets.NIX_CACHE_READ_TOKEN }}
+      NIX_CACHE_UPLOAD_TOKEN: ${{ secrets.NIX_CACHE_UPLOAD_TOKEN }}

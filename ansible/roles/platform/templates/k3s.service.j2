@@ -1,0 +1,20 @@
+[Unit]
+After=network-online.target tailscaled.service platform-api-proxy.service platform-firewall.service
+Wants=network-online.target
+Requires=tailscaled.service platform-api-proxy.service platform-firewall.service
+
+[Service]
+Type={{ 'notify' if platform_role == 'server' else 'exec' }}
+ExecStartPre=/usr/local/bin/platform-preflight
+ExecStart=/usr/local/bin/k3s {{ platform_role }} --config /etc/rancher/k3s/config.yaml
+KillMode=process
+Delegate=yes
+Restart=always
+RestartSec=5s
+LimitNOFILE=1048576
+LimitNPROC=infinity
+TasksMax=infinity
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,32 @@
+node-name: {{ platform_node_name | to_json }}
+node-ip: {{ platform_node_ip | to_json }}
+token-file: {{ (platform_server_token_file if platform_role == 'server' else platform_agent_token_file) | to_json }}
+flannel-iface: tailscale0
+{% if not platform_initialize %}
+server: {{ ('https://' + platform_api_name + ':7443') | to_json }}
+{% endif %}
+kubelet-arg:
+  - cgroup-driver=systemd
+  - protect-kernel-defaults=true
+  - system-reserved=cpu=250m,memory=256Mi,ephemeral-storage=1Gi
+  - kube-reserved=cpu=250m,memory={{ '768Mi' if platform_role == 'server' else '512Mi' }},ephemeral-storage=2Gi
+  - eviction-hard=memory.available<256Mi,nodefs.available<10%,imagefs.available<15%
+  - pod-max-pids=1024
+  - container-log-max-size=10Mi
+  - container-log-max-files=3
+{% if platform_role == 'server' %}
+agent-token-file: {{ platform_agent_token_file | to_json }}
+advertise-address: {{ platform_private_ip | to_json }}
+cluster-init: {{ platform_initialize | bool | to_json }}
+cluster-cidr: {{ platform_pod_cidr | to_json }}
+service-cidr: {{ platform_service_cidr | to_json }}
+tls-san: [{{ platform_api_name | to_json }}]
+write-kubeconfig-mode: "0600"
+secrets-encryption: true
+flannel-backend: vxlan
+disable: [traefik, servicelb]
+node-taint: ["node-role.kubernetes.io/control-plane=true:NoSchedule"]
+kube-apiserver-arg: ["authorization-mode=Node,RBAC", "enable-admission-plugins=NodeRestriction"]
+etcd-snapshot-schedule-cron: "0 */6 * * *"
+etcd-snapshot-retention: 20
+{% endif %}

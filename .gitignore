@@ -18,3 +18,10 @@ result-*
 .DS_Store
 
 .wrangler/
+
+.venv/
+__pycache__/
+*.pyc
+.cache/
+dist/
+.infra/

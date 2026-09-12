@@ -1,0 +1,43 @@
+schemaVersion: 1
+project: llunde-backend
+workloads:
+  api:
+    kind: web
+    port: 8080
+    healthPath: /health
+    domains:
+    - api.llunde.no
+    architecture: multi
+    secretKeys:
+    - DATABASE_URL
+  worker:
+    kind: worker
+    command:
+    - /app/worker
+  cleanup:
+    kind: cron
+    schedule: 0 3 * * *
+    command:
+    - /app/cleanup
+data:
+  postgres:
+    sizeClass: small
+    recovery:
+      rpoHours: 24
+      rtoHours: 4
+  valkey:
+    sizeClass: small
+    recovery:
+      rpoHours: 24
+      rtoHours: 4
+migration:
+  component: app
+  command:
+  - alembic
+  args:
+  - upgrade
+  - head
+  compatibility: backward-compatible
+  secretKeys:
+  - DATABASE_URL
+  retrySafe: true

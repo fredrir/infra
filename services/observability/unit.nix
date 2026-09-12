@@ -112,7 +112,7 @@ in rec {
     container = {
       ContainerName = "observability-prometheus";
       Exec = "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=60d";
-      Image = "docker.io/prom/prometheus:v3.13.2";
+      Image = "docker.io/prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69";
       Network = ["observability.network"];
       PublishPort = ["0.0.0.0:9090:9090"];
       Volume = [
@@ -134,9 +134,9 @@ in rec {
     container = {
       ContainerName = "observability-grafana";
       Environment = [
-        "GF_AUTH_ANONYMOUS_ENABLED=true"
+        "GF_AUTH_ANONYMOUS_ENABLED=false"
         "GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer"
-        "GF_AUTH_DISABLE_LOGIN_FORM=true"
+        "GF_AUTH_DISABLE_LOGIN_FORM=false"
         "GF_AUTH_BASIC_ENABLED=false"
         "GF_ANALYTICS_REPORTING_ENABLED=false"
         "GF_SMTP_ENABLED=true"
@@ -148,7 +148,7 @@ in rec {
         "/run/secrets/observability-smtp.env"
         "/run/secrets/observability-grafana.env"
       ];
-      Image = "docker.io/grafana/grafana:13.1.3";
+      Image = "docker.io/grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283";
       Network = ["observability.network"];
       PublishPort = ["0.0.0.0:3000:3000"];
       Volume = [
@@ -173,7 +173,7 @@ in rec {
     container = {
       ContainerName = "observability-loki";
       Exec = "-config.file=/etc/loki/loki.yaml";
-      Image = "docker.io/grafana/loki:3.7.6";
+      Image = "docker.io/grafana/loki:3.7.7@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500";
       Network = ["observability.network"];
       PublishPort = ["0.0.0.0:3100:3100"];
       Volume = [
@@ -195,7 +195,7 @@ in rec {
     container = {
       ContainerName = "observability-otel";
       # Config mounts over the image's default --config path, so no Exec.
-      Image = "docker.io/otel/opentelemetry-collector-contrib:0.158.0";
+      Image = "docker.io/otel/opentelemetry-collector-contrib:0.160.0@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6";
       Network = ["observability.network"];
       # OTLP gRPC + HTTP for the backend's tracing wiring
       PublishPort = [
@@ -217,7 +217,7 @@ in rec {
     inherit uid;
     container = {
       ContainerName = "observability-blackbox";
-      Image = "docker.io/prom/blackbox-exporter:v0.28.0";
+      Image = "docker.io/prom/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc";
       Network = ["observability.network"];
       PublishPort = ["0.0.0.0:9115:9115"];
       Volume = ["${etcDir}/blackbox.yml:/etc/blackbox_exporter/config.yml:ro"];

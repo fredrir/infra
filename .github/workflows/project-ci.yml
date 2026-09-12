@@ -1,0 +1,255 @@
+name: Project CI
+'on':
+  workflow_call:
+    inputs:
+      project:
+        required: true
+        type: string
+      test-command:
+        required: true
+        type: string
+      platforms:
+        type: string
+        default: '["linux/amd64"]'
+      context:
+        type: string
+        default: .
+      dockerfile:
+        type: string
+        default: Dockerfile
+      nix-target:
+        type: string
+        default: ''
+      request-release:
+        type: boolean
+        default: true
+      component:
+        type: string
+        default: app
+      build-arguments:
+        type: string
+        default: '{}'
+    outputs:
+      image:
+        value: ${{ jobs.publish.outputs.image }}
+    secrets:
+      NIX_CACHE_READ_TOKEN:
+        required: false
+      NIX_CACHE_UPLOAD_TOKEN:
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: project-ci-${{ github.repository_id }}-${{ github.ref }}-${{ inputs.component }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository_owner_id == '114402558' && contains(fromJSON('["773018612","900286164","1327945675","1328085692","1328144104","1328252868"]'),
+      github.repository_id) && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
+      == true && startsWith(vars.INFRA_CI_IMAGE, 'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES
+      || '[]'), 'amd64')
+    runs-on: ${{ format('infra-{0}-{1}', github.repository_id, 'amd64') }}
+    container:
+      image: ${{ vars.INFRA_CI_IMAGE }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+    - &id001
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: infra
+        persist-credentials: false
+    - id: project
+      env:
+        CI_GITHUB_CONTEXT: ${{ toJSON(github) }}
+        CI_PIPELINE_IMAGE: ${{ vars.INFRA_CI_IMAGE }}
+        CI_PROJECT: ${{ inputs.project }}
+        CI_PLATFORMS: ${{ inputs.platforms }}
+        CI_COMPONENT: ${{ inputs.component }}
+        CI_NIX_TARGET: ${{ inputs.nix-target }}
+        CI_AVAILABLE_ARCHITECTURES: ${{ vars.INFRA_CI_ARCHITECTURES }}
+        CI_CONTEXT: ${{ inputs.context }}
+        CI_DOCKERFILE: ${{ inputs.dockerfile }}
+        CI_TEST_COMMAND: ${{ inputs.test-command }}
+        CI_BUILD_ARGUMENTS: ${{ inputs.build-arguments }}
+      run: python3 infra/scripts/ci/policy.py resolve --project "$CI_PROJECT" --component "$CI_COMPONENT" --platforms
+        "$CI_PLATFORMS" --nix-target "$CI_NIX_TARGET"
+    outputs:
+      matrix: ${{ steps.project.outputs.matrix }}
+      image: ${{ steps.project.outputs.image }}
+      cache: ${{ steps.project.outputs.cache }}
+      build-config-sha256: ${{ steps.project.outputs.build-config-sha256 }}
+  build:
+    if: github.repository_owner_id == '114402558' && contains(fromJSON('["773018612","900286164","1327945675","1328085692","1328144104","1328252868"]'),
+      github.repository_id) && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
+      == true && startsWith(vars.INFRA_CI_IMAGE, 'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES
+      || '[]'), 'amd64')
+    runs-on: ${{ format('infra-{0}-{1}', github.repository_id, matrix.architecture) }}
+    container:
+      image: ${{ vars.INFRA_CI_IMAGE }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+    - *id001
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        ref: ${{ github.sha }}
+        path: source
+        persist-credentials: false
+    - env:
+        CI_WORKFLOW_REVISION: ${{ job.workflow_sha }}
+        CI_WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        CI_PROJECT: ${{ inputs.project }}
+        CI_ARCH: ${{ matrix.architecture }}
+        CI_CONTEXT: ${{ inputs.context }}
+        CI_DOCKERFILE: ${{ inputs.dockerfile }}
+        CI_NIX_TARGET: ${{ inputs.nix-target }}
+        CI_TEST_COMMAND: ${{ inputs.test-command }}
+        CI_COMPONENT: ${{ inputs.component }}
+        NIX_CACHE_READ_TOKEN: ${{ secrets.NIX_CACHE_READ_TOKEN }}
+        CI_WORKFLOW_REF: ${{ job.workflow_ref }}
+        CI_BUILD_CONFIG_SHA256: ${{ needs.prepare.outputs.build-config-sha256 }}
+        CI_BUILD_ARGUMENTS: ${{ inputs.build-arguments }}
+      run: python3 infra/scripts/ci/pipeline.py build --project "$CI_PROJECT" --component "$CI_COMPONENT" --architecture
+        "$CI_ARCH" --context "$CI_CONTEXT" --dockerfile "$CI_DOCKERFILE" --nix-target "$CI_NIX_TARGET" --source
+        source --output artifact
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: build-${{ inputs.project }}-${{ inputs.component }}-${{ matrix.architecture }}
+        path: artifact/
+        if-no-files-found: error
+        retention-days: 2
+        overwrite: true
+    needs: prepare
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+  publish:
+    if: github.repository_owner_id == '114402558' && contains(fromJSON('["773018612","900286164","1327945675","1328085692","1328144104","1328252868"]'),
+      github.repository_id) && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
+      == true && startsWith(vars.INFRA_CI_IMAGE, 'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES
+      || '[]'), 'amd64') && !cancelled() && needs.build.result == 'success' && (needs.cache.result == 'success'
+      || needs.cache.result == 'skipped')
+    runs-on: ${{ format('infra-{0}-{1}', github.repository_id, 'amd64') }}
+    container:
+      image: ${{ vars.INFRA_CI_IMAGE }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+    - *id001
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        pattern: build-${{ inputs.project }}-${{ inputs.component }}-*
+        path: artifacts
+        merge-multiple: false
+    - id: publish
+      env:
+        CI_WORKFLOW_REVISION: ${{ job.workflow_sha }}
+        CI_WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        GHCR_TOKEN: ${{ github.token }}
+        CI_PROJECT: ${{ inputs.project }}
+        CI_PLATFORMS: ${{ inputs.platforms }}
+        CI_COMPONENT: ${{ inputs.component }}
+        CI_WORKFLOW_REF: ${{ job.workflow_ref }}
+        CI_BUILD_CONFIG_SHA256: ${{ needs.prepare.outputs.build-config-sha256 }}
+      run: python3 infra/scripts/ci/pipeline.py publish --project "$CI_PROJECT" --component "$CI_COMPONENT" --platforms
+        "$CI_PLATFORMS" --artifacts artifacts
+    needs:
+    - prepare
+    - build
+    - cache
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+  release:
+    if: github.repository_owner_id == '114402558' && contains(fromJSON('["773018612","900286164","1327945675","1328085692","1328144104","1328252868"]'),
+      github.repository_id) && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
+      == true && startsWith(vars.INFRA_CI_IMAGE, 'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES
+      || '[]'), 'amd64')
+    runs-on: ${{ format('infra-{0}-{1}', github.repository_id, 'amd64') }}
+    container:
+      image: ${{ vars.INFRA_CI_IMAGE }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    steps:
+    - *id001
+    - env:
+        CI_WORKFLOW_REVISION: ${{ job.workflow_sha }}
+        CI_WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        GHCR_TOKEN: ${{ github.token }}
+        CI_PROJECT: ${{ inputs.project }}
+        CI_PLATFORMS: ${{ inputs.platforms }}
+        CI_IMAGE: ${{ needs.publish.outputs.image }}
+        CI_COMPONENT: ${{ inputs.component }}
+        CI_WORKFLOW_REF: ${{ job.workflow_ref }}
+        CI_BUILD_CONFIG_SHA256: ${{ needs.prepare.outputs.build-config-sha256 }}
+      run: python3 infra/scripts/ci/pipeline.py release-document --project "$CI_PROJECT" --component "$CI_COMPONENT"
+        --platforms "$CI_PLATFORMS" --image "$CI_IMAGE" --output release.json
+    - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
+      id: sts
+      if: inputs.request-release
+      with:
+        scope: fredrir/llunde-infra
+        identity: ${{ inputs.project }}-release
+    - if: inputs.request-release
+      env:
+        CI_WORKFLOW_REVISION: ${{ job.workflow_sha }}
+        CI_WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        GH_TOKEN: ${{ steps.sts.outputs.token }}
+        CI_WORKFLOW_REF: ${{ job.workflow_ref }}
+        CI_BUILD_CONFIG_SHA256: ${{ needs.prepare.outputs.build-config-sha256 }}
+      run: python3 infra/scripts/ci/pipeline.py request-release release.json
+    needs:
+    - prepare
+    - publish
+  cache:
+    runs-on: ${{ format('infra-{0}-{1}', github.repository_id, matrix.architecture) }}
+    container:
+      image: ${{ vars.INFRA_CI_IMAGE }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    if: github.repository_owner_id == '114402558' && contains(fromJSON('["773018612","900286164","1327945675","1328085692","1328144104","1328252868"]'),
+      github.repository_id) && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
+      == true && startsWith(vars.INFRA_CI_IMAGE, 'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES
+      || '[]'), 'amd64') && needs.prepare.outputs.cache == 'true'
+    permissions:
+      contents: read
+    needs:
+    - prepare
+    - build
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: infra
+        persist-credentials: false
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        pattern: build-${{ inputs.project }}-${{ inputs.component }}-${{ matrix.architecture }}
+        path: artifacts
+        merge-multiple: false
+    - env:
+        CI_WORKFLOW_REVISION: ${{ job.workflow_sha }}
+        CI_WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        CI_PROJECT: ${{ inputs.project }}
+        CI_COMPONENT: ${{ inputs.component }}
+        CI_ARCH: ${{ matrix.architecture }}
+        NIX_CACHE_UPLOAD_TOKEN: ${{ secrets.NIX_CACHE_UPLOAD_TOKEN }}
+        CI_WORKFLOW_REF: ${{ job.workflow_ref }}
+        CI_BUILD_CONFIG_SHA256: ${{ needs.prepare.outputs.build-config-sha256 }}
+      run: python3 infra/scripts/ci/pipeline.py upload-cache --project "$CI_PROJECT" --component "$CI_COMPONENT"
+        --architecture "$CI_ARCH" --artifacts artifacts

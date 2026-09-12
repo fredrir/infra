@@ -207,7 +207,7 @@ groups:
         title: ResticStale
         condition: B
         for: 0s
-        noDataState: OK
+        noDataState: Alerting
         execErrState: Error
         annotations:
           summary: "restic job {{ $labels.job }} last succeeded over 8 days ago"

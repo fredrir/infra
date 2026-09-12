@@ -1,0 +1,86 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "project": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,39}$"
+    },
+    "environment": {
+      "enum": [
+        "production"
+      ]
+    },
+    "image": {
+      "type": "string",
+      "pattern": "^ghcr\\.io/fredrir/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$"
+    },
+    "sourceRevision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflowRepository": {
+          "type": "string"
+        },
+        "workflowRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "workflowPath": {
+          "const": ".github/workflows/project-ci.yml"
+        },
+        "runId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "repositoryId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "linux/amd64",
+              "linux/arm64"
+            ]
+          }
+        },
+        "buildConfigSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "workflowRepository",
+        "workflowRevision",
+        "workflowPath",
+        "runId",
+        "repositoryId",
+        "platforms"
+      ]
+    },
+    "component": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,19}$"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "project",
+    "environment",
+    "image",
+    "sourceRevision",
+    "provenance"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

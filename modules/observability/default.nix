@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   cfg = config.llunde.observability;
@@ -21,9 +22,24 @@ in {
       default = null;
       example = "http://100.92.219.50:3100";
     };
+    legacyPositionsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "/var/lib/promtail/positions.yaml";
+    };
+    journalMaxAge = lib.mkOption {
+      type = lib.types.str;
+      default = "12h";
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.lokiUrl == null || lib.versionAtLeast pkgs.grafana-alloy.version "1.16.0";
+        message = "Alloy journal cursor migration requires Alloy 1.16.0 or newer";
+      }
+    ];
+
     services.prometheus.exporters.node = {
       enable = true;
       port = nodeExporterPort;
@@ -33,38 +49,64 @@ in {
 
     systemd.tmpfiles.rules = ["d ${textfileDir} 0755 root root -"];
 
-    services.promtail = lib.mkIf (cfg.lokiUrl != null) {
+    services.alloy = lib.mkIf (cfg.lokiUrl != null) {
       enable = true;
-      configuration = {
-        server = {
-          http_listen_address = "127.0.0.1";
-          http_listen_port = 9080;
-          grpc_listen_port = 0;
-        };
-        clients = [{url = "${cfg.lokiUrl}/loki/api/v1/push";}];
-        scrape_configs = [
-          {
-            job_name = "journal";
-            journal = {
-              max_age = "12h";
-              labels = {
-                job = "systemd-journal";
-                host = config.networking.hostName;
-              };
-            };
-            relabel_configs = [
-              {
-                source_labels = ["__journal__systemd_unit"];
-                target_label = "unit";
-              }
-            ];
-          }
-        ];
-      };
+      extraFlags = [
+        "--server.http.listen-addr=127.0.0.1:12345"
+        "--storage.path=/var/lib/alloy/data"
+        "--disable-reporting"
+      ];
     };
 
-    systemd.services.promtail = lib.mkIf (cfg.lokiUrl != null) {
-      serviceConfig.MemoryMax = "128M";
+    environment.etc."alloy/journal.alloy" = lib.mkIf (cfg.lokiUrl != null) {
+      text = ''
+        loki.relabel "journal" {
+          forward_to = []
+          rule {
+            source_labels = ["__journal__systemd_unit"]
+            target_label = "unit"
+          }
+          rule {
+            target_label = "job"
+            replacement = "systemd-journal"
+          }
+        }
+        loki.source.journal "journal" {
+          max_age = ${builtins.toJSON cfg.journalMaxAge}
+          labels = { host = ${builtins.toJSON config.networking.hostName} }
+          relabel_rules = loki.relabel.journal.rules
+          forward_to = [loki.write.central.receiver]
+          ${lib.optionalString (cfg.legacyPositionsFile != null) ''
+            legacy_position {
+              file = "/var/lib/alloy/promtail-positions.yaml"
+              name = "journal"
+            }
+          ''}
+        }
+        loki.write "central" {
+          endpoint {
+            url = ${builtins.toJSON "${cfg.lokiUrl}/loki/api/v1/push"}
+          }
+        }
+      '';
+    };
+
+    systemd.services.alloy = lib.mkIf (cfg.lokiUrl != null) {
+      conflicts = ["promtail.service"];
+      after = ["promtail.service"];
+      serviceConfig = {
+        MemoryMax = "256M";
+        ExecStartPre = lib.optional (cfg.legacyPositionsFile != null)
+          "+${pkgs.writeShellScript "alloy-journal-cursor" ''
+            set -eu
+            target=/var/lib/alloy/promtail-positions.yaml
+            if [ ! -f "$target" ]; then
+              test -s ${lib.escapeShellArg cfg.legacyPositionsFile}
+              ${pkgs.coreutils}/bin/install -o alloy -g alloy -m 0600 \
+                ${lib.escapeShellArg cfg.legacyPositionsFile} "$target"
+            fi
+          ''}";
+      };
     };
 
     networking.firewall = lib.mkMerge [

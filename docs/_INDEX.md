@@ -4,11 +4,12 @@
 
 | Path                                             | Description                                           |
 | ------------------------------------------------ | ----------------------------------------------------- |
-| [Domains](Domains.md)                            |                                                       |
-| [Nodes](Nodes.md)                                |                                                       |
+| [Domains](domains.md)                            |                                                       |
+| [Nodes](nodes.md)                                |                                                       |
 | [Requirements](Requirements.md)                  |                                                       |
-| [Runbook](Runbook.md)                            |                                                       |
+| [Runbook](runbook.md)                            |                                                       |
+| [Shared platform](platform.md)                  | Ownership, onboarding, validation and activation |
 | [Secrets](Secrets.md)                            |                                                       |
 | [Research](research/_INDEX.md)                   | Important research on unkown / new areas/technologies |
 | [Backlog](backlog/_INDEX.md)                     |                                                       |
-| [`Backlog/<plan-id>`](backlog/phase-x/_INDEX.md) | A long term plan                                      |
+| `backlog/<plan-id>` | A long term plan                                      |

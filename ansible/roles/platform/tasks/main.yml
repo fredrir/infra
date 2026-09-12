@@ -1,0 +1,286 @@
+- name: Validate host contract
+  ansible.builtin.assert:
+    that:
+      - platform_preflight_approved | bool
+      - ansible_facts.service_mgr == 'systemd'
+      - (ansible_facts.distribution == 'Ubuntu' and ansible_facts.distribution_version in ['24.04', '26.04']) or (ansible_facts.distribution == 'Debian' and ansible_facts.distribution_major_version == '13')
+      - platform_role in ['server', 'agent']
+      - platform_architecture in ['amd64', 'arm64']
+      - ansible_facts.architecture == ('x86_64' if platform_architecture == 'amd64' else 'aarch64')
+      - platform_api_backends | length == 3
+      - platform_api_backends | unique | length == 3
+      - platform_node_name is match('^[a-z0-9][a-z0-9-]+$')
+      - platform_admin_keys | length > 0
+      - ansible_password is not defined and ansible_ssh_pass is not defined
+      - platform_api_name is match('^[a-z0-9][a-z0-9.-]+$')
+      - platform_node_ip | length > 0
+      - platform_server_token_file != platform_agent_token_file
+      - not platform_initialize or platform_role == 'server'
+      - platform_role != 'server' or (platform_private_ip == platform_node_ip and platform_private_interface | length > 0)
+      - platform_k3s_version == 'v1.36.3+k3s1'
+      - platform_tailscale_version == '1.102.4'
+      - platform_gvisor_version == '20260907.0'
+      - not platform_sandbox_enabled or platform_role == 'agent'
+
+- name: Inspect existing K3s installation
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: platform_existing_k3s
+
+- name: Require maintenance clearance for enrolled hosts
+  ansible.builtin.assert:
+    that: not platform_existing_k3s.stat.exists or platform_drain_approved | bool
+
+- name: Install host prerequisites
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, haproxy, nftables, iptables, iproute2, kmod, chrony, restic, prometheus-node-exporter]
+    state: present
+    update_cache: true
+    policy_rc_d: 101
+
+- name: Create platform directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop: [/var/lib/platform, /var/lib/rancher, /etc/rancher/k3s, /etc/platform]
+
+- name: Create exporter metric directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: [/var/lib/platform, /var/lib/platform/metrics]
+
+- name: Publish expected backup job before first success
+  ansible.builtin.copy:
+    dest: /var/lib/platform/metrics/k3s-etcd-expected.prom
+    content: |
+      restic_expected_job{backup_job="k3s-etcd"} 1
+      restic_max_age_seconds{backup_job="k3s-etcd"} 21600
+    mode: "0644"
+  when: platform_role == 'server'
+
+- name: Create administrator key directory
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    mode: "0700"
+
+- name: Install administrator keys
+  ansible.builtin.copy:
+    dest: /root/.ssh/authorized_keys
+    content: "{{ platform_admin_keys | join('\n') }}\n"
+    mode: "0600"
+
+- name: Harden SSH authentication
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/00-platform.conf
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+    mode: "0644"
+  notify: Reload platform SSH
+
+- name: Validate SSH configuration
+  ansible.builtin.command: /usr/sbin/sshd -t
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Inspect effective SSH authentication
+  ansible.builtin.command: /usr/sbin/sshd -T
+  register: platform_sshd_config
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Require effective SSH hardening
+  ansible.builtin.assert:
+    that:
+      - "'passwordauthentication no' in platform_sshd_config.stdout_lines"
+      - "'kbdinteractiveauthentication no' in platform_sshd_config.stdout_lines"
+  when: not ansible_check_mode
+
+- name: Create exporter service override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/prometheus-node-exporter.service.d
+    state: directory
+    mode: "0755"
+
+- name: Bind exporter to the enrolled node address
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/prometheus-node-exporter.service.d/platform.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/prometheus-node-exporter --web.listen-address={{ platform_node_ip }}:9100 --collector.systemd --collector.textfile.directory=/var/lib/platform/metrics
+    mode: "0644"
+  notify: Reload platform systemd
+
+- name: Download verified K3s binary
+  ansible.builtin.get_url:
+    url: "https://github.com/k3s-io/k3s/releases/download/{{ platform_k3s_version }}/{{ platform_k3s_artifacts[platform_architecture].file }}"
+    dest: /usr/local/bin/k3s
+    checksum: "sha256:{{ platform_k3s_artifacts[platform_architecture].sha256 }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart platform K3s
+
+- name: Download verified Tailscale archive
+  ansible.builtin.get_url:
+    url: "https://pkgs.tailscale.com/stable/tailscale_{{ platform_tailscale_version }}_{{ platform_architecture }}.tgz"
+    dest: /var/lib/platform/tailscale.tgz
+    checksum: "sha256:{{ platform_tailscale_sha256[platform_architecture] }}"
+    mode: "0600"
+  register: platform_tailscale_archive
+
+- name: Extract Tailscale binaries
+  ansible.builtin.unarchive:
+    src: /var/lib/platform/tailscale.tgz
+    dest: /var/lib/platform
+    remote_src: true
+  when: not ansible_check_mode
+
+- name: Install Tailscale binaries
+  ansible.builtin.copy:
+    remote_src: true
+    src: "/var/lib/platform/tailscale_{{ platform_tailscale_version }}_{{ platform_architecture }}/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: "0755"
+  loop: [tailscale, tailscaled]
+  when: not ansible_check_mode
+  notify: Restart platform Tailscale
+
+- name: Set kernel prerequisites
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/platform.conf
+    content: "overlay\nbr_netfilter\ntun\nvxlan\n"
+    mode: "0644"
+
+- name: Install optional gVisor runtime
+  ansible.builtin.include_tasks: sandbox.yml
+  when: platform_sandbox_enabled | bool
+
+- name: Install etcd backup command
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../../modules/platform/etcd-backup.sh"
+    dest: /usr/local/bin/platform-etcd-backup
+    mode: "0700"
+  when: platform_role == 'server'
+
+- name: Install scheduled etcd backup
+  ansible.builtin.template:
+    src: "platform-etcd-backup.{{ item }}.j2"
+    dest: "/etc/systemd/system/platform-etcd-backup.{{ item }}"
+    mode: "0644"
+  loop: [service, timer]
+  when: platform_role == 'server' and platform_backup_environment_file | length > 0
+  notify: Reload platform systemd
+
+- name: Load kernel modules
+  ansible.builtin.command:
+    argv: [modprobe, "{{ item }}"]
+  loop: [overlay, br_netfilter, tun, vxlan]
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Set Kubernetes sysctls
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/90-platform.conf
+    content: |
+      net.ipv4.ip_forward=1
+      net.ipv6.conf.all.forwarding=1
+      net.bridge.bridge-nf-call-iptables=1
+      net.bridge.bridge-nf-call-ip6tables=1
+      vm.overcommit_memory=1
+      vm.panic_on_oom=0
+      kernel.panic=10
+      kernel.panic_on_oops=1
+    mode: "0644"
+  notify: Apply platform sysctls
+
+- name: Install platform configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0600') }}"
+  loop:
+    - {src: k3s.yaml.j2, dest: /etc/rancher/k3s/config.yaml}
+    - {src: haproxy.cfg.j2, dest: /etc/platform/haproxy.cfg}
+    - {src: firewall.nft.j2, dest: /etc/platform/firewall.nft}
+    - {src: preflight.sh.j2, dest: /usr/local/bin/platform-preflight, mode: "0700"}
+  notify: [Restart platform API proxy, Restart platform firewall, Restart platform K3s]
+
+- name: Install system services
+  ansible.builtin.template:
+    src: "{{ item }}.service.j2"
+    dest: "/etc/systemd/system/{{ item }}.service"
+    mode: "0644"
+  loop: [tailscaled, platform-api-proxy, platform-firewall, k3s]
+  notify: Reload platform systemd
+
+- name: Resolve API independently of cluster DNS
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: "^127\\.0\\.0\\.1\\s+{{ platform_api_name | regex_escape }}$"
+    line: "127.0.0.1 {{ platform_api_name }}"
+
+- name: Flush host preparation handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Start Tailscale
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Inspect transport enrollment
+  ansible.builtin.command:
+    argv: [/usr/local/bin/tailscale, status, --json]
+  register: platform_tailscale_status
+  changed_when: false
+  failed_when: platform_tailscale_status.rc not in [0, 1]
+  when: not ansible_check_mode
+  no_log: true
+
+- name: Enroll transport with runtime credential
+  ansible.builtin.command:
+    argv: [/usr/local/bin/tailscale, up, "--auth-key=file:{{ platform_tailscale_auth_key_file }}", --accept-routes=true, --ssh=false]
+  when:
+    - not ansible_check_mode
+    - (platform_tailscale_status.stdout | from_json).BackendState != 'Running'
+    - platform_tailscale_auth_key_file | length > 0
+  no_log: true
+
+- name: Configure transport routes
+  ansible.builtin.command:
+    argv: [/usr/local/bin/tailscale, set, --accept-routes=true, --ssh=false, "--advertise-routes={{ platform_advertise_routes | join(',') }}"]
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Run host preflight
+  ansible.builtin.command: /usr/local/bin/platform-preflight
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Start platform services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [chrony, platform-api-proxy, platform-firewall, prometheus-node-exporter, k3s]
+  when: not ansible_check_mode
+
+- name: Enable off-host etcd backup schedule
+  ansible.builtin.systemd_service:
+    name: platform-etcd-backup.timer
+    enabled: true
+    state: started
+  when: not ansible_check_mode and platform_role == 'server' and platform_backup_environment_file | length > 0

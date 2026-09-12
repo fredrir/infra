@@ -1,0 +1,16 @@
+global
+  maxconn 256
+defaults
+  mode tcp
+  timeout connect 5s
+  timeout client 1h
+  timeout server 1h
+frontend api
+  bind 127.0.0.1:7443
+  default_backend control_planes
+backend control_planes
+  balance roundrobin
+  option tcp-check
+{% for address in platform_api_backends %}
+  server control-{{ loop.index }} {{ address }}:6443 check inter 2s fall 3 rise 2
+{% endfor %}

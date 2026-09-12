@@ -1,0 +1,18 @@
+{
+  "postgres": {
+    "image": "docker.io/library/postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0",
+    "version": "17.11-bookworm",
+    "architectures": [
+      "amd64",
+      "arm64"
+    ]
+  },
+  "valkey": {
+    "image": "docker.io/valkey/valkey@sha256:d2e18f3410b6f616de1417f570fa55261af2898b9c5b2cfb6781ce2373ea43d1",
+    "version": "8.1.10-alpine",
+    "architectures": [
+      "amd64",
+      "arm64"
+    ]
+  }
+}

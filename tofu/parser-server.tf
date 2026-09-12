@@ -1,7 +1,7 @@
 module "parser" {
   source = "./modules/hetzner"
 
-  name          = "llunde-parser"
+  name          = "fredrir-04"
   server_type   = "ccx23"
   location      = "hel1"
   image         = "ubuntu-24.04"

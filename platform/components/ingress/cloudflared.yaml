@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared
+  namespace: ingress-system
+data:
+  config.yaml: |
+    tunnel: ${TUNNEL_ID}
+    credentials-file: /credentials/credentials.json
+    metrics: 0.0.0.0:2000
+    no-autoupdate: true
+    ingress:
+      - hostname: "*.fredrir.com"
+        service: http://traefik.ingress-system.svc.cluster.local:80
+      - hostname: hansteen.dev
+        service: http://traefik.ingress-system.svc.cluster.local:80
+      - hostname: "*.llunde.no"
+        service: http://traefik.ingress-system.svc.cluster.local:80
+      - hostname: llunde.no
+        service: http://traefik.ingress-system.svc.cluster.local:80
+      - hostname: fredrir.com
+        service: http://traefik.ingress-system.svc.cluster.local:80
+      - service: http_status:404
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: ingress-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        node-restriction.kubernetes.io/critical: 'true'
+      priorityClassName: production
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: cloudflared
+        image: docker.io/cloudflare/cloudflared:2026.9.1@sha256:b269e8abd07a5bf6f3f4be65d5050b2174eca89c56a0241a8ff32a16aec454e4
+        args:
+        - tunnel
+        - --config
+        - /etc/cloudflared/config.yaml
+        - run
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
+        ports:
+        - name: metrics
+          containerPort: 2000
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: metrics
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: metrics
+          initialDelaySeconds: 30
+        volumeMounts:
+        - name: config
+          mountPath: /etc/cloudflared
+          readOnly: true
+        - name: credentials
+          mountPath: /credentials
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: cloudflared
+      - name: credentials
+        secret:
+          secretName: cloudflared-credentials
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: cloudflared

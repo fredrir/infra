@@ -1,0 +1,508 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "workloads"
+  ],
+  "properties": {
+    "project": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,29}$"
+    },
+    "workloads": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 8,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,19}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "web",
+              "worker",
+              "cron"
+            ]
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 65535
+          },
+          "healthPath": {
+            "type": "string",
+            "pattern": "^/[^\\s]*$",
+            "maxLength": 256
+          },
+          "domains": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9.-]+$",
+              "maxLength": 253
+            }
+          },
+          "replicas": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "maxItems": 64
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "maxItems": 64
+          },
+          "env": {
+            "type": "object",
+            "maxProperties": 64,
+            "propertyNames": {
+              "pattern": "^[A-Z_][A-Z0-9_]*$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "secretKeys": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 64,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z_][A-Z0-9_]*$"
+            }
+          },
+          "egress": {
+            "enum": [
+              "none",
+              "internet"
+            ]
+          },
+          "schedule": {
+            "type": "string",
+            "minLength": 9,
+            "maxLength": 100,
+            "pattern": "^[0-9*,/ -]+$"
+          },
+          "volume": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mountPath",
+              "size"
+            ],
+            "properties": {
+              "mountPath": {
+                "type": "string",
+                "pattern": "^/(data|app/data)(/[a-zA-Z0-9_-]+)*$"
+              },
+              "size": {
+                "enum": [
+                  "10Gi",
+                  "40Gi",
+                  "100Gi"
+                ]
+              }
+            }
+          },
+          "architectures": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "amd64",
+                "arm64"
+              ]
+            }
+          },
+          "resources": {
+            "enum": [
+              {
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128Mi",
+                  "ephemeral-storage": "256Mi"
+                },
+                "limits": {
+                  "cpu": "500m",
+                  "memory": "512Mi",
+                  "ephemeral-storage": "1Gi"
+                }
+              },
+              {
+                "requests": {
+                  "cpu": "500m",
+                  "memory": "512Mi",
+                  "ephemeral-storage": "1Gi"
+                },
+                "limits": {
+                  "cpu": "2",
+                  "memory": "2Gi",
+                  "ephemeral-storage": "4Gi"
+                }
+              },
+              {
+                "requests": {
+                  "cpu": "1",
+                  "memory": "2Gi",
+                  "ephemeral-storage": "2Gi"
+                },
+                "limits": {
+                  "cpu": "4",
+                  "memory": "4Gi",
+                  "ephemeral-storage": "8Gi"
+                }
+              },
+              {
+                "requests": {
+                  "cpu": "2",
+                  "memory": "4Gi",
+                  "ephemeral-storage": "2Gi"
+                },
+                "limits": {
+                  "cpu": "4",
+                  "memory": "8Gi",
+                  "ephemeral-storage": "8Gi"
+                }
+              }
+            ]
+          },
+          "image": {
+            "type": "string",
+            "pattern": "^ghcr\\.io/fredrir/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$"
+          },
+          "sourceRevision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "sharedVolume": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "mountPath"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,19}$"
+              },
+              "mountPath": {
+                "type": "string",
+                "pattern": "^(/(data|app/data)(/[a-zA-Z0-9_-]+)*|/app/\\.local/files)$"
+              }
+            }
+          },
+          "readinessPath": {
+            "type": "string",
+            "pattern": "^/[^\\s]*$",
+            "maxLength": 256
+          },
+          "terminationGracePeriodSeconds": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 120
+          }
+        },
+        "required": [
+          "kind",
+          "architectures",
+          "resources",
+          "replicas",
+          "image",
+          "sourceRevision"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "web"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "port",
+                "healthPath"
+              ]
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "domains"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "port"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "healthPath"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "readinessPath"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "cron"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "schedule"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "schedule"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "volume"
+              ]
+            },
+            "then": {
+              "properties": {
+                "replicas": {
+                  "const": 1
+                },
+                "kind": {
+                  "enum": [
+                    "web",
+                    "worker"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "sharedVolume"
+              ]
+            },
+            "then": {
+              "properties": {
+                "replicas": {
+                  "const": 1
+                },
+                "kind": {
+                  "enum": [
+                    "web",
+                    "worker"
+                  ]
+                }
+              },
+              "not": {
+                "required": [
+                  "volume"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "sharedVolumes": {
+      "type": "object",
+      "maxProperties": 4,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,19}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "size"
+        ],
+        "properties": {
+          "size": {
+            "enum": [
+              "10Gi",
+              "40Gi",
+              "100Gi"
+            ]
+          }
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "image",
+        "sourceRevision",
+        "resources",
+        "architectures",
+        "command",
+        "compatibility",
+        "retrySafe",
+        "serviceAccountName"
+      ],
+      "properties": {
+        "image": {
+          "type": "string",
+          "pattern": "^ghcr\\.io/fredrir/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$"
+        },
+        "sourceRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "resources": {
+          "enum": [
+            {
+              "requests": {
+                "cpu": "100m",
+                "memory": "128Mi",
+                "ephemeral-storage": "256Mi"
+              },
+              "limits": {
+                "cpu": "500m",
+                "memory": "512Mi",
+                "ephemeral-storage": "1Gi"
+              }
+            },
+            {
+              "requests": {
+                "cpu": "500m",
+                "memory": "512Mi",
+                "ephemeral-storage": "1Gi"
+              },
+              "limits": {
+                "cpu": "2",
+                "memory": "2Gi",
+                "ephemeral-storage": "4Gi"
+              }
+            },
+            {
+              "requests": {
+                "cpu": "1",
+                "memory": "2Gi",
+                "ephemeral-storage": "2Gi"
+              },
+              "limits": {
+                "cpu": "4",
+                "memory": "4Gi",
+                "ephemeral-storage": "8Gi"
+              }
+            },
+            {
+              "requests": {
+                "cpu": "2",
+                "memory": "4Gi",
+                "ephemeral-storage": "2Gi"
+              },
+              "limits": {
+                "cpu": "4",
+                "memory": "8Gi",
+                "ephemeral-storage": "8Gi"
+              }
+            }
+          ]
+        },
+        "architectures": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "amd64",
+              "arm64"
+            ]
+          }
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "maxItems": 64,
+          "minItems": 1
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "maxItems": 64
+        },
+        "env": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "secretKeys": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          }
+        },
+        "kind": {
+          "const": "cron"
+        },
+        "compatibility": {
+          "const": "backward-compatible"
+        },
+        "retrySafe": {
+          "const": true
+        },
+        "serviceAccountName": {
+          "const": "project-migration"
+        }
+      }
+    }
+  }
+}

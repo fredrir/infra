@@ -8,11 +8,24 @@ doppler run --project pyparser --config prd -- tofu -chdir=tofu apply
 
 ### Restore from backup
 
+| Backend restore | Value |
+| --- | --- |
+| Service user | `llunde-backend` |
+| Runtime directory | `/run/user/2001` |
+| Container | `llunde-postgres` |
+| Archive | `var/backup/llunde-backend/llunde.dump` |
+| Destination | New `llunde_restore` database |
+| Cutover | After schema, data, and application verification |
+
 ```sh
-export RESTIC_REPOSITORY="s3:s3.eu-north-1.amazonaws.com/llunde-pyparser-bucket/<RESTIC_PREFIX>"   
-restic snapshots   
-restic restore latest --target /tmp/restore
-ssh root@<TAILNET_IP> "podman exec -i -u postgres llunde-postgres psql -U llunde llunde" < /tmp/restore/<DUMP_PATH> 
+export RESTIC_REPOSITORY="s3:s3.eu-north-1.amazonaws.com/llunde-pyparser-bucket/<RESTIC_PREFIX>"
+restic snapshots
+restic restore <SNAPSHOT_ID> --target /tmp/restore
+ssh root@<TAILNET_IP> \
+  'cd / && runuser -u llunde-backend -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus /run/current-system/sw/bin/podman exec llunde-postgres createdb -U llunde llunde_restore'
+ssh root@<TAILNET_IP> \
+  'cd / && runuser -u llunde-backend -- env XDG_RUNTIME_DIR=/run/user/2001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/2001/bus /run/current-system/sw/bin/podman exec -i llunde-postgres pg_restore --exit-on-error -U llunde -d llunde_restore' \
+  < /tmp/restore/var/backup/llunde-backend/llunde.dump
 ```
 
 

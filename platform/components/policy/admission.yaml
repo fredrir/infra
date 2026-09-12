@@ -1,0 +1,290 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: workload-isolation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - pods
+    namespaceSelector:
+      matchExpressions:
+      - key: infra.fredrir.com/tier
+        operator: In
+        values:
+        - project
+        - ci
+  validations:
+  - expression: '!has(object.spec.hostNetwork) || !object.spec.hostNetwork'
+    message: Host networking is forbidden
+  - expression: '!has(object.spec.hostPID) || !object.spec.hostPID'
+    message: Host PID namespace is forbidden
+  - expression: '!has(object.spec.hostIPC) || !object.spec.hostIPC'
+    message: Host IPC namespace is forbidden
+  - expression: '!has(object.spec.nodeName) || (request.operation == "UPDATE" && has(oldObject.spec.nodeName) &&
+      object.spec.nodeName == oldObject.spec.nodeName)'
+    message: Direct node assignment is forbidden
+  - expression: '!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.hostPath))'
+    message: Host paths are forbidden
+  - expression: '(object.spec.containers + (has(object.spec.initContainers) ? object.spec.initContainers : []) +
+      (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers : [])).all(c, has(c.securityContext)
+      && (!has(c.securityContext.privileged) || !c.securityContext.privileged) && has(c.securityContext.allowPrivilegeEscalation)
+      && !c.securityContext.allowPrivilegeEscalation)'
+    message: Privilege escalation is forbidden
+  - expression: '!has(object.spec.tolerations) || object.spec.tolerations.all(t, has(t.key) && t.key != "node-role.kubernetes.io/control-plane")'
+    message: Control-plane tolerations are forbidden
+  - expression: '(object.spec.containers + (has(object.spec.initContainers) ? object.spec.initContainers : []) +
+      (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers : [])).all(c, has(c.resources) &&
+      has(c.resources.requests) && has(c.resources.limits) && "cpu" in c.resources.requests && "memory" in c.resources.requests
+      && "cpu" in c.resources.limits && "memory" in c.resources.limits)'
+    message: CPU and memory requests and limits are required
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: workload-isolation
+spec:
+  policyName: workload-isolation
+  validationActions:
+  - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: ci-sandbox
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - pods
+    namespaceSelector:
+      matchExpressions:
+      - key: infra.fredrir.com/tier
+        operator: In
+        values:
+        - ci
+  validations:
+  - expression: has(object.spec.runtimeClassName) && object.spec.runtimeClassName == "gvisor"
+    message: CI requires gvisor
+  - expression: has(object.spec.nodeSelector) && "node-restriction.kubernetes.io/ci" in object.spec.nodeSelector
+      && object.spec.nodeSelector["node-restriction.kubernetes.io/ci"] == "true"
+    message: CI requires a verified worker
+  - expression: has(object.spec.priorityClassName) && object.spec.priorityClassName == "ci"
+    message: CI requires bounded low priority
+  - expression: '!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.secret) && (!has(v.projected)
+      || v.projected.sources.all(s, !has(s.secret))))'
+    message: CI may not mount Secret volumes
+  - expression: '(object.spec.containers + (has(object.spec.initContainers) ? object.spec.initContainers : []) +
+      (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers : [])).all(c, !has(c.envFrom) && (!has(c.env)
+      || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) || (request.userInfo.username ==
+      "system:serviceaccount:arc-system:arc-controller" && c.name == "runner" && e.name == "ACTIONS_RUNNER_INPUT_JITCONFIG"
+      && e.valueFrom.secretKeyRef.name == object.metadata.name && e.valueFrom.secretKeyRef.key == "jitToken"))))'
+    message: Only the ARC controller may attach a runner's own registration token
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: ci-sandbox
+spec:
+  policyName: ci-sandbox
+  validationActions:
+  - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: project-secret-boundary
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - external-secrets.io
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - externalsecrets
+    namespaceSelector:
+      matchExpressions:
+      - key: infra.fredrir.com/tier
+        operator: In
+        values:
+        - project
+  validations:
+  - expression: object.spec.secretStoreRef.kind == "SecretStore" && object.spec.secretStoreRef.name == "runtime"
+    message: Only the project runtime store is permitted
+  - expression: '!has(object.spec.dataFrom)'
+    message: Bulk secret imports are forbidden
+  - expression: object.spec.target.name == "project-runtime" || (object.spec.target.name == "project-registry" &&
+      request.userInfo.username in ["system:serviceaccount:flux-system:platform-reconciler", "system:serviceaccount:flux-system:kustomize-controller"]
+      && has(object.spec.data) && object.spec.data.size() == 1 && object.spec.data[0].secretKey == ".dockerconfigjson"
+      && object.spec.data[0].remoteRef.key == "GHCR_DOCKER_CONFIG_JSON")
+    message: Runtime credentials and platform-owned registry credentials are the only allowed targets
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: project-secret-boundary
+spec:
+  policyName: project-secret-boundary
+  validationActions:
+  - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: ci-job-credentials
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - pods
+    namespaceSelector:
+      matchExpressions:
+      - key: infra.fredrir.com/tier
+        operator: In
+        values:
+        - ci
+  validations:
+  - expression: has(object.spec.automountServiceAccountToken) && !object.spec.automountServiceAccountToken
+    message: Job pods must disable API credentials
+  - expression: has(object.spec.serviceAccountName) && object.spec.serviceAccountName == "ci-job"
+    message: Job pods must use the unprivileged service account
+  - expression: '!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.projected) || v.projected.sources.all(s,
+      !has(s.serviceAccountToken)))'
+    message: Job pods may not project API tokens
+  - expression: '(object.spec.containers + (has(object.spec.initContainers) ? object.spec.initContainers : []) +
+      (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers : [])).all(c, c.image == "${CI_IMAGE}")'
+    message: Only the approved pipeline image may execute jobs
+  matchConditions:
+  - name: hook-created-pods
+    expression: request.userInfo.username != "system:serviceaccount:arc-system:arc-controller"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: ci-job-credentials
+spec:
+  policyName: ci-job-credentials
+  validationActions:
+  - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: project-network-boundary
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - networking.k8s.io
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - networkpolicies
+    namespaceSelector:
+      matchExpressions:
+      - key: infra.fredrir.com/tier
+        operator: In
+        values:
+        - project
+  validations:
+  - expression: '!has(object.spec.egress) || object.spec.egress.all(r, has(r.to) && r.to.all(p, (has(p.podSelector)
+      && !has(p.namespaceSelector) && !has(p.ipBlock)) || (has(p.ipBlock) && p.ipBlock.cidr == "0.0.0.0/0" && has(p.ipBlock.except)
+      && ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "127.0.0.0/8"].all(cidr,
+      cidr in p.ipBlock.except) && has(r.ports) && r.ports.all(port, has(port.port) && port.port == 443 && (!has(port.protocol)
+      || port.protocol == "TCP"))) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
+      in p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+      == "kube-system" && has(p.podSelector) && has(p.podSelector.matchLabels) && "k8s-app" in p.podSelector.matchLabels
+      && p.podSelector.matchLabels["k8s-app"] == "kube-dns" && has(r.ports) && r.ports.all(port, has(port.port)
+      && port.port == 53)) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
+      in p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+      == "observability" && has(p.podSelector) && has(p.podSelector.matchLabels) && "app.kubernetes.io/name" in
+      p.podSelector.matchLabels && p.podSelector.matchLabels["app.kubernetes.io/name"] == "alloy" && has(r.ports)
+      && r.ports.all(port, has(port.port) && port.port in [4317,4318] && (!has(port.protocol) || port.protocol ==
+      "TCP")))))'
+    message: Project egress may reach its own pods, DNS, Alloy or public HTTPS only
+  - expression: '!has(object.spec.ingress) || object.spec.ingress.all(r, has(r.from) && r.from.all(p, (has(p.podSelector)
+      && !has(p.namespaceSelector) && !has(p.ipBlock)) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels)
+      && "kubernetes.io/metadata.name" in p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions)
+      && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"] in ["ingress-system","observability"])))'
+    message: Project ingress must select project pods, ingress or monitoring
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: project-network-boundary
+spec:
+  policyName: project-network-boundary
+  validationActions:
+  - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: project-baseline-owner
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - networking.k8s.io
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      - DELETE
+      resources:
+      - networkpolicies
+    namespaceSelector:
+      matchExpressions:
+      - key: infra.fredrir.com/tier
+        operator: In
+        values:
+        - project
+  validations:
+  - expression: 'request.userInfo.username in ["system:serviceaccount:flux-system:platform-reconciler", "system:serviceaccount:flux-system:kustomize-controller"]
+      || (request.operation == "DELETE" ? !(oldObject.metadata.name in ["default-deny","dns"]) : !(object.metadata.name
+      in ["default-deny","dns"]))'
+    message: Namespace baseline policies belong to the platform
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: project-baseline-owner
+spec:
+  policyName: project-baseline-owner
+  validationActions:
+  - Deny
