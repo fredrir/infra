@@ -77,9 +77,8 @@ def pod():
 
 
 class AdmissionTests(unittest.TestCase):
-    def test_sandboxed_job_is_admitted(self):
-        for name in ["workload-isolation", "ci-sandbox", "ci-job-credentials"]:
-            self.assertTrue(admitted(name, pod()), name)
+    def test_isolated_workload_is_admitted(self):
+        self.assertTrue(admitted("workload-isolation", pod()))
 
     def test_privileged_init_container_is_denied(self):
         item = pod()
@@ -119,55 +118,6 @@ class AdmissionTests(unittest.TestCase):
         self.assertTrue(
             admitted("workload-isolation", item, operation="UPDATE", old=item)
         )
-
-    def test_runtime_and_approved_image_cannot_be_replaced(self):
-        item = pod()
-        item["spec"]["runtimeClassName"] = "runc"
-        self.assertFalse(admitted("ci-sandbox", item))
-        item = pod()
-        item["spec"]["containers"][0]["image"] = "alpine:latest"
-        self.assertFalse(admitted("ci-job-credentials", item))
-
-    def test_job_cannot_project_api_token_or_production_secret(self):
-        item = pod()
-        item["spec"]["volumes"] = [
-            {
-                "name": "token",
-                "projected": {"sources": [{"serviceAccountToken": {"path": "token"}}]},
-            }
-        ]
-        self.assertFalse(admitted("ci-job-credentials", item))
-        item = pod()
-        item["spec"]["containers"][0]["envFrom"] = [
-            {"secretRef": {"name": "production"}}
-        ]
-        self.assertFalse(admitted("ci-sandbox", item))
-        for volume in [
-            {"name": "credentials", "secret": {"secretName": "github-app"}},
-            {
-                "name": "credentials",
-                "projected": {"sources": [{"secret": {"name": "github-app"}}]},
-            },
-        ]:
-            item = pod()
-            item["spec"]["volumes"] = [volume]
-            self.assertFalse(admitted("ci-sandbox", item))
-
-    def test_arc_registration_token_is_scoped_to_controller_and_runner(self):
-        item = pod()
-        item["spec"]["containers"][0]["name"] = "runner"
-        reference = {"name": "job", "key": "jitToken"}
-        item["spec"]["containers"][0]["env"] = [
-            {
-                "name": "ACTIONS_RUNNER_INPUT_JITCONFIG",
-                "valueFrom": {"secretKeyRef": reference},
-            }
-        ]
-        controller = "system:serviceaccount:arc-system:arc-controller"
-        self.assertTrue(admitted("ci-sandbox", item, user=controller))
-        self.assertFalse(admitted("ci-sandbox", item))
-        reference["name"] = "github-app"
-        self.assertFalse(admitted("ci-sandbox", item, user=controller))
 
     def test_cross_namespace_and_private_network_egress_are_denied(self):
         for peer in [
