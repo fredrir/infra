@@ -6,8 +6,7 @@
   tasks:
     - name: Bootstrap tagged Tailscale transport
       ansible.builtin.include_role:
-        name: platform
-        tasks_from: tailscale-bootstrap.yml
+        name: tailscale
       vars:
         platform_tailscale_restart_handler: Restart bootstrap Tailscale
         platform_node_name: "{{ inventory_hostname }}"

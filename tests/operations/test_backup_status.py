@@ -46,7 +46,7 @@ class StatusTests(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            config = ROOT / "ansible/roles/evacuation_backup/templates/receiver.sshd.j2"
+            config = ROOT / "ansible/roles/watchdog/templates/backup-status.sshd.j2"
 
             def effective(user):
                 result = subprocess.run(

@@ -1,9 +1,0 @@
-[Unit]
-Description=Standalone application recovery schedule
-[Timer]
-OnBootSec=5m
-OnUnitActiveSec=1h
-RandomizedDelaySec=30s
-Unit=restic-backups-llunde-backend.service
-[Install]
-WantedBy=timers.target

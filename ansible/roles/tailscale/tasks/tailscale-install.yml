@@ -21,4 +21,4 @@
     mode: "0755"
   loop: [tailscale, tailscaled]
   when: not ansible_check_mode
-  notify: "{{ platform_tailscale_restart_handler | default('Restart platform Tailscale') }}"
+  notify: "{{ platform_tailscale_restart_handler | default('Restart bootstrap Tailscale') }}"

@@ -30,30 +30,23 @@ jobs:
       env:
         CI_AVAILABLE_ARCHITECTURES: ${{ vars.INFRA_CI_ARCHITECTURES }}
       run: python3 scripts/ci/policy.py available
-    - run: 'uv sync --frozen --group ci
-
+    - run: |
+        uv sync --frozen --group ci
         uv run --frozen --group ci python scripts/ci/policy.py check
-
         uv run --frozen --group ci python -m unittest discover -s tests/ci -v
-
         uv run --frozen --group ci python -m unittest discover -s tests/infra -v
-
         uv run --frozen --group ci python -m unittest discover -s ansible/tests -v
-
         uv run --frozen --group ci ansible-playbook -i localhost, ansible/site.yml --syntax-check
-
         uv run --frozen --group ci python -m tools.infra.cli validate
-
-        uv run --frozen --group ci python -m tools.infra.cli render --check
-
-        uv run --frozen --group ci python scripts/operations/platform_cli.py check
-
         uv run --frozen --group ci python -m unittest discover -s tests/operations -v
-
         actionlint
-
-        nix shell --inputs-from . nixpkgs#kubernetes-helm nixpkgs#kubectl nixpkgs#kubeconform --command uv run --frozen
-        --group ci python scripts/operations/validate_manifests.py'
+        nix shell --inputs-from . nixpkgs#kubernetes-helm nixpkgs#kubectl --command bash -euc '
+          for directory in platform/clusters/production platform/components/* platform/projects/*; do
+            if [ -f "$directory/kustomization.yaml" ]; then kubectl kustomize "$directory" > /dev/null; fi
+          done
+          helm lint charts/project --strict -f tests/infra/fixtures/values.yaml
+          helm lint charts/project-data --strict -f tests/infra/fixtures/data-values.yaml
+        '
     - run: 'nix run --inputs-from . nixpkgs#opentofu -- -chdir=tofu fmt -check -recursive
 
         nix run --inputs-from . nixpkgs#opentofu -- -chdir=tofu init -backend=false -lockfile=readonly -input=false

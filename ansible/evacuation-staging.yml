@@ -1,7 +1,0 @@
-- name: Prepare dormant standalone evacuation target
-  hosts: evacuation_staging
-  become: true
-  serial: 1
-  gather_facts: true
-  roles:
-    - evacuation_staging

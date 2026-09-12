@@ -11,7 +11,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-ROLE = ROOT / "ansible/roles/platform"
+ROLE = ROOT / "ansible/roles/tailscale"
 ANSIBLE = shutil.which("ansible-playbook") or str(ROOT / ".venv/bin/ansible-playbook")
 
 
@@ -80,6 +80,7 @@ class TailscaleBootstrapTests(unittest.TestCase):
         }
         return subprocess.run(
             [ANSIBLE, "-i", "localhost,", "--connection", "local", str(playbook)],
+            check=False,
             capture_output=True,
             text=True,
             env=environment,
@@ -324,6 +325,7 @@ else:
                 str(ROOT / "ansible/tailscale-bootstrap.yml"),
                 "--syntax-check",
             ],
+            check=False,
             capture_output=True,
             text=True,
             env=environment,
