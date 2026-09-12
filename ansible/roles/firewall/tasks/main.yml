@@ -34,9 +34,11 @@
     mode: "0644"
     content: |
       [Unit]
+      DefaultDependencies=no
       After=local-fs.target
-      Before=network-pre.target k3s.service k3s-agent.service
+      Before=network-pre.target k3s.service k3s-agent.service shutdown.target
       Wants=network-pre.target
+      Conflicts=shutdown.target
 
       [Service]
       Type=oneshot
