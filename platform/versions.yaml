@@ -26,6 +26,14 @@ charts:
     version: 0.14.2
     repository: oci://ghcr.io/actions/actions-runner-controller-charts
     ociDigest: sha256:579e3a1bdf4032b3c3de3e9b0880a4a6d3c1989a67c06010f680c1cc49524d11
+  loki:
+    version: 18.13.0
+    repository: https://grafana-community.github.io/helm-charts
+    sha256: 951fcc41fdc9597ed2bf326b3c9273a2073994871debe81f576e3eb23caa405b
+  tempo:
+    version: 3.0.0
+    repository: https://grafana-community.github.io/helm-charts
+    sha256: 4118a1ddc4c2a5e666e8f4d9a9648d5a067bccf901ce5ddb39bcbbb9c1670721
 images:
   loki: docker.io/grafana/loki:3.7.7@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
   tempo: docker.io/grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5

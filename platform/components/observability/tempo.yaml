@@ -1,152 +1,91 @@
-apiVersion: v1
-kind: Service
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
 metadata:
   name: tempo
   namespace: observability
 spec:
-  selector:
-    app: tempo
-  ports:
-  - name: http
-    port: 3200
-    targetPort: 3200
-  - name: otlp-grpc
-    port: 4317
-    targetPort: 4317
-  - name: otlp-http
-    port: 4318
-    targetPort: 4318
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: tempo
-  namespace: observability
-data:
-  config.yaml: |
-    server:
-      http_listen_port: 3200
-    distributor:
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: tempo
+      version: 3.0.0
+      sourceRef:
+        kind: HelmRepository
+        name: grafana-community
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    tempo:
+      tag: 3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: '2'
+          memory: 2Gi
+      reportingEnabled: false
+      retention: 168h
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       receivers:
+        jaeger:
+          protocols:
+            grpc:
+              endpoint: ''
+            thrift_http:
+              endpoint: ''
+            thrift_compact:
+              endpoint: ''
+            thrift_binary:
+              endpoint: ''
         otlp:
           protocols:
             grpc:
               endpoint: 0.0.0.0:4317
             http:
               endpoint: 0.0.0.0:4318
-    storage:
-      trace:
-        backend: s3
-        wal:
-          path: /data/wal
-        s3:
-          endpoint: ${S3_ENDPOINT}
-          region: ${S3_REGION}
-          bucket: ${TEMPO_BUCKET}
-          access_key: $${S3_ACCESS_KEY_ID}
-          secret_key: $${S3_SECRET_ACCESS_KEY}
-          forcepathstyle: true
-          insecure: false
-    usage_report:
-      reporting_enabled: false
-    overrides:
-      defaults:
-        compaction:
-          block_retention: 168h
-        ingestion:
-          rate_limit_bytes: 5000000
-          burst_size_bytes: 10000000
-        global:
-          max_bytes_per_trace: 5000000
-    query_frontend:
-      mcp_server:
-        enabled: false
-    memory:
-      automemlimit_enabled: true
-      automemlimit_ratio: 0.8
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: tempo
-  namespace: observability
-spec:
-  serviceName: tempo
-  replicas: 1
-  selector:
-    matchLabels:
-      app: tempo
-  template:
-    metadata:
-      labels:
-        app: tempo
-    spec:
+      overrides:
+        defaults:
+          ingestion:
+            rate_limit_bytes: 5000000
+            burst_size_bytes: 10000000
+          global:
+            max_bytes_per_trace: 5000000
+    persistence:
+      enabled: true
+      storageClassName: local-retain
+      size: 20Gi
+    nodeSelector:
+      node-restriction.kubernetes.io/stateful: 'true'
+      kubernetes.io/hostname: fredrir-09
+    priorityClassName: production
+    serviceAccount:
       automountServiceAccountToken: false
-      nodeSelector:
-        node-restriction.kubernetes.io/stateful: 'true'
-      priorityClassName: production
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001
-        runAsGroup: 10001
-        fsGroup: 10001
-        seccompProfile:
-          type: RuntimeDefault
-      containers:
-      - name: tempo
-        image: docker.io/grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
-        args:
-        - -config.file=/etc/tempo/config.yaml
-        - -config.expand-env=true
-        - -target=all
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
-        resources:
-          requests:
-            cpu: 200m
-            memory: 512Mi
-          limits:
-            cpu: '2'
-            memory: 2Gi
-        ports:
-        - name: http
-          containerPort: 3200
-        - name: otlp-grpc
-          containerPort: 4317
-        - name: otlp-http
-          containerPort: 4318
-        envFrom:
-        - secretRef:
-            name: tempo-storage
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 3200
-          initialDelaySeconds: 20
-        volumeMounts:
-        - name: data
-          mountPath: /data
-        - name: config
-          mountPath: /etc/tempo
-          readOnly: true
-      volumes:
-      - name: config
-        configMap:
-          name: tempo
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      storageClassName: ${STORAGE_CLASS}
-      resources:
-        requests:
-          storage: 10Gi
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      fsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: monitoring
+  releaseName: tempo
+  dependsOn:
+  - name: monitoring

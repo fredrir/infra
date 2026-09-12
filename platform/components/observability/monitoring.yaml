@@ -139,21 +139,12 @@ spec:
               resources:
                 requests:
                   storage: 25Gi
-        additionalScrapeConfigs:
-        - job_name: node
-          kubernetes_sd_configs:
-          - role: node
-          relabel_configs:
-          - source_labels:
-            - __meta_kubernetes_node_address_InternalIP
-            target_label: __address__
-            replacement: $${1}:9100
-          - source_labels:
-            - __meta_kubernetes_node_name
-            target_label: instance
         ruleSelectorNilUsesHelmValues: false
         ruleSelector: {}
         ruleNamespaceSelector: {}
+        serviceMonitorSelectorNilUsesHelmValues: false
+        serviceMonitorSelector: {}
+        serviceMonitorNamespaceSelector: {}
     alertmanager:
       alertmanagerSpec:
         nodeSelector:
@@ -165,24 +156,17 @@ spec:
           limits:
             cpu: '1'
             memory: 512Mi
-        secrets:
-        - alert-delivery
-      config:
-        global:
-          resolve_timeout: 5m
-        route:
-          receiver: operations
-          group_by:
-          - alertname
-          - namespace
-          group_wait: 30s
-          group_interval: 5m
-          repeat_interval: 4h
-        receivers:
-        - name: operations
-          webhook_configs:
-          - url_file: /etc/alertmanager/secrets/alert-delivery/url
-            send_resolved: true
+        storage:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: local-retain
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+        useExistingSecret: true
+        configSecret: alertmanager-config
     prometheusOperator:
       resources:
         requests:
@@ -200,6 +184,9 @@ spec:
             limits:
               cpu: '1'
               memory: 512Mi
+        enabled: false
+      tls:
+        enabled: false
     kube-state-metrics:
       resources:
         requests:
@@ -236,4 +223,34 @@ spec:
             annotations:
               summary: Alloy collector unreachable
     nodeExporter:
-      enabled: false
+      enabled: true
+    prometheus-node-exporter:
+      namespaceOverride: node-exporter
+      hostNetwork: false
+      hostPID: false
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      prometheus:
+        monitor:
+          relabelings:
+          - sourceLabels:
+            - __meta_kubernetes_pod_node_name
+            targetLabel: node
+          - sourceLabels:
+            - __meta_kubernetes_pod_node_name
+            targetLabel: instance
+  releaseName: monitoring

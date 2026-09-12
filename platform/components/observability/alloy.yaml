@@ -57,11 +57,26 @@ spec:
         port: 4318
         targetPort: 4318
         protocol: TCP
+      mounts:
+        extra:
+        - name: alloy-state
+          mountPath: /tmp/alloy
     controller:
       type: daemonset
       priorityClassName: production
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      volumes:
+        extra:
+        - name: alloy-state
+          emptyDir:
+            sizeLimit: 512Mi
     serviceMonitor:
       enabled: true
+      additionalLabels:
+        release: monitoring
     image:
       registry: docker.io
       repository: grafana/alloy
@@ -85,3 +100,6 @@ spec:
           memory: 128Mi
     crds:
       create: false
+  dependsOn:
+  - name: monitoring
+  releaseName: alloy

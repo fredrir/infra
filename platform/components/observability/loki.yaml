@@ -1,149 +1,100 @@
-apiVersion: v1
-kind: Service
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
 metadata:
   name: loki
   namespace: observability
 spec:
-  selector:
-    app: loki
-  ports:
-  - name: http
-    port: 3100
-    targetPort: 3100
-  clusterIP: ${LOKI_CLUSTER_IP}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: loki
-  namespace: observability
-data:
-  config.yaml: |
-    auth_enabled: false
-    server:
-      http_listen_port: 3100
-    common:
-      instance_addr: 127.0.0.1
-      path_prefix: /data
-      replication_factor: 1
-      ring:
-        kvstore:
-          store: inmemory
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: loki
+      version: 18.13.0
+      sourceRef:
+        kind: HelmRepository
+        name: grafana-community
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    deploymentMode: Monolithic
+    loki:
+      auth_enabled: false
+      image:
+        tag: 3.7.7
+        digest: sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
+      commonConfig:
+        replication_factor: 1
       storage:
-        s3:
-          endpoint: ${S3_ENDPOINT}
-          region: ${S3_REGION}
-          bucketnames: ${LOKI_BUCKET}
-          access_key_id: $${S3_ACCESS_KEY_ID}
-          secret_access_key: $${S3_SECRET_ACCESS_KEY}
-          s3forcepathstyle: true
-          insecure: false
-    schema_config:
-      configs:
-        - from: 2024-04-01
+        type: filesystem
+      schemaConfig:
+        configs:
+        - from: '2024-04-01'
           store: tsdb
-          object_store: s3
+          object_store: filesystem
           schema: v13
           index:
             prefix: loki_index_
             period: 24h
-    storage_config:
-      tsdb_shipper:
-        active_index_directory: /data/index
-        cache_location: /data/cache
-    compactor:
-      working_directory: /data/compactor
-      retention_enabled: true
-      delete_request_store: s3
-    limits_config:
-      retention_period: 168h
-      ingestion_rate_mb: 4
-      ingestion_burst_size_mb: 8
-      max_query_series: 1000
-      max_entries_limit_per_query: 5000
-      reject_old_samples: true
-      reject_old_samples_max_age: 168h
-    analytics:
-      reporting_enabled: false
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: loki
-  namespace: observability
-spec:
-  serviceName: loki
-  replicas: 1
-  selector:
-    matchLabels:
-      app: loki
-  template:
-    metadata:
-      labels:
-        app: loki
-    spec:
-      automountServiceAccountToken: false
-      nodeSelector:
-        node-restriction.kubernetes.io/stateful: 'true'
-      priorityClassName: production
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001
-        runAsGroup: 10001
-        fsGroup: 10001
-        seccompProfile:
-          type: RuntimeDefault
-      containers:
-      - name: loki
-        image: docker.io/grafana/loki:3.7.7@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
-        args:
-        - -config.file=/etc/loki/config.yaml
-        - -config.expand-env=true
-        - -target=all
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
-        resources:
-          requests:
-            cpu: 200m
-            memory: 512Mi
-          limits:
-            cpu: '2'
-            memory: 2Gi
-        ports:
-        - name: http
-          containerPort: 3100
-        envFrom:
-        - secretRef:
-            name: loki-storage
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 3100
-          initialDelaySeconds: 20
-        volumeMounts:
-        - name: data
-          mountPath: /data
-        - name: config
-          mountPath: /etc/loki
-          readOnly: true
-      volumes:
-      - name: config
-        configMap:
-          name: loki
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      storageClassName: ${STORAGE_CLASS}
+      compactor:
+        retention_enabled: true
+        delete_request_store: filesystem
+      limits_config:
+        retention_period: 168h
+        ingestion_rate_mb: 4
+        ingestion_burst_size_mb: 8
+        max_query_series: 1000
+        max_entries_limit_per_query: 5000
+      analytics:
+        reporting_enabled: false
+    singleBinary:
+      replicas: 1
       resources:
         requests:
-          storage: 10Gi
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: '2'
+          memory: 2Gi
+      nodeSelector:
+        node-restriction.kubernetes.io/stateful: 'true'
+        kubernetes.io/hostname: fredrir-09
+      priorityClassName: production
+      persistence:
+        enabled: true
+        storageClass: local-retain
+        size: 40Gi
+        enableStatefulSetAutoDeletePVC: false
+    read:
+      replicas: 0
+    write:
+      replicas: 0
+    backend:
+      replicas: 0
+    gateway:
+      enabled: false
+    lokiCanary:
+      enabled: false
+    test:
+      enabled: false
+    chunksCache:
+      enabled: false
+    resultsCache:
+      enabled: false
+    sidecar:
+      rules:
+        enabled: false
+    monitoring:
+      serviceMonitor:
+        enabled: true
+        labels:
+          release: monitoring
+      dashboards:
+        enabled: true
+  releaseName: loki
+  dependsOn:
+  - name: monitoring

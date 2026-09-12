@@ -7,8 +7,12 @@ resources:
 - loki.yaml
 - tempo.yaml
 - alloy.yaml
-- ingress.yaml
 - network.yaml
+- node-exporter.yaml
+- alertmanager.secret.sops.yaml
+- grafana.secret.sops.yaml
+- tunnel.yaml
+- tunnel.secret.sops.yaml
 configMapGenerator:
 - name: alloy-config
   namespace: observability

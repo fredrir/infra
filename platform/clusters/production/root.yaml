@@ -146,7 +146,6 @@ spec:
   path: ./platform/components/observability
   prune: true
   wait: true
-  suspend: true
   serviceAccountName: platform-reconciler
   postBuild:
     substituteFrom:
@@ -157,7 +156,8 @@ spec:
     secretRef:
       name: sops-age
   dependsOn:
-  - name: platform-secrets
+  - name: platform-policy
+  - name: platform-sources
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: node-exporter
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    infra.fredrir.com/tier: platform
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: node-metrics
+  namespace: node-exporter
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    ports:
+    - port: 9100
+      protocol: TCP
+  egress: []
