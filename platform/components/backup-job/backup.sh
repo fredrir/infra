@@ -107,3 +107,4 @@ trap 'kill -TERM "$child" 2>/dev/null || true; wait "$child" || true; exit 143' 
 wait "$child"
 trap - TERM INT
 restic --retry-lock 10m backup "$work/source" --host platform --tag "$BACKUP_PROJECT" --tag "$BACKUP_KIND" --json
+bash /hooks/heartbeat.sh "$BACKUP_PROJECT"

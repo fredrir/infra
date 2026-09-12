@@ -33,6 +33,7 @@ k3s kubectl get secrets --all-namespaces -o yaml > "$work/kubernetes-secrets.yam
 k3s --version > "$work/k3s-version.txt"
 (cd "$work" && sha256sum snapshots/* server-token agent-token k3s-config.yaml kubernetes-secrets.yaml k3s-version.txt > SHA256SUMS)
 restic --retry-lock 10m backup "$work" --host fredrir-07 --tag control --tag k3s --json
+/usr/local/libexec/platform-backup-heartbeat control
 printf 'platform_control_backup_last_success_timestamp_seconds %s\n' "$(date +%s)" > "$metrics/control_backup_success.prom.tmp"
 chmod 644 "$metrics/control_backup_success.prom.tmp"
 mv "$metrics/control_backup_success.prom.tmp" "$metrics/control_backup_success.prom"

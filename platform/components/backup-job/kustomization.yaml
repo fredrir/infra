@@ -6,6 +6,9 @@ configMapGenerator:
 - name: backup-hook
   files:
   - backup.sh
+  - heartbeat.sh
+resources:
+- heartbeat.yaml
 generatorOptions:
   annotations:
     kustomize.toolkit.fluxcd.io/substitute: disabled

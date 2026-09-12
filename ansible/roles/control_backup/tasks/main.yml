@@ -61,6 +61,15 @@
     group: root
     mode: "0755"
 
+- name: Install the backup heartbeat hook
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../platform/components/backup-job/heartbeat.sh"
+    dest: /usr/local/libexec/platform-backup-heartbeat
+    owner: root
+    group: root
+    mode: "0755"
+    validate: /bin/bash -n %s
+
 - name: Install the bounded recovery service
   ansible.builtin.copy:
     dest: /etc/systemd/system/platform-control-backup.service

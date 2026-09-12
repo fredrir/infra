@@ -220,23 +220,59 @@ spec:
         values:
         - project
   validations:
-  - expression: '!has(object.spec.egress) || object.spec.egress.all(r, has(r.to) && r.to.all(p, (has(p.podSelector)
-      && !has(p.namespaceSelector) && !has(p.ipBlock)) || (request.userInfo.username == "system:serviceaccount:flux-system:platform-reconciler" && object.metadata.name == "backup-control-egress" && has(object.spec.podSelector.matchLabels) && object.spec.podSelector.matchLabels == {"app.kubernetes.io/name": "data-backup"} && has(p.ipBlock) && !has(p.ipBlock.except) && has(r.ports) && r.ports.size() == 1 && r.ports.all(port, has(port.port) && !has(port.endPort) && (!has(port.protocol) || port.protocol == "TCP") && ((p.ipBlock.cidr == "10.43.0.1/32" && port.port == 443) || (p.ipBlock.cidr in ["10.60.0.5/32", "10.60.0.7/32", "10.60.0.8/32"] && port.port == 6443)))) || (request.userInfo.username == "system:serviceaccount:flux-system:platform-reconciler" && request.namespace == "llunde-pyparser" && object.metadata.name == "logs-redirect-egress" && has(object.spec.podSelector.matchLabels) && object.spec.podSelector.matchLabels == {"app.kubernetes.io/name": "cloudflared", "app.kubernetes.io/part-of": "llunde-pyparser", "app.kubernetes.io/component": "tunnel"} && has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels == {"kubernetes.io/metadata.name": "ingress-system"} && has(p.podSelector) && has(p.podSelector.matchLabels) && !has(p.podSelector.matchExpressions) && p.podSelector.matchLabels == {"app.kubernetes.io/name": "traefik"} && has(r.ports) && r.ports.size() == 1 && r.ports.all(port, has(port.port) && port.port == 8000 && !has(port.endPort) && (!has(port.protocol) || port.protocol == "TCP"))) || (has(p.ipBlock) && p.ipBlock.cidr in ["198.41.192.0/24", "198.41.200.0/24"] && has(r.ports) && r.ports.size() > 0 && r.ports.all(port, has(port.port) && !has(port.endPort) && port.port == 7844 && (!has(port.protocol) || port.protocol in ["TCP", "UDP"]))) || (has(p.ipBlock) && p.ipBlock.cidr == "0.0.0.0/0" && has(p.ipBlock.except)
-      && ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "127.0.0.0/8"].all(cidr,
-      cidr in p.ipBlock.except) && has(r.ports) && r.ports.all(port, has(port.port) && !has(port.endPort) && ((port.port == 443 && (!has(port.protocol) || port.protocol == "TCP")) || (port.port == 7844 && (!has(port.protocol) || port.protocol in ["TCP", "UDP"]))))) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
-      in p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
-      == "kube-system" && has(p.podSelector) && has(p.podSelector.matchLabels) && "k8s-app" in p.podSelector.matchLabels
-      && p.podSelector.matchLabels["k8s-app"] == "kube-dns" && has(r.ports) && r.ports.all(port, has(port.port)
-      && !has(port.endPort) && port.port == 53)) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
-      in p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
-      == "observability" && has(p.podSelector) && has(p.podSelector.matchLabels) && "app.kubernetes.io/name" in
-      p.podSelector.matchLabels && p.podSelector.matchLabels["app.kubernetes.io/name"] == "alloy" && has(r.ports)
-      && r.ports.all(port, has(port.port) && !has(port.endPort) && port.port in [4317,4318] && (!has(port.protocol) || port.protocol ==
-      "TCP")))))'
-    message: Project egress may reach its own pods, DNS, Alloy, public HTTPS or Cloudflare Tunnel
-  - expression: '!has(object.spec.ingress) || object.spec.ingress.all(r, has(r.from) && r.from.all(p, (has(p.podSelector)
-      && !has(p.namespaceSelector) && !has(p.ipBlock)) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels)
+  - expression: '!has(object.spec.egress) || object.spec.egress.all(r, has(r.to) &&
+      r.to.all(p, (has(p.podSelector) && !has(p.namespaceSelector) && !has(p.ipBlock))
+      || (request.userInfo.username == "system:serviceaccount:flux-system:platform-reconciler"
+      && object.metadata.name == "backup-heartbeat-egress" && has(object.spec.podSelector.matchLabels)
+      && object.spec.podSelector.matchLabels == {"app.kubernetes.io/name": "data-backup"}
+      && has(p.ipBlock) && p.ipBlock.cidr == "100.86.241.75/32" && !has(p.ipBlock.except)
+      && has(r.ports) && r.ports.size() == 1 && r.ports.all(port, has(port.port) &&
+      port.port == 8080 && !has(port.endPort) && (!has(port.protocol) || port.protocol
+      == "TCP"))) || (request.userInfo.username == "system:serviceaccount:flux-system:platform-reconciler"
+      && object.metadata.name == "backup-control-egress" && has(object.spec.podSelector.matchLabels)
+      && object.spec.podSelector.matchLabels == {"app.kubernetes.io/name": "data-backup"}
+      && has(p.ipBlock) && !has(p.ipBlock.except) && has(r.ports) && r.ports.size()
+      == 1 && r.ports.all(port, has(port.port) && !has(port.endPort) && (!has(port.protocol)
+      || port.protocol == "TCP") && ((p.ipBlock.cidr == "10.43.0.1/32" && port.port
+      == 443) || (p.ipBlock.cidr in ["10.60.0.5/32", "10.60.0.7/32", "10.60.0.8/32"]
+      && port.port == 6443)))) || (request.userInfo.username == "system:serviceaccount:flux-system:platform-reconciler"
+      && request.namespace == "llunde-pyparser" && object.metadata.name == "logs-redirect-egress"
+      && has(object.spec.podSelector.matchLabels) && object.spec.podSelector.matchLabels
+      == {"app.kubernetes.io/name": "cloudflared", "app.kubernetes.io/part-of": "llunde-pyparser",
+      "app.kubernetes.io/component": "tunnel"} && has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels)
+      && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels
+      == {"kubernetes.io/metadata.name": "ingress-system"} && has(p.podSelector) &&
+      has(p.podSelector.matchLabels) && !has(p.podSelector.matchExpressions) && p.podSelector.matchLabels
+      == {"app.kubernetes.io/name": "traefik"} && has(r.ports) && r.ports.size() ==
+      1 && r.ports.all(port, has(port.port) && port.port == 8000 && !has(port.endPort)
+      && (!has(port.protocol) || port.protocol == "TCP"))) || (has(p.ipBlock) && p.ipBlock.cidr
+      in ["198.41.192.0/24", "198.41.200.0/24"] && has(r.ports) && r.ports.size()
+      > 0 && r.ports.all(port, has(port.port) && !has(port.endPort) && port.port ==
+      7844 && (!has(port.protocol) || port.protocol in ["TCP", "UDP"]))) || (has(p.ipBlock)
+      && p.ipBlock.cidr == "0.0.0.0/0" && has(p.ipBlock.except) && ["10.0.0.0/8",
+      "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "127.0.0.0/8"].all(cidr,
+      cidr in p.ipBlock.except) && has(r.ports) && r.ports.all(port, has(port.port)
+      && !has(port.endPort) && ((port.port == 443 && (!has(port.protocol) || port.protocol
+      == "TCP")) || (port.port == 7844 && (!has(port.protocol) || port.protocol in
+      ["TCP", "UDP"]))))) || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels)
       && "kubernetes.io/metadata.name" in p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions)
+      && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"] == "kube-system"
+      && has(p.podSelector) && has(p.podSelector.matchLabels) && "k8s-app" in p.podSelector.matchLabels
+      && p.podSelector.matchLabels["k8s-app"] == "kube-dns" && has(r.ports) && r.ports.all(port,
+      has(port.port) && !has(port.endPort) && port.port == 53)) || (has(p.namespaceSelector)
+      && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name" in
+      p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions)
+      && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"] == "observability"
+      && has(p.podSelector) && has(p.podSelector.matchLabels) && "app.kubernetes.io/name"
+      in p.podSelector.matchLabels && p.podSelector.matchLabels["app.kubernetes.io/name"]
+      == "alloy" && has(r.ports) && r.ports.all(port, has(port.port) && !has(port.endPort)
+      && port.port in [4317,4318] && (!has(port.protocol) || port.protocol == "TCP")))))'
+    message: Project egress may reach its own pods, DNS, Alloy, public HTTPS or Cloudflare
+      Tunnel
+  - expression: '!has(object.spec.ingress) || object.spec.ingress.all(r, has(r.from)
+      && r.from.all(p, (has(p.podSelector) && !has(p.namespaceSelector) && !has(p.ipBlock))
+      || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
+      in p.namespaceSelector.matchLabels && !has(p.namespaceSelector.matchExpressions)
       && p.namespaceSelector.matchLabels["kubernetes.io/metadata.name"] in ["ingress-system","observability"])))'
     message: Project ingress must select project pods, ingress or monitoring
 ---

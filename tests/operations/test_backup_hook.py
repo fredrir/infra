@@ -90,3 +90,42 @@ class BackupHookTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(state, {"review": 1, "worker": 0})
         self.assertFalse(checksum)
+
+
+class BackupHeartbeatTests(unittest.TestCase):
+    def test_curl_receives_private_config_and_failure_is_preserved(self):
+        for failure in [0, 22]:
+            with self.subTest(curl_status=failure), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                binary = root / "curl"
+                binary.write_text(
+                    "#!/usr/bin/env python3\n"
+                    "import json,os,stat,sys\n"
+                    "from pathlib import Path\n"
+                    "p=Path(sys.argv[sys.argv.index('--config')+1])\n"
+                    "token=os.environ['BACKUP_HEARTBEAT_TOKEN']\n"
+                    "assert token not in ' '.join(sys.argv)\n"
+                    "assert stat.S_IMODE(p.stat().st_mode)==0o600\n"
+                    "assert p.read_text()=='header = \\\"Authorization: Bearer '+token+'\\\"\\n'\n"
+                    "Path(os.environ['OBSERVATION']).write_text(json.dumps({'config':str(p)}))\n"
+                    "sys.exit(int(os.environ['CURL_STATUS']))\n"
+                )
+                binary.chmod(0o755)
+                observation = root / "observation.json"
+                result = subprocess.run(
+                    ["bash", str(HOOK.with_name("heartbeat.sh")), "parser"],
+                    env={
+                        **os.environ,
+                        "PATH": str(root) + os.pathsep + os.environ["PATH"],
+                        "TMPDIR": str(root),
+                        "BACKUP_HEARTBEAT_TOKEN": "dummy_backup_token_" * 4,
+                        "OBSERVATION": str(observation),
+                        "CURL_STATUS": str(failure),
+                    },
+                    capture_output=True,
+                    check=False,
+                    timeout=10,
+                )
+                self.assertEqual(result.returncode, failure, result.stderr)
+                config = Path(json.loads(observation.read_text())["config"])
+                self.assertFalse(config.exists())
