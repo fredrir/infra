@@ -1,0 +1,6 @@
+ci_gvisor_version: release-20260907.0
+ci_gvisor_sha256: 81416511897ab8abd4e723d66823c5b0461a2ee3311cfa70d152404ef9b860cf
+ci_gvisor_directory: /opt/gvisor/release-20260907.0
+ci_kata_archive: ''
+ci_kata_sha256: de3676bae12983cd23a5416608af42d8c8cb16fe3fb29835f5fdae5ee1a8b64f
+ci_kata_url: ''

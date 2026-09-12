@@ -1,65 +1,181 @@
 name: Build image
-'on':
+on:
   workflow_call:
     inputs:
-      project:
+      image:
         required: true
         type: string
-      test-command:
-        required: true
-        type: string
-      platforms:
-        type: string
-        default: '["linux/amd64"]'
       context:
         type: string
         default: .
       dockerfile:
         type: string
         default: Dockerfile
-      nix-target:
+      recipe:
         type: string
         default: ''
-      request-release:
+      test-command:
+        required: true
+        type: string
+      deploy:
         type: boolean
         default: true
-      component:
-        type: string
-        default: app
-      build-arguments:
-        type: string
-        default: '{}'
     outputs:
       image:
         value: ${{ jobs.build.outputs.image }}
-    secrets:
-      NIX_CACHE_READ_TOKEN:
-        required: false
-      NIX_CACHE_UPLOAD_TOKEN:
-        required: false
 permissions:
   contents: read
+concurrency:
+  group: image-${{ github.repository }}-${{ inputs.image }}
+  cancel-in-progress: false
 jobs:
   build:
-    if: github.repository_owner_id == '114402558' && contains(fromJSON('["773018612","900286164","1327945675","1328085692","1328144104","1328252868"]'),
-      github.repository_id) && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
-      == true && startsWith(vars.INFRA_CI_IMAGE, 'ghcr.io/fredrir/infra-ci@sha256:') && contains(fromJSON(vars.INFRA_CI_ARCHITECTURES
-      || '[]'), 'amd64')
-    uses: ./.github/workflows/project-ci.yml
+    if: github.repository_owner_id == '114402558' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
+    runs-on: buildkit-amd64
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
       id-token: write
-    with:
-      project: ${{ inputs.project }}
-      test-command: ${{ inputs.test-command }}
-      platforms: ${{ inputs.platforms }}
-      context: ${{ inputs.context }}
-      dockerfile: ${{ inputs.dockerfile }}
-      nix-target: ${{ inputs.nix-target }}
-      request-release: ${{ inputs.request-release }}
-      component: ${{ inputs.component }}
-      build-arguments: ${{ inputs.build-arguments }}
-    secrets:
-      NIX_CACHE_READ_TOKEN: ${{ secrets.NIX_CACHE_READ_TOKEN }}
-      NIX_CACHE_UPLOAD_TOKEN: ${{ secrets.NIX_CACHE_UPLOAD_TOKEN }}
+      attestations: write
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra-build-recipe
+        persist-credentials: false
+    - name: Select shared recipe
+      if: inputs.recipe != ''
+      env:
+        RECIPE: ${{ inputs.recipe }}
+      run: |
+        case "$RECIPE" in
+          y-api|y-web) ;;
+          *) exit 1 ;;
+        esac
+        mkdir -p containers
+        cp .infra-build-recipe/platform/projects/y/Caddyfile containers/Caddyfile
+        printf 'SHARED_DOCKERFILE=.infra-build-recipe/platform/projects/y/%s.Dockerfile\n' "${RECIPE#y-}" >> "$GITHUB_ENV"
+    - name: Check inputs
+      env:
+        IMAGE: ${{ inputs.image }}
+        CONTEXT: ${{ inputs.context }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+      run: |
+        [[ "$IMAGE" =~ ^ghcr\.io/fredrir/[a-z0-9][a-z0-9._/-]*$ ]]
+        [[ "$CONTEXT" != /* && "$CONTEXT" != -* && "$CONTEXT" != *..* ]]
+        [[ "$DOCKERFILE" != /* && "$DOCKERFILE" != -* && "$DOCKERFILE" != *..* ]]
+        test -d "$CONTEXT"
+        test -f "${SHARED_DOCKERFILE:-$DOCKERFILE}"
+        test "$(uname -m)" = x86_64
+        test ! -e /var/run/secrets/kubernetes.io/serviceaccount/token
+    - name: Test
+      env:
+        TEST_COMMAND: ${{ inputs.test-command }}
+      run: bash -euo pipefail -c "$TEST_COMMAND"
+    - name: Build and publish
+      id: build
+      env:
+        IMAGE: ${{ inputs.image }}
+        CONTEXT: ${{ inputs.context }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+        REGISTRY_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        DOCKERFILE="${SHARED_DOCKERFILE:-$DOCKERFILE}"
+        export DOCKER_CONFIG="$RUNNER_TEMP/registry"
+        mkdir -m 700 "$DOCKER_CONFIG"
+        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+        umask 077
+        jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
+        unset REGISTRY_TOKEN
+        export BUILDKITD_FLAGS="$BUILDKITD_FLAGS --oci-worker-net=host"
+        buildctl-daemonless.sh build --frontend dockerfile.v0 \
+          --local "context=$CONTEXT" --local "dockerfile=$(dirname "$DOCKERFILE")" \
+          --opt "filename=$(basename "$DOCKERFILE")" --opt platform=linux/amd64 \
+          --opt attest:provenance=mode=min,version=v1 \
+          --opt "label:org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+          --opt "label:org.opencontainers.image.revision=$GITHUB_SHA" \
+          --output "type=image,name=$IMAGE:$GITHUB_SHA,push=true" \
+          --metadata-file "$RUNNER_TEMP/build.json"
+        digest=$(jq -er '."containerimage.digest"' "$RUNNER_TEMP/build.json")
+        [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+        printf 'image=%s@%s\ndigest=%s\n' "$IMAGE" "$digest" "$digest" >> "$GITHUB_OUTPUT"
+    - name: Install release tools
+      run: bash .infra-build-recipe/scripts/ci/install-release-tools.sh
+    - name: Scan published image
+      env:
+        IMAGE: ${{ steps.build.outputs.image }}
+        TRIVY_USERNAME: ${{ github.actor }}
+        TRIVY_PASSWORD: ${{ github.token }}
+      run: trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --timeout 10m "$IMAGE"
+    - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661
+      if: '!github.event.repository.private'
+      with:
+        subject-name: ${{ inputs.image }}
+        subject-digest: ${{ steps.build.outputs.digest }}
+    - name: Verify published provenance
+      if: inputs.deploy && !github.event.repository.private
+      env:
+        GH_TOKEN: ${{ github.token }}
+        IMAGE: ${{ steps.build.outputs.image }}
+        WORKFLOW_SHA: ${{ job.workflow_sha }}
+      run: |
+        gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+          --signer-workflow fredrir/infra/.github/workflows/build-image.yml \
+          --signer-digest "$WORKFLOW_SHA" --source-ref refs/heads/main \
+          --source-digest "$GITHUB_SHA"
+    - name: Sign and verify private image provenance
+      if: github.event.repository.private
+      env:
+        IMAGE: ${{ steps.build.outputs.image }}
+        WORKFLOW_SHA: ${{ job.workflow_sha }}
+        REGISTRY_TOKEN: ${{ github.token }}
+      run: |
+        export DOCKER_CONFIG="$RUNNER_TEMP/signature-registry"
+        mkdir -m700 "$DOCKER_CONFIG"
+        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+        umask 077
+        jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
+        unset REGISTRY_TOKEN
+        cosign sign --yes --timeout 5m \
+          --annotation "source-repository=$GITHUB_REPOSITORY" \
+          --annotation "source-revision=$GITHUB_SHA" \
+          --annotation "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
+        cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+          --certificate-identity "https://github.com/fredrir/infra/.github/workflows/build-image.yml@$WORKFLOW_SHA" \
+          --certificate-github-workflow-repository "$GITHUB_REPOSITORY" \
+          --certificate-github-workflow-sha "$GITHUB_SHA" \
+          --certificate-github-workflow-ref refs/heads/main \
+          --certificate-github-workflow-trigger push \
+          --annotation "source-repository=$GITHUB_REPOSITORY" \
+          --annotation "source-revision=$GITHUB_SHA" \
+          --annotation "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
+    - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
+      if: inputs.deploy
+      id: deployment-token
+      with:
+        scope: fredrir/infra
+        identity: deploy-${{ github.repository_id }}
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      if: inputs.deploy
+      with:
+        repository: fredrir/infra
+        ref: main
+        path: .infra-deploy
+        token: ${{ steps.deployment-token.outputs.token }}
+        persist-credentials: false
+    - name: Open deployment PR
+      if: inputs.deploy
+      env:
+        GH_TOKEN: ${{ steps.deployment-token.outputs.token }}
+        IMAGE: ${{ steps.build.outputs.image }}
+        SOURCE_REPOSITORY_ID: ${{ github.repository_id }}
+      run: bash .infra-build-recipe/scripts/ci/release-pr.sh .infra-deploy

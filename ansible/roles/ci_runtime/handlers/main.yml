@@ -1,0 +1,4 @@
+- name: Restart the K3s worker
+  ansible.builtin.systemd_service:
+    name: k3s-agent
+    state: restarted

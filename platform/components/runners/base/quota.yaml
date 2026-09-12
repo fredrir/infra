@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: builds
+spec:
+  hard:
+    pods: '3'
+    requests.cpu: '2'
+    requests.memory: 10Gi
+    limits.cpu: '4'
+    limits.memory: 12Gi
+    requests.storage: 40Gi
+    persistentvolumeclaims: '2'
+    services.loadbalancers: '0'
+    services.nodeports: '0'

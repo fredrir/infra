@@ -1,0 +1,94 @@
+{
+  "version": "20260913",
+  "architecture": "amd64",
+  "url": "https://github.com/fredrir/infra/releases/download/ci-runtimes-20260913/kata-runtime-amd64.tar",
+  "sha256": "de3676bae12983cd23a5416608af42d8c8cb16fe3fb29835f5fdae5ee1a8b64f",
+  "files": {
+    "opt/kata/include/libfdt.h": "5d0c45df7f5b21e3a3e79e42b61c7c92b4be5683fe3776d317274d4bc343e6bc",
+    "opt/kata/include/libfdt_env.h": "273bb264cacd60bb005cfa558bee084558469b9107eaf40d7e1362571ed1bc94",
+    "opt/kata/include/fdt.h": "0841a268996ad929ee062303409b9f1bd536c1dfce8516fc121bed3331e41f4e",
+    "opt/kata/bin/qemu-system-x86_64": "35dff898736c3849dd49758138f637150a7211135ee8b99c0c623728f9860cd2",
+    "opt/kata/lib/kata-qemu/pkgconfig/libfdt.pc": "6d25259437f7460eb27ebb0d06cf757e63a078b2197707f84d34a1d3507ea123",
+    "opt/kata/lib/kata-qemu/libfdt.a": "747d722623781b9de5119628e32fe06edeac45862ff6436de97c88dc30e10f30",
+    "opt/kata/share/kata-qemu/qemu/edk2-licenses.txt": "1ddeaed2e7d2e9ecb960bdfc1b8ee45387aff70d056d985d145949af3951657c",
+    "opt/kata/share/kata-qemu/qemu/edk2-x86_64-code.fd": "33090cc07675baa5190d9f1e84bf5176b33bcbfa9bacac522961150cdb6dbb2a",
+    "opt/kata/share/kata-qemu/qemu/bios-microvm.bin": "d226177d125aaf1b91e507738f4e9a0ade9474169b211751f78be08008cb394c",
+    "opt/kata/share/kata-qemu/qemu/bios.bin": "3dfd946d0c03ab0e022f84f10c3eb5f1dd507761f73e7d8067511ba35a10f776",
+    "opt/kata/share/kata-qemu/qemu/qemu-nsis.bmp": "93f79a2b6e0f97bc7b7c75ded89a3c4c7657af37c087cf067470771e0affda9c",
+    "opt/kata/share/kata-qemu/qemu/pvh.bin": "918ff03a118615c2f4611a5df2d9496aabe099b5cfaaf69e544ebf973305d59d",
+    "opt/kata/share/kata-qemu/qemu/efi-virtio.rom": "26be36901db7f8181c306cc62bd74891d8646528965a78e40cceadba5dd7c8e7",
+    "opt/kata/share/kata-qemu/qemu/firmware/50-edk2-i386-secure.json": "2e2d12d24d1a5bd8a938ddbb7da20fe47b7ec275f68eb5d3eec1f403177b4f69",
+    "opt/kata/share/kata-qemu/qemu/firmware/60-edk2-x86_64.json": "b4ef39fdf435f33145aefb12953b0a72f7dd5d4e752e914b70d7ce819c545936",
+    "opt/kata/share/kata-qemu/qemu/firmware/50-edk2-x86_64-secure.json": "52d6289981d221197b24a6f58e0381e129118f2021f1834dba1bc0052528fc62",
+    "opt/kata/share/kata-qemu/qemu/qboot.rom": "9b9dfc6c25740d6225625570d71cab6805cc9216e68c8932e343266daaeb8c4b",
+    "opt/kata/share/kata-qemu/qemu/multiboot_dma.bin": "46def003b1c413cc4a5880d858ca54456ad6978d5fdb6e1b7d086b2905a66df0",
+    "opt/kata/share/kata-qemu/qemu/linuxboot_dma.bin": "9c49e255340c78fc12e54ed043462bca02fb7fca29b7cfab62ff88a5344b6950",
+    "opt/kata/share/kata-qemu/qemu/kvmvapic.bin": "cdf057a71b07e3b52b19cbe210bdefa59250d01a9810b960f7fe1f98eed95a27",
+    "opt/kata/share/kata-qemu/qemu/bios-256k.bin": "ae6f6aa973aaccc143f57aa960fb035fd9de4daee4ad0cd713322f8c259e7650",
+    "opt/kata/share/kata-qemu/qemu/edk2-x86_64-secure-code.fd": "32807682a9e5c0e2d192ecb6077941d4be8bcfa6b9cd6e60830c3a9f48c0555a",
+    "opt/kata/runtime-rs/bin/containerd-shim-kata-v2": "3c88c8d7f183b95912974eaa143f1c8a52c57b0a01c5ef4a4c61e22f16364481",
+    "opt/kata/libexec/virtiofsd": "608a9cfa870de08308d5a0914668c641290cc9df3f4d800fc78fd49ea0bb3ee9",
+    "opt/kata/share/kata-containers/vmlinux-6.18.51-202": "26b892a711b933c0edc06fa0cf13f130a889d9cf197d3220492c92ed49697744",
+    "opt/kata/share/kata-containers/guest.initrd": "ee7cf98be2dc530c17d73e502e5b922777e239fa295ea780a5b23868a36cd5ca",
+    "opt/kata/share/defaults/kata-containers/runtime-rs/configuration.toml": "c00d01fe8f2f38949cac7fd944600bda17a2bab19447274c95b1b95c48195dea"
+  },
+  "components": {
+    "kata": {
+      "version": "4.1.0",
+      "sourceRevision": "ddcb1ad8d23cbb4323f86c209f132b89592902df",
+      "archive": "kata-static-4.1.0-amd64.tar.zst",
+      "sha256": "3dc6b69c4acb787b967b04b64599a20d02a8beb1a8eaab3084110df9d0b08c96",
+      "url": "https://github.com/kata-containers/kata-containers/releases/download/4.1.0/kata-static-4.1.0-amd64.tar.zst"
+    },
+    "qemu": {
+      "version": "11.0.4",
+      "tag": "v11.0.4",
+      "sourceRevision": "81fd11739e6f23c958567d8b2bd5bcff6221625e",
+      "repository": "https://github.com/qemu/qemu.git",
+      "builder": "quay.io/kata-containers/builders@sha256:d9da2386e7a5dcb8c8c3d70236b0f351e2a40eb86c8e2f22fb0c2bae3a64806e"
+    },
+    "kernel": {
+      "version": "6.18.51",
+      "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.51.tar.xz",
+      "sha256": "ba2f60f858bf4d1f929101faa356c93dc8b925b17aaa9f95eabd4627758df613",
+      "builder": "quay.io/kata-containers/builders@sha256:87f7a8216785b7c5446906cfb7c17bd279f4006c7e9f247c3e217548e5c526aa",
+      "packagingPatches": [
+        {
+          "path": "0001-fs-dax-check-zero-or-empty-entry-before-converting-xarray.patch",
+          "sha256": "92dd4a192ea58fa9a59e3bc6d6995e2a156cf862c36a3c10eb212fabdecdaf03",
+          "sourcePath": "fs/dax.c",
+          "action": "retain"
+        },
+        {
+          "path": "0002-virtio-fs-use-sync-release-for-submounts.patch",
+          "sha256": "16bc745ac8c1fd16368d65148b20ff8a3380dacb2f177ff615f2ebce7701963f",
+          "sourcePath": "fs/fuse/file.c",
+          "action": "omit-already-applied"
+        }
+      ],
+      "configVersion": "202"
+    },
+    "guest": {
+      "version": "noble-20260912T000000Z",
+      "builder": "docker.io/library/ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254",
+      "agentSha256": "f11b884b7452ece9eab1343f0886cc0918477766ecc7335bda161131a29f4380",
+      "snapshot": "20260912T000000Z",
+      "bootstrapCaBundleSha256": "6d84ab71cb726c0641b0af84303c316e3fa50db941dc8507d09045eb2fa5d238",
+      "makedevScriptSha256": "c9ffa999319f919e5f9c97b3b5d9cb3b0c90a5f48b8c2a5ae8b289f78be8372c"
+    },
+    "virtiofsd": {
+      "version": "1.14.0",
+      "repository": "https://gitlab.com/virtio-fs/virtiofsd.git",
+      "sourceRevision": "c2540f8db14caba81c1e37fba23fc7bf2cd7f0dd",
+      "builder": "docker.io/library/rust:1.98.1-alpine3.24@sha256:1716b3aa042d735f4566d14dc54e8037de9d69556e2d5dd58131d93a613d173d",
+      "cargoLockSha256": "995b73803681900135edc1e47127fec62832ec7503c87c4eb1f3b18dc5e1d866"
+    }
+  },
+  "scope": {
+    "runtime": "Kata QEMU with KVM",
+    "nixSandbox": true,
+    "buildkitQualified": false,
+    "nativeArmQualified": false
+  },
+  "seccompSHA256": "195d05eb2ae93e5b5cb0973bababa154db05633f43c225978f64f0d3f0b5d3fc"
+}

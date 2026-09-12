@@ -79,10 +79,11 @@ spec:
         values:
         - ci
   validations:
-  - expression: has(object.spec.runtimeClassName) && object.spec.runtimeClassName == "gvisor"
-    message: CI requires gvisor
-  - expression: has(object.spec.nodeSelector) && "node-restriction.kubernetes.io/ci" in object.spec.nodeSelector
-      && object.spec.nodeSelector["node-restriction.kubernetes.io/ci"] == "true"
+  - expression: has(object.spec.runtimeClassName) && object.spec.runtimeClassName in ["gvisor", "kata"]
+    message: CI requires an isolated runtime
+  - expression: has(object.spec.nodeSelector) && ("node-restriction.kubernetes.io/" + object.spec.runtimeClassName) in object.spec.nodeSelector
+      && object.spec.nodeSelector["node-restriction.kubernetes.io/" + object.spec.runtimeClassName] == "true"
+      && "kubernetes.io/arch" in object.spec.nodeSelector && object.spec.nodeSelector["kubernetes.io/arch"] == "amd64"
     message: CI requires a verified worker
   - expression: has(object.spec.priorityClassName) && object.spec.priorityClassName == "ci"
     message: CI requires bounded low priority
@@ -90,10 +91,10 @@ spec:
       || v.projected.sources.all(s, !has(s.secret))))'
     message: CI may not mount Secret volumes
   - expression: >-
-      object.spec.containers.all(c, !has(c.envFrom) && (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) || (request.userInfo.username == "system:serviceaccount:arc-system:arc-controller" && c.name == "runner" && e.name == "ACTIONS_RUNNER_INPUT_JITCONFIG" && e.valueFrom.secretKeyRef.name == object.metadata.name && e.valueFrom.secretKeyRef.key == "jitToken"))))
-      && (!has(object.spec.initContainers) || object.spec.initContainers.all(c, !has(c.envFrom) && (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) || (request.userInfo.username == "system:serviceaccount:arc-system:arc-controller" && c.name == "runner" && e.name == "ACTIONS_RUNNER_INPUT_JITCONFIG" && e.valueFrom.secretKeyRef.name == object.metadata.name && e.valueFrom.secretKeyRef.key == "jitToken")))))
-      && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, !has(c.envFrom) && (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) || (request.userInfo.username == "system:serviceaccount:arc-system:arc-controller" && c.name == "runner" && e.name == "ACTIONS_RUNNER_INPUT_JITCONFIG" && e.valueFrom.secretKeyRef.name == object.metadata.name && e.valueFrom.secretKeyRef.key == "jitToken")))))
-    message: Only the ARC controller may attach a runner's own registration token
+      object.spec.containers.all(c, !has(c.envFrom) && (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) || (request.userInfo.username == "system:serviceaccount:arc-system:arc-controller" && c.name == "runner" && e.name == "ACTIONS_RUNNER_INPUT_JITCONFIG" && e.valueFrom.secretKeyRef.name == object.metadata.name && e.valueFrom.secretKeyRef.key == "jitToken") || (request.namespace == "ci-infra" && request.userInfo.username == "system:serviceaccount:arc-system:arc-controller" && object.spec.runtimeClassName == "kata" && c.name == "runner" && e.name == "ATTIC_TOKEN" && e.valueFrom.secretKeyRef.name == "attic-client" && e.valueFrom.secretKeyRef.key == "ATTIC_TOKEN"))))
+      && (!has(object.spec.initContainers) || object.spec.initContainers.all(c, !has(c.envFrom) && (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) || (request.userInfo.username == "system:serviceaccount:arc-system:arc-controller" && c.name == "runner" && e.name == "ACTIONS_RUNNER_INPUT_JITCONFIG" && e.valueFrom.secretKeyRef.name == object.metadata.name && e.valueFrom.secretKeyRef.key == "jitToken") || (request.namespace == "ci-infra" && request.userInfo.username == "system:serviceaccount:arc-system:arc-controller" && object.spec.runtimeClassName == "kata" && c.name == "runner" && e.name == "ATTIC_TOKEN" && e.valueFrom.secretKeyRef.name == "attic-client" && e.valueFrom.secretKeyRef.key == "ATTIC_TOKEN")))))
+      && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, !has(c.envFrom) && (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) || (request.userInfo.username == "system:serviceaccount:arc-system:arc-controller" && c.name == "runner" && e.name == "ACTIONS_RUNNER_INPUT_JITCONFIG" && e.valueFrom.secretKeyRef.name == object.metadata.name && e.valueFrom.secretKeyRef.key == "jitToken") || (request.namespace == "ci-infra" && request.userInfo.username == "system:serviceaccount:arc-system:arc-controller" && object.spec.runtimeClassName == "kata" && c.name == "runner" && e.name == "ATTIC_TOKEN" && e.valueFrom.secretKeyRef.name == "attic-client" && e.valueFrom.secretKeyRef.key == "ATTIC_TOKEN")))))
+    message: Only the ARC controller may attach scoped runner credentials
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
@@ -179,13 +180,30 @@ spec:
       !has(s.serviceAccountToken)))'
     message: Job pods may not project API tokens
   - expression: >-
-      object.spec.containers.all(c, c.image == "${CI_IMAGE}")
-      && (!has(object.spec.initContainers) || object.spec.initContainers.all(c, c.image == "${CI_IMAGE}"))
-      && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, c.image == "${CI_IMAGE}"))
+      object.spec.containers.all(c, ((object.spec.runtimeClassName == "gvisor" && c.image == "ghcr.io/fredrir/infra-runner-buildkit@sha256:6b400a042682e58da65c25c7fcc16d9f05474714921acfe042603578d5d21667") || (object.spec.runtimeClassName == "kata" && c.image == "ghcr.io/fredrir/infra-runner-nix@sha256:58d2ea5406a9d38ac1dac8f6235534448cdfa576b8c1b6fbfbd82c7d4a73b5f1")))
+      && (!has(object.spec.initContainers) || object.spec.initContainers.all(c, ((object.spec.runtimeClassName == "gvisor" && c.image == "ghcr.io/fredrir/infra-runner-buildkit@sha256:6b400a042682e58da65c25c7fcc16d9f05474714921acfe042603578d5d21667") || (object.spec.runtimeClassName == "kata" && c.image == "ghcr.io/fredrir/infra-runner-nix@sha256:58d2ea5406a9d38ac1dac8f6235534448cdfa576b8c1b6fbfbd82c7d4a73b5f1"))))
+      && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, ((object.spec.runtimeClassName == "gvisor" && c.image == "ghcr.io/fredrir/infra-runner-buildkit@sha256:6b400a042682e58da65c25c7fcc16d9f05474714921acfe042603578d5d21667") || (object.spec.runtimeClassName == "kata" && c.image == "ghcr.io/fredrir/infra-runner-nix@sha256:58d2ea5406a9d38ac1dac8f6235534448cdfa576b8c1b6fbfbd82c7d4a73b5f1"))))
     message: Only the approved pipeline image may execute jobs
-  matchConditions:
-  - name: hook-created-pods
-    expression: request.userInfo.username != "system:serviceaccount:arc-system:arc-controller"
+  - expression: object.spec.containers.size() == 1 && object.spec.containers[0].name == "runner" && (!has(object.spec.initContainers) || object.spec.initContainers.size() == 0) && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.size() == 0)
+    message: CI runs one ephemeral runner without sidecars
+  - expression: has(object.spec.activeDeadlineSeconds) && object.spec.activeDeadlineSeconds > 0 && object.spec.activeDeadlineSeconds <= 3600
+    message: Runner lifetime must be bounded
+  - expression: has(object.spec.securityContext) && has(object.spec.securityContext.seccompProfile) && ((object.spec.runtimeClassName == "gvisor" && object.spec.securityContext.seccompProfile.type == "RuntimeDefault") || (object.spec.runtimeClassName == "kata" && object.spec.securityContext.seccompProfile.type == "Localhost" && object.spec.securityContext.seccompProfile.localhostProfile == "kata-nix.json"))
+    message: Runtime seccomp must match its qualified profile
+  - expression: object.spec.containers.all(c, !has(c.securityContext.seccompProfile))
+    message: Containers must inherit the runtime seccomp profile
+  - expression: >-
+      has(object.metadata.labels) && "infra.fredrir.com/ci-slot" in object.metadata.labels && object.metadata.labels["infra.fredrir.com/ci-slot"] == "build"
+      && has(object.spec.affinity) && has(object.spec.affinity.podAntiAffinity)
+      && has(object.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution)
+      && object.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution.size() == 1
+      && object.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution.all(t,
+        t.topologyKey == "kubernetes.io/hostname" && has(t.labelSelector) && has(t.labelSelector.matchLabels)
+        && t.labelSelector.matchLabels == {"infra.fredrir.com/ci-slot": "build"} && !has(t.labelSelector.matchExpressions)
+        && has(t.namespaceSelector) && has(t.namespaceSelector.matchLabels)
+        && t.namespaceSelector.matchLabels == {"infra.fredrir.com/tier": "ci"} && !has(t.namespaceSelector.matchExpressions)
+        && !has(t.namespaces) && !has(t.matchLabelKeys) && !has(t.mismatchLabelKeys))
+    message: CI shares one build slot per eligible worker
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding

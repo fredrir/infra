@@ -1,0 +1,8 @@
+repository: fredrir/Y
+images:
+  ghcr.io/fredrir/y-api:
+    path: platform/projects/y
+    mode: kustomize
+  ghcr.io/fredrir/y-web:
+    path: platform/projects/y
+    mode: kustomize

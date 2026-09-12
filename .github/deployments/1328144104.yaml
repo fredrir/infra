@@ -1,0 +1,5 @@
+repository: fredrir/llunde-frontend
+images:
+  ghcr.io/fredrir/llunde-frontend:
+    path: platform/projects/llunde
+    mode: kustomize

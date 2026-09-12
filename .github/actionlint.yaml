@@ -1,8 +1,8 @@
 self-hosted-runner:
   labels:
-    - infra-1328085692-amd64
-    - infra-1328085692-arm64
+  - buildkit-amd64
+  - nix-amd64
 paths:
-  .github/workflows/project-ci.yml:
+  .github/workflows/build-image.yml:
     ignore:
-      - 'property "workflow_(sha|repository|ref)" is not defined in object type'
+    - 'property "workflow_(sha|repository)" is not defined in object type'

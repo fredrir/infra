@@ -1,0 +1,155 @@
+- name: Require a supported worker
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.architecture == 'x86_64'
+      - inventory_hostname in groups['agent']
+
+- name: Install runtime archive support
+  ansible.builtin.apt:
+    name: bzip2
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create the runtime directory
+  ansible.builtin.file:
+    path: "{{ ci_gvisor_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Download the pinned runtime
+  ansible.builtin.get_url:
+    url: "https://github.com/google/gvisor/releases/download/{{ ci_gvisor_version }}/gvisor-x86_64.tar.bz2"
+    dest: "{{ ci_gvisor_directory }}/gvisor.tar.bz2"
+    checksum: "sha256:{{ ci_gvisor_sha256 }}"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Extract the runtime and sidecar binaries
+  ansible.builtin.unarchive:
+    src: "{{ ci_gvisor_directory }}/gvisor.tar.bz2"
+    dest: "{{ ci_gvisor_directory }}"
+    remote_src: true
+    owner: root
+    group: root
+    creates: "{{ ci_gvisor_directory }}/runsc"
+
+- name: Expose the containerd shim
+  ansible.builtin.file:
+    src: "{{ ci_gvisor_directory }}/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+    owner: root
+    group: root
+  loop:
+    - runsc
+    - containerd-shim-runsc-v1
+
+- name: Create the runtime configuration directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure the sandbox runtime
+  ansible.builtin.copy:
+    dest: /etc/containerd/runsc.toml
+    content: |
+      binary_name = "{{ ci_gvisor_directory }}/runsc"
+      [runsc_config]
+      platform = "systrap"
+      network = "sandbox"
+      systemd-cgroup = "true"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart the K3s worker
+
+- name: Configure the additional containerd runtime
+  ansible.builtin.template:
+    src: config-v3.toml.tmpl.j2
+    dest: /var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.tmpl
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart the K3s worker
+
+- name: Install the verified Kata package
+  when: ci_kata_archive | length > 0 or ci_kata_url | length > 0
+  block:
+    - name: Require a matching package and KVM
+      ansible.builtin.stat:
+        path: /dev/kvm
+      register: ci_kvm
+
+    - name: Verify KVM and package checksum
+      ansible.builtin.assert:
+        that:
+          - ci_kvm.stat.exists
+          - ci_kata_sha256 is match('^[a-f0-9]{64}$')
+
+    - name: Copy the verified package
+      when: ci_kata_archive | length > 0
+      ansible.builtin.copy:
+        src: "{{ ci_kata_archive }}"
+        dest: /var/tmp/kata-runtime.tar
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Download the verified package
+      when: ci_kata_archive | length == 0
+      ansible.builtin.get_url:
+        url: "{{ ci_kata_url }}"
+        dest: /var/tmp/kata-runtime.tar
+        checksum: "sha256:{{ ci_kata_sha256 }}"
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Hash the delivered package
+      ansible.builtin.stat:
+        path: /var/tmp/kata-runtime.tar
+        checksum_algorithm: sha256
+      register: ci_kata_delivered
+
+    - name: Require the exact runtime archive
+      ansible.builtin.assert:
+        that:
+          - ci_kata_delivered.stat.checksum == ci_kata_sha256
+
+    - name: Extract the runtime under opt
+      ansible.builtin.unarchive:
+        src: /var/tmp/kata-runtime.tar
+        dest: /
+        remote_src: true
+        owner: root
+        group: root
+      notify: Restart the K3s worker
+
+    - name: Expose the Kata shim
+      ansible.builtin.file:
+        src: /opt/kata/runtime-rs/bin/containerd-shim-kata-v2
+        dest: /usr/local/bin/containerd-shim-kata-v2
+        state: link
+
+    - name: Create the local seccomp directory
+      ansible.builtin.file:
+        path: /var/lib/kubelet/seccomp
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install the Nix guest seccomp profile
+      ansible.builtin.copy:
+        src: kata-nix-seccomp.json
+        dest: /var/lib/kubelet/seccomp/kata-nix.json
+        owner: root
+        group: root
+        mode: '0644'

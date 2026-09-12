@@ -13,6 +13,7 @@
         alejandra
         ansible
         attic-client
+        cosign
         curl
         fluxcd
         gh
