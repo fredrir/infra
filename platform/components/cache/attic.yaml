@@ -4,24 +4,41 @@ metadata:
   name: attic
   namespace: nix-cache
 data:
-  server.toml: |
-    listen = "[::]:8080"
-    allowed-hosts = ["${CACHE_HOST}"]
-    api-endpoint = "https://${CACHE_HOST}/"
+  server.toml: 'listen = "[::]:8080"
+
+    allowed-hosts = ["${CACHE_HOST}", "attic.nix-cache.svc.cluster.local:8080"]
+
+    substituter-endpoint = "https://${CACHE_HOST}/"
+
     require-proof-of-possession = true
+
     [database]
+
     url = "sqlite:///data/metadata.db?mode=rwc"
+
     [storage]
+
     type = "local"
+
     path = "/data/nars"
+
     [chunking]
+
     nar-size-threshold = 65536
+
     min-size = 16384
+
     avg-size = 65536
+
     max-size = 262144
+
     [garbage-collection]
+
     interval = "24 hours"
+
     default-retention-period = "30 days"
+
+    '
 ---
 apiVersion: v1
 kind: Service
@@ -42,7 +59,7 @@ metadata:
   namespace: nix-cache
 spec:
   serviceName: attic
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: attic
@@ -54,6 +71,7 @@ spec:
       automountServiceAccountToken: false
       nodeSelector:
         node-restriction.kubernetes.io/stateful: 'true'
+        kubernetes.io/hostname: fredrir-09
       priorityClassName: batch
       securityContext:
         runAsNonRoot: true
@@ -64,7 +82,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: attic
-        image: ${ATTIC_IMAGE}
+        image: ghcr.io/zhaofengli/attic:9eda345a@sha256:325036ce0776ed6e2705819c6bd1ebd1635b0422723110116adf56edf8ea12bd
         args:
         - -f
         - /etc/attic/server.toml
@@ -79,11 +97,11 @@ spec:
             type: RuntimeDefault
         resources:
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 200m
+            memory: 256Mi
           limits:
-            cpu: '1'
-            memory: 512Mi
+            cpu: '2'
+            memory: 1Gi
         ports:
         - containerPort: 8080
         envFrom:
@@ -103,6 +121,11 @@ spec:
         readinessProbe:
           tcpSocket:
             port: 8080
+        startupProbe:
+          tcpSocket:
+            port: 8080
+          periodSeconds: 5
+          failureThreshold: 24
       volumes:
       - name: config
         configMap:
@@ -122,25 +145,6 @@ spec:
           storage: 50Gi
 ---
 apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: attic
-  namespace: nix-cache
-spec:
-  ingressClassName: platform
-  rules:
-  - host: ${CACHE_HOST}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: attic
-            port:
-              number: 8080
----
-apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: attic-ingress
@@ -153,12 +157,12 @@ spec:
   - Ingress
   ingress:
   - from:
+    - podSelector:
+        matchLabels:
+          app: attic-tunnel
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: ingress-system
-      podSelector:
-        matchLabels:
-          app.kubernetes.io/name: traefik
+          kubernetes.io/metadata.name: ci-infra
     ports:
     - port: 8080
       protocol: TCP

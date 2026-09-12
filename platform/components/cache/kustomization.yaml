@@ -4,3 +4,7 @@ metadata:
   name: cache
 resources:
 - attic.yaml
+- server.secret.sops.yaml
+- tunnel.yaml
+- tunnel.secret.sops.yaml
+- reader.secret.sops.yaml

@@ -45,6 +45,7 @@ images:
   prometheus: docker.io/prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69
   otel: docker.io/otel/opentelemetry-collector-contrib:0.160.0@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6
   blackbox: docker.io/prom/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc
+  attic: ghcr.io/zhaofengli/attic:9eda345a@sha256:325036ce0776ed6e2705819c6bd1ebd1635b0422723110116adf56edf8ea12bd
 sources:
 - https://grafana.github.io/helm-charts/index.yaml
 - https://prometheus-community.github.io/helm-charts/index.yaml

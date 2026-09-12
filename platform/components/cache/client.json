@@ -1,42 +1,12 @@
 {
   "schemaVersion": 1,
-  "enabled": false,
+  "enabled": true,
   "caches": {
-    "1327945675": {
-      "url": "https://cache.fredrir.com/llunde-backend",
-      "publicKey": "",
-      "publicRead": false,
-      "uploadEnabled": false
-    },
-    "1328144104": {
-      "url": "https://cache.fredrir.com/llunde-frontend",
-      "publicKey": "",
-      "publicRead": false,
-      "uploadEnabled": false
-    },
-    "1328252868": {
-      "url": "https://cache.fredrir.com/llunde-pyparser",
-      "publicKey": "",
-      "publicRead": false,
-      "uploadEnabled": false
-    },
-    "773018612": {
-      "url": "https://cache.fredrir.com/portfolio",
-      "publicKey": "",
-      "publicRead": false,
-      "uploadEnabled": false
-    },
-    "900286164": {
-      "url": "https://cache.fredrir.com/y",
-      "publicKey": "",
-      "publicRead": false,
-      "uploadEnabled": false
-    },
     "1328085692": {
-      "url": "https://cache.fredrir.com/caddy",
-      "publicKey": "",
+      "url": "https://cache.fredrir.com/infra",
+      "publicKey": "infra:w60F/Qwm6ecNxMJoY1nXISowX2QyTxpxz6HsORJvu6k=",
       "publicRead": false,
-      "uploadEnabled": false
+      "uploadEnabled": true
     }
   }
 }
