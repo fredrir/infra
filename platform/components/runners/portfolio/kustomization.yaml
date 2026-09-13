@@ -10,3 +10,15 @@ patches:
     name: buildkit
   patch: "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name:\
     \ buildkit\nspec:\n  values:\n    githubConfigUrl: https://github.com/fredrir/portfolio\n"
+- target:
+    kind: HelmRelease
+    name: buildkit
+  patch: |
+    - op: replace
+      path: /spec/values/template/spec/runtimeClassName
+      value: kata
+    - op: remove
+      path: /spec/values/template/spec/nodeSelector/node-restriction.kubernetes.io~1gvisor
+    - op: add
+      path: /spec/values/template/spec/nodeSelector/node-restriction.kubernetes.io~1kata
+      value: 'true'

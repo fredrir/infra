@@ -57,7 +57,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Name | Value |
 | --- | --- |
 | Runner registration | Separate `fredrir-infra-runners` GitHub App; encrypted credentials in ARC namespaces |
-| Container builds | Ephemeral ARC runners using gVisor and native BuildKit |
+| Container builds | Ephemeral ARC runners using gVisor and native BuildKit; the portfolio pool runs on Kata because gVisor returns ENOTDIR for `unlink` on trailing-slash directory paths, which breaks nitro's output cleanup |
 | Nix builds | Ephemeral ARC runners using Kata; `sandbox=true`, no sandbox fallback |
 | Runner permissions | No host sockets, host paths or Kubernetes API token |
 | Build egress | Cluster DNS and TCP 443 only; Dockerfiles must use `https://` package sources |
@@ -67,6 +67,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Untrusted public PRs | No PR workflow triggers; GitHub approval required for every external contributor; do not approve external runs |
 | Approved source | Protected `main` pushes with matching numeric repository and owner identities |
 | Workflow reuse | Immutable `fredrir/infra/.github/workflows/build-image.yml@<commit>` |
+| Pin changes | A new shared workflow or shared recipe commit re-pins all callers and the OctoSTS policies to that commit together |
 | Release authorization | OctoSTS installed only on `fredrir/infra`; exact repository, event and immutable workflow claims |
 | Deployment mappings | [Repository image mappings](../.github/deployments) |
 | Promotion | Verify GitHub attestations for public images or keyless Cosign signatures for private images, then merge the reviewed digest PR for Flux to reconcile from `main` |
