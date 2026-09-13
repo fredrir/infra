@@ -57,7 +57,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Name | Value |
 | --- | --- |
 | Runner registration | Separate `fredrir-infra-runners` GitHub App; encrypted credentials in ARC namespaces |
-| Container builds | Ephemeral ARC runners using gVisor and native BuildKit; the portfolio pool runs on Kata because gVisor returns ENOTDIR for `unlink` on trailing-slash directory paths, which breaks nitro's output cleanup |
+| Container builds | Ephemeral ARC runners using gVisor and native BuildKit; BuildKit cannot run under Kata here because virtiofs rejects the xattr reads its content hashing needs |
 | Nix builds | Ephemeral ARC runners using Kata; `sandbox=true`, no sandbox fallback |
 | Runner permissions | No host sockets, host paths or Kubernetes API token |
 | Build egress | Cluster DNS and TCP 443 only; Dockerfiles must use `https://` package sources |
