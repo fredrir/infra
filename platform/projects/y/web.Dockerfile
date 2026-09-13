@@ -6,7 +6,7 @@ COPY frontend/ ./
 ENV VITE_BACKEND_URL=/api
 RUN npm run build
 
-FROM docker.io/library/caddy@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+FROM docker.io/library/caddy@sha256:13ba145cba2f3e28fa801994876e4c086d1b95d5aa2a520a734765ffb6b12017
 ARG REVISION
 LABEL org.opencontainers.image.source="https://github.com/fredrir/Y"
 LABEL org.opencontainers.image.revision=$REVISION
