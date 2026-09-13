@@ -62,6 +62,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Runner permissions | No host sockets, host paths or Kubernetes API token |
 | Build egress | Cluster DNS and TCP 443 only; Dockerfiles must use `https://` package sources |
 | Runner scratch | 10Gi requested, 60Gi limit ephemeral storage; BuildKit runners prefer the non-Kata worker |
+| Shared images | [Infrastructure images workflow](../.github/workflows/images.yml): runner BuildKit, runner Nix, backup tools and `platform-caddy`; BuildKit, runc, restic and Caddy compile from pinned upstream commits with patched Go modules because published binaries carry fixable findings |
 | Untrusted public PRs | No PR workflow triggers; GitHub approval required for every external contributor; do not approve external runs |
 | Approved source | Protected `main` pushes with matching numeric repository and owner identities |
 | Workflow reuse | Immutable `fredrir/infra/.github/workflows/build-image.yml@<commit>` |
