@@ -1,11 +1,11 @@
-FROM docker.io/library/node@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS build
+FROM docker.io/library/node@sha256:e961046fec20896e8904f2b4a8b4c7e5ca91826d84d8d33d83dbaa61f942069e AS build
 WORKDIR /app
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY backend/ ./
 RUN npx tsc -p . && cp -R src/schema dist/schema && npm prune --omit=dev --ignore-scripts && npm cache clean --force
 
-FROM docker.io/library/node@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d
+FROM docker.io/library/node@sha256:e961046fec20896e8904f2b4a8b4c7e5ca91826d84d8d33d83dbaa61f942069e
 ARG REVISION
 LABEL org.opencontainers.image.source="https://github.com/fredrir/Y"
 LABEL org.opencontainers.image.revision=$REVISION
