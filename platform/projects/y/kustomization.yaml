@@ -1,6 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: 'y'
+namespace: "y"
 resources:
 - namespace.yaml
 - storage.yaml
@@ -16,3 +16,7 @@ resources:
 - backup.secret.sops.yaml
 components:
 - ../../components/backup-job
+images:
+- digest: sha256:7d4f58b2e4ac561e932835f01c35a614cee87d1c59db2322b9a146e4f8e482f9
+  name: ghcr.io/fredrir/y-web
+  newName: ghcr.io/fredrir/y-web
