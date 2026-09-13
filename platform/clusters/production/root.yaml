@@ -240,3 +240,41 @@ spec:
       name: sops-age
   dependsOn:
   - name: platform-policy
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: llunde-pyparser-migration
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 15m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./platform/projects/llunde-pyparser/migration
+  prune: true
+  wait: true
+  serviceAccountName: platform-reconciler
+  dependsOn:
+  - name: platform-projects
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: llunde-pyparser-application
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 15m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./platform/projects/llunde-pyparser/application
+  prune: true
+  wait: true
+  serviceAccountName: platform-reconciler
+  dependsOn:
+  - name: llunde-pyparser-migration

@@ -58,10 +58,31 @@ class ReleasePRTests(unittest.TestCase):
                             {"name": "web", "image": "ghcr.io/fredrir/example@sha256:" + "c" * 64}]}}}}
             filename = "application.yaml"
         (self.project / filename).write_text(yaml.safe_dump(resource))
-        (self.project / "kustomization.yaml").write_text(yaml.safe_dump({
-            "apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "resources": [filename]}))
+        self.write_kustomization(self.project, [filename], pinned=mode == "kustomize")
         (self.repo / ".github/deployments/123.yaml").write_text(yaml.safe_dump({
             "repository": "fredrir/example", "images": {"ghcr.io/fredrir/example": target}}))
+        self.git("add", ".")
+        self.git("commit", "-m", "Initial deployment")
+
+    def write_kustomization(self, directory, resources, pinned):
+        kustomization = {"apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "resources": resources}
+        if pinned:
+            kustomization["images"] = [{"name": "ghcr.io/fredrir/example", "newName": "ghcr.io/fredrir/example",
+                                        "digest": "sha256:" + "c" * 64}]
+        (directory / "kustomization.yaml").write_text(yaml.safe_dump(kustomization))
+
+    def prepare_nested(self):
+        for stage, kind in [("migration", "Job"), ("application", "Deployment")]:
+            directory = self.project / stage
+            directory.mkdir()
+            resource = {"apiVersion": "batch/v1" if kind == "Job" else "apps/v1", "kind": kind, "metadata": {"name": stage},
+                        "spec": {"template": {"spec": {"containers": [{"name": "app", "image": "ghcr.io/fredrir/example:latest"}]}}}}
+            (directory / f"{stage}.yaml").write_text(yaml.safe_dump(resource))
+            self.write_kustomization(directory, [f"{stage}.yaml"], pinned=True)
+        (self.project / "namespace.yaml").write_text(yaml.safe_dump({"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "example"}}))
+        self.write_kustomization(self.project, ["namespace.yaml"], pinned=False)
+        (self.repo / ".github/deployments/123.yaml").write_text(yaml.safe_dump({
+            "repository": "fredrir/example", "images": {"ghcr.io/fredrir/example": {"path": "platform/projects/example", "mode": "kustomize"}}}))
         self.git("add", ".")
         self.git("commit", "-m", "Initial deployment")
 
@@ -81,6 +102,26 @@ class ReleasePRTests(unittest.TestCase):
         args = json.loads((self.area / "pr.json").read_text())
         self.assertEqual(args[:4], ["pr", "create", "--repo", "fredrir/infra"])
         self.assertNotIn("test-token", " ".join(args))
+
+    def test_every_nested_pin_receives_the_digest_and_nothing_else_changes(self):
+        self.prepare_nested()
+        result = self.run_release()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for stage in ["migration", "application"]:
+            rendered = yaml.safe_load(subprocess.check_output(["kustomize", "build", str(self.project / stage)], text=True))
+            self.assertEqual(rendered["spec"]["template"]["spec"]["containers"][0]["image"], IMAGE)
+        self.assertEqual(self.git("diff", "--name-only", "HEAD^").splitlines(),
+                         ["platform/projects/example/application/kustomization.yaml",
+                          "platform/projects/example/migration/kustomization.yaml"])
+
+    def test_project_without_a_pin_cannot_receive_a_deployment(self):
+        self.prepare()
+        self.write_kustomization(self.project, ["application.yaml"], pinned=False)
+        self.git("commit", "-am", "Drop the pin")
+        result = self.run_release()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.git("status", "--porcelain"), "")
+        self.assertFalse((self.area / "pr.json").exists())
 
     def test_generic_release_updates_revision_without_starting_workloads(self):
         self.prepare("helmrelease")

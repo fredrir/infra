@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: llunde-pyparser
+resources:
+- application.yaml
+images:
+- digest: sha256:d821dd7f48701e958fb1ea2795e1644e7d8aee9c9fd46efdd46a3ae5d9f33a4d
+  name: ghcr.io/fredrir/pyparser-review
+  newName: ghcr.io/fredrir/pyparser-review

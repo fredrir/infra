@@ -5,9 +5,7 @@ resources:
 - namespace.yaml
 - storage.yaml
 - database.yaml
-- application.yaml
 - tunnel.yaml
-- migration.yaml
 - network.yaml
 - application.secret.sops.yaml
 - database.secret.sops.yaml
@@ -17,7 +15,3 @@ resources:
 - backup.secret.sops.yaml
 components:
 - ../../components/backup-job
-images:
-- digest: sha256:d821dd7f48701e958fb1ea2795e1644e7d8aee9c9fd46efdd46a3ae5d9f33a4d
-  name: ghcr.io/fredrir/pyparser-review
-  newName: ghcr.io/fredrir/pyparser-review

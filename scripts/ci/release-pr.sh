@@ -17,7 +17,14 @@ test "$(realpath "$path")" = "$PWD/$path"
 mode=$(yq -er '.images[strenv(IMAGE_NAME)].mode' "$mapping")
 case "$mode" in
   kustomize)
-    (cd "$path" && kustomize edit set image "$IMAGE_NAME=$IMAGE")
+    pinned=0
+    while IFS= read -r kustomization; do
+      yq -e '.images // [] | .[] | select(.name == strenv(IMAGE_NAME))' "$kustomization" > /dev/null || continue
+      (cd "$(dirname "$kustomization")" && kustomize edit set image "$IMAGE_NAME=$IMAGE")
+      kustomize build "$(dirname "$kustomization")" > /dev/null
+      pinned=$((pinned + 1))
+    done < <(find "$path" -name kustomization.yaml | sort)
+    test "$pinned" -gt 0
     ;;
   helmrelease)
     export WORKLOAD
@@ -32,7 +39,7 @@ kustomize build "$path" > /dev/null
 git diff --check
 if git diff --quiet; then exit 0; fi
 while IFS= read -r changed; do
-  test "$changed" = "$path/kustomization.yaml" || test "$changed" = "$path/release.yaml"
+  [[ "$changed" =~ ^$path(/[a-z][a-z0-9-]*)*/kustomization\.yaml$ ]] || test "$changed" = "$path/release.yaml"
 done < <(git diff --name-only)
 branch="deploy/$SOURCE_REPOSITORY_ID/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-${IMAGE_NAME##*/}"
 git switch -c "$branch"
