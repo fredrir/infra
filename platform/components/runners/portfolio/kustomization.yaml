@@ -22,3 +22,6 @@ patches:
     - op: add
       path: /spec/values/template/spec/nodeSelector/node-restriction.kubernetes.io~1kata
       value: 'true'
+    - op: replace
+      path: /spec/values/template/spec/activeDeadlineSeconds
+      value: 9600

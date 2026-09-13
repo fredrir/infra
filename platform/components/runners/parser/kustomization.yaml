@@ -23,3 +23,6 @@ patches:
     - op: add
       path: /spec/values/template/spec/nodeSelector/kubernetes.io~1hostname
       value: fredrir-09
+    - op: replace
+      path: /spec/values/template/spec/activeDeadlineSeconds
+      value: 7800
