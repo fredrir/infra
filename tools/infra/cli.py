@@ -153,9 +153,9 @@ def verify(args):
             "--certificate-github-workflow-sha", args.source_revision,
             "--certificate-github-workflow-ref", "refs/heads/main",
             "--certificate-github-workflow-trigger", "push",
-            "--annotation", "source-repository=" + args.repository,
-            "--annotation", "source-revision=" + args.source_revision,
-            "--annotation", "workflow-revision=" + args.workflow_ref,
+            "--annotations", "source-repository=" + args.repository,
+            "--annotations", "source-revision=" + args.source_revision,
+            "--annotations", "workflow-revision=" + args.workflow_ref,
         ], check=True)
         return
     subprocess.run([

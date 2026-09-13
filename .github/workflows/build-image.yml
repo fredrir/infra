@@ -151,18 +151,18 @@ jobs:
         jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
         unset REGISTRY_TOKEN
         cosign sign --yes --timeout 5m \
-          --annotation "source-repository=$GITHUB_REPOSITORY" \
-          --annotation "source-revision=$GITHUB_SHA" \
-          --annotation "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
+          --annotations "source-repository=$GITHUB_REPOSITORY" \
+          --annotations "source-revision=$GITHUB_SHA" \
+          --annotations "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
         cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
           --certificate-identity "https://github.com/fredrir/infra/.github/workflows/build-image.yml@$WORKFLOW_SHA" \
           --certificate-github-workflow-repository "$GITHUB_REPOSITORY" \
           --certificate-github-workflow-sha "$GITHUB_SHA" \
           --certificate-github-workflow-ref refs/heads/main \
           --certificate-github-workflow-trigger push \
-          --annotation "source-repository=$GITHUB_REPOSITORY" \
-          --annotation "source-revision=$GITHUB_SHA" \
-          --annotation "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
+          --annotations "source-repository=$GITHUB_REPOSITORY" \
+          --annotations "source-revision=$GITHUB_SHA" \
+          --annotations "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
     - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
       if: inputs.deploy
       id: deployment-token
