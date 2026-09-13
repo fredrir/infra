@@ -121,6 +121,7 @@ The shared [project chart](../charts/project) supports web services, workers and
 export ANSIBLE_CONFIG=ansible/ansible.cfg
 export SOPS_AGE_KEY_FILE=/path/to/age-key.txt
 uv run --frozen --group ci ansible-playbook ansible/site.yml --limit fredrir-NN
+uv run --frozen --group ci ansible-playbook ansible/k3s.yml --limit fredrir-NN -e k3s_registration_server=fredrir-08
 uv run --frozen --group ci ansible-playbook ansible/ci-runtimes.yml --limit fredrir-NN
 uv run --frozen --group ci ansible-playbook ansible/maintenance.yml
 uv run --frozen --group ci ansible-playbook ansible/external.yml --limit fredrir-06
@@ -133,6 +134,7 @@ uv run --frozen --group ci ansible-playbook ansible/external.yml --limit fredrir
 | New-node enrollment | [Enrollment helper](../scripts/operations/tailscale_enrollment.py) and [bootstrap playbook](../ansible/tailscale-bootstrap.yml) |
 | Enrollment credentials | Doppler `infra/ops/TAILSCALE_ENROLL_CLIENT_ID` and `TAILSCALE_ENROLL_CLIENT_SECRET`; owner tag `tag:platform-enrollment` |
 | K3s credentials | Separate server/agent tokens in private `/etc/rancher/k3s/` files |
+| Registration seed | Healthy, already clustered control server; default fresh-cluster initializer `fredrir-07` |
 | Control network | `10.60.0.5`, `10.60.0.7`, `10.60.0.8`; etcd stays private |
 | Admin API | Verified kubeconfig; API port 6443 through approved narrow subnet routes |
 | Maintenance | Serial upgrades; reboot only when required; verify new boot identity, API and NodeReady before proceeding |

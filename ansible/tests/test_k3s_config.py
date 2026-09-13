@@ -29,7 +29,7 @@ class K3sConfigurationTests(unittest.TestCase):
             (ROOT / "roles/k3s/templates/config.yaml.j2").read_text()
         )
 
-    def render(self, name, role):
+    def render(self, name, role, registration_server="fredrir-07"):
         return yaml.safe_load(
             self.template.render(
                 self.defaults
@@ -39,7 +39,8 @@ class K3sConfigurationTests(unittest.TestCase):
                     "groups": self.groups,
                     "hostvars": self.hostvars,
                     "k3s_role": role,
-                    "k3s_api_endpoint": self.hostvars["fredrir-07"]["private_ip"],
+                    "k3s_registration_server": registration_server,
+                    "k3s_api_endpoint": self.hostvars[registration_server]["private_ip"],
                 }
             )
         )
@@ -88,6 +89,17 @@ class K3sConfigurationTests(unittest.TestCase):
             self.assertNotIn("agent-token-file", config)
             self.assertNotIn("cluster-init", config)
             self.assertNotIn("token", config)
+
+    def test_alternate_seed_rejoins_a_server_and_registers_a_worker(self):
+        for name, role in [("fredrir-07", "server"), ("fredrir-09", "agent")]:
+            config = self.render(name, role, registration_server="fredrir-08")
+            self.assertEqual(config["server"], "https://10.60.0.8:6443")
+            self.assertNotIn("cluster-init", config)
+            self.assertNotIn("token", config)
+            self.assertEqual(
+                config["token-file"],
+                self.defaults[f"k3s_{role}_token_file"],
+            )
 
 
 if __name__ == "__main__":

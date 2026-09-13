@@ -3,7 +3,7 @@ node-ip: {{ (private_ip if k3s_role == 'server' else tailscale_ip) | to_json }}
 node-external-ip: {{ tailscale_ip | to_json }}
 token-file: {{ (k3s_server_token_file if k3s_role == 'server' else k3s_agent_token_file) | to_json }}
 flannel-iface: tailscale0
-{% if inventory_hostname != groups['server'][0] %}
+{% if inventory_hostname != k3s_registration_server %}
 server: {{ ('https://' + k3s_api_endpoint + ':6443') | to_json }}
 {% endif %}
 kubelet-arg:
@@ -18,7 +18,7 @@ kubelet-arg:
 {% if k3s_role == 'server' %}
 agent-token-file: {{ k3s_agent_token_file | to_json }}
 advertise-address: {{ private_ip | to_json }}
-{% if inventory_hostname == groups['server'][0] %}
+{% if inventory_hostname == k3s_registration_server %}
 cluster-init: true
 {% endif %}
 cluster-cidr: {{ k3s_pod_cidr | to_json }}
