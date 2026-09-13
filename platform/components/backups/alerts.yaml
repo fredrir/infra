@@ -34,6 +34,15 @@ spec:
         severity: critical
       annotations:
         summary: Enabled backup schedule has no successful run
+    - alert: BackupWriterLeftScaledDown
+      expr: |
+        kube_deployment_spec_replicas{namespace="llunde-pyparser",deployment=~"review|worker-extract|worker-light"} == 0
+        or kube_deployment_spec_replicas{namespace="y",deployment="api"} == 0
+      for: 15m
+      labels:
+        severity: critical
+      annotations:
+        summary: Backup writer deployment stayed scaled to zero after a backup window
     - alert: BackupIntegrityOverdue
       expr: |
         (time() - kube_cronjob_status_last_successful_time{cronjob="repository-maintenance"} > 691200)

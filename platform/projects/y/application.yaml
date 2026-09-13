@@ -18,7 +18,6 @@ metadata:
   name: api
   namespace: 'y'
 spec:
-  replicas: 1
   strategy:
     type: Recreate
   selector:

@@ -60,6 +60,8 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Container builds | Ephemeral ARC runners using gVisor and native BuildKit |
 | Nix builds | Ephemeral ARC runners using Kata; `sandbox=true`, no sandbox fallback |
 | Runner permissions | No host sockets, host paths or Kubernetes API token |
+| Build egress | Cluster DNS and TCP 443 only; Dockerfiles must use `https://` package sources |
+| Runner scratch | 10Gi requested, 60Gi limit ephemeral storage; BuildKit runners prefer the non-Kata worker |
 | Untrusted public PRs | No PR workflow triggers; GitHub approval required for every external contributor; do not approve external runs |
 | Approved source | Protected `main` pushes with matching numeric repository and owner identities |
 | Workflow reuse | Immutable `fredrir/infra/.github/workflows/build-image.yml@<commit>` |
@@ -165,6 +167,7 @@ kubectl get cronjobs --all-namespaces
 | Credentials | Separate project prefixes and separate maintenance authority; SOPS recovery available from Macie or Archie |
 | Independent copies | Verified migration archives on Macie and Archie |
 | Volume policy | Retained local volumes; important application data currently resides on `fredrir-09` |
+| Writer quiescence | Backup jobs scale writers to zero and back; writer Deployments omit `replicas` so Flux does not resume them mid-export; `BackupWriterLeftScaledDown` alerts after 15 minutes |
 | Node loss | Local volumes do not migrate automatically; restore to replacement storage after fencing the old writer |
 | Verification | Parser, Y, portfolio, Attic and native K3s datastore restored independently; row/file checks passed |
 | Cache recovery | Builds can bootstrap independently; cache objects may be rebuilt |
