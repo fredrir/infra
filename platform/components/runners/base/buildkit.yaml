@@ -63,12 +63,12 @@ spec:
             type: RuntimeDefault
         containers:
         - name: runner
-          image: ghcr.io/fredrir/infra-runner-buildkit@sha256:6b400a042682e58da65c25c7fcc16d9f05474714921acfe042603578d5d21667
+          image: ghcr.io/fredrir/infra-runner-buildkit@sha256:27a14f2a3c5182a4f0665ac0afffb6596b93b4addf87dcdb2b21abe336c6ec96
           imagePullPolicy: IfNotPresent
           command:
           - /home/runner/run.sh
           env:
-          - name: RUNNER_ALLOW_RUNAS_ROOT
+          - name: RUNNER_ALLOW_RUNASROOT
             value: '1'
           securityContext:
             privileged: false

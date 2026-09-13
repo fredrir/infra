@@ -10,6 +10,20 @@
       - k3s_role != 'server' or private_ip in ansible_facts.all_ipv4_addresses
       - k3s_server_token_file != k3s_agent_token_file
 
+- name: Require an inventory control server for registration
+  ansible.builtin.assert:
+    that:
+      - k3s_registration_server in groups['server']
+  tags: [registration-check, worker-labels]
+
+- name: Verify the selected registration server API and datastore
+  ansible.builtin.command:
+    argv: [/usr/local/bin/k3s, kubectl, get, --raw=/readyz, --request-timeout=15s]
+  delegate_to: "{{ k3s_registration_server }}"
+  changed_when: false
+  when: inventory_hostname != k3s_registration_server
+  tags: [registration-check, worker-labels]
+
 - name: Inspect protected join credentials
   ansible.builtin.stat:
     path: "{{ item }}"
@@ -146,7 +160,7 @@
       - "{{ inventory_hostname }}"
       - "-o=jsonpath={.status.conditions[?(@.type=='Ready')].status}"
       - --request-timeout=10s
-  delegate_to: "{{ groups['server'][0] }}"
+  delegate_to: "{{ k3s_registration_server }}"
   changed_when: false
   register: k3s_ready
   until: k3s_ready.rc == 0 and k3s_ready.stdout == 'True'
@@ -166,7 +180,7 @@
       - node-restriction.kubernetes.io/stateful=true
       - --overwrite
       - --request-timeout=10s
-  delegate_to: "{{ groups['server'][0] }}"
+  delegate_to: "{{ k3s_registration_server }}"
   when: k3s_role == 'agent'
   register: k3s_labels
   changed_when: "'not labeled' not in k3s_labels.stdout"

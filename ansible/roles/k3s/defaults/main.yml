@@ -10,7 +10,8 @@ k3s_artifacts:
 k3s_server_token_file: /etc/rancher/k3s/server-token
 k3s_agent_token_file: /etc/rancher/k3s/agent-token
 k3s_api_name: k3s-api.internal
-k3s_api_endpoint: "{{ hostvars[groups['server'][0]].private_ip }}"
+k3s_registration_server: "{{ groups['server'][0] }}"
+k3s_api_endpoint: "{{ hostvars[k3s_registration_server].private_ip }}"
 k3s_pod_cidr: 10.42.0.0/16
 k3s_service_cidr: 10.43.0.0/16
 k3s_service: "{{ 'k3s' if k3s_role == 'server' else 'k3s-agent' }}"

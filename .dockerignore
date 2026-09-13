@@ -1,0 +1,12 @@
+.git
+.infra
+.infra-build-recipe
+.infra-deploy
+.venv
+.direnv
+.env
+.env.*
+**/__pycache__
+**/node_modules
+result
+result-*

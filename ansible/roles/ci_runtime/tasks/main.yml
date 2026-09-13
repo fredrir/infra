@@ -80,7 +80,7 @@
   notify: Restart the K3s worker
 
 - name: Install the verified Kata package
-  when: ci_kata_archive | length > 0 or ci_kata_url | length > 0
+  when: ci_kata_enabled or ci_kata_archive | length > 0
   block:
     - name: Require a matching package and KVM
       ansible.builtin.stat:

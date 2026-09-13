@@ -1,5 +1,5 @@
 FROM docker.io/nixos/nix:2.35.2@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c AS nix
-FROM ghcr.io/actions/actions-runner:2.334.0@sha256:b6614fce332517f74d0a76e7c762fb08e4f2ff13dcf333183397c8a5725b6e8e
+FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
 USER root
 COPY --from=nix /nix /nix
 RUN groupadd --gid 30000 nixbld \
@@ -8,5 +8,5 @@ RUN groupadd --gid 30000 nixbld \
     && printf 'experimental-features = nix-command flakes\nsandbox = true\nsandbox-fallback = false\nbuild-users-group = nixbld\nfilter-syscalls = true\nauto-allocate-uids = false\nuse-cgroups = false\nmax-jobs = 1\ncores = 2\n' > /etc/nix/nix.conf
 ENV PATH=/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-ENV RUNNER_ALLOW_RUNAS_ROOT=1
+ENV RUNNER_ALLOW_RUNASROOT=1
 WORKDIR /home/runner

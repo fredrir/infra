@@ -17,6 +17,11 @@ jobs:
       with:
         ref: ${{ github.sha }}
         persist-credentials: false
+    - name: Configure Nix cache
+      run: |
+        echo "::add-mask::$ATTIC_TOKEN"
+        nix run .#attic-client -- login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
+        nix run .#attic-client -- use "infra:$ATTIC_CACHE"
     - name: Check native toolchain
       run: |
         test "$(uname -m)" = x86_64

@@ -64,7 +64,7 @@ spec:
             localhostProfile: kata-nix.json
         containers:
         - name: runner
-          image: ghcr.io/fredrir/infra-runner-nix@sha256:58d2ea5406a9d38ac1dac8f6235534448cdfa576b8c1b6fbfbd82c7d4a73b5f1
+          image: ghcr.io/fredrir/infra-runner-nix@sha256:c5bd85e4fd2c30d999b47bc1ed8cdd15e96cacd5f77044613e924929b65696f3
           imagePullPolicy: IfNotPresent
           command:
           - /bin/bash
@@ -79,7 +79,7 @@ spec:
 
             '
           env:
-          - name: RUNNER_ALLOW_RUNAS_ROOT
+          - name: RUNNER_ALLOW_RUNASROOT
             value: '1'
           - name: ATTIC_SERVER
             value: http://attic.nix-cache.svc.cluster.local:8080
