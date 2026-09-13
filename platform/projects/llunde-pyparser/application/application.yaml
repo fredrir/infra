@@ -3,8 +3,6 @@ kind: Service
 metadata:
   name: review
   namespace: llunde-pyparser
-  annotations:
-    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   selector:
     app.kubernetes.io/name: review

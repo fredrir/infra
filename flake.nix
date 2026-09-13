@@ -40,11 +40,11 @@
     });
     packages = forAllSystems (system: {
       attic-client = nixpkgs.legacyPackages.${system}.attic-client;
-      default = nixpkgs.legacyPackages.${system}.buildEnv {
+      default = (nixpkgs.legacyPackages.${system}.buildEnv {
         name = "infra-toolchain";
         paths = toolchain system;
         pathsToLink = ["/bin" "/share"];
-      };
+      }).overrideAttrs (_: {allowSubstitutes = true;});
     });
     formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);
   };
