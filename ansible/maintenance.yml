@@ -1,0 +1,92 @@
+- name: Update Ubuntu cluster hosts one at a time
+  hosts: k3s_cluster
+  order: inventory
+  serial: 1
+  any_errors_fatal: true
+  become: true
+  gather_facts: true
+  vars:
+    maintenance_control: "{{ groups['server'][1] if inventory_hostname == groups['server'][0] else groups['server'][0] }}"
+    maintenance_service: "{{ 'k3s' if inventory_hostname in groups['server'] else 'k3s-agent' }}"
+  pre_tasks:
+    - name: Require the supported Ubuntu release
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Ubuntu'
+          - ansible_facts.distribution_version == ubuntu_release
+
+    - name: Check the remaining control API
+      ansible.builtin.command:
+        argv: [/usr/local/bin/k3s, kubectl, get, --raw=/readyz, --request-timeout=15s]
+      delegate_to: "{{ maintenance_control }}"
+      changed_when: false
+
+    - name: Require all cluster nodes ready before maintenance
+      ansible.builtin.command:
+        argv: [/usr/local/bin/k3s, kubectl, wait, --for=condition=Ready, node, --all, --timeout=60s]
+      delegate_to: "{{ maintenance_control }}"
+      changed_when: false
+  tasks:
+    - name: Apply supported Ubuntu package updates
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+        upgrade: safe
+        force_apt_get: true
+        policy_rc_d: 101
+        lock_timeout: 60
+        dpkg_options: force-confdef,force-confold
+      environment:
+        NEEDRESTART_MODE: l
+      async: 1200
+      poll: 10
+
+    - name: Check package configuration
+      ansible.builtin.command: dpkg --audit
+      register: maintenance_audit
+      changed_when: false
+      failed_when: maintenance_audit.rc != 0 or maintenance_audit.stdout | trim != ''
+
+    - name: Inspect the reboot requirement
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: maintenance_reboot
+
+    - name: Reboot when updated packages require it
+      ansible.builtin.reboot:
+        reboot_timeout: 420
+        connect_timeout: 5
+        post_reboot_delay: 10
+        test_command: "/usr/bin/systemctl is-active {{ maintenance_service }}"
+      when: maintenance_reboot.stat.exists
+
+    - name: Read the actual host boot identity
+      ansible.builtin.command: cat /proc/sys/kernel/random/boot_id
+      register: maintenance_boot
+      changed_when: false
+
+    - name: Wait for Kubernetes to observe the actual boot
+      ansible.builtin.command:
+        argv: [/usr/local/bin/k3s, kubectl, get, node, "{{ inventory_hostname }}", "-o=jsonpath={.status.nodeInfo.bootID}", --request-timeout=10s]
+      delegate_to: "{{ maintenance_control }}"
+      register: maintenance_observed_boot
+      changed_when: false
+      until: maintenance_observed_boot.rc == 0 and maintenance_observed_boot.stdout == maintenance_boot.stdout
+      retries: 24
+      delay: 5
+
+    - name: Wait for the node to rejoin
+      ansible.builtin.command:
+        argv: [/usr/local/bin/k3s, kubectl, wait, --for=condition=Ready, node, "{{ inventory_hostname }}", --timeout=120s]
+      delegate_to: "{{ maintenance_control }}"
+      changed_when: false
+
+    - name: Verify the API and embedded datastore
+      ansible.builtin.command:
+        argv: [/usr/local/bin/k3s, kubectl, get, --raw=/readyz, --request-timeout=15s]
+      delegate_to: "{{ inventory_hostname if inventory_hostname in groups['server'] else maintenance_control }}"
+      changed_when: false
+
+    - name: Read the running kernel
+      ansible.builtin.command: uname -r
+      changed_when: false
