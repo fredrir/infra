@@ -15,6 +15,11 @@
   "rangeStrategy": "pin",
   "packageRules": [
     {
+      "matchManagers": ["pep621"],
+      "matchDepNames": ["python"],
+      "enabled": false
+    },
+    {
       "matchDatasources": ["docker"],
       "pinDigests": true
     },

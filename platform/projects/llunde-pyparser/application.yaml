@@ -19,7 +19,6 @@ metadata:
   name: review
   namespace: llunde-pyparser
 spec:
-  replicas: 1
   strategy:
     type: Recreate
   selector:
@@ -128,7 +127,6 @@ metadata:
   name: worker-extract
   namespace: llunde-pyparser
 spec:
-  replicas: 1
   strategy:
     type: Recreate
   selector:
@@ -229,7 +227,6 @@ metadata:
   name: worker-light
   namespace: llunde-pyparser
 spec:
-  replicas: 1
   strategy:
     type: Recreate
   selector:
