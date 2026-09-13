@@ -3,13 +3,37 @@ kind: ConfigMap
 metadata:
   name: caddy
 data:
-  Caddyfile: "{\n  admin off\n}\n:8080 {\n  handle /healthz {\n    respond \"origin\
-    \ alive\" 200\n  }\n  @www host www.llunde.no\n  handle @www {\n    redir https://llunde.no{uri}\
-    \ permanent\n  }\n  @api host api.llunde.no\n  handle @api {\n    @private path\
-    \ /metrics* /health* /ready*\n    respond @private 403\n    reverse_proxy api:8080\
-    \ {\n      header_up X-Forwarded-Proto https\n    }\n  }\n  @web host llunde.no\n\
-    \  handle @web {\n    reverse_proxy web:8080 {\n      header_up X-Forwarded-Proto\
-    \ https\n    }\n  }\n  respond 404\n}\n"
+  Caddyfile: |
+    {
+      admin off
+    }
+    (upstream) {
+      reverse_proxy {args[0]} {
+        lb_try_duration 5s
+        lb_try_interval 250ms
+        header_up X-Forwarded-Proto https
+      }
+    }
+    :8080 {
+      handle /healthz {
+        respond "origin alive" 200
+      }
+      @www host www.llunde.no
+      handle @www {
+        redir https://llunde.no{uri} permanent
+      }
+      @api host api.llunde.no
+      handle @api {
+        @private path /metrics* /health* /ready*
+        respond @private 403
+        import upstream api:8080
+      }
+      @web host llunde.no
+      handle @web {
+        import upstream web:8080
+      }
+      respond 404
+    }
 ---
 apiVersion: v1
 kind: Service
@@ -28,6 +52,11 @@ metadata:
   name: caddy
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: caddy
@@ -66,6 +95,10 @@ spec:
         ports:
         - name: http
           containerPort: 8080
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: 5
         resources:
           requests:
             cpu: 50m
@@ -102,6 +135,11 @@ metadata:
   name: cloudflared
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: cloudflared

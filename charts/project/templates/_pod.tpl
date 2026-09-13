@@ -103,6 +103,10 @@ spec:
           port: http
         failureThreshold: 30
         periodSeconds: 5
+      lifecycle:
+        preStop:
+          sleep:
+            seconds: 5
       {{- end }}
       resources: {{ $workload.resources | toJson }}
       volumeMounts:

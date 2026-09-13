@@ -7,6 +7,13 @@ data:
     {
       admin off
     }
+    (upstream) {
+      reverse_proxy {args[0]} {
+        lb_try_duration 5s
+        lb_try_interval 250ms
+        {block}
+      }
+    }
     :8080 {
       handle /healthz {
         respond "origin alive" 200
@@ -15,20 +22,20 @@ data:
       handle @admin {
         @root path /
         redir @root /admin
-        reverse_proxy web:3000 {
+        import upstream web:3000 {
           header_up x-admin-origin 1
         }
       }
       handle /api/* {
-        reverse_proxy api:8080 {
+        import upstream api:8080 {
           header_up -x-admin-origin
         }
       }
       handle /readyz {
-        reverse_proxy api:8080
+        import upstream api:8080
       }
       handle {
-        reverse_proxy web:3000 {
+        import upstream web:3000 {
           header_up -x-admin-origin
         }
       }
@@ -48,6 +55,9 @@ metadata:
   name: caddy
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
   selector:
     matchLabels: {app: caddy}
   template:
@@ -73,6 +83,9 @@ spec:
               drop: [ALL]
               add: [NET_BIND_SERVICE]
           ports: [{name: http, containerPort: 8080}]
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
           resources:
             requests: {cpu: 50m, memory: 64Mi}
             limits: {cpu: 500m, memory: 256Mi}
@@ -96,6 +109,9 @@ metadata:
   name: cloudflared
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
   selector:
     matchLabels: {app: cloudflared}
   template:

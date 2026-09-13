@@ -35,6 +35,7 @@ class OnboardingTests(unittest.TestCase):
             container = deployment["spec"]["template"]["spec"]["containers"][0]
             self.assertEqual(container["image"], IMAGE)
             self.assertFalse(container["securityContext"]["allowPrivilegeEscalation"])
+            self.assertEqual(container["lifecycle"]["preStop"]["sleep"]["seconds"], 5)
             self.assertTrue(any(d and d["kind"] == "Ingress" and d["spec"]["ingressClassName"] == "platform" for d in documents))
             subprocess.run(["kubectl", "kustomize", str(output / "project")], check=True, capture_output=True)
             caller = yaml.safe_load((output / "caller/.github/workflows/build.yaml").read_text())

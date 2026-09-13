@@ -26,6 +26,9 @@ metadata:
   name: api
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
   selector:
     matchLabels:
       app: api
@@ -53,6 +56,9 @@ spec:
               drop: [ALL]
           envFrom: [{secretRef: {name: api}}]
           ports: [{name: http, containerPort: 8080}]
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
           resources:
             requests: {cpu: 100m, memory: 128Mi}
             limits: {cpu: "1", memory: 512Mi}
@@ -76,6 +82,9 @@ metadata:
   name: web
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
   selector:
     matchLabels: {app: web}
   template:
@@ -99,6 +108,9 @@ spec:
             capabilities: {drop: [ALL]}
           envFrom: [{secretRef: {name: web}}]
           ports: [{name: http, containerPort: 3000}]
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
           resources:
             requests: {cpu: 100m, memory: 128Mi}
             limits: {cpu: "1", memory: 512Mi}
