@@ -17,3 +17,7 @@ resources:
 - backup.secret.sops.yaml
 components:
 - ../../components/backup-job
+images:
+- digest: sha256:c9aeb8952f97f708c913835cf4cd29daba64605a496b21362871bfb1d029ec76
+  name: ghcr.io/fredrir/portfolio-worker
+  newName: ghcr.io/fredrir/portfolio-worker
