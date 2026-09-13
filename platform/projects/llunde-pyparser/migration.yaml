@@ -4,6 +4,7 @@ metadata:
   name: migrate
   annotations:
     kustomize.toolkit.fluxcd.io/force: enabled
+    kustomize.toolkit.fluxcd.io/prune: disabled
   namespace: llunde-pyparser
 spec:
   suspend: false
