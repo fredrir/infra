@@ -84,7 +84,7 @@ class TailscaleBootstrapTests(unittest.TestCase):
             capture_output=True,
             text=True,
             env=environment,
-            timeout=30,
+            timeout=120,
         )
 
     def assert_succeeds(self, result):

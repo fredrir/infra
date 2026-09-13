@@ -2,7 +2,9 @@ FROM docker.io/moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f0
 
 FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends jq \
+RUN sed -i 's|^URIs: http://|URIs: https://|' /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get update -o APT::Update::Error-Mode=any \
+    && apt-get install -y --no-install-recommends jq \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=buildkit /usr/bin/buildctl /usr/bin/buildkitd /usr/bin/buildkit-runc /usr/bin/buildctl-daemonless.sh /usr/local/bin/
 ENV RUNNER_ALLOW_RUNASROOT=1
