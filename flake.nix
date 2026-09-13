@@ -39,6 +39,7 @@
       };
     });
     packages = forAllSystems (system: {
+      attic-client = nixpkgs.legacyPackages.${system}.attic-client;
       default = nixpkgs.legacyPackages.${system}.buildEnv {
         name = "infra-toolchain";
         paths = toolchain system;
