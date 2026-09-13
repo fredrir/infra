@@ -20,6 +20,6 @@ images:
 - digest: sha256:77067b9a9fb719df5b006b74fd00aac6feb57fd0eb5b0c1b6685c30bab2e2880
   name: ghcr.io/fredrir/y-api
   newName: ghcr.io/fredrir/y-api
-- digest: sha256:7d4f58b2e4ac561e932835f01c35a614cee87d1c59db2322b9a146e4f8e482f9
+- digest: sha256:25ccbcb89425aaba3da4d9b013099ad73fe2fc1912190b6e0489a1e365b08aba
   name: ghcr.io/fredrir/y-web
   newName: ghcr.io/fredrir/y-web
