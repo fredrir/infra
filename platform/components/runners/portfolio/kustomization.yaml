@@ -30,3 +30,6 @@ patches:
       value:
         type: Localhost
         localhostProfile: kata-nix.json
+    - op: replace
+      path: /spec/values/template/spec/containers/0/resources/limits/memory
+      value: 4Gi
