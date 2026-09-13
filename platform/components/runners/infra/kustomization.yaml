@@ -7,6 +7,7 @@ resources:
 - attic.secret.sops.yaml
 - github-app.secret.sops.yaml
 patches:
+- path: quota.yaml
 - target:
     kind: HelmRelease
     name: buildkit
