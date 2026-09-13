@@ -6,8 +6,8 @@ claim_pattern:
   event_name: ^push$
   ref: ^refs/heads/main$
   runner_environment: ^self-hosted$
-  job_workflow_ref: ^fredrir/infra/\.github/workflows/build-image\.yml@c2b1be6f6cf468f67d7a21a28efa9e684809d7d0$
-  job_workflow_sha: ^c2b1be6f6cf468f67d7a21a28efa9e684809d7d0$
+  job_workflow_ref: ^fredrir/infra/\.github/workflows/build-image\.yml@f20fbb8d9c0f2d1c09f94f05939e92b21cc9d91b$
+  job_workflow_sha: ^f20fbb8d9c0f2d1c09f94f05939e92b21cc9d91b$
 permissions:
   contents: write
   pull_requests: write
