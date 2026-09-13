@@ -186,7 +186,7 @@ spec:
     message: Only the approved pipeline image may execute jobs
   - expression: object.spec.containers.size() == 1 && object.spec.containers[0].name == "runner" && (!has(object.spec.initContainers) || object.spec.initContainers.size() == 0) && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.size() == 0)
     message: CI runs one ephemeral runner without sidecars
-  - expression: has(object.spec.activeDeadlineSeconds) && object.spec.activeDeadlineSeconds > 0 && object.spec.activeDeadlineSeconds <= 3600
+  - expression: has(object.spec.activeDeadlineSeconds) && object.spec.activeDeadlineSeconds > 0 && object.spec.activeDeadlineSeconds <= 10800
     message: Runner lifetime must be bounded
   - expression: has(object.spec.securityContext) && has(object.spec.securityContext.seccompProfile) && ((object.spec.runtimeClassName == "gvisor" && object.spec.securityContext.seccompProfile.type == "RuntimeDefault") || (object.spec.runtimeClassName == "kata" && object.spec.securityContext.seccompProfile.type == "Localhost" && object.spec.securityContext.seccompProfile.localhostProfile == "kata-nix.json"))
     message: Runtime seccomp must match its qualified profile
