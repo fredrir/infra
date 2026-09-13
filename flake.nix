@@ -33,9 +33,12 @@
         yq-go
       ];
   in {
-    devShells = forAllSystems (system: {
-      default = nixpkgs.legacyPackages.${system}.mkShell {
+    devShells = forAllSystems (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+    in {
+      default = pkgs.mkShell {
         packages = toolchain system;
+        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.stdenv.cc.cc.lib]);
       };
     });
     packages = forAllSystems (system: {
