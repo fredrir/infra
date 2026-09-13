@@ -3,8 +3,6 @@ kind: Service
 metadata:
   name: review
   namespace: llunde-pyparser
-  annotations:
-    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   selector:
     app.kubernetes.io/name: review
@@ -20,11 +18,12 @@ kind: Deployment
 metadata:
   name: review
   namespace: llunde-pyparser
-  annotations:
-    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: review
@@ -96,6 +95,10 @@ spec:
         ports:
         - name: http
           containerPort: 8081
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: 5
         readinessProbe:
           httpGet:
             path: /healthz
@@ -130,8 +133,6 @@ kind: Deployment
 metadata:
   name: worker-extract
   namespace: llunde-pyparser
-  annotations:
-    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   strategy:
     type: Recreate
@@ -232,8 +233,6 @@ kind: Deployment
 metadata:
   name: worker-light
   namespace: llunde-pyparser
-  annotations:
-    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   strategy:
     type: Recreate
