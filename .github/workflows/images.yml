@@ -1,0 +1,48 @@
+name: Infrastructure images
+on:
+  push:
+    branches: [main]
+    paths:
+    - .dockerignore
+    - .github/workflows/images.yml
+    - images/runner-buildkit/**
+    - images/runner-nix/**
+    - platform/components/backups/tools.Dockerfile
+permissions:
+  contents: read
+jobs:
+  image:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - image: ghcr.io/fredrir/infra-runner-buildkit
+          dockerfile: images/runner-buildkit/Containerfile
+          check: /home/runner/run.sh --version | grep -x 2.337.0; buildctl --version; buildkitd --version
+        - image: ghcr.io/fredrir/infra-runner-nix
+          dockerfile: images/runner-nix/Containerfile
+          check: /home/runner/run.sh --version | grep -x 2.337.0; nix --version; nix config show | grep -x 'sandbox = true'
+        - image: ghcr.io/fredrir/platform-backup-tools
+          dockerfile: platform/components/backups/tools.Dockerfile
+          check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: fredrir/infra/.github/workflows/build-image.yml@c2b1be6f6cf468f67d7a21a28efa9e684809d7d0
+    with:
+      image: ${{ matrix.image }}
+      dockerfile: ${{ matrix.dockerfile }}
+      deploy: false
+      test-command: |
+        cp '${{ matrix.dockerfile }}' "$RUNNER_TEMP/Containerfile"
+        cat <<'CHECK' >> "$RUNNER_TEMP/Containerfile"
+
+        SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+        RUN ${{ matrix.check }}
+        CHECK
+        export BUILDKITD_FLAGS="$BUILDKITD_FLAGS --oci-worker-net=host"
+        buildctl-daemonless.sh build --frontend dockerfile.v0 \
+          --local context=. --local "dockerfile=$RUNNER_TEMP" \
+          --opt filename=Containerfile --opt platform=linux/amd64
