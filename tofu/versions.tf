@@ -4,7 +4,7 @@ terraform {
   required_providers {
     hcloud = {
       source  = "hetznercloud/hcloud"
-      version = "1.68.0"
+      version = "1.69.0"
     }
     aws = {
       source  = "hashicorp/aws"
@@ -12,7 +12,7 @@ terraform {
     }
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "5.23.0"
+      version = "5.25.0"
     }
   }
   backend "s3" {
