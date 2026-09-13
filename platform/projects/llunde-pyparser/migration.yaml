@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: migrate
   annotations:
-    kustomize.toolkit.fluxcd.io/force: "true"
+    kustomize.toolkit.fluxcd.io/force: enabled
   namespace: llunde-pyparser
 spec:
   suspend: false
