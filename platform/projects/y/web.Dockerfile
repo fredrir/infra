@@ -6,11 +6,11 @@ COPY frontend/ ./
 ENV VITE_BACKEND_URL=/api
 RUN npm run build
 
-FROM docker.io/library/caddy@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+FROM ghcr.io/fredrir/platform-caddy@sha256:b6c38126fe81ea62bba23a7d2aaff7301119eb530a2baae957d7517680889bd8
 ARG REVISION
 LABEL org.opencontainers.image.source="https://github.com/fredrir/Y"
 LABEL org.opencontainers.image.revision=$REVISION
-RUN setcap -r /usr/bin/caddy
+RUN apk upgrade --no-cache
 COPY --from=build /app/dist /srv
 COPY --chmod=644 containers/Caddyfile /etc/caddy/Caddyfile
 USER 1000:1000
