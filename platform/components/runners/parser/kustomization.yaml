@@ -10,3 +10,16 @@ patches:
     name: buildkit
   patch: "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name:\
     \ buildkit\nspec:\n  values:\n    githubConfigUrl: https://github.com/fredrir/llunde-pyparser\n"
+- target:
+    kind: HelmRelease
+    name: buildkit
+  patch: |
+    - op: replace
+      path: /spec/values/template/spec/containers/0/resources/requests/ephemeral-storage
+      value: 40Gi
+    - op: replace
+      path: /spec/values/template/spec/containers/0/resources/limits/ephemeral-storage
+      value: 200Gi
+    - op: add
+      path: /spec/values/template/spec/nodeSelector/kubernetes.io~1hostname
+      value: fredrir-09
