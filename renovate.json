@@ -34,6 +34,11 @@
     {
       "matchManagers": ["terraform"],
       "groupName": "tofu providers"
+    },
+    {
+      "matchManagers": ["terraform"],
+      "matchDepTypes": ["required_version"],
+      "enabled": false
     }
   ],
   "nix": {
