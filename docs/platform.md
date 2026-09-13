@@ -65,7 +65,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Workflow reuse | Immutable `fredrir/infra/.github/workflows/build-image.yml@<commit>` |
 | Release authorization | OctoSTS installed only on `fredrir/infra`; exact repository, event and immutable workflow claims |
 | Deployment mappings | [Repository image mappings](../.github/deployments) |
-| Promotion | Verify GitHub provenance, open an infrastructure PR, merge the reviewed digest update, let Flux reconcile |
+| Promotion | Verify GitHub attestations for public images or keyless Cosign signatures for private images, then merge the reviewed digest PR for Flux to reconcile from `main` |
 | Rollback | Revert the deployment commit; check database schema compatibility first |
 | Native ARM | Unavailable until an ARM worker and its runtime/images pass qualification |
 
