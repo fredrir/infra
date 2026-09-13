@@ -26,6 +26,7 @@ jobs:
         - image: ghcr.io/fredrir/platform-caddy
           dockerfile: images/caddy/Containerfile
           check: caddy version | grep -E '^v2\.11\.4 '; caddy list-modules | grep -x http.handlers.file_server
+          shell: '["/bin/sh", "-euc"]'
         - image: ghcr.io/fredrir/platform-backup-tools
           dockerfile: platform/components/backups/tools.Dockerfile
           check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version
@@ -34,7 +35,7 @@ jobs:
       packages: write
       id-token: write
       attestations: write
-    uses: fredrir/infra/.github/workflows/build-image.yml@c2b1be6f6cf468f67d7a21a28efa9e684809d7d0
+    uses: fredrir/infra/.github/workflows/build-image.yml@bf2b35e076ba54dbf50bfd8f750deaa78157dcfc
     with:
       image: ${{ matrix.image }}
       dockerfile: ${{ matrix.dockerfile }}
@@ -43,7 +44,7 @@ jobs:
         cp '${{ matrix.dockerfile }}' "$RUNNER_TEMP/Containerfile"
         cat <<'CHECK' >> "$RUNNER_TEMP/Containerfile"
 
-        SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+        SHELL ${{ matrix.shell || '["/bin/bash", "-euo", "pipefail", "-c"]' }}
         RUN ${{ matrix.check }}
         CHECK
         export BUILDKITD_FLAGS="$BUILDKITD_FLAGS --oci-worker-net=host"

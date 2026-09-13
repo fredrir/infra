@@ -12,7 +12,7 @@
 | Runtime secrets | SOPS + age; separate Macie, Archie and Flux recipients |
 | Scheduling | Kubernetes requests, limits, quotas, priorities and protected runtime capability labels |
 | Images | GHCR, immutable digests |
-| Version pins | [Platform versions](../platform/versions.yaml), role defaults, image Dockerfiles and `flake.lock` |
+| Version pins | [Platform versions](../platform/versions.yaml), role defaults, image Dockerfiles, `flake.lock`; runner image digests in the runner sets and the [admission policy](../platform/components/policy/admission.yaml) |
 
 ## Ownership
 
