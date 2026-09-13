@@ -127,7 +127,7 @@ jobs:
         subject-name: ${{ inputs.image }}
         subject-digest: ${{ steps.build.outputs.digest }}
     - name: Verify published provenance
-      if: inputs.deploy && !github.event.repository.private
+      if: '!github.event.repository.private'
       env:
         GH_TOKEN: ${{ github.token }}
         IMAGE: ${{ steps.build.outputs.image }}

@@ -22,8 +22,10 @@ jobs:
         echo "::add-mask::$ATTIC_TOKEN"
         nix run .#attic-client -- login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
         nix run .#attic-client -- use "infra:$ATTIC_CACHE"
+        nix config show | grep -E '^(substituters|trusted-public-keys|netrc-file) '
     - name: Check native toolchain
       run: |
+        nix config show | grep -E '^(substituters|trusted-public-keys|netrc-file) '
         test "$(uname -m)" = x86_64
         test ! -e /var/run/secrets/kubernetes.io/serviceaccount/token
         nix flake check --all-systems --no-build

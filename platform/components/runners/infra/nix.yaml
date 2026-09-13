@@ -64,7 +64,7 @@ spec:
             localhostProfile: kata-nix.json
         containers:
         - name: runner
-          image: ghcr.io/fredrir/infra-runner-nix@sha256:c5bd85e4fd2c30d999b47bc1ed8cdd15e96cacd5f77044613e924929b65696f3
+          image: ghcr.io/fredrir/infra-runner-nix@sha256:20441eef3d493f450bcc4f409fa4e0412cb8afcb07548e380a5bbb03a30ffb92
           imagePullPolicy: IfNotPresent
           command:
           - /bin/bash
