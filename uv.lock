@@ -172,15 +172,15 @@ ci = [
 
 [package.metadata]
 requires-dist = [
-    { name = "jsonschema", specifier = ">=4.23,<5" },
-    { name = "pyyaml", specifier = ">=6.0.2,<7" },
+    { name = "jsonschema", specifier = "==4.26.0" },
+    { name = "pyyaml", specifier = "==6.0.3" },
 ]
 
 [package.metadata.requires-dev]
 ci = [
-    { name = "ansible-core", specifier = ">=2.21,<2.22" },
+    { name = "ansible-core", specifier = "==2.21.4" },
     { name = "cel-python", specifier = "==0.4.0" },
-    { name = "jinja2", specifier = ">=3.1.6,<4" },
+    { name = "jinja2", specifier = "==3.1.6" },
 ]
 
 [[package]]
