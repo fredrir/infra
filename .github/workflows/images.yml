@@ -7,6 +7,7 @@ on:
     - .github/workflows/images.yml
     - images/runner-buildkit/**
     - images/runner-nix/**
+    - images/caddy/**
     - platform/components/backups/tools.Dockerfile
 permissions:
   contents: read
@@ -22,6 +23,9 @@ jobs:
         - image: ghcr.io/fredrir/infra-runner-nix
           dockerfile: images/runner-nix/Containerfile
           check: /home/runner/run.sh --version | grep -x 2.337.0; nix --version; nix config show | grep -x 'sandbox = true'
+        - image: ghcr.io/fredrir/platform-caddy
+          dockerfile: images/caddy/Containerfile
+          check: caddy version | grep -E '^v2\.11\.4 '; caddy list-modules | grep -x http.handlers.file_server
         - image: ghcr.io/fredrir/platform-backup-tools
           dockerfile: platform/components/backups/tools.Dockerfile
           check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version

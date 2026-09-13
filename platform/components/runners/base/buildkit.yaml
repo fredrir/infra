@@ -100,7 +100,7 @@ spec:
               ephemeral-storage: 10Gi
             limits:
               cpu: '2'
-              memory: 4Gi
+              memory: 8Gi
               ephemeral-storage: 60Gi
         affinity:
           nodeAffinity:
