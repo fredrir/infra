@@ -23,6 +23,9 @@ on:
       deploy:
         type: boolean
         default: true
+      timeout-minutes:
+        type: number
+        default: 45
     outputs:
       image:
         value: ${{ jobs.build.outputs.image }}
@@ -35,7 +38,7 @@ jobs:
   build:
     if: github.repository_owner_id == '114402558' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
     runs-on: buildkit-amd64
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       contents: read
       packages: write
