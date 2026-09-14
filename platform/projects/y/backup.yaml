@@ -133,6 +133,8 @@ spec:
               value: api
             - name: BACKUP_LOCAL_FILES
               value: 'true'
+            - name: BACKUP_LOCAL_FILES_MAX_BYTES
+              value: '5368709120'
             - name: RESTIC_CACHE_DIR
               value: /cache
             - name: TMPDIR
@@ -150,7 +152,7 @@ spec:
               limits:
                 cpu: '1'
                 memory: 512Mi
-                ephemeral-storage: 5Gi
+                ephemeral-storage: 12Gi
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
@@ -176,13 +178,13 @@ spec:
           volumes:
           - name: work
             emptyDir:
-              sizeLimit: 4Gi
+              sizeLimit: 8Gi
           - name: tmp
             emptyDir:
               sizeLimit: 128Mi
           - name: cache
             emptyDir:
-              sizeLimit: 256Mi
+              sizeLimit: 1Gi
           - name: hook
             configMap:
               name: backup-hook
