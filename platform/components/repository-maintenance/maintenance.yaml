@@ -38,7 +38,7 @@ spec:
             args:
             - -ec
             - |
-              restic --retry-lock 10m check --read-data
+              restic --retry-lock 10m check --read-data-subset=10%
               restic --retry-lock 10m forget --group-by host,tags --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
             envFrom:
             - secretRef:

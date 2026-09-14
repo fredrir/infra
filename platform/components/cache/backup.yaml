@@ -50,7 +50,11 @@ spec:
             - name: BACKUP_WRITERS
               value: ''
             - name: BACKUP_LOCAL_FILES
-              value: 'false'
+              value: 'true'
+            - name: BACKUP_LOCAL_FILES_MAX_BYTES
+              value: '8589934592'
+            - name: BACKUP_LOCAL_FILES_EXCLUDE
+              value: './metadata.db*'
             - name: RESTIC_CACHE_DIR
               value: /cache
             - name: TMPDIR
@@ -63,7 +67,7 @@ spec:
               limits:
                 cpu: '1'
                 memory: 512Mi
-                ephemeral-storage: 5Gi
+                ephemeral-storage: 16Gi
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
@@ -82,17 +86,16 @@ spec:
               readOnly: true
             - name: files
               mountPath: /files
-              readOnly: true
           volumes:
           - name: work
             emptyDir:
-              sizeLimit: 4Gi
+              sizeLimit: 12Gi
           - name: tmp
             emptyDir:
               sizeLimit: 128Mi
           - name: cache
             emptyDir:
-              sizeLimit: 256Mi
+              sizeLimit: 1Gi
           - name: hook
             configMap:
               name: backup-hook
@@ -100,7 +103,6 @@ spec:
           - name: files
             persistentVolumeClaim:
               claimName: data-attic-0
-              readOnly: true
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
