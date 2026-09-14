@@ -9,7 +9,7 @@ RUN go get golang.org/x/crypto@v0.57.0 golang.org/x/net@v0.59.0 golang.org/x/tex
     && go mod tidy
 RUN CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -X main.version=0.19.1' -o /usr/local/bin/restic ./cmd/restic
 
-FROM docker.io/library/alpine:3.23.5@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
+FROM docker.io/library/alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 RUN sed -i 's|http://|https://|g' /etc/apk/repositories \
     && apk upgrade --no-cache \
     && apk add --no-cache bash ca-certificates coreutils curl jq mongodb-tools postgresql17-client sqlite tar
