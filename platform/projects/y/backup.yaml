@@ -117,7 +117,7 @@ spec:
               type: RuntimeDefault
           containers:
           - name: backup
-            image: ghcr.io/fredrir/platform-backup-tools@sha256:36e0b499186d7f2a8f5195cb9ec89305c56f21c0cf9715385d07cf37add80b9a
+            image: ghcr.io/fredrir/platform-backup-tools@sha256:1dd4da1509547564d4094dc03f6351d72600f76416f8e66d8dc5870dc38a36ce
             imagePullPolicy: IfNotPresent
             args:
             - /hooks/backup.sh
