@@ -20,7 +20,11 @@ full=(
   "quay.io/rockylinux/rockylinux:9@sha256:8101994123cf3d0a8fee517bee7f39e555c7d92bd2d9eb3303cc988a0eeed00f rpm"
   "registry.opensuse.org/opensuse/leap:16.0@sha256:6a8998a33df6164d29d545c1bb8d9dd5a3595206d993b1a43c54de9aa33d8feb rpm"
 )
-[[ "$scope" == full ]] && targets=("${full[@]}") || targets=("${quick[@]}")
+case "$scope" in
+  full) targets=("${full[@]}") ;;
+  quick) targets=("${quick[@]}") ;;
+  *) echo "unknown smoke scope $scope"; exit 1 ;;
+esac
 mapfile -t tools < <(jq -r 'to_entries[] | "\(.key) \(.value.binary)"' "$channels/tools.json")
 [[ ${#tools[@]} -gt 0 ]] || { echo "No packages to test"; exit 0; }
 export BUILDKITD_FLAGS="${BUILDKITD_FLAGS:-} --oci-worker-net=host"

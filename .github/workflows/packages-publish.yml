@@ -5,6 +5,9 @@ on:
       dry-run:
         type: boolean
         default: false
+      smoke-scope:
+        type: string
+        default: quick
 permissions:
   contents: read
 jobs:
@@ -70,7 +73,7 @@ jobs:
         path: ${{ runner.temp }}/channels
     - name: Install from the new repositories
       env:
-        SCOPE: ${{ github.event_name == 'schedule' && 'full' || 'quick' }}
+        SCOPE: ${{ inputs.smoke-scope }}
       run: bash .infra/scripts/packages/smoke-all.sh "$RUNNER_TEMP/site" "$RUNNER_TEMP/channels" "$SCOPE"
   publish:
     needs: smoke
