@@ -176,7 +176,7 @@ def encrypt(document, destination, recipients):
         plaintext.touch(mode=0o600)
         plaintext.write_text(yaml.safe_dump(document, sort_keys=False))
         subprocess.run(["sops", "encrypt", "--encrypted-regex", "^(data|stringData)$", "--age", ",".join(recipients),
-                        "--input-type", "yaml", "--output-type", "yaml", "--output", str(destination), str(plaintext)],
+                        "--input-type", "yaml", "--output-type", "yaml", "--output", str(destination.resolve()), str(plaintext)],
                        check=True, capture_output=True, cwd=directory)
 
 
