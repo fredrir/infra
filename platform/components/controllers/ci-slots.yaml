@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-slots
+  namespace: arc-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ci-slots
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ''
+  resources:
+  - nodes/status
+  verbs:
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ci-slots
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ci-slots
+subjects:
+- kind: ServiceAccount
+  name: ci-slots
+  namespace: arc-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ci-slots
+  namespace: arc-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ci-slots
+  template:
+    metadata:
+      labels:
+        app: ci-slots
+    spec:
+      serviceAccountName: ci-slots
+      priorityClassName: batch
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: reconciler
+        image: ghcr.io/fredrir/platform-backup-tools@sha256:1dd4da1509547564d4094dc03f6351d72600f76416f8e66d8dc5870dc38a36ce
+        command:
+        - /bin/bash
+        - /opt/ci-slots/ci-slots.sh
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: script
+          mountPath: /opt/ci-slots
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: script
+        configMap:
+          name: ci-slots
+      - name: tmp
+        emptyDir:
+          sizeLimit: 16Mi

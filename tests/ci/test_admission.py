@@ -79,6 +79,19 @@ class AdmissionTests(unittest.TestCase):
         term["namespaceSelector"] = {"matchLabels": {"kubernetes.io/metadata.name": "ci-y"}}
         self.assertFalse(self.allowed(pod))
 
+    def test_a_single_worker_slot_replaces_the_shared_build_affinity(self):
+        pod = copy.deepcopy(self.pod)
+        del pod["spec"]["affinity"]
+        del pod["metadata"]["labels"]
+        resources = pod["spec"]["containers"][0]["resources"]
+        for value, allowed in [("1", True), (1, True), ("2", False), ("0", False), ("1000m", False)]:
+            with self.subTest(value=value):
+                resources["limits"]["infra.fredrir.com/ci-slot"] = value
+                self.assertEqual(self.allowed(pod), allowed)
+        del resources["limits"]["infra.fredrir.com/ci-slot"]
+        resources["requests"]["infra.fredrir.com/ci-slot"] = "1"
+        self.assertFalse(self.allowed(pod))
+
 
 if __name__ == "__main__":
     unittest.main()

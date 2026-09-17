@@ -178,10 +178,48 @@
       - "{{ inventory_hostname }}"
       - node-restriction.kubernetes.io/critical=true
       - node-restriction.kubernetes.io/stateful=true
+      - "infra.fredrir.com/ci-slots={{ k3s_ci_slots }}"
       - --overwrite
       - --request-timeout=10s
   delegate_to: "{{ k3s_registration_server }}"
   when: k3s_role == 'agent'
   register: k3s_labels
   changed_when: "'not labeled' not in k3s_labels.stdout"
+  tags: [worker-labels]
+
+- name: Advertise CI job slots through the administrator API
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - patch
+      - node
+      - "{{ inventory_hostname }}"
+      - --subresource=status
+      - --type=merge
+      - "--patch={{ {'status': {'capacity': {k3s_ci_slot_resource: k3s_ci_slots | string}}} | to_json }}"
+      - --request-timeout=10s
+  delegate_to: "{{ k3s_registration_server }}"
+  when: k3s_role == 'agent'
+  register: k3s_ci_slot_patch
+  changed_when: "'(no change)' not in k3s_ci_slot_patch.stdout"
+  tags: [worker-labels]
+
+- name: Wait for the kubelet to publish the CI job slots
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - get
+      - node
+      - "{{ inventory_hostname }}"
+      - "-o=jsonpath={.status.allocatable.{{ k3s_ci_slot_resource | replace('.', '\\.') }}}"
+      - --request-timeout=10s
+  delegate_to: "{{ k3s_registration_server }}"
+  when: k3s_role == 'agent'
+  changed_when: false
+  register: k3s_ci_slot_allocatable
+  until: k3s_ci_slot_allocatable.stdout == (k3s_ci_slots | string)
+  retries: 12
+  delay: 5
   tags: [worker-labels]
