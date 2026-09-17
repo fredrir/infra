@@ -27,6 +27,12 @@ for tool in "$@"; do
         cba6ae86f0a4205784eed8ef049fe53c904138806e33a1bda2e25026b17198eb
       tar -xzf git-cliff.tar.gz --strip-components=1 git-cliff-2.14.1/git-cliff
       ;;
+    yq)
+      fetch yq https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_amd64 \
+        c5f056448f973ae7d39b5401949648a78f2dc1947d6a8eb65be60d5c504b9385
+      chmod 755 yq
+      continue
+      ;;
     gh)
       fetch gh.tar.gz https://github.com/cli/cli/releases/download/v2.101.0/gh_2.101.0_linux_amd64.tar.gz \
         9bca2d1c16825f109907a23307628a2f0698fbf99662b73a5cf0b020293072b8

@@ -27,7 +27,7 @@ class RustOnboardingTests(unittest.TestCase):
         runners = self.root / "platform/components/runners"
         for name in ["ci-namespace", "rust"]:
             shutil.copytree(ROOT / "platform/components/runners" / name, runners / name)
-        (runners / "kustomization.yaml").write_text("resources:\n- existing\n")
+        (runners / "kustomization.yaml").write_text("apiVersion: v1\nresources:\n- existing\n- 'y'\npatches: []\n")
         (self.root / "platform/components/build-cache/projects").mkdir(parents=True)
         (self.root / "platform/components/build-cache/projects/kustomization.yaml").write_text("resources: []\n")
         (self.root / "platform/components/cache").mkdir(parents=True)
@@ -77,8 +77,8 @@ class RustOnboardingTests(unittest.TestCase):
 
     def test_registries_list_the_project_once(self):
         self.onboard()
-        runners = yaml.safe_load((self.root / "platform/components/runners/kustomization.yaml").read_text())
-        self.assertEqual(runners["resources"], ["existing", "example"])
+        runners = (self.root / "platform/components/runners/kustomization.yaml").read_text()
+        self.assertEqual(runners, "apiVersion: v1\nresources:\n- existing\n- 'y'\n- example\npatches: []\n")
         projects = yaml.safe_load((self.root / "platform/components/build-cache/projects/kustomization.yaml").read_text())
         self.assertEqual(projects["resources"], ["example.secret.sops.yaml"])
         registry = yaml.safe_load((self.root / ".github/rust-projects.yaml").read_text())

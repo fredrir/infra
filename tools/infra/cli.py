@@ -186,12 +186,17 @@ def secret(name, namespace, data, labels=None):
 
 
 def append_resource(kustomization, entry):
-    document = yaml.safe_load(kustomization.read_text())
-    resources = document.get("resources") or []
-    if entry in resources:
+    text = kustomization.read_text()
+    if entry in (yaml.safe_load(text).get("resources") or []):
         raise ValueError(f"{entry} is already listed in {kustomization}")
-    document["resources"] = resources + [entry]
-    kustomization.write_text(yaml.safe_dump(document, sort_keys=False))
+    line = yaml.safe_dump([entry])
+    if re.search(r"^resources: \[\]$", text, re.M):
+        text = re.sub(r"^resources: \[\]$", "resources:\n" + line.rstrip("\n"), text, count=1, flags=re.M)
+    elif re.search(r"^resources:\n(- .*\n)*", text, re.M):
+        text = re.sub(r"^(resources:\n(?:- .*\n)*)", lambda m: m.group(1) + line, text, count=1, flags=re.M)
+    else:
+        raise ValueError(f"{kustomization} has no top-level resources list")
+    kustomization.write_text(text)
 
 
 def trust_policy(identity, subject, claims, permissions):
@@ -210,6 +215,7 @@ def rust_callers(identity, reference):
     files = {"project/.github/workflows/ci.yml": {
         "name": "CI", "on": {"push": {"branches": ["main"]}, "pull_request": {}},
         "permissions": {"contents": "read"},
+        "concurrency": {"group": "ci-${{ github.ref }}", "cancel-in-progress": "${{ github.event_name == 'pull_request' }}"},
         "jobs": {"rust": {"uses": uses.format("rust-ci")}},
     }}
     if identity.get("private", False):
