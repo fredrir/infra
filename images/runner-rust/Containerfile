@@ -6,7 +6,7 @@ RUN sed -i 's|^URIs: http://|URIs: https://|' /etc/apt/sources.list.d/ubuntu.sou
     && apt-get update -o APT::Update::Error-Mode=any \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        build-essential clang libclang-dev file jq make perl pkg-config python3 python3-yaml \
+        build-essential clang libclang-dev libssl-dev zlib1g-dev file jq make perl pkg-config python3 python3-yaml \
         gnupg openssh-client util-linux xz-utils zstd postgresql-16 \
     && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
