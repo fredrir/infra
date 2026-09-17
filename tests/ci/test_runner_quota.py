@@ -37,10 +37,10 @@ class RunnerQuotaTests(unittest.TestCase):
                                         + sum(quantity(c["resources"][field][resource]) for c in r["template"]["spec"]["containers"]))
                                        * r["maxRunners"] for r in releases)
                         self.assertGreaterEqual(quantity(quota[f"{field}.{resource}"]), required, f"{field}.{resource}")
-                slots = sum(quantity(c["resources"]["requests"].get("infra.fredrir.com/ci-slot", 0)) * r["maxRunners"]
-                            for r in releases for c in r["template"]["spec"]["containers"])
-                if slots:
-                    self.assertGreaterEqual(quantity(quota["requests.infra.fredrir.com/ci-slot"]), slots)
+                for release in releases:
+                    for container in release["template"]["spec"]["containers"]:
+                        self.assertEqual(container["resources"]["limits"]["infra.fredrir.com/ci-slot"], "1")
+                self.assertNotIn("requests.infra.fredrir.com/ci-slot", quota)
 
 
 if __name__ == "__main__":

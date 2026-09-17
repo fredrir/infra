@@ -9,4 +9,3 @@ spec:
     requests.memory: 31Gi
     limits.cpu: 30500m
     limits.memory: 51Gi
-    requests.infra.fredrir.com/ci-slot: '5'
