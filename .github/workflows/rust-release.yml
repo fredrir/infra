@@ -49,7 +49,7 @@ jobs:
         if [[ "$GITHUB_REF_TYPE" == tag ]]; then
           git-cliff --config "$config" --latest --strip all > "$RUNNER_TEMP/notes.md"
         else
-          git-cliff --config "$config" --unreleased --strip all > "$RUNNER_TEMP/notes.md"
+          git-cliff --config "$config" --unreleased --tag v0.0.0-dry-run --strip all > "$RUNNER_TEMP/notes.md"
         fi
         test -z "$(git status --porcelain)"
     - name: Build every target
