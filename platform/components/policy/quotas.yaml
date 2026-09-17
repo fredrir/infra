@@ -132,3 +132,30 @@ spec:
     default:
       cpu: '1'
       memory: 512Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: namespace-budget
+  namespace: build-cache
+spec:
+  hard:
+    requests.cpu: '2'
+    requests.memory: 2Gi
+    pods: '6'
+    requests.storage: 200Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: defaults
+  namespace: build-cache
+spec:
+  limits:
+  - type: Container
+    defaultRequest:
+      cpu: 50m
+      memory: 64Mi
+    default:
+      cpu: '1'
+      memory: 512Mi
