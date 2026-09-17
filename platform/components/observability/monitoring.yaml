@@ -227,7 +227,13 @@ spec:
     prometheus-node-exporter:
       namespaceOverride: node-exporter
       extraArgs:
-      - --collector.textfile.directory=/host/root/var/lib/node_exporter/textfile_collector
+      - --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
+      extraHostVolumeMounts:
+      - name: textfile-collector
+        hostPath: /var/lib/node_exporter/textfile_collector
+        type: DirectoryOrCreate
+        mountPath: /var/lib/node_exporter/textfile_collector
+        readOnly: true
       hostNetwork: false
       hostPID: false
       resources:
