@@ -29,6 +29,9 @@ data:
       }
       @api host api.llunde.no
       handle @api {
+        handle /__client-ip {
+          respond "{client_ip}" 200
+        }
         @private path /metrics* /health* /ready*
         respond @private 403
         import upstream api:8080
