@@ -7,7 +7,17 @@
     "flux",
     "terraform",
     "pep621",
-    "nix"
+    "nix",
+    "custom.regex"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)Containerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( extractVersion=(?<extractVersion>\\S+))?\\nARG \\S+_VERSION=(?<currentValue>\\S+)"
+      ]
+    }
   ],
   "automerge": false,
   "dependencyDashboard": true,
@@ -39,6 +49,11 @@
       "matchManagers": ["terraform"],
       "matchDepTypes": ["required_version"],
       "enabled": false
+    },
+    {
+      "matchManagers": ["custom.regex"],
+      "groupName": "runner tools",
+      "prBodyNotes": ["Update the matching sha256 in the Containerfile before merging."]
     }
   ],
   "nix": {

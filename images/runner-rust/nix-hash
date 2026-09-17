@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+import hashlib
+import sys
+
+ALPHABET = "0123456789abcdfghijklmnpqrsvwxyz"
+SUPPORTED = ["--type", "sha256", "--flat", "--base32"]
+
+
+def nix_base32(digest):
+    characters = []
+    for index in reversed(range((len(digest) * 8 - 1) // 5 + 1)):
+        byte, offset = divmod(index * 5, 8)
+        value = digest[byte] >> offset
+        if byte + 1 < len(digest):
+            value |= digest[byte + 1] << (8 - offset)
+        characters.append(ALPHABET[value & 0x1F])
+    return "".join(characters)
+
+
+def main(arguments):
+    if len(arguments) != 5 or arguments[:4] != SUPPORTED:
+        sys.exit("usage: nix-hash --type sha256 --flat --base32 FILE")
+    with open(arguments[4], "rb") as source:
+        print(nix_base32(hashlib.file_digest(source, "sha256").digest()))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
