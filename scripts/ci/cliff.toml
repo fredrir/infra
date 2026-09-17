@@ -4,8 +4,8 @@ header = """
 
 """
 body = """
-## [{{ version | trim_start_matches(pat="v") }}]
-_{{ timestamp | date(format="%Y-%m-%d") }}_
+{% if version %}## [{{ version | trim_start_matches(pat="v") }}]
+_{{ timestamp | date(format="%Y-%m-%d") }}_{% else %}## [Unreleased]{% endif %}
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group }}
 {% for commit in commits %}\

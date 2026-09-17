@@ -20,7 +20,7 @@ NIX_LICENSES = {
 }
 QUARANTINE = """postflight_steps do
   on_macos do
-    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/%s"]
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{staged_path}}/%s"]
   end
 end"""
 
@@ -85,7 +85,7 @@ def goreleaser(config, root, dist, sdk):
     for flavour, targets in TARGETS.items():
         environment = ["LIBZ_SYS_STATIC=1"]
         if flavour == "darwin":
-            environment += [f"SDKROOT={sdk}", "MACOSX_DEPLOYMENT_TARGET=11.0", "CARGO_PROFILE_RELEASE_STRIP=false"]
+            environment += [f"SDKROOT={sdk}", "MACOSX_DEPLOYMENT_TARGET=13.0", "CARGO_PROFILE_RELEASE_STRIP=false"]
         builds.append({
             "id": flavour, "builder": "rust", "binary": config["binary"], "dir": relative, "targets": targets,
             "flags": ["--release", "--locked", *features], "env": environment,
@@ -150,8 +150,6 @@ def goreleaser(config, root, dist, sdk):
             "license": config["nix_license"], "main_program": config["binary"], "skip_upload": True,
             "repository": {"owner": owner, "name": "nur-packages"},
         }],
-        "metadata": {"maintainers": [config["maintainer"]], "license": config["license"],
-                     "homepage": config["homepage"], "description": config["description"]},
         "nfpms": [],
         "report_sizes": True,
     }
