@@ -178,6 +178,7 @@
       - "{{ inventory_hostname }}"
       - node-restriction.kubernetes.io/critical=true
       - node-restriction.kubernetes.io/stateful=true
+      - "infra.fredrir.com/ci-slots={{ k3s_ci_slots }}"
       - --overwrite
       - --request-timeout=10s
   delegate_to: "{{ k3s_registration_server }}"

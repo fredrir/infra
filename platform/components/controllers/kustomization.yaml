@@ -4,3 +4,12 @@ metadata:
   name: controllers
 resources:
 - releases.yaml
+- ci-slots.yaml
+configMapGenerator:
+- name: ci-slots
+  namespace: arc-system
+  files:
+  - ci-slots.sh
+generatorOptions:
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled
