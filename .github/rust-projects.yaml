@@ -3,3 +3,5 @@ projects:
   repository: fredrir/nsql
   id: 1269406277
   visibility: public
+  taps:
+  - homebrew-nsql
