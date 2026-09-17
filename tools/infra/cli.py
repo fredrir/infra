@@ -223,7 +223,7 @@ def rust_callers(identity, reference):
     return files | {
         "project/.github/workflows/auto-tag.yml": {
             "name": "Tag release",
-            "on": {"push": {"branches": ["main"], "paths-ignore": [".github/**", "**.md"]}, "workflow_dispatch": {}},
+            "on": {"push": {"branches": ["main"], "paths-ignore": [".github/**", "**.md", "cliff.toml"]}, "workflow_dispatch": {}},
             "permissions": {"contents": "read", "id-token": "write"},
             "concurrency": {"group": "auto-tag", "cancel-in-progress": False},
             "jobs": {"tag": {"uses": uses.format("rust-auto-tag")}},
