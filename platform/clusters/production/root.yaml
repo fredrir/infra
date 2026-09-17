@@ -190,6 +190,33 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: platform-build-cache
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 15m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./platform/components/build-cache
+  prune: true
+  wait: true
+  serviceAccountName: platform-reconciler
+  postBuild:
+    substituteFrom:
+    - kind: ConfigMap
+      name: platform-settings
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+  - name: platform-policy
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: platform-backups
   namespace: flux-system
 spec:

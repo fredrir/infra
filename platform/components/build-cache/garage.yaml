@@ -1,0 +1,178 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: garage
+  namespace: build-cache
+data:
+  garage.toml: |
+    metadata_dir = "/data/meta"
+    data_dir = "/data/data"
+    db_engine = "lmdb"
+    replication_factor = 1
+    rpc_bind_addr = "[::]:3901"
+    rpc_public_addr = "127.0.0.1:3901"
+
+    [s3_api]
+    s3_region = "garage"
+    api_bind_addr = "[::]:3900"
+
+    [admin]
+    api_bind_addr = "[::]:3903"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage
+  namespace: build-cache
+spec:
+  selector:
+    app: garage
+  ports:
+  - name: s3
+    port: 3900
+    targetPort: 3900
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage-admin
+  namespace: build-cache
+spec:
+  selector:
+    app: garage
+  ports:
+  - name: admin
+    port: 3903
+    targetPort: 3903
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: garage
+  namespace: build-cache
+spec:
+  serviceName: garage
+  replicas: 1
+  selector:
+    matchLabels:
+      app: garage
+  template:
+    metadata:
+      labels:
+        app: garage
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        node-restriction.kubernetes.io/stateful: 'true'
+        kubernetes.io/hostname: fredrir-09
+      priorityClassName: batch
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: garage
+        image: docker.io/dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020
+        command:
+        - /garage
+        args:
+        - -c
+        - /etc/garage/garage.toml
+        - server
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: '1'
+            memory: 1Gi
+        ports:
+        - containerPort: 3900
+        - containerPort: 3901
+        - containerPort: 3903
+        env:
+        - name: GARAGE_RPC_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: garage
+              key: GARAGE_RPC_SECRET
+        - name: GARAGE_ADMIN_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: garage
+              key: GARAGE_ADMIN_TOKEN
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /etc/garage
+          readOnly: true
+        readinessProbe:
+          tcpSocket:
+            port: 3900
+        startupProbe:
+          tcpSocket:
+            port: 3903
+          periodSeconds: 5
+          failureThreshold: 24
+      volumes:
+      - name: config
+        configMap:
+          name: garage
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      storageClassName: local-ci
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 150Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: garage-ingress
+  namespace: build-cache
+spec:
+  podSelector:
+    matchLabels:
+      app: garage
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          infra.fredrir.com/tier: ci
+      podSelector:
+        matchExpressions:
+        - key: actions.github.com/scale-set-name
+          operator: In
+          values:
+          - rust-amd64
+          - rust-pr-amd64
+          - rust-release-amd64
+    ports:
+    - port: 3900
+      protocol: TCP
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: build-cache-provisioner
+    ports:
+    - port: 3903
+      protocol: TCP

@@ -1,0 +1,96 @@
+name: Rust CI
+on:
+  workflow_call:
+    inputs:
+      clippy-args:
+        type: string
+        default: --all-features
+      test-args:
+        type: string
+        default: ''
+      minimal-build:
+        type: boolean
+        default: true
+      postgres:
+        type: boolean
+        default: false
+      postgres-url-env:
+        type: string
+        default: DATABASE_URL
+      timeout-minutes:
+        type: number
+        default: 45
+permissions:
+  contents: read
+jobs:
+  check:
+    if: github.repository_owner_id == '114402558' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ${{ github.event_name == 'pull_request' && 'rust-pr-amd64' || 'rust-amd64' }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra
+        persist-credentials: false
+        sparse-checkout: scripts/ci
+    - name: Prepare
+      env:
+        CLIPPY_ARGS: ${{ inputs.clippy-args }}
+        TEST_ARGS: ${{ inputs.test-args }}
+      run: bash .infra/scripts/ci/rust-prepare.sh
+    - name: Start PostgreSQL
+      if: inputs.postgres
+      env:
+        URL_ENV: ${{ inputs.postgres-url-env }}
+      run: bash .infra/scripts/ci/start-postgres.sh
+    - name: Format
+      run: cargo fmt --all -- --check
+    - name: Lint
+      run: |
+        source "$RUNNER_TEMP/rust-args.sh"
+        cargo clippy --all-targets --locked "${CLIPPY_FLAGS[@]}" -- -D warnings
+    - name: Test
+      run: |
+        source "$RUNNER_TEMP/rust-args.sh"
+        cargo nextest run --all-targets --locked --no-tests=pass "${TEST_FLAGS[@]}"
+    - name: Test documentation
+      run: |
+        source "$RUNNER_TEMP/rust-args.sh"
+        if cargo metadata --no-deps --format-version 1 | jq -e '[.packages[].targets[].kind[]] | index("lib")' >/dev/null; then
+          cargo test --doc --locked "${TEST_FLAGS[@]}"
+        fi
+    - name: Build without default features
+      if: inputs.minimal-build
+      run: cargo build --locked --no-default-features
+    - name: Cache report
+      if: always()
+      run: sccache --show-stats >> "$GITHUB_STEP_SUMMARY" || true
+  msrv-audit:
+    if: github.repository_owner_id == '114402558' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ${{ github.event_name == 'pull_request' && 'rust-pr-amd64' || 'rust-amd64' }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra
+        persist-credentials: false
+        sparse-checkout: scripts/ci
+    - name: Prepare
+      run: bash .infra/scripts/ci/rust-prepare.sh
+    - name: Check the minimum supported Rust version
+      run: bash .infra/scripts/ci/check-msrv.sh
+    - name: Audit dependencies
+      run: cargo audit
+    - name: Cache report
+      if: always()
+      run: sccache --show-stats >> "$GITHUB_STEP_SUMMARY" || true

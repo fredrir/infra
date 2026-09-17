@@ -2,7 +2,17 @@ self-hosted-runner:
   labels:
   - buildkit-amd64
   - nix-amd64
+  - rust-amd64
+  - rust-pr-amd64
+  - rust-release-amd64
+  - publish-amd64
 paths:
   .github/workflows/build-image.yml:
+    ignore:
+    - 'property "workflow_(sha|repository)" is not defined in object type'
+  .github/workflows/rust-*.yml:
+    ignore:
+    - 'property "workflow_(sha|repository)" is not defined in object type'
+  .github/workflows/packages-publish.yml:
     ignore:
     - 'property "workflow_(sha|repository)" is not defined in object type'

@@ -1,4 +1,5 @@
 import copy
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -100,6 +101,50 @@ class AdmissionTests(unittest.TestCase):
         term = pod["spec"]["affinity"]["podAntiAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"][0]
         term["namespaceSelector"] = {"matchLabels": {"kubernetes.io/metadata.name": "ci-y"}}
         self.assertFalse(self.allowed(pod))
+
+    def rust_pod(self, variant):
+        rendered = subprocess.run(["kubectl", "kustomize", str(ROOT / "platform/components/runners/rust" / variant)],
+                                  check=True, capture_output=True, text=True).stdout
+        values = yaml.safe_load(rendered)["spec"]["values"]
+        pod = copy.deepcopy(values["template"])
+        pod["metadata"] = {"name": "rust-1", "labels": {"actions.github.com/scale-set-name": values["runnerScaleSetName"]}}
+        return pod
+
+    def test_each_rust_pool_only_receives_its_own_cache_credentials(self):
+        pools = {"pr": "sccache-ro", "main": "sccache-rw", "release": "sccache-release"}
+        for variant, own in pools.items():
+            pod = self.rust_pod(variant)
+            self.assertTrue(self.allowed(pod, namespace="ci-example"), variant)
+            self.assertFalse(self.allowed(pod, namespace="ci-example", controller=False), variant)
+            for other in set(pools.values()) - {own}:
+                with self.subTest(variant=variant, secret=other):
+                    stolen = copy.deepcopy(pod)
+                    for variable in stolen["spec"]["containers"][0]["env"]:
+                        if variable["name"].startswith("AWS_"):
+                            variable["valueFrom"]["secretKeyRef"]["name"] = other
+                    self.assertFalse(self.allowed(stolen, namespace="ci-example"))
+
+    def test_rust_cache_credentials_require_the_rust_image_pool_label_and_matching_key(self):
+        pod = self.rust_pod("main")
+        for mutate in [
+            lambda p: p["metadata"]["labels"].clear(),
+            lambda p: p["metadata"]["labels"].update({"actions.github.com/scale-set-name": "buildkit-amd64"}),
+            lambda p: p["spec"]["containers"][0].update({"image": self.pod["spec"]["containers"][0]["image"]}),
+            lambda p: p["spec"]["containers"][0]["env"][4]["valueFrom"]["secretKeyRef"].update({"key": "AWS_SECRET_ACCESS_KEY"}),
+            lambda p: p["spec"]["containers"][0]["env"].append(
+                {"name": "GITHUB_TOKEN", "valueFrom": {"secretKeyRef": {"name": "sccache-rw", "key": "AWS_ACCESS_KEY_ID"}}}),
+        ]:
+            candidate = copy.deepcopy(pod)
+            mutate(candidate)
+            self.assertFalse(self.allowed(candidate, namespace="ci-example"))
+
+    def test_rust_image_is_not_approved_for_kata(self):
+        pod = self.rust_pod("pr")
+        pod["spec"]["runtimeClassName"] = "kata"
+        pod["spec"]["nodeSelector"] = {"node-restriction.kubernetes.io/kata": "true", "kubernetes.io/arch": "amd64"}
+        pod["spec"]["securityContext"]["seccompProfile"] = {"type": "Localhost", "localhostProfile": "kata-nix.json"}
+        self.assertFalse(self.allowed(pod, namespace="ci-example"))
+
 
 if __name__ == "__main__":
     unittest.main()

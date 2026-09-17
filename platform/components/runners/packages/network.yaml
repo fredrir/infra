@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: aur
+spec:
+  podSelector:
+    matchLabels:
+      actions.github.com/scale-set-name: publish-amd64
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 209.126.35.78/32
+    ports:
+    - protocol: TCP
+      port: 22

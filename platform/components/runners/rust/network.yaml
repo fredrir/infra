@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: build-cache
+spec:
+  podSelector:
+    matchExpressions:
+    - key: actions.github.com/scale-set-name
+      operator: In
+      values:
+      - rust-pr-amd64
+      - rust-amd64
+      - rust-release-amd64
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: build-cache
+      podSelector:
+        matchLabels:
+          app: garage
+    ports:
+    - protocol: TCP
+      port: 3900

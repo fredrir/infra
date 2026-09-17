@@ -1,0 +1,112 @@
+name: Package publisher
+on:
+  workflow_call:
+    inputs:
+      dry-run:
+        type: boolean
+        default: false
+      smoke-scope:
+        type: string
+        default: quick
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.repository == 'fredrir/packages' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main'
+    runs-on: publish-amd64
+    timeout-minutes: 45
+    environment: publish
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra
+        persist-credentials: false
+        sparse-checkout: |
+          scripts
+          .github/rust-projects.yaml
+    - name: Install release tools
+      run: bash .infra/scripts/ci/install-rust-release-tools.sh gh nfpm yq
+    - name: Build signed repositories
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PACKAGES_GPG_KEY: ${{ secrets.PACKAGES_GPG_KEY }}
+        PACKAGES_APK_KEY: ${{ secrets.PACKAGES_APK_KEY }}
+      run: bash .infra/scripts/packages/build.sh
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: site
+        path: ${{ runner.temp }}/packages/site
+        include-hidden-files: true
+        if-no-files-found: error
+        retention-days: 3
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: channels
+        path: ${{ runner.temp }}/packages/channels
+        if-no-files-found: error
+        retention-days: 3
+  smoke:
+    needs: build
+    runs-on: publish-amd64
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra
+        persist-credentials: false
+        sparse-checkout: scripts/packages
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: site
+        path: ${{ runner.temp }}/site
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: channels
+        path: ${{ runner.temp }}/channels
+    - name: Install from the new repositories
+      env:
+        SCOPE: ${{ inputs.smoke-scope }}
+      run: bash .infra/scripts/packages/smoke-all.sh "$RUNNER_TEMP/site" "$RUNNER_TEMP/channels" "$SCOPE"
+  publish:
+    needs: smoke
+    if: '!inputs.dry-run'
+    runs-on: publish-amd64
+    timeout-minutes: 20
+    environment: publish
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra
+        persist-credentials: false
+        sparse-checkout: scripts
+    - name: Install release tools
+      run: bash .infra/scripts/ci/install-rust-release-tools.sh gh
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: site
+        path: ${{ runner.temp }}/site
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: channels
+        path: ${{ runner.temp }}/channels
+    - name: Publish the package site
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: bash .infra/scripts/packages/publish-pages.sh "$RUNNER_TEMP/site"
+    - name: Publish Homebrew, Nix and AUR packages
+      env:
+        AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+      run: python3 .infra/scripts/packages/publish_channels.py --channels "$RUNNER_TEMP/channels"

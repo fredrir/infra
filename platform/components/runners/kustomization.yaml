@@ -7,3 +7,5 @@ resources:
 - parser
 - portfolio
 - 'y'
+- nsql
+- packages

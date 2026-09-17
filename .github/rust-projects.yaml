@@ -1,0 +1,5 @@
+projects:
+- project: nsql
+  repository: fredrir/nsql
+  id: 1269406277
+  visibility: public
