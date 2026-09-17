@@ -168,6 +168,12 @@ class SiteTests(unittest.TestCase):
 class ChannelTests(unittest.TestCase):
     NUR = "{ pkgs ? import <nixpkgs> { } }:\n{\n  lib = import ./lib { inherit pkgs; };\n  example-package = pkgs.callPackage ./pkgs/example-package { };\n}\n"
 
+    def test_git_failures_carry_the_command_error(self):
+        with tempfile.TemporaryDirectory() as directory, self.assertRaises(SystemExit) as failure:
+            channels.git("clone", "--quiet", str(Path(directory) / "missing.git"), str(Path(directory) / "out"))
+        self.assertIn("git clone failed:", str(failure.exception))
+        self.assertIn("missing.git", str(failure.exception))
+
     def test_nur_index_gains_each_package_once(self):
         updated = channels.nur_index(self.NUR, "nsql")
         self.assertIn("  nsql = pkgs.callPackage ./pkgs/nsql { };\n}", updated)

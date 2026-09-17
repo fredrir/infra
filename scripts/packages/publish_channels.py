@@ -14,7 +14,10 @@ AUTHOR = ["-c", "user.name=fredrir-packages[bot]", "-c", "user.email=packages@fr
 
 
 def git(*args, cwd=None, env=None):
-    return subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True, text=True).stdout
+    result = subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=True, text=True)
+    if result.returncode:
+        raise SystemExit(f"git {args[0]} failed: {result.stderr.strip()}")
+    return result.stdout
 
 
 def exchange(scope, identity):
