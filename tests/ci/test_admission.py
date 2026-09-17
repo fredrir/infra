@@ -20,7 +20,7 @@ class AdmissionTests(unittest.TestCase):
                         for v in p["spec"]["validations"]]
         release = yaml.safe_load((ROOT / "platform/components/runners/base/buildkit.yaml").read_text())
         cls.pod = copy.deepcopy(release["spec"]["values"]["template"])
-        cls.pod["metadata"]["name"] = "runner-1"
+        cls.pod.setdefault("metadata", {})["name"] = "runner-1"
 
     def allowed(self, pod, namespace="ci-y", controller=True):
         request = {"namespace": namespace, "operation": "CREATE", "userInfo": {
@@ -54,7 +54,7 @@ class AdmissionTests(unittest.TestCase):
     def test_attic_token_is_limited_to_infra_kata(self):
         release = yaml.safe_load((ROOT / "platform/components/runners/infra/nix.yaml").read_text())
         pod = copy.deepcopy(release["spec"]["values"]["template"])
-        pod["metadata"]["name"] = "nix-1"
+        pod.setdefault("metadata", {})["name"] = "nix-1"
         self.assertTrue(self.allowed(pod, namespace="ci-infra"))
         self.assertFalse(self.allowed(pod, namespace="ci-y"))
         self.assertFalse(self.allowed(pod, namespace="ci-infra", controller=False))
@@ -67,31 +67,39 @@ class AdmissionTests(unittest.TestCase):
         pod["spec"]["volumes"] = [{"name": "credentials", "secret": {"secretName": "github-app"}}]
         self.assertFalse(self.allowed(pod))
 
-    def test_shared_worker_budget_cannot_be_removed_or_narrowed(self):
+    def legacy_pod(self):
         pod = copy.deepcopy(self.pod)
-        del pod["spec"]["affinity"]
+        for field in ["requests", "limits"]:
+            del pod["spec"]["containers"][0]["resources"][field]["infra.fredrir.com/ci-slot"]
+        pod["metadata"]["labels"] = {"infra.fredrir.com/ci-slot": "build"}
+        pod["spec"]["affinity"] = {"podAntiAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": [{
+            "labelSelector": {"matchLabels": {"infra.fredrir.com/ci-slot": "build"}},
+            "namespaceSelector": {"matchLabels": {"infra.fredrir.com/tier": "ci"}},
+            "topologyKey": "kubernetes.io/hostname"}]}}
+        return pod
+
+    def test_runner_pools_hold_exactly_one_worker_slot(self):
+        resources = self.pod["spec"]["containers"][0]["resources"]
+        self.assertEqual(resources["limits"]["infra.fredrir.com/ci-slot"], "1")
+        self.assertNotIn("affinity", self.pod["spec"].get("affinity", {}).get("podAntiAffinity", {}))
+        for value, allowed in [("1", True), (1, True), ("2", False), ("0", False), ("1000m", False)]:
+            with self.subTest(value=value):
+                pod = copy.deepcopy(self.pod)
+                pod["spec"]["containers"][0]["resources"]["limits"]["infra.fredrir.com/ci-slot"] = value
+                self.assertEqual(self.allowed(pod), allowed)
+        pod = copy.deepcopy(self.pod)
+        del pod["spec"]["containers"][0]["resources"]["limits"]["infra.fredrir.com/ci-slot"]
         self.assertFalse(self.allowed(pod))
-        pod = copy.deepcopy(self.pod)
+
+    def test_legacy_shared_slot_stays_admitted_until_pools_move(self):
+        self.assertTrue(self.allowed(self.legacy_pod()))
+        pod = self.legacy_pod()
         pod["metadata"]["labels"] = {}
         self.assertFalse(self.allowed(pod))
-        pod = copy.deepcopy(self.pod)
+        pod = self.legacy_pod()
         term = pod["spec"]["affinity"]["podAntiAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"][0]
         term["namespaceSelector"] = {"matchLabels": {"kubernetes.io/metadata.name": "ci-y"}}
         self.assertFalse(self.allowed(pod))
-
-    def test_a_single_worker_slot_replaces_the_shared_build_affinity(self):
-        pod = copy.deepcopy(self.pod)
-        del pod["spec"]["affinity"]
-        del pod["metadata"]["labels"]
-        resources = pod["spec"]["containers"][0]["resources"]
-        for value, allowed in [("1", True), (1, True), ("2", False), ("0", False), ("1000m", False)]:
-            with self.subTest(value=value):
-                resources["limits"]["infra.fredrir.com/ci-slot"] = value
-                self.assertEqual(self.allowed(pod), allowed)
-        del resources["limits"]["infra.fredrir.com/ci-slot"]
-        resources["requests"]["infra.fredrir.com/ci-slot"] = "1"
-        self.assertFalse(self.allowed(pod))
-
 
 if __name__ == "__main__":
     unittest.main()

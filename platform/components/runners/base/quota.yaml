@@ -5,6 +5,7 @@ metadata:
 spec:
   hard:
     pods: '3'
+    requests.infra.fredrir.com/ci-slot: '1'
     requests.cpu: '2'
     requests.memory: 10Gi
     limits.cpu: '4'
