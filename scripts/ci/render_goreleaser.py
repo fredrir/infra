@@ -20,7 +20,7 @@ NIX_LICENSES = {
 }
 QUARANTINE = """postflight_steps do
   on_macos do
-    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{staged_path}}/%s"]
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ \"{{staged_path}}\" }}/%s"]
   end
 end"""
 
