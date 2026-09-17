@@ -1,0 +1,133 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: rust
+spec:
+  suspend: false
+  interval: 30m
+  timeout: 5m
+  chart:
+    spec:
+      chart: gha-runner-scale-set
+      version: 0.14.2
+      sourceRef:
+        kind: HelmRepository
+        name: actions
+        namespace: flux-system
+  values:
+    githubConfigUrl: https://github.com/fredrir/unset
+    githubConfigSecret: github-app
+    runnerScaleSetName: rust-unset
+    minRunners: 0
+    maxRunners: 1
+    controllerServiceAccount:
+      name: arc-controller
+      namespace: arc-system
+    listenerTemplate:
+      spec:
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+        - name: listener
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+    template:
+      spec:
+        serviceAccountName: ci-job
+        automountServiceAccountToken: false
+        runtimeClassName: gvisor
+        nodeSelector:
+          node-restriction.kubernetes.io/gvisor: 'true'
+          kubernetes.io/arch: amd64
+        priorityClassName: ci
+        restartPolicy: Never
+        activeDeadlineSeconds: 5400
+        terminationGracePeriodSeconds: 30
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+        - name: runner
+          image: ghcr.io/fredrir/infra-runner-rust@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command:
+          - /home/runner/run.sh
+          env:
+          - name: CI_POOL
+            value: unset
+          - name: CI_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: SCCACHE_BUCKET
+            value: $(CI_NAMESPACE)-main
+          - name: SCCACHE_S3_RW_MODE
+            value: READ_ONLY
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: sccache-ro
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: sccache-ro
+                key: AWS_SECRET_ACCESS_KEY
+          - name: SCCACHE_ENDPOINT
+            value: http://garage.build-cache.svc.cluster.local:3900
+          - name: RUSTC_WRAPPER
+            value: sccache
+          - name: CARGO_BUILD_JOBS
+            valueFrom:
+              resourceFieldRef:
+                containerName: runner
+                resource: limits.cpu
+          - name: NEXTEST_TEST_THREADS
+            valueFrom:
+              resourceFieldRef:
+                containerName: runner
+                resource: limits.cpu
+          - name: ACTIONS_RUNNER_HOOK_JOB_STARTED
+            value: /usr/local/bin/ci-job-started.sh
+          - name: RUNNER_ALLOW_RUNASROOT
+            value: '1'
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+              add:
+              - CHOWN
+              - DAC_OVERRIDE
+              - FOWNER
+              - FSETID
+              - KILL
+              - SETGID
+              - SETUID
+          resources:
+            requests:
+              cpu: '2'
+              memory: 6Gi
+              ephemeral-storage: 20Gi
+              infra.fredrir.com/ci-slot: '1'
+            limits:
+              cpu: '6'
+              memory: 10Gi
+              ephemeral-storage: 80Gi
+              infra.fredrir.com/ci-slot: '1'

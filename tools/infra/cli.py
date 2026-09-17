@@ -1,13 +1,25 @@
 import argparse
 import json
 import re
+import secrets
 import subprocess
+import tempfile
 from pathlib import Path
 
 import yaml
 
 OWNER_ID = 114402558
 WORKFLOW = "fredrir/infra/.github/workflows/build-image.yml"
+ROOT = Path(__file__).resolve().parents[2]
+RUNNERS = Path("platform/components/runners")
+CACHE_PROJECTS = Path("platform/components/build-cache/projects")
+REGISTRY = Path(".github/rust-projects.yaml")
+SHARED_WORKFLOW = r"^fredrir/infra/\.github/workflows/{}\.yml@[0-9a-f]{{40}}$"
+APP_CREDENTIALS = {
+    "github_app_id": "ARC_GITHUB_APP_ID",
+    "github_app_installation_id": "ARC_GITHUB_APP_INSTALLATION_ID",
+    "github_app_private_key": "ARC_GITHUB_APP_PRIVATE_KEY",
+}
 
 
 def checked(value, pattern, label):
@@ -139,6 +151,139 @@ def onboarding(args):
     print(f"Created {output}; add encrypted project-registry/project-runtime Secrets before starting workloads")
 
 
+def platform_recipients(root):
+    found = {tuple(sorted(re.findall(r"recipient: (age1[0-9a-z]+)", path.read_text())))
+             for path in (root / "platform").rglob("*.secret.sops.yaml")}
+    if len(found) != 1:
+        raise ValueError("Platform secrets disagree on their age recipients")
+    return list(found.pop())
+
+
+def app_credentials():
+    result = subprocess.run(["doppler", "secrets", "get", *APP_CREDENTIALS.values(), "--project", "infra",
+                             "--config", "ops", "--json"], check=True, capture_output=True, text=True)
+    values = json.loads(result.stdout)
+    return {key: values[name]["computed"] for key, name in APP_CREDENTIALS.items()}
+
+
+def garage_key():
+    return {"id": "GK" + secrets.token_hex(12), "secret": secrets.token_hex(32)}
+
+
+def encrypt(document, destination, recipients):
+    with tempfile.TemporaryDirectory() as directory:
+        plaintext = Path(directory) / destination.name
+        plaintext.touch(mode=0o600)
+        plaintext.write_text(yaml.safe_dump(document, sort_keys=False))
+        subprocess.run(["sops", "encrypt", "--encrypted-regex", "^(data|stringData)$", "--age", ",".join(recipients),
+                        "--input-type", "yaml", "--output-type", "yaml", "--output", str(destination), str(plaintext)],
+                       check=True, capture_output=True, cwd=directory)
+
+
+def secret(name, namespace, data, labels=None):
+    metadata = {"name": name, "namespace": namespace} | ({"labels": labels} if labels else {})
+    return {"apiVersion": "v1", "kind": "Secret", "metadata": metadata, "type": "Opaque", "stringData": data}
+
+
+def append_resource(kustomization, entry):
+    document = yaml.safe_load(kustomization.read_text())
+    resources = document.get("resources") or []
+    if entry in resources:
+        raise ValueError(f"{entry} is already listed in {kustomization}")
+    document["resources"] = resources + [entry]
+    kustomization.write_text(yaml.safe_dump(document, sort_keys=False))
+
+
+def trust_policy(identity, subject, claims, permissions):
+    name = re.escape(identity["full_name"].split("/")[1])
+    return {
+        "issuer": "https://token.actions.githubusercontent.com",
+        "subject_pattern": f"^repo:fredrir(@{OWNER_ID})?/{name}(@{identity['id']})?:{subject}$",
+        "claim_pattern": {"repository_id": f"^{identity['id']}$", "repository_owner_id": f"^{OWNER_ID}$",
+                          "runner_environment": "^self-hosted$"} | claims,
+        "permissions": permissions,
+    }
+
+
+def rust_callers(identity, reference):
+    uses = f"fredrir/infra/.github/workflows/{{}}.yml@{reference}"
+    files = {"project/.github/workflows/ci.yml": {
+        "name": "CI", "on": {"push": {"branches": ["main"]}, "pull_request": {}},
+        "permissions": {"contents": "read"},
+        "jobs": {"rust": {"uses": uses.format("rust-ci")}},
+    }}
+    if identity.get("private", False):
+        return files
+    return files | {
+        "project/.github/workflows/auto-tag.yml": {
+            "name": "Tag release",
+            "on": {"push": {"branches": ["main"], "paths-ignore": [".github/**", "**.md"]}, "workflow_dispatch": {}},
+            "permissions": {"contents": "read", "id-token": "write"},
+            "concurrency": {"group": "auto-tag", "cancel-in-progress": False},
+            "jobs": {"tag": {"uses": uses.format("rust-auto-tag")}},
+        },
+        "project/.github/workflows/release.yml": {
+            "name": "Release", "on": {"push": {"tags": ["v*"]}, "workflow_dispatch": {}},
+            "permissions": {"contents": "write", "id-token": "write", "attestations": "write"},
+            "concurrency": {"group": "release-${{ github.ref }}", "cancel-in-progress": False},
+            "jobs": {"release": {"uses": uses.format("rust-release")}},
+        },
+        "project/.github/chainguard/auto-tag.sts.yaml": trust_policy(identity, "ref:refs/heads/main", {
+            "ref": "^refs/heads/main$", "event_name": "^(push|workflow_dispatch)$",
+            "job_workflow_ref": SHARED_WORKFLOW.format("rust-auto-tag"),
+        }, {"contents": "write"}),
+        f"packages/.github/chainguard/dispatch-{identity['id']}.sts.yaml": trust_policy(identity, "environment:release", {
+            "ref": r"^refs/tags/v[0-9A-Za-z.+-]+$", "event_name": "^push$", "environment": "^release$",
+            "job_workflow_ref": SHARED_WORKFLOW.format("rust-release"),
+        }, {"actions": "write"}),
+    }
+
+
+def rust_onboarding(args):
+    project = checked(args.project, r"[a-z][a-z0-9-]{0,24}", "project")
+    revision(args.workflow_ref)
+    root = Path(args.root)
+    output = Path(args.output)
+    overlay = root / RUNNERS / project
+    keys = root / CACHE_PROJECTS / f"{project}.secret.sops.yaml"
+    registry = yaml.safe_load((root / REGISTRY).read_text())
+    if output.exists() or overlay.exists() or keys.exists() or any(p["project"] == project for p in registry["projects"]):
+        raise ValueError("Project is already onboarded or the output directory exists")
+    identity = repository(args.repository)
+    if any(p["id"] == identity["id"] for p in registry["projects"]):
+        raise ValueError("Repository is already onboarded")
+    recipients = platform_recipients(root)
+    credentials = app_credentials()
+    namespace = f"ci-{project}"
+    pools = {"ro": garage_key(), "rw": garage_key(), "release": garage_key()}
+    overlay.mkdir(parents=True)
+    resources = ["../ci-namespace", "github-app.secret.sops.yaml"]
+    encrypt(secret("github-app", namespace, credentials), overlay / "github-app.secret.sops.yaml", recipients)
+    for pool, key in pools.items():
+        name = f"sccache-{pool}"
+        encrypt(secret(name, namespace, {"AWS_ACCESS_KEY_ID": key["id"], "AWS_SECRET_ACCESS_KEY": key["secret"]}),
+                overlay / f"{name}.secret.sops.yaml", recipients)
+        resources.append(f"{name}.secret.sops.yaml")
+    encrypt(secret(f"build-cache-{project}", "build-cache",
+                   {f"{pool}_{field}": key[field] for pool, key in pools.items() for field in ["id", "secret"]},
+                   {"infra.fredrir.com/build-cache-project": project}), keys, recipients)
+    url = [{"op": "replace", "path": "/spec/values/githubConfigUrl", "value": "https://github.com/" + identity["full_name"]}]
+    (overlay / "kustomization.yaml").write_text(yaml.safe_dump({
+        "apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "namespace": namespace,
+        "resources": resources, "components": ["../rust"],
+        "patches": [{"target": {"kind": "HelmRelease"}, "patch": yaml.safe_dump(url, sort_keys=False)}],
+    }, sort_keys=False))
+    append_resource(root / RUNNERS / "kustomization.yaml", project)
+    append_resource(root / CACHE_PROJECTS / "kustomization.yaml", keys.name)
+    registry["projects"].append({"project": project, "repository": identity["full_name"], "id": identity["id"],
+                                 "visibility": "private" if identity.get("private", False) else "public"})
+    (root / REGISTRY).write_text(yaml.safe_dump(registry, sort_keys=False))
+    for path, content in rust_callers(identity, args.workflow_ref).items():
+        (output / path).parent.mkdir(parents=True, exist_ok=True)
+        (output / path).write_text(yaml.safe_dump(content, sort_keys=False))
+    print(f"Onboarded {identity['full_name']} as {namespace}; copy {output}/project into the repository")
+
+
 def verify(args):
     immutable_image(args.image)
     revision(args.source_revision)
@@ -181,6 +326,12 @@ def main(argv=None):
     onboard.add_argument("--architecture", choices=["amd64", "arm64"], default="amd64")
     onboard.add_argument("--test-command", required=True)
     onboard.add_argument("--output", required=True)
+    rust = commands.add_parser("onboard-rust")
+    rust.add_argument("repository")
+    rust.add_argument("--project", required=True)
+    rust.add_argument("--workflow-ref", required=True)
+    rust.add_argument("--output", required=True)
+    rust.add_argument("--root", default=str(ROOT))
     verify_parser = commands.add_parser("verify-release")
     verify_parser.add_argument("image")
     verify_parser.add_argument("--repository", required=True)
@@ -188,7 +339,7 @@ def main(argv=None):
     verify_parser.add_argument("--workflow-ref", required=True)
     args = parser.parse_args(argv)
     try:
-        onboarding(args) if args.command == "onboard" else verify(args)
+        {"onboard": onboarding, "onboard-rust": rust_onboarding, "verify-release": verify}[args.command](args)
     except (ValueError, subprocess.CalledProcessError) as error:
         message = str(error) if isinstance(error, ValueError) else "Native command failed"
         parser.exit(1, message + "\n")

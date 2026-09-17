@@ -1,0 +1,46 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+nameSuffix: -release
+resources:
+- ../pool
+patches:
+- target:
+    kind: HelmRelease
+    name: rust
+  patch: |
+    - op: replace
+      path: /spec/values/runnerScaleSetName
+      value: rust-release-amd64
+    - op: replace
+      path: /spec/values/maxRunners
+      value: 1
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/0/name
+      value: CI_POOL
+    - op: replace
+      path: /spec/values/template/spec/containers/0/env/0/value
+      value: release
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/2/name
+      value: SCCACHE_BUCKET
+    - op: replace
+      path: /spec/values/template/spec/containers/0/env/2/value
+      value: $(CI_NAMESPACE)-release
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/3/name
+      value: SCCACHE_S3_RW_MODE
+    - op: replace
+      path: /spec/values/template/spec/containers/0/env/3/value
+      value: READ_WRITE
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/4/name
+      value: AWS_ACCESS_KEY_ID
+    - op: replace
+      path: /spec/values/template/spec/containers/0/env/4/valueFrom/secretKeyRef/name
+      value: sccache-release
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/5/name
+      value: AWS_SECRET_ACCESS_KEY
+    - op: replace
+      path: /spec/values/template/spec/containers/0/env/5/valueFrom/secretKeyRef/name
+      value: sccache-release

@@ -1,0 +1,140 @@
+name: Rust release
+on:
+  workflow_call: {}
+permissions:
+  contents: read
+env:
+  MACOS_SDK_OBJECT: MacOSX.sdk.tar.zst
+  MACOS_SDK_SHA256: '0000000000000000000000000000000000000000000000000000000000000000'
+jobs:
+  build:
+    if: github.repository_owner_id == '114402558' && github.ref_protected && ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+    runs-on: rust-release-amd64
+    timeout-minutes: 80
+    permissions:
+      contents: read
+    outputs:
+      name: ${{ steps.render.outputs.name }}
+      prerelease: ${{ steps.render.outputs.prerelease }}
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        path: src
+        fetch-depth: 0
+        persist-credentials: false
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra
+        persist-credentials: false
+        sparse-checkout: scripts/ci
+    - name: Install release tools
+      run: bash .infra/scripts/ci/install-rust-release-tools.sh goreleaser git-cliff
+    - name: Fetch the macOS SDK
+      run: bash .infra/scripts/ci/fetch-macos-sdk.sh
+    - name: Render the release configuration
+      id: render
+      working-directory: src
+      run: |
+        cargo metadata --format-version 1 --no-deps --locked > "$RUNNER_TEMP/cargo-metadata.json"
+        python3 ../.infra/scripts/ci/render_goreleaser.py --metadata "$RUNNER_TEMP/cargo-metadata.json" --root . \
+          --repository "$GITHUB_REPOSITORY" --dist "$RUNNER_TEMP/dist" --sdk "$RUNNER_TEMP/macos-sdk/MacOSX.sdk" \
+          --config "$RUNNER_TEMP/goreleaser.yaml" --summary "$RUNNER_TEMP/release.json"
+        printf 'name=%s\n' "$(jq -r .name "$RUNNER_TEMP/release.json")" >> "$GITHUB_OUTPUT"
+        if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" == *-* ]]; then prerelease=true; else prerelease=false; fi
+        printf 'prerelease=%s\n' "$prerelease" >> "$GITHUB_OUTPUT"
+        config=cliff.toml
+        [[ -f "$config" ]] || config=../.infra/scripts/ci/cliff.toml
+        if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+          git-cliff --config "$config" --latest --strip all > "$RUNNER_TEMP/notes.md"
+        else
+          git-cliff --config "$config" --unreleased --strip all > "$RUNNER_TEMP/notes.md"
+        fi
+        test -z "$(git status --porcelain)"
+    - name: Build every target
+      working-directory: src
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        SNAPSHOT: ${{ github.ref_type != 'tag' }}
+      run: |
+        mode=()
+        [[ "$SNAPSHOT" == true ]] && mode=(--snapshot)
+        goreleaser release --config "$RUNNER_TEMP/goreleaser.yaml" --clean --skip=publish,announce \
+          --release-notes "$RUNNER_TEMP/notes.md" "${mode[@]}"
+    - name: Verify and bundle the artifacts
+      run: bash .infra/scripts/ci/bundle-release.sh "$RUNNER_TEMP/dist" "$RUNNER_TEMP/release.json" "$RUNNER_TEMP/notes.md" "$RUNNER_TEMP/bundle"
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: release-bundle
+        path: ${{ runner.temp }}/bundle
+        if-no-files-found: error
+        retention-days: 7
+    - name: Cache report
+      if: always()
+      run: sccache --show-stats >> "$GITHUB_STEP_SUMMARY" || true
+  publish:
+    needs: build
+    if: github.repository_owner_id == '114402558' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.ref_protected
+    runs-on: rust-release-amd64
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: release-bundle
+        path: ${{ runner.temp }}/bundle
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra
+        persist-credentials: false
+        sparse-checkout: scripts/ci
+    - name: Install release tools
+      run: bash .infra/scripts/ci/install-rust-release-tools.sh gh
+    - name: Draft the release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PRERELEASE: ${{ needs.build.outputs.prerelease }}
+      run: |
+        flags=(--draft --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/bundle/notes.md")
+        [[ "$PRERELEASE" == true ]] && flags+=(--prerelease)
+        mapfile -t assets < <(find "$RUNNER_TEMP/bundle/assets" -type f | sort)
+        gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" "${flags[@]}" "${assets[@]}"
+    - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+      with:
+        subject-checksums: ${{ runner.temp }}/bundle/assets/checksums.txt
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      if: needs.build.outputs.prerelease != 'true'
+      with:
+        path: src
+        persist-credentials: false
+    - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18
+      if: needs.build.outputs.prerelease != 'true'
+      id: crates
+    - name: Publish the crate
+      if: needs.build.outputs.prerelease != 'true'
+      working-directory: src
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.crates.outputs.token }}
+        PACKAGE: ${{ needs.build.outputs.name }}
+      run: cargo publish --locked --no-verify --package "$PACKAGE"
+    - name: Publish the release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+    - uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05
+      id: packages
+      with:
+        scope: fredrir/packages
+        identity: dispatch-${{ github.repository_id }}
+    - name: Refresh the package repositories
+      env:
+        GH_TOKEN: ${{ steps.packages.outputs.token }}
+      run: gh workflow run publish.yml --repo fredrir/packages --ref main

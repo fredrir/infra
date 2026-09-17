@@ -1,0 +1,39 @@
+name: Rust release tag
+on:
+  workflow_call: {}
+permissions:
+  contents: read
+jobs:
+  tag:
+    if: github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && !startsWith(github.event.head_commit.message, 'release:')
+    runs-on: rust-amd64
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: rust-auto-tag-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+    - uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05
+      id: token
+      with:
+        scope: ${{ github.repository }}
+        identity: auto-tag
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        path: src
+        fetch-depth: 0
+        token: ${{ steps.token.outputs.token }}
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra
+        persist-credentials: false
+        sparse-checkout: scripts/ci
+    - name: Install release tools
+      run: bash .infra/scripts/ci/install-rust-release-tools.sh git-cliff
+    - name: Tag the next release
+      working-directory: src
+      run: bash ../.infra/scripts/ci/tag-release.sh
