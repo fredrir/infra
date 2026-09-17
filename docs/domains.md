@@ -10,6 +10,7 @@
 | `yeeter.no`           | [Y](https://github.com/fredrir/Y)                             | Y                                         |
 | `fredrir.com`         | `fredrir/fredrir` (planned repository)                        | Reserved for the planned webpage          |
 | `grafana.fredrir.com` | Infrastructure                                                | Authenticated metrics, logs and traces    |
+| `keys.fredrir.com`    | Infrastructure                                                | SSH public keys from `ssh/admin_keys`     |
 | `admin.fredrir.com`   | Infrastructure                                                | Planned administrative dashboard          |
 | `fredrir.com/logs`    | Infrastructure                                                | Redirect to Grafana's logs view           |
 | `fredrir.no`          | Infrastructure                                                | Centrally managed DNS; purpose unassigned |

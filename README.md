@@ -11,6 +11,7 @@ My infrastructure, for my personal projects, services and hobbies
 | `fredrir.com/logs`                       | Redirect to Grafana                             |
 | `grafana.fredrir.com`                    | Grafana, Prometheus, Loki logs and Tempo traces |
 | `cache.fredrir.com/infra`                | Attic Nix cache                                 |
+| `keys.fredrir.com`                       | SSH public keys from `ssh/admin_keys`           |
 | `admin.fredrir.com`                      | Reserved for the future dashboard               |
 | `fredrir.no`                             | Centrally managed DNS                           |
 | `hansteen.dev`                           | Portfolio                                       |
