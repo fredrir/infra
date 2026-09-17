@@ -6,12 +6,17 @@ data:
   Caddyfile: |
     {
       admin off
+      servers {
+        trusted_proxies static private_ranges
+        client_ip_headers Cf-Connecting-Ip
+      }
     }
     (upstream) {
       reverse_proxy {args[0]} {
         lb_try_duration 5s
         lb_try_interval 250ms
         header_up X-Forwarded-Proto https
+        header_up X-Forwarded-For {client_ip}
       }
     }
     :8080 {
