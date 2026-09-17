@@ -7,4 +7,3 @@ spec:
     requests.cpu: 2300m
     limits.cpu: 4300m
     limits.memory: 13Gi
-    requests.infra.fredrir.com/ci-slot: '2'
