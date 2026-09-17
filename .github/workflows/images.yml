@@ -36,6 +36,7 @@ jobs:
             cargo nextest --version | grep -F 0.9.145;
             cargo audit --version | grep -F 0.22.2;
             /usr/lib/postgresql/16/bin/initdb --version | grep -F ' 16.';
+            pkg-config --exists openssl zlib;
             printf test > /tmp/probe && nix-hash --type sha256 --flat --base32 /tmp/probe | grep -x 020ay2q1av2xs4n842rb3d7vz8qms1dcb87a5yd6azaci20x11lz;
             bash -n /usr/local/bin/ci-job-started.sh;
             cd "$(mktemp -d)" && cargo new --vcs none probe && cd probe
