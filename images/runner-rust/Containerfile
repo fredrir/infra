@@ -1,0 +1,70 @@
+FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
+USER root
+RUN sed -i 's|^URIs: http://|URIs: https://|' /etc/apt/sources.list.d/ubuntu.sources \
+    && mkdir -p /etc/postgresql-common/createcluster.d \
+    && printf 'create_main_cluster = false\n' > /etc/postgresql-common/createcluster.d/no-main-cluster.conf \
+    && apt-get update -o APT::Update::Error-Mode=any \
+    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        build-essential clang libclang-dev file jq make perl pkg-config python3 python3-yaml \
+        gnupg openssh-client util-linux xz-utils zstd postgresql-16 \
+    && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
+        /usr/bin/docker /usr/bin/docker-init /usr/bin/docker-proxy /usr/bin/dockerd /usr/bin/runc \
+        /usr/local/lib/docker \
+        /home/runner/externals/node20/lib/node_modules/npm /home/runner/externals/node20/bin/npm /home/runner/externals/node20/bin/npx \
+        /home/runner/externals/node24/lib/node_modules/npm /home/runner/externals/node24/bin/npm /home/runner/externals/node24/bin/npx
+# renovate: datasource=github-releases depName=rust-cross/cargo-zigbuild extractVersion=^v(?<version>.+)$
+ARG CARGO_ZIGBUILD_VERSION=0.23.4
+# renovate: datasource=github-releases depName=mozilla/sccache extractVersion=^v(?<version>.+)$
+ARG SCCACHE_VERSION=0.18.0
+# renovate: datasource=github-releases depName=nextest-rs/nextest extractVersion=^cargo-nextest-(?<version>.+)$
+ARG NEXTEST_VERSION=0.9.145
+# renovate: datasource=github-releases depName=rustsec/rustsec extractVersion=^cargo-audit/v(?<version>.+)$
+ARG CARGO_AUDIT_VERSION=0.22.2
+# renovate: datasource=pypi depName=ziglang
+ARG ZIG_VERSION=0.16.0
+RUN cd /tmp \
+    && curl --fail --silent --show-error --location --max-time 120 --output zig.whl "https://files.pythonhosted.org/packages/py3/z/ziglang/ziglang-${ZIG_VERSION}-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl" \
+    && curl --fail --silent --show-error --location --max-time 120 --output zigbuild.tar.xz "https://github.com/rust-cross/cargo-zigbuild/releases/download/v${CARGO_ZIGBUILD_VERSION}/cargo-zigbuild-x86_64-unknown-linux-musl.tar.xz" \
+    && curl --fail --silent --show-error --location --max-time 120 --output sccache.tar.gz "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+    && curl --fail --silent --show-error --location --max-time 120 --output nextest.tar.gz "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+    && curl --fail --silent --show-error --location --max-time 120 --output audit.tgz "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-musl-v${CARGO_AUDIT_VERSION}.tgz" \
+    && printf '%s  %s\n' \
+        9fcda73f62b851dd72a54b710ad40a209896db14cfb13649e62191243556342b zig.whl \
+        9e3cf73485edbd45905c8aadbc0fdf869c7ddc3848f0c898229f2680db52e44b zigbuild.tar.xz \
+        45f1447fbe231e3037bde351ef70677dd212216c8d62ae7ca409fecc4d6acc89 sccache.tar.gz \
+        cd3c85194e8b28ad26676d287f41f0d6b4d456cef5bd94700def5dea8e328883 nextest.tar.gz \
+        7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428 audit.tgz \
+        | sha256sum --check --strict \
+    && unzip -q zig.whl 'ziglang/*' -d /tmp/zig \
+    && mv /tmp/zig/ziglang "/opt/zig-${ZIG_VERSION}" \
+    && chmod 755 "/opt/zig-${ZIG_VERSION}/zig" \
+    && ln -s "/opt/zig-${ZIG_VERSION}/zig" /usr/local/bin/zig \
+    && tar -xJf zigbuild.tar.xz --strip-components=1 -C /usr/local/bin cargo-zigbuild-x86_64-unknown-linux-musl/cargo-zigbuild \
+    && tar -xzf sccache.tar.gz --strip-components=1 -C /usr/local/bin "sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" \
+    && tar -xzf nextest.tar.gz -C /usr/local/bin cargo-nextest \
+    && tar -xzf audit.tgz --strip-components=1 -C /usr/local/bin "cargo-audit-x86_64-unknown-linux-musl-v${CARGO_AUDIT_VERSION}/cargo-audit" \
+    && chown root:root /usr/local/bin/cargo-zigbuild /usr/local/bin/sccache /usr/local/bin/cargo-nextest /usr/local/bin/cargo-audit \
+    && rm -rf /tmp/zig /tmp/*.whl /tmp/*.tar.xz /tmp/*.tar.gz /tmp/*.tgz
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+RUN curl --fail --silent --show-error --location --max-time 120 --output /tmp/rustup-init https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-unknown-linux-gnu/rustup-init \
+    && printf '%s  %s\n' dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71 /tmp/rustup-init | sha256sum --check --strict \
+    && chmod 755 /tmp/rustup-init \
+    && /tmp/rustup-init -y --no-modify-path --profile minimal --default-toolchain 1.98.1 \
+        --component clippy,rustfmt \
+        --target x86_64-unknown-linux-musl,aarch64-unknown-linux-gnu,aarch64-unknown-linux-musl,x86_64-apple-darwin,aarch64-apple-darwin \
+    && rustup toolchain install 1.95.0 --profile minimal \
+    && rm -f /tmp/rustup-init
+COPY --chmod=755 images/runner-rust/nix-hash /usr/local/bin/nix-hash
+COPY --chmod=755 images/runner-rust/ci-job-started.sh /usr/local/bin/ci-job-started.sh
+ENV HOME=/home/runner
+ENV CARGO_INCREMENTAL=0
+ENV CARGO_TERM_COLOR=always
+ENV SCCACHE_REGION=garage
+ENV SCCACHE_S3_USE_SSL=false
+ENV SCCACHE_IGNORE_SERVER_IO_ERROR=1
+ENV RUNNER_ALLOW_RUNASROOT=1
+WORKDIR /home/runner
