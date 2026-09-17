@@ -152,10 +152,9 @@ while IFS= read -r entry; do
 done < <(jq -c '.[]' <<<"$keys")
 revoke_stale_keys "$(jq -c '[.[].id]' <<<"$keys")"
 
-owner=$(jq -nc --arg id "$PROVISIONER_KEY_ID" '{($id): {read: false, write: false, owner: true}}')
 grants_for() {
-  jq -c --arg project "$1" --argjson owner "$owner" --arg bucket "$2" '
-    $owner + ([.[] | select(if $bucket == "toolchains" then .role == "release" else .project == $project end)
+  jq -c --arg project "$1" --arg provisioner "$PROVISIONER_KEY_ID" --arg bucket "$2" '
+    {($provisioner): {read: ($bucket == "toolchains"), write: ($bucket == "toolchains"), owner: true}} + ([.[] | select(if $bucket == "toolchains" then .role == "release" else .project == $project end)
       | select(if $bucket == "main" then .role != "release" elif $bucket == "release" then .role == "release" else true end)
       | {key: .id, value: {read: true, write: ($bucket != "toolchains" and .role != "ro"), owner: false}}] | from_entries)' <<<"$keys"
 }

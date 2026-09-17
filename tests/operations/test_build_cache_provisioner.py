@@ -221,7 +221,7 @@ class BuildCacheProvisionerTests(unittest.TestCase):
             self.nsql["ro"][0]: {"read": True, "write": False, "owner": False}})
         self.assertEqual(self.cluster.grants("ci-nsql-release"), owner | {
             self.nsql["release"][0]: {"read": True, "write": True, "owner": False}})
-        self.assertEqual(self.cluster.grants("toolchains"), owner | {
+        self.assertEqual(self.cluster.grants("toolchains"), {PROVISIONER[0]: {"read": True, "write": True, "owner": True}} | {
             self.nsql["release"][0]: {"read": True, "write": False, "owner": False},
             self.ui_box["release"][0]: {"read": True, "write": False, "owner": False}})
         main = self.cluster.buckets[self.cluster.bucket_by_alias("ci-ui-box-main")]

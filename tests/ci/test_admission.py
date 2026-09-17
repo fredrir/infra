@@ -92,15 +92,8 @@ class AdmissionTests(unittest.TestCase):
         del pod["spec"]["containers"][0]["resources"]["limits"]["infra.fredrir.com/ci-slot"]
         self.assertFalse(self.allowed(pod))
 
-    def test_legacy_shared_slot_stays_admitted_until_pools_move(self):
-        self.assertTrue(self.allowed(self.legacy_pod()))
-        pod = self.legacy_pod()
-        pod["metadata"]["labels"] = {}
-        self.assertFalse(self.allowed(pod))
-        pod = self.legacy_pod()
-        term = pod["spec"]["affinity"]["podAntiAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"][0]
-        term["namespaceSelector"] = {"matchLabels": {"kubernetes.io/metadata.name": "ci-y"}}
-        self.assertFalse(self.allowed(pod))
+    def test_shared_anti_affinity_no_longer_replaces_a_slot(self):
+        self.assertFalse(self.allowed(self.legacy_pod()))
 
     def rust_pod(self, variant):
         rendered = subprocess.run(["kubectl", "kustomize", str(ROOT / "platform/components/runners/rust" / variant)],
