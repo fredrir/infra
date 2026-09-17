@@ -87,7 +87,7 @@ class RenderGoreleaserTests(unittest.TestCase):
         block = config["homebrew_casks"][0]["custom_block"]
         self.assertIn("postflight_steps do", block)
         self.assertIn("on_macos do", block)
-        self.assertIn('"{{staged_path}}/nsql"', block)
+        self.assertIn('"{{ "{{staged_path}}" }}/nsql"', block)
         self.assertNotIn("#{", block)
         self.assertEqual(config["homebrew_casks"][0]["repository"], {"owner": "fredrir", "name": "homebrew-tap"})
 
