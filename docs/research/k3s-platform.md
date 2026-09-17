@@ -197,18 +197,18 @@ A schema validates shape; authentication and admission establish authority.
 | --- | --- |
 | Scope | One registration boundary per personal repository; no assumed organization-wide runner pool |
 | Eligibility | CI for maintainer-approved revisions; approval authorizes execution but does not establish benign code or dependencies |
-| Pilot budget | One active repository; target at most one running build per architecture, verified before enabling execution |
+| CI capacity | Per-worker `infra.fredrir.com/ci-slot`: `fredrir-04` 1, `fredrir-09` 3; one slot per job |
 | Per-repository maximum | Local scale-set ceiling; does not establish a fleet-wide concurrency cap |
 | Aggregate enforcement | Measured resource classes, quotas and production reservations account for runner, job, build and service pods; quotas alone do not establish a global build count |
 | ARC execution mode | Required job containers; narrowly scoped controller/runner pod-management privileges never exposed to build containers |
 | Queue behavior | Enable multiple repositories only after tests prove the aggregate build budget, backpressure and eventual progress across all runner, job, build and service pods |
 | Shared workflows | Explicit inputs and project test hooks; publication authority scoped separately from build execution |
-| Untrusted public/fork PRs | No workflow job execution and no runner allocation; no approval-to-run exception |
+| Untrusted public/fork PRs | No workflow job execution: job-level guards and pool job-started hooks refuse fork heads |
 | GitHub repository setting | Require approval for all external contributors and never approve their PR runs |
 | Public repository enablement | Contents/history audit and no-external-PR protections pass before any visibility change or runner enrollment |
-| Event boundary | Protected integration-branch pushes only initially; no PR, PR-target or comment-triggered execution |
+| Event boundary | Protected `main` pushes; same-repository PRs on a read-only-cache pool; protected `v*` tags on the release pool |
 | Pre-allocation checks | Every executable job checks authenticated repository/owner identity, event, exact allowed ref and protection with job-level conditions |
-| Reusable workflow boundary | Caller-supplied trust flags and runner labels cannot authorize execution |
+| Reusable workflow boundary | Caller runner labels cannot authorize execution; each pool's job-started hook checks event, ref and protection |
 | Integration and release | Maintainer review precedes integration; successful post-integration tests precede publication/deployment |
 | Merge requirements | Do not require PR checks that this policy never runs |
 | Hosted runners | No GitHub-hosted execution or recovery fallback |

@@ -10,7 +10,7 @@
 | Cluster configuration      | Flux, HelmRelease, Kustomize and ordinary YAML                                                                                                                                                                   |
 | Infrastructure credentials | Doppler `infra → ops`                                                                                                                                                                                            |
 | Runtime secrets            | SOPS + age; separate Macie, Archie and Flux recipients                                                                                                                                                           |
-| Scheduling                 | Kubernetes requests, limits, quotas, priorities and protected runtime capability labels                                                                                                                          |
+| Scheduling                 | Kubernetes requests, limits, quotas, priorities, protected runtime capability labels and per-worker CI slots                                                                                                     |
 | Images                     | GHCR, immutable digests                                                                                                                                                                                          |
 | Version pins               | [Platform versions](../platform/versions.yaml), role defaults, image Dockerfiles, `flake.lock`; runner image digests in the runner sets and the [admission policy](../platform/components/policy/admission.yaml) |
 
@@ -35,6 +35,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | `fredrir.com/logs`                       | Redirect to Grafana                                                   |
 | `grafana.fredrir.com`                    | Authenticated Grafana, Prometheus metrics, Loki logs and Tempo traces |
 | `cache.fredrir.com/infra`                | Authenticated, signed Attic Nix cache                                 |
+| `pkgs.fredrir.com`                       | Signed apt, rpm and apk repositories and `install.sh`                 |
 | `admin.fredrir.com`                      | Reserved for the future dashboard                                     |
 | `fredrir.no`                             | Centrally managed DNS; purpose unassigned                             |
 | `hansteen.dev`                           | Portfolio                                                             |
@@ -42,37 +43,40 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | `parser.llunde.no`, `external.llunde.no` | Parser review and shared media                                        |
 | `llunde.no`, `api.llunde.no`             | Work-in-progress Llunde frontend/backend                              |
 
-| Shared component       | Configuration                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------- |
-| Ingress                | Two Traefik instances and two Cloudflare Tunnel instances; project ingress class `platform` |
-| Metrics                | Prometheus; 15 days or 18 GB                                                                |
-| Logs                   | Alloy → Loki; 7 days                                                                        |
-| Traces                 | Alloy → Tempo; 7 days, bounded ingestion and sensitive attribute removal                    |
-| Nix cache              | Attic; 30-day retention, scoped client tokens and server-held signing key                   |
-| Independent monitoring | Gatus on `fredrir-06`; 13 endpoint checks and five authenticated backup heartbeats          |
-| Email                  | `alerts@fredrir.com`; [credentials and operation](mail-alerts.md)                           |
+| Shared component       | Configuration                                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Ingress                | Two Traefik instances and two Cloudflare Tunnel instances; project ingress class `platform`                             |
+| Metrics                | Prometheus; 15 days or 18 GB                                                                                            |
+| Logs                   | Alloy → Loki; 7 days                                                                                                    |
+| Traces                 | Alloy → Tempo; 7 days, bounded ingestion and sensitive attribute removal                                                |
+| Nix cache              | Attic; 30-day retention, scoped client tokens and server-held signing key                                               |
+| Build cache            | Garage S3 on `fredrir-09`; `ci-<project>-main` 20 GiB, `ci-<project>-release` 10 GiB, 14-day expiry; `toolchains` 5 GiB |
+| Independent monitoring | Gatus on `fredrir-06`; 13 endpoint checks and five authenticated backup heartbeats                                      |
+| Email                  | `alerts@fredrir.com`; [credentials and operation](mail-alerts.md)                                                       |
 
 ## CI and deployments
 
-| Name                  | Value                                                                                                                                                                                                                                                                              |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runner registration   | Separate `fredrir-infra-runners` GitHub App; encrypted credentials in ARC namespaces                                                                                                                                                                                               |
-| Container builds      | Ephemeral ARC runners using gVisor and native BuildKit; BuildKit cannot run under Kata here because virtiofs rejects the xattr reads its content hashing needs                                                                                                                     |
-| Nix builds            | Ephemeral ARC runners using Kata; `sandbox=true`, no sandbox fallback                                                                                                                                                                                                              |
-| Runner permissions    | No host sockets, host paths or Kubernetes API token                                                                                                                                                                                                                                |
-| Build egress          | Cluster DNS and TCP 443 only; Dockerfiles must use `https://` package sources                                                                                                                                                                                                      |
-| Job timeout           | 45 minutes; callers with long native test suites pass `timeout-minutes`                                                                                                                                                                                                            |
-| Runner scratch        | 10Gi requested, 60Gi limit ephemeral storage; BuildKit runners prefer the non-Kata worker; the parser pool gets 40Gi/200Gi on `fredrir-09`                                                                                                                                         |
-| Shared images         | [Infrastructure images workflow](../.github/workflows/images.yml): runner BuildKit, runner Nix, backup tools and `platform-caddy`; BuildKit, runc, restic and Caddy compile from pinned upstream commits with patched Go modules because published binaries carry fixable findings |
-| Untrusted public PRs  | No PR workflow triggers; GitHub approval required for every external contributor; do not approve external runs                                                                                                                                                                     |
-| Approved source       | Protected `main` pushes with matching numeric repository and owner identities                                                                                                                                                                                                      |
-| Workflow reuse        | Immutable `fredrir/infra/.github/workflows/build-image.yml@<commit>`                                                                                                                                                                                                               |
-| Pin changes           | A new shared workflow or shared recipe commit re-pins all callers and the OctoSTS policies to that commit together                                                                                                                                                                 |
-| Release authorization | OctoSTS installed only on `fredrir/infra`; exact repository, event and immutable workflow claims                                                                                                                                                                                   |
-| Deployment mappings   | [Repository image mappings](../.github/deployments)                                                                                                                                                                                                                                |
-| Promotion             | Verify GitHub attestations for public images or keyless Cosign signatures for private images, then merge the reviewed digest PR for Flux to reconcile from `main`                                                                                                                  |
-| Rollback              | Revert the deployment commit; check database schema compatibility first                                                                                                                                                                                                            |
-| Native ARM            | Unavailable until an ARM worker and its runtime/images pass qualification                                                                                                                                                                                                          |
+| Name                  | Value                                                                                                                                                                                                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runner registration   | Separate `fredrir-infra-runners` GitHub App; encrypted credentials in ARC namespaces                                                                                                                                                                                                            |
+| Container builds      | Ephemeral ARC runners using gVisor and native BuildKit; BuildKit cannot run under Kata here because virtiofs rejects the xattr reads its content hashing needs                                                                                                                                  |
+| Nix builds            | Ephemeral ARC runners using Kata; `sandbox=true`, no sandbox fallback                                                                                                                                                                                                                           |
+| Rust builds           | Ephemeral gVisor pools on the [Rust runner image](../images/runner-rust/Containerfile): `rust-pr-amd64`, `rust-amd64`, `rust-release-amd64`; sccache on the build cache                                                                                                                         |
+| CI capacity           | `infra.fredrir.com/ci-slot`: `fredrir-04` 1, `fredrir-09` 3; source label `infra.fredrir.com/ci-slots`, restored by `arc-system/ci-slots`                                                                                                                                                       |
+| Runner permissions    | No host sockets, host paths or Kubernetes API token                                                                                                                                                                                                                                             |
+| Build egress          | Cluster DNS and TCP 443; Rust pools add the build cache on TCP 3900; `publish-amd64` adds TCP 22 to AUR; Dockerfiles must use `https://` package sources                                                                                                                                        |
+| Job timeout           | 45 minutes; callers with long native test suites pass `timeout-minutes`                                                                                                                                                                                                                         |
+| Runner scratch        | 10Gi requested, 60Gi limit ephemeral storage; Rust pools 20Gi/80Gi; BuildKit runners prefer the non-Kata worker; the parser pool gets 40Gi/200Gi on `fredrir-09`                                                                                                                                |
+| Shared images         | [Infrastructure images workflow](../.github/workflows/images.yml): runner BuildKit, runner Nix, runner Rust, backup tools and `platform-caddy`; BuildKit, runc, restic and Caddy compile from pinned upstream commits with patched Go modules because published binaries carry fixable findings |
+| Fork PRs              | Never run: job-level guard, pool job-started hook and approval required for every external contributor                                                                                                                                                                                          |
+| Approved source       | Protected `main` pushes; same-repository PRs on `rust-pr-amd64`; protected `v*` tags and `main` dry runs on `rust-release-amd64`; matching numeric repository and owner identities                                                                                                              |
+| Workflow reuse        | Immutable `fredrir/infra/.github/workflows/{build-image,rust-ci,rust-auto-tag,rust-release,packages-publish}.yml@<commit>`                                                                                                                                                                      |
+| Pin changes           | A new shared workflow or shared recipe commit re-pins all callers and the OctoSTS policies to that commit together                                                                                                                                                                              |
+| Release authorization | OctoSTS on `infra`, onboarded projects, `packages`, `homebrew-tap`, `homebrew-nsql` and `nur-packages`; policies pin workflow path, repository id, ref and environment                                                                                                                          |
+| Deployment mappings   | [Repository image mappings](../.github/deployments)                                                                                                                                                                                                                                             |
+| Promotion             | Verify GitHub attestations for public images or keyless Cosign signatures for private images, then merge the reviewed digest PR for Flux to reconcile from `main`                                                                                                                               |
+| Rollback              | Revert the deployment commit; check database schema compatibility first                                                                                                                                                                                                                         |
+| Native ARM            | Rust targets cross-compile with cargo-zigbuild; container images and native tests stay amd64 until an ARM worker passes qualification                                                                                                                                                           |
 
 A project caller contains only its build inputs and a pinned reusable workflow. The infrastructure repository owns authentication, publication and deployment PR logic.
 
@@ -92,6 +96,53 @@ jobs:
     with:
       image: ghcr.io/fredrir/example
       test-command: <native-project-test-command>
+```
+
+## Rust projects
+
+| Name           | Value                                                                                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Registry       | [Rust projects](../.github/rust-projects.yaml)                                                                                                                 |
+| CI             | [`rust-ci.yml`](../.github/workflows/rust-ci.yml): fmt, clippy, nextest, doc tests, minimal build, MSRV, cargo audit                                           |
+| Versioning     | [`rust-auto-tag.yml`](../.github/workflows/rust-auto-tag.yml): patch bump, git-cliff, `v*` tag                                                                 |
+| Release        | [`rust-release.yml`](../.github/workflows/rust-release.yml): GoReleaser OSS and cargo-zigbuild                                                                 |
+| Targets        | `x86_64`/`aarch64` Linux gnu (glibc 2.28) and musl (static); `x86_64`/`aarch64` macOS (SDK in `toolchains`)                                                    |
+| Channels       | GitHub Release, crates.io (trusted publishing), `fredrir/homebrew-tap`, AUR `<name>` and `<name>-bin`, `fredrir/nur-packages`, `pkgs.fredrir.com`              |
+| Publisher      | `fredrir/packages` → [`packages-publish.yml`](../.github/workflows/packages-publish.yml); dispatch after each release, daily reconcile, weekly full smoke test |
+| Package trust  | Attested by the release workflow on an infra `main` revision; latest 3 stable releases per project                                                             |
+| Public keys    | [GPG](../scripts/packages/keys/fredrir.asc), [apk](../scripts/packages/keys/fredrir.rsa.pub)                                                                   |
+| Private repos  | CI only                                                                                                                                                        |
+| Release config | `[package.metadata.release]`: `maintainer`, `section`, `features`, `extra-files`, `optional`, `depends`                                                        |
+
+```sh
+nix develop
+uv run --frozen infra onboard-rust fredrir/example \
+  --project example \
+  --workflow-ref "$workflow_revision" \
+  --output .infra/onboarding/example
+```
+
+| Generated                                   | Destination                                     |
+| ------------------------------------------- | ----------------------------------------------- |
+| `platform/components/runners/example/`      | Written in place; three pools and cache secrets |
+| `platform/components/build-cache/projects/` | Written in place; provisioner keys              |
+| `.github/rust-projects.yaml`                | Written in place                                |
+| `project/.github/`                          | Project repository callers and auto-tag policy  |
+| `packages/.github/chainguard/`              | `fredrir/packages`                              |
+
+| Project setting       | Value                                                              |
+| --------------------- | ------------------------------------------------------------------ |
+| Rulesets              | `main` and `v*` tags protected; bypass: repository admin, Octo STS |
+| Environment `release` | Tags `v*`                                                          |
+| Actions               | Approval required for all external contributors                    |
+| Releases              | Immutable                                                          |
+| crates.io             | Trusted publisher: workflow `release.yml`, environment `release`   |
+
+```sh
+gh workflow run release.yml --repo fredrir/example
+gh workflow run publish.yml --repo fredrir/packages
+bash scripts/operations/macos_sdk.sh package .infra/macos-sdk
+SOPS_AGE_KEY_FILE=/path/to/age-key.txt bash scripts/operations/macos_sdk.sh upload .infra/macos-sdk/MacOSX<version>.sdk.tar.zst
 ```
 
 ## Onboarding
