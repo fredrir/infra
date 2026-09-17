@@ -193,7 +193,9 @@ spec:
   - expression: object.spec.containers.all(c, !has(c.securityContext.seccompProfile))
     message: Containers must inherit the runtime seccomp profile
   - expression: >-
-      has(object.metadata.labels) && "infra.fredrir.com/ci-slot" in object.metadata.labels && object.metadata.labels["infra.fredrir.com/ci-slot"] == "build"
+      object.spec.containers.all(c, has(c.resources) && has(dyn(c.resources).limits)
+        && "infra.fredrir.com/ci-slot" in dyn(c.resources).limits && string(dyn(c.resources).limits["infra.fredrir.com/ci-slot"]) == "1")
+      || (has(object.metadata.labels) && "infra.fredrir.com/ci-slot" in object.metadata.labels && object.metadata.labels["infra.fredrir.com/ci-slot"] == "build"
       && has(object.spec.affinity) && has(object.spec.affinity.podAntiAffinity)
       && has(object.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution)
       && object.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution.size() == 1
@@ -202,8 +204,8 @@ spec:
         && t.labelSelector.matchLabels == {"infra.fredrir.com/ci-slot": "build"} && !has(t.labelSelector.matchExpressions)
         && has(t.namespaceSelector) && has(t.namespaceSelector.matchLabels)
         && t.namespaceSelector.matchLabels == {"infra.fredrir.com/tier": "ci"} && !has(t.namespaceSelector.matchExpressions)
-        && !has(t.namespaces) && !has(t.matchLabelKeys) && !has(t.mismatchLabelKeys))
-    message: CI shares one build slot per eligible worker
+        && !has(t.namespaces) && !has(t.matchLabelKeys) && !has(t.mismatchLabelKeys)))
+    message: CI jobs must hold exactly one worker slot
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
