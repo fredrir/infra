@@ -47,7 +47,8 @@ jobs:
         config=cliff.toml
         [[ -f "$config" ]] || config=../.infra/scripts/ci/cliff.toml
         if [[ "$GITHUB_REF_TYPE" == tag ]]; then
-          git-cliff --config "$config" --latest --strip all > "$RUNNER_TEMP/notes.md"
+          previous=$(git tag --list 'v*' --sort=-v:refname | grep -v -- '-' | grep -vx "$GITHUB_REF_NAME" | head -n1 || true)
+          git-cliff --config "$config" --tag "$GITHUB_REF_NAME" --strip all ${previous:+"$previous..$GITHUB_REF_NAME"} > "$RUNNER_TEMP/notes.md"
         else
           git-cliff --config "$config" --unreleased --tag v0.0.0-dry-run --strip all > "$RUNNER_TEMP/notes.md"
         fi
