@@ -13,7 +13,6 @@ on:
     - flake.lock
     - pyproject.toml
     - uv.lock
-    - tofu/.terraform.lock.hcl
     - images/caddy/**
     - platform/components/backups/tools.Dockerfile
 permissions:
@@ -31,7 +30,7 @@ jobs:
             /home/runner/run.sh --version | grep -x 2.337.0;
             kubectl version --client; kustomize version; helm version --short; actionlint -version; tofu version;
             ansible-playbook --version | head -n1; sops --version; age --version;
-            /opt/venv/bin/python -c 'import ansible, celpy, jinja2, yaml'
+            LD_LIBRARY_PATH=$CHECK_LIBRARY_PATH /opt/venv/bin/python -c 'import ansible, celpy, jinja2, yaml'
         - image: ghcr.io/fredrir/infra-runner-buildkit
           dockerfile: images/runner-buildkit/Containerfile
           check: /home/runner/run.sh --version | grep -x 2.337.0; buildctl --version; buildkitd --version
