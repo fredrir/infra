@@ -163,6 +163,8 @@ def server_for(cluster):
 
 @unittest.skipUnless(shutil.which("bash") and shutil.which("jq") and shutil.which("curl"), "Native shell tools required")
 class BuildCacheProvisionerTests(unittest.TestCase):
+    snapshot = None
+
     def setUp(self):
         self.cluster = FakeCluster()
         self.server = server_for(self.cluster)
@@ -207,6 +209,12 @@ class BuildCacheProvisionerTests(unittest.TestCase):
     def mutations(self):
         return [path for method, path in self.cluster.requests if method == "POST"]
 
+    def provisioned(self):
+        if BuildCacheProvisionerTests.snapshot is None:
+            self.assertEqual(self.provision().returncode, 0)
+            BuildCacheProvisionerTests.snapshot = copy.deepcopy((self.cluster.layout, self.cluster.keys, self.cluster.buckets))
+        self.cluster.layout, self.cluster.keys, self.cluster.buckets = copy.deepcopy(BuildCacheProvisionerTests.snapshot)
+
     def test_fresh_cluster_gets_layout_keys_buckets_and_exact_grants(self):
         result = self.provision()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -234,13 +242,13 @@ class BuildCacheProvisionerTests(unittest.TestCase):
         self.assertIsNone(toolchains["rules"])
 
     def test_rerun_only_reasserts_bucket_settings(self):
-        self.assertEqual(self.provision().returncode, 0)
+        self.provisioned()
         result = self.provision()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(set(self.mutations()), {"/v2/UpdateBucket"})
 
     def test_drifted_grants_are_narrowed_and_removed_projects_are_revoked(self):
-        self.assertEqual(self.provision().returncode, 0)
+        self.provisioned()
         main = self.cluster.bucket_by_alias("ci-nsql-main")
         self.cluster.buckets[main]["permissions"][self.nsql["ro"][0]]["write"] = True
         self.cluster.buckets[main]["permissions"][self.ui_box["rw"][0]] = {"read": True, "write": True, "owner": False}
@@ -254,7 +262,7 @@ class BuildCacheProvisionerTests(unittest.TestCase):
         self.assertIn("/v2/DenyBucketKey", self.mutations())
 
     def test_changed_secrets_and_reused_ids_refuse_without_leaking(self):
-        self.assertEqual(self.provision().returncode, 0)
+        self.provisioned()
         rotated = copy.deepcopy(self.nsql)
         rotated["rw"] = (rotated["rw"][0], "c" * 64)
         self.cluster.add_project("nsql", rotated)

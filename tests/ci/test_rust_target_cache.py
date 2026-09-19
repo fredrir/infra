@@ -29,20 +29,24 @@ else:
 
 
 class RustTargetCacheTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        tools = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(tools.cleanup)
+        cls.binaries = Path(tools.name)
+        for name, content in [("curl", CURL), ("rustc", "#!/bin/sh\necho rustc 1.98.1\n")]:
+            (cls.binaries / name).write_text(content)
+            (cls.binaries / name).chmod(0o755)
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.area = Path(self.directory.name)
         self.bucket = self.area / "s3/ci-example-main/target"
-        binaries = self.area / "bin"
-        binaries.mkdir()
-        for name, content in [("curl", CURL), ("rustc", "#!/bin/sh\necho rustc 1.98.1\n")]:
-            (binaries / name).write_text(content)
-            (binaries / name).chmod(0o755)
         (self.area / "temp").mkdir()
         (self.area / "temp/rust-args.sh").write_text("declare -a CLIPPY_FLAGS=()\n")
         self.environment = {
-            "PATH": str(binaries) + os.pathsep + os.environ["PATH"], "RUNNER_TEMP": str(self.area / "temp"),
+            "PATH": str(self.binaries) + os.pathsep + os.environ["PATH"], "RUNNER_TEMP": str(self.area / "temp"),
             "S3_ROOT": str(self.area / "s3"), "S3_LOG": str(self.area / "s3.log"),
             "SCCACHE_ENDPOINT": "http://garage.invalid:3900", "SCCACHE_BUCKET": "ci-example-main",
             "AWS_ACCESS_KEY_ID": "GK" + "a" * 24, "AWS_SECRET_ACCESS_KEY": SECRET,

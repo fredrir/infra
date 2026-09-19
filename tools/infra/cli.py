@@ -335,33 +335,6 @@ def cache_onboarding(args):
     print(f"Enabled the layer cache for ci-{project}")
 
 
-def verify(args):
-    immutable_image(args.image)
-    revision(args.source_revision)
-    revision(args.workflow_ref)
-    identity = repository(args.repository)
-    if identity.get("private", False):
-        subprocess.run([
-            "cosign", "verify", args.image,
-            "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com",
-            "--certificate-identity", "https://github.com/" + WORKFLOW + "@" + args.workflow_ref,
-            "--certificate-github-workflow-repository", args.repository,
-            "--certificate-github-workflow-sha", args.source_revision,
-            "--certificate-github-workflow-ref", "refs/heads/main",
-            "--certificate-github-workflow-trigger", "push",
-            "--annotations", "source-repository=" + args.repository,
-            "--annotations", "source-revision=" + args.source_revision,
-            "--annotations", "workflow-revision=" + args.workflow_ref,
-        ], check=True)
-        return
-    subprocess.run([
-        "gh", "attestation", "verify", "oci://" + args.image,
-        "--repo", args.repository, "--signer-workflow", WORKFLOW,
-        "--signer-digest", args.workflow_ref, "--source-ref", "refs/heads/main",
-        "--source-digest", args.source_revision,
-    ], check=True)
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="infra")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -386,14 +359,9 @@ def main(argv=None):
     cache = commands.add_parser("onboard-cache")
     cache.add_argument("--project", required=True)
     cache.add_argument("--root", default=str(ROOT))
-    verify_parser = commands.add_parser("verify-release")
-    verify_parser.add_argument("image")
-    verify_parser.add_argument("--repository", required=True)
-    verify_parser.add_argument("--source-revision", required=True)
-    verify_parser.add_argument("--workflow-ref", required=True)
     args = parser.parse_args(argv)
     try:
-        {"onboard": onboarding, "onboard-rust": rust_onboarding, "onboard-cache": cache_onboarding, "verify-release": verify}[args.command](args)
+        {"onboard": onboarding, "onboard-rust": rust_onboarding, "onboard-cache": cache_onboarding}[args.command](args)
     except (ValueError, subprocess.CalledProcessError) as error:
         message = str(error) if isinstance(error, ValueError) else "Native command failed"
         parser.exit(1, message + "\n")
