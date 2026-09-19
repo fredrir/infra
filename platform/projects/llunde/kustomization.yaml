@@ -13,7 +13,7 @@ resources:
 - tunnel.secret.sops.yaml
 - ghcr.secret.sops.yaml
 images:
-- digest: sha256:5207ff4437b4ca5dde292c7c81f03068d1554b0fb29f8b5f93f9059db5a9dcbd
+- digest: sha256:977b5bb3da7946fe97662e42e8d447286fc6794087b07c9706aa86f45469c534
   name: ghcr.io/fredrir/llunde-backend
   newName: ghcr.io/fredrir/llunde-backend
 - digest: sha256:3a7b3a85e9a0c014270f70faed9c800ff9fddb2377f30ebad9af730ab8964226
