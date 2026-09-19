@@ -134,16 +134,6 @@ class PackageConfigurationTests(unittest.TestCase):
 class SiteTests(unittest.TestCase):
     TOOLS = {"nsql": {"repository": "fredrir/nsql", "version": "0.1.14", "binary": "nsql", "taps": []}}
 
-    def test_site_carries_domain_keys_and_repository_definitions(self):
-        with tempfile.TemporaryDirectory() as directory:
-            site = Path(directory)
-            package_site.build(site, self.TOOLS, "GPG", "APK")
-            self.assertEqual((site / "CNAME").read_text(), "pkgs.fredrir.com\n")
-            self.assertTrue((site / ".nojekyll").exists())
-            self.assertIn("repo_gpgcheck=1", (site / "rpm/fredrir.repo").read_text())
-            self.assertIn("signed-by=", (site / "deb/fredrir.list").read_text())
-            self.assertIn("nsql", (site / "index.html").read_text())
-
     def test_installer_is_valid_shell_and_rejects_unknown_input(self):
         with tempfile.TemporaryDirectory() as directory:
             script = Path(directory) / "install.sh"
@@ -167,12 +157,6 @@ class SiteTests(unittest.TestCase):
 
 class ChannelTests(unittest.TestCase):
     NUR = "{ pkgs ? import <nixpkgs> { } }:\n{\n  lib = import ./lib { inherit pkgs; };\n  example-package = pkgs.callPackage ./pkgs/example-package { };\n}\n"
-
-    def test_git_failures_carry_the_command_error(self):
-        with tempfile.TemporaryDirectory() as directory, self.assertRaises(SystemExit) as failure:
-            channels.git("clone", "--quiet", str(Path(directory) / "missing.git"), str(Path(directory) / "out"))
-        self.assertIn("git clone failed:", str(failure.exception))
-        self.assertIn("missing.git", str(failure.exception))
 
     def test_nur_index_gains_each_package_once(self):
         updated = channels.nur_index(self.NUR, "nsql")

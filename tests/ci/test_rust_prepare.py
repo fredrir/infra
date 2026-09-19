@@ -9,14 +9,19 @@ SCRIPT = ROOT / "scripts/ci/rust-prepare.sh"
 
 
 class RustPrepareTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        tools = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(tools.cleanup)
+        cls.binaries = Path(tools.name)
+        for tool in ["rustup", "sccache"]:
+            (cls.binaries / tool).write_text("#!/bin/sh\nexit 0\n")
+            (cls.binaries / tool).chmod(0o755)
+
     def prepare(self, clippy="", test="", **extra):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
-            (base / "bin").mkdir()
-            for tool in ["rustup", "sccache"]:
-                (base / "bin" / tool).write_text("#!/bin/sh\nexit 0\n")
-                (base / "bin" / tool).chmod(0o755)
-            environment = {"PATH": f"{base / 'bin'}:{os.environ['PATH']}", "RUNNER_TEMP": directory,
+            environment = {"PATH": f"{self.binaries}:{os.environ['PATH']}", "RUNNER_TEMP": directory,
                            "GITHUB_ENV": str(base / "env"), "CLIPPY_ARGS": clippy, "TEST_ARGS": test} | extra
             result = subprocess.run(["bash", str(SCRIPT)], env=environment, capture_output=True, text=True, check=False)
             if result.returncode:

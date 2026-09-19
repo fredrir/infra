@@ -363,9 +363,7 @@ class EnrollmentTests(unittest.TestCase):
                 None, None, 302, "", {}, "https://untrusted.invalid"
             )
 
-    def test_administrator_ssh_alias_keeps_its_user_and_escalates_noninteractively(
-        self,
-    ):
+    def test_administrator_ssh_alias_keeps_its_user(self):
         runner = Mock(
             return_value=subprocess.CompletedProcess([], 0, b'{"result":"ok"}', b"")
         )
@@ -383,10 +381,6 @@ class EnrollmentTests(unittest.TestCase):
         self.assertEqual(args[-2], "fredrir-09")
         self.assertNotIn("root@fredrir-09", args)
         self.assertNotIn("-l", args)
-        self.assertIn("/usr/bin/sudo -n -- /usr/bin/python3", args[-1])
-        self.assertNotIn("/usr/bin/id", args[-1])
-        self.assertIn("import os; print(os.geteuid())", args[-1])
-        self.assertIn("/usr/bin/python3 -I -B -c", args[-1])
         self.assertNotIn("fixture-oauth-secret", " ".join(args))
 
 

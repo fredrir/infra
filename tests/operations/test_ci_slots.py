@@ -26,18 +26,14 @@ class CiSlotReconcilerTests(unittest.TestCase):
             patches = (base / "patches").read_text().splitlines() if (base / "patches").exists() else []
             return result, patches
 
-    def test_only_drifted_nodes_are_patched(self):
-        result, patches = self.reconcile([node("fredrir-04", "1", "1"), node("fredrir-09", "3", "0"), node("new", "2")])
+    def test_only_drifted_nodes_with_valid_labels_are_patched(self):
+        result, patches = self.reconcile([node("fredrir-04", "1", "1"), node("fredrir-09", "3", "0"), node("new", "2"),
+                                          node("odd", '3"}}'), node("empty", "")])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(patches), 2)
         self.assertIn('patch node fredrir-09 --subresource=status --type=merge --patch {"status":{"capacity":{"infra.fredrir.com/ci-slot":"3"}}}', patches)
         self.assertTrue(any(p.startswith("patch node new ") and '"2"' in p for p in patches))
         self.assertIn("Advertised 3 CI slots on fredrir-09 (was 0)", result.stdout)
-
-    def test_invalid_labels_are_ignored(self):
-        result, patches = self.reconcile([node("odd", '3"}}'), node("empty", "")])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(patches, [])
         self.assertIn("Ignoring odd", result.stdout)
 
 

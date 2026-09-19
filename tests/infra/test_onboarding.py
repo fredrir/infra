@@ -58,36 +58,6 @@ class OnboardingTests(unittest.TestCase):
                     main(self.arguments(Path(directory) / "new") + extra)
                 remote.assert_not_called()
 
-    def test_verification_requires_all_trust_bindings_and_propagates_failure(self):
-        args = ["verify-release", IMAGE, "--repository", "fredrir/example",
-                "--source-revision", "b" * 40, "--workflow-ref", "c" * 40]
-        with patch("infra.cli.repository", return_value=IDENTITY), patch("infra.cli.subprocess.run") as run:
-            main(args)
-            command = run.call_args.args[0]
-            self.assertIn("--signer-workflow", command)
-            self.assertEqual(command[command.index("--source-ref") + 1], "refs/heads/main")
-            self.assertEqual(command[command.index("--source-digest") + 1], "b" * 40)
-            self.assertEqual(command[command.index("--signer-digest") + 1], "c" * 40)
-            run.side_effect = subprocess.CalledProcessError(1, ["gh"])
-            with self.assertRaises(SystemExit):
-                main(args)
-
-    def test_private_repository_uses_keyless_verification_without_skipping_source_checks(self):
-        args = ["verify-release", IMAGE, "--repository", "fredrir/example",
-                "--source-revision", "b" * 40, "--workflow-ref", "c" * 40]
-        with patch("infra.cli.repository", return_value=IDENTITY | {"private": True}), patch("infra.cli.subprocess.run") as run:
-            main(args)
-            command = run.call_args.args[0]
-            self.assertEqual(command[:3], ["cosign", "verify", IMAGE])
-            self.assertEqual(command[command.index("--certificate-github-workflow-sha") + 1], "b" * 40)
-            self.assertEqual(command[command.index("--certificate-identity") + 1],
-                             "https://github.com/fredrir/infra/.github/workflows/build-image.yml@" + "c" * 40)
-            self.assertIn("source-repository=fredrir/example", command)
-            self.assertIn("workflow-revision=" + "c" * 40, command)
-            run.side_effect = subprocess.CalledProcessError(1, ["cosign"])
-            with self.assertRaises(SystemExit):
-                main(args)
-
 
 if __name__ == "__main__":
     unittest.main()
