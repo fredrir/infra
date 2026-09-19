@@ -108,6 +108,14 @@ class RunnerAdmissionTests(unittest.TestCase):
         del pod["spec"]["containers"][0]["resources"]["limits"]["infra.fredrir.com/ci-slot"]
         self.assertFalse(self.allowed(pod))
 
+    def test_check_pool_runs_the_approved_check_image_with_a_slot(self):
+        release = yaml.safe_load((ROOT / "platform/components/runners/infra/check.yaml").read_text())
+        pod = copy.deepcopy(release["spec"]["values"]["template"])
+        pod["metadata"] = {"name": "check-1", "labels": {"actions.github.com/scale-set-name": "check-amd64"}}
+        self.assertTrue(self.allowed(pod, namespace="ci-infra"))
+        pod["spec"]["containers"][0]["image"] = "ghcr.io/fredrir/infra-runner-check@sha256:" + "f" * 64
+        self.assertFalse(self.allowed(pod, namespace="ci-infra"))
+
     def test_only_the_bounded_infra_deploy_pool_runs_without_a_slot(self):
         pod = runner_template("infra/deploy.yaml")
         pod["metadata"] = {"name": "deploy-1", "labels": {"actions.github.com/scale-set-name": "deploy-amd64"}}
