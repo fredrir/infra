@@ -1,4 +1,4 @@
-FROM docker.io/library/node@sha256:729cbbdccbbac8f9354c9ddaed8cfa6fe5ec893dca12ea52e9c13b4b76f7282b AS build
+FROM docker.io/library/node@sha256:cad3d421752df04025739eab1cec176426916faec228ff684211394c5bc8e339 AS build
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
