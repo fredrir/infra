@@ -181,7 +181,7 @@ uv run --frozen infra onboard-cache --project example
 | `infra` setting  | Value                                                                                   |
 | ---------------- | --------------------------------------------------------------------------------------- |
 | `main` ruleset   | [`main-ruleset.json`](../.github/main-ruleset.json); bypass: repository admin, Octo STS |
-| Private projects | `.github/chainguard/infra-deploy.sts.yaml`: `packages: read` for `deploy.yml` on `main` |
+| Private packages | Package settings → Manage Actions access: `fredrir/infra`, read                         |
 
 The shared [project chart](../charts/project) supports web services, workers and scheduled jobs. Databases and durable files require explicit storage, backup and recovery configuration.
 

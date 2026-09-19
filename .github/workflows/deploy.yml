@@ -26,6 +26,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      packages: read
       id-token: write
     steps:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -34,22 +35,6 @@ jobs:
         persist-credentials: false
     - name: Install release tools
       run: bash scripts/ci/install-release-tools.sh
-    - name: Resolve source
-      id: source
-      env:
-        SOURCE_REPOSITORY_ID: ${{ inputs.repository-id }}
-      run: |
-        [[ "$SOURCE_REPOSITORY_ID" =~ ^[0-9]+$ ]]
-        mapping=".github/deployments/$SOURCE_REPOSITORY_ID.yaml"
-        repository=$(yq -er '.repository' "$mapping")
-        [[ "$repository" =~ ^fredrir/[A-Za-z0-9_.-]+$ ]]
-        printf 'repository=%s\nvisibility=%s\n' "$repository" "$(yq -er '.visibility' "$mapping")" >> "$GITHUB_OUTPUT"
-    - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
-      if: steps.source.outputs.visibility == 'private'
-      id: registry-token
-      with:
-        scope: ${{ steps.source.outputs.repository }}
-        identity: infra-deploy
     - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
       id: deployment-token
       with:
@@ -59,7 +44,7 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
         DEPLOY_TOKEN: ${{ steps.deployment-token.outputs.token }}
-        REGISTRY_TOKEN: ${{ steps.registry-token.outputs.token || github.token }}
+        REGISTRY_TOKEN: ${{ github.token }}
         SOURCE_REPOSITORY_ID: ${{ inputs.repository-id }}
         IMAGE_NAME: ${{ inputs.image }}
         IMAGE_DIGEST: ${{ inputs.digest }}
@@ -69,7 +54,7 @@ jobs:
         mkdir -m 700 "$DOCKER_CONFIG"
         trap 'rm -rf "$DOCKER_CONFIG"' EXIT
         umask 077
-        jq -n '{auths:{"ghcr.io":{username:"x-access-token",password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
+        jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
         unset REGISTRY_TOKEN
         bash scripts/ci/deploy.sh "$GITHUB_WORKSPACE"
     - name: Reconcile
