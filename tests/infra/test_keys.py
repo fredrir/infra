@@ -32,6 +32,7 @@ class KeysTests(unittest.TestCase):
         self.assertEqual(keys_cm["data"]["admin_keys"], (ROOT / "keys/admin_keys").read_text())
 
         caddy_cm = next(d for d in configmaps if d.get("metadata", {}).get("name") == "keys-caddy")
+        self.assertIn("root * /data/keys", caddy_cm["data"]["Caddyfile"])
         self.assertIn("try_files {path} /admin_keys", caddy_cm["data"]["Caddyfile"])
 
         deployment = next(

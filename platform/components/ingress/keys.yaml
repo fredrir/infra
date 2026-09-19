@@ -9,15 +9,14 @@ data:
       admin off
     }
     :8080 {
+      root * /data/keys
       handle /healthz {
         respond "origin alive" 200
       }
       handle {
         header Content-Type "text/plain; charset=utf-8"
         try_files {path} /admin_keys
-        file_server {
-          root /data/keys
-        }
+        file_server
       }
     }
 ---
