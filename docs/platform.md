@@ -178,10 +178,10 @@ uv run --frozen infra onboard-cache --project example
 | `platform/components/build-cache/projects/example.secret.sops.yaml`   | Provisioner keys                     |
 | `components: [../buildkit-cache]`                                     | Cache environment and egress         |
 
-| `infra` setting   | Value                                                                                        |
-| ----------------- | -------------------------------------------------------------------------------------------- |
-| `main` protection | [`main-protection.json`](../.github/main-protection.json); `octo-sts` bypasses pull requests |
-| Private projects  | `.github/chainguard/infra-deploy.sts.yaml`: `packages: read` for `deploy.yml` on `main`      |
+| `infra` setting  | Value                                                                                   |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| `main` ruleset   | [`main-ruleset.json`](../.github/main-ruleset.json); bypass: repository admin, Octo STS |
+| Private projects | `.github/chainguard/infra-deploy.sts.yaml`: `packages: read` for `deploy.yml` on `main` |
 
 The shared [project chart](../charts/project) supports web services, workers and scheduled jobs. Databases and durable files require explicit storage, backup and recovery configuration.
 
