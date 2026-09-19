@@ -4,3 +4,5 @@ metadata:
   name: sources
 resources:
 - repositories.yaml
+- receiver.yaml
+- deploy-receiver.secret.sops.yaml

@@ -1,4 +1,5 @@
 repository: fredrir/Y
+visibility: public
 images:
   ghcr.io/fredrir/y-api:
     path: platform/projects/y

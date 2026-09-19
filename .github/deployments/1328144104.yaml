@@ -1,4 +1,5 @@
 repository: fredrir/llunde-frontend
+visibility: private
 images:
   ghcr.io/fredrir/llunde-frontend:
     path: platform/projects/llunde

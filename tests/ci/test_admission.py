@@ -131,6 +131,32 @@ class AdmissionTests(unittest.TestCase):
             mutate(candidate)
             self.assertFalse(self.allowed(candidate, namespace="ci-example"))
 
+    def cached_buildkit_pod(self):
+        component = yaml.safe_load((ROOT / "platform/components/runners/buildkit-cache/kustomization.yaml").read_text())
+        pod = copy.deepcopy(self.pod)
+        pod["metadata"]["labels"] = {"actions.github.com/scale-set-name": "buildkit-amd64"}
+        pod["spec"]["containers"][0]["env"] += [o["value"] for o in yaml.safe_load(component["patches"][0]["patch"])]
+        return pod
+
+    def test_layer_cache_credentials_require_the_buildkit_image_pool_label_and_own_secret(self):
+        pod = self.cached_buildkit_pod()
+        self.assertTrue(self.allowed(pod))
+        self.assertFalse(self.allowed(pod, controller=False))
+        credentials = [e for e in pod["spec"]["containers"][0]["env"] if e["name"].startswith("AWS_")]
+        self.assertEqual([e["valueFrom"]["secretKeyRef"]["name"] for e in credentials], ["buildkit-cache"] * 2)
+        for mutate in [
+            lambda p: p["metadata"]["labels"].clear(),
+            lambda p: p["metadata"]["labels"].update({"actions.github.com/scale-set-name": "publish-amd64"}),
+            lambda p: p["spec"]["containers"][0].update({"image": self.rust_pod("main")["spec"]["containers"][0]["image"]}),
+            lambda p: p["spec"]["containers"][0]["env"][-1]["valueFrom"]["secretKeyRef"].update({"name": "sccache-rw"}),
+            lambda p: p["spec"]["containers"][0]["env"][-1]["valueFrom"]["secretKeyRef"].update({"key": "AWS_ACCESS_KEY_ID"}),
+            lambda p: p["spec"]["containers"][0]["env"].append(
+                {"name": "GITHUB_TOKEN", "valueFrom": {"secretKeyRef": {"name": "buildkit-cache", "key": "AWS_ACCESS_KEY_ID"}}}),
+        ]:
+            candidate = copy.deepcopy(pod)
+            mutate(candidate)
+            self.assertFalse(self.allowed(candidate))
+
     def test_rust_image_is_not_approved_for_kata(self):
         pod = self.rust_pod("pr")
         pod["spec"]["runtimeClassName"] = "kata"

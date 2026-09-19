@@ -42,38 +42,38 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | `parser.llunde.no`, `external.llunde.no` | Parser review and shared media                                        |
 | `llunde.no`, `api.llunde.no`             | Work-in-progress Llunde frontend/backend                              |
 
-| Shared component       | Configuration                                                                                                           |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Ingress                | Two Traefik instances and two Cloudflare Tunnel instances; project ingress class `platform`                             |
-| Metrics                | Prometheus; 15 days or 18 GB                                                                                            |
-| Logs                   | Alloy → Loki; 7 days                                                                                                    |
-| Traces                 | Alloy → Tempo; 7 days, bounded ingestion and sensitive attribute removal                                                |
-| Nix cache              | Attic; 30-day retention, scoped client tokens and server-held signing key                                               |
-| Build cache            | Garage S3 on `fredrir-09`; `ci-<project>-main` 20 GiB, `ci-<project>-release` 10 GiB, 14-day expiry; `toolchains` 5 GiB |
-| Independent monitoring | Gatus on `fredrir-06`; 13 endpoint checks and five authenticated backup heartbeats                                      |
-| Email                  | `alerts@fredrir.com`; [credentials and operation](mail-alerts.md)                                                       |
+| Shared component       | Configuration                                                                                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ingress                | Two Traefik instances and two Cloudflare Tunnel instances; project ingress class `platform`                                                                           |
+| Metrics                | Prometheus; 15 days or 18 GB                                                                                                                                          |
+| Logs                   | Alloy → Loki; 7 days                                                                                                                                                  |
+| Traces                 | Alloy → Tempo; 7 days, bounded ingestion and sensitive attribute removal                                                                                              |
+| Nix cache              | Attic; 30-day retention, scoped client tokens and server-held signing key                                                                                             |
+| Build cache            | Garage S3 on `fredrir-09`; `ci-<project>-main` 20 GiB (sccache, `target/` archive, BuildKit layers), `ci-<project>-release` 10 GiB, 14-day expiry; `toolchains` 5 GiB |
+| Independent monitoring | Gatus on `fredrir-06`; 13 endpoint checks and five authenticated backup heartbeats                                                                                    |
+| Email                  | `alerts@fredrir.com`; [credentials and operation](mail-alerts.md)                                                                                                     |
 
 ## CI and deployments
 
 | Name                  | Value                                                                                                                                                                                                                                                                                           |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Runner registration   | Separate `fredrir-infra-runners` GitHub App; encrypted credentials in ARC namespaces                                                                                                                                                                                                            |
-| Container builds      | Ephemeral ARC runners using gVisor and native BuildKit; BuildKit cannot run under Kata here because virtiofs rejects the xattr reads its content hashing needs                                                                                                                                  |
+| Container builds      | Ephemeral ARC runners using gVisor and native BuildKit; BuildKit cannot run under Kata here because virtiofs rejects the xattr reads its content hashing needs; layer cache `type=s3,mode=max` in `ci-<project>-main`, weekly manifest rotation, caller input `layer-cache: false` disables it  |
 | Nix builds            | Ephemeral ARC runners using Kata; `sandbox=true`, no sandbox fallback                                                                                                                                                                                                                           |
-| Rust builds           | Ephemeral gVisor pools on the [Rust runner image](../images/runner-rust/Containerfile): `rust-pr-amd64`, `rust-amd64`, `rust-release-amd64`; sccache on the build cache                                                                                                                         |
+| Rust builds           | Ephemeral gVisor pools on the [Rust runner image](../images/runner-rust/Containerfile): `rust-pr-amd64`, `rust-amd64`, `rust-release-amd64`; sccache on the build cache; `target/` archive per toolchain, written by `rust-amd64` only                                                          |
 | CI capacity           | `infra.fredrir.com/ci-slot`: `fredrir-04` 1, `fredrir-09` 3; source label `infra.fredrir.com/ci-slots`, restored by `arc-system/ci-slots`                                                                                                                                                       |
 | Runner permissions    | No host sockets, host paths or Kubernetes API token                                                                                                                                                                                                                                             |
-| Build egress          | Cluster DNS and TCP 443; Rust pools add the build cache on TCP 3900; `publish-amd64` adds TCP 22 to AUR; Dockerfiles must use `https://` package sources                                                                                                                                        |
+| Build egress          | Cluster DNS and TCP 443; Rust and layer-cache pools add the build cache on TCP 3900; `ci-infra` BuildKit adds the Flux receiver on TCP 9292; `publish-amd64` adds TCP 22 to AUR; Dockerfiles must use `https://` package sources                                                                |
 | Job timeout           | 45 minutes; callers with long native test suites pass `timeout-minutes`                                                                                                                                                                                                                         |
-| Runner scratch        | 10Gi requested, 60Gi limit ephemeral storage; Rust pools 20Gi/80Gi; BuildKit runners prefer the non-Kata worker; the parser pool gets 40Gi/200Gi on `fredrir-09`                                                                                                                                |
+| Runner scratch        | 10Gi requested, 60Gi limit ephemeral storage; Rust pools 20Gi/80Gi; BuildKit runners 1/4 CPU and prefer the non-Kata worker; the parser pool gets 40Gi/200Gi on `fredrir-09`                                                                                                                    |
 | Shared images         | [Infrastructure images workflow](../.github/workflows/images.yml): runner BuildKit, runner Nix, runner Rust, backup tools and `platform-caddy`; BuildKit, runc, restic and Caddy compile from pinned upstream commits with patched Go modules because published binaries carry fixable findings |
 | Fork PRs              | Never run: job-level guard, pool job-started hook and approval required for every external contributor                                                                                                                                                                                          |
 | Approved source       | Protected `main` pushes; same-repository PRs on `rust-pr-amd64`; protected `v*` tags and `main` dry runs on `rust-release-amd64`; matching numeric repository and owner identities                                                                                                              |
 | Workflow reuse        | Immutable `fredrir/infra/.github/workflows/{build-image,rust-ci,rust-auto-tag,rust-release,packages-publish}.yml@<commit>`                                                                                                                                                                      |
 | Pin changes           | A new shared workflow or shared recipe commit re-pins all callers and the OctoSTS policies to that commit together                                                                                                                                                                              |
-| Release authorization | OctoSTS on `infra`, onboarded projects, `packages`, `homebrew-tap`, `homebrew-nsql` and `nur-packages`; policies pin workflow path, repository id, ref and environment                                                                                                                          |
+| Release authorization | OctoSTS on `infra`, onboarded projects, `packages`, `homebrew-tap`, `homebrew-nsql` and `nur-packages`; policies pin workflow path, repository id, ref and environment; project deploy identities hold `actions: write` on `infra`, only `deploy.yml` on `main` holds `contents: write`         |
 | Deployment mappings   | [Repository image mappings](../.github/deployments)                                                                                                                                                                                                                                             |
-| Promotion             | Verify GitHub attestations for public images or keyless Cosign signatures for private images, then merge the reviewed digest PR for Flux to reconcile from `main`                                                                                                                               |
+| Promotion             | `build-image.yml` dispatches [`deploy.yml`](../.github/workflows/deploy.yml); it verifies the GitHub attestation (public) or keyless Cosign signature (private) against the pinned workflow commit, pushes the digest to `main` and notifies the Flux `deploy` receiver                         |
 | Rollback              | Revert the deployment commit; check database schema compatibility first                                                                                                                                                                                                                         |
 | Native ARM            | Rust targets cross-compile with cargo-zigbuild; container images and native tests stay amd64 until an ARM worker passes qualification                                                                                                                                                           |
 
@@ -162,11 +162,26 @@ uv run --frozen infra onboard fredrir/example \
 | ------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `project/`                            | `platform/projects/example/`; include it in the projects Kustomization                     |
 | `runner/`                             | `platform/components/runners/example/`; include it in the runners Kustomization            |
-| `infrastructure/.github/`             | Infrastructure deployment mapping and OctoSTS trust policy                                 |
+| `infrastructure/.github/`             | Infrastructure deployment mapping (`visibility`, image paths) and OctoSTS trust policy     |
 | `caller/.github/workflows/build.yaml` | Project repository                                                                         |
 | Application credentials               | Add encrypted `project-registry` and `project-runtime` Secrets                             |
 | Runner credentials                    | Add the encrypted ARC registration Secret in the new runner namespace                      |
 | Activation                            | Review generated YAML, resource limits and secrets, then raise workload replicas from zero |
+
+```sh
+uv run --frozen infra onboard-cache --project example
+```
+
+| Generated                                                             | Value                                |
+| --------------------------------------------------------------------- | ------------------------------------ |
+| `platform/components/runners/example/buildkit-cache.secret.sops.yaml` | Read-write key for `ci-example-main` |
+| `platform/components/build-cache/projects/example.secret.sops.yaml`   | Provisioner keys                     |
+| `components: [../buildkit-cache]`                                     | Cache environment and egress         |
+
+| `infra` setting  | Value                                                                                   |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| `main` ruleset   | [`main-ruleset.json`](../.github/main-ruleset.json); bypass: repository admin, Octo STS |
+| Private projects | `.github/chainguard/infra-deploy.sts.yaml`: `packages: read` for `deploy.yml` on `main` |
 
 The shared [project chart](../charts/project) supports web services, workers and scheduled jobs. Databases and durable files require explicit storage, backup and recovery configuration.
 

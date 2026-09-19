@@ -15,6 +15,16 @@ RUNNERS = Path("platform/components/runners")
 CACHE_PROJECTS = Path("platform/components/build-cache/projects")
 REGISTRY = Path(".github/rust-projects.yaml")
 SHARED_WORKFLOW = r"^fredrir/infra/\.github/workflows/{}\.yml@[0-9a-f]{{40}}$"
+REGISTRY_READER = {
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject_pattern": rf"^repo:fredrir(@{OWNER_ID})?/infra(@1328085692)?:ref:refs/heads/main$",
+    "claim_pattern": {
+        "repository_id": "^1328085692$", "repository_owner_id": f"^{OWNER_ID}$", "event_name": "^workflow_dispatch$",
+        "ref": "^refs/heads/main$", "runner_environment": "^self-hosted$",
+        "job_workflow_ref": r"^fredrir/infra/\.github/workflows/deploy\.yml@refs/heads/main$",
+    },
+    "permissions": {"packages": "read"},
+}
 APP_CREDENTIALS = {
     "github_app_id": "ARC_GITHUB_APP_ID",
     "github_app_installation_id": "ARC_GITHUB_APP_INSTALLATION_ID",
@@ -122,7 +132,8 @@ def onboarding(args):
         "project/kustomization.yaml": yaml.safe_dump({"apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "namespace": namespace, "resources": ["baseline.yaml", "release.yaml"]}, sort_keys=False),
         "caller/.github/workflows/build.yaml": yaml.safe_dump(caller, sort_keys=False),
         f"infrastructure/.github/deployments/{identity['id']}.yaml": yaml.safe_dump({
-            "repository": identity["full_name"], "images": {args.image.split("@")[0]: {
+            "repository": identity["full_name"], "visibility": "private" if identity.get("private", False) else "public",
+            "images": {args.image.split("@")[0]: {
                 "path": f"platform/projects/{project}", "mode": "helmrelease", "workload": "web",
             }},
         }, sort_keys=False),
@@ -134,8 +145,10 @@ def onboarding(args):
                 "event_name": "^push$", "ref": "^refs/heads/main$", "runner_environment": "^self-hosted$",
                 "job_workflow_ref": "^" + re.escape(WORKFLOW + "@" + args.workflow_ref) + "$",
                 "job_workflow_sha": "^" + args.workflow_ref + "$",
-            }, "permissions": {"contents": "write", "pull_requests": "write"},
+            }, "permissions": {"actions": "write"},
         }, sort_keys=False),
+    } | ({"caller/.github/chainguard/infra-deploy.sts.yaml": yaml.safe_dump(REGISTRY_READER, sort_keys=False)}
+         if identity.get("private", False) else {}) | {
         "runner/kustomization.yaml": yaml.safe_dump({
             "apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization",
             "namespace": f"ci-{project}", "resources": ["../base"],
@@ -185,18 +198,38 @@ def secret(name, namespace, data, labels=None):
     return {"apiVersion": "v1", "kind": "Secret", "metadata": metadata, "type": "Opaque", "stringData": data}
 
 
-def append_resource(kustomization, entry):
+def append_entry(kustomization, field, entry):
     text = kustomization.read_text()
-    if entry in (yaml.safe_load(text).get("resources") or []):
+    if entry in (yaml.safe_load(text).get(field) or []):
         raise ValueError(f"{entry} is already listed in {kustomization}")
     line = yaml.safe_dump([entry])
-    if re.search(r"^resources: \[\]$", text, re.M):
-        text = re.sub(r"^resources: \[\]$", "resources:\n" + line.rstrip("\n"), text, count=1, flags=re.M)
-    elif re.search(r"^resources:\n(- .*\n)*", text, re.M):
-        text = re.sub(r"^(resources:\n(?:- .*\n)*)", lambda m: m.group(1) + line, text, count=1, flags=re.M)
+    if re.search(rf"^{field}: \[\]$", text, re.M):
+        text = re.sub(rf"^{field}: \[\]$", f"{field}:\n" + line.rstrip("\n"), text, count=1, flags=re.M)
+    elif re.search(rf"^{field}:\n(- .*\n)*", text, re.M):
+        text = re.sub(rf"^({field}:\n(?:- .*\n)*)", lambda m: m.group(1) + line, text, count=1, flags=re.M)
+    elif field == "components" and re.search(r"^resources:\n(- .*\n)*", text, re.M):
+        text = re.sub(r"^(resources:\n(?:- .*\n)*)", lambda m: m.group(1) + "components:\n" + line, text, count=1, flags=re.M)
     else:
-        raise ValueError(f"{kustomization} has no top-level resources list")
+        raise ValueError(f"{kustomization} has no top-level {field} list")
     kustomization.write_text(text)
+
+
+def append_resource(kustomization, entry):
+    append_entry(kustomization, "resources", entry)
+
+
+def cache_pools():
+    return {"ro": garage_key(), "rw": garage_key(), "release": garage_key()}
+
+
+def runner_credentials(key):
+    return {"AWS_ACCESS_KEY_ID": key["id"], "AWS_SECRET_ACCESS_KEY": key["secret"]}
+
+
+def encrypt_provisioner_keys(project, pools, destination, recipients):
+    encrypt(secret(f"build-cache-{project}", "build-cache",
+                   {f"{pool}_{field}": key[field] for pool, key in pools.items() for field in ["id", "secret"]},
+                   {"infra.fredrir.com/build-cache-project": project}), destination, recipients)
 
 
 def trust_policy(identity, subject, claims, permissions):
@@ -261,18 +294,15 @@ def rust_onboarding(args):
     recipients = platform_recipients(root)
     credentials = app_credentials()
     namespace = f"ci-{project}"
-    pools = {"ro": garage_key(), "rw": garage_key(), "release": garage_key()}
+    pools = cache_pools()
     overlay.mkdir(parents=True)
     resources = ["../ci-namespace", "github-app.secret.sops.yaml"]
     encrypt(secret("github-app", namespace, credentials), overlay / "github-app.secret.sops.yaml", recipients)
     for pool, key in pools.items():
         name = f"sccache-{pool}"
-        encrypt(secret(name, namespace, {"AWS_ACCESS_KEY_ID": key["id"], "AWS_SECRET_ACCESS_KEY": key["secret"]}),
-                overlay / f"{name}.secret.sops.yaml", recipients)
+        encrypt(secret(name, namespace, runner_credentials(key)), overlay / f"{name}.secret.sops.yaml", recipients)
         resources.append(f"{name}.secret.sops.yaml")
-    encrypt(secret(f"build-cache-{project}", "build-cache",
-                   {f"{pool}_{field}": key[field] for pool, key in pools.items() for field in ["id", "secret"]},
-                   {"infra.fredrir.com/build-cache-project": project}), keys, recipients)
+    encrypt_provisioner_keys(project, pools, keys, recipients)
     url = [{"op": "replace", "path": "/spec/values/githubConfigUrl", "value": "https://github.com/" + identity["full_name"]}]
     (overlay / "kustomization.yaml").write_text(yaml.safe_dump({
         "apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "namespace": namespace,
@@ -288,6 +318,33 @@ def rust_onboarding(args):
         (output / path).parent.mkdir(parents=True, exist_ok=True)
         (output / path).write_text(yaml.safe_dump(content, sort_keys=False))
     print(f"Onboarded {identity['full_name']} as {namespace}; copy {output}/project into the repository")
+
+
+def cache_onboarding(args):
+    project = checked(args.project, r"[a-z][a-z0-9-]{0,24}", "project")
+    root = Path(args.root)
+    overlay = root / RUNNERS / project
+    kustomization = overlay / "kustomization.yaml"
+    credentials = overlay / "buildkit-cache.secret.sops.yaml"
+    keys = root / CACHE_PROJECTS / f"{project}.secret.sops.yaml"
+    if not kustomization.exists():
+        raise ValueError("Project has no runner overlay")
+    text = kustomization.read_text()
+    settings = yaml.safe_load(text)
+    if "../base" not in (settings.get("resources") or []) or "runnerScaleSetName" in text:
+        raise ValueError("Only buildkit-amd64 pools support the layer cache")
+    if settings.get("namespace") != f"ci-{project}":
+        raise ValueError("Runner namespace does not match the project")
+    if credentials.exists() or keys.exists():
+        raise ValueError("Project already has a build cache")
+    recipients = platform_recipients(root)
+    pools = cache_pools()
+    encrypt(secret("buildkit-cache", f"ci-{project}", runner_credentials(pools["rw"])), credentials, recipients)
+    encrypt_provisioner_keys(project, pools, keys, recipients)
+    append_resource(kustomization, credentials.name)
+    append_entry(kustomization, "components", "../buildkit-cache")
+    append_resource(root / CACHE_PROJECTS / "kustomization.yaml", keys.name)
+    print(f"Enabled the layer cache for ci-{project}")
 
 
 def verify(args):
@@ -338,6 +395,9 @@ def main(argv=None):
     rust.add_argument("--workflow-ref", required=True)
     rust.add_argument("--output", required=True)
     rust.add_argument("--root", default=str(ROOT))
+    cache = commands.add_parser("onboard-cache")
+    cache.add_argument("--project", required=True)
+    cache.add_argument("--root", default=str(ROOT))
     verify_parser = commands.add_parser("verify-release")
     verify_parser.add_argument("image")
     verify_parser.add_argument("--repository", required=True)
@@ -345,7 +405,7 @@ def main(argv=None):
     verify_parser.add_argument("--workflow-ref", required=True)
     args = parser.parse_args(argv)
     try:
-        {"onboard": onboarding, "onboard-rust": rust_onboarding, "verify-release": verify}[args.command](args)
+        {"onboard": onboarding, "onboard-rust": rust_onboarding, "onboard-cache": cache_onboarding, "verify-release": verify}[args.command](args)
     except (ValueError, subprocess.CalledProcessError) as error:
         message = str(error) if isinstance(error, ValueError) else "Native command failed"
         parser.exit(1, message + "\n")

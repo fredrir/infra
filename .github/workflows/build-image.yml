@@ -18,9 +18,12 @@ on:
         type: string
         default: ''
       test-command:
-        required: true
         type: string
+        default: ''
       deploy:
+        type: boolean
+        default: true
+      layer-cache:
         type: boolean
         default: true
       timeout-minutes:
@@ -83,6 +86,7 @@ jobs:
         test "$(uname -m)" = x86_64
         test ! -e /var/run/secrets/kubernetes.io/serviceaccount/token
     - name: Test
+      if: inputs.test-command != ''
       env:
         TEST_COMMAND: ${{ inputs.test-command }}
       run: bash -euo pipefail -c "$TEST_COMMAND"
@@ -94,6 +98,7 @@ jobs:
         DOCKERFILE: ${{ inputs.dockerfile }}
         REGISTRY_TOKEN: ${{ github.token }}
         BUILD_ARGS: ${{ inputs.build-args }}
+        LAYER_CACHE: ${{ inputs.layer-cache }}
       run: |
         set -euo pipefail
         DOCKERFILE="${SHARED_DOCKERFILE:-$DOCKERFILE}"
@@ -105,7 +110,8 @@ jobs:
         unset REGISTRY_TOKEN
         export BUILDKITD_FLAGS="$BUILDKITD_FLAGS --oci-worker-net=host"
         source .infra-build-recipe/scripts/ci/build-args.sh
-        buildctl-daemonless.sh build --frontend dockerfile.v0 "${build_args[@]}" \
+        source .infra-build-recipe/scripts/ci/build-cache-args.sh
+        buildctl-daemonless.sh build --frontend dockerfile.v0 "${build_args[@]}" "${cache_args[@]}" \
           --local "context=$CONTEXT" --local "dockerfile=$(dirname "$DOCKERFILE")" \
           --opt "filename=$(basename "$DOCKERFILE")" --opt platform=linux/amd64 \
           --opt attest:provenance=mode=min,version=v1 \
@@ -172,18 +178,12 @@ jobs:
       with:
         scope: fredrir/infra
         identity: deploy-${{ github.repository_id }}
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      if: inputs.deploy
-      with:
-        repository: fredrir/infra
-        ref: main
-        path: .infra-deploy
-        token: ${{ steps.deployment-token.outputs.token }}
-        persist-credentials: false
-    - name: Open deployment PR
+    - name: Request deployment
       if: inputs.deploy
       env:
         GH_TOKEN: ${{ steps.deployment-token.outputs.token }}
-        IMAGE: ${{ steps.build.outputs.image }}
-        SOURCE_REPOSITORY_ID: ${{ github.repository_id }}
-      run: bash .infra-build-recipe/scripts/ci/release-pr.sh .infra-deploy
+        IMAGE: ${{ inputs.image }}
+        DIGEST: ${{ steps.build.outputs.digest }}
+      run: |
+        gh workflow run deploy.yml --repo fredrir/infra --ref main -f "repository-id=$GITHUB_REPOSITORY_ID" \
+          -f "image=$IMAGE" -f "digest=$DIGEST" -f "source-revision=$GITHUB_SHA"
