@@ -13,8 +13,6 @@ KEEP = 3
 SIGNER = "fredrir/infra/.github/workflows/rust-release.yml"
 STABLE = re.compile(r"v(\d+)\.(\d+)\.(\d+)")
 ARCHES = {"x86_64": "amd64", "aarch64": "arm64"}
-RPM_ARCHES = {"amd64": "x86_64", "arm64": "aarch64"}
-APK_ARCHES = {"amd64": "x86_64", "arm64": "aarch64"}
 CHANNEL_FILES = ["{name}.rb", "{name}.nix", "{name}-bin.pkgbuild", "{name}-bin.srcinfo", "{name}.pkgbuild", "{name}.srcinfo"]
 
 
@@ -104,8 +102,8 @@ def package(release, version, tag_dir, work, site):
             config.write_text(json.dumps(nfpm_config(release, version, arch, payload), indent=2))
             for packager in packagers:
                 target = {"deb": site / "deb/pool/main" / name,
-                          "rpm": site / "rpm" / RPM_ARCHES[arch],
-                          "apk": site / "apk" / APK_ARCHES[arch] / f"{name}-{version}-r1.apk"}[packager]
+                          "rpm": site / "rpm" / triple_arch,
+                          "apk": site / "apk" / triple_arch / f"{name}-{version}-r1.apk"}[packager]
                 (target.parent if packager == "apk" else target).mkdir(parents=True, exist_ok=True)
                 subprocess.run(["nfpm", "package", "--config", str(config), "--packager", packager, "--target", str(target)],
                                check=True, capture_output=True, text=True)

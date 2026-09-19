@@ -113,8 +113,7 @@ def main(argv=None):
         key = work / "aur.key"
         key.touch(mode=0o600)
         key.write_text(os.environ["AUR_SSH_KEY"].strip() + "\n")
-        tokens = {}
-        token_for = lambda scope: tokens.setdefault(scope, exchange(scope, "publisher"))
+        token_for = lambda scope: exchange(scope, "publisher")
         publish_taps(tools, args.channels, work, token_for)
         publish_nur(tools, args.channels, work, token_for)
         publish_aur(tools, args.channels, work, key)
