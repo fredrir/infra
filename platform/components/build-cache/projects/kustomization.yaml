@@ -7,3 +7,4 @@ resources:
 - portfolio.secret.sops.yaml
 - y.secret.sops.yaml
 - infra.secret.sops.yaml
+- parser.secret.sops.yaml
