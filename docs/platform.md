@@ -181,7 +181,7 @@ uv run --frozen infra onboard-cache --project example
 | `infra` setting   | Value                                                                                        |
 | ----------------- | -------------------------------------------------------------------------------------------- |
 | `main` protection | [`main-protection.json`](../.github/main-protection.json); `octo-sts` bypasses pull requests |
-| Private packages  | Actions access: `fredrir/infra`, read                                                        |
+| Private projects  | `.github/chainguard/infra-deploy.sts.yaml`: `packages: read` for `deploy.yml` on `main`      |
 
 The shared [project chart](../charts/project) supports web services, workers and scheduled jobs. Databases and durable files require explicit storage, backup and recovery configuration.
 
