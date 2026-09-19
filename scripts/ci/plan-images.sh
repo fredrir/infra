@@ -28,7 +28,7 @@ for ((index = 0; index < count; index++)); do
   done < <(jq -er '.inputs[]' <<< "$entry")
   [[ -n "$objects" ]]
   tag=inputs-$(printf '%s\n%s\n%s' "$entry" "$shared" "$objects" | sha256sum | cut -d' ' -f1)
-  if published "$name" "$tag"; then
+  if [[ "${REFRESH:-false}" != true ]] && published "$name" "$tag"; then
     printf 'Unchanged: %s\n' "$image"
   else
     printf 'Building: %s\n' "$image"

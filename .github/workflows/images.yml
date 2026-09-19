@@ -16,6 +16,9 @@ on:
     - uv.lock
     - images/caddy/**
     - platform/components/backups/tools.Dockerfile
+  schedule:
+  - cron: 0 4 * * 1
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -32,6 +35,8 @@ jobs:
         persist-credentials: false
     - name: Plan
       id: plan
+      env:
+        REFRESH: ${{ github.event_name != 'push' }}
       run: bash scripts/ci/plan-images.sh
   image:
     needs: plan
@@ -45,7 +50,7 @@ jobs:
       packages: write
       id-token: write
       attestations: write
-    uses: fredrir/infra/.github/workflows/build-image.yml@6b6f2140394215194aa49b8bb36294528c65a304
+    uses: fredrir/infra/.github/workflows/build-image.yml@1f2eecbc81ba184252f9ed85f893fa5eb3b5150a
     with:
       image: ${{ matrix.image }}
       dockerfile: ${{ matrix.dockerfile }}

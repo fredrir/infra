@@ -123,10 +123,10 @@ class PlanImagesTests(unittest.TestCase):
         self.git('add', '--all')
         self.git('commit', '--quiet', '--message', 'change')
 
-    def plan(self, registry):
+    def plan(self, registry, **environment):
         self.output.write_text('')
         result = subprocess.run(['bash', str(PLAN_IMAGES)], cwd=self.repository, capture_output=True, text=True, check=False,
-                                env=os.environ | {'REGISTRY_URL': registry.url, 'GITHUB_OUTPUT': str(self.output)})
+                                env=os.environ | {'REGISTRY_URL': registry.url, 'GITHUB_OUTPUT': str(self.output)} | environment)
         self.assertEqual(result.returncode, 0, result.stderr)
         name, _, value = self.output.read_text().strip().partition('=')
         self.assertEqual(name, 'images')
@@ -148,6 +148,7 @@ class PlanImagesTests(unittest.TestCase):
         self.assertEqual(sorted(self.plan(published)), ['ghcr.io/fredrir/two'])
         everything = {f"/v2/{image.removeprefix('ghcr.io/')}/manifests/{entry['tag']}": INDEX for image, entry in planned.items()}
         self.assertEqual(self.plan(self.registry(manifests=everything)), {})
+        self.assertEqual(len(self.plan(self.registry(manifests=everything), REFRESH='true')), 2)
 
     def test_a_changed_input_only_retags_the_images_that_declare_it(self):
         before = self.plan(self.registry())

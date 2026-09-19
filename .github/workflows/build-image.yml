@@ -45,7 +45,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: github.repository_owner_id == '114402558' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
+    if: github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected
     runs-on: buildkit-amd64
     timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
@@ -98,6 +98,9 @@ jobs:
       if: inputs.test-command != ''
       env:
         TEST_COMMAND: ${{ inputs.test-command }}
+        IMAGE: ${{ inputs.image }}
+        CONTEXT: ${{ inputs.context }}
+        LAYER_CACHE: ${{ inputs.layer-cache }}
       run: bash -euo pipefail -c "$TEST_COMMAND"
     - name: Build and publish
       id: build
