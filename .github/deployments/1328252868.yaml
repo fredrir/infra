@@ -1,4 +1,5 @@
 repository: fredrir/llunde-pyparser
+visibility: private
 images:
   ghcr.io/fredrir/pyparser-review:
     path: platform/projects/llunde-pyparser

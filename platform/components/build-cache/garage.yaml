@@ -163,6 +163,7 @@ spec:
         - key: actions.github.com/scale-set-name
           operator: In
           values:
+          - buildkit-amd64
           - rust-amd64
           - rust-pr-amd64
           - rust-release-amd64

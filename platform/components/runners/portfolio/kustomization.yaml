@@ -4,6 +4,9 @@ namespace: ci-portfolio
 resources:
 - ../base
 - github-app.secret.sops.yaml
+- buildkit-cache.secret.sops.yaml
+components:
+- ../buildkit-cache
 patches:
 - target:
     kind: HelmRelease

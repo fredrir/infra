@@ -1,4 +1,5 @@
 repository: fredrir/portfolio
+visibility: public
 images:
   ghcr.io/fredrir/portfolio-api:
     path: platform/projects/portfolio

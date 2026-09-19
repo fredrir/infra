@@ -7,6 +7,9 @@ resources:
 - network.yaml
 - attic.secret.sops.yaml
 - github-app.secret.sops.yaml
+- buildkit-cache.secret.sops.yaml
+components:
+- ../buildkit-cache
 patches:
 - path: quota.yaml
 - target:

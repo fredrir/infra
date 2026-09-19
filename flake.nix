@@ -31,6 +31,7 @@
         sops
         uv
         yq-go
+        zstd
       ];
   in {
     devShells = forAllSystems (system: let

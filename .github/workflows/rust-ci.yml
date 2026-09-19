@@ -43,6 +43,8 @@ jobs:
         CLIPPY_ARGS: ${{ inputs.clippy-args }}
         TEST_ARGS: ${{ inputs.test-args }}
       run: bash .infra/scripts/ci/rust-prepare.sh
+    - name: Restore build outputs
+      run: bash .infra/scripts/ci/rust-target-cache.sh restore
     - name: Start PostgreSQL
       if: inputs.postgres
       env:
@@ -67,30 +69,12 @@ jobs:
     - name: Build without default features
       if: inputs.minimal-build
       run: cargo build --locked --no-default-features
-    - name: Cache report
-      if: always()
-      run: sccache --show-stats >> "$GITHUB_STEP_SUMMARY" || true
-  msrv-audit:
-    if: github.repository_owner_id == '114402558' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: ${{ github.event_name == 'pull_request' && 'rust-pr-amd64' || 'rust-amd64' }}
-    timeout-minutes: ${{ inputs.timeout-minutes }}
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        repository: ${{ job.workflow_repository }}
-        ref: ${{ job.workflow_sha }}
-        path: .infra
-        persist-credentials: false
-        sparse-checkout: scripts/ci
-    - name: Prepare
-      run: bash .infra/scripts/ci/rust-prepare.sh
     - name: Check the minimum supported Rust version
       run: bash .infra/scripts/ci/check-msrv.sh
     - name: Audit dependencies
       run: cargo audit
+    - name: Save build outputs
+      run: bash .infra/scripts/ci/rust-target-cache.sh save
     - name: Cache report
       if: always()
       run: sccache --show-stats >> "$GITHUB_STEP_SUMMARY" || true
