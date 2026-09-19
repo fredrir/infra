@@ -1,0 +1,38 @@
+FROM docker.io/nixos/nix:2.35.2@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c AS toolchain
+WORKDIR /src
+COPY flake.nix flake.lock ./
+RUN nix --extra-experimental-features 'nix-command flakes' --option sandbox false --option filter-syscalls false \
+        build --out-link /toolchain .#check \
+    && mkdir -p /out/nix/store /out/opt \
+    && cp -a $(nix-store --query --requisites /toolchain) /out/nix/store/ \
+    && ln -s "$(readlink -f /toolchain)" /out/opt/toolchain
+
+FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
+USER root
+RUN sed -i 's|^URIs: http://|URIs: https://|' /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get update -o APT::Update::Error-Mode=any \
+    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
+        /usr/bin/docker /usr/bin/docker-init /usr/bin/docker-proxy /usr/bin/dockerd /usr/bin/runc \
+        /usr/local/lib/docker \
+        /home/runner/externals/node20/lib/node_modules/npm /home/runner/externals/node20/bin/npm /home/runner/externals/node20/bin/npx \
+        /home/runner/externals/node24/lib/node_modules/npm /home/runner/externals/node24/bin/npm /home/runner/externals/node24/bin/npx
+COPY --from=toolchain /out/ /
+ENV PATH=/opt/toolchain/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV LD_LIBRARY_PATH=/opt/toolchain/lib
+ENV UV_PYTHON_DOWNLOADS=never
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+ENV UV_LINK_MODE=copy
+ENV TF_PLUGIN_CACHE_DIR=/opt/tofu-plugins
+RUN --mount=type=bind,source=pyproject.toml,target=/pins/pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=/pins/uv.lock \
+    --mount=type=bind,source=tofu,target=/pins/tofu \
+    mkdir -p "$TF_PLUGIN_CACHE_DIR" /tmp/pins \
+    && cp -r /pins/. /tmp/pins/ \
+    && cd /tmp/pins \
+    && uv sync --frozen --group ci --no-install-project \
+    && tofu -chdir=tofu init -backend=false -lockfile=readonly -input=false \
+    && rm -rf /tmp/pins /root/.cache
+ENV RUNNER_ALLOW_RUNASROOT=1
+WORKDIR /home/runner

@@ -33,6 +33,29 @@
         yq-go
         zstd
       ];
+    checks = system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+    in
+      with pkgs; [
+        actionlint
+        age
+        ansible
+        bash
+        coreutils
+        git
+        gnutar
+        jq
+        kubectl
+        kubernetes-helm
+        kustomize
+        opentofu
+        (python3.withPackages (python: [python.pyyaml python.jsonschema]))
+        sops
+        stdenv.cc.cc.lib
+        uv
+        yq-go
+        zstd
+      ];
   in {
     devShells = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
@@ -44,6 +67,11 @@
     });
     packages = forAllSystems (system: {
       attic-client = nixpkgs.legacyPackages.${system}.attic-client;
+      check = nixpkgs.legacyPackages.${system}.buildEnv {
+        name = "infra-check";
+        paths = checks system;
+        pathsToLink = ["/bin" "/lib" "/share"];
+      };
       default = (nixpkgs.legacyPackages.${system}.buildEnv {
         name = "infra-toolchain";
         paths = toolchain system;

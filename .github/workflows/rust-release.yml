@@ -30,7 +30,7 @@ jobs:
         persist-credentials: false
         sparse-checkout: scripts/ci
     - name: Install release tools
-      run: bash .infra/scripts/ci/install-rust-release-tools.sh goreleaser git-cliff
+      run: bash .infra/scripts/ci/install-tools.sh goreleaser git-cliff
     - name: Fetch the macOS SDK
       run: bash .infra/scripts/ci/fetch-macos-sdk.sh
     - name: Render the release configuration
@@ -98,7 +98,7 @@ jobs:
         persist-credentials: false
         sparse-checkout: scripts/ci
     - name: Install release tools
-      run: bash .infra/scripts/ci/install-rust-release-tools.sh gh
+      run: bash .infra/scripts/ci/install-tools.sh gh
     - name: Draft the release
       env:
         GH_TOKEN: ${{ github.token }}

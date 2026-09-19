@@ -26,6 +26,9 @@ on:
       layer-cache:
         type: boolean
         default: true
+      scan-skip-dirs:
+        type: string
+        default: ''
       timeout-minutes:
         type: number
         default: 45
@@ -60,6 +63,9 @@ jobs:
         ref: ${{ job.workflow_sha }}
         path: .infra-build-recipe
         persist-credentials: false
+        sparse-checkout: |
+          scripts/ci
+          platform/projects/y
     - name: Select shared recipe
       if: inputs.recipe != ''
       env:
@@ -101,6 +107,8 @@ jobs:
         LAYER_CACHE: ${{ inputs.layer-cache }}
       run: |
         set -euo pipefail
+        bash .infra-build-recipe/scripts/ci/install-tools.sh gh trivy cosign &
+        tools=$!
         DOCKERFILE="${SHARED_DOCKERFILE:-$DOCKERFILE}"
         export DOCKER_CONFIG="$RUNNER_TEMP/registry"
         mkdir -m 700 "$DOCKER_CONFIG"
@@ -122,14 +130,20 @@ jobs:
         digest=$(jq -er '."containerimage.digest"' "$RUNNER_TEMP/build.json")
         [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
         printf 'image=%s@%s\ndigest=%s\n' "$IMAGE" "$digest" "$digest" >> "$GITHUB_OUTPUT"
-    - name: Install release tools
-      run: bash .infra-build-recipe/scripts/ci/install-release-tools.sh
+        wait "$tools"
     - name: Scan published image
       env:
         IMAGE: ${{ steps.build.outputs.image }}
         TRIVY_USERNAME: ${{ github.actor }}
         TRIVY_PASSWORD: ${{ github.token }}
-      run: trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --timeout 10m "$IMAGE"
+        SKIP_DIRS: ${{ inputs.scan-skip-dirs }}
+      run: |
+        skip=()
+        if [[ -n "$SKIP_DIRS" ]]; then
+          [[ "$SKIP_DIRS" =~ ^/[a-z/]+$ ]]
+          skip=(--skip-dirs "$SKIP_DIRS")
+        fi
+        trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --timeout 10m "${skip[@]}" "$IMAGE"
     - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661
       if: '!github.event.repository.private'
       with:
