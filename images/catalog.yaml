@@ -1,0 +1,56 @@
+- image: ghcr.io/fredrir/infra-runner-check
+  dockerfile: images/runner-check/Containerfile
+  inputs:
+  - images/runner-check
+  - flake.nix
+  - flake.lock
+  - pyproject.toml
+  - uv.lock
+  scan-skip-dirs: /nix
+  check: >-
+    /home/runner/run.sh --version | grep -x 2.337.0;
+    kubectl version --client; kustomize version; helm version --short; actionlint -version; tofu version;
+    ansible-playbook --version | head -n1; sops --version; age --version;
+    LD_LIBRARY_PATH=$CHECK_LIBRARY_PATH /opt/venv/bin/python -c 'import ansible, celpy, jinja2, yaml'
+- image: ghcr.io/fredrir/infra-runner-buildkit
+  dockerfile: images/runner-buildkit/Containerfile
+  inputs:
+  - images/runner-buildkit
+  check: /home/runner/run.sh --version | grep -x 2.337.0; buildctl --version; buildkitd --version
+- image: ghcr.io/fredrir/infra-runner-nix
+  dockerfile: images/runner-nix/Containerfile
+  inputs:
+  - images/runner-nix
+  check: /home/runner/run.sh --version | grep -x 2.337.0; nix --version; nix config show | grep -x 'sandbox = true'
+- image: ghcr.io/fredrir/infra-runner-rust
+  dockerfile: images/runner-rust/Containerfile
+  inputs:
+  - images/runner-rust
+  check: >-
+    /home/runner/run.sh --version | grep -x 2.337.0;
+    rustc --version | grep '^rustc 1\.98\.1 ';
+    cargo +1.95.0 --version | grep '^cargo 1\.95\.0 ';
+    zig version | grep -x 0.16.0;
+    cargo-zigbuild -V | grep -F 0.23.4;
+    sccache --version | grep -F 0.18.0;
+    cargo nextest --version | grep -F 0.9.145;
+    cargo audit --version | grep -F 0.22.2;
+    /usr/lib/postgresql/16/bin/initdb --version | grep -F ' 16.';
+    pkg-config --exists openssl zlib;
+    printf test > /tmp/probe && nix-hash --type sha256 --flat --base32 /tmp/probe | grep -x 020ay2q1av2xs4n842rb3d7vz8qms1dcb87a5yd6azaci20x11lz;
+    bash -n /usr/local/bin/ci-job-started.sh;
+    cd "$(mktemp -d)" && cargo new --vcs none probe && cd probe
+    && cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.28 --target x86_64-unknown-linux-musl
+    && file target/aarch64-unknown-linux-gnu/release/probe | grep -F 'ARM aarch64'
+    && file target/x86_64-unknown-linux-musl/release/probe | grep -E 'statically linked|static-pie linked'
+- image: ghcr.io/fredrir/platform-caddy
+  dockerfile: images/caddy/Containerfile
+  inputs:
+  - images/caddy
+  check: caddy version | grep -E '^v2\.11\.4 '; caddy list-modules | grep -x http.handlers.file_server
+  shell: '["/bin/sh", "-euc"]'
+- image: ghcr.io/fredrir/platform-backup-tools
+  dockerfile: platform/components/backups/tools.Dockerfile
+  inputs:
+  - platform/components/backups/tools.Dockerfile
+  check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version

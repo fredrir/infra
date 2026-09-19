@@ -29,6 +29,9 @@ on:
       scan-skip-dirs:
         type: string
         default: ''
+      verified-tag:
+        type: string
+        default: ''
       timeout-minutes:
         type: number
         default: 45
@@ -186,6 +189,13 @@ jobs:
           --annotations "source-repository=$GITHUB_REPOSITORY" \
           --annotations "source-revision=$GITHUB_SHA" \
           --annotations "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
+    - name: Tag verified image
+      if: inputs.verified-tag != ''
+      env:
+        IMAGE: ${{ steps.build.outputs.image }}
+        TAG: ${{ inputs.verified-tag }}
+        REGISTRY_TOKEN: ${{ github.token }}
+      run: bash .infra-build-recipe/scripts/ci/tag-image.sh
     - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
       if: inputs.deploy
       id: deployment-token

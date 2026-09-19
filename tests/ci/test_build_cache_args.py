@@ -18,10 +18,10 @@ class BuildCacheArgumentTests(unittest.TestCase):
         self.listener.listen()
         self.endpoint = f'http://127.0.0.1:{self.listener.getsockname()[1]}'
 
-    def arguments(self, environment):
+    def arguments(self, environment, array='cache_args'):
         inherited = {k: v for k, v in os.environ.items() if not k.startswith(('BUILDKIT_CACHE_', 'AWS_'))}
         return subprocess.run(
-            ['bash', '-c', 'source "$1"; printf "%s\\0" "${cache_args[@]}"', 'args', str(SCRIPT)],
+            ['bash', '-c', f'source "$1"; printf "%s\\0" "${{{array}[@]}}"', 'args', str(SCRIPT)],
             env=inherited | environment, capture_output=True, check=False,
         )
 
@@ -33,6 +33,13 @@ class BuildCacheArgumentTests(unittest.TestCase):
         self.assertEqual(values[values.index('--import-cache') + 1], store)
         self.assertEqual(values[values.index('--export-cache') + 1], store + ',mode=max,touch_refresh=1m,ignore-error=true')
         self.assertNotIn(CACHE['AWS_SECRET_ACCESS_KEY'], result.stdout.decode())
+
+    def test_import_only_arguments_never_export(self):
+        result = self.arguments(CACHE | {'BUILDKIT_CACHE_ENDPOINT': self.endpoint}, 'cache_import_args')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        values = result.stdout.decode().split('\0')
+        self.assertIn('--import-cache', values)
+        self.assertNotIn('--export-cache', values)
 
     def test_disabled_unconfigured_or_unreachable_cache_builds_without_it(self):
         reachable = CACHE | {'BUILDKIT_CACHE_ENDPOINT': self.endpoint}
