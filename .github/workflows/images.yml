@@ -8,6 +8,12 @@ on:
     - images/runner-buildkit/**
     - images/runner-nix/**
     - images/runner-rust/**
+    - images/runner-check/**
+    - flake.nix
+    - flake.lock
+    - pyproject.toml
+    - uv.lock
+    - tofu/.terraform.lock.hcl
     - images/caddy/**
     - platform/components/backups/tools.Dockerfile
 permissions:
@@ -43,6 +49,14 @@ jobs:
             && cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.28 --target x86_64-unknown-linux-musl
             && file target/aarch64-unknown-linux-gnu/release/probe | grep -F 'ARM aarch64'
             && file target/x86_64-unknown-linux-musl/release/probe | grep -E 'statically linked|static-pie linked'
+        - image: ghcr.io/fredrir/infra-runner-check
+          dockerfile: images/runner-check/Containerfile
+          scan-skip-dirs: /nix
+          check: >-
+            /home/runner/run.sh --version | grep -x 2.337.0;
+            kubectl version --client; kustomize version; helm version --short; actionlint -version; tofu version;
+            ansible-playbook --version | head -n1; sops --version; age --version;
+            /opt/venv/bin/python -c 'import ansible, celpy, jinja2, yaml'
         - image: ghcr.io/fredrir/platform-caddy
           dockerfile: images/caddy/Containerfile
           check: caddy version | grep -E '^v2\.11\.4 '; caddy list-modules | grep -x http.handlers.file_server
@@ -60,6 +74,7 @@ jobs:
       image: ${{ matrix.image }}
       dockerfile: ${{ matrix.dockerfile }}
       deploy: false
+      scan-skip-dirs: ${{ matrix.scan-skip-dirs || '' }}
       test-command: |
         cp '${{ matrix.dockerfile }}' "$RUNNER_TEMP/Containerfile"
         cat <<'CHECK' >> "$RUNNER_TEMP/Containerfile"
@@ -68,6 +83,7 @@ jobs:
         RUN ${{ matrix.check }}
         CHECK
         export BUILDKITD_FLAGS="$BUILDKITD_FLAGS --oci-worker-net=host"
-        buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        IMAGE='${{ matrix.image }}' source scripts/ci/build-cache-args.sh
+        buildctl-daemonless.sh build --frontend dockerfile.v0 "${cache_args[@]}" \
           --local context=. --local "dockerfile=$RUNNER_TEMP" \
           --opt filename=Containerfile --opt platform=linux/amd64

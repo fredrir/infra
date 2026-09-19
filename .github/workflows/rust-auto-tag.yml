@@ -33,7 +33,7 @@ jobs:
         persist-credentials: false
         sparse-checkout: scripts/ci
     - name: Install release tools
-      run: bash .infra/scripts/ci/install-rust-release-tools.sh git-cliff
+      run: bash .infra/scripts/ci/install-tools.sh git-cliff
     - name: Tag the next release
       working-directory: src
       run: bash ../.infra/scripts/ci/tag-release.sh

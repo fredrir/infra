@@ -33,8 +33,8 @@ jobs:
       with:
         ref: main
         persist-credentials: false
-    - name: Install release tools
-      run: bash scripts/ci/install-release-tools.sh
+    - name: Install tools
+      run: bash scripts/ci/install-tools.sh gh yq kustomize cosign
     - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
       id: deployment-token
       with:
