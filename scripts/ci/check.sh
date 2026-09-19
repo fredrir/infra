@@ -7,10 +7,23 @@ else
   files=$(git ls-files)
 fi
 changed() { grep -Eq "$1" <<< "$files"; }
+logs=$(mktemp -d)
+suites=()
 suite() {
-  printf '::group::%s\n' "$1"
-  LD_LIBRARY_PATH=${CHECK_LIBRARY_PATH:-${LD_LIBRARY_PATH:-}} uv run --frozen --group ci python -m unittest discover -s "$1"
-  printf '::endgroup::\n'
+  if [[ ${#suites[@]} -eq 0 ]]; then uv sync --frozen --group ci --quiet; fi
+  LD_LIBRARY_PATH=${CHECK_LIBRARY_PATH:-${LD_LIBRARY_PATH:-}} uv run --no-sync python -m unittest discover -s "$1" > "$logs/${1//\//-}" 2>&1 &
+  suites+=("$!:$1")
+}
+report() {
+  local failed=0 entry name
+  for entry in "${suites[@]}"; do
+    name=${entry#*:}
+    wait "${entry%%:*}" || failed=1
+    printf '::group::%s\n' "$name"
+    cat "$logs/${name//\//-}"
+    printf '::endgroup::\n'
+  done
+  return "$failed"
 }
 
 python='^(pyproject\.toml|uv\.lock)$'
@@ -31,3 +44,4 @@ if changed '^tofu/'; then
   tofu -chdir=tofu validate
 fi
 if changed '^flake\.(nix|lock)$'; then printf 'toolchain=true\n' >> "$GITHUB_OUTPUT"; fi
+report
