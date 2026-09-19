@@ -1,0 +1,105 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: check
+spec:
+  suspend: false
+  interval: 30m
+  timeout: 5m
+  chart:
+    spec:
+      chart: gha-runner-scale-set
+      version: 0.14.2
+      sourceRef:
+        kind: HelmRepository
+        name: actions
+        namespace: flux-system
+  values:
+    githubConfigUrl: https://github.com/fredrir/infra
+    githubConfigSecret: github-app
+    runnerScaleSetName: check-amd64
+    minRunners: 0
+    maxRunners: 1
+    controllerServiceAccount:
+      name: arc-controller
+      namespace: arc-system
+    listenerTemplate:
+      spec:
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+        - name: listener
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+    template:
+      spec:
+        serviceAccountName: ci-job
+        automountServiceAccountToken: false
+        runtimeClassName: gvisor
+        nodeSelector:
+          node-restriction.kubernetes.io/gvisor: 'true'
+          kubernetes.io/arch: amd64
+        priorityClassName: ci
+        restartPolicy: Never
+        activeDeadlineSeconds: 1800
+        terminationGracePeriodSeconds: 30
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+        - name: runner
+          image: ghcr.io/fredrir/infra-runner-check@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command:
+          - /home/runner/run.sh
+          env:
+          - name: RUNNER_ALLOW_RUNASROOT
+            value: '1'
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+              add:
+              - CHOWN
+              - DAC_OVERRIDE
+              - FOWNER
+              - FSETID
+              - KILL
+              - SETGID
+              - SETUID
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+              ephemeral-storage: 2Gi
+              infra.fredrir.com/ci-slot: '1'
+            limits:
+              cpu: '4'
+              memory: 4Gi
+              ephemeral-storage: 10Gi
+              infra.fredrir.com/ci-slot: '1'
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                - key: node-restriction.kubernetes.io/kata
+                  operator: DoesNotExist

@@ -7,7 +7,11 @@ else
   files=$(git ls-files)
 fi
 changed() { grep -Eq "$1" <<< "$files"; }
-suite() { printf '::group::%s\n' "$1"; uv run --frozen --group ci python -m unittest discover -s "$1"; printf '::endgroup::\n'; }
+suite() {
+  printf '::group::%s\n' "$1"
+  LD_LIBRARY_PATH=${CHECK_LIBRARY_PATH:-${LD_LIBRARY_PATH:-}} uv run --frozen --group ci python -m unittest discover -s "$1"
+  printf '::endgroup::\n'
+}
 
 python='^(pyproject\.toml|uv\.lock)$'
 if changed "$python|^(scripts/(ci|packages)/|\.github/|tests/(ci|fixtures|golden)/|images/|platform/components/(policy|runners)/)"; then suite tests/ci; fi

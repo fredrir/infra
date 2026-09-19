@@ -1,11 +1,14 @@
 FROM docker.io/nixos/nix:2.35.2@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c AS toolchain
 WORKDIR /src
 COPY flake.nix flake.lock ./
-RUN nix --extra-experimental-features 'nix-command flakes' --option sandbox false --option filter-syscalls false \
-        build --out-link /toolchain .#check \
-    && mkdir -p /out/nix/store /out/opt \
-    && cp -a $(nix-store --query --requisites /toolchain) /out/nix/store/ \
-    && ln -s "$(readlink -f /toolchain)" /out/opt/toolchain
+RUN paths=$(nix --extra-experimental-features 'nix-command flakes' eval --json .#check.paths | tr -d '[]"' | tr ',' ' ') \
+    && nix-store --realise $paths > /dev/null \
+    && mkdir -p /out/nix/store /out/opt/toolchain/bin /out/opt/toolchain/lib \
+    && cp -a $(nix-store --query --requisites $paths) /out/nix/store/ \
+    && for path in $paths; do \
+         if [ -d "$path/bin" ]; then ln -sf "$path"/bin/* /out/opt/toolchain/bin/; fi; \
+         if [ -e "$path/lib/libstdc++.so.6" ]; then ln -sf "$path"/lib/libstdc++.so* "$path"/lib/libgcc_s.so* /out/opt/toolchain/lib/; fi; \
+       done
 
 FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
 USER root
@@ -20,7 +23,7 @@ RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
         /home/runner/externals/node24/lib/node_modules/npm /home/runner/externals/node24/bin/npm /home/runner/externals/node24/bin/npx
 COPY --from=toolchain /out/ /
 ENV PATH=/opt/toolchain/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ENV LD_LIBRARY_PATH=/opt/toolchain/lib
+ENV CHECK_LIBRARY_PATH=/opt/toolchain/lib
 ENV UV_PYTHON_DOWNLOADS=never
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 ENV UV_LINK_MODE=copy

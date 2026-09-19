@@ -50,7 +50,7 @@
         kubernetes-helm
         kustomize
         opentofu
-        (python3.withPackages (python: [python.pyyaml python.jsonschema]))
+        python3
         sops
         sqlite
         stdenv.cc.cc.lib
