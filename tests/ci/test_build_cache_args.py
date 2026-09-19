@@ -41,6 +41,16 @@ class BuildCacheArgumentTests(unittest.TestCase):
         self.assertIn('--import-cache', values)
         self.assertNotIn('--export-cache', values)
 
+    def test_a_scope_exports_its_own_cache_and_still_reads_the_image_cache(self):
+        result = self.arguments(CACHE | {'BUILDKIT_CACHE_ENDPOINT': self.endpoint, 'CACHE_SCOPE': 'test-unit'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        values = result.stdout.decode().split('\0')
+        week = datetime.now(timezone.utc).strftime('%G-%V')
+        imported = [values[index + 1].rsplit('name=', 1)[1] for index, value in enumerate(values) if value == '--import-cache']
+        self.assertEqual(imported, [f'example-web-test-unit-{week}', f'example-web-{week}'])
+        self.assertIn(f'name=example-web-test-unit-{week},mode=max', values[values.index('--export-cache') + 1])
+        self.assertNotEqual(self.arguments(CACHE | {'BUILDKIT_CACHE_ENDPOINT': self.endpoint, 'CACHE_SCOPE': 'Test,name=other'}).returncode, 0)
+
     def test_disabled_unconfigured_or_unreachable_cache_builds_without_it(self):
         reachable = CACHE | {'BUILDKIT_CACHE_ENDPOINT': self.endpoint}
         self.assertNotIn(b'--import-cache', self.arguments(reachable | {'LAYER_CACHE': 'false'}).stdout)
