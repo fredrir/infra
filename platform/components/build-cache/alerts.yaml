@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: build-cache
+spec:
+  groups:
+  - name: build-cache
+    rules:
+    - alert: BuildCacheProvisionerFailing
+      expr: |
+        (time() - kube_cronjob_status_last_successful_time{namespace="build-cache",cronjob="build-cache-provisioner"} > 3600)
+        and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Build cache provisioner is failing; its log names the cause, such as buckets near their quota

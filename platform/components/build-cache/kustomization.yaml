@@ -7,6 +7,7 @@ resources:
 - garage.secret.sops.yaml
 - provisioner.yaml
 - provisioner.secret.sops.yaml
+- alerts.yaml
 - projects
 configMapGenerator:
 - name: build-cache-provisioner

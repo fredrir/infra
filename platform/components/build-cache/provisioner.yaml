@@ -101,6 +101,8 @@ spec:
               value: '5368709120'
             - name: EXPIRATION_DAYS
               value: '14'
+            - name: QUOTA_ALERT_PERCENT
+              value: '90'
             - name: TMPDIR
               value: /tmp
             resources:

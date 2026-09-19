@@ -35,7 +35,7 @@ class FakeCluster:
 
     def bucket_view(self, bucket_id):
         bucket = self.buckets[bucket_id]
-        return {"id": bucket_id, "globalAliases": [bucket["alias"]], "quotas": bucket["quotas"],
+        return {"id": bucket_id, "globalAliases": [bucket["alias"]], "quotas": bucket["quotas"], "bytes": bucket.get("bytes", 0),
                 "lifecycleRules": bucket["rules"],
                 "keys": [{"accessKeyId": key, "name": self.keys[key]["name"], "permissions": permissions}
                          for key, permissions in bucket["permissions"].items() if any(permissions.values())]}
@@ -188,6 +188,7 @@ class BuildCacheProvisionerTests(unittest.TestCase):
             "RELEASE_QUOTA_BYTES": "10737418240",
             "TOOLCHAINS_QUOTA_BYTES": "5368709120",
             "EXPIRATION_DAYS": "14",
+            "QUOTA_ALERT_PERCENT": "90",
             "KUBERNETES_API_URL": f"http://127.0.0.1:{self.server.server_port}",
             "SERVICE_ACCOUNT_DIR": str(account),
             "WAIT_ATTEMPTS": "2",
@@ -246,6 +247,17 @@ class BuildCacheProvisionerTests(unittest.TestCase):
         result = self.provision()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(set(self.mutations()), {"/v2/UpdateBucket"})
+
+    def test_a_nearly_full_bucket_fails_the_run_after_everything_is_provisioned(self):
+        self.provisioned()
+        self.cluster.buckets[self.cluster.bucket_by_alias("ci-nsql-main")]["bytes"] = 21474836480 * 9 // 10
+        self.cluster.buckets[self.cluster.bucket_by_alias("ci-ui-box-main")]["bytes"] = 21474836480 * 9 // 10 - 1
+        self.cluster.add_project("late", project_keys("late", 3))
+        result = self.provision()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("buckets above 90% of their quota: ci-nsql-main\n", result.stderr)
+        self.assertIsNotNone(self.cluster.bucket_by_alias("ci-late-release"))
+        self.assertIsNotNone(self.cluster.bucket_by_alias("toolchains"))
 
     def test_drifted_grants_are_narrowed_and_removed_projects_are_revoked(self):
         self.provisioned()
