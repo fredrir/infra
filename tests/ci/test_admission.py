@@ -92,6 +92,21 @@ class AdmissionTests(unittest.TestCase):
         del pod["spec"]["containers"][0]["resources"]["limits"]["infra.fredrir.com/ci-slot"]
         self.assertFalse(self.allowed(pod))
 
+    def test_only_the_bounded_infra_deploy_pool_runs_without_a_slot(self):
+        release = yaml.safe_load((ROOT / "platform/components/runners/infra/deploy.yaml").read_text())
+        pod = copy.deepcopy(release["spec"]["values"]["template"])
+        pod["metadata"] = {"name": "deploy-1", "labels": {"actions.github.com/scale-set-name": "deploy-amd64"}}
+        self.assertTrue(self.allowed(pod, namespace="ci-infra"))
+        for namespace, mutate in [
+            ("ci-y", lambda p: None),
+            ("ci-infra", lambda p: p["metadata"]["labels"].update({"actions.github.com/scale-set-name": "buildkit-amd64"})),
+            ("ci-infra", lambda p: p["spec"]["containers"][0]["resources"]["limits"].update({"cpu": "4"})),
+            ("ci-infra", lambda p: p["spec"]["containers"][0]["resources"]["limits"].update({"memory": "8Gi"})),
+        ]:
+            candidate = copy.deepcopy(pod)
+            mutate(candidate)
+            self.assertFalse(self.allowed(candidate, namespace=namespace))
+
     def test_shared_anti_affinity_no_longer_replaces_a_slot(self):
         self.assertFalse(self.allowed(self.legacy_pod()))
 

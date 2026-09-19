@@ -4,6 +4,7 @@ namespace: ci-infra
 resources:
 - ../base
 - nix.yaml
+- deploy.yaml
 - network.yaml
 - attic.secret.sops.yaml
 - github-app.secret.sops.yaml

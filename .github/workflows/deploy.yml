@@ -22,7 +22,7 @@ concurrency:
 jobs:
   deploy:
     if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref == 'refs/heads/main' && github.ref_protected
-    runs-on: buildkit-amd64
+    runs-on: deploy-amd64
     timeout-minutes: 10
     permissions:
       contents: read

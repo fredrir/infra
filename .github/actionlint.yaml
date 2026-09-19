@@ -1,6 +1,7 @@
 self-hosted-runner:
   labels:
   - buildkit-amd64
+  - deploy-amd64
   - nix-amd64
   - rust-amd64
   - rust-pr-amd64
