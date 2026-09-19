@@ -12,6 +12,5 @@
 | `grafana.fredrir.com` | Infrastructure                                                | Authenticated metrics, logs and traces    |
 | `pkgs.fredrir.com`    | [packages](https://github.com/fredrir/packages)               | Signed apt, rpm and apk repositories      |
 | `admin.fredrir.com`   | Infrastructure                                                | Planned administrative dashboard          |
-| `fredrir.com/logs`    | Infrastructure                                                | Redirect to Grafana's logs view           |
 | `keys.fredrir.com`    | Infrastructure                                                | Plain text administrative SSH public keys |
 | `fredrir.no`          | Infrastructure                                                | Centrally managed DNS; purpose unassigned |

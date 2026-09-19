@@ -3,7 +3,7 @@
   "enabled": true,
   "caches": {
     "1328085692": {
-      "url": "https://cache.fredrir.com/infra",
+      "url": "https://cache.fredrir.com",
       "publicKey": "infra:w60F/Qwm6ecNxMJoY1nXISowX2QyTxpxz6HsORJvu6k=",
       "publicRead": false,
       "uploadEnabled": true

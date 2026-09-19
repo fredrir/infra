@@ -8,9 +8,8 @@ My infrastructure, for my personal projects, services and hobbies
 | Address                                  | Service                                         |
 | ---------------------------------------- | ----------------------------------------------- |
 | `fredrir.com`                            | WiP                                             |
-| `fredrir.com/logs`                       | Redirect to Grafana                             |
 | `grafana.fredrir.com`                    | Grafana, Prometheus, Loki logs and Tempo traces |
-| `cache.fredrir.com/infra`                | Attic Nix cache                                 |
+| `cache.fredrir.com`                      | Attic Nix cache                                 |
 | `admin.fredrir.com`                      | Reserved for the future dashboard               |
 | `keys.fredrir.com`                       | Plain text administrative SSH public keys       |
 | `fredrir.no`                             | Centrally managed DNS                           |

@@ -32,9 +32,8 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Address                                  | Service                                                               |
 | ---------------------------------------- | --------------------------------------------------------------------- |
 | `fredrir.com`                            | Reserved for the future `fredrir/fredrir` application                 |
-| `fredrir.com/logs`                       | Redirect to Grafana                                                   |
 | `grafana.fredrir.com`                    | Authenticated Grafana, Prometheus metrics, Loki logs and Tempo traces |
-| `cache.fredrir.com/infra`                | Authenticated, signed Attic Nix cache                                 |
+| `cache.fredrir.com`                      | Authenticated, signed Attic Nix cache                                 |
 | `pkgs.fredrir.com`                       | Signed apt, rpm and apk repositories and `install.sh`                 |
 | `admin.fredrir.com`                      | Reserved for the future dashboard                                     |
 | `fredrir.no`                             | Centrally managed DNS; purpose unassigned                             |
