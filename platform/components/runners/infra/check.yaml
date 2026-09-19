@@ -63,7 +63,7 @@ spec:
             type: RuntimeDefault
         containers:
         - name: runner
-          image: ghcr.io/fredrir/infra-runner-check@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          image: ghcr.io/fredrir/infra-runner-check@sha256:33b2fad199ee665f03aaa1ec8ee82f1dc02c14945de97c68613651dbfad0949c
           imagePullPolicy: IfNotPresent
           command:
           - /home/runner/run.sh

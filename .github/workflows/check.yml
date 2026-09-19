@@ -10,8 +10,8 @@ concurrency:
 jobs:
   check:
     if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]'
-    runs-on: nix-amd64
-    timeout-minutes: 30
+    runs-on: check-amd64
+    timeout-minutes: 15
     outputs:
       toolchain: ${{ steps.check.outputs.toolchain }}
     steps:
@@ -19,16 +19,11 @@ jobs:
       with:
         ref: ${{ github.sha }}
         persist-credentials: false
-    - name: Configure Nix cache
-      run: |
-        echo "::add-mask::$ATTIC_TOKEN"
-        nix run .#attic-client -- login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
-        nix run .#attic-client -- use "infra:$ATTIC_CACHE"
     - name: Check
       id: check
       env:
         BEFORE: ${{ github.event.before }}
-      run: nix develop --command bash scripts/ci/check.sh
+      run: bash scripts/ci/check.sh
   toolchain:
     needs: check
     if: needs.check.outputs.toolchain == 'true'
