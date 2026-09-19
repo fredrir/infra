@@ -1,12 +1,12 @@
 # Kata runtime
 
-| Input | Value |
-|---|---|
-| Builder | Native Linux amd64, rootless Podman, two CPUs, 4 GiB memory |
-| Host tools | Bash, Git, curl, jq, GNU tar, gzip, zstd, patch, dpkg-deb, debugfs, sha256sum, Python 3.11+ |
-| Source and release pins | `ansible/roles/ci_runtime/files/kata-runtime.json` |
-| Output | 27 regular files under `/opt/kata` |
-| Qualification | Kata Nix sandbox; BuildKit uses gVisor |
+| Input                   | Value                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------- |
+| Builder                 | Native Linux amd64, rootless Podman, two CPUs, 4 GiB memory                                 |
+| Host tools              | Bash, Git, curl, jq, GNU tar, gzip, zstd, patch, dpkg-deb, debugfs, sha256sum, Python 3.11+ |
+| Source and release pins | `ansible/roles/ci_runtime/files/kata-runtime.json`                                          |
+| Output                  | 27 regular files under `/opt/kata`                                                          |
+| Qualification           | Kata Nix sandbox; BuildKit uses gVisor                                                      |
 
 ```sh
 work="$HOME/kata-build-$(date -u +%Y%m%dT%H%M%SZ)"

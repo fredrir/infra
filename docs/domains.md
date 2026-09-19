@@ -8,7 +8,7 @@
 | `external.llunde.no`  | [llunde-pyparser](https://github.com/fredrir/llunde-pyparser) | External parser                           |
 | `hansteen.dev`        | [portfolio](https://github.com/fredrir/portfolio)             | Portfolio                                 |
 | `yeeter.no`           | [Y](https://github.com/fredrir/Y)                             | Y                                         |
-| `fredrir.com`         | `fredrir/fredrir` (planned repository)                        | Reserved for the planned webpage          |
+| `fredrir.com`         | `fredrir/fredrir` (WiP)                                       | WiP Webpage                               |
 | `grafana.fredrir.com` | Infrastructure                                                | Authenticated metrics, logs and traces    |
 | `pkgs.fredrir.com`    | [packages](https://github.com/fredrir/packages)               | Signed apt, rpm and apk repositories      |
 | `admin.fredrir.com`   | Infrastructure                                                | Planned administrative dashboard          |

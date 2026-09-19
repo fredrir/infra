@@ -1,28 +1,28 @@
 # Email alerts
 
-| Setting | Value |
-| --- | --- |
-| Sender | `alerts@fredrir.com` |
-| Recipient | Doppler `infra/ops/PLATFORM_ALERT_RECIPIENT` |
-| SMTP | `email-smtp.eu-north-1.amazonaws.com:587`, verified STARTTLS |
-| IAM | OpenTofu `module.platform_mail`, restricted `fredrir-platform-alerts-smtp` user |
-| Credentials | Doppler `infra/ops/PLATFORM_WATCHDOG_SMTP_USERNAME` and `PLATFORM_WATCHDOG_SMTP_PASSWORD` |
-| Cluster alerts | Alertmanager; `platform/components/observability/alertmanager.secret.sops.yaml` |
-| Independent monitor | Gatus on Ubuntu `fredrir-06`, outside Kubernetes |
-| Monitor settings | `ansible/roles/gatus/files/config.sops.yaml` |
-| Native configuration | Root `0600` `/etc/gatus/config.yaml`, delivered through systemd `LoadCredential` |
-| Runtime | `DynamicUser`, SQLite `/var/lib/gatus/gatus.db`, `MemoryMax=256M` |
-| Listener | Tailnet-only `100.86.241.75:8080` |
-| HTTP checks | Exact status codes; portfolio follows redirects; authentication boundaries checked separately |
-| Response handling | Status-only checks do not read response bodies; Y API checks its small GraphQL readiness response |
+| Setting              | Value                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| Sender               | `alerts@fredrir.com`                                                                              |
+| Recipient            | Doppler `infra/ops/PLATFORM_ALERT_RECIPIENT`                                                      |
+| SMTP                 | `email-smtp.eu-north-1.amazonaws.com:587`, verified STARTTLS                                      |
+| IAM                  | OpenTofu `module.platform_mail`, restricted `fredrir-platform-alerts-smtp` user                   |
+| Credentials          | Doppler `infra/ops/PLATFORM_WATCHDOG_SMTP_USERNAME` and `PLATFORM_WATCHDOG_SMTP_PASSWORD`         |
+| Cluster alerts       | Alertmanager; `platform/components/observability/alertmanager.secret.sops.yaml`                   |
+| Independent monitor  | Gatus on Ubuntu `fredrir-06`, outside Kubernetes                                                  |
+| Monitor settings     | `ansible/roles/gatus/files/config.sops.yaml`                                                      |
+| Native configuration | Root `0600` `/etc/gatus/config.yaml`, delivered through systemd `LoadCredential`                  |
+| Runtime              | `DynamicUser`, SQLite `/var/lib/gatus/gatus.db`, `MemoryMax=256M`                                 |
+| Listener             | Tailnet-only `100.86.241.75:8080`                                                                 |
+| HTTP checks          | Exact status codes; portfolio follows redirects; authentication boundaries checked separately     |
+| Response handling    | Status-only checks do not read response bodies; Y API checks its small GraphQL readiness response |
 
-| Backup heartbeat | Maximum age |
-| --- | --- |
-| `backups_parser` | 8 hours |
-| `backups_y` | 8 hours |
-| `backups_control` | 8 hours |
-| `backups_portfolio` | 2 hours |
-| `backups_attic` | 2 hours |
+| Backup heartbeat    | Maximum age |
+| ------------------- | ----------- |
+| `backups_parser`    | 8 hours     |
+| `backups_y`         | 8 hours     |
+| `backups_control`   | 8 hours     |
+| `backups_portfolio` | 2 hours     |
+| `backups_attic`     | 2 hours     |
 
 Successful backup producers POST to `/api/v1/endpoints/backups_<name>/external?success=true` with separate Bearer tokens from their encrypted repository credentials. Producers keep tokens in private curl configuration files. Tailnet policy permits the control and worker producers to reach the monitor; Kubernetes network policies restrict backup pods to this destination.
 
