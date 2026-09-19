@@ -38,8 +38,9 @@ class RunnerQuotaTests(unittest.TestCase):
                                        * r["maxRunners"] for r in releases)
                         self.assertGreaterEqual(quantity(quota[f"{field}.{resource}"]), required, f"{field}.{resource}")
                 for release in releases:
+                    slots = None if release["runnerScaleSetName"] == "deploy-amd64" else "1"
                     for container in release["template"]["spec"]["containers"]:
-                        self.assertEqual(container["resources"]["limits"]["infra.fredrir.com/ci-slot"], "1")
+                        self.assertEqual(container["resources"]["limits"].get("infra.fredrir.com/ci-slot"), slots)
                 self.assertNotIn("requests.infra.fredrir.com/ci-slot", quota)
 
 
