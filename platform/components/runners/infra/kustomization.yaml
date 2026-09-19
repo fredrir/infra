@@ -18,4 +18,4 @@ patches:
     kind: HelmRelease
     name: buildkit
   patch: "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name:\
-    \ buildkit\nspec:\n  values:\n    githubConfigUrl: https://github.com/fredrir/infra\n"
+    \ buildkit\nspec:\n  values:\n    githubConfigUrl: https://github.com/fredrir/infra\n    maxRunners: 3\n"
