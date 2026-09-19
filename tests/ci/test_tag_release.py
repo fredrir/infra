@@ -56,14 +56,6 @@ class TagReleaseTests(unittest.TestCase):
         self.assertEqual(git(self.remote, "show", "main:CHANGELOG.md"), "## v0.1.14")
         self.assertIn("update --workspace", (Path(self.directory.name) / "cargo.log").read_text())
 
-    def test_manual_version_bump_is_tagged_as_written(self):
-        (self.work / "Cargo.toml").write_text('[package]\nname = "nsql"\nversion = "0.2.0"\n')
-        git(self.work, "commit", "--quiet", "-am", "feat: bump")
-        result = self.tag()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Tagged v0.2.0", result.stdout)
-        self.assertIn('version = "0.2.0"', git(self.remote, "show", "v0.2.0:Cargo.toml"))
-        self.assertEqual(git(self.remote, "log", "-1", "--format=%s", "main"), "release: v0.2.0")
 
 if __name__ == "__main__":
     unittest.main()

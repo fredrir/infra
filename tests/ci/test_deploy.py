@@ -18,6 +18,15 @@ TOOL = '#!/usr/bin/env python3\nimport json,os,sys\nfrom pathlib import Path\n' 
 
 
 class DeployTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        tools = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(tools.cleanup)
+        cls.binary = Path(tools.name)
+        for name in ["gh", "cosign"]:
+            (cls.binary / name).write_text(TOOL)
+            (cls.binary / name).chmod(0o755)
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
@@ -37,11 +46,6 @@ class DeployTests(unittest.TestCase):
         (self.repo / ".github/chainguard").mkdir()
         (self.repo / ".github/chainguard/deploy-123.sts.yaml").write_text(yaml.safe_dump({
             "claim_pattern": {"job_workflow_sha": f"^{WORKFLOW_REVISION}$"}, "permissions": {"actions": "write"}}))
-        self.binary = self.area / "bin"
-        self.binary.mkdir()
-        for name in ["gh", "cosign"]:
-            (self.binary / name).write_text(TOOL)
-            (self.binary / name).chmod(0o755)
         self.environment = os.environ | {
             "PATH": str(self.binary) + os.pathsep + os.environ["PATH"],
             "SOURCE_REPOSITORY_ID": "123", "SOURCE_REVISION": "b" * 40, "IMAGE_NAME": IMAGE.split("@")[0],
@@ -105,7 +109,7 @@ class DeployTests(unittest.TestCase):
         return subprocess.run(["bash", str(ROOT / "scripts/ci/deploy.sh"), str(self.repo)],
                               env=self.environment, capture_output=True, text=True, check=False)
 
-    def test_verified_deployment_pushes_only_the_pinned_image_change_to_main(self):
+    def test_verified_deployment_pushes_only_the_pinned_image_change_to_main_once(self):
         self.prepare()
         result = self.run_release()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -121,6 +125,10 @@ class DeployTests(unittest.TestCase):
                             ("--signer-workflow", "fredrir/infra/.github/workflows/build-image.yml")]:
             self.assertEqual(args[args.index(flag) + 1], value)
         self.assertNotIn("deploy-token", " ".join(args))
+        deployed = self.deployed()
+        result = self.run_release()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.deployed(), deployed)
 
     def test_private_images_verify_the_keyless_signature_of_the_pinned_workflow(self):
         self.prepare(visibility="private")
@@ -158,14 +166,6 @@ class DeployTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.git("rev-parse", "HEAD"), self.deployed())
         self.assertEqual(self.git("log", "--format=%s", "-2"), "Deploy example " + "b" * 12 + "\nMove main")
-
-    def test_already_deployed_digest_changes_nothing(self):
-        self.prepare()
-        self.assertEqual(self.run_release().returncode, 0)
-        deployed = self.deployed()
-        result = self.run_release()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.deployed(), deployed)
 
     def test_every_nested_pin_receives_the_digest_and_nothing_else_changes(self):
         self.prepare_nested()

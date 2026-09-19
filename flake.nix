@@ -29,6 +29,7 @@
         (python3.withPackages (python: [python.pyyaml python.jsonschema]))
         restic
         sops
+        sqlite
         uv
         yq-go
         zstd
@@ -51,6 +52,7 @@
         opentofu
         (python3.withPackages (python: [python.pyyaml python.jsonschema]))
         sops
+        sqlite
         stdenv.cc.cc.lib
         uv
         yq-go

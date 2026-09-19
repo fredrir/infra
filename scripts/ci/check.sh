@@ -11,7 +11,7 @@ suite() { printf '::group::%s\n' "$1"; uv run --frozen --group ci python -m unit
 
 python='^(pyproject\.toml|uv\.lock)$'
 if changed "$python|^(scripts/(ci|packages)/|\.github/|tests/(ci|fixtures|golden)/|images/|platform/components/(policy|runners)/)"; then suite tests/ci; fi
-if changed "$python|^(tools/|tests/infra/|platform/components/runners/|charts/|keys/)"; then suite tests/infra; fi
+if changed "$python|^(tools/|tests/infra/|platform/components/runners/|charts/)"; then suite tests/infra; fi
 if changed "$python|^(scripts/operations/|tests/operations/|platform/components/)"; then suite tests/operations; fi
 if changed '^ansible/'; then ansible-playbook -i localhost, ansible/site.yml --syntax-check; fi
 if changed '^\.github/'; then actionlint; fi

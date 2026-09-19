@@ -171,7 +171,6 @@ dependencies = [
 ci = [
     { name = "ansible-core" },
     { name = "cel-python" },
-    { name = "jinja2" },
 ]
 
 [package.metadata]
@@ -184,7 +183,6 @@ requires-dist = [
 ci = [
     { name = "ansible-core", specifier = "==2.21.4" },
     { name = "cel-python", specifier = "==0.5.0" },
-    { name = "jinja2", specifier = "==3.1.6" },
 ]
 
 [[package]]
