@@ -7,4 +7,6 @@ resources:
 - cloudflared.yaml
 - network.yaml
 - shortcuts.yaml
+- keys.yaml
 - tunnel.secret.sops.yaml
+- ../../../keys
