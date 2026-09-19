@@ -2,7 +2,7 @@
 set -euo pipefail
 
 : "${GARAGE_ADMIN_URL:?}" "${GARAGE_ADMIN_TOKEN:?}" "${PROVISIONER_KEY_ID:?}" "${PROVISIONER_KEY_SECRET:?}"
-: "${LAYOUT_CAPACITY_BYTES:?}" "${MAIN_QUOTA_BYTES:?}" "${RELEASE_QUOTA_BYTES:?}" "${TOOLCHAINS_QUOTA_BYTES:?}" "${EXPIRATION_DAYS:?}"
+: "${LAYOUT_CAPACITY_BYTES:?}" "${MAIN_QUOTA_BYTES:?}" "${RELEASE_QUOTA_BYTES:?}" "${TOOLCHAINS_QUOTA_BYTES:?}" "${EXPIRATION_DAYS:?}" "${QUOTA_ALERT_PERCENT:?}"
 KUBERNETES_API_URL=${KUBERNETES_API_URL:-https://kubernetes.default.svc}
 SERVICE_ACCOUNT_DIR=${SERVICE_ACCOUNT_DIR:-/var/run/secrets/kubernetes.io/serviceaccount}
 WAIT_ATTEMPTS=${WAIT_ATTEMPTS:-60}
@@ -10,6 +10,7 @@ WAIT_SECONDS=${WAIT_SECONDS:-5}
 PROJECT_LABEL=infra.fredrir.com/build-cache-project
 PROVISIONER_KEY_NAME=build-cache-provisioner
 NO_PERMISSIONS='{"read":false,"write":false,"owner":false}'
+nearly_full=()
 
 log() { printf '%s\n' "$*"; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -126,6 +127,9 @@ ensure_bucket() {
     log "Created bucket $name"
   fi
   id=$(json -er '.id')
+  if (( $(json -er '.bytes') * 100 >= quota * QUOTA_ALERT_PERCENT )); then
+    nearly_full+=("$name")
+  fi
   local current
   current=$(json -c '[.keys[] | {key: .accessKeyId, value: .permissions}] | from_entries')
   require POST "/v2/UpdateBucket?id=$id" "$(jq -nc --argjson quota "$quota" --argjson rules "$rules" \
@@ -164,3 +168,4 @@ while IFS= read -r project; do
 done < <(jq -r '[.[].project] | unique | .[]' <<<"$keys")
 ensure_bucket toolchains "$TOOLCHAINS_QUOTA_BYTES" "$(bucket_rules keep)" "$(grants_for "" toolchains)"
 log "Build cache is provisioned for $(jq '[.[].project] | unique | length' <<<"$keys") projects"
+[[ ${#nearly_full[@]} -eq 0 ]] || fail "buckets above $QUOTA_ALERT_PERCENT% of their quota: ${nearly_full[*]}"
