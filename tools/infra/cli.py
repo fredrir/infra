@@ -15,16 +15,6 @@ RUNNERS = Path("platform/components/runners")
 CACHE_PROJECTS = Path("platform/components/build-cache/projects")
 REGISTRY = Path(".github/rust-projects.yaml")
 SHARED_WORKFLOW = r"^fredrir/infra/\.github/workflows/{}\.yml@[0-9a-f]{{40}}$"
-REGISTRY_READER = {
-    "issuer": "https://token.actions.githubusercontent.com",
-    "subject_pattern": rf"^repo:fredrir(@{OWNER_ID})?/infra(@1328085692)?:ref:refs/heads/main$",
-    "claim_pattern": {
-        "repository_id": "^1328085692$", "repository_owner_id": f"^{OWNER_ID}$", "event_name": "^workflow_dispatch$",
-        "ref": "^refs/heads/main$", "runner_environment": "^self-hosted$",
-        "job_workflow_ref": r"^fredrir/infra/\.github/workflows/deploy\.yml@refs/heads/main$",
-    },
-    "permissions": {"packages": "read"},
-}
 APP_CREDENTIALS = {
     "github_app_id": "ARC_GITHUB_APP_ID",
     "github_app_installation_id": "ARC_GITHUB_APP_INSTALLATION_ID",
@@ -147,8 +137,6 @@ def onboarding(args):
                 "job_workflow_sha": "^" + args.workflow_ref + "$",
             }, "permissions": {"actions": "write"},
         }, sort_keys=False),
-    } | ({"caller/.github/chainguard/infra-deploy.sts.yaml": yaml.safe_dump(REGISTRY_READER, sort_keys=False)}
-         if identity.get("private", False) else {}) | {
         "runner/kustomization.yaml": yaml.safe_dump({
             "apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization",
             "namespace": f"ci-{project}", "resources": ["../base"],
