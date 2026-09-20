@@ -27,4 +27,4 @@ dist/
 .infra/
 .claude/worktrees/
 
-bazel-*
+/bazel-*

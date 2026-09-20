@@ -1,0 +1,24 @@
+{
+  "scope": "Local working-tree exports with precompiled CLI; no publication, signing or promotion",
+  "date": "2026-09-20",
+  "dagger": "0.21.9",
+  "platform": "linux/amd64",
+  "images": [
+    {
+      "recipe": "images/runner-check/Containerfile",
+      "duration_seconds": 428,
+      "manifest": "sha256:16a269d9d3a7251f12b6ed4f1f072e6efdd622e827e16e6501b25886c6a025e4",
+      "archive_sha256": "d4a43689dcaa8e9fd1491ae76338f5c3d663efb175adeab5f046d958ec1490a5",
+      "smoke": "infra version && actionlint -version && age --version && sops --version && tofu version && helm version --short && kubectl version --client && kustomize version && ansible-playbook --version && /opt/venv/bin/python -c \"import ansible, celpy, jinja2, yaml\"",
+      "passed": true
+    },
+    {
+      "recipe": "platform/components/backups/tools.Dockerfile",
+      "duration_seconds": 239,
+      "manifest": "sha256:fc59b0406ad7eb6eb7efb1b098a9e1dc898c62caf13d64b24f6425a67af2a840",
+      "archive_sha256": "7e21a8915092cbe6100031454e346299d78fc1e73bfe01c7b7f92a4ea1238904",
+      "smoke": "infra version && restic version && mongodump --version && pg_dump --version && kubectl version --client && sqlite3 --version",
+      "passed": true
+    }
+  ]
+}

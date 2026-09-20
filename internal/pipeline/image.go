@@ -13,6 +13,8 @@ import (
 )
 
 type ImageOptions struct {
+	Target        string
+	CheckOnly     bool
 	InfraBinary   string
 	SourceURL     string
 	Revision      string
@@ -31,7 +33,7 @@ type ImageOptions struct {
 }
 
 func Image(ctx context.Context, opts ImageOptions) (string, error) {
-	if opts.Image == "" && opts.Export == "" {
+	if opts.Image == "" && opts.Export == "" && !opts.CheckOnly {
 		return "", errors.New("image reference or export path required")
 	}
 	if !filepath.IsLocal(opts.Dockerfile) {
@@ -58,11 +60,11 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		args = append(args, dagger.BuildArg{Name: name, Value: value})
 	}
 	sort.Slice(args, func(i, j int) bool { return args[i].Name < args[j].Name })
-	source := client.Host().Directory(opts.Context, dagger.HostDirectoryOpts{Exclude: []string{".git", "dist", "bazel-*", ".cache", ".direnv", ".venv", "**/.terraform", ".env", ".env.*"}}).WithFile(".infra.Containerfile", client.Host().File(opts.Dockerfile))
+	source := client.Host().Directory(opts.Context, dagger.HostDirectoryOpts{Gitignore: true, Exclude: []string{".git", "dist", "bazel-*", ".cache", ".direnv", ".venv", "**/.terraform", ".env", ".env.*"}}).WithFile(".infra.Containerfile", client.Host().File(opts.Dockerfile))
 	if opts.InfraBinary != "" {
 		source = source.WithFile(".infra-artifacts/infra", client.Host().File(opts.InfraBinary), dagger.DirectoryWithFileOpts{Permissions: 0o755})
 	}
-	container := source.DockerBuild(dagger.DirectoryDockerBuildOpts{Platform: dagger.Platform(opts.Platform), Dockerfile: ".infra.Containerfile", BuildArgs: args})
+	container := source.DockerBuild(dagger.DirectoryDockerBuildOpts{Platform: dagger.Platform(opts.Platform), Dockerfile: ".infra.Containerfile", Target: opts.Target, BuildArgs: args})
 	if opts.SourceURL != "" {
 		container = container.WithLabel("org.opencontainers.image.source", opts.SourceURL)
 	}
@@ -74,9 +76,17 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		if shell == "" {
 			shell = "sh"
 		}
-		if _, err := container.WithExec([]string{shell, "-ec", opts.TestCommand}).Sync(ctx); err != nil {
+		arguments := []string{shell, "-euc", opts.TestCommand}
+		if shell == "bash" {
+			arguments = []string{shell, "-euo", "pipefail", "-c", opts.TestCommand}
+		}
+		if _, err := container.WithExec(arguments).Sync(ctx); err != nil {
 			return "", fmt.Errorf("image verification: %w", err)
 		}
+	}
+	if opts.CheckOnly {
+		_, err := container.Sync(ctx)
+		return "", err
 	}
 	if opts.Export != "" {
 		if _, err := container.Export(ctx, opts.Export); err != nil {

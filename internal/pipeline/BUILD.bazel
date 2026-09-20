@@ -4,6 +4,7 @@ go_library(
     name = "pipeline",
     srcs = [
         "affected.go",
+        "cache.go",
         "config.go",
         "doctor.go",
         "image.go",
@@ -19,6 +20,9 @@ go_library(
 
 go_test(
     name = "pipeline_test",
-    srcs = ["pipeline_test.go"],
-    deps = [":pipeline"],
+    srcs = [
+        "cache_test.go",
+        "pipeline_test.go",
+    ],
+    embed = [":pipeline"],
 )

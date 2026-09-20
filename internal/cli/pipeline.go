@@ -56,6 +56,7 @@ func newBuildCommand(name, operation string) *cobra.Command {
 	cmd.Flags().StringVar(&opts.Base, "base", "", "Select targets affected since this Git revision")
 	cmd.Flags().StringVar(&opts.RemoteCache, "remote-cache", os.Getenv("BAZEL_REMOTE_CACHE"), "Bazel remote cache URL")
 	cmd.Flags().StringVar(&opts.RemoteExecutor, "remote-executor", os.Getenv("BAZEL_REMOTE_EXECUTOR"), "Optional Bazel remote execution endpoint")
+	cmd.Flags().BoolVar(&opts.ForwardLocalCache, "forward-local-cache", false, "Forward a client-host loopback cache into Dagger")
 	cmd.Flags().BoolVar(&opts.ReadOnlyCache, "read-only-cache", false, "Disable remote cache writes")
 	cmd.Flags().StringVar(&opts.ReportDir, "report-dir", "", "Directory for result, build events and timing profile")
 	return cmd
@@ -134,6 +135,8 @@ func newImageCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.Revision, "revision", "", "Source revision")
 	cmd.Flags().StringVar(&opts.Context, "context", ".", "Image build context")
 	cmd.Flags().StringVar(&opts.Dockerfile, "dockerfile", "Dockerfile", "Dockerfile relative to context")
+	cmd.Flags().StringVar(&opts.Target, "target", "", "Dockerfile build stage")
+	cmd.Flags().BoolVar(&opts.CheckOnly, "check-only", false, "Build and verify without export or publication")
 	cmd.Flags().StringVar(&opts.InfraBinary, "infra-binary", "", "Prebuilt infrastructure binary for runner images")
 	cmd.Flags().StringVar(&opts.Image, "image", "", "Image reference to publish")
 	cmd.Flags().StringVar(&opts.Platform, "platform", "linux/amd64", "Target platform")

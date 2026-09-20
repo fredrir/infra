@@ -60,11 +60,11 @@ concurrency:
   cancel-in-progress: false
 jobs:
   cli:
-    if: inputs.cli-artifact == ''
+    if: inputs.cli-artifact == '' || github.repository != 'fredrir/infra'
     uses: ./.github/workflows/infra-cli.yml
   build:
     needs: cli
-    if: always() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected
+    if: always() && (needs.cli.result == 'success' || (github.repository == 'fredrir/infra' && inputs.cli-artifact != '')) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
@@ -87,12 +87,12 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
+          name: ${{ github.repository == 'fredrir/infra' && inputs.cli-artifact || needs.cli.outputs.artifact }}
           path: ${{ runner.temp }}/infra-cli
       - name: Verify CLI
         env:
-          CLI_SHA256: ${{ inputs.cli-sha256 || needs.cli.outputs.sha256 }}
-          CLI_REVISION: ${{ inputs.cli-revision || needs.cli.outputs.revision }}
+          CLI_SHA256: ${{ github.repository == 'fredrir/infra' && inputs.cli-sha256 || needs.cli.outputs.sha256 }}
+          CLI_REVISION: ${{ github.repository == 'fredrir/infra' && inputs.cli-revision || needs.cli.outputs.revision }}
           WORKFLOW_REVISION: ${{ job.workflow_sha }}
         run: |
           test "$CLI_REVISION" = "$WORKFLOW_REVISION"
@@ -118,6 +118,14 @@ jobs:
           mkdir -p containers
           cp .infra-build-recipe/platform/projects/y/Caddyfile containers/Caddyfile
           printf 'SHARED_DOCKERFILE=.infra-build-recipe/platform/projects/y/%s.Dockerfile\n' "${RECIPE#y-}" >> "$GITHUB_ENV"
+      - name: Validate Dagger cache policy
+        env:
+          LAYER_CACHE: ${{ inputs.layer-cache }}
+        run: |
+          if [[ "$LAYER_CACHE" != true ]]; then
+            echo 'layer-cache=false is unsupported with Dagger; use an isolated engine for a cold build.' >&2
+            exit 1
+          fi
       - name: Check inputs
         env:
           IMAGE: ${{ inputs.image }}

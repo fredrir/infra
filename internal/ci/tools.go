@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type ToolAsset struct{ URL, Digest, Member string }
@@ -36,7 +38,7 @@ func InstallTools(ctx context.Context, temporary, pathOutput string, names []str
 		return fmt.Errorf("runner temporary directory is required")
 	}
 	for _, name := range names {
-		if _, ok := ToolAssets[name]; !ok {
+		if _, ok := toolAsset(name); !ok {
 			return fmt.Errorf("unknown tool %q", name)
 		}
 	}
@@ -45,10 +47,19 @@ func InstallTools(ctx context.Context, temporary, pathOutput string, names []str
 		return err
 	}
 	client := &http.Client{Timeout: 2 * time.Minute}
+	group, installContext := errgroup.WithContext(ctx)
+	group.SetLimit(4)
 	for _, name := range names {
-		if err := InstallTool(ctx, client, ToolAssets[name], filepath.Join(directory, name)); err != nil {
-			return fmt.Errorf("install %s: %w", name, err)
-		}
+		asset, _ := toolAsset(name)
+		group.Go(func() error {
+			if err := InstallTool(installContext, client, asset, filepath.Join(directory, name)); err != nil {
+				return fmt.Errorf("install %s: %w", name, err)
+			}
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return err
 	}
 	if pathOutput != "" {
 		file, err := os.OpenFile(pathOutput, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)

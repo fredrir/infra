@@ -2,16 +2,20 @@
   dockerfile: images/runner-check/Containerfile
   inputs:
   - images/runner-check
-  - flake.nix
-  - flake.lock
+  - cmd
+  - internal
+  - go.mod
+  - go.sum
+  - build
+  - MODULE.bazel
+  - MODULE.bazel.lock
   - pyproject.toml
   - uv.lock
-  scan-skip-dirs: /nix
   check: >-
     /home/runner/run.sh --version | grep -x 2.337.0;
     kubectl version --client; kustomize version; helm version --short; actionlint -version; tofu version;
     ansible-playbook --version | head -n1; sops --version; age --version;
-    LD_LIBRARY_PATH=$CHECK_LIBRARY_PATH /opt/venv/bin/python -c 'import ansible, celpy, jinja2, yaml'
+    /opt/venv/bin/python -c 'import ansible, jinja2, yaml'
 - image: ghcr.io/fredrir/infra-runner-dagger
   dockerfile: images/runner-dagger/Containerfile
   inputs:

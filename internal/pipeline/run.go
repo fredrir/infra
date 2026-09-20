@@ -16,17 +16,18 @@ import (
 )
 
 type Options struct {
-	Root           string
-	Local          bool
-	Bazel          string
-	Operation      string
-	Targets        []string
-	Base           string
-	RemoteCache    string
-	RemoteExecutor string
-	ReadOnlyCache  bool
-	ReportDir      string
-	Log            io.Writer
+	ForwardLocalCache bool
+	Root              string
+	Local             bool
+	Bazel             string
+	Operation         string
+	Targets           []string
+	Base              string
+	RemoteCache       string
+	RemoteExecutor    string
+	ReadOnlyCache     bool
+	ReportDir         string
+	Log               io.Writer
 }
 
 type Report struct {
@@ -62,6 +63,14 @@ func Run(ctx context.Context, opts Options) (report Report, err error) {
 		}
 		err = errors.Join(err, marshalErr)
 	}()
+	if opts.ForwardLocalCache {
+		if opts.Local {
+			return report, errors.New("cache forwarding requires Dagger execution")
+		}
+		if _, _, _, err := localCache(opts.RemoteCache); err != nil {
+			return report, err
+		}
+	}
 	config, err := ReadToolchain(opts.Root)
 	if err != nil {
 		return report, err
@@ -151,7 +160,7 @@ func runDagger(ctx context.Context, opts Options, config Toolchain, expression s
 	if strings.TrimPrefix(actual, "v") != config.Dagger {
 		return fmt.Errorf("Dagger engine %s required, got %s", config.Dagger, actual)
 	}
-	source := client.Host().Directory(opts.Root, dagger.HostDirectoryOpts{Exclude: []string{".git", "dist", "bazel-*", ".infra", ".cache", ".direnv", ".venv", "**/.terraform", "**/node_modules", ".env", ".env.*"}})
+	source := client.Host().Directory(opts.Root, dagger.HostDirectoryOpts{Gitignore: true, Exclude: []string{".git", "dist", "bazel-*", ".infra", ".cache", ".direnv", ".venv", "**/.terraform", "**/node_modules", ".env", ".env.*"}})
 	url := "https://github.com/bazelbuild/bazel/releases/download/" + config.Bazel + "/bazel-" + config.Bazel + "-linux-x86_64"
 	container := client.Container(dagger.ContainerOpts{Platform: "linux/amd64"}).From(config.Image).
 		WithFile("/usr/local/bin/bazel", client.HTTP(url), dagger.ContainerWithFileOpts{Permissions: 0o755}).
@@ -159,6 +168,15 @@ func runDagger(ctx context.Context, opts Options, config Toolchain, expression s
 		WithDirectory("/src", source).WithWorkdir("/src").
 		WithMountedCache("/root/.cache/bazel-repo", client.CacheVolume("infra-bazel-repository-v1")).
 		WithExec([]string{"mkdir", "-p", "/reports"})
+	if opts.ForwardLocalCache {
+		endpoint, host, port, err := localCache(opts.RemoteCache)
+		if err != nil {
+			return err
+		}
+		service := client.Host().Service([]dagger.PortForward{{Backend: port, Frontend: port}}, dagger.HostServiceOpts{Host: host})
+		container = container.WithServiceBinding("infra-cache", service)
+		opts.RemoteCache = endpoint
+	}
 	targets := opts.Targets
 	if len(targets) == 0 && expression != "//..." {
 		query := container.WithExec([]string{"bazel", "--batch", "query", expression, "--output=label"})

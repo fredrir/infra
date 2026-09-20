@@ -38,7 +38,7 @@ jobs:
       - name: Check Go targets
         env:
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
-          BAZEL_REMOTE_CACHE: ${{ vars.BAZEL_REMOTE_CACHE }}
+          BAZEL_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '' }}
         run: infra ci check --read-only-cache
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

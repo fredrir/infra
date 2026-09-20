@@ -1,0 +1,46 @@
+{
+  "scope": "Local Linux amd64 validation; no remote CI execution or registry publication",
+  "date": "2026-09-20",
+  "bazel": "9.2.0",
+  "go": "1.27.1",
+  "source_digest": "sha256:af6329fd4afd0bf332f41f66d6e3def3f8b4c055b2917be3440429e1fe3cd06d",
+  "source_digest_method": "SHA-256 of sorted relative paths followed by NUL and raw SHA-256 file digests for cmd/, internal/, build/, go.mod, go.sum, MODULE.bazel, MODULE.bazel.lock, BUILD.bazel, .bazelrc and .bazelversion",
+  "target": "//internal/pipeline:pipeline_test",
+  "cache_image": "buchgr/bazel-remote-cache:v2.6.2@sha256:8109f1f39eb17d898cf51e08b41e4eabaaaeb1f584c2f22c1be45b7568fcc512",
+  "conditions": {
+    "output_bases": "Separate empty directories for cold and warm invocations",
+    "repository_cache": "Shared downloaded dependencies; no shared action output directories",
+    "dagger_cache": "Not used",
+    "cache_endpoint": "Loopback-only HTTP endpoint",
+    "warm_writes": false,
+    "jobs": 4
+  },
+  "cold": {
+    "command": "bazel --batch --output_base=<fresh-one> test --jobs=4 --repository_cache=<shared-downloads> --remote_cache=http://127.0.0.1:19092 --build_event_json_file=<cold-events.jsonl> //internal/pipeline:pipeline_test",
+    "elapsed_seconds": 78.558,
+    "linux_sandbox_actions": 171,
+    "internal_actions": 38,
+    "tests_executed": 1
+  },
+  "warm": {
+    "command": "bazel --batch --output_base=<fresh-two> test --jobs=4 --repository_cache=<shared-downloads> --remote_cache=http://127.0.0.1:19092 --remote_upload_local_results=false --build_event_json_file=<warm-events.jsonl> //internal/pipeline:pipeline_test",
+    "elapsed_seconds": 1.733,
+    "remote_cache_hits": 171,
+    "internal_actions": 38,
+    "tests_executed": 0
+  },
+  "cache": {
+    "stored_bytes": 112541696,
+    "uncompressed_bytes": 351285248
+  },
+  "separate_checks": {
+    "dagger_engine": "0.21.9",
+    "dagger_bazel_test_passed": true,
+    "dagger_bazel_seconds": 38.589732732,
+    "scratch_image_oci_export_passed": true,
+    "scratch_image_archive_bytes": 8192,
+    "dagger_loopback_cache_forwarding_passed": true,
+    "dagger_loopback_cache_seconds": 45.006292276,
+    "dockerfile_target_check_only_passed": true
+  }
+}

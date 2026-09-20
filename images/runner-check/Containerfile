@@ -1,38 +1,22 @@
-FROM docker.io/nixos/nix:2.35.2@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c AS toolchain
-WORKDIR /src
-COPY flake.nix flake.lock ./
-RUN paths=$(nix --extra-experimental-features 'nix-command flakes' eval --json .#check.paths | tr -d '[]"' | tr ',' ' ') \
-    && nix-store --realise $paths > /dev/null \
-    && mkdir -p /out/nix/store /out/opt/toolchain/bin /out/opt/toolchain/lib \
-    && cp -a $(nix-store --query --requisites $paths) /out/nix/store/ \
-    && for path in $paths; do \
-         if [ -d "$path/bin" ]; then ln -sf "$path"/bin/* /out/opt/toolchain/bin/; fi; \
-         if [ -e "$path/lib/libstdc++.so.6" ]; then ln -sf "$path"/lib/libstdc++.so* "$path"/lib/libgcc_s.so* /out/opt/toolchain/lib/; fi; \
-       done
-
 FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
 USER root
-RUN sed -i 's|^URIs: http://|URIs: https://|' /etc/apt/sources.list.d/ubuntu.sources \
-    && apt-get update -o APT::Update::Error-Mode=any \
+COPY images/runner-check/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources
+RUN apt-get update -o APT::Update::Error-Mode=any \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        bash ca-certificates coreutils curl git jq openssh-client python3 python3-venv sqlite3 zstd \
     && rm -rf /var/lib/apt/lists/*
-RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
-        /usr/bin/docker /usr/bin/docker-init /usr/bin/docker-proxy /usr/bin/dockerd /usr/bin/runc \
-        /usr/local/lib/docker \
-        /home/runner/externals/node20/lib/node_modules/npm /home/runner/externals/node20/bin/npm /home/runner/externals/node20/bin/npx \
-        /home/runner/externals/node24/lib/node_modules/npm /home/runner/externals/node24/bin/npm /home/runner/externals/node24/bin/npx
-COPY --from=toolchain /out/ /
-ENV PATH=/opt/toolchain/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ENV CHECK_LIBRARY_PATH=/opt/toolchain/lib
+COPY --chmod=755 .infra-artifacts/infra /usr/local/bin/infra
+RUN RUNNER_TEMP=/opt infra ci install-tools actionlint age age-keygen sops uv tofu helm kubectl kustomize yq \
+    && chmod 755 /opt/tools \
+    && ln -s /usr/local/bin/infra /usr/local/bin/infra-runner-hook
+ENV PATH=/usr/local/bin:/opt/tools:/opt/venv/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV UV_PYTHON_DOWNLOADS=never
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 ENV UV_LINK_MODE=copy
-RUN --mount=type=bind,source=pyproject.toml,target=/pins/pyproject.toml \
-    --mount=type=bind,source=uv.lock,target=/pins/uv.lock \
-    mkdir /tmp/pins \
-    && cp /pins/pyproject.toml /pins/uv.lock /tmp/pins/ \
-    && cd /tmp/pins \
-    && uv sync --frozen --group ci --no-install-project \
+COPY pyproject.toml uv.lock /tmp/pins/
+RUN cd /tmp/pins && uv sync --frozen --group ci --no-install-project \
+    && chmod -R a+rX /opt/venv \
     && rm -rf /tmp/pins /root/.cache
 ENV RUNNER_ALLOW_RUNASROOT=1
 WORKDIR /home/runner
