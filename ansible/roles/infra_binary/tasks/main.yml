@@ -14,7 +14,7 @@
   ansible.builtin.set_fact:
     infra_binary_cache: "/var/cache/infra/{{ infra_binary_revision }}/linux-{{ 'amd64' if ansible_facts.architecture == 'x86_64' else 'arm64' }}/{{ infra_binary_sha256 }}"
 
-- name: Create private artifact cache
+- name: Create root-owned artifact cache
   ansible.builtin.file:
     path: '{{ infra_binary_cache }}'
     state: directory

@@ -20,6 +20,14 @@ type Edit struct {
 }
 
 func ToolsPromotion(root, image string) ([]Edit, error) {
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return nil, err
+	}
+	root, err = filepath.Abs(resolvedRoot)
+	if err != nil {
+		return nil, err
+	}
 	if !regexp.MustCompile(`^ghcr\.io/fredrir/platform-backup-tools@sha256:[a-f0-9]{64}$`).MatchString(image) {
 		return nil, fmt.Errorf("digest-pinned backup tools image required")
 	}
@@ -35,6 +43,16 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 	var edits []Edit
 	for _, item := range paths {
 		path := filepath.Join(root, item.path)
+		resolved, err := filepath.EvalSymlinks(path)
+		if os.IsNotExist(err) && item.path == "platform/components/cache/backup.yaml" {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if resolved != path {
+			return nil, fmt.Errorf("promotion path must not traverse symlinks: %s", item.path)
+		}
 		before, err := os.ReadFile(path)
 		if os.IsNotExist(err) && item.path == "platform/components/cache/backup.yaml" {
 			continue
