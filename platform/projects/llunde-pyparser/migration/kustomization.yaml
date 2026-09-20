@@ -2,8 +2,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: llunde-pyparser
 resources:
-- migration.yaml
+    - migration.yaml
 images:
-- digest: sha256:f1674b53ba26cbc0d305571fb35c457e0cd6fc3049e85b42f4ede4891457b831
-  name: ghcr.io/fredrir/pyparser-review
-  newName: ghcr.io/fredrir/pyparser-review
+    - digest: sha256:250638036eec01841fb0c276fd7b84e15cf040e979aea069c71ce2bcd048c7a0
+      name: ghcr.io/fredrir/pyparser-review
+      newName: ghcr.io/fredrir/pyparser-review
