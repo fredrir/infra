@@ -1,0 +1,70 @@
+name: Tag verified infrastructure image
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        required: true
+        type: string
+      digest:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+      source-revision:
+        required: true
+        type: string
+      workflow-revision:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  cli:
+    if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected
+    uses: ./.github/workflows/infra-cli.yml
+  tag:
+    needs: cli
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+      attestations: read
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ needs.cli.outputs.artifact }}
+          path: ${{ runner.temp }}/infra-cli
+      - name: Verify CLI
+        env:
+          CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+          CLI_REVISION: ${{ needs.cli.outputs.revision }}
+        run: |
+          test "$CLI_REVISION" = "$GITHUB_SHA"
+          printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+          chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+          printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+      - name: Install verification tools
+        run: infra ci install-tools gh
+      - name: Verify published provenance and tag
+        env:
+          IMAGE_NAME: ${{ inputs.image }}
+          DIGEST: ${{ inputs.digest }}
+          TAG: ${{ inputs.tag }}
+          SOURCE_REVISION: ${{ inputs.source-revision }}
+          WORKFLOW_REVISION: ${{ inputs.workflow-revision }}
+          GH_TOKEN: ${{ github.token }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$IMAGE_NAME" =~ ^ghcr\.io/fredrir/[a-z0-9][a-z0-9._/-]*$ ]]
+          [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          [[ "$TAG" =~ ^inputs-[a-f0-9]{64}$ ]]
+          [[ "$SOURCE_REVISION" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$WORKFLOW_REVISION" =~ ^[a-f0-9]{40}$ ]]
+          export IMAGE="$IMAGE_NAME@$DIGEST"
+          gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow fredrir/infra/.github/workflows/build-image.yml \
+            --signer-digest "$WORKFLOW_REVISION" --source-ref refs/heads/main \
+            --source-digest "$SOURCE_REVISION"
+          infra ci tag-image

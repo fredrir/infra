@@ -230,7 +230,7 @@ jobs:
       - name: Tag verified image
         if: inputs.verified-tag != ''
         env:
-          IMAGE: ${{ steps.build.outputs.image }}
+          IMAGE: ${{ inputs.image }}@${{ steps.build.outputs.digest }}
           TAG: ${{ inputs.verified-tag }}
           REGISTRY_TOKEN: ${{ github.token }}
         run: infra ci tag-image
