@@ -17,6 +17,9 @@ on:
       check-target:
         type: string
         default: ''
+      dependency-image:
+        type: string
+        default: ''
       build-args:
         type: string
         default: ''
@@ -47,6 +50,9 @@ on:
       layer-cache:
         type: boolean
         default: true
+      scanner-java:
+        type: boolean
+        default: false
       scan-skip-dirs:
         type: string
         default: ''
@@ -188,10 +194,14 @@ jobs:
         run: infra ci install-tools gh trivy cosign
       - name: Prepare vulnerability databases
         if: steps.affected.outputs.changed == 'true'
+        env:
+          SCANNER_JAVA: ${{ inputs.scanner-java }}
         run: |
           infra ci measure --stage scanner-preparation --budget 5m --report-dir "$RUNNER_TEMP/performance/preparation" -- bash -euo pipefail -c '
             trivy image --download-db-only --no-progress --timeout 2m
-            trivy image --download-java-db-only --no-progress --timeout 2m
+            if [[ "$SCANNER_JAVA" == true ]]; then
+              trivy image --download-java-db-only --no-progress --timeout 2m
+            fi
           '
       - name: Build and publish
         if: steps.affected.outputs.changed == 'true'
@@ -202,6 +212,7 @@ jobs:
           DOCKERFILE: ${{ inputs.dockerfile }}
           REGISTRY_TOKEN: ${{ github.token }}
           TARGET: ${{ inputs.target }}
+          DEPENDENCY_IMAGE: ${{ inputs.dependency-image }}
           CHECK_TARGET: ${{ inputs.check-target }}
           BUILD_ARGS: ${{ inputs.build-args }}
           IMAGE_TEST_COMMAND: ${{ inputs.image-test-command }}
@@ -209,6 +220,10 @@ jobs:
           BUILD_TIMEOUT: ${{ inputs.timeout-minutes }}
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
         run: |
+          if [[ -n "$DEPENDENCY_IMAGE" ]]; then
+            [[ "$DEPENDENCY_IMAGE" =~ ^ghcr\.io/fredrir/pyparser-dependencies@sha256:[a-f0-9]{64}$ ]]
+            export BUILD_ARGS="$BUILD_ARGS"$'\n'"PARSER_DEPENDENCIES=$DEPENDENCY_IMAGE"
+          fi
           infra pipeline image --root .infra-build-recipe --context "$CONTEXT" --dockerfile "${SHARED_DOCKERFILE:-$DOCKERFILE}" \
             --target "$TARGET" --check-target "$CHECK_TARGET" --check-report-dir "$RUNNER_TEMP/performance/checks" --infra-binary "$INFRA_BINARY" --image "$IMAGE:$GITHUB_SHA" --build-args "$(infra ci build-args)" \
             --source-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" \
