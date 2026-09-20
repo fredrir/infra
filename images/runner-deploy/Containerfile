@@ -1,0 +1,12 @@
+FROM ghcr.io/fredrir/infra-runner-check@sha256:bfc11faad9e02ce555758e243ada83d7fabca99bb03e0e8c172dc00c7e6c97f6
+USER root
+COPY --chmod=0555 .infra-artifacts/infra /usr/local/bin/infra
+COPY build/cli-release.json /opt/infra-cli-release.json
+ENV INFRA_TOOL_CACHE=/root/.cache/infra/tools
+RUN digest=$(jq -er '.sha256 | select(test("^[a-f0-9]{64}$"))' /opt/infra-cli-release.json) \
+    && printf '%s  %s\n' "$digest" /usr/local/bin/infra | sha256sum --check --strict \
+    && install -d -m0700 "/root/.cache/infra/bin/$digest" "$INFRA_TOOL_CACHE" \
+    && install -m0555 /usr/local/bin/infra "/root/.cache/infra/bin/$digest/infra" \
+    && RUNNER_TEMP=/tmp infra ci install-tools gh cosign
+RUN --network=none RUNNER_TEMP=/tmp infra ci install-tools gh cosign
+ENV PATH=/root/.cache/infra/tools:/usr/local/bin:/opt/tools:/opt/venv/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin

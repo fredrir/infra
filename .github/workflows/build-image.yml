@@ -35,6 +35,9 @@ on:
       image-test-shell:
         type: string
         default: bash
+      release-cli:
+        type: boolean
+        default: false
       cli-artifact:
         type: string
         default: ''
@@ -72,11 +75,11 @@ concurrency:
   cancel-in-progress: true
 jobs:
   cli:
-    if: inputs.cli-artifact == '' && github.repository == 'fredrir/infra'
+    if: inputs.cli-artifact == '' && github.repository == 'fredrir/infra' && !inputs.release-cli
     uses: ./.github/workflows/infra-cli.yml
   build:
     needs: cli
-    if: ${{ !cancelled() && (needs.cli.result == 'success' || (needs.cli.result == 'skipped' && ((github.repository == 'fredrir/infra' && inputs.cli-artifact != '') || (github.repository != 'fredrir/infra' && inputs.cli-artifact == '')))) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected }}
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || (needs.cli.result == 'skipped' && ((github.repository == 'fredrir/infra' && inputs.cli-artifact != '') || (github.repository != 'fredrir/infra' && inputs.cli-artifact == '') || (github.repository == 'fredrir/infra' && inputs.release-cli)))) && (!inputs.release-cli || (github.repository == 'fredrir/infra' && inputs.image == 'ghcr.io/fredrir/infra-runner-deploy' && inputs.cli-artifact == '')) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected }}
     runs-on: ${{ contains(fromJSON('["fredrir/infra","fredrir/Y","fredrir/portfolio","fredrir/llunde-frontend","fredrir/llunde-backend","fredrir/llunde-pyparser"]'), github.repository) && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     env:
@@ -107,16 +110,16 @@ jobs:
           git -C .infra-build-recipe -c core.hooksPath=/dev/null checkout --quiet --detach FETCH_HEAD
           test "$(git -C .infra-build-recipe rev-parse HEAD)" = "$WORKFLOW_REVISION"
       - uses: ./.infra-build-recipe/.github/actions/setup-infra
-        if: github.repository != 'fredrir/infra'
+        if: github.repository != 'fredrir/infra' || inputs.release-cli
         with:
           root: .infra-build-recipe
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        if: github.repository == 'fredrir/infra'
+        if: github.repository == 'fredrir/infra' && !inputs.release-cli
         with:
           name: ${{ github.repository == 'fredrir/infra' && inputs.cli-artifact || needs.cli.outputs.artifact }}
           path: ${{ runner.temp }}/infra-cli
       - name: Verify CLI
-        if: github.repository == 'fredrir/infra'
+        if: github.repository == 'fredrir/infra' && !inputs.release-cli
         env:
           CLI_SHA256: ${{ github.repository == 'fredrir/infra' && inputs.cli-sha256 || needs.cli.outputs.sha256 }}
           CLI_REVISION: ${{ github.repository == 'fredrir/infra' && inputs.cli-revision || needs.cli.outputs.revision }}

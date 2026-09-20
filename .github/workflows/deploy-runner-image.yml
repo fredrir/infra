@@ -1,0 +1,32 @@
+name: Deploy runner image
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-runner-image.yml
+      - .github/actions/setup-infra/**
+      - images/runner-deploy/**
+      - build/cli-release.json
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  image:
+    if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref == 'refs/heads/main' && github.ref_protected
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image: ghcr.io/fredrir/infra-runner-deploy
+      dockerfile: images/runner-deploy/Containerfile
+      deploy: false
+      release-cli: true
+      timeout-minutes: 10
+      image-test-command: >-
+        gh --version; cosign version; kustomize version;
+        digest=$(jq -er .sha256 /opt/infra-cli-release.json);
+        printf '%s  %s\n' "$digest" "/root/.cache/infra/bin/$digest/infra" | sha256sum --check --strict;
+        RUNNER_TEMP=/tmp infra ci install-tools gh cosign
