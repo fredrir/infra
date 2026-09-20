@@ -34,7 +34,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	root.SetArgs(args)
 	root.CompletionOptions.DisableDefaultCmd = true
 	ci := &cobra.Command{Use: "ci", Short: "Continuous integration commands", RunE: missingCommand}
-	ci.AddCommand(newPlanImagesCommand(), newCheckCommand(), newMeasureCommand())
+	ci.AddCommand(newPlanImagesCommand(), newCheckCommand(), newMeasureCommand(), newReadinessCommand())
 	root.AddCommand(ci, newPipelineCommand(), newDoctorCommand(), &cobra.Command{
 		Use: "version", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 			info, ok := debug.ReadBuildInfo()
