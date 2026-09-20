@@ -203,6 +203,79 @@
       "measurement": "Observation upper bound, not exact first-serving time"
     },
     "deployment_available": true,
-    "subminute_end_to_end_qualified": false
+    "subminute_end_to_end_qualified": false,
+    "build_publication": {
+      "workflow_step_seconds": 29,
+      "dagger_session_seconds": 28.7,
+      "phase_seconds": {
+        "host_filesync": 0.6,
+        "check_target_graph": 13.9,
+        "runtime_image_graph": 9.6,
+        "oci_publication": 4.1
+      },
+      "components": {
+        "dependency_install": {
+          "command": "bun install --frozen-lockfile",
+          "packages": 377,
+          "reported_install_seconds": 4.54,
+          "execution_seconds": 6.01173323
+        },
+        "dependency_mount_content_hash": {
+          "preceding_execution_finished_at": "2026-09-20T21:31:58.326Z",
+          "bind_mount_call_finished_at": "2026-09-20T21:32:03.494Z",
+          "interval_seconds": 5.168,
+          "operation": "Dockerfile bind source content hashing before mounting node_modules"
+        },
+        "frontend_check_seconds": 1.20400055,
+        "vite": {
+          "execution_seconds_approximate": 7.2,
+          "reported_bundling_seconds": 4.54
+        },
+        "runtime_apk_upgrade_seconds": 0.8,
+        "oci_layer_export_seconds": 0.5,
+        "publication_http_operations": {
+          "HEAD": 16,
+          "POST": 5,
+          "PUT": 5,
+          "GET": 1
+        }
+      },
+      "accounting": "Components are contained in phase spans; nested or overlapping measurements must not be summed.",
+      "base_images_cached": [
+        "oven/bun",
+        "library/node"
+      ],
+      "diagnosis": {
+        "preparation_revision": "b8e4d01ce2f2370fd6c5fd98e6b3984a7ec87987",
+        "preparation_source": "git archive extracted with mode 0664",
+        "workflow_source": "Git checkout with mode 0644",
+        "identical_file_sha256": {
+          "package.json": "d76085ea64ae3bb26b912abe3b0f19c40d514fc00ceb6f1f8ce103d41978d37b",
+          "bun.lock": "c9a0c73ff346322c254dc3896db066ad940f40e38d2bf81898774663547325d2"
+        },
+        "snapshot_observations": {
+          "preparation": {
+            "ids": [
+              2436,
+              2439
+            ],
+            "file_mode": "0664"
+          },
+          "workflow": {
+            "ids": [
+              2481,
+              2482
+            ],
+            "file_mode": "0644"
+          }
+        },
+        "gc_eviction_between_preparation_and_workflow": false,
+        "cache_key_includes_file_mode": true,
+        "cache_key_excludes_mtime": true,
+        "implementation_source": "https://github.com/dagger/dagger/blob/v0.21.9/engine/contenthash/tarsum.go",
+        "correction": "Prepare from an actual Git checkout with CI file modes and matching execution inputs.",
+        "corrected_checkout_cache_reuse_remeasured": false
+      }
+    }
   }
 }

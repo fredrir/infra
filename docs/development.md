@@ -228,6 +228,21 @@ infra platform prefetch --namespace llunde --node fredrir-09 \
 
 Initial native preparation is explicit; periodic compilation is disabled to avoid contending with running CI jobs.
 
+| Image preparation input | Required match |
+| --- | --- |
+| Source | Git checkout at the intended revision, including executable file modes |
+| Execution | CI CLI checksum, engine, platform, build arguments and build targets |
+| Cache identity | Dependency bytes and file modes; archive extraction can change modes and invalidate layers |
+| Qualification | Preparation is reported separately; only a measured CI run establishes deployment latency |
+| Evidence | [Frontend checkout-mode diagnosis and publication breakdown](../build/rollout/flux-artifacts/rollout.json) |
+
+Create the preparation checkout from an existing repository:
+
+```sh
+umask 022
+git worktree add --detach "$PREPARATION_DIR" "$SOURCE_REVISION"
+```
+
 ```sh
 infra ci prepare-validation
 infra ci validate
