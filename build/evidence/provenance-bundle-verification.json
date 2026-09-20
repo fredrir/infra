@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "image": "ghcr.io/fredrir/infra-runner-deploy@sha256:147b39afa11db231c31ce87a5ad7819b47117609391827c402b13ca96ce23e26",
+  "source_revision": "aa9a6537c86495e03cb3b3730e4298dc25b07e6a",
+  "signer_workflow": "fredrir/infra/.github/workflows/build-image.yml",
+  "local_bundle_with_online_trust_roots": {
+    "schema": 1,
+    "stage": "local-bundle-verification",
+    "started": "2026-09-20T21:19:02.945177Z",
+    "duration_seconds": 6.669594,
+    "budget_seconds": 10,
+    "budget_exceeded": false,
+    "success": true,
+    "exit_code": 0,
+    "cpu_seconds": 0.177863,
+    "peak_memory_bytes": 56164352
+  },
+  "local_bundle_with_prepared_trust_roots": {
+    "schema": 1,
+    "stage": "prepared-root-bundle-verification",
+    "started": "2026-09-20T21:24:56.996869Z",
+    "duration_seconds": 0.847725,
+    "budget_seconds": 10,
+    "budget_exceeded": false,
+    "success": true,
+    "exit_code": 0,
+    "cpu_seconds": 0.131431,
+    "peak_memory_bytes": 50839552
+  },
+  "tampered_signature_with_prepared_trust_roots": {
+    "schema": 1,
+    "stage": "tampered-prepared-root-bundle",
+    "started": "2026-09-20T21:26:43.305789Z",
+    "duration_seconds": 0.816478,
+    "budget_seconds": 10,
+    "budget_exceeded": false,
+    "success": false,
+    "exit_code": 1,
+    "cpu_seconds": 0.106691,
+    "peak_memory_bytes": 50790400,
+    "error": "gh failed: exit status 1"
+  },
+  "scope": "Local OCI signature verification; trust-root download cost is separate and remains in workflow preparation metrics; no end-to-end latency claim"
+}

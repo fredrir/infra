@@ -7,10 +7,15 @@ inputs:
   digest:
     description: Published immutable image digest.
     required: true
+outputs:
+  bundle-path:
+    description: Signed attestation bundle path.
+    value: ${{ steps.attest.outputs.bundle-path }}
 runs:
   using: composite
   steps:
     - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+      id: attest
       with:
         subject-name: ${{ inputs.image }}
         subject-digest: ${{ inputs.digest }}

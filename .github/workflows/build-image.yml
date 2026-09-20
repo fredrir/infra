@@ -238,15 +238,22 @@ jobs:
           else
             echo 'Scanner package analysis cache is cold; extraction cost remains inside the strict check budget.' >> "$GITHUB_STEP_SUMMARY"
           fi
-      - name: Prepare vulnerability databases
+      - name: Prepare verification data
         if: steps.affected.outputs.changed == 'true'
         env:
           SCANNER_JAVA: ${{ inputs.scanner-java }}
+          PUBLIC_PROVENANCE: ${{ !github.event.repository.private }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           infra ci measure --stage scanner-preparation --budget 5m --report-dir "$RUNNER_TEMP/performance/preparation" -- bash -euo pipefail -c '
             trivy image --download-db-only --no-progress --timeout 2m
             if [[ "$SCANNER_JAVA" == true ]]; then
               trivy image --download-java-db-only --no-progress --timeout 2m
+            fi
+            if [[ "$PUBLIC_PROVENANCE" == true ]]; then
+              umask 077
+              gh attestation trusted-root > "$RUNNER_TEMP/github-trusted-root.jsonl"
+              test -s "$RUNNER_TEMP/github-trusted-root.jsonl"
             fi
           '
       - name: Build and publish
@@ -291,6 +298,7 @@ jobs:
           infra ci measure-check --stage vulnerability-scan --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- \
             trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --skip-java-db-update --timeout 10s "${skip[@]}" "$IMAGE"
       - uses: ./.infra-build-recipe/.github/actions/attest-image
+        id: provenance
         if: steps.affected.outputs.changed == 'true' && (!github.event.repository.private)
         with:
           image: ${{ inputs.image }}
@@ -301,9 +309,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           IMAGE: ${{ steps.build.outputs.image }}
           WORKFLOW_SHA: ${{ job.workflow_sha }}
+          ATTESTATION_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
         run: |
+          test -s "$ATTESTATION_BUNDLE"
           infra ci measure-check --stage provenance-verification --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- \
-            gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+            gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" --bundle "$ATTESTATION_BUNDLE" \
+            --custom-trusted-root "$RUNNER_TEMP/github-trusted-root.jsonl" \
             --signer-workflow fredrir/infra/.github/workflows/build-image.yml \
             --signer-digest "$WORKFLOW_SHA" --source-ref refs/heads/main \
             --source-digest "$GITHUB_SHA"
