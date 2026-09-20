@@ -24,6 +24,6 @@ images:
     - digest: sha256:46e02e43ad85da625c83e401476736c42536d4c98a2b87c52d269267679d8513
       name: ghcr.io/fredrir/portfolio-web
       newName: ghcr.io/fredrir/portfolio-web
-    - digest: sha256:e0fb56ab320654dbd8fd64d27357f55e552346c934773787139ade2382e2f5c4
+    - digest: sha256:054f6b68188109a8809cc1c8023195dfb8149b8bf537a50ae249e60ae8fc3476
       name: ghcr.io/fredrir/portfolio-worker
       newName: ghcr.io/fredrir/portfolio-worker
