@@ -192,6 +192,38 @@ jobs:
       - name: Install verification tools
         if: steps.affected.outputs.changed == 'true'
         run: infra ci install-tools gh trivy cosign
+      - name: Select isolated scanner cache
+        if: steps.affected.outputs.changed == 'true'
+        id: scanner-cache
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: |
+          family="${IMAGE##*/}"
+          [[ "$family" =~ ^[a-z0-9][a-z0-9._-]*$ ]]
+          cache="$HOME/.cache/infra/trivy/$family"
+          mkdir -p "$cache"
+          chmod 700 "$cache"
+          export TRIVY_CACHE_DIR="$cache"
+          version=$(trivy --version | sed -n 's/^Version: //p')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'TRIVY_CACHE_DIR=%s\n' "$cache" >> "$GITHUB_ENV"
+          printf 'path=%s\nfamily=%s\nversion=%s\n' "$cache" "$family" "$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        if: steps.affected.outputs.changed == 'true' && runner.environment == 'github-hosted'
+        id: scanner-restore
+        with:
+          path: ${{ steps.scanner-cache.outputs.path }}
+          key: trivy-v1-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-${{ github.sha }}
+          restore-keys: |
+            trivy-v1-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-
+      - name: Report scanner cache state
+        if: steps.affected.outputs.changed == 'true'
+        run: |
+          if [ -f "$TRIVY_CACHE_DIR/fanal/fanal.db" ]; then
+            echo 'Scanner package analysis cache retained; vulnerability data is refreshed before checks.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Scanner package analysis cache is cold; extraction cost remains inside the strict check budget.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Prepare vulnerability databases
         if: steps.affected.outputs.changed == 'true'
         env:
@@ -315,6 +347,11 @@ jobs:
         run: |
           gh workflow run deploy.yml --repo fredrir/infra --ref main -f "repository-id=$GITHUB_REPOSITORY_ID" \
             -f "image=$IMAGE" -f "digest=$DIGEST" -f "source-revision=$GITHUB_SHA"
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        if: always() && runner.environment == 'github-hosted' && steps.scanner-restore.outputs.cache-primary-key != '' && steps.scanner-restore.outputs.cache-hit != 'true'
+        with:
+          path: ${{ steps.scanner-cache.outputs.path }}
+          key: ${{ steps.scanner-restore.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
