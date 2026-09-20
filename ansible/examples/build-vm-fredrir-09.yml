@@ -4,6 +4,7 @@ all:
       hosts:
         fredrir-09:
           build_vm_enabled: false
+          build_vm_cpu_overhead_millicores: 250
           build_vm_ssh_public_key: "{{ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'HOME') + '/.ssh/id_ed25519.pub') }}"
           k3s_system_reserved_cpu: 4250m
           k3s_system_reserved_memory: 10Gi

@@ -1,6 +1,7 @@
 build_vm_enabled: false
 build_vm_name: infra-build
 build_vm_cpus: 4
+build_vm_cpu_overhead_millicores: 250
 build_vm_memory_mib: 8192
 build_vm_disk_gib: 80
 build_vm_ssh_port: 2222

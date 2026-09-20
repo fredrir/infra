@@ -6,6 +6,10 @@
     - ansible_facts.architecture == 'x86_64'
     - build_vm_name is match('^[a-z][a-z0-9-]+$')
     - build_vm_cpus | int == 4
+    - build_vm_cpu_overhead_millicores | int >= 0
+    - build_vm_cpu_overhead_millicores | int <= 250
+    - build_vm_system_reserved_cpu is match('^[1-9][0-9]*m$')
+    - (build_vm_cpus | int * 1000 + build_vm_cpu_overhead_millicores | int) <= (build_vm_system_reserved_cpu | regex_replace('m$', '') | int)
     - build_vm_memory_mib | int == 8192
     - build_vm_disk_gib | int == 80
     - build_vm_ssh_port | int > 1024
