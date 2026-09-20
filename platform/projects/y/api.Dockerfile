@@ -1,4 +1,6 @@
-FROM docker.io/library/node@sha256:e961046fec20896e8904f2b4a8b4c7e5ca91826d84d8d33d83dbaa61f942069e AS build
+FROM docker.io/library/node@sha256:e961046fec20896e8904f2b4a8b4c7e5ca91826d84d8d33d83dbaa61f942069e AS toolchain
+
+FROM toolchain AS build
 WORKDIR /app
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -9,8 +11,11 @@ FROM docker.io/library/node:26.8.2-trixie-slim@sha256:f7bb8247fdb16250dbec7fd0e2
 ARG REVISION
 LABEL org.opencontainers.image.source="https://github.com/fredrir/Y"
 LABEL org.opencontainers.image.revision=$REVISION
+COPY --from=toolchain /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 RUN sed -i 's|http://|https://|g' /etc/apt/sources.list.d/debian.sources \
-    && apt-get update && apt-get upgrade -y \
+    && apt-get -o Acquire::https::CaInfo=/etc/ssl/certs/ca-certificates.crt update -o APT::Update::Error-Mode=any \
+    && apt-get -o Acquire::https::CaInfo=/etc/ssl/certs/ca-certificates.crt install -y --no-install-recommends ca-certificates \
+    && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 WORKDIR /app
