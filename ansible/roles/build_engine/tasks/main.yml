@@ -24,7 +24,11 @@
     - build_engine_prewarm_cpu_percent | int >= 1
     - build_engine_prewarm_cpu_percent | int <= 100
     - build_engine_prewarm_memory is match('^[1-9][0-9]*[MG]$')
-    - build_engine_cache_gib | int > 0
+    - build_engine_cache_gib | int >= 4
+    - build_engine_named_cache_hours | int >= 1
+    - build_engine_named_cache_hours | int <= 168
+    - build_engine_gc_emergency_free_gib | int >= 1
+    - build_engine_gc_free_gib | int > build_engine_gc_emergency_free_gib | int
     - build_engine_prewarm_workdir is match('^/[-a-zA-Z0-9_/.]+$')
     - build_engine_cache_port | int > 1024
     - build_engine_cache_port | int < 65536
@@ -78,6 +82,15 @@
   - '{{ build_engine_bazel_image }}'
   register: build_engine_pull
   changed_when: "'Downloaded newer image' in build_engine_pull.stdout"
+
+- name: Install bounded engine cache retention
+  ansible.builtin.template:
+    src: infra-dagger.toml.j2
+    dest: /etc/infra-dagger.toml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart build engines
 
 - name: Install engine units
   ansible.builtin.template:

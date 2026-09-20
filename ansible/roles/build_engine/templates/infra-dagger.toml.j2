@@ -1,0 +1,18 @@
+[[worker.oci.gcpolicy]]
+filters = ["type==regular,type==source.local,type==source.git.checkout,type==source.http"]
+reservedSpace = "1GiB"
+maxUsedSpace = "{{ build_engine_cache_gib | int * 4 // 5 }}GiB"
+minFreeSpace = "{{ build_engine_gc_free_gib | int }}GiB"
+
+[[worker.oci.gcpolicy]]
+filters = ["type==exec.cachemount"]
+keepDuration = "{{ build_engine_named_cache_hours | int }}h"
+reservedSpace = "1GiB"
+maxUsedSpace = "{{ build_engine_cache_gib | int * 4 // 5 }}GiB"
+minFreeSpace = "{{ build_engine_gc_free_gib | int }}GiB"
+
+[[worker.oci.gcpolicy]]
+all = true
+reservedSpace = "1GiB"
+maxUsedSpace = "{{ build_engine_cache_gib | int }}GiB"
+minFreeSpace = "{{ build_engine_gc_emergency_free_gib | int }}GiB"
