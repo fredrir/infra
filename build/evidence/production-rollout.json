@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "observedAt": "2026-09-20T17:21:31Z",
-  "sourceRevision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e",
+  "observedAt": "2026-09-20T17:52:50Z",
+  "sourceRevision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d",
   "nodes": [
     {
       "name": "fredrir-04",
@@ -28,67 +28,67 @@
     {
       "name": "flux-system",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "llunde-pyparser-application",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "llunde-pyparser-migration",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-backups",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-build-cache",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-cache",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-controllers",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-ingress",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-observability",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-policy",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-projects",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-runners",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     },
     {
       "name": "platform-sources",
       "ready": true,
-      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+      "revision": "main@sha1:d1c09917693ce13007127f17d4ac6af875a1af9d"
     }
   ],
   "toolsWorkloads": [
@@ -237,17 +237,17 @@
   "runnerPools": [
     {
       "resource": "ci-infra/check",
-      "image": "ghcr.io/fredrir/infra-runner-check@sha256:33b2fad199ee665f03aaa1ec8ee82f1dc02c14945de97c68613651dbfad0949c",
+      "image": "ghcr.io/fredrir/infra-runner-check@sha256:bfc11faad9e02ce555758e243ada83d7fabca99bb03e0e8c172dc00c7e6c97f6",
       "ready": true,
-      "generation": 1,
-      "observedGeneration": 1
+      "generation": 2,
+      "observedGeneration": 2
     },
     {
       "resource": "ci-infra/deploy",
-      "image": "ghcr.io/fredrir/infra-runner-buildkit@sha256:4045faa13605053af98949c8e862966c7ba38d0cb2e81e213cf58ac351ac7f08",
+      "image": "ghcr.io/fredrir/infra-runner-check@sha256:bfc11faad9e02ce555758e243ada83d7fabca99bb03e0e8c172dc00c7e6c97f6",
       "ready": true,
-      "generation": 1,
-      "observedGeneration": 1
+      "generation": 2,
+      "observedGeneration": 2
     },
     {
       "resource": "ci-nsql/rust-main",
@@ -273,6 +273,7 @@
   ],
   "legacyRetirement": {
     "buildkitAndNixPoolsPresent": false,
+    "activeLegacyImagePods": [],
     "atticReplicas": 0,
     "atticPVC": "nix-cache/data-attic-0",
     "atticPVCPhase": "Bound",
@@ -307,6 +308,18 @@
       "result": "Complete",
       "succeeded": 1,
       "evidence": "Observed scheduled Go provisioner Job completion"
+    },
+    {
+      "operation": "declaration-validation",
+      "workflowRun": 35527139935,
+      "job": 106121300187,
+      "sourceRevision": "d1c09917693ce13007127f17d4ac6af875a1af9d",
+      "runner": "check-amd64-5p9jc-runner-wlpgm",
+      "image": "ghcr.io/fredrir/infra-runner-check@sha256:bfc11faad9e02ce555758e243ada83d7fabca99bb03e0e8c172dc00c7e6c97f6",
+      "startedAt": "2026-09-20T17:51:47Z",
+      "finishedAt": "2026-09-20T17:52:05Z",
+      "result": "success",
+      "evidence": "https://github.com/fredrir/infra/actions/runs/35527139935/job/106121300187"
     }
   ],
   "podReadinessIssues": [],
