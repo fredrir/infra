@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "date": "2026-09-20",
+  "release": "https://github.com/fredrir/infra/releases/tag/cosign-v3.1.3-infra.1",
+  "source_revision": "28e8dab4c3d70fda8fffaba61a2dea1b615cda2a",
+  "upstream_revision": "11926fa5bbbbde47e88fc006b625a17769b743b2",
+  "binary_sha256": "05e004d22d93dc6dffb1b1633c1a03fcf0369b2f6eb247b714e236b61a742c71",
+  "hosted_run_id": 35535808146,
+  "hosted_attestation_id": 48796226,
+  "qualification": {
+    "schema": 1,
+    "stage": "cosign-qualification",
+    "revision": "28e8dab4c3d70fda8fffaba61a2dea1b615cda2a",
+    "started": "2026-09-20T20:35:13.049980784Z",
+    "duration_seconds": 0.488631192,
+    "budget_seconds": 10,
+    "budget_exceeded": false,
+    "success": true,
+    "exit_code": 0,
+    "cpu_seconds": 0.605713,
+    "peak_memory_bytes": 134033408
+  },
+  "scanned_go_binaries": 1,
+  "fixable_high_critical_findings": 0,
+  "publication_recovery": {
+    "workflow_conclusion": "failure",
+    "reason": "The workflow token could not create the release tag",
+    "reproduced_artifacts_matching_hosted_attestation": 7,
+    "verified_repository": "fredrir/infra",
+    "verified_signer_workflow": "fredrir/infra/.github/workflows/cosign-release.yml",
+    "verified_source_ref": "refs/heads/main",
+    "self_hosted_signers_rejected": true,
+    "published_with_existing_user_credentials": true
+  },
+  "upstream_license_asset": {
+    "name": "LICENSE",
+    "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "included_in_original_attestation": false
+  }
+}

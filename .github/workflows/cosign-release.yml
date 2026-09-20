@@ -34,10 +34,8 @@ jobs:
             printf 'Release %s already exists\n' "$tag" >&2
             exit 1
           fi
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
-            printf 'Tag %s already exists\n' "$tag" >&2
-            exit 1
-          fi
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.type')" = commit
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')" = "$GITHUB_SHA"
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         id: go-cache
         with:
@@ -108,28 +106,40 @@ jobs:
         run: |
           cp build/tools/cosign/source.json "$RUNNER_TEMP/release/source.json"
           cp build/tools/cosign/dependencies.patch "$RUNNER_TEMP/release/dependencies.patch"
+          cp "$RUNNER_TEMP/cosign-source/LICENSE" "$RUNNER_TEMP/release/LICENSE"
+          if [ -f "$RUNNER_TEMP/cosign-source/NOTICE" ]; then cp "$RUNNER_TEMP/cosign-source/NOTICE" "$RUNNER_TEMP/release/NOTICE"; fi
           cp "$RUNNER_TEMP/checks/cosign-qualification.json" "$RUNNER_TEMP/release/qualification.json"
           cp "$RUNNER_TEMP/checks/scan.json" "$RUNNER_TEMP/release/scan.json"
           cd "$RUNNER_TEMP/release"
-          sha256sum cosign-linux-amd64 source.json dependencies.patch qualification.json scan.json > SHA256SUMS
+          sha256sum cosign-linux-amd64 source.json dependencies.patch qualification.json scan.json LICENSE > SHA256SUMS
+          if [ -f NOTICE ]; then sha256sum NOTICE >> SHA256SUMS; fi
           jq -n --arg revision "$GITHUB_SHA" --arg sha256 "$(sha256sum cosign-linux-amd64 | cut -d' ' -f1)" --slurpfile source source.json '{schema:1, revision:$revision, source:$source[0], binary:{file:"cosign-linux-amd64", platform:"linux/amd64", sha256:$sha256}}' > manifest.json
           sha256sum manifest.json >> SHA256SUMS
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         id: provenance
         with:
           subject-path: ${{ runner.temp }}/release/*
+      - name: Preserve attestation bundle
+        env:
+          ATTESTATION_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: cp "$ATTESTATION_BUNDLE" "$RUNNER_TEMP/release/provenance.jsonl"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: cosign-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish downstream version
         env:
           GH_TOKEN: ${{ github.token }}
-          ATTESTATION_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
         run: |
           tag=$(jq -er .tag build/tools/cosign/source.json)
           cd "$RUNNER_TEMP/release"
-          cp "$ATTESTATION_BUNDLE" provenance.jsonl
-          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null
-          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --title "$tag" \
+          assets=(cosign-linux-amd64 source.json dependencies.patch qualification.json scan.json manifest.json SHA256SUMS provenance.jsonl LICENSE)
+          if [ -f NOTICE ]; then assets+=(NOTICE); fi
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$tag" \
             --notes "Downstream Cosign build with the tracked dependency patch and Go 1.27.1; this is not an upstream Sigstore release. Verify provenance and SHA256SUMS before installation." \
-            cosign-linux-amd64 source.json dependencies.patch qualification.json scan.json manifest.json SHA256SUMS provenance.jsonl
+            "${assets[@]}"
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.type')" = commit
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')" = "$GITHUB_SHA"
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false

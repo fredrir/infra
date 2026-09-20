@@ -28,7 +28,7 @@ var ToolAssets = map[string]ToolAsset{
 	"kustomize":  {"https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.8.1/kustomize_v5.8.1_linux_amd64.tar.gz", "029a7f0f4e1932c52a0476cf02a0fd855c0bb85694b82c338fc648dcb53a819d", "kustomize"},
 	"trivy":      {"https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz", "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a", "trivy"},
 	"yq":         {"https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_amd64", "c5f056448f973ae7d39b5401949648a78f2dc1947d6a8eb65be60d5c504b9385", ""},
-	"cosign":     {"https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-amd64", "4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71", ""},
+	"cosign":     {"https://github.com/fredrir/infra/releases/download/cosign-v3.1.3-infra.1/cosign-linux-amd64", "05e004d22d93dc6dffb1b1633c1a03fcf0369b2f6eb247b714e236b61a742c71", ""},
 }
 
 func InstallTools(ctx context.Context, temporary, pathOutput string, names []string) error {
