@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "release": {
+    "schema": 1,
+    "revision": "9354b19939e672259c19e9ebe7742914ae10b61a",
+    "tag": "infra-v0.2.2",
+    "toolchain": {
+      "bazel": "9.2.0",
+      "go": "1.27.1",
+      "dagger": "0.21.9",
+      "image": "golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195",
+      "bazel_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+      "engine_image": "registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4"
+    },
+    "binaries": [
+      {
+        "platform": "darwin/amd64",
+        "file": "infra-darwin-amd64",
+        "sha256": "88a188a07ad9fe6f6d5f0d2aba304da0fc80318ac482c567726de3d06d551ead"
+      },
+      {
+        "platform": "darwin/arm64",
+        "file": "infra-darwin-arm64",
+        "sha256": "9257d4829268d96530f00e3c6722ce362b8d211126efa0a50e3ca67d3fe7eb4a"
+      },
+      {
+        "platform": "linux/amd64",
+        "file": "infra-linux-amd64",
+        "sha256": "dc6d4d3c31efc3162158c4d21a4743d768c07c3639e5c798d98c42d33f5f815b"
+      },
+      {
+        "platform": "linux/arm64",
+        "file": "infra-linux-arm64",
+        "sha256": "813986f562eb95c62ae89c873b98733be5d66b1ffcbca701d52b26045622ee68"
+      }
+    ]
+  },
+  "run": "https://github.com/fredrir/infra/actions/runs/35536602703",
+  "verification": {
+    "checksums": true,
+    "provenance_subjects": [
+      "infra-darwin-amd64",
+      "infra-darwin-arm64",
+      "infra-linux-amd64",
+      "infra-linux-arm64",
+      "manifest.json",
+      "SHA256SUMS"
+    ],
+    "signer_workflow": "fredrir/infra/.github/workflows/cli-release.yml",
+    "source_revision": "9354b19939e672259c19e9ebe7742914ae10b61a",
+    "signer_revision": "9354b19939e672259c19e9ebe7742914ae10b61a",
+    "self_hosted_runners_denied": true
+  },
+  "native_preparation": {
+    "schema": 1,
+    "metrics": {
+      "actions_executed": 995,
+      "local_cache_hits": 80,
+      "system_network_bytes_sent": 863276,
+      "system_network_bytes_received": 15061400
+    },
+    "operation": "prepare-check",
+    "targets": [
+      "//...",
+      "//:gazelle"
+    ],
+    "started": "2026-09-20T20:49:08.195992728Z",
+    "duration_seconds": 105.738012438,
+    "success": true
+  },
+  "native_checks": [
+    {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 18,
+        "system_network_bytes_sent": 938880,
+        "system_network_bytes_received": 15121734
+      },
+      "operation": "test",
+      "targets": [
+        "//..."
+      ],
+      "started": "2026-09-20T20:50:53.94803045Z",
+      "duration_seconds": 3.831507958,
+      "success": true
+    },
+    {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 1,
+        "system_network_bytes_sent": 944216,
+        "system_network_bytes_received": 15122088
+      },
+      "operation": "generate-check",
+      "targets": [
+        "//:gazelle",
+        "--",
+        "-mode=diff"
+      ],
+      "started": "2026-09-20T20:50:57.779679101Z",
+      "duration_seconds": 0.361508496,
+      "success": true
+    }
+  ],
+  "aggregate_native_check_seconds": 4.193016454,
+  "scope": "Release qualification; application build and deployment latency measured separately"
+}
