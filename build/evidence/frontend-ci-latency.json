@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "date": "2026-09-20",
+  "state": "measured-target-not-met",
+  "build_run": "https://github.com/fredrir/llunde-frontend/actions/runs/35533660342",
+  "deployment_run": "https://github.com/fredrir/infra/actions/runs/35533700993",
+  "source_revision": "171f2387b3a5ce87a6fe555e2603121bd8a86229",
+  "workflow_revision": "f467a384e922ddb64955bc19469892077e5bd507",
+  "check_budget": {
+    "schema": 1,
+    "accounting": "sum-of-recorded-check-durations",
+    "budget_seconds": 10,
+    "duration_seconds": 9.970741814,
+    "remaining_seconds": 0.029258185999999853,
+    "success": true,
+    "stages": [
+      {
+        "schema": 1,
+        "stage": "frontend",
+        "started": "2026-09-20T19:46:11.03241864Z",
+        "duration_seconds": 4.671908192,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 15.070041,
+        "peak_memory_bytes": 755666944
+      },
+      {
+        "schema": 1,
+        "stage": "provenance-verification",
+        "revision": "171f2387b3a5ce87a6fe555e2603121bd8a86229",
+        "started": "2026-09-20T19:51:59.932603997Z",
+        "duration_seconds": 3.248473238,
+        "budget_seconds": 3.277731423,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.16064,
+        "peak_memory_bytes": 69337088
+      },
+      {
+        "schema": 1,
+        "stage": "vulnerability-scan",
+        "revision": "171f2387b3a5ce87a6fe555e2603121bd8a86229",
+        "started": "2026-09-20T19:51:50.798536142Z",
+        "duration_seconds": 2.050360384,
+        "budget_seconds": 5.328091808,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.364321,
+        "peak_memory_bytes": 124780544
+      }
+    ]
+  },
+  "build_workflow_seconds": 54,
+  "workflow_created_to_deployment_dispatch_seconds": 46,
+  "readiness_gate": {
+    "success": false,
+    "budget_seconds": 19
+  },
+  "observed_pod_ready_at": "2026-09-20T19:53:10Z",
+  "workflow_created_to_observed_pod_ready_seconds": 107,
+  "limitations": [
+    "GitHub created_at is the earliest observable timestamp, not the git push timestamp.",
+    "Pod readiness was observed after the deployment workflow readiness deadline.",
+    "The reused inline check receipt records its original execution duration."
+  ],
+  "reconciliation": {
+    "artifact_stored_at": "2026-09-20T19:52:42.533Z",
+    "projects_started_at": "2026-09-20T19:52:55.349Z",
+    "projects_apply_seconds": 9.45,
+    "image_pull_seconds": 2.255,
+    "policy_dependency_wait_seconds_approx": 12
+  },
+  "optimization_qualification": {
+    "lint": {
+      "seconds": 0.387,
+      "exit_code": 0
+    },
+    "cold_types": {
+      "seconds": 0.887,
+      "exit_code": 0
+    },
+    "warm_types": {
+      "seconds": 0.201,
+      "exit_code": 0
+    },
+    "new_type_error": {
+      "seconds": 0.237,
+      "exit_code": 1
+    },
+    "corrected_type_error": {
+      "seconds": 0.221,
+      "exit_code": 0
+    },
+    "restored_source": {
+      "seconds": 0.214,
+      "exit_code": 0
+    },
+    "warm_lint": {
+      "seconds": 0.336,
+      "exit_code": 0
+    },
+    "final_warm_types": {
+      "seconds": 0.201,
+      "exit_code": 0
+    },
+    "aggregate_seconds": 0.537
+  }
+}
