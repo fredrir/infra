@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "source_revision": "7d90aca729dc9cef75616a5a7b62b92305af8015",
+  "source": "git archive",
+  "excluded": [
+    ".git",
+    "secrets",
+    "dist"
+  ],
+  "host": "archie",
+  "started_at": "2026-09-20T16:25:38.983479+00:00",
+  "budget_seconds": 180,
+  "commands": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "./..."
+      ],
+      "stdout": "go-test-race.log",
+      "stderr": "go-test-race.log",
+      "exit_code": 0,
+      "status": "passed",
+      "elapsed_seconds": 25.336
+    },
+    {
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "stdout": "go-vet.log",
+      "stderr": "go-vet.log",
+      "exit_code": 0,
+      "status": "passed",
+      "elapsed_seconds": 2.893
+    }
+  ],
+  "elapsed_seconds": 28.23,
+  "go_version": "go version go1.27.1-X:nodwarf5 linux/amd64",
+  "platform": "linux/amd64",
+  "logs": {
+    "go-test-race.log": {
+      "remote_path": "archie:/tmp/infra-refactor-kata/final-7d90aca/go-test-race.log",
+      "sha256": "7b989baa88f68a99caa159b1b95ce4fc1d151311ba76930a62e2ee93d6ed5312"
+    },
+    "go-vet.log": {
+      "remote_path": "archie:/tmp/infra-refactor-kata/final-7d90aca/go-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "package_results": [
+    "?   \tgithub.com/fredrir/infra/cmd/infra\t[no test files]",
+    "ok  \tgithub.com/fredrir/infra/internal/artifact\t1.188s",
+    "ok  \tgithub.com/fredrir/infra/internal/ci\t8.624s",
+    "ok  \tgithub.com/fredrir/infra/internal/cli\t1.028s",
+    "ok  \tgithub.com/fredrir/infra/internal/contracts\t1.036s",
+    "ok  \tgithub.com/fredrir/infra/internal/enrollment\t1.055s",
+    "ok  \tgithub.com/fredrir/infra/internal/images\t1.144s",
+    "ok  \tgithub.com/fredrir/infra/internal/kata\t1.055s",
+    "ok  \tgithub.com/fredrir/infra/internal/objectstore\t1.008s",
+    "ok  \tgithub.com/fredrir/infra/internal/operations\t1.117s",
+    "ok  \tgithub.com/fredrir/infra/internal/packages\t1.043s",
+    "ok  \tgithub.com/fredrir/infra/internal/pipeline\t1.011s",
+    "ok  \tgithub.com/fredrir/infra/internal/platformops\t1.167s",
+    "ok  \tgithub.com/fredrir/infra/internal/policy\t3.282s",
+    "ok  \tgithub.com/fredrir/infra/internal/process\t4.174s",
+    "ok  \tgithub.com/fredrir/infra/internal/projects\t1.034s",
+    "ok  \tgithub.com/fredrir/infra/internal/release\t3.067s"
+  ],
+  "scope": "Default unit and contract suites; opt-in live infrastructure qualification tests were not enabled."
+}
