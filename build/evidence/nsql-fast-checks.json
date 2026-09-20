@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "date": "2026-09-20",
+  "repository": "fredrir/nsql",
+  "run": "https://github.com/fredrir/nsql/actions/runs/35534733127",
+  "attempt": 2,
+  "runner_pool": "rust-amd64",
+  "check": {
+    "schema": 1,
+    "stage": "checks",
+    "revision": "88b7dc30d48de3142e044f145a446d65a15ef21d",
+    "started": "2026-09-20T20:19:37.404129992Z",
+    "duration_seconds": 4.347013507,
+    "budget_seconds": 10,
+    "budget_exceeded": false,
+    "success": true,
+    "exit_code": 0,
+    "cpu_seconds": 11.01,
+    "peak_memory_bytes": 333422592
+  },
+  "limitations": [
+    "Rerun after repairing the runner hook; workflow creation time is not a fresh latency measurement.",
+    "Compilation and output cache restore/save are separate from the aggregate check budget.",
+    "Deep Rust checks remain local."
+  ]
+}
