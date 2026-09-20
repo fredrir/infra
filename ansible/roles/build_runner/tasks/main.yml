@@ -131,7 +131,7 @@
     mode: '0555'
     content: |
       #!/bin/sh
-      exec /usr/local/bin/infra platform runner-hook
+      CI_POOL=main exec /usr/local/bin/infra platform runner-hook
 
 - name: Configure repository runners
   ansible.builtin.include_tasks: repository.yml

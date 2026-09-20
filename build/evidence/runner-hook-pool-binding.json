@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "verified_at": "2026-09-20T21:50:50.028896+00:00",
+  "guest": "infra-build-09",
+  "hook": "/usr/local/libexec/infra-runner-hook.sh",
+  "owner": "root",
+  "mode": "0555",
+  "pool_bound_in_adapter": "main",
+  "job_supplied_pool": "pr",
+  "protected_main_push_accepted": true,
+  "same_repository_pull_request_override_rejected": true,
+  "go_authorization_logic_changed": false,
+  "listener_restarts": 0
+}
