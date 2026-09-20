@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "observed_at": "2026-09-20T21:00:29.398914+00:00",
+  "host": "fredrir-09",
+  "guest": "infra-build-09",
+  "qemu_cpu_quota_millicores": 4250,
+  "guest_cpus": 4,
+  "cli_release": {
+    "schema": 1,
+    "tag": "infra-v0.2.2",
+    "revision": "9354b19939e672259c19e9ebe7742914ae10b61a",
+    "sha256": "dc6d4d3c31efc3162158c4d21a4743d768c07c3639e5c798d98c42d33f5f815b",
+    "inputs_sha256": "2f64cbb4879a36962d5b130de28a1420d42d3da6122045f2d1d9e3b200c23532"
+  },
+  "installed_root_and_runner_cli_sha256_verified": true,
+  "protected_main_hook_accepted": true,
+  "engine": {
+    "image": "registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4",
+    "started_at": "2026-09-20T20:56:53.587998986Z",
+    "parallelism": 1,
+    "cpus": 4.0,
+    "memory_bytes": 4294967296,
+    "cache_volume": "infra-dagger-cache",
+    "cache_preserved_across_restart": true
+  },
+  "drain": {
+    "running_jobs_interrupted": false,
+    "all_eight_runner_labels_restored": true,
+    "routing_labels": [
+      "dagger-amd64",
+      "infra-trusted"
+    ]
+  },
+  "scope": "Production runtime configuration and checksum inspection; excludes build throughput and deployment timing claims"
+}
