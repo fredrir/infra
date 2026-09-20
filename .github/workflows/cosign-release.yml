@@ -1,6 +1,8 @@
 name: Release patched Cosign
 on:
   workflow_dispatch:
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
   contents: read
 concurrency:
@@ -36,7 +38,7 @@ jobs:
           fi
           git -C "$GITHUB_WORKSPACE" -c credential.helper= -c http.extraHeader= fetch --quiet --force origin "refs/tags/$tag:refs/tags/$tag"
           test "$(git -C "$GITHUB_WORKSPACE" rev-parse "refs/tags/$tag^{commit}")" = "$GITHUB_SHA"
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         id: go-cache
         with:
           path: ~/.cache/infra-cosign-go
@@ -74,7 +76,7 @@ jobs:
                 -ldflags="-s -w -buildid= -X sigs.k8s.io/release-utils/version.gitVersion=$VERSION -X sigs.k8s.io/release-utils/version.gitCommit=$REVISION -X sigs.k8s.io/release-utils/version.gitTreeState=modified" \
                 -o /release/cosign-linux-amd64 ./cmd/cosign
             '
-      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: steps.go-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/infra-cosign-go

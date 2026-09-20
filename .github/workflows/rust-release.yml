@@ -4,6 +4,7 @@ on:
 permissions:
   contents: read
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   MACOS_SDK_OBJECT: MacOSX27.0.sdk.tar.zst
   MACOS_SDK_SHA256: 206f0ccf404784e98b1d1040fef4dbefce00273b1a4a668f4483c8b0370b52ab
 jobs:

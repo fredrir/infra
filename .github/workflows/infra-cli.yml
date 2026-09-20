@@ -8,6 +8,8 @@ on:
         value: ${{ jobs.build.outputs.sha256 }}
       revision:
         value: ${{ jobs.build.outputs.revision }}
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
   contents: read
 jobs:
@@ -44,7 +46,7 @@ jobs:
           if [ "$digest" = "$(jq -r '.inputs_sha256 // ""' build/cli-release.json)" ]; then
             printf 'released=true\n' >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         id: binary-cache
         if: runner.environment == 'github-hosted'
         with:
@@ -87,7 +89,7 @@ jobs:
           if [ -f "$bundle/inputs" ] && [ "$(cat "$bundle/inputs")" = "$INPUT_DIGEST" ] && printf '%s  %s\n' "$(cat "$bundle/sha256")" "$bundle/infra" | sha256sum --check --strict --status; then
             printf 'hit=true\n' >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: runner.environment == 'github-hosted' && steps.cached.outputs.hit != 'true'
         with:
           path: |

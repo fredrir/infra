@@ -1,6 +1,8 @@
 name: Rust release tag
 on:
   workflow_call: {}
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
   contents: read
 jobs:

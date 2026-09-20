@@ -8,6 +8,8 @@ on:
       smoke-scope:
         type: string
         default: quick
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
   contents: read
 jobs:
