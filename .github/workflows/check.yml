@@ -14,7 +14,7 @@ jobs:
     uses: ./.github/workflows/infra-cli.yml
   check:
     needs: cli
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository == 'fredrir/infra' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name != 'pull_request' && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -34,12 +34,18 @@ jobs:
           chmod 755 "$RUNNER_TEMP/infra-cli/infra"
           printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
       - name: Start isolated Dagger engine
+        if: runner.environment == 'github-hosted'
         run: docker run --detach --name infra-dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+      - name: Verify dedicated engine
+        if: runner.environment == 'self-hosted'
+        env:
+          _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
+        run: infra doctor --engine-only
       - name: Check Go targets
         env:
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
-          BAZEL_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '' }}
-        run: infra ci check --read-only-cache
+          BAZEL_REMOTE_CACHE: ${{ runner.environment == 'self-hosted' && 'http://127.0.0.1:9092' || (github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '') }}
+        run: infra ci check --read-only-cache=${{ github.event_name == 'pull_request' }} --forward-local-cache=${{ runner.environment == 'self-hosted' }}
       - name: Check generated BUILD files
         env:
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
@@ -52,7 +58,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Stop Dagger engine
-        if: always()
+        if: always() && runner.environment == 'github-hosted'
         run: docker rm --force infra-dagger
   validate:
     needs: cli

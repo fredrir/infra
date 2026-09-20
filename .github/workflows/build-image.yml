@@ -65,8 +65,10 @@ jobs:
   build:
     needs: cli
     if: always() && (needs.cli.result == 'success' || (github.repository == 'fredrir/infra' && inputs.cli-artifact != '')) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository == 'fredrir/infra' && github.ref == 'refs/heads/main' && github.ref_protected && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
+    env:
+      _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
     permissions:
       contents: read
       packages: write
@@ -105,7 +107,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
       - name: Start isolated Dagger engine
+        if: runner.environment == 'github-hosted'
         run: docker run --detach --name infra-dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+      - name: Verify dedicated engine
+        if: runner.environment == 'self-hosted'
+        run: infra doctor --root .infra-build-recipe --engine-only
       - name: Select shared recipe
         if: inputs.recipe != ''
         env:
@@ -159,12 +165,13 @@ jobs:
           BUILD_ARGS: ${{ inputs.build-args }}
           IMAGE_TEST_COMMAND: ${{ inputs.image-test-command }}
           IMAGE_TEST_SHELL: ${{ inputs.image-test-shell }}
+          BUILD_TIMEOUT: ${{ inputs.timeout-minutes }}
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
         run: |
           infra pipeline image --root .infra-build-recipe --context "$CONTEXT" --dockerfile "${SHARED_DOCKERFILE:-$DOCKERFILE}" \
             --infra-binary "$RUNNER_TEMP/infra-cli/infra" --image "$IMAGE:$GITHUB_SHA" --build-args "$(infra ci build-args)" \
             --source-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" \
-            --test-command "$IMAGE_TEST_COMMAND" --test-shell "$IMAGE_TEST_SHELL"
+            --test-command "$IMAGE_TEST_COMMAND" --test-shell "$IMAGE_TEST_SHELL" --timeout "${BUILD_TIMEOUT}m"
       - name: Scan published image
         env:
           IMAGE: ${{ steps.build.outputs.image }}
@@ -243,5 +250,5 @@ jobs:
           gh workflow run deploy.yml --repo fredrir/infra --ref main -f "repository-id=$GITHUB_REPOSITORY_ID" \
             -f "image=$IMAGE" -f "digest=$DIGEST" -f "source-revision=$GITHUB_SHA"
       - name: Stop Dagger engine
-        if: always()
+        if: always() && runner.environment == 'github-hosted'
         run: docker rm --force infra-dagger

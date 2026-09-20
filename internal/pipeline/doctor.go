@@ -22,7 +22,11 @@ func Doctor(ctx context.Context, root, bazel string, engine bool) []Diagnostic {
 		return append(checks, Diagnostic{Name: "toolchain", Detail: err.Error()})
 	}
 	checks = append(checks, Diagnostic{Name: "toolchain", OK: true, Detail: "Go " + config.Go + ", Bazel " + config.Bazel + ", Dagger " + config.Dagger})
-	for _, tool := range []string{"git", bazel} {
+	tools := []string{"git"}
+	if bazel != "" {
+		tools = append(tools, bazel)
+	}
+	for _, tool := range tools {
 		command := exec.CommandContext(ctx, tool, "--version")
 		data, err := command.CombinedOutput()
 		detail := strings.TrimSpace(string(data))

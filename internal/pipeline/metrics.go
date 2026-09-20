@@ -12,6 +12,7 @@ type Metrics struct {
 	ActionsExecuted     *uint64 `json:"actions_executed,omitempty"`
 	LocalCacheHits      *uint64 `json:"local_cache_hits,omitempty"`
 	RemoteCacheHits     *uint64 `json:"remote_cache_hits,omitempty"`
+	DiskCacheHits       *uint64 `json:"disk_cache_hits,omitempty"`
 	SystemBytesSent     *uint64 `json:"system_network_bytes_sent,omitempty"`
 	SystemBytesReceived *uint64 `json:"system_network_bytes_received,omitempty"`
 }
@@ -62,11 +63,18 @@ func readMetrics(path string) (*Metrics, error) {
 			{metrics.NetworkMetrics.SystemNetworkStats.BytesRecv, &result.SystemBytesReceived},
 		}
 		for _, runner := range metrics.ActionSummary.RunnerCount {
-			if runner.Name == "remote cache hit" {
+			var target **uint64
+			switch runner.Name {
+			case "remote cache hit":
+				target = &result.RemoteCacheHits
+			case "disk cache hit":
+				target = &result.DiskCacheHits
+			}
+			if target != nil {
 				fields = append(fields, struct {
 					raw    json.RawMessage
 					target **uint64
-				}{runner.Count, &result.RemoteCacheHits})
+				}{runner.Count, target})
 			}
 		}
 		for _, field := range fields {

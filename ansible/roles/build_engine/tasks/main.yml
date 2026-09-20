@@ -4,6 +4,7 @@
     - build_engine_dedicated | bool
     - build_engine_qualified | bool
     - build_engine_trust == 'trusted'
+    - build_engine_runner_service is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]service$')
     - ansible_facts.system == 'Linux'
     - ansible_facts.architecture == 'x86_64'
     - inventory_hostname not in groups.get('k3s_cluster', [])
@@ -13,6 +14,30 @@
     - build_engine_cache_gib | int > 0
     - build_engine_cache_port | int > 1024
     - build_engine_cache_port | int < 65536
+    - build_engine_cache_port | int == 9092
+    - build_engine_dagger_name == 'infra-dagger'
+
+- name: Read runner services
+  ansible.builtin.service_facts:
+
+- name: Require an installed active GitHub runner
+  ansible.builtin.assert:
+    that:
+    - build_engine_runner_service in ansible_facts.services
+    - ansible_facts.services[build_engine_runner_service].state == 'running'
+
+- name: Read the registered runner account
+  ansible.builtin.command:
+    argv: [systemctl, show, '--property=User', --value, '{{ build_engine_runner_service }}']
+  register: build_engine_runner_account
+  changed_when: false
+
+- name: Verify runner access to its dedicated Docker engine
+  ansible.builtin.command:
+    argv: [runuser, --user, '{{ build_engine_runner_account.stdout | default("root", true) }}', --, docker, info, --format, '{{ "{{.OSType}}" }}']
+  register: build_engine_runner_docker
+  changed_when: false
+  failed_when: build_engine_runner_docker.rc != 0 or build_engine_runner_docker.stdout != 'linux'
 
 - name: Read engine pin
   ansible.builtin.set_fact:

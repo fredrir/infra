@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "scope": "Local isolated Linux amd64 qualification using a working-tree snapshot; no hosted CI, publication or production rollout",
+  "date": "2026-09-20",
+  "dagger": "0.21.9",
+  "bazel": "9.2.0",
+  "go": "1.27.1",
+  "target": "//internal/pipeline:pipeline_test",
+  "conditions": {
+    "remote_cache": "Disabled for both invocations",
+    "repository_cache": "Shared existing dependency downloads",
+    "disk_cache": "Initially empty Dagger cache volume infra-bazel-actions-v1, retained between invocations",
+    "source_edit": "Appended one newline to internal/pipeline/metrics_test.go between invocations",
+    "output_base": "Fresh source-dependent container filesystem for each invocation",
+    "engine_limits": {"cpus": 4, "memory_bytes": 8589934592, "pids": 1024},
+    "reports": "Exported outside the source directory"
+  },
+  "cold": {
+    "command": "infra pipeline check //internal/pipeline:pipeline_test --timeout=5m --report-dir=<external-cold-report-directory>",
+    "success": true,
+    "duration_seconds": 40.208378597,
+    "actions_executed": 208,
+    "local_sandbox_actions": 170,
+    "internal_actions": 38,
+    "build_events_sha256": "90a158487eeaa72d72b7d55713e3489583432482eb2b2e859bf6ca882a02d207"
+  },
+  "warm_after_source_edit": {
+    "command": "infra pipeline check //internal/pipeline:pipeline_test --timeout=5m --report-dir=<external-warm-report-directory>",
+    "success": true,
+    "duration_seconds": 8.548253524,
+    "actions_executed": 208,
+    "disk_cache_hits": 165,
+    "local_sandbox_actions": 5,
+    "internal_actions": 38,
+    "build_events_sha256": "2fe8e7eb0bf7040bed78166758904801c0d01a70ee18f7c30d193cc1ad6d9471"
+  },
+  "cache_collection": {
+    "maximum_bytes_target": 8589934592,
+    "maximum_age_days": 7,
+    "recent_entry_protection_minutes": 30,
+    "mode": "Go-controlled pruning before each Bazel invocation; soft retention targets, not a filesystem quota"
+  }
+}

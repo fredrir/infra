@@ -64,9 +64,12 @@ func newBuildCommand(name, operation string) *cobra.Command {
 
 func newDoctorCommand() *cobra.Command {
 	var root, bazel string
-	var engine bool
+	var engine, engineOnly bool
 	cmd := &cobra.Command{Use: "doctor", Short: "Check the local toolchain and optional Dagger connection", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if engineOnly {
+				bazel, engine = "", true
+			}
 			checks := pipeline.Doctor(cmd.Context(), root, bazel, engine)
 			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(checks); err != nil {
 				return err
@@ -81,6 +84,7 @@ func newDoctorCommand() *cobra.Command {
 	cmd.Flags().StringVar(&root, "root", ".", "Repository directory")
 	cmd.Flags().StringVar(&bazel, "bazel", "bazel", "Local Bazel executable")
 	cmd.Flags().BoolVar(&engine, "engine", false, "Connect to Dagger and verify engine version")
+	cmd.Flags().BoolVar(&engineOnly, "engine-only", false, "Verify Dagger without requiring local Bazel")
 	return cmd
 }
 

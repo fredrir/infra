@@ -40,4 +40,11 @@ func TestBuildMetricsPreserveObservedCountsWithoutInventingMissingCounters(t *te
 	if value, err := readMetrics(filepath.Join(t.TempDir(), "absent")); value != nil || err != nil {
 		t.Fatalf("missing event file: %+v %v", value, err)
 	}
+	if err := os.WriteFile(path, []byte(`{"buildMetrics":{"actionSummary":{"runnerCount":[{"name":"disk cache hit","count":165,"execKind":"Remote"}]}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	metrics, err = readMetrics(path)
+	if err != nil || metrics.DiskCacheHits == nil || *metrics.DiskCacheHits != 165 || metrics.RemoteCacheHits != nil {
+		t.Fatalf("disk cache hits must remain distinct from remote hits: %+v %v", metrics, err)
+	}
 }

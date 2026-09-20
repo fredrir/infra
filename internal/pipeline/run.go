@@ -187,7 +187,11 @@ func runDagger(ctx context.Context, opts Options, config Toolchain, expression s
 		WithExec([]string{"sha256sum", "--check", "--strict"}, dagger.ContainerWithExecOpts{Stdin: config.BazelSHA256 + "  /usr/local/bin/bazel\n"}).
 		WithDirectory("/src", source).WithWorkdir("/src").
 		WithMountedCache("/root/.cache/bazel-repo", client.CacheVolume("infra-bazel-repository-v1")).
+		WithMountedCache(diskCachePath, client.CacheVolume("infra-bazel-actions-v1"), dagger.ContainerWithMountedCacheOpts{Sharing: dagger.CacheSharingModeLocked}).
 		WithExec([]string{"mkdir", "-p", "/reports"})
+	if err := pruneDiskCache(ctx, container); err != nil {
+		return err
+	}
 	if opts.ForwardLocalCache {
 		endpoint, host, port, err := localCache(opts.RemoteCache)
 		if err != nil {
@@ -214,7 +218,7 @@ func runDagger(ctx context.Context, opts Options, config Toolchain, expression s
 	}
 	report.Targets = targets
 	args := buildArgs(opts, config, targets, "/reports")
-	args = append(args[:len(args)-len(targets)], append([]string{"--repository_cache=/root/.cache/bazel-repo"}, targets...)...)
+	args = append(args[:len(args)-len(targets)], append([]string{"--repository_cache=/root/.cache/bazel-repo", "--disk_cache=" + diskCachePath}, targets...)...)
 	container = container.WithExec(append([]string{"bazel"}, args...), dagger.ContainerWithExecOpts{Expect: dagger.ReturnTypeAny})
 	code, err := container.ExitCode(ctx)
 	if err != nil {
