@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "version": "v2.2.4-infra.1",
+  "upstream_version": "v2.2.4",
+  "upstream_revision": "06cb1109bfa7834e8403e2b543d9838e1623f85a",
+  "source_url": "https://codeload.github.com/fluxcd/source-watcher/tar.gz/refs/tags/v2.2.4",
+  "source_sha256": "f01d3eb03353089627dc384842da2fe7fdfedc05178f25ded8104affb1e90d3f",
+  "go_image": "golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195",
+  "runtime_image": "alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0",
+  "minimum_openssl": "3.5.8-r0"
+}

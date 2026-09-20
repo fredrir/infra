@@ -6,6 +6,7 @@
 | Approval | Required before selecting an overlay in production |
 | Flux | 2.9.5 |
 | Extension | source-watcher 2.2.4, immutable image digest in `controller/source-watcher.yaml` |
+| Image qualification | Blocked until the downstream candidate passes scanning and provenance verification; the upstream pin has four fixable HIGH findings in `image/upstream-scan.json` |
 | Added resources | One CRD, deployment, service, service account, namespaced role and binding |
 | CPU | 50m requested, 1 core limit |
 | Memory | 64Mi requested, 256Mi limit; requires qualification |

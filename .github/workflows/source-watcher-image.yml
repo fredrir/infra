@@ -1,0 +1,23 @@
+name: Source watcher image
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  image:
+    if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image: ghcr.io/fredrir/infra-source-watcher
+      dockerfile: build/rollout/flux-artifacts/image/Dockerfile
+      image-test-command: source-watcher --help >/dev/null
+      image-test-shell: sh
+      release-cli: true
+      hosted: true
+      deploy: false
+      timeout-minutes: 20

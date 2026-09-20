@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "scanner": "Trivy 0.74.0",
+  "scanned_at": "2026-09-20T22:28:14.636177467+02:00",
+  "image": "ghcr.io/fluxcd/source-watcher@sha256:86743f5a4cd4ea76b9722eb86222d56e8253e776daa0565ecb186ec68ad1d835",
+  "platform": "linux/amd64",
+  "result": "rejected",
+  "findings": [
+    {
+      "target": "ghcr.io/fluxcd/source-watcher@sha256:86743f5a4cd4ea76b9722eb86222d56e8253e776daa0565ecb186ec68ad1d835 (alpine 3.23.5)",
+      "id": "CVE-2026-14456",
+      "package": "libcrypto3",
+      "installed": "3.5.7-r0",
+      "fixed": "3.5.8-r0",
+      "severity": "HIGH"
+    },
+    {
+      "target": "ghcr.io/fluxcd/source-watcher@sha256:86743f5a4cd4ea76b9722eb86222d56e8253e776daa0565ecb186ec68ad1d835 (alpine 3.23.5)",
+      "id": "CVE-2026-14456",
+      "package": "libssl3",
+      "installed": "3.5.7-r0",
+      "fixed": "3.5.8-r0",
+      "severity": "HIGH"
+    },
+    {
+      "target": "usr/local/bin/source-watcher",
+      "id": "CVE-2026-56864",
+      "package": "golang.org/x/mod",
+      "installed": "v0.37.0",
+      "fixed": "0.40.0",
+      "severity": "HIGH"
+    },
+    {
+      "target": "usr/local/bin/source-watcher",
+      "id": "CVE-2026-56865",
+      "package": "golang.org/x/mod",
+      "installed": "v0.37.0",
+      "fixed": "0.40.0",
+      "severity": "HIGH"
+    }
+  ]
+}

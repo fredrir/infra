@@ -67,6 +67,8 @@ func TestImageBuildCancellationPreservesVerifiedArtifactReuse(t *testing.T) {
 		{"failed consumer bootstrap", "fredrir/example", "failure", "", "", false, true, false, false},
 		{"unprotected source", "fredrir/infra", "success", "", "", false, false, false, false},
 		{"thin runner released CLI", "fredrir/infra", "skipped", "", "ghcr.io/fredrir/infra-runner-deploy", false, true, true, true},
+		{"controller released CLI", "fredrir/infra", "skipped", "", "ghcr.io/fredrir/infra-source-watcher", false, true, true, true},
+		{"controller foreign caller", "fredrir/example", "skipped", "", "ghcr.io/fredrir/infra-source-watcher", false, true, true, false},
 		{"release CLI wrong image", "fredrir/infra", "skipped", "", "ghcr.io/fredrir/other", false, true, true, false},
 		{"release CLI foreign caller", "fredrir/example", "skipped", "", "ghcr.io/fredrir/infra-runner-deploy", false, true, true, false},
 		{"release CLI artifact conflict", "fredrir/infra", "skipped", "artifact", "ghcr.io/fredrir/infra-runner-deploy", false, true, true, false},
