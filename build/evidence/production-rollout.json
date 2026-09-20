@@ -1,0 +1,324 @@
+{
+  "schema": 1,
+  "observedAt": "2026-09-20T17:21:31Z",
+  "sourceRevision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e",
+  "nodes": [
+    {
+      "name": "fredrir-04",
+      "ready": true
+    },
+    {
+      "name": "fredrir-05",
+      "ready": true
+    },
+    {
+      "name": "fredrir-07",
+      "ready": true
+    },
+    {
+      "name": "fredrir-08",
+      "ready": true
+    },
+    {
+      "name": "fredrir-09",
+      "ready": true
+    }
+  ],
+  "flux": [
+    {
+      "name": "flux-system",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "llunde-pyparser-application",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "llunde-pyparser-migration",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-backups",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-build-cache",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-cache",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-controllers",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-ingress",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-observability",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-policy",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-projects",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-runners",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    },
+    {
+      "name": "platform-sources",
+      "ready": true,
+      "revision": "main@sha1:9c178096f9abc45e04653cf389688e6980a8757e"
+    }
+  ],
+  "toolsWorkloads": [
+    {
+      "resource": "arc-system/ci-slots",
+      "kind": "Deployment",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "ci-slots"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "build-cache/build-cache-provisioner",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "provision-cache"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "llunde-pyparser/data-backup",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "backup"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "llunde-pyparser/repository-maintenance",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "repository-maintenance"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "nix-cache/data-backup",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "backup"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "nix-cache/repository-maintenance",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "repository-maintenance"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "platform-backups/repository-maintenance",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "repository-maintenance"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "portfolio/data-backup",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "backup"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "portfolio/repository-maintenance",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "repository-maintenance"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "y/data-backup",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "backup"
+      ],
+      "legacyScriptVolumes": []
+    },
+    {
+      "resource": "y/repository-maintenance",
+      "kind": "CronJob",
+      "image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+      "command": [
+        "/usr/local/bin/infra",
+        "platform",
+        "repository-maintenance"
+      ],
+      "legacyScriptVolumes": []
+    }
+  ],
+  "caddyDeployments": [
+    {
+      "resource": "ingress-system/keys",
+      "image": "ghcr.io/fredrir/platform-caddy@sha256:b03ceb80193dea33aa4812a190a08465dbe56f6a6aec364a47c15df1f56c8106",
+      "desired": 1,
+      "ready": 1
+    },
+    {
+      "resource": "llunde/caddy",
+      "image": "ghcr.io/fredrir/platform-caddy@sha256:b03ceb80193dea33aa4812a190a08465dbe56f6a6aec364a47c15df1f56c8106",
+      "desired": 1,
+      "ready": 1
+    },
+    {
+      "resource": "portfolio/caddy",
+      "image": "ghcr.io/fredrir/platform-caddy@sha256:b03ceb80193dea33aa4812a190a08465dbe56f6a6aec364a47c15df1f56c8106",
+      "desired": 1,
+      "ready": 1
+    }
+  ],
+  "runnerPools": [
+    {
+      "resource": "ci-infra/check",
+      "image": "ghcr.io/fredrir/infra-runner-check@sha256:33b2fad199ee665f03aaa1ec8ee82f1dc02c14945de97c68613651dbfad0949c",
+      "ready": true,
+      "generation": 1,
+      "observedGeneration": 1
+    },
+    {
+      "resource": "ci-infra/deploy",
+      "image": "ghcr.io/fredrir/infra-runner-buildkit@sha256:4045faa13605053af98949c8e862966c7ba38d0cb2e81e213cf58ac351ac7f08",
+      "ready": true,
+      "generation": 1,
+      "observedGeneration": 1
+    },
+    {
+      "resource": "ci-nsql/rust-main",
+      "image": "ghcr.io/fredrir/infra-runner-rust@sha256:cf228dea43fb65a9bb83ce7a59ca1d4b9d398e63825e806eb9b47c7e593616ca",
+      "ready": true,
+      "generation": 3,
+      "observedGeneration": 3
+    },
+    {
+      "resource": "ci-nsql/rust-pr",
+      "image": "ghcr.io/fredrir/infra-runner-rust@sha256:cf228dea43fb65a9bb83ce7a59ca1d4b9d398e63825e806eb9b47c7e593616ca",
+      "ready": true,
+      "generation": 3,
+      "observedGeneration": 3
+    },
+    {
+      "resource": "ci-nsql/rust-release",
+      "image": "ghcr.io/fredrir/infra-runner-rust@sha256:cf228dea43fb65a9bb83ce7a59ca1d4b9d398e63825e806eb9b47c7e593616ca",
+      "ready": true,
+      "generation": 3,
+      "observedGeneration": 3
+    }
+  ],
+  "legacyRetirement": {
+    "buildkitAndNixPoolsPresent": false,
+    "atticReplicas": 0,
+    "atticPVC": "nix-cache/data-attic-0",
+    "atticPVCPhase": "Bound",
+    "atticPV": "pvc-857e17cb-63b4-460c-bce8-7adace49677a",
+    "atticPVReclaimPolicy": "Retain",
+    "backupResourcesRetained": true
+  },
+  "runtimeVerification": [
+    {
+      "operation": "control-backup",
+      "host": "fredrir-07",
+      "startedAt": "2026-09-20T17:04:58Z",
+      "finishedAt": "2026-09-20T17:05:08Z",
+      "exitCode": 0,
+      "result": "success",
+      "evidence": "Observed systemd service result during rollout"
+    },
+    {
+      "operation": "backup",
+      "resource": "nix-cache/infra-go-backup-qualification",
+      "startedAt": "2026-09-20T17:13:49Z",
+      "finishedAt": "2026-09-20T17:13:54Z",
+      "exitCode": 0,
+      "result": "Complete",
+      "evidence": "Observed container termination and Job Complete before automatic TTL cleanup"
+    },
+    {
+      "operation": "provision-cache",
+      "resource": "build-cache/build-cache-provisioner-29832075",
+      "startedAt": "2026-09-20T17:15:00Z",
+      "finishedAt": "2026-09-20T17:15:12Z",
+      "result": "Complete",
+      "succeeded": 1,
+      "evidence": "Observed scheduled Go provisioner Job completion"
+    }
+  ],
+  "podReadinessIssues": [],
+  "activeJobs": [],
+  "failedJobs": [],
+  "gatus": {
+    "host": "fredrir-06",
+    "service": "active",
+    "endpointCount": 12,
+    "retiredCacheEndpointPresent": false,
+    "logsRedirectRetained": true,
+    "atticBackupHeartbeatRetained": true,
+    "evidence": "Verified after Gatus-only Ansible apply during rollout"
+  }
+}

@@ -68,6 +68,7 @@ The current Flux cache Kustomization uses `prune: true`. Retain the `nix-cache` 
 
 | Check | Evidence |
 | --- | --- |
+| Production health and native operations | [Production receipt](../build/evidence/production-rollout.json) |
 | CLI cross-compilation | [Four-platform build receipts](../build/evidence/cli-crossbuild.json) |
 | Changed-source Dagger reuse | [Persistent action-cache experiment](../build/evidence/dagger-disk-cache-linux-amd64.json) |
 | Independent Bazel cache reuse | [Cold and warm action-cache experiment](../build/evidence/bazel-cache-linux-amd64.json) |
