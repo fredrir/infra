@@ -126,6 +126,9 @@ func buildArgs(opts Options, config Toolchain, targets []string, reports string)
 	if !opts.Local {
 		args = append([]string{"--batch"}, args...)
 	}
+	if opts.Operation == "test" {
+		args = append(args, "--build_tests_only")
+	}
 	if opts.RemoteCache != "" {
 		args = append(args, "--remote_cache="+opts.RemoteCache)
 	}
