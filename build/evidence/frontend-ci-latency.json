@@ -108,5 +108,15 @@
       "exit_code": 0
     },
     "aggregate_seconds": 0.537
+  },
+  "subsequent_cold_cache_failure": {
+    "run": "https://github.com/fredrir/llunde-frontend/actions/runs/35534705437",
+    "revision": "eb37f907afe55aa0d6808ecfa773c2456c768f05",
+    "inline_check_seconds": 7.839481754,
+    "scan_seconds": 1.977353129,
+    "aggregate_seconds": 10.011247352,
+    "success": false,
+    "reason": "Cold inline check left insufficient budget for provenance verification.",
+    "local_qualification_predicts_vm_timing": false
   }
 }
