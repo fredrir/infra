@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "objectstore",
+    srcs = ["client.go"],
+    importpath = "github.com/fredrir/infra/internal/objectstore",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@com_github_aws_aws_sdk_go_v2//aws",
+        "@com_github_aws_aws_sdk_go_v2//aws/signer/v4:signer",
+    ],
+)
+
+go_test(
+    name = "objectstore_test",
+    srcs = ["client_test.go"],
+    embed = [":objectstore"],
+)

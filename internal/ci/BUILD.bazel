@@ -1,0 +1,42 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ci",
+    srcs = [
+        "archive.go",
+        "arguments.go",
+        "authentication.go",
+        "cache.go",
+        "deploy.go",
+        "postgres.go",
+        "process.go",
+        "registry.go",
+        "rust.go",
+        "tools.go",
+        "validate.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/ci",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/objectstore",
+        "//internal/process",
+        "@com_github_klauspost_compress//zstd",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)
+
+go_test(
+    name = "ci_test",
+    srcs = [
+        "archive_test.go",
+        "arguments_test.go",
+        "deploy_test.go",
+        "registry_test.go",
+        "tools_test.go",
+    ],
+    embed = [":ci"],
+    deps = [
+        "@com_github_klauspost_compress//zstd",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)

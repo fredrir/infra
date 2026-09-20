@@ -1,0 +1,32 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "cli",
+    srcs = [
+        "artifact.go",
+        "automation.go",
+        "cli.go",
+        "kata.go",
+        "pipeline.go",
+        "platform.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/cli",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/artifact",
+        "//internal/ci",
+        "//internal/images",
+        "//internal/kata",
+        "//internal/pipeline",
+        "//internal/platformops",
+        "//internal/process",
+        "//internal/release",
+        "@com_github_spf13_cobra//:cobra",
+    ],
+)
+
+go_test(
+    name = "cli_test",
+    srcs = ["cli_test.go"],
+    deps = [":cli"],
+)

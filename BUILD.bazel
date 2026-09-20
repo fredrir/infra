@@ -1,0 +1,12 @@
+load("@gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/fredrir/infra
+# gazelle:exclude dist
+# gazelle:exclude .infra
+
+gazelle(name = "gazelle")
+
+exports_files([
+    "go.mod",
+    "go.sum",
+])

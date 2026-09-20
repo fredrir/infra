@@ -1,0 +1,81 @@
+package cli_test
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/fredrir/infra/internal/cli"
+)
+
+func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
+	root := t.TempDir()
+	for path, content := range map[string]string{
+		"images/catalog.yaml":          "- image: ghcr.io/fredrir/example\n  dockerfile: Containerfile\n  check: example --version\n  inputs: [Containerfile]\n",
+		".github/workflows/images.yml": "name: Images\n", ".dockerignore": ".git\n", "Containerfile": "FROM scratch\n",
+	} {
+		path = filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, args := range [][]string{{"init", "--quiet"}, {"add", "--all"}, {"commit", "--quiet", "--message", "fixture"}} {
+		command := exec.Command("git", append([]string{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, args...)...)
+		command.Dir = root
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git: %v\n%s", err, output)
+		}
+	}
+	output := filepath.Join(t.TempDir(), "output")
+	if err := os.WriteFile(output, []byte("existing=value\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GITHUB_OUTPUT", output)
+	t.Setenv("REFRESH", "true")
+	t.Setenv("REGISTRY_URL", "http://127.0.0.1:1")
+	var stdout, stderr bytes.Buffer
+	if err := cli.Run(context.Background(), []string{"ci", "plan-images", "--root", root}, &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	var entries []map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &entries); err != nil || len(entries) != 1 {
+		t.Fatalf("stdout is not a valid matrix: %s (%v)", &stdout, err)
+	}
+	if !strings.Contains(stderr.String(), "Building: ghcr.io/fredrir/example") {
+		t.Fatal("missing progress on stderr:", stderr.String())
+	}
+	data, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "existing=value\nimages="+stdout.String() {
+		t.Fatalf("unexpected Actions output: %s", data)
+	}
+	stdout.Reset()
+	if err := cli.Run(context.Background(), []string{"ci", "plan-images", "--root", root, "--github-output", root}, &stdout, &stderr); err == nil || stdout.Len() != 0 {
+		t.Fatal("output write failure must fail without printing a successful matrix")
+	}
+}
+
+func TestCommandValidation(t *testing.T) {
+	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}} {
+		var output bytes.Buffer
+		if err := cli.Run(context.Background(), args, &output, &output); err == nil {
+			t.Errorf("accepted invalid command %q", args)
+		}
+	}
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}} {
+		var output bytes.Buffer
+		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
+			t.Errorf("command %q: %v, output=%q", args, err, &output)
+		}
+	}
+}

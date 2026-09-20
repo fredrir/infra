@@ -1,0 +1,29 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "release",
+    srcs = [
+        "bundle.go",
+        "render.go",
+        "tag.go",
+        "version.go",
+        "workflow.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/release",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/ci",
+        "@com_github_pelletier_go_toml_v2//:go-toml",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)
+
+go_test(
+    name = "release_test",
+    srcs = [
+        "bundle_test.go",
+        "render_test.go",
+        "version_test.go",
+    ],
+    embed = [":release"],
+)

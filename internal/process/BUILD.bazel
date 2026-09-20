@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "process",
+    srcs = [
+        "group_unix.go",
+        "process.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/process",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "process_test",
+    srcs = ["process_test.go"],
+    deps = [":process"],
+)

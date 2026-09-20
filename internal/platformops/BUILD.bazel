@@ -1,0 +1,29 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "platformops",
+    srcs = [
+        "backup.go",
+        "cache.go",
+        "client.go",
+        "control.go",
+        "heartbeat.go",
+        "hook.go",
+        "slots.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/platformops",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "platformops_test",
+    srcs = [
+        "backup_contract_test.go",
+        "backup_test.go",
+        "heartbeat_test.go",
+        "hook_test.go",
+        "slots_test.go",
+    ],
+    embed = [":platformops"],
+    deps = ["//internal/process"],
+)

@@ -1,0 +1,22 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -9,6 +9,7 @@
+         "generate.go",
+     ],
+     embedsrcs = [
++        "//engineconn:embed_sources",
+         "client.go",
+         "dagger.gen.go",
+         "go.mod",
+diff --git a/engineconn/BUILD.bazel b/engineconn/BUILD.bazel
+--- a/engineconn/BUILD.bazel
++++ b/engineconn/BUILD.bazel
+@@ -3,1 +3,7 @@
++filegroup(
++    name = "embed_sources",
++    srcs = glob(["*.go"]),
++    visibility = ["//visibility:public"],
++)
++
+ go_library(

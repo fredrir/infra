@@ -1,0 +1,36 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "kata",
+    srcs = [
+        "affinity_darwin.go",
+        "affinity_linux.go",
+        "build.go",
+        "dagger.go",
+        "guest.go",
+        "initrd.go",
+        "package.go",
+        "qualify.go",
+        "types.go",
+        "workers.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/kata",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/process",
+        "@com_github_klauspost_compress//zstd",
+        "@io_dagger_dagger//:dagger",
+    ],
+)
+
+go_test(
+    name = "kata_test",
+    srcs = [
+        "dagger_test.go",
+        "initrd_test.go",
+        "package_test.go",
+        "workers_test.go",
+    ],
+    embed = [":kata"],
+    deps = ["@com_github_klauspost_compress//zstd"],
+)

@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "images",
+    srcs = ["plan.go"],
+    importpath = "github.com/fredrir/infra/internal/images",
+    visibility = ["//:__subpackages__"],
+    deps = ["@in_yaml_go_yaml_v3//:yaml"],
+)
+
+go_test(
+    name = "images_test",
+    srcs = ["plan_test.go"],
+    deps = [":images"],
+)

@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "pipeline",
+    srcs = [
+        "affected.go",
+        "config.go",
+        "doctor.go",
+        "image.go",
+        "run.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/pipeline",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/process",
+        "@io_dagger_dagger//:dagger",
+    ],
+)
+
+go_test(
+    name = "pipeline_test",
+    srcs = ["pipeline_test.go"],
+    deps = [":pipeline"],
+)

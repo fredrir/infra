@@ -1,0 +1,6 @@
+common --enable_bzlmod
+build --incompatible_strict_action_env
+build --nostamp
+test --test_output=errors
+build:ci --color=no
+build:ci --curses=no

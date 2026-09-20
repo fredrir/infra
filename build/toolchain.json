@@ -1,0 +1,8 @@
+{
+  "bazel": "9.2.0",
+  "go": "1.27.1",
+  "dagger": "0.21.9",
+  "image": "golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195",
+  "bazel_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+  "engine_image": "registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4"
+}

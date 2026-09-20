@@ -1,0 +1,190 @@
+package pipeline
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"dagger.io/dagger"
+	"github.com/fredrir/infra/internal/process"
+)
+
+type Options struct {
+	Root           string
+	Local          bool
+	Bazel          string
+	Operation      string
+	Targets        []string
+	Base           string
+	RemoteCache    string
+	RemoteExecutor string
+	ReadOnlyCache  bool
+	ReportDir      string
+	Log            io.Writer
+}
+
+type Report struct {
+	Operation       string    `json:"operation"`
+	Targets         []string  `json:"targets"`
+	Started         time.Time `json:"started"`
+	DurationSeconds float64   `json:"duration_seconds"`
+	Success         bool      `json:"success"`
+	Error           string    `json:"error,omitempty"`
+	TraceURL        string    `json:"trace_url,omitempty"`
+}
+
+func Run(ctx context.Context, opts Options) (report Report, err error) {
+	report = Report{Operation: opts.Operation, Targets: opts.Targets, Started: time.Now().UTC(), TraceURL: os.Getenv("DAGGER_TRACE_URL")}
+	if opts.Operation != "test" && opts.Operation != "build" {
+		return report, errors.New("operation must be build or test")
+	}
+	if opts.ReportDir == "" {
+		opts.ReportDir = filepath.Join(opts.Root, "dist", "reports")
+	}
+	if err := os.MkdirAll(opts.ReportDir, 0o755); err != nil {
+		return report, err
+	}
+	defer func() {
+		report.DurationSeconds = time.Since(report.Started).Seconds()
+		report.Success = err == nil
+		if err != nil {
+			report.Error = err.Error()
+		}
+		data, marshalErr := json.MarshalIndent(report, "", "  ")
+		if marshalErr == nil {
+			marshalErr = os.WriteFile(filepath.Join(opts.ReportDir, "report.json"), append(data, '\n'), 0o644)
+		}
+		err = errors.Join(err, marshalErr)
+	}()
+	config, err := ReadToolchain(opts.Root)
+	if err != nil {
+		return report, err
+	}
+	expression, err := AffectedExpression(ctx, opts.Root, opts.Base)
+	if err != nil {
+		return report, err
+	}
+	if expression == "set()" && len(opts.Targets) == 0 {
+		return report, nil
+	}
+	if opts.Local {
+		err = runLocal(ctx, opts, config, expression, &report)
+	} else {
+		err = runDagger(ctx, opts, config, expression, &report)
+	}
+	return report, err
+}
+
+func buildArgs(opts Options, config Toolchain, targets []string, reports string) []string {
+	args := []string{"--batch", opts.Operation, "--config=ci", "--action_env=INFRA_BUILD_IMAGE=" + config.Image,
+		"--build_event_json_file=" + filepath.Join(reports, "events.jsonl"), "--profile=" + filepath.Join(reports, "profile.json.gz")}
+	if opts.RemoteCache != "" {
+		args = append(args, "--remote_cache="+opts.RemoteCache)
+	}
+	if opts.RemoteExecutor != "" {
+		args = append(args, "--remote_executor="+opts.RemoteExecutor)
+	}
+	if opts.ReadOnlyCache {
+		args = append(args, "--remote_upload_local_results=false")
+	}
+	return append(args, targets...)
+}
+
+func runLocal(ctx context.Context, opts Options, config Toolchain, expression string, report *Report) error {
+	bazel := opts.Bazel
+	if bazel == "" {
+		bazel = "bazel"
+	}
+	version, err := process.Run(ctx, process.Options{Name: bazel, Args: []string{"--version"}, Timeout: time.Minute})
+	data := version.Stdout
+	if err != nil {
+		return fmt.Errorf("read Bazel version: %w", err)
+	}
+	if strings.TrimSpace(string(data)) != "bazel "+config.Bazel {
+		return fmt.Errorf("Bazel %s required, got %s", config.Bazel, strings.TrimSpace(string(data)))
+	}
+	targets := opts.Targets
+	if len(targets) == 0 && expression != "//..." {
+		query, err := process.Run(ctx, process.Options{Name: bazel, Args: []string{"--batch", "query", expression, "--output=label"}, Dir: opts.Root, Stderr: opts.Log})
+		data := query.Stdout
+		if err != nil {
+			return fmt.Errorf("query affected targets: %w", err)
+		}
+		targets = strings.Fields(string(data))
+		if len(targets) == 0 {
+			return nil
+		}
+	}
+	if len(targets) == 0 {
+		targets = []string{"//..."}
+	}
+	report.Targets = targets
+	reports, err := filepath.Abs(opts.ReportDir)
+	if err != nil {
+		return err
+	}
+	_, err = process.Run(ctx, process.Options{Name: bazel, Args: buildArgs(opts, config, targets, reports), Dir: opts.Root, Stdout: opts.Log, Stderr: opts.Log})
+	return err
+}
+
+func runDagger(ctx context.Context, opts Options, config Toolchain, expression string, report *Report) error {
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(opts.Log))
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	if os.Getenv("DAGGER_CLOUD_TOKEN") != "" {
+		if trace, traceErr := client.Cloud().TraceURL(ctx); traceErr == nil {
+			report.TraceURL = trace
+		}
+	}
+	actual, err := client.Version(ctx)
+	if err != nil {
+		return err
+	}
+	if strings.TrimPrefix(actual, "v") != config.Dagger {
+		return fmt.Errorf("Dagger engine %s required, got %s", config.Dagger, actual)
+	}
+	source := client.Host().Directory(opts.Root, dagger.HostDirectoryOpts{Exclude: []string{".git", "dist", "bazel-*", ".infra", ".cache", ".direnv", ".venv", "**/.terraform", "**/node_modules", ".env", ".env.*"}})
+	url := "https://github.com/bazelbuild/bazel/releases/download/" + config.Bazel + "/bazel-" + config.Bazel + "-linux-x86_64"
+	container := client.Container(dagger.ContainerOpts{Platform: "linux/amd64"}).From(config.Image).
+		WithFile("/usr/local/bin/bazel", client.HTTP(url), dagger.ContainerWithFileOpts{Permissions: 0o755}).
+		WithExec([]string{"sha256sum", "--check", "--strict"}, dagger.ContainerWithExecOpts{Stdin: config.BazelSHA256 + "  /usr/local/bin/bazel\n"}).
+		WithDirectory("/src", source).WithWorkdir("/src").
+		WithMountedCache("/root/.cache/bazel-repo", client.CacheVolume("infra-bazel-repository-v1")).
+		WithExec([]string{"mkdir", "-p", "/reports"})
+	targets := opts.Targets
+	if len(targets) == 0 && expression != "//..." {
+		query := container.WithExec([]string{"bazel", "--batch", "query", expression, "--output=label"})
+		result, err := query.Stdout(ctx)
+		if err != nil {
+			return err
+		}
+		targets = strings.Fields(result)
+		if len(targets) == 0 {
+			return nil
+		}
+	}
+	if len(targets) == 0 {
+		targets = []string{"//..."}
+	}
+	report.Targets = targets
+	args := buildArgs(opts, config, targets, "/reports")
+	args = append(args[:len(args)-len(targets)], append([]string{"--repository_cache=/root/.cache/bazel-repo"}, targets...)...)
+	container = container.WithExec(append([]string{"bazel"}, args...), dagger.ContainerWithExecOpts{Expect: dagger.ReturnTypeAny})
+	code, err := container.ExitCode(ctx)
+	if err != nil {
+		return err
+	}
+	_, exportErr := container.Directory("/reports").Export(ctx, opts.ReportDir)
+	if code != 0 {
+		return errors.Join(fmt.Errorf("Bazel %s exited with status %d", opts.Operation, code), exportErr)
+	}
+	return exportErr
+}
