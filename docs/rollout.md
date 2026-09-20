@@ -28,7 +28,8 @@ git -C "$CONSUMER_CHECKOUT" apply --check "$INFRA_CHECKOUT/build/rollout/$REPOSI
 
 | Name | Value |
 | --- | --- |
-| CLI release | [`infra-v0.1.0`](https://github.com/fredrir/infra/releases/tag/infra-v0.1.0); source `73a5ca2e6b88b40a6f8c55deae12af4a3e058c78` |
+| Released CLI | [`infra-v0.1.1`](https://github.com/fredrir/infra/releases/tag/infra-v0.1.1); source `a284f912fa9c5febe375a5b6743db4598b29477c` |
+| Backup host CLI | [`infra-v0.1.0`](https://github.com/fredrir/infra/releases/tag/infra-v0.1.0); source `73a5ca2e6b88b40a6f8c55deae12af4a3e058c78` |
 | Linux host binary | SHA-256 `c37acf10dd13009f61374b9fce811877b2a40c33b34a600a67e0c9e9dc39d0c1` |
 | Control backup | `fredrir-07`; Go command completed successfully on 2026-09-20 at 17:05:08 UTC |
 | Go tools image | `ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2` |
@@ -68,6 +69,7 @@ The current Flux cache Kustomization uses `prune: true`. Retain the `nix-cache` 
 
 | Check | Evidence |
 | --- | --- |
+| Hosted Bazel and declarations | [Full check](https://github.com/fredrir/infra/actions/runs/35526426207): 16 tests, generated BUILD files and infrastructure declarations passed |
 | Production health and native operations | [Production receipt](../build/evidence/production-rollout.json) |
 | CLI cross-compilation | [Four-platform build receipts](../build/evidence/cli-crossbuild.json) |
 | Changed-source Dagger reuse | [Persistent action-cache experiment](../build/evidence/dagger-disk-cache-linux-amd64.json) |
