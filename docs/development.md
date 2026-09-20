@@ -114,18 +114,21 @@ git diff -- platform
 | Host provisioning | `ansible/build-vms.yml`; inventory group `build_vm_hosts` |
 | Runner provisioning | `ansible/build-runners.yml`; inventory group `build_engines` |
 | Engine provisioning | `ansible/build-engines.yml`; inventory group `build_engines` |
-| Inactive capacity proposal | `ansible/examples/build-vm-fredrir-09.yml` |
-| Host reservation | 4.25 CPUs / 10 GiB removed from Kubernetes allocatable before boot |
+| Production placement | `ansible/inventory/production.yml`; `infra-build-09` on `fredrir-09` |
+| Reviewable provisioning example | `ansible/examples/build-vm-fredrir-09.yml` |
+| Host reservation | 4.25 CPUs / 10 GiB reserved; resulting allocatable 11.5 CPUs / 21,585,868 KiB |
 | Guest | Four CPUs / 8 GiB RAM / 80 GiB sparse persistent disk |
 | Host boundary | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding |
 | Activation gates | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true` |
-| Runner registration | Separate registration per trusted repository; GitHub personal accounts have no shared account-level runner pool |
+| Runner registration | Eight repository registrations share one VM; each accepts protected main pushes or manual runs only |
 | Runner slice | Two CPUs / 2 GiB aggregate for runner services and native child processes |
-| Dagger ceiling in proposal | Four CPUs / 4 GiB RAM / 1,024 processes / two parallel operations |
-| Engine defaults outside proposal | Four CPUs / 8 GiB RAM / four parallel operations; configurable within host capacity |
+| Production Dagger ceiling | Four CPUs / 4 GiB RAM / 1,024 processes / two parallel operations |
+| Standalone engine defaults | Four CPUs / 8 GiB RAM / four parallel operations; configurable within host capacity |
 | Dagger connection | Local `docker-container://infra-dagger`; no published engine port |
 | Bazel cache | `127.0.0.1:9092`; one CPU / 1 GiB RAM; VM-local trusted writes |
-| Persistent caches | Separate Docker volumes for Dagger and Bazel; engine-local Bazel action cache |
+| Persistent caches | Separate Docker volumes for Dagger and Bazel; engine-local Bazel action cache; native repository downloads in `/var/cache/infra/bazel-repo` |
+| Runner cache environment | `BAZEL_REMOTE_CACHE=http://127.0.0.1:9092`; `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger` |
+| Runner enforcement | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected |
 | Cache collection | Dagger background GC; Bazel remote LRU with 20 GiB target and 21 GiB admission ceiling |
 | Background preparation | Six-hour systemd timer; low-priority client; ten-minute timeout; configured argv only |
 | Preparation commands | `infra pipeline cache-gc`; `infra pipeline prepare-check --local` |
@@ -135,11 +138,9 @@ git diff -- platform
 
 ```sh
 ansible-playbook -i ansible/inventory/production.yml \
-  -i ansible/examples/build-vm-fredrir-09.yml ansible/k3s.yml \
-  --limit fredrir-09 --check --diff
+  ansible/k3s.yml --limit fredrir-09 --tags capacity --check --diff
 ansible-playbook -i ansible/inventory/production.yml \
-  -i ansible/examples/build-vm-fredrir-09.yml ansible/build-vms.yml \
-  -e build_vm_enabled=true --check --diff
+  ansible/build-vms.yml --check --diff
 ```
 
 | Activation order | Required result |
@@ -153,9 +154,9 @@ ansible-playbook -i ansible/inventory/production.yml \
 | Verify latency | Measure queue, setup, checks, publication and revision readiness independently |
 | Roll back routing | Disable qualification variables before stopping services; retain guest disk and cache volumes |
 
-The capacity proposal is inactive and requires an explicit rollout decision. The guest shares physical CPUs with Kubernetes; reservations constrain schedulable capacity rather than guaranteeing latency. Runner registrations share one capped engine, so concurrent repositories may queue. Background preparation limits its client process; expensive Dagger work remains bounded by the engine's shared limits. Cache thresholds are retention targets rather than filesystem quotas, except for Bazel remote's write-admission ceiling and the guest disk's virtual capacity.
+The reservation and dedicated guest are provisioned and natively qualified; workflow routing remains separately gated by release identity and qualified-pool variables. The guest shares physical CPUs with Kubernetes; reservations constrain schedulable capacity rather than guaranteeing latency. Runner registrations share one capped engine, so concurrent repositories may queue. Background preparation limits its client process; expensive Dagger work remains bounded by the engine's shared limits. Cache thresholds are retention targets rather than filesystem quotas, except for Bazel remote's write-admission ceiling and the guest disk's virtual capacity.
 
-The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary. Only trusted repositories and protected branches may use this VM. Prewarming starts only when commands and their working directory exist; first population may exceed the normal CI budget.
+The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary. Only trusted repositories and protected branches may use this VM. Prewarming starts only when supported commands and their working directory exist; first population may exceed the normal CI budget.
 
 ## Consumer cutover
 
@@ -180,3 +181,44 @@ The inventory records GitHub reads on its `checked` date; refresh it before reti
 | Native boundaries | Bounded Linux smoke checks; explicit qualification evidence |
 | Secret handling | No credentials in process errors or command-line logs |
 | Changes | Tested coherent commits; independent package review |
+
+## Performance budgets
+
+| Path | Budget | Measurement |
+| --- | --- | --- |
+| Fast checks | 10 seconds aggregate | `infra pipeline check-fast`; `infra ci measure`; image check receipts |
+| Deployment | 60 seconds target | Workflow creation through expected revision readiness, including queueing |
+| Frontend deployment | 30 seconds target | `https://llunde.no/.well-known/revision` must match source revision |
+| Cold preparation | Reported separately | Dependency/toolchain compilation; never reported as a passing fast check |
+| Process resources | Per command | CPU seconds and subprocess maximum RSS; remote engine resources are separate |
+| Cache resources | Bounded persistent storage | VM volumes, Bazel action metrics and engine resource ceilings |
+
+| Local operation | Command |
+| --- | --- |
+| Complete infrastructure checks | `infra pipeline check-deep --local` |
+| Prepare infrastructure test executables | `infra pipeline prepare-check --local` |
+| Fast checks | `infra pipeline check-fast --local --base HEAD~1` |
+| Maintain Dagger action cache | `infra pipeline cache-gc` |
+| Rust full validation | `infra ci rust prepare && infra ci rust check deep` |
+| Rust cross-toolchain qualification | `infra ci rust check toolchain` inside the verified Rust runner image |
+| Full package installation matrix | `infra packages smoke --root . SITE CHANNELS full` |
+| Measure a bounded command | `infra ci measure --stage checks --budget 10s --report-dir /tmp/infra-performance -- COMMAND` |
+| Inspect deployment critical path | `infra ci timeline REPOSITORY RUN_ID --deployment-run RUN_ID --budget 30s` |
+| Prefetch verified image layers | `infra platform prefetch --namespace llunde --node fredrir-09 --utility-image "$TOOLS_IMAGE" "$VERIFIED_IMAGE" --apply` |
+
+Slow suites remain explicit local operations. Failed, missing or timed-out checks fail the gate. Preparation and qualification costs remain visible; the target budgets are not evidence of achieved end-to-end latency.
+
+```sh
+TOOLS_IMAGE=ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2
+infra platform prefetch --namespace llunde --node fredrir-09 \
+  --utility-image "$TOOLS_IMAGE" --pull-secret ghcr --timeout 30s \
+  "$VERIFIED_IMAGE" --apply
+```
+
+| Timing and prefetch boundary | Behavior |
+| --- | --- |
+| Timeline start | GitHub API workflow creation is the earliest known timestamp, not the exact push-event timestamp |
+| Prefetch execution | Only the platform-tools helper executes; application images mount read-only as image volumes |
+| Prefetch lifetime | At most one minute; cleanup on success, failure or cancellation; finished Job TTL 60 seconds |
+| Prefetch prerequisites | Kubernetes 1.36 image volumes; compatible container runtime; namespace pull credentials; verified owned image digests |
+| Native VM evidence | [Warm VM qualification](../build/evidence/warm-vm-linux-amd64.json) |

@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "date": "2026-09-20",
+  "host": "fredrir-09",
+  "guest": "infra-build-09",
+  "source_revision": "5010d76270103231b4cd82e94fdf0cfa9b2eb82f",
+  "scope": "Native amd64 VM qualification; warm local checks exclude GitHub queueing and deployment readiness",
+  "cli_sha256": "e236b11bc7273bc8a3a9ae31e90082d61f886086732f72c0b3a0b7533bfb9926",
+  "vm": {
+    "cpus": 4,
+    "memory_mib": 8192,
+    "disk_gib": 80
+  },
+  "native_bazel": {
+    "jobs": 2,
+    "jvm_heap_mib": 512,
+    "runner_context": "builder qualification account; production runner context qualified separately"
+  },
+  "trust": {
+    "trusted_protected_push": {
+      "accepted": true,
+      "exit_code": 0
+    },
+    "pull_request": {
+      "accepted": false,
+      "exit_code": 1
+    },
+    "unprotected_main": {
+      "accepted": false,
+      "exit_code": 1
+    },
+    "foreign_owner": {
+      "accepted": false,
+      "exit_code": 1
+    },
+    "other_branch": {
+      "accepted": false,
+      "exit_code": 1
+    }
+  },
+  "persistent_engine": {
+    "scope": "Native amd64 dedicated QEMU VM on fredrir-09",
+    "engine_image": "registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4",
+    "cache_image": "buchgr/bazel-remote-cache:v2.6.2@sha256:8109f1f39eb17d898cf51e08b41e4eabaaaeb1f584c2f22c1be45b7568fcc512",
+    "dagger_volume_survives_restart": true,
+    "engine_limits": {
+      "NanoCpus": 4000000000,
+      "Memory": 4294967296,
+      "MemorySwap": 4294967296,
+      "PidsLimit": 1024
+    },
+    "engine_ports": {},
+    "bazel_cas_survives_restart": true,
+    "cache_ports": {
+      "8080/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "19092"
+        }
+      ]
+    },
+    "duration_seconds": 3.671
+  },
+  "image_build": {
+    "cold": {
+      "success": true,
+      "seconds": 17.06
+    },
+    "warm_after_restart": {
+      "success": true,
+      "seconds": 4.489
+    }
+  },
+  "prepare": {
+    "schema": 1,
+    "metrics": {
+      "actions_executed": 71,
+      "local_cache_hits": 519,
+      "system_network_bytes_sent": 2490944,
+      "system_network_bytes_received": 704899892
+    },
+    "operation": "prepare-check",
+    "targets": [
+      "//...",
+      "//:gazelle"
+    ],
+    "started": "2026-09-20T19:07:08.254812155Z",
+    "duration_seconds": 15.228150784,
+    "success": true
+  },
+  "tests": {
+    "schema": 1,
+    "metrics": {
+      "actions_executed": 16,
+      "local_cache_hits": 1,
+      "system_network_bytes_sent": 2490944,
+      "system_network_bytes_received": 704899892
+    },
+    "operation": "test",
+    "targets": [
+      "//..."
+    ],
+    "started": "2026-09-20T19:07:23.509465659Z",
+    "duration_seconds": 5.159514842,
+    "success": true
+  },
+  "generated": {
+    "schema": 1,
+    "metrics": {
+      "actions_executed": 1,
+      "system_network_bytes_sent": 2490944,
+      "system_network_bytes_received": 704899892
+    },
+    "operation": "generate-check",
+    "targets": [
+      "//:gazelle",
+      "--",
+      "-mode=diff"
+    ],
+    "started": "2026-09-20T19:07:28.669234079Z",
+    "duration_seconds": 0.747408901,
+    "success": true
+  },
+  "blocking_checks_seconds": 5.906923743,
+  "prefetch": {
+    "namespace": "llunde",
+    "node": "fredrir-09",
+    "job": "infra-prefetch-e37b23f7a36d",
+    "created": "2026-09-20T19:19:05Z",
+    "completed": "2026-09-20T19:19:10Z",
+    "duration_seconds": 5,
+    "target_image": "ghcr.io/fredrir/llunde-frontend@sha256:b50d48d23cd9028b7309896357369c84abb236efcb5cc2900f8c5857bdf39665",
+    "helper_image": "ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2",
+    "application_executed": false,
+    "cleanup_verified": true,
+    "cache_state": "Both images already cached; validates runtime image-volume support, not cold transfer throughput"
+  }
+}

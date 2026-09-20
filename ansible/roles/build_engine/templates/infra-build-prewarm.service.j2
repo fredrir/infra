@@ -14,6 +14,7 @@ IOSchedulingClass=idle
 CPUQuota={{ build_engine_prewarm_cpu_percent }}%
 MemoryMax={{ build_engine_prewarm_memory }}
 TimeoutStartSec={{ build_engine_prewarm_timeout }}
+ExecCondition=/usr/local/bin/infra pipeline prepare-check --help
 {% for command in build_engine_prewarm_commands %}
 ExecStart={{ command | map('to_json') | join(' ') }}
 {% else %}

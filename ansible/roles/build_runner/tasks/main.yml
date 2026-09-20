@@ -58,6 +58,14 @@
     mode: '0755'
     timeout: 30
 
+- name: Create shared native repository cache
+  ansible.builtin.file:
+    path: /var/cache/infra/bazel-repo
+    state: directory
+    owner: runner
+    group: runner
+    mode: '0750'
+
 - name: Bound native Bazel startup and compilation
   ansible.builtin.copy:
     dest: /etc/bazel.bazelrc
@@ -67,6 +75,7 @@
     content: |
       startup --host_jvm_args=-Xmx512m
       build --jobs=2
+      build --repository_cache=/var/cache/infra/bazel-repo
 
 - name: Install aggregate runner resource limits
   ansible.builtin.copy:

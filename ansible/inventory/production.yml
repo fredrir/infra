@@ -108,7 +108,7 @@ all:
           ansible_python_interpreter: /usr/bin/python3
           ansible_ssh_common_args: -o ProxyJump=administrator@85.190.100.72 -o HostKeyAlias=infra-build-09 -o StrictHostKeyChecking=yes -o ConnectTimeout=10
           build_engine_dedicated: true
-          build_engine_qualified: false
+          build_engine_qualified: true
           build_engine_cpus: 4
           build_engine_memory: 4g
           build_engine_parallelism: 2
