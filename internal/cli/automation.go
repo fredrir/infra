@@ -60,7 +60,7 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	}}
 	prepare.Flags().StringVar(&clippyArguments, "clippy-args", os.Getenv("CLIPPY_ARGS"), "Allowed Clippy arguments")
 	prepare.Flags().StringVar(&testArguments, "test-args", os.Getenv("TEST_ARGS"), "Allowed test arguments")
-	checkRust := &cobra.Command{Use: "check format|lint|test|docs|minimal|msrv|audit", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
+	checkRust := &cobra.Command{Use: "check fast|deep|prepare-fast|format|lint|test|unit|docs|minimal|msrv|audit", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
 		return ci.CheckRust(command.Context(), ci.Runner{Dir: rustRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, rustTemporary, args[0])
 	}}
 	rust.AddCommand(prepare, checkRust)

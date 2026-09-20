@@ -11,6 +11,9 @@ on:
       dockerfile:
         type: string
         default: Dockerfile
+      target:
+        type: string
+        default: ''
       build-args:
         type: string
         default: ''
@@ -57,15 +60,15 @@ permissions:
   contents: read
 concurrency:
   group: image-${{ github.repository }}-${{ inputs.image }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   cli:
-    if: inputs.cli-artifact == '' || github.repository != 'fredrir/infra'
+    if: inputs.cli-artifact == '' && github.repository == 'fredrir/infra'
     uses: ./.github/workflows/infra-cli.yml
   build:
     needs: cli
-    if: ${{ !cancelled() && (needs.cli.result == 'success' || (github.repository == 'fredrir/infra' && inputs.cli-artifact != '')) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected }}
-    runs-on: ${{ github.repository == 'fredrir/infra' && github.ref == 'refs/heads/main' && github.ref_protected && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || (needs.cli.result == 'skipped' && ((github.repository == 'fredrir/infra' && inputs.cli-artifact != '') || (github.repository != 'fredrir/infra' && inputs.cli-artifact == '')))) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected }}
+    runs-on: ${{ contains(fromJSON('["fredrir/infra","fredrir/Y","fredrir/portfolio","fredrir/llunde-frontend","fredrir/llunde-backend","fredrir/llunde-pyparser"]'), github.repository) && github.ref == 'refs/heads/main' && github.ref_protected && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     env:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
@@ -80,6 +83,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -87,11 +91,17 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .infra-build-recipe
           persist-credentials: false
+      - uses: ./.infra-build-recipe/.github/actions/setup-infra
+        if: github.repository != 'fredrir/infra'
+        with:
+          root: .infra-build-recipe
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        if: github.repository == 'fredrir/infra'
         with:
           name: ${{ github.repository == 'fredrir/infra' && inputs.cli-artifact || needs.cli.outputs.artifact }}
           path: ${{ runner.temp }}/infra-cli
       - name: Verify CLI
+        if: github.repository == 'fredrir/infra'
         env:
           CLI_SHA256: ${{ github.repository == 'fredrir/infra' && inputs.cli-sha256 || needs.cli.outputs.sha256 }}
           CLI_REVISION: ${{ github.repository == 'fredrir/infra' && inputs.cli-revision || needs.cli.outputs.revision }}
@@ -101,19 +111,34 @@ jobs:
           printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
           chmod 755 "$RUNNER_TEMP/infra-cli/infra"
           printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+          printf 'INFRA_BINARY=%s/infra\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_ENV"
+      - name: Select affected image
+        id: affected
+        env:
+          BASE: ${{ github.event.before }}
+          IMAGE: ${{ inputs.image }}
+        run: |
+          printf 'report-id=%s-%s\n' "${IMAGE##*/}" "$(cat /proc/sys/kernel/random/uuid)" >> "$GITHUB_OUTPUT"
+          printf '/.infra-build-recipe/\n' >> .git/info/exclude
+          if [ -f ci/targets.json ]; then
+            infra ci affected-project --base "$BASE" --target "${IMAGE##*/}"
+          else
+            printf 'changed=true\nreason=unconfigured\n' >> "$GITHUB_OUTPUT"
+          fi
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        if: steps.affected.outputs.changed == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
       - name: Start isolated Dagger engine
-        if: runner.environment == 'github-hosted'
+        if: steps.affected.outputs.changed == 'true' && (runner.environment == 'github-hosted')
         run: docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
       - name: Verify dedicated engine
-        if: runner.environment == 'self-hosted'
+        if: steps.affected.outputs.changed == 'true' && (runner.environment == 'self-hosted')
         run: infra doctor --root .infra-build-recipe --engine-only
       - name: Select shared recipe
-        if: inputs.recipe != ''
+        if: steps.affected.outputs.changed == 'true' && (inputs.recipe != '')
         env:
           RECIPE: ${{ inputs.recipe }}
         run: |
@@ -125,6 +150,7 @@ jobs:
           cp .infra-build-recipe/platform/projects/y/Caddyfile containers/Caddyfile
           printf 'SHARED_DOCKERFILE=.infra-build-recipe/platform/projects/y/%s.Dockerfile\n' "${RECIPE#y-}" >> "$GITHUB_ENV"
       - name: Validate Dagger cache policy
+        if: steps.affected.outputs.changed == 'true'
         env:
           LAYER_CACHE: ${{ inputs.layer-cache }}
         run: |
@@ -133,6 +159,7 @@ jobs:
             exit 1
           fi
       - name: Check inputs
+        if: steps.affected.outputs.changed == 'true'
         env:
           IMAGE: ${{ inputs.image }}
           CONTEXT: ${{ inputs.context }}
@@ -146,22 +173,25 @@ jobs:
           test "$(uname -m)" = x86_64
           test ! -e /var/run/secrets/kubernetes.io/serviceaccount/token
       - name: Test
-        if: inputs.test-command != ''
+        if: steps.affected.outputs.changed == 'true' && (inputs.test-command != '')
         env:
           TEST_COMMAND: ${{ inputs.test-command }}
           IMAGE: ${{ inputs.image }}
           CONTEXT: ${{ inputs.context }}
           LAYER_CACHE: ${{ inputs.layer-cache }}
-        run: bash -euo pipefail -c "$TEST_COMMAND"
+        run: infra ci measure --stage checks --budget 10s --report-dir "$RUNNER_TEMP/performance" -- bash -euo pipefail -c "$TEST_COMMAND"
       - name: Install verification tools
+        if: steps.affected.outputs.changed == 'true'
         run: infra ci install-tools gh trivy cosign
       - name: Build and publish
+        if: steps.affected.outputs.changed == 'true'
         id: build
         env:
           IMAGE: ${{ inputs.image }}
           CONTEXT: ${{ inputs.context }}
           DOCKERFILE: ${{ inputs.dockerfile }}
           REGISTRY_TOKEN: ${{ github.token }}
+          TARGET: ${{ inputs.target }}
           BUILD_ARGS: ${{ inputs.build-args }}
           IMAGE_TEST_COMMAND: ${{ inputs.image-test-command }}
           IMAGE_TEST_SHELL: ${{ inputs.image-test-shell }}
@@ -169,10 +199,12 @@ jobs:
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
         run: |
           infra pipeline image --root .infra-build-recipe --context "$CONTEXT" --dockerfile "${SHARED_DOCKERFILE:-$DOCKERFILE}" \
-            --infra-binary "$RUNNER_TEMP/infra-cli/infra" --image "$IMAGE:$GITHUB_SHA" --build-args "$(infra ci build-args)" \
+            --target "$TARGET" --infra-binary "$INFRA_BINARY" --image "$IMAGE:$GITHUB_SHA" --build-args "$(infra ci build-args)" \
             --source-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" \
             --test-command "$IMAGE_TEST_COMMAND" --test-shell "$IMAGE_TEST_SHELL" --timeout "${BUILD_TIMEOUT}m"
+          printf 'report-id=%s-%s\n' "${IMAGE##*/}" "$(cat /proc/sys/kernel/random/uuid)" >> "$GITHUB_OUTPUT"
       - name: Scan published image
+        if: steps.affected.outputs.changed == 'true'
         env:
           IMAGE: ${{ steps.build.outputs.image }}
           TRIVY_USERNAME: ${{ github.actor }}
@@ -186,12 +218,12 @@ jobs:
           fi
           trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --timeout 10m "${skip[@]}" "$IMAGE"
       - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661
-        if: '!github.event.repository.private'
+        if: steps.affected.outputs.changed == 'true' && (!github.event.repository.private)
         with:
           subject-name: ${{ inputs.image }}
           subject-digest: ${{ steps.build.outputs.digest }}
       - name: Verify published provenance
-        if: '!github.event.repository.private'
+        if: steps.affected.outputs.changed == 'true' && (!github.event.repository.private)
         env:
           GH_TOKEN: ${{ github.token }}
           IMAGE: ${{ steps.build.outputs.image }}
@@ -202,7 +234,7 @@ jobs:
             --signer-digest "$WORKFLOW_SHA" --source-ref refs/heads/main \
             --source-digest "$GITHUB_SHA"
       - name: Sign and verify private image provenance
-        if: github.event.repository.private
+        if: steps.affected.outputs.changed == 'true' && (github.event.repository.private)
         env:
           IMAGE: ${{ steps.build.outputs.image }}
           WORKFLOW_SHA: ${{ job.workflow_sha }}
@@ -217,7 +249,9 @@ jobs:
           cosign sign --yes --timeout 5m \
             --annotations "source-repository=$GITHUB_REPOSITORY" \
             --annotations "source-revision=$GITHUB_SHA" \
-            --annotations "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
+            --annotations "workflow-revision=$WORKFLOW_SHA" \
+            --annotations "source-run-id=$GITHUB_RUN_ID" \
+            --annotations "source-run-attempt=$GITHUB_RUN_ATTEMPT" "$IMAGE"
           cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --certificate-identity "https://github.com/fredrir/infra/.github/workflows/build-image.yml@$WORKFLOW_SHA" \
             --certificate-github-workflow-repository "$GITHUB_REPOSITORY" \
@@ -228,20 +262,20 @@ jobs:
             --annotations "source-revision=$GITHUB_SHA" \
             --annotations "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
       - name: Tag verified image
-        if: inputs.verified-tag != ''
+        if: steps.affected.outputs.changed == 'true' && (inputs.verified-tag != '')
         env:
           IMAGE: ${{ inputs.image }}@${{ steps.build.outputs.digest }}
           TAG: ${{ inputs.verified-tag }}
           REGISTRY_TOKEN: ${{ github.token }}
         run: infra ci tag-image
       - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
-        if: inputs.deploy
+        if: steps.affected.outputs.changed == 'true' && (inputs.deploy)
         id: deployment-token
         with:
           scope: fredrir/infra
           identity: deploy-${{ github.repository_id }}
       - name: Request deployment
-        if: inputs.deploy
+        if: steps.affected.outputs.changed == 'true' && (inputs.deploy)
         env:
           GH_TOKEN: ${{ steps.deployment-token.outputs.token }}
           IMAGE: ${{ inputs.image }}
@@ -249,6 +283,13 @@ jobs:
         run: |
           gh workflow run deploy.yml --repo fredrir/infra --ref main -f "repository-id=$GITHUB_REPOSITORY_ID" \
             -f "image=$IMAGE" -f "digest=$DIGEST" -f "source-revision=$GITHUB_SHA"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: performance-${{ steps.affected.outputs.report-id || github.job }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/performance
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Stop Dagger engine
-        if: always() && runner.environment == 'github-hosted'
+        if: always() && runner.environment == 'github-hosted' && steps.affected.outputs.changed == 'true'
         run: docker rm --force --volumes infra-dagger

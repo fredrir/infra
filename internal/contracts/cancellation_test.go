@@ -61,6 +61,7 @@ func TestImageBuildCancellationPreservesVerifiedArtifactReuse(t *testing.T) {
 		{"infra missing artifact", "fredrir/infra", "skipped", "", false, true, false},
 		{"cancelled bootstrap", "fredrir/infra", "success", "", true, true, false},
 		{"cancelled artifact reuse", "fredrir/infra", "skipped", "verified-artifact", true, true, false},
+		{"consumer released CLI", "fredrir/example", "skipped", "", false, true, true},
 		{"consumer bootstrap", "fredrir/example", "success", "", false, true, true},
 		{"consumer artifact substitution", "fredrir/example", "skipped", "caller-artifact", false, true, false},
 		{"failed consumer bootstrap", "fredrir/example", "failure", "", false, true, false},

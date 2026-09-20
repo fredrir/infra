@@ -16,8 +16,9 @@ import (
 )
 
 type RustOptions struct {
-	Clippy []string `json:"clippy"`
-	Test   []string `json:"test"`
+	Clippy   []string `json:"clippy"`
+	Test     []string `json:"test"`
+	FastTest []string `json:"fast_test,omitempty"`
 }
 
 func PrepareRust(ctx context.Context, runner Runner, temporary, clippy, test string) error {
@@ -32,7 +33,11 @@ func PrepareRust(ctx context.Context, runner Runner, temporary, clippy, test str
 	if temporary == "" {
 		return fmt.Errorf("runner temporary directory is required")
 	}
-	data, err := json.Marshal(RustOptions{Clippy: clippyFlags, Test: testFlags})
+	fastFlags, err := RustArguments(os.Getenv("FAST_TEST_ARGS"))
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(RustOptions{Clippy: clippyFlags, Test: testFlags, FastTest: fastFlags})
 	if err != nil {
 		return err
 	}
@@ -70,8 +75,24 @@ func PrepareRust(ctx context.Context, runner Runner, temporary, clippy, test str
 }
 
 func CheckRust(ctx context.Context, runner Runner, temporary, stage string) error {
+	if stage == "fast" || stage == "deep" {
+		stages := []string{"format", "unit"}
+		if stage == "fast" {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+		} else {
+			stages = []string{"format", "lint", "test", "docs", "minimal", "msrv", "audit"}
+		}
+		for _, part := range stages {
+			if err := CheckRust(ctx, runner, temporary, part); err != nil {
+				return err
+			}
+		}
+		return ctx.Err()
+	}
 	var options RustOptions
-	if stage == "lint" || stage == "test" || stage == "docs" {
+	if stage == "lint" || stage == "test" || stage == "docs" || stage == "unit" || stage == "prepare-fast" {
 		data, err := os.ReadFile(filepath.Join(temporary, "rust-args.json"))
 		if err != nil {
 			return err
@@ -85,6 +106,9 @@ func CheckRust(ctx context.Context, runner Runner, temporary, stage string) erro
 		if _, err := RustArguments(strings.Join(options.Test, " ")); err != nil {
 			return err
 		}
+		if _, err := RustArguments(strings.Join(options.FastTest, " ")); err != nil {
+			return err
+		}
 	}
 	switch stage {
 	case "format":
@@ -94,6 +118,11 @@ func CheckRust(ctx context.Context, runner Runner, temporary, stage string) erro
 		return runner.Run(ctx, "cargo", append(args, "--", "-D", "warnings")...)
 	case "test":
 		return runner.Run(ctx, "cargo", append([]string{"nextest", "run", "--all-targets", "--locked", "--no-tests=pass"}, options.Test...)...)
+	case "unit":
+		args := append([]string{"nextest", "run", "--bins", "--locked", "--no-tests=fail"}, options.Test...)
+		return runner.Run(ctx, "cargo", append(args, options.FastTest...)...)
+	case "prepare-fast":
+		return runner.Run(ctx, "cargo", append([]string{"nextest", "list", "--bins", "--locked", "--list-type", "binaries-only"}, options.Test...)...)
 	case "docs":
 		metadata, err := cargoMetadata(ctx, runner)
 		if err != nil {

@@ -16,7 +16,7 @@ func TestBuildArgumentsPreserveLiteralValues(t *testing.T) {
 }
 
 func TestBuildArgumentsRejectUnsafeInputs(t *testing.T) {
-	for _, input := range []string{"TOKEN=private", "GIT_SHA=override", "REVISION=override", "VITE_A=one\nVITE_A=two", "VITE_A", "VITE_A=one\r"} {
+	for _, input := range []string{"TOKEN=private", "GIT_SHA=override", "REVISION=override", "CI_REVISION=override", "VITE_A=one\nVITE_A=two", "VITE_A", "VITE_A=one\r"} {
 		t.Run(input, func(t *testing.T) {
 			if _, err := BuildArguments(strings.Repeat("a", 40), input); err == nil {
 				t.Fatal("accepted unsafe build argument")

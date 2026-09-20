@@ -14,7 +14,7 @@ func BuildArguments(revision, input string) (map[string]string, error) {
 	if !revisionPattern.MatchString(revision) {
 		return nil, fmt.Errorf("invalid source revision")
 	}
-	arguments := map[string]string{"GIT_SHA": revision, "REVISION": revision}
+	arguments := map[string]string{"GIT_SHA": revision, "REVISION": revision, "CI_REVISION": revision}
 	for _, line := range strings.Split(input, "\n") {
 		if line == "" {
 			continue

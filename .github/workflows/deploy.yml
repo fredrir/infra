@@ -20,10 +20,7 @@ concurrency:
   group: deploy-${{ inputs.image }}
   cancel-in-progress: false
 jobs:
-  cli:
-    uses: ./.github/workflows/infra-cli.yml
   deploy:
-    needs: cli
     if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref == 'refs/heads/main' && github.ref_protected
     runs-on: deploy-amd64
     timeout-minutes: 10
@@ -36,20 +33,9 @@ jobs:
         with:
           ref: main
           persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: ./.github/actions/setup-infra
         with:
-          name: ${{ needs.cli.outputs.artifact }}
-          path: ${{ runner.temp }}/infra-cli
-      - name: Verify infrastructure CLI
-        env:
-          CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
-          CLI_REVISION: ${{ needs.cli.outputs.revision }}
-          WORKFLOW_REVISION: ${{ github.workflow_sha }}
-        run: |
-          test "$CLI_REVISION" = "$WORKFLOW_REVISION"
-          printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
-          chmod 755 "$RUNNER_TEMP/infra-cli/infra"
-          printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+          root: .
       - name: Install tools
         run: |
           infra ci install-tools gh cosign
@@ -68,6 +54,18 @@ jobs:
           IMAGE_NAME: ${{ inputs.image }}
           IMAGE_DIGEST: ${{ inputs.digest }}
           SOURCE_REVISION: ${{ inputs.source-revision }}
-        run: infra ci deploy "$GITHUB_WORKSPACE"
+        run: infra ci measure --stage promotion --budget 30s --report-dir "$RUNNER_TEMP/performance" -- infra ci deploy "$GITHUB_WORKSPACE"
       - name: Reconcile
         run: infra ci reconcile http://webhook-receiver.flux-system.svc.cluster.local/hook/273de0d9e70f699a6815cac41ac0e847b0ed56918dfff9301840383ef2760306
+      - name: Verify served frontend revision
+        if: inputs.image == 'ghcr.io/fredrir/llunde-frontend'
+        env:
+          REVISION: ${{ inputs.source-revision }}
+        run: infra ci measure --stage readiness --budget 20s --report-dir "$RUNNER_TEMP/performance" -- infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "$REVISION" --budget 19s
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: deployment-performance-${{ github.run_id }}
+          path: ${{ runner.temp }}/performance
+          if-no-files-found: ignore
+          retention-days: 14

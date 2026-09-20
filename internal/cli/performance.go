@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
@@ -20,5 +22,22 @@ func newMeasureCommand() *cobra.Command {
 	command.Flags().StringVar(&directory, "report-dir", "", "Timing report directory")
 	command.Flags().StringVar(&root, "root", ".", "Working directory")
 	command.Flags().DurationVar(&budget, "budget", 10*time.Second, "Aggregate execution budget")
+	return command
+}
+
+func newReadinessCommand() *cobra.Command {
+	var address, revision string
+	var budget time.Duration
+	command := &cobra.Command{Use: "wait-revision", Short: "Wait for the expected served revision", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
+		if budget <= 0 {
+			return errors.New("positive readiness budget required")
+		}
+		ctx, cancel := context.WithTimeout(command.Context(), budget)
+		defer cancel()
+		return ci.WaitRevision(ctx, &http.Client{Timeout: time.Second}, address, revision, 500*time.Millisecond)
+	}}
+	command.Flags().StringVar(&address, "url", "", "Revision endpoint")
+	command.Flags().StringVar(&revision, "revision", "", "Expected source revision")
+	command.Flags().DurationVar(&budget, "budget", 20*time.Second, "Readiness budget")
 	return command
 }

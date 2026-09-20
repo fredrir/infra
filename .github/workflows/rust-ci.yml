@@ -8,6 +8,9 @@ on:
       test-args:
         type: string
         default: ''
+      fast-test-args:
+        type: string
+        default: ''
       minimal-build:
         type: boolean
         default: true
@@ -23,10 +26,7 @@ on:
 permissions:
   contents: read
 jobs:
-  cli:
-    uses: ./.github/workflows/infra-cli.yml
   check:
-    needs: cli
     if: github.repository_owner_id == '114402558' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ${{ github.event_name == 'pull_request' && 'rust-pr-amd64' || 'rust-amd64' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
@@ -34,52 +34,38 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
-    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        name: ${{ needs.cli.outputs.artifact }}
-        path: ${{ runner.temp }}/infra-cli
-    - name: Verify infrastructure CLI
-      env:
-        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
-        CLI_REVISION: ${{ needs.cli.outputs.revision }}
-        WORKFLOW_REVISION: ${{ job.workflow_sha }}
-      run: |
-        test "$CLI_REVISION" = "$WORKFLOW_REVISION"
-        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
-        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
-        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+        repository: ${{ job.workflow_repository }}
+        ref: ${{ job.workflow_sha }}
+        path: .infra-build-recipe
+        persist-credentials: false
+        sparse-checkout: |
+          .github/actions/setup-infra
+          build/cli-release.json
+    - uses: ./.infra-build-recipe/.github/actions/setup-infra
+      with:
+        root: .infra-build-recipe
     - name: Prepare
       env:
         CLIPPY_ARGS: ${{ inputs.clippy-args }}
         TEST_ARGS: ${{ inputs.test-args }}
+        FAST_TEST_ARGS: ${{ inputs.fast-test-args }}
       run: infra ci rust prepare
     - name: Restore build outputs
       run: infra ci rust cache restore
-    - name: Start PostgreSQL
-      if: inputs.postgres
-      env:
-        URL_ENV: ${{ inputs.postgres-url-env }}
-      run: infra ci postgres start
-    - name: Format
-      run: infra ci rust check format
-    - name: Lint
-      run: infra ci rust check lint
-    - name: Test
-      run: infra ci rust check test
-    - name: Test documentation
-      run: infra ci rust check docs
-    - name: Build without default features
-      if: inputs.minimal-build
-      run: infra ci rust check minimal
-    - name: Check the minimum supported Rust version
-      run: infra ci rust check msrv
-    - name: Audit dependencies
-      run: infra ci rust check audit
+    - name: Prepare changed test executables
+      run: infra ci rust check prepare-fast
+    - name: Check within aggregate budget
+      run: infra ci measure --stage checks --budget 10s --report-dir "$RUNNER_TEMP/performance" -- infra ci rust check fast
     - name: Save build outputs
       run: infra ci rust cache save
-    - name: Stop PostgreSQL
-      if: always() && inputs.postgres
-      run: infra ci postgres stop
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      if: always()
+      with:
+        name: rust-performance
+        path: ${{ runner.temp }}/performance
+        if-no-files-found: ignore
     - name: Cache report
       if: always()
       run: sccache --show-stats >> "$GITHUB_STEP_SUMMARY" || true

@@ -1,6 +1,8 @@
 name: Install verified infrastructure CLI
+description: Install the pinned CLI binary.
 inputs:
   root:
+    description: Trusted infrastructure checkout.
     required: true
 runs:
   using: composite
