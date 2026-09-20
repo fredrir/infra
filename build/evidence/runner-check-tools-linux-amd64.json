@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "recorded_at": "2026-09-20T17:12:30.801006+00:00",
+  "recorded_at": "2026-09-20T17:36:12.996167+00:00",
   "platform": "linux/amd64",
   "go": "1.27.1",
   "trivy": "0.74.0",
   "scan": "rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1",
-  "scan_report_sha256": "6f51cd07e6d4569b6132ec29adfa2586f3a70c93de5b1146c77d5aa28e6436dc",
+  "scan_report_sha256": "4961b7a0f72dbd7f4c5fef897c6d75f9b88a318711c56988384121d2dec31cbe",
   "scope": "rebuilt standalone tooling binaries; final runner image requires its publication scan",
   "sources": [
     {
@@ -57,19 +57,23 @@
     },
     {
       "name": "tofu",
-      "sha256": "9572ef6b39c0141ced1b127d78bfbfaee5e13c3eca2eb6627b0ce34c97d7cb1c",
+      "sha256": "5c288ec859f0251b59608e0088cd794fb0522d20a539ccbe40acb48f83e9be4a",
       "fixed_high_critical": 0
     }
   ],
   "smoke": [
     "all five native version commands",
     "Kustomize image substitution preserves replicas zero",
-    "OpenTofu fmt check, init without backend, validate without providers"
+    "OpenTofu fmt check, init without backend, validate without providers",
+    "OpenTofu version with OTEL_TRACES_EXPORTER=otlp"
   ],
   "go_tests": [
     "internal/ci",
     "internal/pipeline",
     "internal/images",
     "internal/contracts"
+  ],
+  "upstream_tests": [
+    "OpenTofu internal/tracing/traceattrs: schema conflict reproduced before patch, passed after semconv alignment"
   ]
 }

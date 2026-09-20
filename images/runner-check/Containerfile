@@ -43,6 +43,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/tofu \
     && cd /src/tofu \
     && git apply /tmp/tofu.patch \
+    && go test ./internal/tracing/traceattrs \
     && go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/opentofu/opentofu/version.dev=no" -o /out/tofu ./cmd/tofu \
     && rm -rf /src/tofu /tmp/source.tar.gz
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
