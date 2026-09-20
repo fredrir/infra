@@ -11,6 +11,8 @@ kind: HelmRelease
 metadata:
   name: valkey
 spec:
+  driftDetection:
+    mode: enabled
   interval: 30m
   chart:
     spec:

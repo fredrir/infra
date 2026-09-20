@@ -1,0 +1,175 @@
+name: Reconcile infrastructure
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+  - cron: '17,47 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  AWS_REGION: eu-north-1
+  AWS_DEFAULT_REGION: eu-north-1
+  AWS_PAGER: ''
+  TF_IN_AUTOMATION: 'true'
+  INFRA_RECONCILE_TAILNET: 'true'
+concurrency:
+  group: infrastructure-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'production' }}
+  cancel-in-progress: false
+jobs:
+  cli:
+    uses: ./.github/workflows/infra-cli.yml
+  plan:
+    if: github.event_name == 'pull_request'
+    needs: cli
+    runs-on: ubuntu-24.04
+    environment: infrastructure-plan
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        ref: ${{ github.sha }}
+        fetch-depth: 0
+        persist-credentials: false
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ needs.cli.outputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify CLI
+      env:
+        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+      run: |
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+    - uses: ./.github/actions/setup-reconciliation
+      with:
+        network: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+    - name: Validate affected declarations
+      env:
+        BEFORE: ${{ github.event.pull_request.base.sha }}
+      run: |
+        infra ci prepare-validation
+        infra ci validate
+    - name: Plan affected infrastructure
+      if: github.event.pull_request.head.repo.full_name == github.repository
+      env:
+        BASE: ${{ github.event.pull_request.base.sha }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+      run: |
+        set -o pipefail
+        infra reconcile plan --base "$BASE" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
+    - name: Require a trusted branch for the live plan
+      if: github.event.pull_request.head.repo.full_name != github.repository
+      run: |
+        echo 'Live planning requires a branch in fredrir/infra; fork code receives no infrastructure credentials.' >> "$GITHUB_STEP_SUMMARY"
+        exit 1
+    - name: Summarize plan
+      if: always()
+      run: |
+        if [ -f "$RUNNER_TEMP/infrastructure-plan.txt" ]; then
+          printf '```text\n' >> "$GITHUB_STEP_SUMMARY"
+          tail -c 900000 "$RUNNER_TEMP/infrastructure-plan.txt" >> "$GITHUB_STEP_SUMMARY"
+          printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+        fi
+    - name: Remove session credentials
+      if: always()
+      run: |
+        if command -v tailscale >/dev/null; then sudo "$(command -v tailscale)" --socket=/var/run/infra-tailnet.sock logout || true; fi
+        sudo systemctl stop infra-tailnet || true
+        rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$RUNNER_TEMP/tailnet-key"
+  apply:
+    if: github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name != 'pull_request'
+    needs: cli
+    runs-on: ubuntu-24.04
+    environment: infrastructure-apply
+    timeout-minutes: 100
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        ref: ${{ github.sha }}
+        fetch-depth: 0
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ needs.cli.outputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify CLI
+      env:
+        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+      run: |
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+    - uses: ./.github/actions/setup-reconciliation
+      with:
+        network: 'true'
+        identity: apply
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+    - name: Configure host identity
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+      run: |
+        test -n "$SSH_PRIVATE_KEY" && test -n "$SSH_KNOWN_HOSTS"
+        umask 077
+        mkdir -p "$HOME/.ssh"
+        printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+        printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+        ssh-keygen -y -f "$HOME/.ssh/id_ed25519" > "$HOME/.ssh/id_ed25519.pub"
+    - name: Validate affected declarations
+      env:
+        BEFORE: ${{ github.event.before }}
+      run: |
+        infra ci prepare-validation
+        infra ci validate
+    - name: Reconcile merged revision
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+        SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        GH_TOKEN: ${{ secrets.RUNNER_REGISTRATION_TOKEN }}
+        FULL: ${{ github.event_name != 'push' }}
+      run: infra reconcile apply --full="$FULL" --report="$RUNNER_TEMP/reconciliation/status.json"
+    - name: Summarize reconciliation
+      if: always()
+      run: |
+        if [ -f "$RUNNER_TEMP/reconciliation/status.json" ]; then
+          printf '```json\n' >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/reconciliation/status.json" >> "$GITHUB_STEP_SUMMARY"
+          printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+        fi
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      if: always()
+      with:
+        name: reconciliation-${{ github.run_id }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/reconciliation/status.json
+        if-no-files-found: warn
+        retention-days: 30
+    - name: Remove session credentials
+      if: always()
+      run: |
+        if command -v tailscale >/dev/null; then sudo "$(command -v tailscale)" --socket=/var/run/infra-tailnet.sock logout || true; fi
+        sudo systemctl stop infra-tailnet || true
+        rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$RUNNER_TEMP/tailnet-key" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"

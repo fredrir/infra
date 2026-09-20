@@ -4,3 +4,4 @@ gatus_binary_sha256: 99c60412a77edd1dd887e68a49754d4ba9e06a48e1812e32fde155fd092
 gatus_config_sops_file: "{{ role_path }}/files/config.sops.yaml"
 gatus_address: "{{ tailscale_ip }}"
 gatus_port: 8080
+grafana_host: "{{ (lookup('ansible.builtin.file', playbook_dir + '/../platform/clusters/production/settings.yaml') | from_yaml).data.GRAFANA_HOST }}"

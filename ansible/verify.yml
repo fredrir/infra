@@ -1,0 +1,48 @@
+- name: Verify cluster services
+  hosts: k3s_cluster
+  become: true
+  gather_facts: false
+  tasks:
+  - name: Read Kubernetes service status
+    ansible.builtin.command:
+      argv: [systemctl, is-active, "{{ 'k3s' if inventory_hostname in groups['server'] else 'k3s-agent' }}"]
+    changed_when: false
+  - name: Verify node registration
+    ansible.builtin.command:
+      argv: [/usr/local/bin/k3s, kubectl, wait, node, --all, --for=condition=Ready, --timeout=120s]
+    changed_when: false
+    when: inventory_hostname == groups['server'][0]
+
+- name: Verify independent monitoring configuration
+  hosts: external
+  become: true
+  gather_facts: false
+  vars:
+    grafana_host: "{{ (lookup('ansible.builtin.file', playbook_dir + '/../platform/clusters/production/settings.yaml') | from_yaml).data.GRAFANA_HOST }}"
+  tasks:
+  - name: Read active monitor configuration
+    ansible.builtin.slurp:
+      src: /etc/gatus/config.yaml
+    register: monitor_configuration
+    no_log: true
+  - name: Verify declared Grafana endpoints
+    ansible.builtin.assert:
+      that:
+      - "(monitor_configuration.content | b64decode | from_yaml).endpoints | selectattr('name', 'equalto', 'grafana-login') | map(attribute='url') | list == ['https://' ~ grafana_host ~ '/login']"
+      - "(monitor_configuration.content | b64decode | from_yaml).endpoints | selectattr('name', 'equalto', 'grafana-auth') | map(attribute='url') | list == ['https://' ~ grafana_host ~ '/api/user']"
+    no_log: true
+  - name: Verify monitor health
+    ansible.builtin.uri:
+      url: "http://{{ tailscale_ip }}:8080/health"
+      status_code: 200
+      use_proxy: false
+
+- name: Verify dedicated build engine
+  hosts: build_engines
+  become: true
+  gather_facts: false
+  tasks:
+  - name: Read Docker service status
+    ansible.builtin.command:
+      argv: [systemctl, is-active, docker]
+    changed_when: false

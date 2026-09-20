@@ -255,7 +255,7 @@ spec:
     name: flux-system
   path: ./platform/projects
   prune: true
-  wait: false
+  wait: true
   serviceAccountName: platform-reconciler
   postBuild:
     substituteFrom:

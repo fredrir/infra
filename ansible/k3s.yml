@@ -2,6 +2,7 @@
   hosts: server
   order: inventory
   serial: 1
+  any_errors_fatal: true
   become: true
   gather_facts: true
   vars:
@@ -11,6 +12,8 @@
 
 - name: Configure K3s workers
   hosts: agent
+  serial: 1
+  any_errors_fatal: true
   become: true
   gather_facts: true
   vars:

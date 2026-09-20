@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: infrastructure-plan
+  namespace: flux-system
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: infrastructure-apply
+  namespace: flux-system
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: infrastructure-plan
+rules:
+- apiGroups: [source.toolkit.fluxcd.io, kustomize.toolkit.fluxcd.io, helm.toolkit.fluxcd.io]
+  resources: [gitrepositories, kustomizations, helmreleases]
+  verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: infrastructure-plan
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: infrastructure-plan
+subjects:
+- kind: ServiceAccount
+  name: infrastructure-plan
+  namespace: flux-system
+- kind: ServiceAccount
+  name: infrastructure-apply
+  namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: infrastructure-plan-settings
+  namespace: flux-system
+rules:
+- apiGroups: ['']
+  resources: [configmaps]
+  resourceNames: [platform-settings]
+  verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: infrastructure-plan-settings
+  namespace: flux-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: infrastructure-plan-settings
+subjects:
+- kind: ServiceAccount
+  name: infrastructure-plan
+  namespace: flux-system
+- kind: ServiceAccount
+  name: infrastructure-apply
+  namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: infrastructure-apply
+rules:
+- apiGroups: [source.toolkit.fluxcd.io]
+  resources: [gitrepositories]
+  resourceNames: [flux-system]
+  verbs: [patch]
+- apiGroups: [kustomize.toolkit.fluxcd.io, helm.toolkit.fluxcd.io]
+  resources: [kustomizations, helmreleases]
+  verbs: [patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: infrastructure-apply
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: infrastructure-apply
+subjects:
+- kind: ServiceAccount
+  name: infrastructure-apply
+  namespace: flux-system
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: infrastructure-reconcile-annotations
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups: [source.toolkit.fluxcd.io, kustomize.toolkit.fluxcd.io, helm.toolkit.fluxcd.io]
+      apiVersions: ['*']
+      operations: [UPDATE]
+      resources: [gitrepositories, kustomizations, helmreleases]
+  matchConditions:
+  - name: coordinator
+    expression: request.userInfo.username == 'system:serviceaccount:flux-system:infrastructure-apply'
+  validations:
+  - expression: object.spec == oldObject.spec
+    message: Reconciliation may request controller work without changing desired configuration.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: infrastructure-reconcile-annotations
+spec:
+  policyName: infrastructure-reconcile-annotations
+  validationActions: [Deny]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infrastructure-plan-credentials
+  namespace: flux-system
+  annotations:
+    kubernetes.io/service-account.name: infrastructure-plan
+type: kubernetes.io/service-account-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infrastructure-apply-credentials
+  namespace: flux-system
+  annotations:
+    kubernetes.io/service-account.name: infrastructure-apply
+type: kubernetes.io/service-account-token

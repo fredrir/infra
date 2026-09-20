@@ -3,15 +3,12 @@ locals {
     grafana = {
       id   = "0aef0efb-868d-4dba-862b-b4c3a72a83fa"
       name = "platform-grafana"
-      ingress = [
-        {
+      ingress = concat([
+        for hostname in local.grafana_hosts : {
           service  = "http://monitoring-grafana.observability.svc.cluster.local:80"
-          hostname = "grafana.fredrir.com"
-        },
-        {
-          service = "http_status:404"
-        },
-      ]
+          hostname = hostname
+        }
+      ], [{ service = "http_status:404" }])
     }
     cache = {
       id   = "899938ad-d232-4906-8d81-f77b3b32f6c9"

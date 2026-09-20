@@ -1,6 +1,9 @@
 package ci
 
 var checkToolAssets = map[string]ToolAsset{
+	"flux":       {"https://github.com/fluxcd/flux2/releases/download/v2.9.5/flux_2.9.5_linux_amd64.tar.gz", "b853df82adfd7736f580692f9f734473d571606307139f8fd20c2a80dd1ff473", "flux"},
+	"tailscale":  {"https://pkgs.tailscale.com/stable/tailscale_1.102.4_amd64.tgz", "50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9", "tailscale_1.102.4_amd64/tailscale"},
+	"tailscaled": {"https://pkgs.tailscale.com/stable/tailscale_1.102.4_amd64.tgz", "50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9", "tailscale_1.102.4_amd64/tailscaled"},
 	"actionlint": {"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz", "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8", "actionlint"},
 	"age":        {"https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz", "cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10", "age/age"},
 	"age-keygen": {"https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz", "cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10", "age/age-keygen"},

@@ -1,0 +1,29 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "reconcile",
+    srcs = [
+        "commands.go",
+        "config.go",
+        "run.go",
+        "store.go",
+        "verify.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/reconcile",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/ci",
+        "//internal/process",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)
+
+go_test(
+    name = "reconcile_test",
+    srcs = ["reconcile_test.go"],
+    embed = [":reconcile"],
+    deps = [
+        "//internal/ci",
+        "//internal/process",
+    ],
+)

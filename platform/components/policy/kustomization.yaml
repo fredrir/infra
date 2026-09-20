@@ -12,3 +12,4 @@ resources:
 - reconciler.yaml
 - admission.yaml
 - dns.yaml
+- reconciliation.yaml

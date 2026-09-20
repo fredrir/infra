@@ -61,13 +61,10 @@ jobs:
           IMAGE_DIGEST: ${{ inputs.digest }}
           SOURCE_REVISION: ${{ inputs.source-revision }}
         run: infra ci measure --stage promotion --budget 30s --report-dir "$RUNNER_TEMP/performance" -- infra ci deploy "$GITHUB_WORKSPACE"
-      - name: Reconcile
-        run: infra ci reconcile http://webhook-receiver.flux-system.svc.cluster.local/hook/273de0d9e70f699a6815cac41ac0e847b0ed56918dfff9301840383ef2760306
-      - name: Verify served frontend revision
-        if: inputs.image == 'ghcr.io/fredrir/llunde-frontend'
-        env:
-          REVISION: ${{ inputs.source-revision }}
-        run: infra ci measure --stage readiness --budget 20s --report-dir "$RUNNER_TEMP/performance" -- infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "$REVISION" --budget 19s
+      - name: Report desired revision
+        run: |
+          printf 'Desired infrastructure revision: `%s`\n\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo 'The Reconcile infrastructure workflow applies and verifies production.' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:

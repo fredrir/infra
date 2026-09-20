@@ -3,6 +3,8 @@ kind: HelmRelease
 metadata:
   name: buildkit
 spec:
+  driftDetection:
+    mode: enabled
   suspend: false
   interval: 30m
   timeout: 5m

@@ -63,7 +63,10 @@
 
 - name: Install encrypted monitor settings
   ansible.builtin.copy:
-    content: "{{ lookup('ansible.builtin.pipe', 'sops --decrypt ' ~ (gatus_config_sops_file | quote)) }}"
+    content: "{{ gatus_configuration | combine({'endpoints': gatus_endpoints}) | to_nice_yaml }}"
+  vars:
+    gatus_configuration: "{{ lookup('ansible.builtin.pipe', 'sops --decrypt ' ~ (gatus_config_sops_file | quote)) | from_yaml }}"
+    gatus_endpoints: "{{ lookup('ansible.builtin.template', 'endpoints.json.j2') | from_json }}"
     dest: /etc/gatus/config.yaml
     owner: root
     group: root

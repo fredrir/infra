@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: platform-settings
   namespace: flux-system
+  labels:
+    reconcile.fluxcd.io/watch: Enabled
 data:
   STORAGE_CLASS: local-retain
   GRAFANA_HOST: grafana.fredrir.com

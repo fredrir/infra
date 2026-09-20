@@ -23,6 +23,9 @@ all:
         status: unpurchased
         node_number: null
   children:
+    infra_cli_targets:
+      hosts:
+        fredrir-07: {}
     ubuntu:
       children:
         k3s_cluster:
@@ -33,7 +36,7 @@ all:
                   infra_binary_url: https://github.com/fredrir/infra/releases/download/infra-v0.1.0/infra-linux-amd64
                   infra_binary_revision: 73a5ca2e6b88b40a6f8c55deae12af4a3e058c78
                   infra_binary_sha256: c37acf10dd13009f61374b9fce811877b2a40c33b34a600a67e0c9e9dc39d0c1
-                  ansible_host: 89.167.88.128
+                  ansible_host: "{{ tailscale_ip if infra_reconcile_tailnet | default(false) | bool else public_ipv4 }}"
                   private_ip: 10.60.0.7
                   tailscale_ip: 100.115.121.9
                   provider: hetzner
@@ -42,7 +45,7 @@ all:
                   architecture: amd64
                   public_ipv4: 89.167.88.128
                 fredrir-08:
-                  ansible_host: 89.167.93.100
+                  ansible_host: "{{ tailscale_ip if infra_reconcile_tailnet | default(false) | bool else public_ipv4 }}"
                   private_ip: 10.60.0.8
                   tailscale_ip: 100.96.114.53
                   provider: hetzner
@@ -71,7 +74,7 @@ all:
                   k3s_ci_slots: 1
                   public_ipv4: 95.217.135.164
                 fredrir-09:
-                  ansible_host: 85.190.100.72
+                  ansible_host: "{{ tailscale_ip if infra_reconcile_tailnet | default(false) | bool else public_ipv4 }}"
                   ansible_user: administrator
                   ci_kata_enabled: true
                   k3s_system_reserved_cpu: 4250m
@@ -107,7 +110,7 @@ all:
           ansible_port: 2222
           ansible_user: builder
           ansible_python_interpreter: /usr/bin/python3
-          ansible_ssh_common_args: -o ProxyJump=administrator@85.190.100.72 -o HostKeyAlias=infra-build-09 -o StrictHostKeyChecking=yes -o ConnectTimeout=10
+          ansible_ssh_common_args: -o ProxyJump=administrator@{{ hostvars['fredrir-09'].tailscale_ip if infra_reconcile_tailnet | default(false) | bool else hostvars['fredrir-09'].public_ipv4 }} -o HostKeyAlias=infra-build-09 -o StrictHostKeyChecking=yes -o ConnectTimeout=10
           build_engine_dedicated: true
           build_engine_qualified: true
           build_engine_cpus: 4

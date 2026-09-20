@@ -1,0 +1,47 @@
+name: Prepare reconciliation
+description: Install reconciliation tools and session credentials.
+inputs:
+  network:
+    description: Enable private infrastructure access.
+    default: 'false'
+  identity:
+    description: Scoped network identity.
+    default: plan
+runs:
+  using: composite
+  steps:
+  - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+    with:
+      path: |
+        ${{ runner.temp }}/tofu-providers
+        ~/.cache/uv
+      key: reconciliation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tofu/.terraform.lock.hcl', 'uv.lock') }}
+  - shell: bash
+    run: |
+      infra ci install-tools tofu flux kubectl helm actionlint sops uv tailscale tailscaled
+  - shell: bash
+    run: |
+      uv sync --frozen --group ci --no-install-project
+      printf '%s\n' "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      mkdir -p "$RUNNER_TEMP/tofu-providers"
+      printf 'TF_PLUGIN_CACHE_DIR=%s\n' "$RUNNER_TEMP/tofu-providers" >> "$GITHUB_ENV"
+  - if: inputs.network == 'true'
+    shell: bash
+    env:
+      RECONCILE_IDENTITY: ${{ inputs.identity }}
+    run: |
+      for required in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY CLOUDFLARE_API_TOKEN TF_VAR_hcloud_token KUBE_CONFIG TAILSCALE_AUTH_KEY; do
+        if [ -z "${!required}" ]; then echo "Missing $required in infrastructure-$RECONCILE_IDENTITY" >&2; exit 1; fi
+      done
+      identity=$(aws sts get-caller-identity --query Arn --output text)
+      case "$identity" in
+        arn:aws:iam::*:user/automation/infra-reconciliation-"$RECONCILE_IDENTITY") ;;
+        *) echo 'Unexpected AWS reconciliation identity' >&2; exit 1 ;;
+      esac
+      umask 077
+      printf '%s' "$KUBE_CONFIG" > "$RUNNER_TEMP/reconcile-kubeconfig"
+      printf 'KUBECONFIG=%s\n' "$RUNNER_TEMP/reconcile-kubeconfig" >> "$GITHUB_ENV"
+      printf '%s' "$TAILSCALE_AUTH_KEY" > "$RUNNER_TEMP/tailnet-key"
+      sudo systemd-run --unit=infra-tailnet "$(command -v tailscaled)" --state=mem: --socket=/var/run/infra-tailnet.sock
+      sudo "$(command -v tailscale)" --socket=/var/run/infra-tailnet.sock up --auth-key="file:$RUNNER_TEMP/tailnet-key" --hostname="infra-$RECONCILE_IDENTITY-$GITHUB_RUN_ID" --advertise-tags="tag:infra-$RECONCILE_IDENTITY" --accept-dns=false --timeout=60s
+      rm "$RUNNER_TEMP/tailnet-key"

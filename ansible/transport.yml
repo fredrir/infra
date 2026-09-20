@@ -1,0 +1,23 @@
+- name: Reconcile enrolled cluster transport
+  hosts: k3s_cluster
+  serial: 1
+  become: true
+  gather_facts: true
+  vars:
+    platform_architecture: "{{ architecture }}"
+  tasks:
+  - name: Require an enrolled identity
+    ansible.builtin.stat:
+      path: /var/lib/tailscale/tailscaled.state
+      get_checksum: false
+    register: transport_state
+    no_log: true
+  - name: Preserve enrolled transport
+    ansible.builtin.assert:
+      that:
+      - transport_state.stat.isreg | default(false)
+      - transport_state.stat.size > 0
+  - name: Configure Tailscale
+    ansible.builtin.import_role:
+      name: tailscale
+      tasks_from: install.yml

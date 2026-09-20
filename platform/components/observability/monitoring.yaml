@@ -4,6 +4,8 @@ metadata:
   name: monitoring
   namespace: observability
 spec:
+  driftDetection:
+    mode: enabled
   interval: 30m
   timeout: 10m
   chart:

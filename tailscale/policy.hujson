@@ -16,6 +16,12 @@
     "tag:platform-worker": [
       "autogroup:admin",
       "tag:platform-enrollment"
+    ],
+    "tag:infra-plan": [
+      "autogroup:admin"
+    ],
+    "tag:infra-apply": [
+      "autogroup:admin"
     ]
   },
   "hosts": {
@@ -100,6 +106,29 @@
       "proto": "tcp",
       "dst": [
         "platform-monitor:8080"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "tag:infra-plan",
+        "tag:infra-apply"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "tag:platform-control:6443"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "tag:infra-apply"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "tag:platform-control:22",
+        "tag:platform-worker:22",
+        "platform-monitor:22"
       ]
     }
   ],
@@ -575,6 +604,33 @@
       "src": "10.42.0.10",
       "proto": "tcp",
       "deny": [
+        "platform-monitor:8080"
+      ]
+    },
+    {
+      "src": "tag:infra-plan",
+      "proto": "tcp",
+      "accept": [
+        "tag:platform-control:6443"
+      ],
+      "deny": [
+        "tag:platform-control:22",
+        "tag:platform-worker:22",
+        "platform-monitor:22"
+      ]
+    },
+    {
+      "src": "tag:infra-apply",
+      "proto": "tcp",
+      "accept": [
+        "tag:platform-control:22",
+        "tag:platform-control:6443",
+        "tag:platform-worker:22",
+        "platform-monitor:22"
+      ],
+      "deny": [
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
         "platform-monitor:8080"
       ]
     }
