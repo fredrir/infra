@@ -4,7 +4,7 @@
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Infrastructure APIs, runner App, mail | Doppler `infra → ops`                                                                                                                        |
 | Package signing and AUR keys          | Doppler `infra → ops` (`PACKAGES_GPG_KEY`, `PACKAGES_APK_KEY`, `AUR_SSH_KEY`); `fredrir/packages` environment `publish`                      |
-| Build cache keys                      | `platform/components/runners/<project>/{sccache-*,buildkit-cache}.secret.sops.yaml`, `platform/components/build-cache/**/*.secret.sops.yaml` |
+| Build cache keys                      | `platform/components/runners/<project>/sccache-*.secret.sops.yaml`, `platform/components/build-cache/**/*.secret.sops.yaml`; legacy BuildKit credentials remain through caller cutover |
 | Flux deploy receiver                  | `platform/components/sources/deploy-receiver.secret.sops.yaml`                                                                               |
 | Release tokens                        | None; crates.io trusted publishing and Octo STS                                                                                              |
 | Application source environments       | Each project's existing Doppler configuration                                                                                                |
