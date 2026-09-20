@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-09-20T17:12:30.801006+00:00",
+  "platform": "linux/amd64",
+  "go": "1.27.1",
+  "trivy": "0.74.0",
+  "scan": "rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1",
+  "scan_report_sha256": "6f51cd07e6d4569b6132ec29adfa2586f3a70c93de5b1146c77d5aa28e6436dc",
+  "scope": "rebuilt standalone tooling binaries; final runner image requires its publication scan",
+  "sources": [
+    {
+      "name": "actionlint",
+      "url": "https://codeload.github.com/rhysd/actionlint/tar.gz/refs/tags/v1.7.12",
+      "sha256": "454800bd4f854592bcfe79b161f71d56e35940eb7016e48a26dd356adc9d400a"
+    },
+    {
+      "name": "sops",
+      "url": "https://codeload.github.com/getsops/sops/tar.gz/refs/tags/v3.13.3",
+      "sha256": "49811c5ed80f6b4d4e98cef98e3f7378406aa692fd773dfb72ad1b4dfb940448"
+    },
+    {
+      "name": "tofu",
+      "url": "https://codeload.github.com/opentofu/opentofu/tar.gz/refs/tags/v1.12.6",
+      "sha256": "d6b49908a66ad277d7de33e9a218ae11b956cd094e39c82300b9b75cac2479ba"
+    },
+    {
+      "name": "kustomize",
+      "url": "https://codeload.github.com/kubernetes-sigs/kustomize/tar.gz/refs/tags/kustomize/v5.8.1",
+      "sha256": "4ea5a974c46ad6efcde4fd9c339ab1bd278a80b6872dda2d1a366936e4638475"
+    },
+    {
+      "name": "kubectl",
+      "url": "https://codeload.github.com/kubernetes/kubernetes/tar.gz/refs/tags/v1.36.4",
+      "sha256": "86a216801ddba7098a50c6f3b3fe5fbc28ba34ea5b1daa66d81c2d5307c301ac"
+    }
+  ],
+  "binaries": [
+    {
+      "name": "actionlint",
+      "sha256": "d8791eacc41a70a22e3609260a3770b4f1977275ef6e3213e2484d51629bcc4c",
+      "fixed_high_critical": 0
+    },
+    {
+      "name": "kubectl",
+      "sha256": "92f958348d9c4d93ff5ff90657853db2c8743af5ee4724d10f6906da501b3b87",
+      "fixed_high_critical": 0
+    },
+    {
+      "name": "kustomize",
+      "sha256": "7c3753f65a84587e766418bb3bc19df3a76d70ea87bd92d2f4216dfcc7aa1e59",
+      "fixed_high_critical": 0
+    },
+    {
+      "name": "sops",
+      "sha256": "e3aa3145b4457d48c3fd7cc632c1c29f3dea797de331c1818fc5a9bdb370a6ed",
+      "fixed_high_critical": 0
+    },
+    {
+      "name": "tofu",
+      "sha256": "9572ef6b39c0141ced1b127d78bfbfaee5e13c3eca2eb6627b0ce34c97d7cb1c",
+      "fixed_high_critical": 0
+    }
+  ],
+  "smoke": [
+    "all five native version commands",
+    "Kustomize image substitution preserves replicas zero",
+    "OpenTofu fmt check, init without backend, validate without providers"
+  ],
+  "go_tests": [
+    "internal/ci",
+    "internal/pipeline",
+    "internal/images",
+    "internal/contracts"
+  ]
+}

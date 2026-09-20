@@ -1,3 +1,59 @@
+FROM golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195 AS tools
+ENV CGO_ENABLED=0
+ENV GOTOOLCHAIN=local
+ENV GOWORK=off
+ENV GOMAXPROCS=2
+ENV GOMEMLIMIT=1GiB
+ENV GOFLAGS="-mod=readonly -p=2"
+COPY images/runner-check/patches/actionlint.patch /tmp/actionlint.patch
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /src/actionlint /out \
+    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/rhysd/actionlint/tar.gz/refs/tags/v1.7.12 \
+    && printf '%s  %s\n' 454800bd4f854592bcfe79b161f71d56e35940eb7016e48a26dd356adc9d400a /tmp/source.tar.gz | sha256sum --check --strict \
+    && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/actionlint \
+    && cd /src/actionlint \
+    && git apply /tmp/actionlint.patch \
+    && go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/rhysd/actionlint.version=1.7.12" -o /out/actionlint ./cmd/actionlint \
+    && rm -rf /src/actionlint /tmp/source.tar.gz
+COPY images/runner-check/patches/kustomize.patch /tmp/kustomize.patch
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /src/kustomize /out \
+    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/kubernetes-sigs/kustomize/tar.gz/refs/tags/kustomize/v5.8.1 \
+    && printf '%s  %s\n' 4ea5a974c46ad6efcde4fd9c339ab1bd278a80b6872dda2d1a366936e4638475 /tmp/source.tar.gz | sha256sum --check --strict \
+    && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/kustomize \
+    && cd /src/kustomize/kustomize \
+    && git apply /tmp/kustomize.patch \
+    && go build -trimpath -buildvcs=false -ldflags="-s -w -X sigs.k8s.io/kustomize/api/provenance.version=v5.8.1" -o /out/kustomize . \
+    && rm -rf /src/kustomize /tmp/source.tar.gz
+COPY images/runner-check/patches/sops.patch /tmp/sops.patch
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /src/sops /out \
+    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/getsops/sops/tar.gz/refs/tags/v3.13.3 \
+    && printf '%s  %s\n' 49811c5ed80f6b4d4e98cef98e3f7378406aa692fd773dfb72ad1b4dfb940448 /tmp/source.tar.gz | sha256sum --check --strict \
+    && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/sops \
+    && cd /src/sops \
+    && git apply /tmp/sops.patch \
+    && go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/getsops/sops/v3/version.Version=3.13.3" -o /out/sops ./cmd/sops \
+    && rm -rf /src/sops /tmp/source.tar.gz
+COPY images/runner-check/patches/tofu.patch /tmp/tofu.patch
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /src/tofu /out \
+    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/opentofu/opentofu/tar.gz/refs/tags/v1.12.6 \
+    && printf '%s  %s\n' d6b49908a66ad277d7de33e9a218ae11b956cd094e39c82300b9b75cac2479ba /tmp/source.tar.gz | sha256sum --check --strict \
+    && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/tofu \
+    && cd /src/tofu \
+    && git apply /tmp/tofu.patch \
+    && go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/opentofu/opentofu/version.dev=no" -o /out/tofu ./cmd/tofu \
+    && rm -rf /src/tofu /tmp/source.tar.gz
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /src/kubectl /out \
+    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/kubernetes/kubernetes/tar.gz/refs/tags/v1.36.4 \
+    && printf '%s  %s\n' 86a216801ddba7098a50c6f3b3fe5fbc28ba34ea5b1daa66d81c2d5307c301ac /tmp/source.tar.gz | sha256sum --check --strict \
+    && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/kubectl \
+    && cd /src/kubectl \
+    && go build -trimpath -buildvcs=false -ldflags="-s -w -X k8s.io/client-go/pkg/version.gitVersion=v1.36.4 -X k8s.io/component-base/version.gitVersion=v1.36.4" -o /out/kubectl ./cmd/kubectl \
+    && rm -rf /src/kubectl /tmp/source.tar.gz
+
 FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
 USER root
 COPY images/runner-check/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources
@@ -6,8 +62,15 @@ RUN apt-get update -o APT::Update::Error-Mode=any \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         bash ca-certificates coreutils curl git jq openssh-client python3 python3-venv sqlite3 zstd \
     && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
+        /usr/bin/docker /usr/bin/docker-init /usr/bin/docker-proxy /usr/bin/dockerd /usr/bin/runc \
+        /usr/local/lib/docker \
+        /home/runner/externals/node20/lib/node_modules /home/runner/externals/node24/lib/node_modules \
+        /home/runner/externals/node20/bin/npm /home/runner/externals/node20/bin/npx /home/runner/externals/node20/bin/corepack \
+        /home/runner/externals/node24/bin/npm /home/runner/externals/node24/bin/npx /home/runner/externals/node24/bin/corepack
 COPY --chmod=755 .infra-artifacts/infra /usr/local/bin/infra
-RUN RUNNER_TEMP=/opt infra ci install-tools actionlint age age-keygen sops uv tofu helm kubectl kustomize yq \
+COPY --from=tools /out/ /opt/tools/
+RUN RUNNER_TEMP=/opt infra ci install-tools age age-keygen uv helm yq \
     && chmod 755 /opt/tools \
     && ln -s /usr/local/bin/infra /usr/local/bin/infra-runner-hook
 ENV PATH=/usr/local/bin:/opt/tools:/opt/venv/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
