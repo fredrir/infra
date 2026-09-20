@@ -222,6 +222,8 @@ infra platform prefetch --namespace llunde --node fredrir-09 \
 | Prefetch lifetime | At most one minute; cleanup on success, failure or cancellation; finished Job TTL 60 seconds |
 | Prefetch prerequisites | Kubernetes 1.36 image volumes; compatible container runtime; namespace pull credentials; verified owned image digests |
 | Native VM evidence | [Warm VM qualification](../build/evidence/warm-vm-linux-amd64.json) |
+| Process metrics | OS-reported command CPU and peak memory; timed-out descendants and external build services may be excluded |
+| Selective GitOps | [Qualified controller and ownership handoff](../build/rollout/flux-artifacts/README.md) |
 
 Initial native preparation is explicit; periodic compilation is disabled to avoid contending with running CI jobs.
 

@@ -23,8 +23,10 @@
 | OpenTofu                 | Provider machines, private network, DNS, tunnels and restricted backup/mail IAM      |
 | Ansible                  | Host packages, SSH, firewall, Tailscale, K3s, containerd and native services         |
 | Flux platform reconciler | Shared services, project namespaces, network policy, admission and encrypted secrets |
+| Flux project reconcilers | Four project owners consume content-addressed artifacts; policy readiness and parser migration ordering remain required |
+| Source watcher | [Selective reconciliation, generation and rollback](../build/rollout/flux-artifacts/README.md) |
 | Project repository       | Source, native tests, Dockerfiles and a pinned shared workflow caller                |
-| Deployment PR            | Verified image digest and source revision, limited to the configured application     |
+| Deployment workflow            | Verified image digest and source revision, limited to the configured application     |
 | Application owner        | Database schema compatibility and recovery requirements                              |
 
 Provider APIs provision machines; an existing SSH-accessible machine enters through Ansible inventory. Workers use encrypted Tailscale connectivity across providers. Etcd stays on the three colocated control servers. Macie and Archie are administration and recovery machines.
@@ -161,7 +163,7 @@ infra onboard fredrir/example \
 
 | Generated files                       | Destination                                                                                |
 | ------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `project/`                            | `platform/projects/example/`; include it in the projects Kustomization                     |
+| `project/`                            | `platform/projects/example/`; include it in the projects Kustomization and regenerate selective Flux artifacts                     |
 | `infrastructure/.github/`             | Infrastructure deployment mapping (`visibility`, image paths) and OctoSTS trust policy     |
 | `caller/.github/workflows/build.yaml` | Project repository                                                                         |
 | Application credentials               | Add encrypted `project-registry` and `project-runtime` Secrets                             |
