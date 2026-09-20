@@ -30,10 +30,13 @@ jobs:
       packages: read
       id-token: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: main
-          persist-credentials: false
+      - name: Fetch current deployment configuration
+        run: |
+          test ! -e .git && test ! -L .git
+          git init --quiet
+          git remote add origin https://github.com/fredrir/infra
+          git -c credential.helper= -c http.extraHeader= fetch --quiet --depth=1 origin refs/heads/main
+          git -c core.hooksPath=/dev/null checkout --quiet -B main FETCH_HEAD
       - uses: ./.github/actions/setup-infra
         with:
           root: .
