@@ -5,5 +5,6 @@ resources:
 - main
 - release
 - network.yaml
+- hooks.yaml
 patches:
 - path: quota.yaml

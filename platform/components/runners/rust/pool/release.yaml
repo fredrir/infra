@@ -103,9 +103,13 @@ spec:
                 containerName: runner
                 resource: limits.cpu
           - name: ACTIONS_RUNNER_HOOK_JOB_STARTED
-            value: /usr/local/bin/ci-job-started.sh
+            value: /opt/infra/hooks/job-started.sh
           - name: RUNNER_ALLOW_RUNASROOT
             value: '1'
+          volumeMounts:
+          - name: runner-hooks
+            mountPath: /opt/infra/hooks
+            readOnly: true
           securityContext:
             privileged: false
             allowPrivilegeEscalation: false
@@ -131,3 +135,8 @@ spec:
               memory: 10Gi
               ephemeral-storage: 80Gi
               infra.fredrir.com/ci-slot: '1'
+        volumes:
+        - name: runner-hooks
+          configMap:
+            name: rust-runner-hooks
+            defaultMode: 365

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rust-runner-hooks
+data:
+  job-started.sh: |
+    #!/bin/sh
+    exec /usr/local/bin/infra platform runner-hook
