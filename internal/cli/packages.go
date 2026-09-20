@@ -34,8 +34,8 @@ func newPackagesCommand() *cobra.Command {
 	smoke := &cobra.Command{Use: "smoke SITE CHANNELS quick|full", Short: "Install packages across pinned distributions", Args: cobra.ExactArgs(3), RunE: func(command *cobra.Command, args []string) error {
 		return packages.Smoke(command.Context(), options(command), args[0], args[1], args[2])
 	}}
-	install := &cobra.Command{Use: "smoke-install deb|rpm|apk PACKAGE BINARY", Short: "Verify installation inside a test container", Args: cobra.ExactArgs(3), Hidden: true, RunE: func(command *cobra.Command, args []string) error {
-		return packages.SmokeInstall(command.Context(), runner(command), args[0], args[1], args[2])
+	install := &cobra.Command{Use: "smoke-install deb|rpm|apk PACKAGE BINARY [PACKAGE BINARY...]", Short: "Verify installation inside a test container", Args: cobra.MinimumNArgs(3), Hidden: true, RunE: func(command *cobra.Command, args []string) error {
+		return packages.SmokeInstallBatch(command.Context(), runner(command), args[0], args[1:])
 	}}
 	var repository string
 	pages := &cobra.Command{Use: "publish-pages SITE", Short: "Publish verified repositories to GitHub Pages", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {

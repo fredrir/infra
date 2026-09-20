@@ -11,11 +11,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"dagger.io/dagger"
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/pipeline"
+	"golang.org/x/sync/errgroup"
 )
 
 //go:embed assets/fredrir.asc
@@ -184,14 +186,43 @@ func Smoke(ctx context.Context, options PipelineOptions, site, channels, scope s
 	defer client.Close()
 	cli := client.Host().File(binary)
 	repository := client.Host().Directory(site)
+	names := make([]string, 0, len(tools))
+	for name := range tools {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var identities []string
+	for _, name := range names {
+		identities = append(identities, name, tools[name].Binary)
+	}
+	if err := smokeDistributions(ctx, targets, func(ctx context.Context, target SmokeTarget) error {
+		args := append([]string{"infra", "packages", "smoke-install", target.Format}, identities...)
+		container := client.Container(dagger.ContainerOpts{Platform: "linux/amd64"}).From(target.Image).WithFile("/usr/local/bin/infra", cli, dagger.ContainerWithFileOpts{Permissions: 0755}).WithDirectory("/repo", repository).WithExec(args)
+		if _, err := container.Sync(ctx); err != nil {
+			return fmt.Errorf("packages on %s: %w", target.Image, err)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
 	for _, target := range targets {
-		for name, tool := range tools {
-			container := client.Container(dagger.ContainerOpts{Platform: "linux/amd64"}).From(target.Image).WithFile("/usr/local/bin/infra", cli, dagger.ContainerWithFileOpts{Permissions: 0755}).WithDirectory("/repo", repository).WithExec([]string{"infra", "packages", "smoke-install", target.Format, name, tool.Binary})
-			if _, err := container.Sync(ctx); err != nil {
-				return fmt.Errorf("%s on %s: %w", name, target.Image, err)
-			}
+		for _, name := range names {
 			fmt.Fprintf(options.Output, "%s on %s: ok\n", name, target.Image)
 		}
 	}
 	return nil
+}
+
+func smokeDistributions(ctx context.Context, targets []SmokeTarget, check func(context.Context, SmokeTarget) error) error {
+	group, ctx := errgroup.WithContext(ctx)
+	group.SetLimit(2)
+	for _, target := range targets {
+		group.Go(func() error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			return check(ctx, target)
+		})
+	}
+	return group.Wait()
 }

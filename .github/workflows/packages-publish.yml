@@ -19,6 +19,14 @@ jobs:
     permissions:
       contents: read
     steps:
+    - name: Require the bounded CI smoke scope
+      env:
+        SCOPE: ${{ inputs.smoke-scope }}
+      run: |
+        if [ "$SCOPE" != quick ]; then
+          echo 'The full distribution matrix is local-only; CI requires quick.' >&2
+          exit 1
+        fi
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         repository: ${{ job.workflow_repository }}
@@ -97,6 +105,13 @@ jobs:
         SCOPE: ${{ inputs.smoke-scope }}
         _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
       run: infra ci measure --stage package-install --budget 10s --report-dir "$RUNNER_TEMP/performance" -- infra packages smoke --root .infra --infra-binary "$INFRA_BINARY" "$RUNNER_TEMP/site" "$RUNNER_TEMP/channels" "$SCOPE"
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      if: always()
+      with:
+        name: package-check-performance
+        path: ${{ runner.temp }}/performance
+        if-no-files-found: warn
+        retention-days: 14
     - name: Stop Dagger engine
       if: always() && runner.environment == 'github-hosted'
       run: docker rm --force --volumes infra-dagger
