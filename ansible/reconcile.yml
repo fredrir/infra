@@ -2,6 +2,7 @@
 - import_playbook: site.yml
 - import_playbook: ci-runtimes.yml
 - import_playbook: build-vms.yml
+- import_playbook: reconciliation-identity.yml
 - import_playbook: control-backup.yml
 - import_playbook: infra-cli.yml
 - import_playbook: build-runners.yml

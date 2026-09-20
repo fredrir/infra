@@ -26,6 +26,9 @@ jobs:
     needs: cli
     runs-on: ubuntu-24.04
     environment: infrastructure-plan
+    permissions:
+      contents: read
+      id-token: write
     timeout-minutes: 30
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -47,13 +50,14 @@ jobs:
     - uses: ./.github/actions/setup-reconciliation
       with:
         network: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
         KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-        TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
     - name: Validate affected declarations
       env:
         BEFORE: ${{ github.event.pull_request.base.sha }}
@@ -68,6 +72,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
       run: |
         set -o pipefail
         infra reconcile plan --base "$BASE" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
@@ -87,9 +92,7 @@ jobs:
     - name: Remove session credentials
       if: always()
       run: |
-        if command -v tailscale >/dev/null; then sudo "$(command -v tailscale)" --socket=/var/run/infra-tailnet.sock logout || true; fi
-        sudo systemctl stop infra-tailnet || true
-        rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$RUNNER_TEMP/tailnet-key"
+        rm -f "$RUNNER_TEMP/reconcile-kubeconfig"
   apply:
     if: github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name != 'pull_request'
     needs: cli
@@ -98,6 +101,7 @@ jobs:
     timeout-minutes: 100
     permissions:
       contents: write
+      id-token: write
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
@@ -118,13 +122,14 @@ jobs:
       with:
         network: 'true'
         identity: apply
+        tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
         KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-        TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
     - name: Configure host identity
       env:
         SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -142,14 +147,23 @@ jobs:
       run: |
         infra ci prepare-validation
         infra ci validate
+    - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+      id: runner-token
+      with:
+        app-id: ${{ secrets.RUNNER_APP_ID }}
+        private-key: ${{ secrets.RUNNER_APP_PRIVATE_KEY }}
+        owner: fredrir
+        repositories: infra,Y,llunde-frontend,llunde-backend,llunde-pyparser,packages,nsql,portfolio
+        permission-administration: write
     - name: Reconcile merged revision
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
         SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-        GH_TOKEN: ${{ secrets.RUNNER_REGISTRATION_TOKEN }}
+        GH_TOKEN: ${{ steps.runner-token.outputs.token }}
         FULL: ${{ github.event_name != 'push' }}
       run: infra reconcile apply --full="$FULL" --report="$RUNNER_TEMP/reconciliation/status.json"
     - name: Summarize reconciliation
@@ -170,6 +184,4 @@ jobs:
     - name: Remove session credentials
       if: always()
       run: |
-        if command -v tailscale >/dev/null; then sudo "$(command -v tailscale)" --socket=/var/run/infra-tailnet.sock logout || true; fi
-        sudo systemctl stop infra-tailnet || true
-        rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$RUNNER_TEMP/tailnet-key" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"
+        rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"

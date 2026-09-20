@@ -19,10 +19,10 @@ resource "aws_iam_user" "reconciliation" {
   path     = "/automation/"
 }
 
-resource "aws_iam_user_policy" "reconciliation" {
+resource "aws_iam_policy" "reconciliation" {
   for_each = local.reconciliation_identities
-  name     = "managed-infrastructure"
-  user     = aws_iam_user.reconciliation[each.key].name
+  name     = "infra-reconciliation-${each.key}"
+  path     = "/automation/"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = concat([
@@ -48,7 +48,9 @@ resource "aws_iam_user_policy" "reconciliation" {
           "iam:ListAttachedUserPolicies", "iam:ListUserPolicies", "iam:ListAccessKeys",
           "iam:GetUserPolicy", "iam:ListUserTags", "iam:ListPolicyTags",
         ]
-        Resource = concat(local.reconciliation_iam_resources, [for user in aws_iam_user.reconciliation : user.arn])
+        Resource = concat(local.reconciliation_iam_resources, [for user in aws_iam_user.reconciliation : user.arn], [
+          for identity in local.reconciliation_identities : "arn:aws:iam::${data.aws_caller_identity.reconciliation.account_id}:policy/automation/infra-reconciliation-${identity}"
+        ])
       },
       {
         Effect   = "Allow"
@@ -88,4 +90,10 @@ resource "aws_iam_user_policy" "reconciliation" {
       }
     ] : [])
   })
+}
+
+resource "aws_iam_user_policy_attachment" "reconciliation" {
+  for_each   = local.reconciliation_identities
+  user       = aws_iam_user.reconciliation[each.key].name
+  policy_arn = aws_iam_policy.reconciliation[each.key].arn
 }

@@ -77,15 +77,15 @@ go build -o .infra/bin/infra ./cmd/infra
 | --- | --- |
 | 1 | Prepare an administrator session with OpenTofu backend/provider access, Kubernetes access, existing host SSH identities and SOPS decryption |
 | 2 | Merge the reconciliation implementation without a simultaneous hostname change |
-| 3 | Check out that exact `main` revision, build the CLI and run `infra reconcile apply --full` with the administrator session |
-| 4 | Confirm the run created the IAM users and Flux service accounts, published `production`, switched the Flux source and completed verification |
+| 3 | Apply the IAM policies from `tofu/reconciliation.tf` using an administrator OpenTofu session; let Flux install the Kubernetes identities |
+| 4 | Confirm the IAM users, managed policy attachments and Kubernetes service accounts exist; point Flux at `production` |
 | 5 | Create GitHub environments `infrastructure-plan` and `infrastructure-apply`; restrict `infrastructure-apply` to `main` without deployment reviewers |
 | 6 | Configure the environment secrets below; use separate plan and apply identities |
-| 7 | Install the dedicated apply SSH public key on inventory hosts and the build guest; retain existing administrator keys |
-| 8 | Apply `tailscale/policy.hujson` to authorize the new CI tags; issue scoped, ephemeral-device enrollment keys |
+| 7 | Run `ansible-playbook reconciliation-identity.yml` with administrator SSH access; retain existing administrator keys |
+| 8 | Apply `tailscale/policy.hujson`; create the environment-bound OIDC identities below |
 | 9 | Run the workflow manually and confirm `desired_revision == applied_revision` with `stage == complete` |
 
-The first merge requires the administrator bootstrap before CI can deploy; Flux may report the missing `production` branch until that run publishes it.
+These activation steps provision external credentials once; merge and scheduled reconciliation use the configured GitHub environments.
 
 | Environment secret | `infrastructure-plan` | `infrastructure-apply` |
 | --- | --- | --- |
@@ -93,21 +93,34 @@ The first merge requires the administrator bootstrap before CI can deploy; Flux 
 | `CLOUDFLARE_API_TOKEN` | Read managed DNS zones and account tunnels | Edit managed DNS zones and account tunnels |
 | `HCLOUD_TOKEN` | Read managed Hetzner project | Read/write managed Hetzner project |
 | `KUBE_CONFIG` | `flux-system/infrastructure-plan` identity | `flux-system/infrastructure-apply` identity |
-| `TAILSCALE_AUTH_KEY` | Ephemeral devices tagged `tag:infra-plan` | Ephemeral devices tagged `tag:infra-apply` |
+| `PLATFORM_MAIL_RECIPIENT` | Private OpenTofu mail recipient | Same recipient |
 | `SSH_PRIVATE_KEY` | Unset | Dedicated key for managed hosts and build guest |
 | `SSH_KNOWN_HOSTS` | Unset | Verified Tailnet host keys, `fredrir-06` and `infra-build-09` aliases |
 | `SOPS_AGE_KEY` | Unset | Decrypt host monitoring and backup credentials |
-| `RUNNER_REGISTRATION_TOKEN` | Unset | Register missing runners for inventory repositories |
+| `RUNNER_APP_ID`, `RUNNER_APP_PRIVATE_KEY` | Unset | Existing runner GitHub App; mint a short-lived installation token with repository administration permission |
+
+| OIDC setting | `infrastructure-plan` | `infrastructure-apply` |
+| --- | --- | --- |
+| GitHub environment variable | `TAILSCALE_CLIENT_ID` | `TAILSCALE_CLIENT_ID` |
+| Issuer | `https://token.actions.githubusercontent.com` | Same issuer |
+| Subject | `repo:fredrir/infra:environment:infrastructure-plan` | `repo:fredrir/infra:environment:infrastructure-apply` |
+| Audience | `infra-reconciliation-plan` | `infra-reconciliation-apply` |
+| Repository claim | `repository_id=1328085692` | Same repository |
+| Workflow claim | Pull request workflow revision | `workflow_ref=fredrir/infra/.github/workflows/reconcile.yml@refs/heads/main` |
+| Scope / tag | `auth_keys` / `tag:infra-plan` | `auth_keys` / `tag:infra-apply` |
+| Device lifetime | Ephemeral; removed after job completion | Same lifetime |
 
 | Credential boundary | Value |
 | --- | --- |
-| AWS identity policies | `tofu/reconciliation.tf`; deployment identities cannot change their own grants |
+| AWS identity policies | `tofu/reconciliation.tf`; attached managed policies; deployment identities cannot change their own grants |
 | Kubernetes identities | `platform/components/policy/reconciliation.yaml` |
 | Kubernetes tokens | Controller-populated `infrastructure-plan-credentials` and `infrastructure-apply-credentials` Secrets in `flux-system` |
 | Kubernetes API address | Reachable control-plane Tailnet address with a matching certificate; include its CA in each kubeconfig |
 | Kubernetes apply scope | Read Flux resources; patch reconciliation annotations; admission rejects spec changes |
 | Tailnet plan scope | Control-plane API only |
 | Tailnet apply scope | Control-plane API and SSH to managed hosts |
+| Host SSH key | `ansible/files/reconciliation.pub`; maintained by `ansible/reconciliation-identity.yml` |
+| CI SOPS recipient | Added only to host monitoring and backup secret files |
 | Provider-policy changes or revoked credentials | Administrator repair required |
 
 ```sh

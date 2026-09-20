@@ -1,0 +1,22 @@
+- name: Maintain reconciliation host access
+  hosts: ubuntu:build_engines
+  become: true
+  gather_facts: false
+  tasks:
+  - name: Read SSH account
+    ansible.builtin.getent:
+      database: passwd
+      key: '{{ ansible_user }}'
+  - name: Create SSH directory
+    ansible.builtin.file:
+      path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh'
+      state: directory
+      owner: '{{ ansible_user }}'
+      mode: '0700'
+  - name: Install reconciliation identity
+    ansible.builtin.lineinfile:
+      path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh/authorized_keys'
+      line: '{{ lookup("ansible.builtin.file", "files/reconciliation.pub") }}'
+      create: true
+      owner: '{{ ansible_user }}'
+      mode: '0600'

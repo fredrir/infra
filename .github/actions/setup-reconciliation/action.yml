@@ -7,6 +7,9 @@ inputs:
   identity:
     description: Scoped network identity.
     default: plan
+  tailscale-client-id:
+    description: Federated network identity.
+    required: false
 runs:
   using: composite
   steps:
@@ -18,7 +21,7 @@ runs:
       key: reconciliation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tofu/.terraform.lock.hcl', 'uv.lock') }}
   - shell: bash
     run: |
-      infra ci install-tools tofu flux kubectl helm actionlint sops uv tailscale tailscaled
+      infra ci install-tools tofu flux kubectl helm actionlint sops uv
   - shell: bash
     run: |
       uv sync --frozen --group ci --no-install-project
@@ -30,7 +33,7 @@ runs:
     env:
       RECONCILE_IDENTITY: ${{ inputs.identity }}
     run: |
-      for required in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY CLOUDFLARE_API_TOKEN TF_VAR_hcloud_token KUBE_CONFIG TAILSCALE_AUTH_KEY; do
+      for required in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY CLOUDFLARE_API_TOKEN TF_VAR_hcloud_token TF_VAR_platform_mail_recipient KUBE_CONFIG; do
         if [ -z "${!required}" ]; then echo "Missing $required in infrastructure-$RECONCILE_IDENTITY" >&2; exit 1; fi
       done
       identity=$(aws sts get-caller-identity --query Arn --output text)
@@ -41,7 +44,13 @@ runs:
       umask 077
       printf '%s' "$KUBE_CONFIG" > "$RUNNER_TEMP/reconcile-kubeconfig"
       printf 'KUBECONFIG=%s\n' "$RUNNER_TEMP/reconcile-kubeconfig" >> "$GITHUB_ENV"
-      printf '%s' "$TAILSCALE_AUTH_KEY" > "$RUNNER_TEMP/tailnet-key"
-      sudo systemd-run --unit=infra-tailnet "$(command -v tailscaled)" --state=mem: --socket=/var/run/infra-tailnet.sock
-      sudo "$(command -v tailscale)" --socket=/var/run/infra-tailnet.sock up --auth-key="file:$RUNNER_TEMP/tailnet-key" --hostname="infra-$RECONCILE_IDENTITY-$GITHUB_RUN_ID" --advertise-tags="tag:infra-$RECONCILE_IDENTITY" --accept-dns=false --timeout=60s
-      rm "$RUNNER_TEMP/tailnet-key"
+  - if: inputs.network == 'true'
+    uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8
+    with:
+      version: 1.102.4
+      sha256sum: 50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9
+      oauth-client-id: ${{ inputs.tailscale-client-id }}
+      audience: infra-reconciliation-${{ inputs.identity }}
+      tags: tag:infra-${{ inputs.identity }}
+      hostname: infra-${{ inputs.identity }}-${{ github.run_id }}
+      args: --accept-dns=false
