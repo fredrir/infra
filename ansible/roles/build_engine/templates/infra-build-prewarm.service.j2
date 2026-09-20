@@ -5,6 +5,7 @@ ConditionPathIsDirectory={{ build_engine_prewarm_workdir }}
 
 [Service]
 Type=oneshot
+Slice=infra-runners.slice
 User={{ build_engine_runner_account.stdout | default("root", true) }}
 WorkingDirectory={{ build_engine_prewarm_workdir }}
 Environment=_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://{{ build_engine_dagger_name }}
@@ -14,7 +15,7 @@ IOSchedulingClass=idle
 CPUQuota={{ build_engine_prewarm_cpu_percent }}%
 MemoryMax={{ build_engine_prewarm_memory }}
 TimeoutStartSec={{ build_engine_prewarm_timeout }}
-ExecCondition=/usr/local/bin/infra pipeline prepare-check --help
+ExecCondition=/usr/local/bin/infra artifact prune-source --help
 {% for command in build_engine_prewarm_commands %}
 ExecStart={{ command | map('to_json') | join(' ') }}
 {% else %}
