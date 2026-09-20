@@ -1,0 +1,6 @@
+- name: Provision capacity-reserved build VMs
+  hosts: build_vm_hosts
+  become: true
+  gather_facts: true
+  roles:
+  - build_vm

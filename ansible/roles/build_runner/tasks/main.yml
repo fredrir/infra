@@ -1,0 +1,92 @@
+- name: Require trusted dedicated runner guest
+  ansible.builtin.assert:
+    that:
+    - build_engine_dedicated | bool
+    - ansible_facts.system == 'Linux'
+    - ansible_facts.architecture == 'x86_64'
+    - ansible_facts.virtualization_role == 'guest'
+    - inventory_hostname not in groups.get('k3s_cluster', [])
+    - build_runner_owner == 'fredrir'
+    - build_runner_repositories | length > 0
+    - build_runner_repositories | difference(['infra', 'Y', 'llunde-frontend', 'llunde-backend', 'llunde-pyparser', 'packages', 'nsql', 'portfolio']) | length == 0
+    - build_runner_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
+    - build_runner_sha256 is match('^[a-f0-9]{64}$')
+    - build_runner_memory is match('^[1-9][0-9]*G$')
+    - build_runner_cpus_percent | int >= 1
+    - build_runner_cpus_percent | int <= 200
+    - build_runner_labels | select('match', '^[a-zA-Z0-9_-]+$') | list | length == build_runner_labels | length
+
+- name: Wait for cloud initialization
+  ansible.builtin.command:
+    argv: [cloud-init, status, --wait]
+  changed_when: false
+  timeout: 120
+
+- name: Install runner dependencies
+  ansible.builtin.apt:
+    name: [docker.io, git, curl, jq, libicu74]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Start dedicated Docker engine
+  ansible.builtin.systemd_service:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Create trusted runner account
+  ansible.builtin.user:
+    name: runner
+    groups: docker
+    shell: /bin/bash
+    create_home: true
+
+- name: Read pinned build toolchain
+  ansible.builtin.set_fact:
+    build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
+    build_runner_toolchain: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json }}"
+
+- name: Install verified native Bazel
+  ansible.builtin.get_url:
+    url: 'https://github.com/bazelbuild/bazel/releases/download/{{ build_runner_toolchain.bazel }}/bazel-{{ build_runner_toolchain.bazel }}-linux-x86_64'
+    dest: /usr/local/bin/bazel
+    checksum: 'sha256:{{ build_runner_toolchain.bazel_sha256 }}'
+    owner: root
+    group: root
+    mode: '0755'
+    timeout: 30
+
+- name: Install aggregate runner resource limits
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/infra-runners.slice
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Slice]
+      CPUQuota={{ build_runner_cpus_percent }}%
+      MemoryMax={{ build_runner_memory }}
+      TasksMax=4096
+
+- name: Configure repository runners
+  ansible.builtin.include_tasks: repository.yml
+  loop: '{{ build_runner_repositories }}'
+  loop_control:
+    loop_var: build_runner_repository
+
+- name: Create prewarming source directory
+  ansible.builtin.file:
+    path: /var/lib/infra/build
+    state: directory
+    owner: runner
+    group: runner
+    mode: '0755'
+
+- name: Checkout verified CLI source for prewarming
+  become_user: runner
+  ansible.builtin.git:
+    repo: https://github.com/fredrir/infra.git
+    dest: /var/lib/infra/build
+    version: '{{ build_runner_cli.revision }}'
+    force: false

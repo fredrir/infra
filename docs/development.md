@@ -111,29 +111,51 @@ git diff -- platform
 
 | Dedicated VM setting | Value |
 | --- | --- |
-| Playbook | `ansible/build-engines.yml`; inventory group `build_engines` |
-| Activation gates | `build_engine_dedicated=true`, `build_engine_qualified=true` |
-| Excluded hosts | Existing `k3s_cluster` inventory |
-| Prerequisite | Docker; active GitHub runner restricted to `fredrir/infra`, label `dagger-amd64` |
-| Runner service | `build_engine_runner_service=actions.runner.<name>.service`; Docker access checked by Ansible |
-| Workflow opt-in | Repository variable `INFRA_VM_POOL_QUALIFIED=true`; protected infrastructure `main` only |
-| Dagger resource ceiling | Two CPUs, 4 GiB RAM, no swap, 256 processes |
+| Host provisioning | `ansible/build-vms.yml`; inventory group `build_vm_hosts` |
+| Runner provisioning | `ansible/build-runners.yml`; inventory group `build_engines` |
+| Engine provisioning | `ansible/build-engines.yml`; inventory group `build_engines` |
+| Inactive capacity proposal | `ansible/examples/build-vm-fredrir-09.yml` |
+| Host reservation | 4.25 CPUs / 10 GiB removed from Kubernetes allocatable before boot |
+| Guest | Four CPUs / 8 GiB RAM / 80 GiB sparse persistent disk |
+| Host boundary | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding |
+| Activation gates | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true` |
+| Runner registration | Separate registration per trusted repository; GitHub personal accounts have no shared account-level runner pool |
+| Runner slice | Two CPUs / 2 GiB aggregate for runner services and native child processes |
+| Dagger ceiling in proposal | Four CPUs / 4 GiB RAM / 1,024 processes / two parallel operations |
+| Engine defaults outside proposal | Four CPUs / 8 GiB RAM / four parallel operations; configurable within host capacity |
 | Dagger connection | Local `docker-container://infra-dagger`; no published engine port |
-| Bazel cache | `127.0.0.1:9092`; VM-local trust boundary |
+| Bazel cache | `127.0.0.1:9092`; one CPU / 1 GiB RAM; VM-local trusted writes |
 | Persistent caches | Separate Docker volumes for Dagger and Bazel; engine-local Bazel action cache |
-| Action cache collection | 8 GiB / 7 days; entries accessed within 30 minutes retained |
-| Cache collection | 20 GiB per cache; Dagger additionally targets 10 GiB free disk |
-| Pool isolation | Trusted jobs only; untrusted PR jobs use hosted isolated engines |
+| Cache collection | Dagger background GC; Bazel remote LRU with 20 GiB target and 21 GiB admission ceiling |
+| Background preparation | Six-hour systemd timer; low-priority client; ten-minute timeout; configured argv only |
+| Preparation commands | `infra pipeline cache-gc`; `infra pipeline prepare-check --local` |
+| Verified tooling | CLI release checksum and revision; pinned native Bazel; pinned GitHub runner archive |
+| Warm ARC capacity | One deploy runner and one declaration-check runner |
+| Pool isolation | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines |
 
 ```sh
-ansible-playbook -i "$BUILD_ENGINE_INVENTORY" ansible/build-engines.yml \
-  -e build_engine_dedicated=true -e build_engine_qualified=true \
-  -e "build_engine_runner_service=$GITHUB_RUNNER_SERVICE"
+ansible-playbook -i ansible/inventory/production.yml \
+  -i ansible/examples/build-vm-fredrir-09.yml ansible/k3s.yml \
+  --limit fredrir-09 --check --diff
+ansible-playbook -i ansible/inventory/production.yml \
+  -i ansible/examples/build-vm-fredrir-09.yml ansible/build-vms.yml \
+  -e build_vm_enabled=true --check --diff
 ```
 
-Cache collection thresholds are garbage-collection targets, not filesystem quotas; provision enough VM disk for active builds and both caches.
+| Activation order | Required result |
+| --- | --- |
+| Publish tooling | `build/cli-release.json` identifies a verified release supporting preparation and cache collection |
+| Reserve host capacity | Apply reviewed K3s reservation; verify worker readiness and allocatable resources |
+| Provision guest | Apply VM playbook with `build_vm_enabled=true`; verify guest SSH host identity before adding it to known hosts |
+| Qualify guest | Native Linux builds, persistent cache reuse, resource ceilings and trust isolation pass |
+| Register runners | Apply runner playbook with `build_engine_qualified=true`; registration tokens obtained locally through authenticated `gh` |
+| Route trusted work | Enable workflow qualification variables only after runner labels and protected-branch conditions match |
+| Verify latency | Measure queue, setup, checks, publication and revision readiness independently |
+| Roll back routing | Disable qualification variables before stopping services; retain guest disk and cache volumes |
 
-The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary. Runner registration and credentials must be configured before applying the engine role. Pull requests and external reusable-workflow callers remain hosted.
+The capacity proposal is inactive and requires an explicit rollout decision. The guest shares physical CPUs with Kubernetes; reservations constrain schedulable capacity rather than guaranteeing latency. Runner registrations share one capped engine, so concurrent repositories may queue. Background preparation limits its client process; expensive Dagger work remains bounded by the engine's shared limits. Cache thresholds are retention targets rather than filesystem quotas, except for Bazel remote's write-admission ceiling and the guest disk's virtual capacity.
+
+The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary. Only trusted repositories and protected branches may use this VM. Prewarming starts only when commands and their working directory exist; first population may exceed the normal CI budget.
 
 ## Consumer cutover
 

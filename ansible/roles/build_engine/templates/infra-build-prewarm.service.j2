@@ -1,0 +1,21 @@
+[Unit]
+After=infra-dagger.service infra-bazel-cache.service
+Requires=infra-dagger.service infra-bazel-cache.service
+ConditionPathIsDirectory={{ build_engine_prewarm_workdir }}
+
+[Service]
+Type=oneshot
+User={{ build_engine_runner_account.stdout | default("root", true) }}
+WorkingDirectory={{ build_engine_prewarm_workdir }}
+Environment=_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://{{ build_engine_dagger_name }}
+Environment=BAZEL_REMOTE_CACHE=http://127.0.0.1:{{ build_engine_cache_port }}
+Nice=19
+IOSchedulingClass=idle
+CPUQuota={{ build_engine_prewarm_cpu_percent }}%
+MemoryMax={{ build_engine_prewarm_memory }}
+TimeoutStartSec={{ build_engine_prewarm_timeout }}
+{% for command in build_engine_prewarm_commands %}
+ExecStart={{ command | map('to_json') | join(' ') }}
+{% else %}
+ExecStart=/usr/bin/true
+{% endfor %}

@@ -9,7 +9,7 @@ server: {{ ('https://' + k3s_api_endpoint + ':6443') | to_json }}
 kubelet-arg:
   - cgroup-driver=systemd
   - protect-kernel-defaults=true
-  - system-reserved=cpu=250m,memory=256Mi,ephemeral-storage=1Gi
+  - system-reserved=cpu={{ k3s_system_reserved_cpu }},memory={{ k3s_system_reserved_memory }},ephemeral-storage=1Gi
   - kube-reserved=cpu=250m,memory={{ '768Mi' if k3s_role == 'server' else '512Mi' }},ephemeral-storage=2Gi
   - eviction-hard=memory.available<256Mi,nodefs.available<10%,imagefs.available<15%
   - pod-max-pids=1024

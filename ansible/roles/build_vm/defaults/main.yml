@@ -1,0 +1,12 @@
+build_vm_enabled: false
+build_vm_name: infra-build
+build_vm_cpus: 4
+build_vm_memory_mib: 8192
+build_vm_disk_gib: 80
+build_vm_ssh_port: 2222
+build_vm_ssh_public_key: ''
+build_vm_image_url: https://cloud-images.ubuntu.com/noble/20260911/noble-server-cloudimg-amd64.img
+build_vm_image_sha256: 612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354
+build_vm_directory: /var/lib/infra-build-vm
+build_vm_system_reserved_cpu: 4250m
+build_vm_system_reserved_memory: 10Gi

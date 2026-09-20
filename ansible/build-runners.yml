@@ -1,0 +1,8 @@
+- name: Register trusted dedicated build runners
+  hosts: build_engines
+  become: true
+  gather_facts: true
+  roles:
+  - build_runner
+  - infra_binary
+  - build_engine

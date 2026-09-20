@@ -8,10 +8,24 @@
     - ansible_facts.system == 'Linux'
     - ansible_facts.architecture == 'x86_64'
     - inventory_hostname not in groups.get('k3s_cluster', [])
-    - build_engine_cpus | int == 2
-    - build_engine_memory == '4g'
-    - build_engine_pids | int == 256
+    - build_engine_cpus | int >= 1
+    - build_engine_cpus | int <= ansible_facts.processor_vcpus | int
+    - build_engine_memory is match('^[1-9][0-9]*g$')
+    - build_engine_memory[:-1] | int * 1024 <= ansible_facts.memtotal_mb | int
+    - build_engine_pids | int >= 256
+    - build_engine_pids | int <= 8192
+    - build_engine_parallelism | int >= 1
+    - build_engine_parallelism | int <= build_engine_cpus | int
+    - build_engine_cache_cpus | int >= 1
+    - build_engine_cache_cpus | int <= build_engine_cpus | int
+    - build_engine_cache_memory is match('^[1-9][0-9]*g$')
+    - build_engine_prewarm_interval is match('^[1-9][0-9]*h$')
+    - build_engine_prewarm_timeout is match('^[1-9][0-9]*min$')
+    - build_engine_prewarm_cpu_percent | int >= 1
+    - build_engine_prewarm_cpu_percent | int <= 100
+    - build_engine_prewarm_memory is match('^[1-9][0-9]*[MG]$')
     - build_engine_cache_gib | int > 0
+    - build_engine_prewarm_workdir is match('^/[-a-zA-Z0-9_/.]+$')
     - build_engine_cache_port | int > 1024
     - build_engine_cache_port | int < 65536
     - build_engine_cache_port | int == 9092
@@ -86,3 +100,33 @@
   loop:
   - infra-dagger
   - infra-bazel-cache
+
+- name: Validate prewarming commands
+  ansible.builtin.assert:
+    that:
+    - item is sequence
+    - item is not string
+    - item | length > 0
+    - item | select('string') | list | length == item | length
+    - item[0] is match('^/[-a-zA-Z0-9_/.]+$')
+    - item | select('search', '[\n\r%$]') | list | length == 0
+  loop: '{{ build_engine_prewarm_commands }}'
+
+- name: Install background prewarming units
+  ansible.builtin.template:
+    src: '{{ item }}.j2'
+    dest: '/etc/systemd/system/{{ item }}'
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+  - infra-build-prewarm.service
+  - infra-build-prewarm.timer
+  notify: Restart build prewarming
+
+- name: Configure background prewarming
+  ansible.builtin.systemd_service:
+    name: infra-build-prewarm.timer
+    daemon_reload: true
+    enabled: '{{ build_engine_prewarm_commands | length > 0 }}'
+    state: '{{ "started" if build_engine_prewarm_commands | length > 0 else "stopped" }}'

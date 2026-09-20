@@ -1,0 +1,5 @@
+- name: Restart build VM
+  ansible.builtin.systemd_service:
+    name: infra-build-vm
+    daemon_reload: true
+    state: restarted

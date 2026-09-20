@@ -1,0 +1,123 @@
+- name: Require bounded dedicated guest resources
+  ansible.builtin.assert:
+    that:
+    - build_vm_enabled | bool
+    - inventory_hostname in groups.get('agent', [])
+    - ansible_facts.architecture == 'x86_64'
+    - build_vm_name is match('^[a-z][a-z0-9-]+$')
+    - build_vm_cpus | int == 4
+    - build_vm_memory_mib | int == 8192
+    - build_vm_disk_gib | int == 80
+    - build_vm_ssh_port | int > 1024
+    - build_vm_ssh_port | int < 65536
+    - build_vm_ssh_public_key is match('^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$')
+    - build_vm_image_url is match('^https://cloud-images[.]ubuntu[.]com/[-a-zA-Z0-9/_.]+$')
+    - build_vm_image_sha256 is match('^[a-f0-9]{64}$')
+    - build_vm_directory == '/var/lib/infra-build-vm'
+
+- name: Read host capacity reservation
+  ansible.builtin.slurp:
+    src: /etc/rancher/k3s/config.yaml
+  register: build_vm_host_config
+
+- name: Require Kubernetes capacity reservation before boot
+  ansible.builtin.assert:
+    that:
+    - "('system-reserved=cpu=' + build_vm_system_reserved_cpu + ',memory=' + build_vm_system_reserved_memory + ',ephemeral-storage=1Gi') in (build_vm_host_config.content | b64decode)"
+
+- name: Check KVM device
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: build_vm_kvm
+
+- name: Require native virtualization
+  ansible.builtin.assert:
+    that:
+    - build_vm_kvm.stat.ischr | default(false)
+
+- name: Install VM tools
+  ansible.builtin.apt:
+    name: [qemu-system-x86, qemu-utils, cloud-image-utils]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create isolated VM account
+  ansible.builtin.user:
+    name: infra-build-vm
+    system: true
+    groups: kvm
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Create VM storage
+  ansible.builtin.file:
+    path: '{{ build_vm_directory }}'
+    state: directory
+    owner: infra-build-vm
+    group: infra-build-vm
+    mode: '0750'
+
+- name: Download verified guest base
+  ansible.builtin.get_url:
+    url: '{{ build_vm_image_url }}'
+    dest: '{{ build_vm_directory }}/base-{{ build_vm_image_sha256 }}.qcow2'
+    checksum: 'sha256:{{ build_vm_image_sha256 }}'
+    owner: infra-build-vm
+    group: infra-build-vm
+    mode: '0440'
+    timeout: 60
+
+- name: Create bounded persistent guest disk
+  become_user: infra-build-vm
+  ansible.builtin.command:
+    argv:
+    - qemu-img
+    - create
+    - -f
+    - qcow2
+    - -F
+    - qcow2
+    - -b
+    - '{{ build_vm_directory }}/base-{{ build_vm_image_sha256 }}.qcow2'
+    - '{{ build_vm_directory }}/disk.qcow2'
+    - '{{ build_vm_disk_gib }}G'
+    creates: '{{ build_vm_directory }}/disk.qcow2'
+
+- name: Render guest initialization
+  ansible.builtin.template:
+    src: '{{ item }}.j2'
+    dest: '{{ build_vm_directory }}/{{ item }}'
+    owner: infra-build-vm
+    group: infra-build-vm
+    mode: '0640'
+  loop: [user-data, meta-data]
+  register: build_vm_seed
+
+- name: Build guest initialization disk
+  become_user: infra-build-vm
+  ansible.builtin.command:
+    argv: [cloud-localds, '{{ build_vm_directory }}/seed.img', '{{ build_vm_directory }}/user-data', '{{ build_vm_directory }}/meta-data']
+  when: build_vm_seed.changed
+
+- name: Install bounded guest service
+  ansible.builtin.template:
+    src: infra-build-vm.service.j2
+    dest: /etc/systemd/system/infra-build-vm.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart build VM
+
+- name: Start build VM
+  ansible.builtin.systemd_service:
+    name: infra-build-vm
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Wait for guest SSH
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: '{{ build_vm_ssh_port }}'
+    timeout: 60

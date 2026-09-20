@@ -4,7 +4,7 @@ Requires=docker.service
 
 [Service]
 ExecStartPre=-/usr/bin/docker rm -f infra-bazel-cache
-ExecStart=/usr/bin/docker run --rm --name infra-bazel-cache --cpus=1 --memory=1g --memory-swap=1g --pids-limit=128 --security-opt=no-new-privileges --cap-drop=ALL --publish 127.0.0.1:{{ build_engine_cache_port }}:8080 --volume infra-bazel-cache:/data {{ build_engine_bazel_image }} --dir=/data --max_size={{ build_engine_cache_gib }} --http_address=0.0.0.0:8080
+ExecStart=/usr/bin/docker run --rm --name infra-bazel-cache --cpus={{ build_engine_cache_cpus }} --memory={{ build_engine_cache_memory }} --memory-swap={{ build_engine_cache_memory }} --pids-limit=128 --security-opt=no-new-privileges --cap-drop=ALL --publish 127.0.0.1:{{ build_engine_cache_port }}:8080 --volume infra-bazel-cache:/data {{ build_engine_bazel_image }} --dir=/data --max_size={{ build_engine_cache_gib }} --http_address=0.0.0.0:8080 --max_size_hard_limit={{ build_engine_cache_gib | int + 1 }} --grpc_address=none
 ExecStop=/usr/bin/docker stop --time 20 infra-bazel-cache
 Restart=on-failure
 RestartSec=5
