@@ -14,7 +14,7 @@
     - build_runner_sha256 is match('^[a-f0-9]{64}$')
     - build_runner_memory is match('^[1-9][0-9]*G$')
     - build_runner_cpus_percent | int >= 1
-    - build_runner_cpus_percent | int <= 200
+    - build_runner_cpus_percent | int <= 400
     - build_runner_labels | select('match', '^[a-zA-Z0-9_-]+$') | list | length == build_runner_labels | length
 
 - name: Wait for cloud initialization
