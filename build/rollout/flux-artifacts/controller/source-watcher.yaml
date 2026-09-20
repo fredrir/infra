@@ -470,6 +470,7 @@ spec:
         - mountPath: "/tmp"
           name: tmp
       nodeSelector:
+        kubernetes.io/arch: amd64
         kubernetes.io/os: linux
       priorityClassName: system-cluster-critical
       securityContext:
