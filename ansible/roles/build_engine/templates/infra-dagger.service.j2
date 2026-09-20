@@ -1,0 +1,14 @@
+[Unit]
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+ExecStartPre=-/usr/bin/docker rm -f {{ build_engine_dagger_name }}
+ExecStart=/usr/bin/docker run --rm --name {{ build_engine_dagger_name }} --privileged --cpus={{ build_engine_cpus }} --memory={{ build_engine_memory }} --memory-swap={{ build_engine_memory }} --pids-limit={{ build_engine_pids }} --volume infra-dagger-cache:/var/lib/dagger {{ build_engine_image }} --oci-max-parallelism=2 --oci-worker-gc --oci-worker-gc-keepstorage=1024,10240,{{ build_engine_cache_gib | int * 1024 }}
+ExecStop=/usr/bin/docker stop --time 30 {{ build_engine_dagger_name }}
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target

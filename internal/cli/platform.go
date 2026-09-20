@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -27,7 +28,7 @@ func newPlatformCommand() *cobra.Command {
 	}}
 	slots.Flags().DurationVar(&interval, "interval", 30*time.Second, "Reconciliation interval")
 	slots.Flags().BoolVar(&once, "once", false, "Reconcile once")
-	root.AddCommand(slots, &cobra.Command{Use: "runner-hook", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	root.AddCommand(newToolsPromotionCommand(), slots, &cobra.Command{Use: "runner-hook", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		var event *os.File
 		if path := os.Getenv("GITHUB_EVENT_PATH"); path != "" {
 			var err error
@@ -49,6 +50,27 @@ func newPlatformCommand() *cobra.Command {
 		return nil
 	}})
 	return root
+}
+
+func newToolsPromotionCommand() *cobra.Command {
+	var root, image string
+	var apply bool
+	cmd := &cobra.Command{Use: "promote-tools", Short: "Update tools image pins and commands together", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		edits, err := platformops.ToolsPromotion(root, image)
+		if err != nil {
+			return err
+		}
+		if apply {
+			if err := platformops.ApplyEdits(edits); err != nil {
+				return err
+			}
+		}
+		return json.NewEncoder(cmd.OutOrStdout()).Encode(edits)
+	}}
+	cmd.Flags().StringVar(&root, "root", ".", "Infrastructure repository directory")
+	cmd.Flags().StringVar(&image, "image", "", "Verified published tools image digest")
+	cmd.Flags().BoolVar(&apply, "apply", false, "Apply changes to repository files")
+	return cmd
 }
 
 func newControlBackupCommand() *cobra.Command {

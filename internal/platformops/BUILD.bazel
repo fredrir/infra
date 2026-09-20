@@ -9,10 +9,12 @@ go_library(
         "control.go",
         "heartbeat.go",
         "hook.go",
+        "promote.go",
         "slots.go",
     ],
     importpath = "github.com/fredrir/infra/internal/platformops",
     visibility = ["//:__subpackages__"],
+    deps = ["@in_yaml_go_yaml_v3//:yaml"],
 )
 
 go_test(
@@ -20,8 +22,11 @@ go_test(
     srcs = [
         "backup_contract_test.go",
         "backup_test.go",
+        "cache_test.go",
+        "control_test.go",
         "heartbeat_test.go",
         "hook_test.go",
+        "promote_test.go",
         "slots_test.go",
     ],
     embed = [":platformops"],

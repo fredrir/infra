@@ -2,6 +2,8 @@
 
 My infrastructure, for my personal projects, services and hobbies
 
+[Go development and build architecture](docs/development.md)
+
 
 ## Services
 

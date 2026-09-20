@@ -1,0 +1,6 @@
+- name: Configure isolated build engines
+  hosts: build_engines
+  become: true
+  gather_facts: true
+  roles:
+  - build_engine

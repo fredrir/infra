@@ -1,0 +1,62 @@
+- name: Require a qualified dedicated VM
+  ansible.builtin.assert:
+    that:
+    - build_engine_dedicated | bool
+    - build_engine_qualified | bool
+    - ansible_facts.system == 'Linux'
+    - ansible_facts.architecture == 'x86_64'
+    - inventory_hostname not in groups.get('k3s_cluster', [])
+    - build_engine_cpus | int == 2
+    - build_engine_memory == '4g'
+    - build_engine_pids | int == 256
+    - build_engine_cache_gib | int > 0
+    - build_engine_cache_port | int > 1024
+    - build_engine_cache_port | int < 65536
+
+- name: Read engine pin
+  ansible.builtin.set_fact:
+    build_engine_image: "{{ (lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json).engine_image }}"
+
+- name: Validate engine pins
+  ansible.builtin.assert:
+    that:
+    - build_engine_image is match('^registry.dagger.io/engine:v[0-9.]+@sha256:[a-f0-9]{64}$')
+    - build_engine_bazel_image is match('^buchgr/bazel-remote-cache:v[0-9.]+@sha256:[a-f0-9]{64}$')
+
+- name: Check Docker availability
+  ansible.builtin.command:
+    argv: [docker, info, --format, '{{ "{{.OSType}}" }}']
+  register: build_engine_docker
+  changed_when: false
+  failed_when: build_engine_docker.rc != 0 or build_engine_docker.stdout != 'linux'
+
+- name: Pull pinned engine images
+  ansible.builtin.command:
+    argv: [docker, pull, '{{ item }}']
+  loop:
+  - '{{ build_engine_image }}'
+  - '{{ build_engine_bazel_image }}'
+  register: build_engine_pull
+  changed_when: "'Downloaded newer image' in build_engine_pull.stdout"
+
+- name: Install engine units
+  ansible.builtin.template:
+    src: '{{ item }}.service.j2'
+    dest: '/etc/systemd/system/{{ item }}.service'
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+  - infra-dagger
+  - infra-bazel-cache
+  notify: Restart build engines
+
+- name: Start build engines
+  ansible.builtin.systemd_service:
+    name: '{{ item }}'
+    daemon_reload: true
+    enabled: true
+    state: started
+  loop:
+  - infra-dagger
+  - infra-bazel-cache
