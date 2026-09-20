@@ -3,6 +3,7 @@ load("@gazelle//:def.bzl", "gazelle")
 # gazelle:prefix github.com/fredrir/infra
 # gazelle:exclude dist
 # gazelle:exclude .infra
+# gazelle:exclude build/rollout/flux-artifacts/generate
 
 gazelle(name = "gazelle")
 
