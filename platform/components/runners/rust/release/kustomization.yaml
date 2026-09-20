@@ -21,6 +21,12 @@ patches:
       path: /spec/values/template/spec/containers/0/env/0/value
       value: release
     - op: test
+      path: /spec/values/template/spec/containers/0/env/10/name
+      value: ACTIONS_RUNNER_HOOK_JOB_STARTED
+    - op: replace
+      path: /spec/values/template/spec/containers/0/env/10/value
+      value: /opt/infra/hooks/job-started-release.sh
+    - op: test
       path: /spec/values/template/spec/containers/0/env/2/name
       value: SCCACHE_BUCKET
     - op: replace

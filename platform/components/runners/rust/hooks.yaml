@@ -5,4 +5,10 @@ metadata:
 data:
   job-started.sh: |
     #!/bin/sh
-    exec /usr/local/bin/infra platform runner-hook
+    CI_POOL=main exec /usr/local/bin/infra platform runner-hook
+  job-started-pr.sh: |
+    #!/bin/sh
+    CI_POOL=pr exec /usr/local/bin/infra platform runner-hook
+  job-started-release.sh: |
+    #!/bin/sh
+    CI_POOL=release exec /usr/local/bin/infra platform runner-hook

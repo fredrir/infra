@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "verified_at": "2026-09-20T22:00:55.381654+00:00",
+  "runner_version": "2.337.0",
+  "hook_path_source": "https://github.com/actions/runner/blob/v2.337.0/src/Runner.Worker/JobExtension.cs",
+  "hook_path_selection": "Captured from the Runner.Worker process environment, separately from the job environment dictionary.",
+  "pool_binding": "Each read-only adapter supplies its literal pool to the unchanged Go authorization command.",
+  "scope": "Synthetic exact-script boundary checks establish adapter behavior; they do not claim a previously exploitable job environment bypass.",
+  "rendered_pools": [
+    "main",
+    "pr",
+    "release"
+  ],
+  "read_only_mounts_verified": true,
+  "policy_tests_seconds": 1.14,
+  "adapter_cases": [
+    {
+      "case": "main-push",
+      "allowed": true,
+      "passed": true
+    },
+    {
+      "case": "main-pr-override",
+      "allowed": false,
+      "passed": true
+    },
+    {
+      "case": "pr-same-repo",
+      "allowed": true,
+      "passed": true
+    },
+    {
+      "case": "pr-fork",
+      "allowed": false,
+      "passed": true
+    },
+    {
+      "case": "pr-push-override",
+      "allowed": false,
+      "passed": true
+    },
+    {
+      "case": "release-tag",
+      "allowed": true,
+      "passed": true
+    },
+    {
+      "case": "release-unprotected",
+      "allowed": false,
+      "passed": true
+    },
+    {
+      "case": "release-pr-override",
+      "allowed": false,
+      "passed": true
+    }
+  ],
+  "production_pods_restarted": 0,
+  "independent_review": "Passed by fast_checks."
+}

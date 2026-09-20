@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "restored_at": "2026-09-20T21:54:52.600982+00:00",
+  "all_eight_restored": true,
+  "held_pools": [],
+  "runners": [
+    {
+      "repository": "fredrir/Y",
+      "runner": "infra-build-09-Y",
+      "status": "online",
+      "custom_labels": [
+        "dagger-amd64",
+        "infra-trusted"
+      ]
+    },
+    {
+      "repository": "fredrir/llunde-frontend",
+      "runner": "infra-build-09-llunde-frontend",
+      "status": "online",
+      "custom_labels": [
+        "dagger-amd64",
+        "infra-trusted"
+      ]
+    },
+    {
+      "repository": "fredrir/llunde-backend",
+      "runner": "infra-build-09-llunde-backend",
+      "status": "online",
+      "custom_labels": [
+        "dagger-amd64",
+        "infra-trusted"
+      ]
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "runner": "infra-build-09-llunde-pyparser",
+      "status": "online",
+      "custom_labels": [
+        "dagger-amd64",
+        "infra-trusted"
+      ]
+    },
+    {
+      "repository": "fredrir/packages",
+      "runner": "infra-build-09-packages",
+      "status": "online",
+      "custom_labels": [
+        "dagger-amd64",
+        "infra-trusted"
+      ]
+    },
+    {
+      "repository": "fredrir/nsql",
+      "runner": "infra-build-09-nsql",
+      "status": "online",
+      "custom_labels": [
+        "dagger-amd64",
+        "infra-trusted"
+      ]
+    },
+    {
+      "repository": "fredrir/portfolio",
+      "runner": "infra-build-09-portfolio",
+      "status": "online",
+      "custom_labels": [
+        "dagger-amd64",
+        "infra-trusted"
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "runner": "infra-build-09-infra",
+      "status": "online",
+      "custom_labels": [
+        "dagger-amd64",
+        "infra-trusted"
+      ]
+    }
+  ],
+  "all_eight_online": true,
+  "resources": {
+    "observed_at": "2026-09-20T22:00:52.224975+00:00",
+    "guest_memory_bytes": {
+      "total": 8326930432,
+      "available": 5166698496
+    },
+    "runner_slice": {
+      "current_bytes": 2147397632,
+      "maximum_bytes": 2147483648,
+      "stat": {
+        "anon": 748421120,
+        "file": 1243824128,
+        "inactive_anon": 301424640,
+        "active_anon": 744161280,
+        "inactive_file": 299360256,
+        "active_file": 647299072
+      },
+      "events": {
+        "low": 0,
+        "high": 0,
+        "max": 535694,
+        "oom": 1,
+        "oom_kill": 1,
+        "oom_group_kill": 0
+      },
+      "pressure": [
+        "some avg10=0.09 avg60=0.25 avg300=0.33 total=122250774",
+        "full avg10=0.00 avg60=0.06 avg300=0.10 total=86819202"
+      ]
+    },
+    "runner_worker_count": 4,
+    "bazel_jvms": [],
+    "root_disk_available_bytes": 18309292032
+  },
+  "asynchronous_jobs": [
+    {
+      "repository": "fredrir/Y",
+      "run_id": 35539108191,
+      "status": "in_progress",
+      "name": "Build images",
+      "url": "https://github.com/fredrir/Y/actions/runs/35539108191"
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "run_id": 35540314905,
+      "status": "in_progress",
+      "name": "Build images",
+      "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35540314905"
+    },
+    {
+      "repository": "fredrir/portfolio",
+      "run_id": 35539106585,
+      "status": "queued",
+      "name": "Build images",
+      "url": "https://github.com/fredrir/portfolio/actions/runs/35539106585"
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 35540351227,
+      "status": "in_progress",
+      "name": "Check",
+      "url": "https://github.com/fredrir/infra/actions/runs/35540351227"
+    }
+  ],
+  "qualification_complete_for_all_jobs": false,
+  "resource_limitations": [
+    "The runner aggregate remains limited to 2 GiB; concurrent native tools and scanners share this limit.",
+    "The recorded OOM count is historical; near-limit memory.current includes reclaimable file cache and is not alone proof of imminent OOM.",
+    "Dagger maxparallelism1 bounds engine vertices, not all host processes."
+  ]
+}
