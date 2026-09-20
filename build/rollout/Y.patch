@@ -1,5 +1,5 @@
 diff --git a/.github/workflows/images.yml b/.github/workflows/images.yml
-index 83447abe7d80db526db5dc131edd658a4c0f7579..8271834935f81fee3bfd87234c53d0b590f43fec 100644
+index 83447abe7d80db526db5dc131edd658a4c0f7579..0ae607f23442418135b208110e4699c65b9aa585 100644
 --- a/.github/workflows/images.yml
 +++ b/.github/workflows/images.yml
 @@ -3,6 +3,12 @@ name: Build images
@@ -20,7 +20,7 @@ index 83447abe7d80db526db5dc131edd658a4c0f7579..8271834935f81fee3bfd87234c53d0b5
        id-token: write
        attestations: write
 -    uses: fredrir/infra/.github/workflows/build-image.yml@25cbb5389a5d5df996709e2c5a1b4d1443861172
-+    uses: fredrir/infra/.github/workflows/build-image.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610
      with:
        image: ghcr.io/fredrir/y-api
        context: .
@@ -34,7 +34,7 @@ index 83447abe7d80db526db5dc131edd658a4c0f7579..8271834935f81fee3bfd87234c53d0b5
        id-token: write
        attestations: write
 -    uses: fredrir/infra/.github/workflows/build-image.yml@25cbb5389a5d5df996709e2c5a1b4d1443861172
-+    uses: fredrir/infra/.github/workflows/build-image.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610
      with:
        image: ghcr.io/fredrir/y-web
        context: .

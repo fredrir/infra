@@ -1,6 +1,6 @@
 diff --git a/.github/chainguard/dependencies.sts.yaml b/.github/chainguard/dependencies.sts.yaml
 new file mode 100644
-index 0000000000000000000000000000000000000000..7637117909e7245cfb29fd3ff216e6d4c9e1f10b
+index 0000000000000000000000000000000000000000..26db34529c29f0a22804cd44028cd1e42673dd24
 --- /dev/null
 +++ b/.github/chainguard/dependencies.sts.yaml
 @@ -0,0 +1,13 @@
@@ -12,17 +12,17 @@ index 0000000000000000000000000000000000000000..7637117909e7245cfb29fd3ff216e6d4
 +  event_name: ^push$
 +  ref: ^refs/heads/main$
 +  runner_environment: ^github-hosted$
-+  job_workflow_ref: ^fredrir/llunde-pyparser/\.github/workflows/pin-dependencies\.yml@c31fcd6c7a29f68dfa54da8120a4a00131f48101$
-+  job_workflow_sha: ^c31fcd6c7a29f68dfa54da8120a4a00131f48101$
++  job_workflow_ref: ^fredrir/llunde-pyparser/\.github/workflows/pin-dependencies\.yml@fbd1c5e18819a58f6f29f0dd9be49682fad1c800$
++  job_workflow_sha: ^fbd1c5e18819a58f6f29f0dd9be49682fad1c800$
 +permissions:
 +  contents: write
 +  pull_requests: write
 diff --git a/.github/workflows/dependencies.yml b/.github/workflows/dependencies.yml
 new file mode 100644
-index 0000000000000000000000000000000000000000..959a9af0c0449a2b02f0fca363a53a0178e388a1
+index 0000000000000000000000000000000000000000..312de05276416a3a043fa07521f92fc05eaeb6d6
 --- /dev/null
 +++ b/.github/workflows/dependencies.yml
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,71 @@
 +name: Prepare parser dependencies
 +on:
 +  push:
@@ -32,40 +32,73 @@ index 0000000000000000000000000000000000000000..959a9af0c0449a2b02f0fca363a53a01
 +      - uv.lock
 +      - ci/dependencies.Containerfile
 +      - .github/workflows/dependencies.yml
++      - ci/dependency-build.json
++      - ci/dependency_plan.py
++      - .dockerignore
++      - .gitignore
 +permissions:
 +  contents: read
 +concurrency:
 +  group: parser-dependencies
 +  cancel-in-progress: true
++env:
++  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 +jobs:
++  plan:
++    runs-on: ubuntu-24.04
++    outputs:
++      build: ${{ steps.plan.outputs.build }}
++      contract: ${{ steps.plan.outputs.contract_sha256 }}
++      image: ${{ steps.plan.outputs.image }}
++      context: ${{ steps.plan.outputs.context }}
++      dockerfile: ${{ steps.plan.outputs.dockerfile }}
++      target: ${{ steps.plan.outputs.target }}
++      build-args: ${{ steps.plan.outputs.build_args }}
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++        with:
++          persist-credentials: false
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++        with:
++          repository: fredrir/infra
++          ref: a57b0e15d5ca1c3180fba6a16cedbc7595e90610
++          path: .infra-dependency-recipe
++          persist-credentials: false
++      - id: plan
++        run: python3 ci/dependency_plan.py plan --infra-root .infra-dependency-recipe --github-output "$GITHUB_OUTPUT"
 +  image:
++    needs: plan
++    if: needs.plan.outputs.build == 'true'
 +    permissions:
 +      contents: read
 +      packages: write
 +      id-token: write
 +      attestations: write
-+    uses: fredrir/infra/.github/workflows/build-image.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610
 +    with:
-+      image: ghcr.io/fredrir/pyparser-dependencies
-+      context: .
-+      dockerfile: ci/dependencies.Containerfile
++      image: ${{ needs.plan.outputs.image }}
++      context: ${{ needs.plan.outputs.context }}
++      dockerfile: ${{ needs.plan.outputs.dockerfile }}
++      target: ${{ needs.plan.outputs.target }}
++      build-args: ${{ needs.plan.outputs.build-args }}
 +      deploy: false
 +      timeout-minutes: 120
 +  pin:
-+    needs: image
++    needs: [plan, image]
 +    permissions:
 +      contents: read
 +      packages: read
 +      id-token: write
-+    uses: fredrir/llunde-pyparser/.github/workflows/pin-dependencies.yml@c31fcd6c7a29f68dfa54da8120a4a00131f48101
++    uses: fredrir/llunde-pyparser/.github/workflows/pin-dependencies.yml@fbd1c5e18819a58f6f29f0dd9be49682fad1c800
 +    with:
 +      image: ${{ needs.image.outputs.image }}
-+      workflow-revision: d9016b2889c88f1ec99bfe9d7262343a759e4b69
++      build-contract: ${{ needs.plan.outputs.contract }}
++      workflow-revision: a57b0e15d5ca1c3180fba6a16cedbc7595e90610
 diff --git a/.github/workflows/images.yml b/.github/workflows/images.yml
-index 615c9728c8af38b89282b85dcc66c8ce686f3194..f2144ebb0b6d5db50e53fb3a8b0b91ef106e7a80 100644
+index 615c9728c8af38b89282b85dcc66c8ce686f3194..4cdc844ebdf55518628e74d315d43a3cc0685e9a 100644
 --- a/.github/workflows/images.yml
 +++ b/.github/workflows/images.yml
-@@ -3,21 +3,42 @@ name: Build images
+@@ -3,21 +3,44 @@ name: Build images
    push:
      branches:
      - main
@@ -77,6 +110,8 @@ index 615c9728c8af38b89282b85dcc66c8ce686f3194..f2144ebb0b6d5db50e53fb3a8b0b91ef
 +  cancel-in-progress: true
  permissions:
    contents: read
++env:
++  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
  jobs:
 +  dependencies:
 +    runs-on: ubuntu-24.04
@@ -101,7 +136,7 @@ index 615c9728c8af38b89282b85dcc66c8ce686f3194..f2144ebb0b6d5db50e53fb3a8b0b91ef
        id-token: write
        attestations: write
 -    uses: fredrir/infra/.github/workflows/build-image.yml@25cbb5389a5d5df996709e2c5a1b4d1443861172
-+    uses: fredrir/infra/.github/workflows/build-image.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610
      with:
        image: ghcr.io/fredrir/pyparser-review
        context: .
@@ -114,10 +149,10 @@ index 615c9728c8af38b89282b85dcc66c8ce686f3194..f2144ebb0b6d5db50e53fb3a8b0b91ef
 +      dependency-image: ${{ needs.dependencies.outputs.image }}
 diff --git a/.github/workflows/import-prepared-dependencies.yml b/.github/workflows/import-prepared-dependencies.yml
 new file mode 100644
-index 0000000000000000000000000000000000000000..4e00dcfdfdd2991a718ae6e640229fb373a0073e
+index 0000000000000000000000000000000000000000..3c0cc9b562abc2711bb2b5b39574523d91422fd0
 --- /dev/null
 +++ b/.github/workflows/import-prepared-dependencies.yml
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,64 @@
 +name: Import locally prepared parser dependencies
 +on:
 +  workflow_dispatch:
@@ -126,6 +161,8 @@ index 0000000000000000000000000000000000000000..4e00dcfdfdd2991a718ae6e640229fb3
 +concurrency:
 +  group: parser-prepared-import
 +  cancel-in-progress: false
++env:
++  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 +jobs:
 +  publish:
 +    if: github.repository == 'fredrir/llunde-pyparser' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && vars.INFRA_VM_POOL_QUALIFIED == 'true'
@@ -182,15 +219,18 @@ index 0000000000000000000000000000000000000000..4e00dcfdfdd2991a718ae6e640229fb3
 +          printf 'Locally prepared dependency image: `%s`\n\nSource: `%s`\n\nArchive: `%s`\n' "$digest" "$source" "$checksum" >> "$GITHUB_STEP_SUMMARY"
 diff --git a/.github/workflows/pin-dependencies.yml b/.github/workflows/pin-dependencies.yml
 new file mode 100644
-index 0000000000000000000000000000000000000000..c5f0f5bcbb9957596acd5c647d5c4ada4eb4c316
+index 0000000000000000000000000000000000000000..ccf24337c1f80bf222f3ce85a8a0429bb6d4d24b
 --- /dev/null
 +++ b/.github/workflows/pin-dependencies.yml
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,107 @@
 +name: Pin verified parser dependencies
 +on:
 +  workflow_call:
 +    inputs:
 +      image:
++        required: true
++        type: string
++      build-contract:
 +        required: true
 +        type: string
 +      workflow-revision:
@@ -201,6 +241,8 @@ index 0000000000000000000000000000000000000000..c5f0f5bcbb9957596acd5c647d5c4ada
 +concurrency:
 +  group: parser-dependency-pin
 +  cancel-in-progress: false
++env:
++  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 +jobs:
 +  pin:
 +    if: github.repository == 'fredrir/llunde-pyparser' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name == 'push'
@@ -215,10 +257,16 @@ index 0000000000000000000000000000000000000000..c5f0f5bcbb9957596acd5c647d5c4ada
 +          ref: main
 +          fetch-depth: 0
 +          persist-credentials: false
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++        with:
++          repository: fredrir/infra
++          ref: ${{ inputs.workflow-revision }}
++          path: .infra-dependency-recipe
++          persist-credentials: false
 +      - name: Install pinned verifier
 +        run: |
-+          curl --fail --silent --show-error --location --retry 2 --max-time 30 https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-amd64 --output "$RUNNER_TEMP/cosign"
-+          printf '4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71  %s/cosign\n' "$RUNNER_TEMP" | sha256sum --check --strict
++          curl --fail --silent --show-error --location --retry 2 --max-time 30 https://github.com/fredrir/infra/releases/download/cosign-v3.1.3-infra.1/cosign-linux-amd64 --output "$RUNNER_TEMP/cosign"
++          printf '05e004d22d93dc6dffb1b1633c1a03fcf0369b2f6eb247b714e236b61a742c71  %s/cosign\n' "$RUNNER_TEMP" | sha256sum --check --strict
 +          chmod 755 "$RUNNER_TEMP/cosign"
 +          printf '%s\n' "$RUNNER_TEMP" >> "$GITHUB_PATH"
 +      - name: Verify dependency image
@@ -252,6 +300,7 @@ index 0000000000000000000000000000000000000000..c5f0f5bcbb9957596acd5c647d5c4ada
 +          identity: dependencies
 +      - name: Pin current dependency inputs
 +        env:
++          BUILD_CONTRACT: ${{ inputs.build-contract }}
 +          IMAGE: ${{ inputs.image }}
 +          GH_TOKEN: ${{ steps.token.outputs.token }}
 +        run: |
@@ -262,8 +311,10 @@ index 0000000000000000000000000000000000000000..c5f0f5bcbb9957596acd5c647d5c4ada
 +            git reset --hard FETCH_HEAD
 +            current=$(git ls-tree HEAD -- pyproject.toml uv.lock ci/dependencies.Containerfile | sha256sum | cut -d' ' -f1)
 +            test "$current" = "$expected"
++            contract=$(python3 ci/dependency_plan.py contract --infra-root .infra-dependency-recipe | jq -er .contract_sha256)
++            test "$contract" = "$BUILD_CONTRACT"
 +            test ! -L ci && test ! -L ci/dependencies.json
-+            jq -n --arg image "$IMAGE" --arg revision "$GITHUB_SHA" --arg inputs "$expected" '{schema:1,image:$image,source_revision:$revision,inputs_sha256:$inputs}' > ci/dependencies.json
++            jq -n --arg image "$IMAGE" --arg revision "$GITHUB_SHA" --arg inputs "$expected" --arg contract "$contract" '{schema:1,image:$image,source_revision:$revision,inputs_sha256:$inputs,build_contract_sha256:$contract,origin:"github-actions"}' > ci/dependencies.json
 +            git add -- ci/dependencies.json
 +            if git diff --cached --quiet; then exit 0; fi
 +            git -c user.name=infra-release -c user.email=infra-release@users.noreply.github.com commit --quiet -m 'Pin verified parser dependency image'
@@ -281,10 +332,10 @@ index 0000000000000000000000000000000000000000..c5f0f5bcbb9957596acd5c647d5c4ada
 +          exit 1
 diff --git a/ci/dependencies.json b/ci/dependencies.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..c0a97561cd8783af44192a7247cac66b14d7074a
+index 0000000000000000000000000000000000000000..0efdb5b99b9499a3d585ba125ba9713c43c1b190
 --- /dev/null
 +++ b/ci/dependencies.json
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,28 @@
 +{
 +  "schema": 1,
 +  "image": "ghcr.io/fredrir/pyparser-dependencies@sha256:3f0d7afca910cc28c6d4a41b9088fe92622319f9aa50d1602209b92d5319f3de",
@@ -292,8 +343,174 @@ index 0000000000000000000000000000000000000000..c0a97561cd8783af44192a7247cac66b
 +  "inputs_sha256": "99fd99b41f182b09186c866a065a386e1966b0b8e8c8a89eecad9c574a799f06",
 +  "origin": "maintainer-local-archie",
 +  "archive_sha256": "57d6ec1b24e2b04ce8030749fb652c3649783d5e87c2bbe5381177baee2c004a",
-+  "publication_run": "https://github.com/fredrir/llunde-pyparser/actions/runs/35534463752"
++  "publication_run": "https://github.com/fredrir/llunde-pyparser/actions/runs/35534463752",
++  "build_compatibility": {
++    "contract_sha256": "80ca729082a6280bb63d24f785676d5b10f18930ba30abf6ff10a4cacf223cac",
++    "qualification": "maintainer-reviewed-build-semantics-and-local-runtime",
++    "infrastructure_revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
++    "prepared_cli_sha256": "b1bb0e9e300beab3e91bd1b57411440149684a1d92e7d877f60eefae234fa8f9",
++    "review_baseline": "a284f912fa9c5febe375a5b6743db4598b29477c",
++    "equivalence": [
++      "DockerBuild context, platform, target and build arguments unchanged",
++      "Dagger 0.21.9 engine and toolchain unchanged",
++      "New check stages are unused by the dependency recipe",
++      "Context exclusion adds only the infrastructure planning checkout",
++      "Node 24 action runtime and post-build signed-bundle verification do not alter container build inputs"
++    ],
++    "local_qualification": [
++      "Trivy 0.74.0 fixed HIGH/CRITICAL scan clean",
++      "Offline Granite generation successful",
++      "Python public export identities and 23 fast tests successful"
++    ]
++  }
 +}
+diff --git a/ci/dependency-build.json b/ci/dependency-build.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f94b29cecf6b7da2ac7dfeee4ee9251d24d4f229
+--- /dev/null
++++ b/ci/dependency-build.json
+@@ -0,0 +1,12 @@
++{
++  "schema": 1,
++  "image": "ghcr.io/fredrir/pyparser-dependencies",
++  "context": ".",
++  "dockerfile": "ci/dependencies.Containerfile",
++  "target": "",
++  "platform": "linux/amd64",
++  "build_args": {},
++  "revision_args": ["CI_REVISION", "GIT_SHA", "REVISION"],
++  "check_target": "",
++  "test_command": ""
++}
+diff --git a/ci/dependency_plan.py b/ci/dependency_plan.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b20fca2ac1ad5fe724363a0e405dfaf4dbe0c983
+--- /dev/null
++++ b/ci/dependency_plan.py
+@@ -0,0 +1,123 @@
++from __future__ import annotations
++
++import argparse
++import hashlib
++import json
++import re
++import subprocess
++from pathlib import Path
++
++SOURCE_INPUTS = ("pyproject.toml", "uv.lock", "ci/dependencies.Containerfile")
++INFRA_INPUTS = (
++    ".github/workflows/build-image.yml",
++    ".github/actions/setup-infra/action.yml",
++    "build/cli-release.json",
++    "build/toolchain.json",
++    "internal/pipeline/image.go",
++    "internal/pipeline/config.go",
++    "internal/cli/pipeline.go",
++    "internal/ci/arguments.go",
++    "go.mod",
++    "go.sum",
++)
++
++
++def digest(value: bytes) -> str:
++    return hashlib.sha256(value).hexdigest()
++
++
++def source_digest(root: Path) -> str:
++    entries = subprocess.check_output(["git", "ls-tree", "HEAD", "--", *SOURCE_INPUTS], cwd=root)
++    if len(entries.splitlines()) != len(SOURCE_INPUTS):
++        raise ValueError("dependency source input missing")
++    return digest(entries)
++
++
++def build_contract(root: Path, infra: Path) -> tuple[str, dict]:
++    recipe = json.loads((root / "ci/dependency-build.json").read_text())
++    supported = {
++        "schema": 1,
++        "image": "ghcr.io/fredrir/pyparser-dependencies",
++        "context": ".",
++        "dockerfile": "ci/dependencies.Containerfile",
++        "target": "",
++        "platform": "linux/amd64",
++        "build_args": {},
++        "revision_args": ["CI_REVISION", "GIT_SHA", "REVISION"],
++        "check_target": "",
++        "test_command": "",
++    }
++    if recipe != supported:
++        raise ValueError("unsupported dependency build contract")
++    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=infra, text=True).strip()
++    workflow = (root / ".github/workflows/dependencies.yml").read_text()
++    declared = re.findall(
++        r"fredrir/infra/\.github/workflows/build-image.yml@([a-f0-9]{40})", workflow
++    )
++    if declared != [revision]:
++        raise ValueError("dependency workflow and infrastructure checkout differ")
++    workflow = workflow.replace(revision, "<infra-revision>")
++    workflow = re.sub(r"(pin-dependencies\.yml@)[a-f0-9]{40}", r"\1<pin-helper>", workflow)
++    inputs = {name: digest((infra / name).read_bytes()) for name in INFRA_INPUTS}
++    context = {
++        name: digest((root / name).read_bytes())
++        for name in (".dockerignore", ".gitignore", "ci/dependency_plan.py")
++    }
++    contract = {
++        "recipe": recipe,
++        "infrastructure": inputs,
++        "context": context,
++        "workflow": digest(workflow.encode()),
++    }
++    return digest(json.dumps(contract, sort_keys=True, separators=(",", ":")).encode()), recipe
++
++
++def requires_build(manifest: dict, inputs: str, contract: str) -> bool:
++    if not isinstance(manifest, dict):
++        return True
++    compatibility = manifest.get("build_compatibility")
++    compatible = compatibility.get("contract_sha256") if isinstance(compatibility, dict) else None
++    return not (
++        manifest.get("schema") == 1
++        and isinstance(manifest.get("image"), str)
++        and re.fullmatch(
++            r"ghcr.io/fredrir/pyparser-dependencies@sha256:[a-f0-9]{64}", manifest.get("image", "")
++        )
++        and manifest.get("inputs_sha256") == inputs
++        and contract in (manifest.get("build_contract_sha256"), compatible)
++    )
++
++
++def main() -> None:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("command", choices=("plan", "contract"))
++    parser.add_argument("--root", type=Path, default=Path("."))
++    parser.add_argument("--infra-root", type=Path, required=True)
++    parser.add_argument("--github-output", type=Path)
++    args = parser.parse_args()
++    contract, recipe = build_contract(args.root, args.infra_root)
++    inputs = source_digest(args.root)
++    result = {"inputs_sha256": inputs, "contract_sha256": contract}
++    if args.command == "plan":
++        try:
++            manifest = json.loads((args.root / "ci/dependencies.json").read_text())
++        except (OSError, ValueError):
++            manifest = {}
++        result["build"] = requires_build(manifest, inputs, contract)
++        result.update({key: recipe[key] for key in ("image", "context", "dockerfile", "target")})
++        result["build_args"] = "\n".join(
++            f"{key}={value}" for key, value in sorted(recipe["build_args"].items())
++        )
++    if args.github_output:
++        with args.github_output.open("a") as output:
++            for key, value in result.items():
++                if isinstance(value, bool):
++                    value = str(value).lower()
++                if "\n" in str(value):
++                    raise ValueError("multiline dependency workflow output")
++                output.write(f"{key}={value}\n")
++    print(json.dumps(result, sort_keys=True))
++
++
++if __name__ == "__main__":
++    main()
 diff --git a/ci/prepared-dependencies.json b/ci/prepared-dependencies.json
 new file mode 100644
 index 0000000000000000000000000000000000000000..10aa8765ae2fa77280ab4c5fd01b5cd58f9f0c90

@@ -1,5 +1,5 @@
 diff --git a/.github/chainguard/auto-tag.sts.yaml b/.github/chainguard/auto-tag.sts.yaml
-index 5c6a026298aa2656552a3464b5bf7dfe4c162202..a2bfb3b4ee9942c7fa7eb24c8876be801c859024 100644
+index 5c6a026298aa2656552a3464b5bf7dfe4c162202..a529fa0a9cca38de0057f072ebaa4e1fb8a84232 100644
 --- a/.github/chainguard/auto-tag.sts.yaml
 +++ b/.github/chainguard/auto-tag.sts.yaml
 @@ -6,7 +6,7 @@ claim_pattern:
@@ -8,12 +8,12 @@ index 5c6a026298aa2656552a3464b5bf7dfe4c162202..a2bfb3b4ee9942c7fa7eb24c8876be80
    event_name: ^(push|workflow_dispatch)$
 -  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
 -  job_workflow_sha: ^(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
-+  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@(b2c97f0c98c09099d19696089e55f1e95bd6ac1d|d9016b2889c88f1ec99bfe9d7262343a759e4b69)$
-+  job_workflow_sha: ^(b2c97f0c98c09099d19696089e55f1e95bd6ac1d|d9016b2889c88f1ec99bfe9d7262343a759e4b69)$
++  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@(d9016b2889c88f1ec99bfe9d7262343a759e4b69|a57b0e15d5ca1c3180fba6a16cedbc7595e90610)$
++  job_workflow_sha: ^(d9016b2889c88f1ec99bfe9d7262343a759e4b69|a57b0e15d5ca1c3180fba6a16cedbc7595e90610)$
  permissions:
    contents: write
 diff --git a/.github/workflows/auto-tag.yml b/.github/workflows/auto-tag.yml
-index 6bf645880e8dc8f9d23d759b6fa94601ccd837ef..cadc479ed9a6c0e071aeb180f380fee94feeab3c 100644
+index 6bf645880e8dc8f9d23d759b6fa94601ccd837ef..7fb5b195245923a7fdd68b7d8cdad9f4fd3916e7 100644
 --- a/.github/workflows/auto-tag.yml
 +++ b/.github/workflows/auto-tag.yml
 @@ -9,4 +9,4 @@ concurrency:
@@ -21,9 +21,9 @@ index 6bf645880e8dc8f9d23d759b6fa94601ccd837ef..cadc479ed9a6c0e071aeb180f380fee9
  jobs:
    tag:
 -    uses: fredrir/infra/.github/workflows/rust-auto-tag.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
-+    uses: fredrir/infra/.github/workflows/rust-auto-tag.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    uses: fredrir/infra/.github/workflows/rust-auto-tag.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610
 diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
-index 12575732cafd85f7c4f1f8ccbb4499dd052a5240..95604608e5edfb7e873e22c450fb580edfca4b9d 100644
+index 12575732cafd85f7c4f1f8ccbb4499dd052a5240..defef493fc72e6593302c7473eab85c272b3720e 100644
 --- a/.github/workflows/ci.yml
 +++ b/.github/workflows/ci.yml
 @@ -10,7 +10,8 @@ concurrency:
@@ -31,13 +31,13 @@ index 12575732cafd85f7c4f1f8ccbb4499dd052a5240..95604608e5edfb7e873e22c450fb580e
  jobs:
    rust:
 -    uses: fredrir/infra/.github/workflows/rust-ci.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
-+    uses: fredrir/infra/.github/workflows/rust-ci.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    uses: fredrir/infra/.github/workflows/rust-ci.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610
      with:
 +      fast-test-args: '-- --skip embed_drives_real_nvim_and_reads_back --skip embed_captures_highlight_colors --skip run_keymap_round_trips_via_rpcnotify'
        postgres: true
        postgres-url-env: NSQL_TEST_PG_URL
 diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
-index c1d4e4a43f1f75804e9ff2da1fd6328757332899..aeabdae26a9575c09c06cb0a4cd40b5a4b26f919 100644
+index c1d4e4a43f1f75804e9ff2da1fd6328757332899..32e8485652fc8d2bad26872b7afb3f69120f656e 100644
 --- a/.github/workflows/release.yml
 +++ b/.github/workflows/release.yml
 @@ -13,4 +13,4 @@ concurrency:
@@ -45,4 +45,4 @@ index c1d4e4a43f1f75804e9ff2da1fd6328757332899..aeabdae26a9575c09c06cb0a4cd40b5a
  jobs:
    release:
 -    uses: fredrir/infra/.github/workflows/rust-release.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
-+    uses: fredrir/infra/.github/workflows/rust-release.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    uses: fredrir/infra/.github/workflows/rust-release.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610

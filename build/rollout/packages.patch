@@ -1,5 +1,5 @@
 diff --git a/.github/chainguard/dispatch-1269406277.sts.yaml b/.github/chainguard/dispatch-1269406277.sts.yaml
-index ba5b482e3dcbee6072ce7e3bab104c7ced3a8db0..b02d0d6e469271c76be59b73ef4a18a0243b20e2 100644
+index ba5b482e3dcbee6072ce7e3bab104c7ced3a8db0..fa96b56019288e3411af253268df3a3d5cb4b9aa 100644
 --- a/.github/chainguard/dispatch-1269406277.sts.yaml
 +++ b/.github/chainguard/dispatch-1269406277.sts.yaml
 @@ -7,7 +7,7 @@ claim_pattern:
@@ -8,12 +8,12 @@ index ba5b482e3dcbee6072ce7e3bab104c7ced3a8db0..b02d0d6e469271c76be59b73ef4a18a0
    environment: ^release$
 -  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-release\.yml@(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
 -  job_workflow_sha: ^(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
-+  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-release\.yml@(b2c97f0c98c09099d19696089e55f1e95bd6ac1d|d9016b2889c88f1ec99bfe9d7262343a759e4b69)$
-+  job_workflow_sha: ^(b2c97f0c98c09099d19696089e55f1e95bd6ac1d|d9016b2889c88f1ec99bfe9d7262343a759e4b69)$
++  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-release\.yml@(d9016b2889c88f1ec99bfe9d7262343a759e4b69|a57b0e15d5ca1c3180fba6a16cedbc7595e90610)$
++  job_workflow_sha: ^(d9016b2889c88f1ec99bfe9d7262343a759e4b69|a57b0e15d5ca1c3180fba6a16cedbc7595e90610)$
  permissions:
    actions: write
 diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
-index 215424aa574d8754cfeae9efc8a880ef2fef54b7..427cc9ddca322a2619a894ccace6d23a259b3dfa 100644
+index 215424aa574d8754cfeae9efc8a880ef2fef54b7..107536571de80954042049fc4dd44537b32f338b 100644
 --- a/.github/workflows/publish.yml
 +++ b/.github/workflows/publish.yml
 @@ -5,7 +5,6 @@ on:
@@ -29,7 +29,7 @@ index 215424aa574d8754cfeae9efc8a880ef2fef54b7..427cc9ddca322a2619a894ccace6d23a
        contents: write
        id-token: write
 -    uses: fredrir/infra/.github/workflows/packages-publish.yml@25cbb5389a5d5df996709e2c5a1b4d1443861172
-+    uses: fredrir/infra/.github/workflows/packages-publish.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    uses: fredrir/infra/.github/workflows/packages-publish.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610
      secrets: inherit
      with:
 -      smoke-scope: ${{ github.event.schedule == '41 5 * * 1' && 'full' || 'quick' }}

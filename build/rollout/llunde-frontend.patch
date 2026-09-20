@@ -1,5 +1,5 @@
 diff --git a/.github/workflows/images.yml b/.github/workflows/images.yml
-index 070f8ea170d11891599df1334f1a111a407ba9cb..a436c8fa06bb7cde719acf6e860e5f795ec0cfe9 100644
+index 070f8ea170d11891599df1334f1a111a407ba9cb..f50871b56ed3d8aa40ed2033d3757722cc140c42 100644
 --- a/.github/workflows/images.yml
 +++ b/.github/workflows/images.yml
 @@ -18,7 +18,7 @@ jobs:
@@ -7,7 +7,7 @@ index 070f8ea170d11891599df1334f1a111a407ba9cb..a436c8fa06bb7cde719acf6e860e5f79
        id-token: write
        attestations: write
 -    uses: fredrir/infra/.github/workflows/build-image.yml@f467a384e922ddb64955bc19469892077e5bd507
-+    uses: fredrir/infra/.github/workflows/build-image.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610
      with:
        image: ghcr.io/fredrir/llunde-frontend
        context: .
