@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "image": "ghcr.io/fredrir/portfolio-api",
+  "revision": "a09f477f74f99f75b78b86f1be838b6a4f051477",
+  "digest": "sha256:cd271ffe5bced1c0b1dde91c195b313905791e445701a7b4ce3c7f5f147e71f9",
+  "run_id": 35536202065,
+  "attempt": 1
+}
