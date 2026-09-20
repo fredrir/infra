@@ -1,7 +1,9 @@
 FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
 USER root
-ADD --checksum=sha256:33eea0b08d6be444bada18e64b2216459100d6070abcb4b5345cee40c9fff982 https://github.com/dagger/dagger/releases/download/v0.21.9/dagger_v0.21.9_linux_amd64.tar.gz /tmp/dagger.tar.gz
-RUN tar -xzf /tmp/dagger.tar.gz -C /usr/local/bin dagger && rm /tmp/dagger.tar.gz
+RUN curl --fail --silent --show-error --location --max-time 120 --output /tmp/dagger.tar.gz https://github.com/dagger/dagger/releases/download/v0.21.9/dagger_v0.21.9_linux_amd64.tar.gz \
+    && echo '33eea0b08d6be444bada18e64b2216459100d6070abcb4b5345cee40c9fff982  /tmp/dagger.tar.gz' | sha256sum --check --strict \
+    && tar -xzf /tmp/dagger.tar.gz -C /usr/local/bin dagger \
+    && rm /tmp/dagger.tar.gz
 COPY --chmod=755 .infra-artifacts/infra /usr/local/bin/infra
 RUN ln -s /usr/local/bin/infra /usr/local/bin/infra-runner-hook
 ENV _EXPERIMENTAL_DAGGER_CLI_BIN=/usr/local/bin/dagger
