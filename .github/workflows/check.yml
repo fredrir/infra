@@ -64,7 +64,7 @@ jobs:
       - name: Prepare affected check artifacts
         if: steps.affected.outputs.expression != 'set()'
         env:
-          BAZEL_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '' }}
+          BAZEL_REMOTE_CACHE: ${{ runner.environment == 'self-hosted' && 'http://127.0.0.1:9092' || (github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '') }}
           BASE: ${{ steps.affected.outputs.base }}
         run: |
           echo 'Artifact preparation is measured separately from the check budget.' >> "$GITHUB_STEP_SUMMARY"
