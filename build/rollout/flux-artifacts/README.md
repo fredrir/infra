@@ -5,8 +5,9 @@
 | State | Optional; absent from the active production resource list |
 | Approval | Required before selecting an overlay in production |
 | Flux | 2.9.5 |
-| Extension | source-watcher 2.2.4, immutable image digest in `controller/source-watcher.yaml` |
-| Image qualification | Blocked until the downstream candidate passes scanning and provenance verification; the upstream pin has four fixable HIGH findings in `image/upstream-scan.json` |
+| Extension | source-watcher v2.2.4-infra.1, immutable image digest in `controller/source-watcher.yaml` |
+| Image qualification | Hosted run 35535974900 passed smoke, current vulnerability scanning and provenance verification in 5.032s aggregate; `image/qualification.json` records the verified digest |
+| Upstream image | Rejected with four fixable HIGH findings in `image/upstream-scan.json`; tracked dependency/runtime fixes in `image/Dockerfile` and `image/dependencies.patch` |
 | Added resources | One CRD, deployment, service, service account, namespaced role and binding |
 | CPU | 50m requested, 1 core limit |
 | Memory | 64Mi requested, 256Mi limit; requires qualification |

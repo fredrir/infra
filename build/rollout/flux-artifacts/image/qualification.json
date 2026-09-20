@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "image": "ghcr.io/fredrir/infra-source-watcher@sha256:632f482078fb655603c3648169e9f99c3647c91d83a04f1cb8591d6ac9849f76",
+  "platform": "linux/amd64",
+  "version": "v2.2.4-infra.1",
+  "run_url": "https://github.com/fredrir/infra/actions/runs/35535974900/attempts/1",
+  "source_revision": "0ef1966f8e77dccce0fefd83ab7f53e84809fd00",
+  "signer_workflow": "https://github.com/fredrir/infra/.github/workflows/build-image.yml@refs/heads/main",
+  "signer_revision": "0ef1966f8e77dccce0fefd83ab7f53e84809fd00",
+  "runner_environment": "github-hosted",
+  "anonymous_pull": true,
+  "checks": {
+    "schema": 1,
+    "accounting": "sum-of-recorded-check-durations",
+    "budget_seconds": 10,
+    "duration_seconds": 5.031501557,
+    "remaining_seconds": 4.968498443,
+    "success": true,
+    "stages": [
+      {
+        "schema": 1,
+        "stage": "image-smoke",
+        "revision": "0ef1966f8e77dccce0fefd83ab7f53e84809fd00",
+        "started": "2026-09-20T20:37:18.562223151Z",
+        "duration_seconds": 0.022137568,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.031053,
+        "peak_memory_bytes": 37531648
+      },
+      {
+        "schema": 1,
+        "stage": "provenance-verification",
+        "revision": "0ef1966f8e77dccce0fefd83ab7f53e84809fd00",
+        "started": "2026-09-20T20:37:29.156803227Z",
+        "duration_seconds": 3.6759344,
+        "budget_seconds": 8.644432843,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.196562,
+        "peak_memory_bytes": 56803328
+      },
+      {
+        "schema": 1,
+        "stage": "vulnerability-scan",
+        "revision": "0ef1966f8e77dccce0fefd83ab7f53e84809fd00",
+        "started": "2026-09-20T20:37:23.69852783Z",
+        "duration_seconds": 1.333429589,
+        "budget_seconds": 9.977862432,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.688679,
+        "peak_memory_bytes": 249782272
+      }
+    ]
+  },
+  "independent_scan": {
+    "scanner": "Trivy 0.74.0",
+    "scanned_at": "2026-09-20T22:39:40.225371673+02:00",
+    "detected_targets": [
+      {
+        "type": "alpine",
+        "fixable_high_critical": 0
+      },
+      {
+        "type": "gobinary",
+        "fixable_high_critical": 0
+      }
+    ],
+    "sha256": "26f218436041c4525544b5714e55c13339fe44aba559c5ecf1385314ac8ed133"
+  },
+  "provenance_result_sha256": "0f0869207c18134b62e6713544a2b4ede40ab69309d73976da9dd4e81236d0f1"
+}
