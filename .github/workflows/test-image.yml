@@ -1,0 +1,112 @@
+name: Test image stage
+on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+      dockerfile:
+        type: string
+        default: ci/Containerfile
+      context:
+        type: string
+        default: .
+      build-args:
+        type: string
+        default: '{}'
+      artifact:
+        required: true
+        type: string
+      report-check:
+        required: true
+        type: string
+      timeout-minutes:
+        type: number
+        default: 45
+permissions:
+  contents: read
+jobs:
+  cli:
+    if: github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected
+    uses: ./.github/workflows/infra-cli.yml
+  test:
+    needs: cli
+    if: github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .infra-build-recipe
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ needs.cli.outputs.artifact }}
+          path: ${{ runner.temp }}/infra-cli
+      - name: Verify CLI
+        env:
+          CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+          CLI_REVISION: ${{ needs.cli.outputs.revision }}
+          WORKFLOW_REVISION: ${{ job.workflow_sha }}
+        run: |
+          test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+          printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+          chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+          printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+      - name: Check inputs
+        env:
+          TARGET: ${{ inputs.target }}
+          CONTEXT: ${{ inputs.context }}
+          DOCKERFILE: ${{ inputs.dockerfile }}
+          ARTIFACT: ${{ inputs.artifact }}
+          REPORT_CHECK: ${{ inputs.report-check }}
+        run: |
+          [[ "$TARGET" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]
+          [[ "$CONTEXT" != /* && "$CONTEXT" != -* && "$CONTEXT" != *..* ]]
+          [[ "$DOCKERFILE" != /* && "$DOCKERFILE" != -* && "$DOCKERFILE" != *..* ]]
+          test -d "$CONTEXT"
+          test -f "$DOCKERFILE"
+          test -n "$ARTIFACT"
+          test -n "$REPORT_CHECK"
+          test "$(uname -m)" = x86_64
+          test ! -e /var/run/secrets/kubernetes.io/serviceaccount/token
+      - name: Start isolated Dagger engine
+        run: docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+      - name: Export test reports
+        id: export
+        env:
+          TARGET: ${{ inputs.target }}
+          CONTEXT: ${{ inputs.context }}
+          DOCKERFILE: ${{ inputs.dockerfile }}
+          BUILD_ARGS: ${{ inputs.build-args }}
+          BUILD_TIMEOUT: ${{ inputs.timeout-minutes }}
+        run: |
+          infra pipeline image --root .infra-build-recipe --context "$CONTEXT" --dockerfile "$DOCKERFILE" \
+            --target "$TARGET" --build-args "$BUILD_ARGS" --build-arg "CI_REVISION=$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --export-directory "$RUNNER_TEMP/reports" --timeout "${BUILD_TIMEOUT}m"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ runner.temp }}/reports
+          if-no-files-found: error
+          retention-days: 14
+      - name: Check reports
+        if: always() && steps.export.outcome == 'success'
+        env:
+          REPORT_CHECK: ${{ inputs.report-check }}
+        run: bash -euo pipefail -c "$REPORT_CHECK"
+      - name: Stop Dagger engine
+        if: always()
+        run: docker rm --force --volumes infra-dagger
