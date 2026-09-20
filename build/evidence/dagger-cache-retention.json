@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "observed_at": "2026-09-20T21:30:13.481092+00:00",
+  "guest": "infra-build-09",
+  "engine_image": "registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4",
+  "engine_started_at": "2026-09-20T21:29:20.738241224Z",
+  "parallelism": 1,
+  "configuration_sha256": "6de2411f9c04fd390a5038078579b26c122252f584c2e6da5778b79e1313768f",
+  "configuration_mounted_read_only": true,
+  "persistent_volume": "infra-dagger-cache",
+  "policies": [
+    {
+      "types": [
+        "regular",
+        "source.local",
+        "source.git.checkout",
+        "source.http"
+      ],
+      "max_used_gib": 16,
+      "minimum_free_gib": 8
+    },
+    {
+      "types": [
+        "exec.cachemount"
+      ],
+      "keep_hours": 48,
+      "max_used_gib": 16,
+      "minimum_free_gib": 8
+    },
+    {
+      "all": true,
+      "max_used_gib": 20,
+      "minimum_free_gib": 4
+    }
+  ],
+  "previous_failure": {
+    "evicted_at": "2026-09-20T21:05:25Z",
+    "cache_volume": "portfolio-release-target",
+    "evicted_size_bytes": 1481134080,
+    "consequence": "API repeated compilation after worker had already built the same workspace",
+    "old_reserved_free_maximum_gib": [
+      1,
+      10,
+      20
+    ]
+  },
+  "validation": {
+    "pinned_engine_configuration_smoke_on_archie_seconds": 8,
+    "engine_api_started": true,
+    "three_policies_loaded": true,
+    "temporary_engine_removed": true,
+    "production_restart_at_verified_idle": true,
+    "active_compilations_interrupted": false
+  },
+  "disk_recovery": {
+    "completed_parser_archive_removed": true,
+    "exact_unreferenced_import_image_removed": true,
+    "registry_and_archie_original_retained": true,
+    "trivy_caches_preserved": true,
+    "used_gib_before": 66,
+    "used_gib_after": 56,
+    "available_gib_after": 21
+  },
+  "retention_scope": "Named-cache retention is preferential; emergency collection and active work can exceed the normal GC target temporarily"
+}
