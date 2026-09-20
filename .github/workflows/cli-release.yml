@@ -38,9 +38,6 @@ jobs:
           curl --fail --location --retry 3 https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-linux-x86_64 --output "$RUNNER_TEMP/bazel"
           printf '%s  %s\n' "$BAZEL_SHA256" "$RUNNER_TEMP/bazel" | sha256sum --check --strict
           chmod 755 "$RUNNER_TEMP/bazel"
-      - name: Test native targets
-        if: matrix.platform == 'linux_amd64'
-        run: '"$RUNNER_TEMP/bazel" --batch test --config=ci --disk_cache="$HOME/.cache/infra-bazel-actions" --repository_cache="$HOME/.cache/infra-bazel-repository" //...'
       - name: Build platform binary
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -48,6 +45,16 @@ jobs:
           "$RUNNER_TEMP/bazel" --batch build --config=ci --platforms="@rules_go//go/toolchain:$PLATFORM" --@rules_go//go/config:pure --disk_cache="$HOME/.cache/infra-bazel-actions" --repository_cache="$HOME/.cache/infra-bazel-repository" //cmd/infra:infra
           mkdir -p "$RUNNER_TEMP/release"
           cp bazel-bin/cmd/infra/infra_/infra "$RUNNER_TEMP/release/infra-${PLATFORM/_/-}"
+      - name: Prepare native check artifacts
+        if: matrix.platform == 'linux_amd64'
+        run: |
+          chmod 755 "$RUNNER_TEMP/release/infra-linux-amd64"
+          "$RUNNER_TEMP/release/infra-linux-amd64" pipeline prepare-check --local --bazel "$RUNNER_TEMP/bazel" --report-dir "$RUNNER_TEMP/check-preparation"
+      - name: Check native targets within aggregate budget
+        if: matrix.platform == 'linux_amd64'
+        run: |
+          chmod 755 "$RUNNER_TEMP/release/infra-linux-amd64"
+          "$RUNNER_TEMP/release/infra-linux-amd64" pipeline check-fast --local --bazel "$RUNNER_TEMP/bazel" --report-dir "$RUNNER_TEMP/check-reports"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: cli-release-${{ matrix.platform }}
