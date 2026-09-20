@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
@@ -22,6 +23,35 @@ func newMeasureCommand() *cobra.Command {
 	command.Flags().StringVar(&directory, "report-dir", "", "Timing report directory")
 	command.Flags().StringVar(&root, "root", ".", "Working directory")
 	command.Flags().DurationVar(&budget, "budget", 10*time.Second, "Aggregate execution budget")
+	return command
+}
+
+func newTimelineCommand() *cobra.Command {
+	var deploymentID uint64
+	var budget time.Duration
+	command := &cobra.Command{Use: "timeline REPOSITORY RUN_ID", Short: "Read workflow and revision-readiness timing", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
+		id, err := strconv.ParseUint(args[1], 10, 64)
+		if err != nil || budget <= 0 {
+			return errors.New("positive run ID and budget required")
+		}
+		ctx, cancel := context.WithTimeout(command.Context(), 30*time.Second)
+		defer cancel()
+		runner := ci.Runner{Stderr: command.ErrOrStderr()}
+		build, err := ci.ReadWorkflowTimeline(ctx, runner, args[0], id)
+		if err != nil {
+			return err
+		}
+		var deployment ci.WorkflowTimeline
+		if deploymentID != 0 {
+			deployment, err = ci.ReadWorkflowTimeline(ctx, runner, "fredrir/infra", deploymentID)
+			if err != nil {
+				return err
+			}
+		}
+		return json.NewEncoder(command.OutOrStdout()).Encode(ci.JoinDeploymentTimeline(build, deployment, budget))
+	}}
+	command.Flags().Uint64Var(&deploymentID, "deployment-run", 0, "Associated infra deployment run")
+	command.Flags().DurationVar(&budget, "budget", time.Minute, "Workflow-to-readiness target")
 	return command
 }
 

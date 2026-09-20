@@ -1,4 +1,5 @@
 name: Deploy
+run-name: Deploy ${{ inputs.repository-id }} ${{ inputs.image }} ${{ inputs.source-revision }}
 on:
   workflow_dispatch:
     inputs:

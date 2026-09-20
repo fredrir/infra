@@ -36,3 +36,16 @@ func TestRustArgumentsRejectConfigurationOverrides(t *testing.T) {
 		t.Fatalf("arguments %v: %v", arguments, err)
 	}
 }
+
+func TestParserDependencyInputsRequireImmutableApprovedImage(t *testing.T) {
+	for _, value := range []string{"models", "ghcr.io/fredrir/pyparser-dependencies@sha256:" + strings.Repeat("a", 64)} {
+		if _, err := BuildArguments(strings.Repeat("b", 40), "PARSER_DEPENDENCIES="+value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, value := range []string{"ghcr.io/fredrir/pyparser-dependencies:latest", "ghcr.io/other/deps@sha256:" + strings.Repeat("a", 64), "models\r"} {
+		if _, err := BuildArguments(strings.Repeat("b", 40), "PARSER_DEPENDENCIES="+value); err == nil {
+			t.Fatalf("accepted %q", value)
+		}
+	}
+}

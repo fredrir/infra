@@ -20,6 +20,13 @@ func BuildArguments(revision, input string) (map[string]string, error) {
 			continue
 		}
 		name, value, ok := strings.Cut(line, "=")
+		if name == "PARSER_DEPENDENCIES" && ok && (value == "models" || regexp.MustCompile(`^ghcr\.io/fredrir/pyparser-dependencies@sha256:[a-f0-9]{64}$`).MatchString(value)) {
+			if _, exists := arguments[name]; exists {
+				return nil, fmt.Errorf("duplicate build argument %q", name)
+			}
+			arguments[name] = value
+			continue
+		}
 		if !ok || strings.ContainsAny(line, "\r\x00") || !publicArgumentPattern.MatchString(name) {
 			return nil, fmt.Errorf("invalid public build argument %q", name)
 		}

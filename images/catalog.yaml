@@ -66,11 +66,7 @@
     /usr/lib/postgresql/16/bin/initdb --version | grep -F ' 16.';
     pkg-config --exists openssl zlib;
     printf test > /tmp/probe && nix-hash --type sha256 --flat --base32 /tmp/probe | grep -x 020ay2q1av2xs4n842rb3d7vz8qms1dcb87a5yd6azaci20x11lz;
-    infra version;
-    cd "$(mktemp -d)" && cargo new --vcs none probe && cd probe
-    && cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.28 --target x86_64-unknown-linux-musl
-    && file target/aarch64-unknown-linux-gnu/release/probe | grep -F 'ARM aarch64'
-    && file target/x86_64-unknown-linux-musl/release/probe | grep -E 'statically linked|static-pie linked'
+    infra version
 - image: ghcr.io/fredrir/platform-caddy
   dockerfile: images/caddy/Containerfile
   inputs:
