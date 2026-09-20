@@ -48,13 +48,19 @@
     build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
     build_runner_toolchain: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json }}"
 
-- name: Create verified CLI fast-path cache
+- name: Create runner-owned CLI and tool caches
   ansible.builtin.file:
-    path: '/home/runner/.cache/infra/bin/{{ build_runner_cli.sha256 }}'
+    path: '{{ item }}'
     state: directory
     owner: runner
     group: runner
     mode: '0700'
+  loop:
+  - /home/runner/.cache
+  - /home/runner/.cache/infra
+  - /home/runner/.cache/infra/bin
+  - /home/runner/.cache/infra/tools
+  - '/home/runner/.cache/infra/bin/{{ build_runner_cli.sha256 }}'
 
 - name: Seed verified CLI fast-path cache
   ansible.builtin.copy:
