@@ -81,5 +81,37 @@
   },
   "all_desired_nonzero_deployments_available": true,
   "parser_children_ready": true,
-  "end_to_end_latency_qualified": false
+  "end_to_end_latency_qualified": false,
+  "selective_promotion": {
+    "infra_revision": "278171f6e24ae4d1cd6063db0c9b928c8ee0deaf",
+    "application_repository": "fredrir/portfolio",
+    "application_revision": "a09f477f74f99f75b78b86f1be838b6a4f051477",
+    "image": "ghcr.io/fredrir/portfolio-api@sha256:cd271ffe5bced1c0b1dde91c195b313905791e445701a7b4ce3c7f5f147e71f9",
+    "changed_artifacts": [
+      "project-portfolio"
+    ],
+    "unchanged_artifacts": [
+      "platform-policy-f12037929eefe180c344468b72c86f63cab4f032",
+      "project-llunde",
+      "project-llunde-pyparser",
+      "project-y"
+    ],
+    "artifact_before": "latest@sha256:f7f1e3e418e30c31ac77ed0e83da4936f2bfb6c83fb77b47d34418fe06d0ee7e",
+    "artifact_after": "latest@sha256:a0698b9d7cf7117051baaab67c4b4bb6bd58d17f1e870110250e473bd6f97326",
+    "artifact_updated_at": "2026-09-20T20:55:22Z",
+    "infra_commit_timestamp": "2026-09-20T20:55:15Z",
+    "reconciliation_finished_at": "2026-09-20T20:55:29.299Z",
+    "reconciliation_seconds": 1.025701181,
+    "commit_timestamp_to_reconciliation_finished_seconds": 14.299,
+    "deployment_observation": {
+      "namespace": "portfolio",
+      "name": "api",
+      "generation": 9,
+      "observed_generation": 9,
+      "desired_replicas": 1,
+      "updated_replicas": 1,
+      "ready_replicas": 1
+    },
+    "frontend_end_to_end_latency_qualified": false
+  }
 }
