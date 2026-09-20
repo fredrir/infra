@@ -40,6 +40,7 @@ jobs:
         ref: ${{ job.workflow_sha }}
         path: .infra-build-recipe
         persist-credentials: false
+        sparse-checkout-cone-mode: false
         sparse-checkout: |
           .github/actions/setup-infra
           build/cli-release.json
