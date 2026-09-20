@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "observed_at": "2026-09-20T22:02:30.565161+00:00",
+  "applied_revision": "e522eeb4ac3bfc003378ee3038dc26009a18ca7e",
+  "node24": {
+    "migration_complete": true,
+    "production_deployment_run": 35538709531,
+    "result": "success"
+  },
+  "runners": {
+    "all_eight_routing_labels_restored": true,
+    "rust_pool_adapters_applied": true
+  },
+  "qualified_aggregate_checks_seconds": {
+    "frontend": 6.16945,
+    "backend": 5.610484767
+  },
+  "deployment_under_one_minute_qualified": false,
+  "package_install": {
+    "run_id": 35539109185,
+    "report": {
+      "schema": 1,
+      "stage": "package-install",
+      "revision": "cb0f493406f2740a679dcd7384935cf53fa87aa2",
+      "started": "2026-09-20T21:58:54.028383539Z",
+      "duration_seconds": 10.057034066,
+      "budget_seconds": 10,
+      "budget_exceeded": true,
+      "success": false,
+      "exit_code": 1,
+      "cpu_seconds": 1.5533299999999999,
+      "peak_memory_bytes": 77070336,
+      "error": "infra failed: context deadline exceeded\npackage-install exceeded 10s budget"
+    }
+  },
+  "remaining_qualification": {
+    "parser_run": 35540314905,
+    "y_run": 35539108191,
+    "portfolio_run": 35539106585
+  },
+  "scope": "Performance qualification remains incomplete; normal workflows remain enabled and no runner labels are held."
+}
