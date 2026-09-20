@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "tag": "infra-v0.1.1",
-  "revision": "a284f912fa9c5febe375a5b6743db4598b29477c",
-  "sha256": "b1bb0e9e300beab3e91bd1b57411440149684a1d92e7d877f60eefae234fa8f9"
+  "tag": "infra-v0.2.0",
+  "revision": "25622d613c0b140154fe2d2d34f59083377ba259",
+  "sha256": "89d8f53fbc2d44390b946aefa11bac242634fff3c4442b1cbb96944fbdd90bb9"
 }
