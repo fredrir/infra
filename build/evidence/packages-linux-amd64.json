@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "date": "2026-09-20",
+  "scope": "Local Linux amd64 qualification with throwaway keys and fixture binaries; no publication",
+  "source_revision_containing_tested_package_code": "303b3b3d3521d1f24786182796e3b46a318288b9",
+  "test": "TestSignedPackageQualification",
+  "engine": "0.21.9",
+  "package_architectures": [
+    "amd64",
+    "arm64"
+  ],
+  "package_formats": [
+    "deb",
+    "rpm",
+    "apk"
+  ],
+  "signed_repository_installation": [
+    {
+      "distribution": "Debian 12",
+      "format": "apt",
+      "architecture": "amd64",
+      "passed": true
+    },
+    {
+      "distribution": "Fedora 44",
+      "format": "rpm",
+      "architecture": "amd64",
+      "passed": true
+    },
+    {
+      "distribution": "Alpine 3.24",
+      "format": "apk",
+      "architecture": "amd64",
+      "passed": true
+    }
+  ],
+  "warm_elapsed_seconds": 2.15,
+  "limitations": [
+    "arm64 packages built; native arm64 installation not run",
+    "Expanded production distro matrix not run",
+    "Warm timing includes Dagger cache reuse; not a cold-build performance claim"
+  ],
+  "log_sha256": "913d71341c51666ee8afb0cd0de55c517cba6847a0a06ff6bdb9e924368cdaa1",
+  "remote_log": "archie:/tmp/infra-refactor-kata/package-qualification/final.log"
+}

@@ -45,6 +45,7 @@ The current Flux cache Kustomization uses `prune: true`. Retain the `nix-cache` 
 | --- | --- |
 | Independent Bazel cache reuse | [Cold and warm action-cache experiment](../build/evidence/bazel-cache-linux-amd64.json) |
 | Native Linux quality | [Race tests and vet at the recorded revision](../build/evidence/go-validation-linux-amd64.json) |
+| Signed package installation | [Debian, Fedora and Alpine qualification](../build/evidence/packages-linux-amd64.json) |
 | External source state | [Consumer inventory](../build/consumers.json); refresh before applying patches |
 
 | Deferred validation | Gate |
