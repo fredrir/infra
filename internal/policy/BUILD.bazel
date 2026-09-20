@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "policy_test",
+    srcs = [
+        "helpers_test.go",
+        "project_test.go",
+        "quota_test.go",
+        "runner_test.go",
+    ],
+    data = ["//platform:policy_testdata"],
+    deps = [
+        "@dev_cel_cel_go//cel",
+        "@dev_cel_cel_go//common/types",
+        "@in_yaml_go_yaml_v3//:yaml",
+        "@io_k8s_apimachinery//pkg/api/resource",
+        "@io_k8s_sigs_kustomize_api//krusty",
+        "@io_k8s_sigs_kustomize_kyaml//filesys",
+    ],
+)
