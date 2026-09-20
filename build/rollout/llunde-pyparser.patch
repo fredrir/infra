@@ -1,18 +1,337 @@
+diff --git a/.github/chainguard/dependencies.sts.yaml b/.github/chainguard/dependencies.sts.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..7637117909e7245cfb29fd3ff216e6d4c9e1f10b
+--- /dev/null
++++ b/.github/chainguard/dependencies.sts.yaml
+@@ -0,0 +1,13 @@
++issuer: https://token.actions.githubusercontent.com
++subject_pattern: ^repo:fredrir(@114402558)?/llunde-pyparser(@1328252868)?:ref:refs/heads/main$
++claim_pattern:
++  repository_id: ^1328252868$
++  repository_owner_id: ^114402558$
++  event_name: ^push$
++  ref: ^refs/heads/main$
++  runner_environment: ^github-hosted$
++  job_workflow_ref: ^fredrir/llunde-pyparser/\.github/workflows/pin-dependencies\.yml@c31fcd6c7a29f68dfa54da8120a4a00131f48101$
++  job_workflow_sha: ^c31fcd6c7a29f68dfa54da8120a4a00131f48101$
++permissions:
++  contents: write
++  pull_requests: write
+diff --git a/.github/workflows/dependencies.yml b/.github/workflows/dependencies.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..959a9af0c0449a2b02f0fca363a53a0178e388a1
+--- /dev/null
++++ b/.github/workflows/dependencies.yml
+@@ -0,0 +1,38 @@
++name: Prepare parser dependencies
++on:
++  push:
++    branches: [main]
++    paths:
++      - pyproject.toml
++      - uv.lock
++      - ci/dependencies.Containerfile
++      - .github/workflows/dependencies.yml
++permissions:
++  contents: read
++concurrency:
++  group: parser-dependencies
++  cancel-in-progress: true
++jobs:
++  image:
++    permissions:
++      contents: read
++      packages: write
++      id-token: write
++      attestations: write
++    uses: fredrir/infra/.github/workflows/build-image.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
++    with:
++      image: ghcr.io/fredrir/pyparser-dependencies
++      context: .
++      dockerfile: ci/dependencies.Containerfile
++      deploy: false
++      timeout-minutes: 120
++  pin:
++    needs: image
++    permissions:
++      contents: read
++      packages: read
++      id-token: write
++    uses: fredrir/llunde-pyparser/.github/workflows/pin-dependencies.yml@c31fcd6c7a29f68dfa54da8120a4a00131f48101
++    with:
++      image: ${{ needs.image.outputs.image }}
++      workflow-revision: d9016b2889c88f1ec99bfe9d7262343a759e4b69
+diff --git a/.github/workflows/images.yml b/.github/workflows/images.yml
+index 615c9728c8af38b89282b85dcc66c8ce686f3194..f2144ebb0b6d5db50e53fb3a8b0b91ef106e7a80 100644
 --- a/.github/workflows/images.yml
 +++ b/.github/workflows/images.yml
-@@ -12,12 +12,12 @@
+@@ -3,21 +3,42 @@ name: Build images
+   push:
+     branches:
+     - main
++    paths-ignore:
++    - "README.md"
++    - "docs/**"
++concurrency:
++  group: images-${{ github.ref }}
++  cancel-in-progress: true
+ permissions:
+   contents: read
+ jobs:
++  dependencies:
++    runs-on: ubuntu-24.04
++    outputs:
++      image: ${{ steps.pin.outputs.image }}
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++        with:
++          persist-credentials: false
++      - id: pin
++        run: |
++          set -euo pipefail
++          expected=$(git ls-tree HEAD -- pyproject.toml uv.lock ci/dependencies.Containerfile | sha256sum | cut -d' ' -f1)
++          jq -e --arg inputs "$expected" '.schema == 1 and .inputs_sha256 == $inputs' ci/dependencies.json
++          image=$(jq -er '.image | select(test("^ghcr.io/fredrir/pyparser-dependencies@sha256:[a-f0-9]{64}$"))' ci/dependencies.json)
++          printf 'image=%s\n' "$image" >> "$GITHUB_OUTPUT"
+   parser:
++    needs: dependencies
+     permissions:
+       contents: read
        packages: write
        id-token: write
        attestations: write
--    uses: fredrir/infra/.github/workflows/build-image.yml@1f2eecbc81ba184252f9ed85f893fa5eb3b5150a
-+    uses: fredrir/infra/.github/workflows/build-image.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
+-    uses: fredrir/infra/.github/workflows/build-image.yml@25cbb5389a5d5df996709e2c5a1b4d1443861172
++    uses: fredrir/infra/.github/workflows/build-image.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
      with:
        image: ghcr.io/fredrir/pyparser-review
        context: .
++      check-target: check-reports
        dockerfile: Dockerfile
        timeout-minutes: 120
--      test-command: 'bash .infra-build-recipe/scripts/ci/build-test-target.sh Dockerfile python-tests
-+      test-command: 'infra pipeline image --root .infra-build-recipe --context . --dockerfile Dockerfile --target python-tests --check-only --timeout 120m
- 
--        bash .infra-build-recipe/scripts/ci/build-test-target.sh Dockerfile ui-tests'
-+        infra pipeline image --root .infra-build-recipe --context . --dockerfile Dockerfile --target ui-tests --check-only --timeout 120m'
+-      test-command: 'infra pipeline image --root .infra-build-recipe --context . --dockerfile Dockerfile --target python-tests --check-only --timeout 120m
+-
+-        infra pipeline image --root .infra-build-recipe --context . --dockerfile Dockerfile --target ui-tests --check-only --timeout 120m'
++      dependency-image: ${{ needs.dependencies.outputs.image }}
+diff --git a/.github/workflows/import-prepared-dependencies.yml b/.github/workflows/import-prepared-dependencies.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e00dcfdfdd2991a718ae6e640229fb373a0073e
+--- /dev/null
++++ b/.github/workflows/import-prepared-dependencies.yml
+@@ -0,0 +1,62 @@
++name: Import locally prepared parser dependencies
++on:
++  workflow_dispatch:
++permissions:
++  contents: read
++concurrency:
++  group: parser-prepared-import
++  cancel-in-progress: false
++jobs:
++  publish:
++    if: github.repository == 'fredrir/llunde-pyparser' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && vars.INFRA_VM_POOL_QUALIFIED == 'true'
++    runs-on: ${{ 'dagger-amd64' }}
++    timeout-minutes: 15
++    permissions:
++      contents: read
++      packages: write
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++        with:
++          persist-credentials: false
++      - name: Verify and publish prepared archive
++        env:
++          GH_TOKEN: ${{ github.token }}
++          REGISTRY_USER: ${{ github.actor }}
++        run: |
++          set -euo pipefail
++          archive=/var/lib/infra-parser-preparation/base.tar
++          receipt=ci/prepared-dependencies.json
++          for directory in /var /var/lib /var/lib/infra-parser-preparation; do
++            test -d "$directory" && test ! -L "$directory"
++            test "$(stat -c %u "$directory")" = 0
++            test "$((8#$(stat -c %a "$directory") & 0022))" = 0
++          done
++          test -f "$archive" && test ! -L "$archive"
++          test "$(stat -c %u "$archive")" = 0
++          test "$(stat -c %a "$archive")" = 640
++          expected=$(git ls-tree HEAD -- pyproject.toml uv.lock ci/dependencies.Containerfile | sha256sum | cut -d' ' -f1)
++          jq -e --arg inputs "$expected" '.schema == 1 and .origin == "maintainer-local-archie" and .inputs_sha256 == $inputs and .scan.exit_code == 0 and .scan.tool == "trivy" and .scan.version == "0.74.0" and .scan.scanners == ["vuln"] and .scan.severities == ["HIGH", "CRITICAL"] and .scan.ignore_unfixed == true and .scan.archive_sha256 == .archive_sha256' "$receipt"
++          scan_time=$(date --date="$(jq -er .scan.completed_at "$receipt")" +%s)
++          age=$(( $(date +%s) - scan_time ))
++          test "$age" -ge 0 && test "$age" -le 86400
++          checksum=$(jq -er '.archive_sha256 | select(test("^[a-f0-9]{64}$"))' "$receipt")
++          source=$(jq -er '.source_revision | select(test("^[a-f0-9]{40}$"))' "$receipt")
++          printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check --strict
++          manifest=$(tar -xOf "$archive" index.json | jq -er '.manifests[0].digest | select(test("^sha256:[a-f0-9]{64}$"))')
++          config=$(tar -xOf "$archive" "blobs/sha256/${manifest#sha256:}" | jq -er '.config.digest | select(test("^sha256:[a-f0-9]{64}$"))')
++          export DOCKER_CONFIG
++          DOCKER_CONFIG=$(mktemp -d)
++          trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf "$DOCKER_CONFIG"' EXIT
++          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
++          if ! docker image inspect "$manifest" >/dev/null 2>&1 && ! docker image inspect "$config" >/dev/null 2>&1; then
++            docker load --input "$archive"
++          fi
++          loaded="$manifest"
++          if ! docker image inspect "$loaded" >/dev/null 2>&1; then loaded="$config"; fi
++          test "$(docker image inspect "$loaded" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$source"
++          test "$(docker image inspect "$loaded" --format '{{.Os}}/{{.Architecture}}')" = linux/amd64
++          image="ghcr.io/fredrir/pyparser-dependencies:prepared-${source:0:12}"
++          docker tag "$loaded" "$image"
++          docker push "$image"
++          digest=$(docker image inspect "$image" --format '{{json .RepoDigests}}' | jq -er '.[] | select(test("^ghcr.io/fredrir/pyparser-dependencies@sha256:[a-f0-9]{64}$"))')
++          printf 'Locally prepared dependency image: `%s`\n\nSource: `%s`\n\nArchive: `%s`\n' "$digest" "$source" "$checksum" >> "$GITHUB_STEP_SUMMARY"
+diff --git a/.github/workflows/pin-dependencies.yml b/.github/workflows/pin-dependencies.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..c5f0f5bcbb9957596acd5c647d5c4ada4eb4c316
+--- /dev/null
++++ b/.github/workflows/pin-dependencies.yml
+@@ -0,0 +1,93 @@
++name: Pin verified parser dependencies
++on:
++  workflow_call:
++    inputs:
++      image:
++        required: true
++        type: string
++      workflow-revision:
++        required: true
++        type: string
++permissions:
++  contents: read
++concurrency:
++  group: parser-dependency-pin
++  cancel-in-progress: false
++jobs:
++  pin:
++    if: github.repository == 'fredrir/llunde-pyparser' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name == 'push'
++    runs-on: ubuntu-24.04
++    permissions:
++      contents: read
++      packages: read
++      id-token: write
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++        with:
++          ref: main
++          fetch-depth: 0
++          persist-credentials: false
++      - name: Install pinned verifier
++        run: |
++          curl --fail --silent --show-error --location --retry 2 --max-time 30 https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-amd64 --output "$RUNNER_TEMP/cosign"
++          printf '4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71  %s/cosign\n' "$RUNNER_TEMP" | sha256sum --check --strict
++          chmod 755 "$RUNNER_TEMP/cosign"
++          printf '%s\n' "$RUNNER_TEMP" >> "$GITHUB_PATH"
++      - name: Verify dependency image
++        env:
++          IMAGE: ${{ inputs.image }}
++          WORKFLOW_REVISION: ${{ inputs.workflow-revision }}
++          REGISTRY_TOKEN: ${{ github.token }}
++        run: |
++          set -euo pipefail
++          [[ "$IMAGE" =~ ^ghcr\.io/fredrir/pyparser-dependencies@sha256:[a-f0-9]{64}$ ]]
++          [[ "$WORKFLOW_REVISION" =~ ^[a-f0-9]{40}$ ]]
++          export DOCKER_CONFIG="$RUNNER_TEMP/dependency-registry"
++          mkdir -m700 "$DOCKER_CONFIG"
++          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
++          umask 077
++          jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
++          unset REGISTRY_TOKEN
++          cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
++            --certificate-identity "https://github.com/fredrir/infra/.github/workflows/build-image.yml@$WORKFLOW_REVISION" \
++            --certificate-github-workflow-repository "$GITHUB_REPOSITORY" \
++            --certificate-github-workflow-sha "$GITHUB_SHA" \
++            --certificate-github-workflow-ref refs/heads/main \
++            --certificate-github-workflow-trigger push \
++            --annotations "source-repository=$GITHUB_REPOSITORY" \
++            --annotations "source-revision=$GITHUB_SHA" \
++            --annotations "workflow-revision=$WORKFLOW_REVISION" "$IMAGE"
++      - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
++        id: token
++        with:
++          scope: fredrir/llunde-pyparser
++          identity: dependencies
++      - name: Pin current dependency inputs
++        env:
++          IMAGE: ${{ inputs.image }}
++          GH_TOKEN: ${{ steps.token.outputs.token }}
++        run: |
++          set -euo pipefail
++          expected=$(git ls-tree "$GITHUB_SHA" -- pyproject.toml uv.lock ci/dependencies.Containerfile | sha256sum | cut -d' ' -f1)
++          for attempt in 1 2 3; do
++            git -c credential.helper='!gh auth git-credential' fetch --quiet origin main
++            git reset --hard FETCH_HEAD
++            current=$(git ls-tree HEAD -- pyproject.toml uv.lock ci/dependencies.Containerfile | sha256sum | cut -d' ' -f1)
++            test "$current" = "$expected"
++            test ! -L ci && test ! -L ci/dependencies.json
++            jq -n --arg image "$IMAGE" --arg revision "$GITHUB_SHA" --arg inputs "$expected" '{schema:1,image:$image,source_revision:$revision,inputs_sha256:$inputs}' > ci/dependencies.json
++            git add -- ci/dependencies.json
++            if git diff --cached --quiet; then exit 0; fi
++            git -c user.name=infra-release -c user.email=infra-release@users.noreply.github.com commit --quiet -m 'Pin verified parser dependency image'
++            if git -c credential.helper='!gh auth git-credential' push --quiet origin HEAD:main; then exit 0; fi
++            branch="infra/dependencies-${GITHUB_SHA:0:12}-${IMAGE##*:}"
++            git -c credential.helper='!gh auth git-credential' push --quiet origin "HEAD:refs/heads/$branch"
++            url=$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')
++            if [[ -z "$url" ]]; then
++              printf 'Pin verified dependency image %s from source %s.\n' "$IMAGE" "$GITHUB_SHA" > "$RUNNER_TEMP/dependency-pr.txt"
++              url=$(gh pr create --base main --head "$branch" --title 'Pin verified parser dependencies' --body-file "$RUNNER_TEMP/dependency-pr.txt")
++            fi
++            gh pr merge "$url" --auto --squash || gh pr merge "$url" --squash
++            exit 0
++          done
++          exit 1
+diff --git a/ci/dependencies.json b/ci/dependencies.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..c0a97561cd8783af44192a7247cac66b14d7074a
+--- /dev/null
++++ b/ci/dependencies.json
+@@ -0,0 +1,9 @@
++{
++  "schema": 1,
++  "image": "ghcr.io/fredrir/pyparser-dependencies@sha256:3f0d7afca910cc28c6d4a41b9088fe92622319f9aa50d1602209b92d5319f3de",
++  "source_revision": "7bcb12b7746771571b60754923e20770f8c18052",
++  "inputs_sha256": "99fd99b41f182b09186c866a065a386e1966b0b8e8c8a89eecad9c574a799f06",
++  "origin": "maintainer-local-archie",
++  "archive_sha256": "57d6ec1b24e2b04ce8030749fb652c3649783d5e87c2bbe5381177baee2c004a",
++  "publication_run": "https://github.com/fredrir/llunde-pyparser/actions/runs/35534463752"
++}
+diff --git a/ci/prepared-dependencies.json b/ci/prepared-dependencies.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..10aa8765ae2fa77280ab4c5fd01b5cd58f9f0c90
+--- /dev/null
++++ b/ci/prepared-dependencies.json
+@@ -0,0 +1,35 @@
++{
++  "schema": 1,
++  "origin": "maintainer-local-archie",
++  "source_revision": "7bcb12b7746771571b60754923e20770f8c18052",
++  "inputs_sha256": "99fd99b41f182b09186c866a065a386e1966b0b8e8c8a89eecad9c574a799f06",
++  "archive_sha256": "57d6ec1b24e2b04ce8030749fb652c3649783d5e87c2bbe5381177baee2c004a",
++  "archive_bytes": 2822226944,
++  "scan": {
++    "tool": "trivy",
++    "version": "0.74.0",
++    "exit_code": 0,
++    "elapsed_seconds": 11.631,
++    "completed_at": "2026-09-20T19:48:45.198195+00:00",
++    "archive_sha256": "57d6ec1b24e2b04ce8030749fb652c3649783d5e87c2bbe5381177baee2c004a",
++    "report_sha256": "c8b47db03a7cedecdf2169155b3638314dec48e0cd54d0f672d52ab91bbf3e8b",
++    "warm_elapsed_seconds": 0.46,
++    "scanners": [
++      "vuln"
++    ],
++    "severities": [
++      "HIGH",
++      "CRITICAL"
++    ],
++    "ignore_unfixed": true
++  },
++  "model_smoke": {
++    "network": "none",
++    "cpus": 2,
++    "memory": "4GiB",
++    "transformers": "5.10.4",
++    "model": "Idefics3ForConditionalGeneration",
++    "generated_tokens": 1,
++    "elapsed_seconds": 5.343
++  }
++}

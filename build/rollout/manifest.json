@@ -1,151 +1,140 @@
 {
   "schema": 1,
   "checked": "2026-09-20",
-  "source_revision": "b2c97f0c98c09099d19696089e55f1e95bd6ac1d",
+  "source_revision": "d9016b2889c88f1ec99bfe9d7262343a759e4b69",
   "state": "applied",
+  "applied_commits": {
+    "fredrir/llunde-frontend": "fd240f219a9441e2d027213ca7f24c626339e482",
+    "fredrir/llunde-backend": "efecf2a6edde47d7fa372c9ebd30eecffd034a84",
+    "fredrir/llunde-pyparser": "7365b4414cd1f6f32bb6b1e0ab7627d3ad8e72aa",
+    "fredrir/portfolio": "a09f477f74f99f75b78b86f1be838b6a4f051477",
+    "fredrir/Y": "94b1fff829494cb516dbcee53df40b85f2fcf90b",
+    "fredrir/nsql": "88b7dc30d48de3142e044f145a446d65a15ef21d",
+    "fredrir/packages": "e1c57c4fc05e455dd2b550ae49ea1e4acebcf1e5",
+    "fredrir/homebrew-tap": "bee741edeedcd20c3b5b2888aab393d4cf2aa588",
+    "fredrir/homebrew-nsql": "ae27c7542874f860c53cea75063bf237fd433f98",
+    "fredrir/nur-packages": "d7f937907226d8ebc8a226824d6de2a8c7be8fe0"
+  },
   "expected_blobs": [
-    {
-      "repository": "fredrir/nsql",
-      "path": ".github/workflows/ci.yml",
-      "blob": "52ab8f58052fc274643aa3053fcc56873ec984fb",
-      "updated_sha256": "a7c29cde3b8260378fd883341c11c2d1fe7ac5bc3100d05262ad8297658999e4"
-    },
-    {
-      "repository": "fredrir/nsql",
-      "path": ".github/workflows/release.yml",
-      "blob": "239166ef95908a69396de7587ecf40671099c938",
-      "updated_sha256": "f0e279ea479eff0189f69d56faeacb1401af8701a687dad80e76a3d2ce123ce6"
-    },
-    {
-      "repository": "fredrir/nsql",
-      "path": ".github/workflows/auto-tag.yml",
-      "blob": "a9933af5303263b87ee90d01a6dc4dd105cbffbf",
-      "updated_sha256": "b1a7539a1bc3aeb1f9f01ced984bbfcf7446fb10b4c52431cae786f53ab7924f"
-    },
-    {
-      "repository": "fredrir/portfolio",
-      "path": ".github/workflows/images.yml",
-      "blob": "3c4f10cd526036e422b48fb128016217280b2462",
-      "updated_sha256": "e668776bd9d74e851945d803568891acd8ba6661573a33bb6de8162ed223facc"
-    },
-    {
-      "repository": "fredrir/Y",
-      "path": ".github/workflows/images.yml",
-      "blob": "a51be483548f6a87584a2ec6055b2e2c4074a476",
-      "updated_sha256": "fae782224c1dcef50b86659daad6ffab08022bc76df6b12a139abbb90ee98578"
-    },
     {
       "repository": "fredrir/llunde-frontend",
       "path": ".github/workflows/images.yml",
-      "blob": "621b3d6a45e4f3a6e845426408b97d6bfe12bfe2",
-      "updated_sha256": "e1b526d26c23f2862b0bc2f01ee1dae9a09eeacd6f2f2010875b670c41246bb3"
+      "blob": "a436c8fa06bb7cde719acf6e860e5f795ec0cfe9",
+      "updated_sha256": "0f219129024becb79df5b7300baae627b57805e87a5a34f061f47b4572b36224"
     },
     {
       "repository": "fredrir/llunde-backend",
       "path": ".github/workflows/images.yml",
-      "blob": "ee03fe2d2dc76280ad5f365f6308c82e51c30a20",
-      "updated_sha256": "9df38e82d511ee1fe51cb330119528e56474e472fb83e0e8452b5b3d20a4d3fe"
+      "blob": "e3d7c339b161d4939eb9aaa7c5a9e216c44d69ec",
+      "updated_sha256": "bc7a4ba77b28e9287f27828710d737098331a9884df7a3c8c4c30c7caf14f467"
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "path": ".github/chainguard/dependencies.sts.yaml",
+      "blob": "7637117909e7245cfb29fd3ff216e6d4c9e1f10b",
+      "updated_sha256": "8be5909f21be7862196ebba33b435313dc436b910cbb2c8b2c1ed8e9c0582991"
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "path": ".github/workflows/dependencies.yml",
+      "blob": "959a9af0c0449a2b02f0fca363a53a0178e388a1",
+      "updated_sha256": "4cc0c0b0630fd5aa3568b4b9e4d67010741e8200090c8276822e058eab2c50c3"
     },
     {
       "repository": "fredrir/llunde-pyparser",
       "path": ".github/workflows/images.yml",
-      "blob": "5802764bffb71700e4cb78335fb35d399b0be6bc",
-      "updated_sha256": "49f02f50272617da600a6ef40440c0d0e59ebf142a821a9dd1f9922ad842ae3e"
+      "blob": "f2144ebb0b6d5db50e53fb3a8b0b91ef106e7a80",
+      "updated_sha256": "257fa89b2268ad3e359fde3b26276425d45e8be1f3506a97c60f2e40bb98c3a6"
     },
     {
-      "repository": "fredrir/packages",
-      "path": ".github/workflows/publish.yml",
-      "blob": "201f5a48567dd3928ab8fca6bbc222bf777c7942",
-      "updated_sha256": "d239958eeecbd41b6f05885911a255805dde91794998f4a30db74dbc48ec0d14"
+      "repository": "fredrir/llunde-pyparser",
+      "path": ".github/workflows/import-prepared-dependencies.yml",
+      "blob": "4e00dcfdfdd2991a718ae6e640229fb373a0073e",
+      "updated_sha256": "aa8e073a27457b8a025ff5556b5c22519cedc6e10beff6eb08200e16d2aa49d1"
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "path": ".github/workflows/pin-dependencies.yml",
+      "blob": "c5f0f5bcbb9957596acd5c647d5c4ada4eb4c316",
+      "updated_sha256": "6d84399044f5425d8ad3527f6d12e9d7939b8bf67043c3d298f8d05c4ce0786a"
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "path": "ci/dependencies.json",
+      "blob": "c0a97561cd8783af44192a7247cac66b14d7074a",
+      "updated_sha256": "265e352d1409d9662c9e0d78eba6ef54aef8f17c6634a82f4666a2f3c30329bb"
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "path": "ci/prepared-dependencies.json",
+      "blob": "10aa8765ae2fa77280ab4c5fd01b5cd58f9f0c90",
+      "updated_sha256": "f33060556d3aad1a7ffeff63d5f6f588b921d6e2aafcf9b4401c05c2b19e3bb6"
+    },
+    {
+      "repository": "fredrir/portfolio",
+      "path": ".github/workflows/images.yml",
+      "blob": "57aff53429b45b40509919c6705a0dd0f9de73ba",
+      "updated_sha256": "2f69663a62bb790327e535bf38a5b954dc85a2144a47d73228d5389c6c102f58"
+    },
+    {
+      "repository": "fredrir/Y",
+      "path": ".github/workflows/images.yml",
+      "blob": "8271834935f81fee3bfd87234c53d0b590f43fec",
+      "updated_sha256": "c5e4105d6b016414d4eacb62680b9c95288dbf4ae8ff4e5597bb0800d79c9172"
     },
     {
       "repository": "fredrir/nsql",
       "path": ".github/chainguard/auto-tag.sts.yaml",
-      "blob": "e272f26702beedd619d2fa75a263154becbbb4ec",
-      "updated_sha256": "88e7fe6528b46b30c7d836422646e653a740b707aa8e177a6ce105041389c263"
+      "blob": "a2bfb3b4ee9942c7fa7eb24c8876be801c859024",
+      "updated_sha256": "ba64ebf6b929b2619fb266d330e7e7c5eb7be75fb02979e5669f5a2733a802f3"
+    },
+    {
+      "repository": "fredrir/nsql",
+      "path": ".github/workflows/auto-tag.yml",
+      "blob": "cadc479ed9a6c0e071aeb180f380fee94feeab3c",
+      "updated_sha256": "5bad7c48eba54224db4d0c31ad3b64ece75c866cf005bf931ea52e293a65ef96"
+    },
+    {
+      "repository": "fredrir/nsql",
+      "path": ".github/workflows/ci.yml",
+      "blob": "95604608e5edfb7e873e22c450fb580edfca4b9d",
+      "updated_sha256": "384c875a5f63ed077f0230b6abac89f86bbe91f4dec815af8723151fae6c2e2f"
+    },
+    {
+      "repository": "fredrir/nsql",
+      "path": ".github/workflows/release.yml",
+      "blob": "aeabdae26a9575c09c06cb0a4cd40b5a4b26f919",
+      "updated_sha256": "25fa7caa31c32e10f07f5cfa883cdef0b4e3d6c4e93b21725fa263137e6be229"
     },
     {
       "repository": "fredrir/packages",
       "path": ".github/chainguard/dispatch-1269406277.sts.yaml",
-      "blob": "0bb82a56f031e46139693c66868e4d276f212289",
-      "updated_sha256": "5381f07bbe49b868ca3e2784bfd009c5b56a22eb4a5f3adc4810544ed57fc1ca"
-    },
-    {
-      "repository": "fredrir/homebrew-tap",
-      "path": ".github/chainguard/publisher.sts.yaml",
-      "blob": "6a8d90b935b2f5c4f950a1527be813071db44d80",
-      "updated_sha256": "cd92bf01c7683ef6e9b828f643141dc1e536b38a42c996f7451f2c8866dfd12f"
-    },
-    {
-      "repository": "fredrir/homebrew-nsql",
-      "path": ".github/chainguard/publisher.sts.yaml",
-      "blob": "6a8d90b935b2f5c4f950a1527be813071db44d80",
-      "updated_sha256": "cd92bf01c7683ef6e9b828f643141dc1e536b38a42c996f7451f2c8866dfd12f"
-    },
-    {
-      "repository": "fredrir/nur-packages",
-      "path": ".github/chainguard/publisher.sts.yaml",
-      "blob": "6a8d90b935b2f5c4f950a1527be813071db44d80",
-      "updated_sha256": "cd92bf01c7683ef6e9b828f643141dc1e536b38a42c996f7451f2c8866dfd12f"
-    }
-  ],
-  "local_policy_paths": [
-    ".github/chainguard/deploy-1327945675.sts.yaml",
-    ".github/chainguard/deploy-1328144104.sts.yaml",
-    ".github/chainguard/deploy-1328252868.sts.yaml",
-    ".github/chainguard/deploy-773018612.sts.yaml",
-    ".github/chainguard/deploy-900286164.sts.yaml"
-  ],
-  "patches": [
-    {
-      "repository": "fredrir/Y",
-      "path": "Y.patch",
-      "sha256": "42af105db964118e6ebbefa6e24951326247e57c8fb3235c06b267c60420e501"
-    },
-    {
-      "repository": "fredrir/homebrew-nsql",
-      "path": "homebrew-nsql.patch",
-      "sha256": "a49c9cfcde2081ff1418a9466f2372d7f87351a1027eeafddf046b468e64a8cd"
-    },
-    {
-      "repository": "fredrir/homebrew-tap",
-      "path": "homebrew-tap.patch",
-      "sha256": "a49c9cfcde2081ff1418a9466f2372d7f87351a1027eeafddf046b468e64a8cd"
-    },
-    {
-      "repository": "fredrir/llunde-backend",
-      "path": "llunde-backend.patch",
-      "sha256": "d0e1b78594c560bf69c4aa7817169fc08f9c5013e94ea14487a77d2da6bcc592"
-    },
-    {
-      "repository": "fredrir/llunde-frontend",
-      "path": "llunde-frontend.patch",
-      "sha256": "2f37423e91768ccc9b2fb5df15f1a557c561298c00d78ab3189f7761dd3f66b2"
-    },
-    {
-      "repository": "fredrir/llunde-pyparser",
-      "path": "llunde-pyparser.patch",
-      "sha256": "010dce300a3b8915bf63cfd4028936035cc7e9021af91752fbfa394ba80f2f3a"
-    },
-    {
-      "repository": "fredrir/nsql",
-      "path": "nsql.patch",
-      "sha256": "56234be91303f6e573b48389e52635021d447f3661076a29a0ab2da74b461167"
-    },
-    {
-      "repository": "fredrir/nur-packages",
-      "path": "nur-packages.patch",
-      "sha256": "a49c9cfcde2081ff1418a9466f2372d7f87351a1027eeafddf046b468e64a8cd"
+      "blob": "b02d0d6e469271c76be59b73ef4a18a0243b20e2",
+      "updated_sha256": "a17cf91ef6016042415f2719db8d85152bf9af16d59b9c6151df308b86969fd2"
     },
     {
       "repository": "fredrir/packages",
-      "path": "packages.patch",
-      "sha256": "c78f2b57e103519bed1f790ff9ea1decd04226c4a5f5190a5f8c7a9920b0f507"
+      "path": ".github/workflows/publish.yml",
+      "blob": "427cc9ddca322a2619a894ccace6d23a259b3dfa",
+      "updated_sha256": "cdd4b08d614fd1b9b40d01a7940098debba2006976bf4f826a781359048ef2e9"
     },
     {
-      "repository": "fredrir/portfolio",
-      "path": "portfolio.patch",
-      "sha256": "45d4ec985cf7a5d9993f43835f929d15b285007c87d3d9c3d021af298a30443f"
+      "repository": "fredrir/homebrew-tap",
+      "path": ".github/chainguard/publisher.sts.yaml",
+      "blob": "7df5c50830de6101104b4a2b2d300e232a1ec639",
+      "updated_sha256": "6de03c6c2ab5245718d1d2404007f206c49f416bb3f0c61693e6fac6ae9dfa87"
+    },
+    {
+      "repository": "fredrir/homebrew-nsql",
+      "path": ".github/chainguard/publisher.sts.yaml",
+      "blob": "7df5c50830de6101104b4a2b2d300e232a1ec639",
+      "updated_sha256": "6de03c6c2ab5245718d1d2404007f206c49f416bb3f0c61693e6fac6ae9dfa87"
+    },
+    {
+      "repository": "fredrir/nur-packages",
+      "path": ".github/chainguard/publisher.sts.yaml",
+      "blob": "7df5c50830de6101104b4a2b2d300e232a1ec639",
+      "updated_sha256": "6de03c6c2ab5245718d1d2404007f206c49f416bb3f0c61693e6fac6ae9dfa87"
     }
   ]
 }

@@ -1,16 +1,14 @@
+diff --git a/.github/chainguard/publisher.sts.yaml b/.github/chainguard/publisher.sts.yaml
+index 310a8c9f865ece1f4104c26050e634bb2bc675ab..7df5c50830de6101104b4a2b2d300e232a1ec639 100644
 --- a/.github/chainguard/publisher.sts.yaml
 +++ b/.github/chainguard/publisher.sts.yaml
-@@ -3,10 +3,11 @@
- claim_pattern:
-   repository_id: ^1374225208$
-   repository_owner_id: ^114402558$
--  runner_environment: ^self-hosted$
-+  runner_environment: ^(self-hosted|github-hosted)$
+@@ -7,7 +7,7 @@ claim_pattern:
    ref: ^refs/heads/main$
    event_name: ^(push|schedule|workflow_dispatch)$
    environment: ^publish$
--  job_workflow_ref: ^fredrir/infra/\.github/workflows/packages-publish\.yml@[0-9a-f]{40}$
-+  job_workflow_ref: ^fredrir/infra/\.github/workflows/packages-publish\.yml@(2623cd04d593090e66eb418586a1fc1d246b449e|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
-+  job_workflow_sha: ^(2623cd04d593090e66eb418586a1fc1d246b449e|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
+-  job_workflow_ref: ^fredrir/infra/\.github/workflows/packages-publish\.yml@(25cbb5389a5d5df996709e2c5a1b4d1443861172|f467a384e922ddb64955bc19469892077e5bd507)$
+-  job_workflow_sha: ^(25cbb5389a5d5df996709e2c5a1b4d1443861172|f467a384e922ddb64955bc19469892077e5bd507)$
++  job_workflow_ref: ^fredrir/infra/\.github/workflows/packages-publish\.yml@(25cbb5389a5d5df996709e2c5a1b4d1443861172|d9016b2889c88f1ec99bfe9d7262343a759e4b69)$
++  job_workflow_sha: ^(25cbb5389a5d5df996709e2c5a1b4d1443861172|d9016b2889c88f1ec99bfe9d7262343a759e4b69)$
  permissions:
    contents: write

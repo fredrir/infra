@@ -1,14 +1,30 @@
+diff --git a/.github/workflows/images.yml b/.github/workflows/images.yml
+index 7c34a4aa8ac2106b1063ce2b1ab3d69675716a37..e3d7c339b161d4939eb9aaa7c5a9e216c44d69ec 100644
 --- a/.github/workflows/images.yml
 +++ b/.github/workflows/images.yml
-@@ -12,9 +12,9 @@
+@@ -3,6 +3,12 @@ name: Build images
+   push:
+     branches:
+     - main
++    paths-ignore:
++    - "README.md"
++    - "docs/**"
++concurrency:
++  group: images-${{ github.ref }}
++  cancel-in-progress: true
+ permissions:
+   contents: read
+ jobs:
+@@ -12,9 +18,10 @@ jobs:
        packages: write
        id-token: write
        attestations: write
--    uses: fredrir/infra/.github/workflows/build-image.yml@1f2eecbc81ba184252f9ed85f893fa5eb3b5150a
-+    uses: fredrir/infra/.github/workflows/build-image.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
+-    uses: fredrir/infra/.github/workflows/build-image.yml@25cbb5389a5d5df996709e2c5a1b4d1443861172
++    uses: fredrir/infra/.github/workflows/build-image.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
      with:
        image: ghcr.io/fredrir/llunde-backend
        context: .
++      scanner-java: true
++      check-target: check-reports
        dockerfile: Containerfile
--      test-command: bash .infra-build-recipe/scripts/ci/build-test-target.sh ci/Containerfile ci
-+      test-command: infra pipeline image --root .infra-build-recipe --context . --dockerfile ci/Containerfile --target ci --check-only --timeout 45m
+-      test-command: infra pipeline image --root .infra-build-recipe --context . --dockerfile ci/Containerfile --target ci --check-only --timeout 45m

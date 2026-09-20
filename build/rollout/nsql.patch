@@ -1,38 +1,48 @@
---- a/.github/workflows/ci.yml
-+++ b/.github/workflows/ci.yml
-@@ -10,7 +10,7 @@
-   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
- jobs:
-   rust:
--    uses: fredrir/infra/.github/workflows/rust-ci.yml@eb764b837d1fd10cb71fde1963500854aaef5d6c
-+    uses: fredrir/infra/.github/workflows/rust-ci.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
-     with:
-       postgres: true
-       postgres-url-env: NSQL_TEST_PG_URL
---- a/.github/workflows/release.yml
-+++ b/.github/workflows/release.yml
-@@ -13,4 +13,4 @@
-   cancel-in-progress: false
- jobs:
-   release:
--    uses: fredrir/infra/.github/workflows/rust-release.yml@eb764b837d1fd10cb71fde1963500854aaef5d6c
-+    uses: fredrir/infra/.github/workflows/rust-release.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
---- a/.github/workflows/auto-tag.yml
-+++ b/.github/workflows/auto-tag.yml
-@@ -9,4 +9,4 @@
-   cancel-in-progress: false
- jobs:
-   tag:
--    uses: fredrir/infra/.github/workflows/rust-auto-tag.yml@eb764b837d1fd10cb71fde1963500854aaef5d6c
-+    uses: fredrir/infra/.github/workflows/rust-auto-tag.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
+diff --git a/.github/chainguard/auto-tag.sts.yaml b/.github/chainguard/auto-tag.sts.yaml
+index 5c6a026298aa2656552a3464b5bf7dfe4c162202..a2bfb3b4ee9942c7fa7eb24c8876be801c859024 100644
 --- a/.github/chainguard/auto-tag.sts.yaml
 +++ b/.github/chainguard/auto-tag.sts.yaml
-@@ -6,6 +6,7 @@
+@@ -6,7 +6,7 @@ claim_pattern:
    runner_environment: ^self-hosted$
    ref: ^refs/heads/main$
    event_name: ^(push|workflow_dispatch)$
--  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@[0-9a-f]{40}$
-+  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
-+  job_workflow_sha: ^(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
+-  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
+-  job_workflow_sha: ^(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
++  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@(b2c97f0c98c09099d19696089e55f1e95bd6ac1d|d9016b2889c88f1ec99bfe9d7262343a759e4b69)$
++  job_workflow_sha: ^(b2c97f0c98c09099d19696089e55f1e95bd6ac1d|d9016b2889c88f1ec99bfe9d7262343a759e4b69)$
  permissions:
    contents: write
+diff --git a/.github/workflows/auto-tag.yml b/.github/workflows/auto-tag.yml
+index 6bf645880e8dc8f9d23d759b6fa94601ccd837ef..cadc479ed9a6c0e071aeb180f380fee94feeab3c 100644
+--- a/.github/workflows/auto-tag.yml
++++ b/.github/workflows/auto-tag.yml
+@@ -9,4 +9,4 @@ concurrency:
+   cancel-in-progress: false
+ jobs:
+   tag:
+-    uses: fredrir/infra/.github/workflows/rust-auto-tag.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
++    uses: fredrir/infra/.github/workflows/rust-auto-tag.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 12575732cafd85f7c4f1f8ccbb4499dd052a5240..95604608e5edfb7e873e22c450fb580edfca4b9d 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -10,7 +10,8 @@ concurrency:
+   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+ jobs:
+   rust:
+-    uses: fredrir/infra/.github/workflows/rust-ci.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
++    uses: fredrir/infra/.github/workflows/rust-ci.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
+     with:
++      fast-test-args: '-- --skip embed_drives_real_nvim_and_reads_back --skip embed_captures_highlight_colors --skip run_keymap_round_trips_via_rpcnotify'
+       postgres: true
+       postgres-url-env: NSQL_TEST_PG_URL
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index c1d4e4a43f1f75804e9ff2da1fd6328757332899..aeabdae26a9575c09c06cb0a4cd40b5a4b26f919 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -13,4 +13,4 @@ concurrency:
+   cancel-in-progress: false
+ jobs:
+   release:
+-    uses: fredrir/infra/.github/workflows/rust-release.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
++    uses: fredrir/infra/.github/workflows/rust-release.yml@d9016b2889c88f1ec99bfe9d7262343a759e4b69
