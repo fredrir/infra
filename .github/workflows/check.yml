@@ -64,10 +64,11 @@ jobs:
       - name: Prepare cold hosted check artifacts
         if: runner.environment == 'github-hosted' && steps.affected.outputs.expression != 'set()'
         env:
+          BAZEL_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '' }}
           BASE: ${{ steps.affected.outputs.base }}
         run: |
           echo 'Cold hosted qualification includes artifact preparation and does not meet the warm deployment budget.' >> "$GITHUB_STEP_SUMMARY"
-          infra pipeline prepare-check --local --base "$BASE" --read-only-cache --report-dir dist/reports/preparation
+          infra pipeline prepare-check --local --base "$BASE" --read-only-cache=${{ github.event_name == 'pull_request' }} --report-dir dist/reports/preparation
       - name: Check affected targets within aggregate budget
         env:
           BAZEL_REMOTE_CACHE: ${{ runner.environment == 'self-hosted' && 'http://127.0.0.1:9092' || (github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '') }}
