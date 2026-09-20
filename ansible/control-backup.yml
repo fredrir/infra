@@ -1,7 +1,7 @@
 - name: Configure control-plane recovery backups
   hosts: fredrir-07
   become: true
-  gather_facts: false
+  gather_facts: true
   vars:
     backup_environment: "{{ (lookup('ansible.builtin.pipe', 'sops decrypt --output-type json ' ~ ((playbook_dir ~ '/../platform/components/backups/backup.secret.sops.yaml') | quote)) | from_json).stringData }}"
     backup_timer_enabled: true
