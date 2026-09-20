@@ -166,5 +166,44 @@
         }
       ]
     }
+  },
+  "backend": {
+    "run_id": 35539105419,
+    "aggregate": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 10.063341087,
+      "remaining_seconds": 0,
+      "success": false,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "backend",
+          "started": "2026-09-20T21:40:30.974715307Z",
+          "duration_seconds": 1.212130152,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 3.064959,
+          "peak_memory_bytes": 133513216
+        },
+        {
+          "schema": 1,
+          "stage": "vulnerability-scan",
+          "revision": "4e4f62fbd34b2c64e14aafdc3559141cc5165fb8",
+          "started": "2026-09-20T21:41:10.003300755Z",
+          "duration_seconds": 8.851210935,
+          "budget_seconds": 8.787869848,
+          "budget_exceeded": true,
+          "success": false,
+          "exit_code": 0,
+          "cpu_seconds": 14.269989,
+          "peak_memory_bytes": 236294144,
+          "error": "trivy failed: context deadline exceeded\nvulnerability-scan exceeded 8.787869848s budget"
+        }
+      ]
+    }
   }
 }
