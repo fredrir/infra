@@ -20,7 +20,7 @@ all:
           build_engine_qualified: false
           build_engine_cpus: 4
           build_engine_memory: 4g
-          build_engine_parallelism: 2
+          build_engine_parallelism: 1
           build_runner_cpus_percent: 400
           build_engine_prewarm_memory: 2G
           build_engine_prewarm_commands:
