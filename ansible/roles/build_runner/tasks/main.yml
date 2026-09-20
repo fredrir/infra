@@ -99,7 +99,7 @@
     mode: '0644'
     content: |
       startup --host_jvm_args=-Xmx512m
-      startup --max_idle_secs={{ build_runner_bazel_idle_seconds }}
+      startup --max_idle_secs={{ build_runner_bazel_idle_seconds | int }}
       build --jobs=2
       build --repository_cache=/var/cache/infra/bazel-repo
 
