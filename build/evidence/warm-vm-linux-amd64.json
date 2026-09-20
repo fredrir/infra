@@ -14,7 +14,7 @@
   "native_bazel": {
     "jobs": 2,
     "jvm_heap_mib": 512,
-    "runner_context": "builder qualification account; production runner context qualified separately"
+    "runner_context": "Initial builder qualification; actual production runner qualification recorded under actual_runner"
   },
   "trust": {
     "trusted_protected_push": {
@@ -134,5 +134,85 @@
     "application_executed": false,
     "cleanup_verified": true,
     "cache_state": "Both images already cached; validates runtime image-volume support, not cold transfer throughput"
+  },
+  "actual_runner": {
+    "source_revision": "0549725e3fe2af85a9c4da8ed9948712efa97890",
+    "cli_revision": "25622d613c0b140154fe2d2d34f59083377ba259",
+    "cli_tag": "infra-v0.2.0",
+    "cli_sha256": "89d8f53fbc2d44390b946aefa11bac242634fff3c4442b1cbb96944fbdd90bb9",
+    "unix_user": "runner",
+    "workspace": "/home/runner/infra/_work/infra/infra",
+    "aggregate_cpu_limit": 4,
+    "aggregate_memory_mib": 2048,
+    "bazel_jobs": 2,
+    "bazel_jvm_heap_mib": 512,
+    "remote_cache": "http://127.0.0.1:9092",
+    "repository_cache": "/var/cache/infra/bazel-repo",
+    "initial_preparation_seconds": 296.956984619,
+    "initial_preparation_cpu_limit": 2,
+    "incremental_preparation": {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 30,
+        "local_cache_hits": 322,
+        "system_network_bytes_sent": 1774165351,
+        "system_network_bytes_received": 36100204
+      },
+      "operation": "prepare-check",
+      "targets": [
+        "//...",
+        "//:gazelle"
+      ],
+      "started": "2026-09-20T19:38:25.864086743Z",
+      "duration_seconds": 7.575942436,
+      "success": true
+    },
+    "tests": {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 5,
+        "local_cache_hits": 12,
+        "system_network_bytes_sent": 1831624582,
+        "system_network_bytes_received": 36129112
+      },
+      "operation": "test",
+      "targets": [
+        "//..."
+      ],
+      "started": "2026-09-20T19:38:50.018392072Z",
+      "duration_seconds": 4.700971767,
+      "success": true
+    },
+    "generated": {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 1,
+        "system_network_bytes_sent": 1831635612,
+        "system_network_bytes_received": 36131128
+      },
+      "operation": "generate-check",
+      "targets": [
+        "//:gazelle",
+        "--",
+        "-mode=diff"
+      ],
+      "started": "2026-09-20T19:38:54.719575706Z",
+      "duration_seconds": 0.958372866,
+      "success": true
+    },
+    "blocking_checks_seconds": 5.659344633000001,
+    "passed_suites": 16,
+    "executed_suites": 4,
+    "cached_suites": 12,
+    "oom_events": 0,
+    "oom_kill_events": 0,
+    "previous_attempt": {
+      "source_revision": "e2616e7",
+      "aggregate_cpu_limit": 2,
+      "success": false,
+      "duration_seconds": 10.100943891,
+      "passed_suites": 15,
+      "reason": "Aggregate deadline reached while final suite still running"
+    }
   }
 }

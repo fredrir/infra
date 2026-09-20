@@ -48,6 +48,23 @@
     build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
     build_runner_toolchain: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json }}"
 
+- name: Create verified CLI fast-path cache
+  ansible.builtin.file:
+    path: '/home/runner/.cache/infra/bin/{{ build_runner_cli.sha256 }}'
+    state: directory
+    owner: runner
+    group: runner
+    mode: '0700'
+
+- name: Seed verified CLI fast-path cache
+  ansible.builtin.copy:
+    src: /usr/local/bin/infra
+    dest: '/home/runner/.cache/infra/bin/{{ build_runner_cli.sha256 }}/infra'
+    remote_src: true
+    owner: runner
+    group: runner
+    mode: '0555'
+
 - name: Install verified native Bazel
   ansible.builtin.get_url:
     url: 'https://github.com/bazelbuild/bazel/releases/download/{{ build_runner_toolchain.bazel }}/bazel-{{ build_runner_toolchain.bazel }}-linux-x86_64'
