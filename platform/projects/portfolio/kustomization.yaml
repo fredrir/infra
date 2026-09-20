@@ -2,28 +2,28 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: portfolio
 resources:
-- namespace.yaml
-- database.yaml
-- application.yaml
-- ingress.yaml
-- network.yaml
-- database.secret.sops.yaml
-- api.secret.sops.yaml
-- web.secret.sops.yaml
-- worker.secret.sops.yaml
-- tunnel.secret.sops.yaml
-- ghcr.secret.sops.yaml
-- backup.yaml
-- backup.secret.sops.yaml
+    - namespace.yaml
+    - database.yaml
+    - application.yaml
+    - ingress.yaml
+    - network.yaml
+    - database.secret.sops.yaml
+    - api.secret.sops.yaml
+    - web.secret.sops.yaml
+    - worker.secret.sops.yaml
+    - tunnel.secret.sops.yaml
+    - ghcr.secret.sops.yaml
+    - backup.yaml
+    - backup.secret.sops.yaml
 components:
-- ../../components/backup-job
+    - ../../components/backup-job
 images:
-- digest: sha256:20e276c7049492e193f26f7c143501d62df11a60a0daf63fddd356708ba9e4a2
-  name: ghcr.io/fredrir/portfolio-api
-  newName: ghcr.io/fredrir/portfolio-api
-- digest: sha256:01520e45e7e8a7dc345ceebacf72af388968789bc93c03cc6e4c6101f2141baa
-  name: ghcr.io/fredrir/portfolio-web
-  newName: ghcr.io/fredrir/portfolio-web
-- digest: sha256:e0fb56ab320654dbd8fd64d27357f55e552346c934773787139ade2382e2f5c4
-  name: ghcr.io/fredrir/portfolio-worker
-  newName: ghcr.io/fredrir/portfolio-worker
+    - digest: sha256:20e276c7049492e193f26f7c143501d62df11a60a0daf63fddd356708ba9e4a2
+      name: ghcr.io/fredrir/portfolio-api
+      newName: ghcr.io/fredrir/portfolio-api
+    - digest: sha256:b387cbdbb71248992cf885335b537125bb666732376d61e73c0fd0b4f2298386
+      name: ghcr.io/fredrir/portfolio-web
+      newName: ghcr.io/fredrir/portfolio-web
+    - digest: sha256:e0fb56ab320654dbd8fd64d27357f55e552346c934773787139ade2382e2f5c4
+      name: ghcr.io/fredrir/portfolio-worker
+      newName: ghcr.io/fredrir/portfolio-worker
