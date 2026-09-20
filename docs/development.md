@@ -107,29 +107,33 @@ infra platform promote-tools --image "$VERIFIED_TOOLS_IMAGE" --apply
 git diff -- platform
 ```
 
-`promote-tools` prepares repository changes for the published tools digest; it does not publish images or apply resources to a cluster.
+`promote-tools` pairs the published tools digest with native commands, removes the obsolete script ConfigMap generators and deletes their four source scripts; it does not publish images or apply cluster resources.
 
 | Dedicated VM setting | Value |
 | --- | --- |
 | Playbook | `ansible/build-engines.yml`; inventory group `build_engines` |
 | Activation gates | `build_engine_dedicated=true`, `build_engine_qualified=true` |
 | Excluded hosts | Existing `k3s_cluster` inventory |
-| Prerequisite | Docker installed on the dedicated Linux amd64 VM |
+| Prerequisite | Docker; active GitHub runner restricted to `fredrir/infra`, label `dagger-amd64` |
+| Runner service | `build_engine_runner_service=actions.runner.<name>.service`; Docker access checked by Ansible |
+| Workflow opt-in | Repository variable `INFRA_VM_POOL_QUALIFIED=true`; protected infrastructure `main` only |
 | Dagger resource ceiling | Two CPUs, 4 GiB RAM, no swap, 256 processes |
 | Dagger connection | Local `docker-container://infra-dagger`; no published engine port |
 | Bazel cache | `127.0.0.1:9092`; VM-local trust boundary |
-| Persistent caches | Separate Docker volumes for Dagger and Bazel |
+| Persistent caches | Separate Docker volumes for Dagger and Bazel; engine-local Bazel action cache |
+| Action cache collection | 8 GiB / 7 days; entries accessed within 30 minutes retained |
 | Cache collection | 20 GiB per cache; Dagger additionally targets 10 GiB free disk |
 | Pool isolation | Trusted jobs only; untrusted PR jobs use hosted isolated engines |
 
 ```sh
 ansible-playbook -i "$BUILD_ENGINE_INVENTORY" ansible/build-engines.yml \
-  -e build_engine_dedicated=true -e build_engine_qualified=true
+  -e build_engine_dedicated=true -e build_engine_qualified=true \
+  -e "build_engine_runner_service=$GITHUB_RUNNER_SERVICE"
 ```
 
 Cache collection thresholds are garbage-collection targets, not filesystem quotas; provision enough VM disk for active builds and both caches.
 
-The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary.
+The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary. Runner registration and credentials must be configured before applying the engine role. Pull requests and external reusable-workflow callers remain hosted.
 
 ## Consumer cutover
 
@@ -141,7 +145,7 @@ The VM-local Bazel endpoint permits writes; a client read-only flag does not enf
 | Retirement | No remaining callers of the old runner pools, scripts or cache service |
 | Rollback | Retained accepted image digests and cache data until the rollback window closes |
 
-The inventory records GitHub reads on its `checked` date; refresh it before retirement.
+The inventory records GitHub reads on its `checked` date; refresh it before retirement. See [rollout and retention](rollout.md).
 
 ## Code quality
 

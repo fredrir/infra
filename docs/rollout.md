@@ -32,12 +32,12 @@ ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook \
 | --- | --- | --- |
 | BuildKit ARC pools and cache credentials | Every image and package caller uses the hosted Dagger workflow; old jobs drained | Previous workflow/image pins for rollback |
 | Nix ARC pool and Attic reader credentials | Infrastructure checks use Bazel; no remaining Nix callers | Previous workflow/image pins for rollback |
-| Attic Deployment, Service and tunnel | No consumers; replacement path verified | Attic namespace, PVC, local data and backups until rollback window closes |
+| Attic StatefulSet, Service and tunnel | No consumers; replacement path verified | Attic namespace, PVC, local data and backups until rollback window closes |
 | Attic monitoring | Service retirement approved | Re-encrypt Gatus configuration with SOPS; keep its integrity metadata valid |
 | Attic provider resources | Reviewed OpenTofu plan | Preserve backup objects; resolve `prevent_destroy` explicitly |
 | Legacy platform scripts | Published Go tools image promoted with commands | Remove their ConfigMap generators and source files in the same change |
 
-The current Flux cache Kustomization uses `prune: true`; removing it or the namespace without a retention change can delete persistent claims. Retain data before pruning service resources.
+The current Flux cache Kustomization uses `prune: true`. Retain the `nix-cache` namespace, PVC and backup objects; remove workload, network and tunnel resources separately.
 
 ## Evidence
 
