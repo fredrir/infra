@@ -14,9 +14,10 @@ func TestVerifiedDeploymentOrder(t *testing.T) {
 		name, visibility, data string
 		valid                  bool
 	}{
-		{"public", "public", `[{"verificationResult":{"statement":{"predicate":{"runDetails":{"metadata":{"invocationId":"https://github.com/fredrir/example/actions/runs/35525556507/attempts/2"}}}}}}]`, true},
+		{"public", "public", `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/fredrir/example/actions/runs/35525556507/attempts/2"}}}}]`, true},
 		{"private", "private", `[{"optional":{"source-run-id":"35525556507","source-run-attempt":"2"}}]`, true},
-		{"wrong-repository", "public", `[{"verificationResult":{"statement":{"predicate":{"runDetails":{"metadata":{"invocationId":"https://github.com/other/example/actions/runs/35525556507/attempts/2"}}}}}}]`, false},
+		{"wrong-repository", "public", `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/other/example/actions/runs/35525556507/attempts/2"}}}}]`, false},
+		{"mutable-statement", "public", `[{"verificationResult":{"statement":{"predicate":{"runDetails":{"metadata":{"invocationId":"https://github.com/fredrir/example/actions/runs/35525556507/attempts/2"}}}}}}]`, false},
 		{"unsigned-root-field", "public", `[{"run_id":35525556507}]`, false},
 		{"legacy-private", "private", `[{"optional":{"source-revision":"abc"}}]`, false},
 		{"numeric-annotation", "private", `[{"optional":{"source-run-id":35525556507,"source-run-attempt":"2"}}]`, false},

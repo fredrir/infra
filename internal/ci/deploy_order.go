@@ -22,15 +22,11 @@ type deploymentOrder struct {
 func verifiedDeploymentOrder(data []byte, visibility, repository string, options DeployOptions) (deploymentOrder, error) {
 	var results []struct {
 		VerificationResult struct {
-			Statement struct {
-				Predicate struct {
-					RunDetails struct {
-						Metadata struct {
-							InvocationID string `json:"invocationId"`
-						} `json:"metadata"`
-					} `json:"runDetails"`
-				} `json:"predicate"`
-			} `json:"statement"`
+			Signature struct {
+				Certificate struct {
+					RunInvocationURI string `json:"runInvocationURI"`
+				} `json:"certificate"`
+			} `json:"signature"`
 		} `json:"verificationResult"`
 		Optional map[string]any `json:"optional"`
 	}
@@ -43,7 +39,7 @@ func verifiedDeploymentOrder(data []byte, visibility, repository string, options
 		switch visibility {
 		case "public":
 			prefix := "https://github.com/" + repository + "/actions/runs/"
-			invocation := result.VerificationResult.Statement.Predicate.RunDetails.Metadata.InvocationID
+			invocation := result.VerificationResult.Signature.Certificate.RunInvocationURI
 			if !strings.HasPrefix(invocation, prefix) {
 				continue
 			}

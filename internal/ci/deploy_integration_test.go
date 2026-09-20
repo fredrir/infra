@@ -76,7 +76,7 @@ func newDeployFixture(t *testing.T, mode, visibility string, nested bool) *deplo
 			}
 			data := `[ {"optional":{"source-run-id":"100","source-run-attempt":"1"}} ]`
 			if p.Name == "gh" {
-				data = `[ {"verificationResult":{"statement":{"predicate":{"runDetails":{"metadata":{"invocationId":"https://github.com/fredrir/example/actions/runs/100/attempts/1"}}}}}} ]`
+				data = `[ {"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/fredrir/example/actions/runs/100/attempts/1"}}}} ]`
 			}
 			return process.Result{Stdout: []byte(data)}, nil
 		}
