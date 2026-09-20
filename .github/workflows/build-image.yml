@@ -14,6 +14,9 @@ on:
       target:
         type: string
         default: ''
+      check-target:
+        type: string
+        default: ''
       build-args:
         type: string
         default: ''
@@ -179,10 +182,17 @@ jobs:
           IMAGE: ${{ inputs.image }}
           CONTEXT: ${{ inputs.context }}
           LAYER_CACHE: ${{ inputs.layer-cache }}
-        run: infra ci measure --stage checks --budget 10s --report-dir "$RUNNER_TEMP/performance" -- bash -euo pipefail -c "$TEST_COMMAND"
+        run: infra ci measure-check --stage test-command --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- bash -euo pipefail -c "$TEST_COMMAND"
       - name: Install verification tools
         if: steps.affected.outputs.changed == 'true'
         run: infra ci install-tools gh trivy cosign
+      - name: Prepare vulnerability databases
+        if: steps.affected.outputs.changed == 'true'
+        run: |
+          infra ci measure --stage scanner-preparation --budget 5m --report-dir "$RUNNER_TEMP/performance/preparation" -- bash -euo pipefail -c '
+            trivy image --download-db-only --no-progress --timeout 2m
+            trivy image --download-java-db-only --no-progress --timeout 2m
+          '
       - name: Build and publish
         if: steps.affected.outputs.changed == 'true'
         id: build
@@ -192,6 +202,7 @@ jobs:
           DOCKERFILE: ${{ inputs.dockerfile }}
           REGISTRY_TOKEN: ${{ github.token }}
           TARGET: ${{ inputs.target }}
+          CHECK_TARGET: ${{ inputs.check-target }}
           BUILD_ARGS: ${{ inputs.build-args }}
           IMAGE_TEST_COMMAND: ${{ inputs.image-test-command }}
           IMAGE_TEST_SHELL: ${{ inputs.image-test-shell }}
@@ -199,7 +210,7 @@ jobs:
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
         run: |
           infra pipeline image --root .infra-build-recipe --context "$CONTEXT" --dockerfile "${SHARED_DOCKERFILE:-$DOCKERFILE}" \
-            --target "$TARGET" --infra-binary "$INFRA_BINARY" --image "$IMAGE:$GITHUB_SHA" --build-args "$(infra ci build-args)" \
+            --target "$TARGET" --check-target "$CHECK_TARGET" --check-report-dir "$RUNNER_TEMP/performance/checks" --infra-binary "$INFRA_BINARY" --image "$IMAGE:$GITHUB_SHA" --build-args "$(infra ci build-args)" \
             --source-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" \
             --test-command "$IMAGE_TEST_COMMAND" --test-shell "$IMAGE_TEST_SHELL" --timeout "${BUILD_TIMEOUT}m"
           printf 'report-id=%s-%s\n' "${IMAGE##*/}" "$(cat /proc/sys/kernel/random/uuid)" >> "$GITHUB_OUTPUT"
@@ -216,7 +227,8 @@ jobs:
             [[ "$SKIP_DIRS" =~ ^/[a-z/]+$ ]]
             skip=(--skip-dirs "$SKIP_DIRS")
           fi
-          trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --timeout 10m "${skip[@]}" "$IMAGE"
+          infra ci measure-check --stage vulnerability-scan --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- \
+            trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --skip-java-db-update --timeout 10s "${skip[@]}" "$IMAGE"
       - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661
         if: steps.affected.outputs.changed == 'true' && (!github.event.repository.private)
         with:
@@ -229,7 +241,8 @@ jobs:
           IMAGE: ${{ steps.build.outputs.image }}
           WORKFLOW_SHA: ${{ job.workflow_sha }}
         run: |
-          gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+          infra ci measure-check --stage provenance-verification --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- \
+            gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
             --signer-workflow fredrir/infra/.github/workflows/build-image.yml \
             --signer-digest "$WORKFLOW_SHA" --source-ref refs/heads/main \
             --source-digest "$GITHUB_SHA"
@@ -252,7 +265,8 @@ jobs:
             --annotations "workflow-revision=$WORKFLOW_SHA" \
             --annotations "source-run-id=$GITHUB_RUN_ID" \
             --annotations "source-run-attempt=$GITHUB_RUN_ATTEMPT" "$IMAGE"
-          cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+          infra ci measure-check --stage provenance-verification --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- \
+            cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --certificate-identity "https://github.com/fredrir/infra/.github/workflows/build-image.yml@$WORKFLOW_SHA" \
             --certificate-github-workflow-repository "$GITHUB_REPOSITORY" \
             --certificate-github-workflow-sha "$GITHUB_SHA" \
@@ -261,6 +275,9 @@ jobs:
             --annotations "source-repository=$GITHUB_REPOSITORY" \
             --annotations "source-revision=$GITHUB_SHA" \
             --annotations "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
+      - name: Enforce aggregate check budget
+        if: steps.affected.outputs.changed == 'true'
+        run: infra ci check-budget --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" > "$RUNNER_TEMP/performance/check-budget.json"
       - name: Tag verified image
         if: steps.affected.outputs.changed == 'true' && (inputs.verified-tag != '')
         env:

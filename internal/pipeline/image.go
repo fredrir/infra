@@ -10,11 +10,16 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/fredrir/infra/internal/ci"
 
 	"dagger.io/dagger"
 )
 
 type ImageOptions struct {
+	CheckTarget     string
+	CheckReportDir  string
 	Target          string
 	CheckOnly       bool
 	InfraBinary     string
@@ -42,8 +47,13 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 	if !filepath.IsLocal(opts.Dockerfile) {
 		return "", errors.New("Dockerfile must be relative to the working directory")
 	}
-	if opts.Target != "" && !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`).MatchString(opts.Target) {
-		return "", errors.New("invalid Dockerfile target")
+	for _, target := range []string{opts.Target, opts.CheckTarget} {
+		if target != "" && !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`).MatchString(target) {
+			return "", errors.New("invalid Dockerfile target")
+		}
+	}
+	if (opts.CheckTarget != "" || opts.TestCommand != "") && (opts.CheckReportDir == "" || opts.InfraBinary == "") {
+		return "", errors.New("measured image checks require an infra binary and check report directory")
 	}
 	if info, err := os.Stat(opts.Dockerfile); err != nil || !info.Mode().IsRegular() {
 		return "", errors.New("Dockerfile must be an existing regular file")
@@ -73,6 +83,19 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 	if opts.InfraBinary != "" {
 		source = source.WithFile(".infra-artifacts/infra", client.Host().File(opts.InfraBinary), dagger.DirectoryWithFileOpts{Permissions: 0o755})
 	}
+	if opts.CheckTarget != "" {
+		checks := source.DockerBuild(dagger.DirectoryDockerBuildOpts{Platform: dagger.Platform(opts.Platform), Dockerfile: ".infra.Containerfile", Target: opts.CheckTarget, BuildArgs: args})
+		directory := filepath.Join(opts.CheckReportDir, "inline")
+		if _, err := checks.Directory("/infra-checks").Export(ctx, directory); err != nil {
+			return "", fmt.Errorf("export inline check receipts: %w", err)
+		}
+		if _, err := ci.CheckGroupBudget(directory, 10*time.Second, true); err != nil {
+			return "", err
+		}
+		if _, err := ci.CheckGroupBudget(opts.CheckReportDir, 10*time.Second, true); err != nil {
+			return "", err
+		}
+	}
 	container := source.DockerBuild(dagger.DirectoryDockerBuildOpts{Platform: dagger.Platform(opts.Platform), Dockerfile: ".infra.Containerfile", Target: opts.Target, BuildArgs: args})
 	if opts.SourceURL != "" {
 		container = container.WithLabel("org.opencontainers.image.source", opts.SourceURL)
@@ -89,8 +112,27 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		if shell == "bash" {
 			arguments = []string{shell, "-euo", "pipefail", "-c", opts.TestCommand}
 		}
-		if _, err := container.WithExec(arguments).Sync(ctx); err != nil {
+		if _, err := container.Sync(ctx); err != nil {
+			return "", err
+		}
+		group, err := ci.CheckGroupBudget(opts.CheckReportDir, 10*time.Second, false)
+		if err != nil {
+			return "", err
+		}
+		budget := time.Duration(group.RemainingSeconds * float64(time.Second)).String()
+		command := append([]string{"/tmp/infra-measure", "ci", "measure", "--stage", "image-smoke", "--budget", budget, "--report-dir", "/tmp/infra-checks", "--"}, arguments...)
+		checked := container.WithMountedFile("/tmp/infra-measure", client.Host().File(opts.InfraBinary)).WithEnvVariable("GITHUB_SHA", opts.Revision).WithExec(command, dagger.ContainerWithExecOpts{Expect: dagger.ReturnTypeAny})
+		code, err := checked.ExitCode(ctx)
+		if err != nil {
 			return "", fmt.Errorf("image verification: %w", err)
+		}
+		_, exportErr := checked.Directory("/tmp/infra-checks").Export(ctx, filepath.Join(opts.CheckReportDir, "smoke"))
+		_, checkErr := ci.CheckGroupBudget(opts.CheckReportDir, 10*time.Second, true)
+		if code != 0 {
+			return "", errors.Join(fmt.Errorf("image verification exited with status %d", code), exportErr, checkErr)
+		}
+		if err := errors.Join(exportErr, checkErr); err != nil {
+			return "", err
 		}
 	}
 	if opts.CheckOnly {

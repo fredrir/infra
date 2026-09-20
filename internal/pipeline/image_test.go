@@ -26,6 +26,18 @@ func TestImageRejectsMissingEscapingAndMalformedInputsBeforeConnecting(t *testin
 	}
 }
 
+func TestMeasuredImageChecksRequireReceiptsAndVerifiedBinary(t *testing.T) {
+	for _, options := range []ImageOptions{
+		{Dockerfile: "Dockerfile", CheckOnly: true, CheckTarget: "check-reports"},
+		{Dockerfile: "Dockerfile", CheckOnly: true, CheckTarget: "check-reports", InfraBinary: "infra"},
+		{Dockerfile: "Dockerfile", CheckOnly: true, TestCommand: "test true", CheckReportDir: t.TempDir()},
+	} {
+		if _, err := Image(context.Background(), options); err == nil || !strings.Contains(err.Error(), "measured image checks require") {
+			t.Fatalf("unmeasured image check accepted: %v", err)
+		}
+	}
+}
+
 func TestDaggerImageBuildSelectsStageAndPreservesLiteralBuildArguments(t *testing.T) {
 	root := os.Getenv("INFRA_DAGGER_IMAGE_TEST_ROOT")
 	if root == "" {
