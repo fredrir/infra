@@ -205,5 +205,69 @@
         }
       ]
     }
+  },
+  "parser-a57": {
+    "run_id": 35539104606,
+    "aggregate": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 10.017759458,
+      "remaining_seconds": 0,
+      "success": false,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "parser-python",
+          "started": "2026-09-20T21:10:26.33275595Z",
+          "duration_seconds": 2.223066294,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 2.040193,
+          "peak_memory_bytes": 36544512
+        },
+        {
+          "schema": 1,
+          "stage": "parser-ui",
+          "started": "2026-09-20T21:10:28.756874182Z",
+          "duration_seconds": 2.382518529,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 2.253683,
+          "peak_memory_bytes": 135151616
+        },
+        {
+          "schema": 1,
+          "stage": "provenance-verification",
+          "revision": "b8d6e766a5505261061468eb7d679496c1c661a8",
+          "started": "2026-09-20T21:57:33.483964588Z",
+          "duration_seconds": 0.3617345,
+          "budget_seconds": 0.343975042,
+          "budget_exceeded": true,
+          "success": false,
+          "exit_code": -1,
+          "cpu_seconds": 0.104122,
+          "peak_memory_bytes": 65798144,
+          "error": "cosign failed: context deadline exceeded\nprovenance-verification exceeded 343.975042ms budget"
+        },
+        {
+          "schema": 1,
+          "stage": "vulnerability-scan",
+          "revision": "b8d6e766a5505261061468eb7d679496c1c661a8",
+          "started": "2026-09-20T21:57:20.809494027Z",
+          "duration_seconds": 5.050440135,
+          "budget_seconds": 5.394415177,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 2.043449,
+          "peak_memory_bytes": 137371648
+        }
+      ]
+    }
   }
 }
