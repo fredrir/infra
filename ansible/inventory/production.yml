@@ -114,6 +114,7 @@ all:
           build_engine_parallelism: 2
           build_engine_prewarm_memory: 512M
           build_engine_prewarm_commands:
+          - [/usr/local/bin/infra, artifact, prune-source, --keep=16, --max-age=168h]
           - [/usr/local/bin/infra, pipeline, cache-gc, --timeout=30s]
           - [/usr/local/bin/infra, pipeline, prepare-check, --local, --timeout=5m, --report-dir=/home/runner/prewarm-reports]
           build_runner_repositories: [infra, Y, llunde-frontend, llunde-backend, llunde-pyparser, packages, nsql, portfolio]

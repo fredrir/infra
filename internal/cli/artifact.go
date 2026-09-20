@@ -42,5 +42,17 @@ func newArtifactCommand() *cobra.Command {
 	cleanup.Flags().Int64Var(&prune.MaxBytes, "max-bytes", 1<<30, "Maximum retained binary bytes")
 	cleanup.Flags().DurationVar(&prune.MaxAge, "max-age", 30*24*time.Hour, "Maximum unused artifact age")
 	root.AddCommand(cleanup)
+	var source artifact.SourcePruneOptions
+	sourceCleanup := &cobra.Command{Use: "prune-source", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		result, err := artifact.PruneSource(cmd.Context(), source)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(cmd.OutOrStdout()).Encode(result)
+	}}
+	sourceCleanup.Flags().StringVar(&source.CacheDir, "cache-dir", filepath.Join(cache, "infra", "source-cli"), "Private source CLI cache")
+	sourceCleanup.Flags().IntVar(&source.Keep, "keep", 16, "Maximum retained source binaries")
+	sourceCleanup.Flags().DurationVar(&source.MaxAge, "max-age", 7*24*time.Hour, "Maximum unused source binary age")
+	root.AddCommand(sourceCleanup)
 	return root
 }
