@@ -73,7 +73,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: caddy
-          image: ghcr.io/fredrir/platform-caddy@sha256:b6c38126fe81ea62bba23a7d2aaff7301119eb530a2baae957d7517680889bd8
+          image: ghcr.io/fredrir/platform-caddy@sha256:b03ceb80193dea33aa4812a190a08465dbe56f6a6aec364a47c15df1f56c8106
           command: [caddy]
           args: [run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
           securityContext:

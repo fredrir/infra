@@ -6,7 +6,7 @@ COPY frontend/ ./
 ENV VITE_BACKEND_URL=/api
 RUN npm run build
 
-FROM ghcr.io/fredrir/platform-caddy@sha256:b6c38126fe81ea62bba23a7d2aaff7301119eb530a2baae957d7517680889bd8
+FROM ghcr.io/fredrir/platform-caddy@sha256:b03ceb80193dea33aa4812a190a08465dbe56f6a6aec364a47c15df1f56c8106
 ARG REVISION
 LABEL org.opencontainers.image.source="https://github.com/fredrir/Y"
 LABEL org.opencontainers.image.revision=$REVISION

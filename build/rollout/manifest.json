@@ -2,7 +2,7 @@
   "schema": 1,
   "checked": "2026-09-20",
   "source_revision": "b2c97f0c98c09099d19696089e55f1e95bd6ac1d",
-  "state": "prepared-not-applied",
+  "state": "applied",
   "expected_blobs": [
     {
       "repository": "fredrir/nsql",
