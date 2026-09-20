@@ -24,11 +24,16 @@ jobs:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           persist-credentials: false
+      - name: Identify CLI inputs
+        id: inputs
+        run: |
+          digest=$(git ls-tree -r HEAD -- cmd internal go.mod go.sum MODULE.bazel MODULE.bazel.lock BUILD.bazel .bazelrc .bazelversion build/toolchain.json build/dagger-embed.patch build/BUILD.bazel | sha256sum | cut -d' ' -f1)
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         id: binary-cache
         with:
           path: ${{ runner.temp }}/infra-cli
-          key: infra-cli-linux-amd64-bazel9.2.0-go1.27.1-${{ job.workflow_sha }}
+          key: infra-cli-inputs-v2-${{ steps.inputs.outputs.digest }}
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         if: steps.binary-cache.outputs.cache-hit != 'true'
         with:
@@ -53,17 +58,20 @@ jobs:
         if: steps.binary-cache.outputs.cache-hit != 'true'
         env:
           REVISION: ${{ job.workflow_sha }}
+          INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
         run: |
           mkdir -p "$RUNNER_TEMP/infra-cli"
           cp bazel-bin/cmd/infra/infra_/infra "$RUNNER_TEMP/infra-cli/infra"
           sha256sum "$RUNNER_TEMP/infra-cli/infra" | cut -d' ' -f1 > "$RUNNER_TEMP/infra-cli/sha256"
-          printf '%s\n' "$REVISION" > "$RUNNER_TEMP/infra-cli/revision"
+          printf '%s\n' "$REVISION" > "$RUNNER_TEMP/infra-cli/source-revision"
+          printf '%s\n' "$INPUT_DIGEST" > "$RUNNER_TEMP/infra-cli/inputs"
       - name: Verify binary identity
         id: bundle
         env:
           REVISION: ${{ job.workflow_sha }}
+          INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
         run: |
-          test "$(cat "$RUNNER_TEMP/infra-cli/revision")" = "$REVISION"
+          test "$(cat "$RUNNER_TEMP/infra-cli/inputs")" = "$INPUT_DIGEST"
           printf '%s  %s\n' "$(cat "$RUNNER_TEMP/infra-cli/sha256")" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
           printf 'sha256=%s\nrevision=%s\nartifact=infra-cli-%s-%s\n' "$(cat "$RUNNER_TEMP/infra-cli/sha256")" "$REVISION" "$REVISION" "$(cat /proc/sys/kernel/random/uuid)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

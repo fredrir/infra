@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -43,6 +44,9 @@ func InstallTools(ctx context.Context, temporary, pathOutput string, names []str
 		}
 	}
 	directory := filepath.Join(temporary, "tools")
+	if cache := os.Getenv("INFRA_TOOL_CACHE"); cache != "" {
+		directory = cache
+	}
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return err
 	}
@@ -77,6 +81,9 @@ func InstallTools(ctx context.Context, temporary, pathOutput string, names []str
 }
 
 func InstallTool(ctx context.Context, client *http.Client, asset ToolAsset, destination string) error {
+	if cachedToolMatches(destination, asset.Digest) {
+		return nil
+	}
 	work, err := os.MkdirTemp(filepath.Dir(destination), ".tool-")
 	if err != nil {
 		return err
@@ -160,5 +167,55 @@ func InstallTool(ctx context.Context, client *http.Client, asset ToolAsset, dest
 	if err := os.Chmod(path, 0755); err != nil {
 		return err
 	}
-	return os.Rename(path, destination)
+	if err := os.Rename(path, destination); err != nil {
+		return err
+	}
+	binaryDigest, err := toolDigest(destination)
+	if err != nil {
+		return err
+	}
+	metadata, err := json.Marshal(toolReceipt{Asset: asset.Digest, Binary: binaryDigest})
+	if err != nil {
+		return err
+	}
+	receipt := filepath.Join(work, "receipt")
+	if err := os.WriteFile(receipt, metadata, 0600); err != nil {
+		return err
+	}
+	return os.Rename(receipt, destination+".json")
+}
+
+type toolReceipt struct{ Asset, Binary string }
+
+func toolDigest(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
+		return "", fmt.Errorf("tool must be executable regular file")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func cachedToolMatches(path, asset string) bool {
+	data, err := os.ReadFile(path + ".json")
+	if err != nil {
+		return false
+	}
+	var receipt toolReceipt
+	if json.Unmarshal(data, &receipt) != nil || receipt.Asset != asset {
+		return false
+	}
+	digest, err := toolDigest(path)
+	return err == nil && digest == receipt.Binary
 }

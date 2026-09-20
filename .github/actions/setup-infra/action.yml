@@ -1,0 +1,29 @@
+name: Install verified infrastructure CLI
+inputs:
+  root:
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        INFRA_ROOT: ${{ inputs.root }}
+      run: |
+        set -euo pipefail
+        manifest="$INFRA_ROOT/build/cli-release.json"
+        version=$(jq -er '.tag | select(test("^infra-v[0-9]+[.][0-9]+[.][0-9]+$"))' "$manifest")
+        digest=$(jq -er '.sha256 | select(test("^[a-f0-9]{64}$"))' "$manifest")
+        test "$(uname -s)-$(uname -m)" = Linux-x86_64
+        cache="${XDG_CACHE_HOME:-$HOME/.cache}/infra/bin/$digest"
+        mkdir -p "$cache"
+        if ! printf '%s  %s\n' "$digest" "$cache/infra" | sha256sum --check --strict --status 2>/dev/null; then
+          temporary=$(mktemp "$cache/.infra.XXXXXX")
+          trap 'rm -f "$temporary"' EXIT
+          curl --fail --silent --show-error --location --retry 2 --max-time 30 "https://github.com/fredrir/infra/releases/download/$version/infra-linux-amd64" --output "$temporary"
+          printf '%s  %s\n' "$digest" "$temporary" | sha256sum --check --strict
+          chmod 755 "$temporary"
+          mv "$temporary" "$cache/infra"
+        fi
+        printf '%s\n' "$cache" >> "$GITHUB_PATH"
+        printf 'INFRA_BINARY=%s/infra\n' "$cache" >> "$GITHUB_ENV"
+        printf 'INFRA_TOOL_CACHE=%s/infra/tools\n' "${XDG_CACHE_HOME:-$HOME/.cache}" >> "$GITHUB_ENV"
