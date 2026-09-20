@@ -40,7 +40,19 @@ func Validate(ctx context.Context, runner Runner, before string) error {
 		return false
 	}
 	if changed(`^ansible/`) {
-		if err := runner.Run(ctx, "ansible-playbook", "-i", "localhost,", "ansible/site.yml", "--syntax-check"); err != nil {
+		playbooks, err := filepath.Glob(filepath.Join(runner.Dir, "ansible", "*.yml"))
+		if err != nil {
+			return err
+		}
+		arguments := []string{"-i", "localhost,", "--syntax-check"}
+		for _, playbook := range playbooks {
+			relative, err := filepath.Rel(runner.Dir, playbook)
+			if err != nil {
+				return err
+			}
+			arguments = append(arguments, relative)
+		}
+		if err := runner.Run(ctx, "ansible-playbook", arguments...); err != nil {
 			return err
 		}
 	}
