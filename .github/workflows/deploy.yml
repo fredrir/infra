@@ -51,7 +51,9 @@ jobs:
           chmod 755 "$RUNNER_TEMP/infra-cli/infra"
           printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
       - name: Install tools
-        run: infra ci install-tools gh kustomize cosign
+        run: |
+          infra ci install-tools gh cosign
+          command -v kustomize >/dev/null || infra ci install-tools kustomize
       - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
         id: deployment-token
         with:
