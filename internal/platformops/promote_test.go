@@ -1,6 +1,7 @@
 package platformops
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,18 +20,42 @@ func TestToolsPromotionChangesPinsAndCommandsTogether(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	for _, fixture := range []struct{ directory, generator, files string }{
+		{"controllers", "ci-slots", "ci-slots.sh"},
+		{"build-cache", "build-cache-provisioner", "provision.sh"},
+		{"backup-job", "backup-hook", "backup.sh heartbeat.sh"},
+	} {
+		directory := filepath.Join(root, "platform/components", fixture.directory)
+		if err := os.MkdirAll(directory, 0755); err != nil {
+			t.Fatal(err)
+		}
+		manifest := "resources: [keep.yaml]\nconfigMapGenerator:\n- name: " + fixture.generator + "\n  files:\n"
+		for _, name := range strings.Fields(fixture.files) {
+			manifest += "  - " + name + "\n"
+			if err := os.WriteFile(filepath.Join(directory, name), []byte("legacy script"), 0750); err != nil {
+				t.Fatal(err)
+			}
+		}
+		manifest += "- name: unrelated\n  literals: [keep=value]\n"
+		if err := os.WriteFile(filepath.Join(directory, "kustomization.yaml"), []byte(manifest), 0640); err != nil {
+			t.Fatal(err)
+		}
+	}
 	image := "ghcr.io/fredrir/platform-backup-tools@sha256:" + strings.Repeat("b", 64)
 	edits, err := ToolsPromotion(root, image)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(edits) != 6 {
-		t.Fatalf("expected six changes, got %d", len(edits))
+	if len(edits) != 13 {
+		t.Fatalf("expected thirteen changes, got %d", len(edits))
 	}
 	for _, edit := range edits {
 		text := string(edit.After)
-		if !strings.Contains(text, image) || !strings.Contains(text, "/usr/local/bin/infra") || !strings.Contains(text, "platform") || strings.Contains(text, "name: hook") || !strings.Contains(text, "name: files") {
+		if strings.Contains(string(edit.Before), "containers:") && (!strings.Contains(text, image) || !strings.Contains(text, "/usr/local/bin/infra") || !strings.Contains(text, "platform") || strings.Contains(text, "name: hook") || !strings.Contains(text, "name: files")) {
 			t.Fatalf("invalid promotion: %s", text)
+		}
+		if strings.HasSuffix(edit.Path, "kustomization.yaml") && (!strings.Contains(text, "name: unrelated") || !strings.Contains(text, "keep.yaml") || strings.Contains(text, ".sh")) {
+			t.Fatalf("unrelated generator or resource changed: %s", text)
 		}
 		current, _ := os.ReadFile(edit.Path)
 		if string(current) != string(edit.Before) {
@@ -43,6 +68,81 @@ func TestToolsPromotionChangesPinsAndCommandsTogether(t *testing.T) {
 	second, err := ToolsPromotion(root, image)
 	if err != nil || len(second) != 0 {
 		t.Fatalf("promotion not idempotent: %d %v", len(second), err)
+	}
+}
+
+func TestPromotionRollbackRestoresDeletedFilesContentsAndModes(t *testing.T) {
+	root := t.TempDir()
+	var edits []Edit
+	for index, name := range []string{"update.yaml", "delete.sh", "fail.yaml"} {
+		path := filepath.Join(root, name)
+		mode := os.FileMode(0640)
+		if index == 1 {
+			mode = 0751
+		}
+		if err := os.WriteFile(path, []byte(name), mode); err != nil {
+			t.Fatal(err)
+		}
+		edit := Edit{Path: path, Before: []byte(name), After: []byte("promoted")}
+		if index == 1 {
+			edit.Delete, edit.After = true, nil
+		}
+		edits = append(edits, edit)
+	}
+	failure := errors.New("injected write failure")
+	err := applyEdits(edits, func(edit Edit, mode os.FileMode) error {
+		if strings.HasSuffix(edit.Path, "fail.yaml") {
+			return failure
+		}
+		return applyEdit(edit, mode)
+	})
+	if !errors.Is(err, failure) {
+		t.Fatalf("unexpected failure: %v", err)
+	}
+	for index, edit := range edits {
+		data, err := os.ReadFile(edit.Path)
+		if err != nil || string(data) != string(edit.Before) {
+			t.Fatalf("rollback lost %s: %s %v", edit.Path, data, err)
+		}
+		info, err := os.Stat(edit.Path)
+		want := os.FileMode(0640)
+		if index == 1 {
+			want = 0751
+		}
+		if err != nil || info.Mode().Perm() != want {
+			t.Fatalf("rollback changed mode for %s", edit.Path)
+		}
+	}
+}
+
+func TestPromotionPreflightsEveryDeletionBeforeChangingFiles(t *testing.T) {
+	for _, scenario := range []string{"changed", "symlink", "directory"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := t.TempDir()
+			first, last := filepath.Join(root, "first"), filepath.Join(root, "last")
+			if err := os.WriteFile(first, []byte("original"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var err error
+			switch scenario {
+			case "changed":
+				err = os.WriteFile(last, []byte("concurrent change"), 0600)
+			case "symlink":
+				err = os.Symlink(first, last)
+			case "directory":
+				err = os.Mkdir(last, 0700)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ApplyEdits([]Edit{{Path: first, Before: []byte("original"), Delete: true}, {Path: last, Before: []byte("original"), Delete: true}}); err == nil {
+				t.Fatal("invalid deletion accepted")
+			}
+			data, err := os.ReadFile(first)
+			if err != nil || string(data) != "original" {
+				t.Fatal("preflight failure removed an earlier file")
+			}
+		})
 	}
 }
 

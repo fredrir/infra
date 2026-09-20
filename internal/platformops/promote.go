@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -17,6 +18,7 @@ type Edit struct {
 	Path   string `json:"path"`
 	Before []byte `json:"-"`
 	After  []byte `json:"-"`
+	Delete bool   `json:"delete,omitempty"`
 }
 
 func ToolsPromotion(root, image string) ([]Edit, error) {
@@ -116,11 +118,37 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 			edits = append(edits, Edit{Path: path, Before: before, After: after.Bytes()})
 		}
 	}
-	return edits, nil
+	cleanup, err := legacyToolsCleanup(root)
+	if err != nil {
+		return nil, err
+	}
+	return append(edits, cleanup...), nil
 }
 
 func ApplyEdits(edits []Edit) error {
-	for _, edit := range edits {
+	return applyEdits(edits, applyEdit)
+}
+
+func applyEdits(edits []Edit, apply func(Edit, os.FileMode) error) error {
+	modes := make([]os.FileMode, len(edits))
+	seen := map[string]bool{}
+	for index, edit := range edits {
+		path, err := filepath.Abs(edit.Path)
+		if err != nil {
+			return err
+		}
+		if seen[path] || (edit.Delete && len(edit.After) != 0) {
+			return fmt.Errorf("invalid or duplicate promotion edit: %s", edit.Path)
+		}
+		seen[path] = true
+		info, err := os.Lstat(edit.Path)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("promotion requires regular files: %s", edit.Path)
+		}
+		modes[index] = info.Mode().Perm()
 		current, err := os.ReadFile(edit.Path)
 		if err != nil {
 			return err
@@ -129,38 +157,145 @@ func ApplyEdits(edits []Edit) error {
 			return fmt.Errorf("file changed during promotion: %s", edit.Path)
 		}
 	}
-	var written []Edit
-	for _, edit := range edits {
-		if err := atomicFile(edit.Path, edit.After); err != nil {
-			for i := len(written) - 1; i >= 0; i-- {
-				err = errors.Join(err, atomicFile(written[i].Path, written[i].Before))
+	for index, edit := range edits {
+		if err := apply(edit, modes[index]); err != nil {
+			for i := index - 1; i >= 0; i-- {
+				err = errors.Join(err, atomicFile(edits[i].Path, edits[i].Before, modes[i]))
 			}
 			return err
 		}
-		written = append(written, edit)
 	}
 	return nil
 }
 
-func atomicFile(path string, data []byte) error {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return err
+func applyEdit(edit Edit, mode os.FileMode) error {
+	if edit.Delete {
+		return os.Remove(edit.Path)
 	}
-	if !info.Mode().IsRegular() {
-		return fmt.Errorf("promotion requires regular file")
-	}
+	return atomicFile(edit.Path, edit.After, mode)
+}
+
+func atomicFile(path string, data []byte, mode os.FileMode) error {
 	f, err := os.CreateTemp(filepath.Dir(path), ".infra-promote-*")
 	if err != nil {
 		return err
 	}
 	defer os.Remove(f.Name())
 	_, writeErr := f.Write(data)
-	err = errors.Join(writeErr, f.Chmod(info.Mode().Perm()), f.Sync(), f.Close())
+	err = errors.Join(writeErr, f.Chmod(mode), f.Sync(), f.Close())
 	if err != nil {
 		return err
 	}
 	return os.Rename(f.Name(), path)
+}
+
+func legacyToolsCleanup(root string) ([]Edit, error) {
+	var edits []Edit
+	for _, generator := range []struct {
+		directory, name string
+		files           []string
+	}{
+		{"platform/components/controllers", "ci-slots", []string{"ci-slots.sh"}},
+		{"platform/components/build-cache", "build-cache-provisioner", []string{"provision.sh"}},
+		{"platform/components/backup-job", "backup-hook", []string{"backup.sh", "heartbeat.sh"}},
+	} {
+		path := filepath.Join(root, generator.directory, "kustomization.yaml")
+		before, err := promotionSource(path)
+		if err != nil {
+			return nil, err
+		}
+		var document yaml.Node
+		if err := yaml.Unmarshal(before, &document); err != nil {
+			return nil, err
+		}
+		if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
+			return nil, fmt.Errorf("invalid promotion kustomization: %s", path)
+		}
+		mapping := document.Content[0]
+		removed := false
+		if generators := mapValue(mapping, "configMapGenerator"); generators != nil {
+			if generators.Kind != yaml.SequenceNode {
+				return nil, fmt.Errorf("invalid configMapGenerator in %s", path)
+			}
+			var kept []*yaml.Node
+			for _, entry := range generators.Content {
+				name := mapValue(entry, "name")
+				if name == nil || name.Value != generator.name {
+					kept = append(kept, entry)
+					continue
+				}
+				files := mapValue(entry, "files")
+				var actual []string
+				if files != nil && files.Kind == yaml.SequenceNode {
+					for _, file := range files.Content {
+						actual = append(actual, file.Value)
+					}
+				}
+				slices.Sort(actual)
+				expected := slices.Clone(generator.files)
+				slices.Sort(expected)
+				if !slices.Equal(actual, expected) || mapValue(entry, "literals") != nil || mapValue(entry, "envs") != nil {
+					return nil, fmt.Errorf("legacy generator %s contains unexpected content", generator.name)
+				}
+				removed = true
+			}
+			generators.Content = kept
+			if len(kept) == 0 {
+				removeMapValue(mapping, "configMapGenerator")
+			}
+		}
+		if removed {
+			var after bytes.Buffer
+			encoder := yaml.NewEncoder(&after)
+			encoder.SetIndent(2)
+			if err := encoder.Encode(&document); err != nil {
+				return nil, err
+			}
+			if err := encoder.Close(); err != nil {
+				return nil, err
+			}
+			edits = append(edits, Edit{Path: path, Before: before, After: after.Bytes()})
+		}
+		for _, name := range generator.files {
+			path := filepath.Join(root, generator.directory, name)
+			before, err := promotionSource(path)
+			if os.IsNotExist(err) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			edits = append(edits, Edit{Path: path, Before: before, Delete: true})
+		}
+	}
+	return edits, nil
+}
+
+func promotionSource(path string) ([]byte, error) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return nil, err
+	}
+	if resolved != path {
+		return nil, fmt.Errorf("promotion path must not traverse symlinks: %s", path)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("promotion requires regular file: %s", path)
+	}
+	return os.ReadFile(path)
+}
+
+func removeMapValue(node *yaml.Node, key string) {
+	for index := 0; index+1 < len(node.Content); index += 2 {
+		if node.Content[index].Value == key {
+			node.Content = append(node.Content[:index], node.Content[index+2:]...)
+			return
+		}
+	}
 }
 
 func walkYAML(node *yaml.Node, visit func(*yaml.Node)) {

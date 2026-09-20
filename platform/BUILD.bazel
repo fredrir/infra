@@ -8,3 +8,12 @@ filegroup(
 )
 
 exports_files(["components/backups/tools.Dockerfile"])
+
+filegroup(
+    name = "promotion_testdata",
+    srcs = glob([
+        "components/**",
+        "projects/**",
+    ]),
+    visibility = ["//internal/platformops:__pkg__"],
+)
