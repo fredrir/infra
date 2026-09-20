@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "recorded_at": "2026-09-20T17:37:23.249609+00:00",
+  "recorded_at": "2026-09-20T17:45:34.646360+00:00",
   "source_revision": "25cbb5389a5d5df996709e2c5a1b4d1443861172",
-  "state": "applied-awaiting-build-results",
+  "state": "applied-portfolio-long-tests-in-progress",
   "infra_policy_commit": "9c178096f9abc45e04653cf389688e6980a8757e",
   "retained_workflow_revision": "b2c97f0c98c09099d19696089e55f1e95bd6ac1d",
   "repositories": [
@@ -89,10 +89,10 @@
       "verified_main": "55a0b84db3cc5915b24fb4144a6281d303aa1dd6",
       "runs": [
         {
-          "conclusion": "",
+          "conclusion": "success",
           "databaseId": 35525555509,
           "headSha": "55a0b84db3cc5915b24fb4144a6281d303aa1dd6",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35525555509",
           "workflowName": "Build images"
         }
@@ -174,10 +174,10 @@
       "verified_main": "505774bbe44ced9a192d833d16a3c71e78e2ddb7",
       "runs": [
         {
-          "conclusion": "",
+          "conclusion": "success",
           "databaseId": 35525560202,
           "headSha": "505774bbe44ced9a192d833d16a3c71e78e2ddb7",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/fredrir/portfolio/actions/runs/35525560202",
           "workflowName": "Dependabot Updates"
         },
@@ -185,9 +185,51 @@
           "conclusion": "",
           "databaseId": 35525559752,
           "headSha": "505774bbe44ced9a192d833d16a3c71e78e2ddb7",
-          "status": "pending",
+          "status": "in_progress",
           "url": "https://github.com/fredrir/portfolio/actions/runs/35525559752",
-          "workflowName": "Build images"
+          "workflowName": "Build images",
+          "jobs": [
+            {
+              "name": "worker / cli / build",
+              "status": "completed",
+              "conclusion": "success",
+              "active_steps": []
+            },
+            {
+              "name": "api / cli / build",
+              "status": "completed",
+              "conclusion": "success",
+              "active_steps": []
+            },
+            {
+              "name": "web / cli / build",
+              "status": "completed",
+              "conclusion": "success",
+              "active_steps": []
+            },
+            {
+              "name": "web / build",
+              "status": "completed",
+              "conclusion": "success",
+              "active_steps": []
+            },
+            {
+              "name": "api / build",
+              "status": "in_progress",
+              "conclusion": "",
+              "active_steps": [
+                "Build and publish"
+              ]
+            },
+            {
+              "name": "worker / build",
+              "status": "in_progress",
+              "conclusion": "",
+              "active_steps": [
+                "Build and publish"
+              ]
+            }
+          ]
         }
       ]
     }
@@ -196,9 +238,12 @@
     "backend_native_tests": "success",
     "backend_image_workflow": "success",
     "parser_native_tests": "success",
-    "parser_image_workflow": "in_progress",
+    "parser_image_workflow": "success",
     "superseded_portfolio_run": 35524556506,
     "superseded_portfolio_conclusion": "cancelled",
-    "cancellation_method": "force cancellation after job-level always() blocked normal cancellation"
+    "cancellation_method": "force cancellation after job-level always() blocked normal cancellation",
+    "smaller_consumer_workflows": "success",
+    "portfolio_web_workflow": "success",
+    "portfolio_api_worker_workflows": "native tests in progress; existing workflows continue in the background"
   }
 }
