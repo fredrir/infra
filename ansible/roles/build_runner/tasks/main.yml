@@ -106,14 +106,23 @@
       MemoryMax={{ build_runner_memory }}
       TasksMax=4096
 
-- name: Install immutable trusted-job hook
+- name: Create trusted hook adapter directory
   ansible.builtin.file:
-    src: /usr/local/bin/infra
-    dest: /usr/local/bin/infra-runner-hook
-    state: link
+    path: /usr/local/libexec
+    state: directory
     owner: root
     group: root
-    force: true
+    mode: '0755'
+
+- name: Install immutable trusted-job hook adapter
+  ansible.builtin.copy:
+    dest: /usr/local/libexec/infra-runner-hook.sh
+    owner: root
+    group: root
+    mode: '0555'
+    content: |
+      #!/bin/sh
+      exec /usr/local/bin/infra platform runner-hook
 
 - name: Configure repository runners
   ansible.builtin.include_tasks: repository.yml
