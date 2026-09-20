@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "recorded_at": "2026-09-20T17:02:36.063504+00:00",
+  "recorded_at": "2026-09-20T17:03:56.950844+00:00",
   "source_revision": "b2c97f0c98c09099d19696089e55f1e95bd6ac1d",
   "state": "applied",
   "validation": {
@@ -14,9 +14,16 @@
       "binary identity verification",
       "bounded Dagger engine startup",
       "build input checks",
-      "verification tool installation"
+      "verification tool installation",
+      "image publication",
+      "vulnerability scan",
+      "private image signature verification",
+      "OctoSTS exchange",
+      "deployment dispatch"
     ],
-    "canary_build_state": "in_progress"
+    "canary_build_state": "success",
+    "canary_image": "ghcr.io/fredrir/llunde-frontend@sha256:5e345888244db6b75bd35c0aed00255cd5aba530a24b05b5fd7f0629c86c42dd",
+    "deployment_run": 35524605690
   },
   "packages_main_ruleset": {
     "id": 23732572,
@@ -94,10 +101,10 @@
       "verified_main": "11fed6e3ae475521dc28fee56916b974ae9d625c",
       "runs": [
         {
-          "conclusion": "",
+          "conclusion": "success",
           "databaseId": 35524265298,
           "headSha": "11fed6e3ae475521dc28fee56916b974ae9d625c",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35524265298",
           "workflowName": "Build images"
         }
