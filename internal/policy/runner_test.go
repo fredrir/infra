@@ -93,6 +93,15 @@ func TestCheckAndDeployPoolsRemainBounded(t *testing.T) {
 	if !e.runner(deploy, "ci-infra", controller) || e.runner(deploy, "ci-y", controller) {
 		t.Fatal("deploy namespace boundary")
 	}
+	set(check, at(deploy, "spec", "containers", 0, "image"), "spec", "containers", 0, "image")
+	if e.runner(check, "ci-infra", controller) {
+		t.Fatal("deploy image admitted to check pool")
+	}
+	unapprovedDeploy := clone(deploy).(object)
+	set(unapprovedDeploy, "ghcr.io/fredrir/infra-runner-deploy@sha256:"+strings.Repeat("f", 64), "spec", "containers", 0, "image")
+	if e.runner(unapprovedDeploy, "ci-infra", controller) {
+		t.Fatal("unapproved deploy image admitted")
+	}
 	for _, mutate := range []func(object){func(p object) { set(p, "buildkit-amd64", "metadata", "labels", "actions.github.com/scale-set-name") }, func(p object) { set(p, "4", "spec", "containers", 0, "resources", "limits", "cpu") }, func(p object) { set(p, "8Gi", "spec", "containers", 0, "resources", "limits", "memory") }} {
 		p := clone(deploy).(object)
 		mutate(p)
