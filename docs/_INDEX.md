@@ -7,7 +7,7 @@
 | [Domains](domains.md)             |                                                  |
 | [Nodes](nodes.md)                 |                                                  |
 | [Requirements](Requirements.md)   |                                                  |
-| [Development](development.md) | Go commands, build graph, binary distribution |
+| [Development](development.md)     | Go commands, build graph, binary distribution    |
 | [Runbook](runbook.md)             |                                                  |
 | [Platform](platform.md)           | Ownership, onboarding, validation and activation |
 | [Secrets](Secrets.md)             |                                                  |

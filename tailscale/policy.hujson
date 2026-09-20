@@ -20,7 +20,7 @@
   },
   "hosts": {
     "macie": "100.75.71.79",
-    "archie": "100.126.231.24",
+    "archie": "100.124.205.100",
     "platform-control-05": "10.60.0.5",
     "platform-control-07": "10.60.0.7",
     "platform-control-08": "10.60.0.8",
