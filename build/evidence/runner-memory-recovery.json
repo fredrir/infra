@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "date": "2026-09-20",
+  "guest": "infra-build-09",
+  "incident": {
+    "time_utc": "2026-09-20T21:02:18Z",
+    "run": "https://github.com/fredrir/llunde-backend/actions/runs/35537318927",
+    "cause": "Memory cgroup OOM in shared runner slice; systemd OOMPolicy=stop canceled backend job",
+    "slice": "/infra.slice/infra-runners.slice",
+    "memory_max_bytes": 2147483648,
+    "memory_peak_bytes": 2152202240,
+    "oom_events": 1,
+    "oom_kill_events": 1,
+    "service_result": "oom-kill"
+  },
+  "recovery": {
+    "active_compilations_interrupted": false,
+    "idle_runner_bazel_server_memory_mib": 808.4,
+    "idle_builder_bazel_server_memory_mib": 626.2,
+    "idle_servers_shutdown_with_nonblocking_locks": true,
+    "persistent_disk_caches_preserved": true,
+    "runner_memory_bytes_after_shutdown_before_listener_restart": 974032896,
+    "bazel_idle_timeout_seconds": 300,
+    "failed_backend_listener_started": true,
+    "routing_labels_held_for_sequential_qualification": true,
+    "guest_memory_increased": false
+  },
+  "limitation": "Concurrent native Bazel preparation and host scans still share the 2GiB cap; idle expiry reduces retention, while controlled assignment is required during qualification"
+}

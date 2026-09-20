@@ -5,3 +5,4 @@ build_runner_sha256: 70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d00638
 build_runner_labels: [dagger-amd64, infra-trusted]
 build_runner_memory: 2G
 build_runner_cpus_percent: 400
+build_runner_bazel_idle_seconds: 300
