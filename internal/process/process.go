@@ -30,6 +30,8 @@ type Result struct {
 	ExitCode        int
 	StdoutTruncated bool
 	StderrTruncated bool
+	CPUSeconds      float64
+	PeakMemoryBytes int64
 }
 
 var ErrOutputLimit = errors.New("captured output exceeds limit; stream command output")
@@ -108,6 +110,8 @@ func Run(ctx context.Context, o Options) (Result, error) {
 		err = ctx.Err()
 	}
 	result := Result{Stdout: stdout.buffer.Bytes(), Stderr: stderr.buffer.Bytes(), Duration: time.Since(start), ExitCode: command.ProcessState.ExitCode(), StdoutTruncated: stdout.truncated, StderrTruncated: stderr.truncated}
+	result.CPUSeconds = (command.ProcessState.UserTime() + command.ProcessState.SystemTime()).Seconds()
+	result.PeakMemoryBytes = peakMemory(command)
 	if (stdout.truncated && o.Stdout == nil) || (stderr.truncated && o.Stderr == nil) {
 		err = errors.Join(err, ErrOutputLimit)
 	}
