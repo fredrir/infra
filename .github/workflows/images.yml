@@ -9,7 +9,8 @@ on:
       - .github/workflows/infra-cli.yml
       - cmd/**
       - internal/**
-      - build/**
+      - build/toolchain.json
+      - build/dagger-embed.patch
       - go.mod
       - go.sum
       - pyproject.toml

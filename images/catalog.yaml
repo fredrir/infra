@@ -6,7 +6,9 @@
   - internal
   - go.mod
   - go.sum
-  - build
+  - build/toolchain.json
+  - build/dagger-embed.patch
+  - build/BUILD.bazel
   - MODULE.bazel
   - MODULE.bazel.lock
   - .bazelversion
@@ -27,7 +29,9 @@
   - internal
   - go.mod
   - go.sum
-  - build
+  - build/toolchain.json
+  - build/dagger-embed.patch
+  - build/BUILD.bazel
   - MODULE.bazel
   - MODULE.bazel.lock
   - .bazelversion
@@ -42,7 +46,9 @@
   - internal
   - go.mod
   - go.sum
-  - build
+  - build/toolchain.json
+  - build/dagger-embed.patch
+  - build/BUILD.bazel
   - MODULE.bazel
   - MODULE.bazel.lock
   - .bazelversion
@@ -79,7 +85,9 @@
   - internal
   - go.mod
   - go.sum
-  - build
+  - build/toolchain.json
+  - build/dagger-embed.patch
+  - build/BUILD.bazel
   - MODULE.bazel
   - MODULE.bazel.lock
   - .bazelversion

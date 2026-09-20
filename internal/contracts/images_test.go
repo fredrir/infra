@@ -12,7 +12,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-var binaryInputs = []string{"cmd", "internal", "go.mod", "go.sum", "build", "MODULE.bazel", "MODULE.bazel.lock", ".bazelversion", ".bazelrc", "BUILD.bazel"}
+var binaryInputs = []string{"cmd", "internal", "go.mod", "go.sum", "build/toolchain.json", "build/dagger-embed.patch", "build/BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelversion", ".bazelrc", "BUILD.bazel"}
 
 func root(t *testing.T) string {
 	t.Helper()
@@ -62,6 +62,11 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 			seen[image.Image] = true
 			covered := func(path string) bool {
 				return slices.ContainsFunc(image.Inputs, func(input string) bool { return path == input || strings.HasPrefix(path, input+"/") })
+			}
+			for _, receipt := range []string{"build/evidence/production-rollout.json", "build/rollout/manifest.json", "build/consumers.json"} {
+				if covered(receipt) || triggered(workflow.On.Push.Paths, receipt) {
+					t.Errorf("rollout record %s unnecessarily rebuilds image", receipt)
+				}
 			}
 			if !covered(image.Dockerfile) {
 				t.Fatal("Dockerfile does not invalidate the image input tag")
