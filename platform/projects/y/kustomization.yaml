@@ -2,24 +2,24 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: "y"
 resources:
-- namespace.yaml
-- storage.yaml
-- database.yaml
-- application.yaml
-- network.yaml
-- database.secret.sops.yaml
-- application.secret.sops.yaml
-- ghcr.secret.sops.yaml
-- tunnel.yaml
-- tunnel.secret.sops.yaml
-- backup.yaml
-- backup.secret.sops.yaml
+    - namespace.yaml
+    - storage.yaml
+    - database.yaml
+    - application.yaml
+    - network.yaml
+    - database.secret.sops.yaml
+    - application.secret.sops.yaml
+    - ghcr.secret.sops.yaml
+    - tunnel.yaml
+    - tunnel.secret.sops.yaml
+    - backup.yaml
+    - backup.secret.sops.yaml
 components:
-- ../../components/backup-job
+    - ../../components/backup-job
 images:
-- digest: sha256:f783143351387f1fc52ab7a928b14b6237275a9264f8d3f997d6cc17d518522c
-  name: ghcr.io/fredrir/y-api
-  newName: ghcr.io/fredrir/y-api
-- digest: sha256:7df1c8f1a624e6f9868cb428a1a2fd51f694c7e611a9bf05c1f1d7c0f70b0048
-  name: ghcr.io/fredrir/y-web
-  newName: ghcr.io/fredrir/y-web
+    - digest: sha256:f783143351387f1fc52ab7a928b14b6237275a9264f8d3f997d6cc17d518522c
+      name: ghcr.io/fredrir/y-api
+      newName: ghcr.io/fredrir/y-api
+    - digest: sha256:ece3b4585f0302eb1d03740d90e0c2c4e66c290729a9bc0c3f9e12beda749541
+      name: ghcr.io/fredrir/y-web
+      newName: ghcr.io/fredrir/y-web
