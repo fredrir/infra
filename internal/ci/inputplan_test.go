@@ -76,10 +76,24 @@ func TestProjectInputDiffIncludesDeletedAndRenamedSources(t *testing.T) {
 			t.Fatalf("base=%q plan=%+v error=%v", base, plan, err)
 		}
 	}
+	write(".infra-build-recipe/BUILD.bazel", []byte("helper checkout\n"))
+	write(".git/info/exclude", []byte("/.infra-build-recipe/\n"))
+	plan, err := PlanProjectInputs(context.Background(), root, "ci/targets.json", "HEAD", "api")
+	if err != nil || plan.Changed {
+		t.Fatalf("selection included excluded helper checkout: %+v %v", plan, err)
+	}
+	write("untracked.conf", []byte("unknown input\n"))
+	plan, err = PlanProjectInputs(context.Background(), root, "ci/targets.json", "HEAD", "api")
+	if err != nil || !plan.Changed || plan.Reason != "unmapped-input" {
+		t.Fatalf("selection missed unknown untracked input: %+v %v", plan, err)
+	}
+	if err := os.Remove(filepath.Join(root, "untracked.conf")); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Remove(filepath.Join(root, "api/main.go")); err != nil {
 		t.Fatal(err)
 	}
-	plan, err := PlanProjectInputs(context.Background(), root, "ci/targets.json", "HEAD", "api")
+	plan, err = PlanProjectInputs(context.Background(), root, "ci/targets.json", "HEAD", "api")
 	if err != nil || !plan.Changed || !reflect.DeepEqual(plan.AffectedTargets, []string{"api"}) {
 		t.Fatalf("deleted input missed: %+v %v", plan, err)
 	}
