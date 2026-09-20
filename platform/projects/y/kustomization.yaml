@@ -17,7 +17,7 @@ resources:
 components:
     - ../../components/backup-job
 images:
-    - digest: sha256:d2b7bf33f218d336d9bddc3ee118a5520a9493b02ec32e090100181759fd1d90
+    - digest: sha256:7ea61a943086dfc6c6b3939853bfec3e3a082c04bf6c605cb5d96863e2c90cf7
       name: ghcr.io/fredrir/y-api
       newName: ghcr.io/fredrir/y-api
     - digest: sha256:555b5921868ff37b6aa23d2bf4b39dd0739a3836999e31888eade40408354d64
