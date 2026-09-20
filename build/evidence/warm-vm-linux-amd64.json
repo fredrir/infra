@@ -214,5 +214,21 @@
       "passed_suites": 15,
       "reason": "Aggregate deadline reached while final suite still running"
     }
+  },
+  "github_runner_startup": {
+    "repository": "fredrir/llunde-frontend",
+    "run_id": 35533087208,
+    "attempt": 3,
+    "runner": "infra-build-09-llunde-frontend",
+    "hook_path": "/usr/local/libexec/infra-runner-hook.sh",
+    "hook_owner": "root",
+    "hook_mode": "0555",
+    "protected_push_accepted": true,
+    "pull_request_adapter_probe_rejected": true,
+    "verified_cli_cache_writable": true,
+    "verification_tool_cache_writable": true,
+    "completed_through": "Prepare vulnerability databases",
+    "next_step_observed": "Build and publish",
+    "scope": "Actual GitHub runner startup through build entry; final image publication and deployment measured separately"
   }
 }
