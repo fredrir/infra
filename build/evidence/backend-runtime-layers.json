@@ -1,0 +1,12 @@
+{
+  "distribution_files": 171,
+  "dependency_jars": 168,
+  "application_jar": "backend-1.0.1-SNAPSHOT.jar",
+  "distribution_byte_and_mode_identity": true,
+  "linux_runtime": "eclipse-temurin:25-jre@sha256:bb036ed6cfdc57e3da7c22634d15f1b840d2caf76183861c80e81ca4b5104abb",
+  "runtime_tests": 8,
+  "runtime_tests_successful": 8,
+  "unchanged_dependency_layer": "sha256:1cfaa96c4c6d901eaa74d66e8bf48530417d1fe9d0bec09ec2178cc152d21964",
+  "original_application_layer": "sha256:812fecb4bff90371b543e953da12ae06304cec512587c5363099cae240ad7f12",
+  "changed_application_layer": "sha256:da05ec379439faf13b54362905f6a8181cc268ebd636a0ec2d964c0342ba250f"
+}

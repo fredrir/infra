@@ -1,0 +1,51 @@
+{
+  "run_id": 35540078113,
+  "aggregate": {
+    "schema": 1,
+    "accounting": "sum-of-recorded-check-durations",
+    "budget_seconds": 10,
+    "duration_seconds": 5.610484767,
+    "remaining_seconds": 4.389515233,
+    "success": true,
+    "stages": [
+      {
+        "schema": 1,
+        "stage": "backend",
+        "started": "2026-09-20T21:55:57.432020439Z",
+        "duration_seconds": 1.309236592,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 2.880418,
+        "peak_memory_bytes": 131055616
+      },
+      {
+        "schema": 1,
+        "stage": "provenance-verification",
+        "revision": "dbdff56a84ea6a15ebf0ac84f848b0815a1b5982",
+        "started": "2026-09-20T21:56:18.797858431Z",
+        "duration_seconds": 3.013158579,
+        "budget_seconds": 7.402673812,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.211808,
+        "peak_memory_bytes": 71303168
+      },
+      {
+        "schema": 1,
+        "stage": "vulnerability-scan",
+        "revision": "dbdff56a84ea6a15ebf0ac84f848b0815a1b5982",
+        "started": "2026-09-20T21:56:10.832655638Z",
+        "duration_seconds": 1.288089596,
+        "budget_seconds": 8.690763408,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.319788,
+        "peak_memory_bytes": 119406592
+      }
+    ]
+  }
+}
