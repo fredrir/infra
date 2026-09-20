@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "date": "2026-09-20",
+  "host": "archie",
+  "scope": "Minimal scratch-image check accounting and export isolation; not application latency",
+  "engine_cpus": 4,
+  "engine_memory_gib": 4,
+  "passed_receipts": [
+    {
+      "schema": 1,
+      "stage": "inline",
+      "started": "2026-09-20T19:15:14.354148973Z",
+      "duration_seconds": 0.001305025,
+      "budget_seconds": 1,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.001317,
+      "peak_memory_bytes": 17715200
+    },
+    {
+      "schema": 1,
+      "stage": "image-smoke",
+      "started": "2026-09-20T19:15:14.396700854Z",
+      "duration_seconds": 0.000530619,
+      "budget_seconds": 9.998694975,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.000509,
+      "peak_memory_bytes": 17723392
+    }
+  ],
+  "failed_receipts": [
+    {
+      "schema": 1,
+      "stage": "inline",
+      "started": "2026-09-20T19:15:14.354148973Z",
+      "duration_seconds": 0.001305025,
+      "budget_seconds": 1,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.001317,
+      "peak_memory_bytes": 17715200
+    },
+    {
+      "schema": 1,
+      "stage": "image-smoke",
+      "started": "2026-09-20T19:15:47.549929331Z",
+      "duration_seconds": 0.000683427,
+      "budget_seconds": 9.998694975,
+      "budget_exceeded": false,
+      "success": false,
+      "exit_code": 7,
+      "cpu_seconds": 0.000623,
+      "peak_memory_bytes": 19644416,
+      "error": "probe failed: exit status 7"
+    }
+  ],
+  "runtime_export_contains_measurement_tools": false,
+  "failed_check_runtime_exported": false,
+  "cached_receipt_reuse_verified": true,
+  "temporary_engine_removed": true
+}
