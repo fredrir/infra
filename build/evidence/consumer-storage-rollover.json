@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "recorded_at": "2026-09-20T17:21:36.714715+00:00",
+  "recorded_at": "2026-09-20T17:37:23.249609+00:00",
   "source_revision": "25cbb5389a5d5df996709e2c5a1b4d1443861172",
   "state": "applied-awaiting-build-results",
   "infra_policy_commit": "9c178096f9abc45e04653cf389688e6980a8757e",
@@ -20,10 +20,10 @@
       "verified_main": "fb3bc7187a4beec93e7d7bedc1d15a71dc108fce",
       "runs": [
         {
-          "conclusion": "",
+          "conclusion": "success",
           "databaseId": 35525556507,
           "headSha": "fb3bc7187a4beec93e7d7bedc1d15a71dc108fce",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/fredrir/Y/actions/runs/35525556507",
           "workflowName": "Build images"
         }
@@ -43,10 +43,10 @@
       "verified_main": "40748097602eae867b4f158e015a19ee36c63ead",
       "runs": [
         {
-          "conclusion": "",
+          "conclusion": "success",
           "databaseId": 35525554440,
           "headSha": "40748097602eae867b4f158e015a19ee36c63ead",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/fredrir/llunde-backend/actions/runs/35525554440",
           "workflowName": "Build images"
         }
@@ -66,10 +66,10 @@
       "verified_main": "a465143b1abc2ddb0853ba33157594c22693bb24",
       "runs": [
         {
-          "conclusion": "",
+          "conclusion": "success",
           "databaseId": 35525557284,
           "headSha": "a465143b1abc2ddb0853ba33157594c22693bb24",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35525557284",
           "workflowName": "Build images"
         }
@@ -112,10 +112,10 @@
       "verified_main": "55cff712023208f7856a1f69e803fd02aa240555",
       "runs": [
         {
-          "conclusion": "",
+          "conclusion": "success",
           "databaseId": 35525559259,
           "headSha": "55cff712023208f7856a1f69e803fd02aa240555",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/fredrir/packages/actions/runs/35525559259",
           "workflowName": "Publish packages"
         }
@@ -191,5 +191,14 @@
         }
       ]
     }
-  ]
+  ],
+  "validation": {
+    "backend_native_tests": "success",
+    "backend_image_workflow": "success",
+    "parser_native_tests": "success",
+    "parser_image_workflow": "in_progress",
+    "superseded_portfolio_run": 35524556506,
+    "superseded_portfolio_conclusion": "cancelled",
+    "cancellation_method": "force cancellation after job-level always() blocked normal cancellation"
+  }
 }
