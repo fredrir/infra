@@ -286,7 +286,7 @@ jobs:
             --certificate-github-workflow-repository "$GITHUB_REPOSITORY" \
             --certificate-github-workflow-sha "$GITHUB_SHA" \
             --certificate-github-workflow-ref refs/heads/main \
-            --certificate-github-workflow-trigger push \
+            --certificate-github-workflow-trigger "$GITHUB_EVENT_NAME" \
             --annotations "source-repository=$GITHUB_REPOSITORY" \
             --annotations "source-revision=$GITHUB_SHA" \
             --annotations "workflow-revision=$WORKFLOW_SHA" "$IMAGE"
