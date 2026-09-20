@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -104,5 +105,34 @@ func TestMeasureCheckPreservesDeadlineFailure(t *testing.T) {
 	report, err := MeasureCheck(context.Background(), runner, "scan", 10*time.Second, directory, []string{"scan"})
 	if !errors.Is(err, context.DeadlineExceeded) || report.Success {
 		t.Fatalf("deadline lost: %+v %v", report, err)
+	}
+}
+
+func TestCheckGroupCountsLaterReceiptsAfterFailedStage(t *testing.T) {
+	directory := t.TempDir()
+	writeCheckReceipt(t, directory, "frontend.json", "frontend", 4.75)
+	writeCheckReceipt(t, directory, "vulnerability.json", "vulnerability-scan", 4.5)
+	failed := StageReport{Schema: 1, Stage: "provenance", Started: time.Unix(1800000000, 0), DurationSeconds: 0.8, BudgetSeconds: 0.75, BudgetExceeded: true, Success: false, ExitCode: -1}
+	data, err := json.Marshal(failed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "provenance.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	report, err := CheckGroupBudget(directory, 10*time.Second, true)
+	if err == nil || report.Success || len(report.Stages) != 3 || report.DurationSeconds != 10.05 || report.RemainingSeconds != 0 {
+		t.Fatalf("failed check lost later durations: %+v %v", report, err)
+	}
+	if !strings.Contains(err.Error(), `check stage "provenance"`) || !strings.Contains(err.Error(), "aggregate checks used 10.050000s") {
+		t.Fatalf("stage or aggregate failure was lost: %v", err)
+	}
+	called := false
+	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+		called = true
+		return process.Result{}, nil
+	}}
+	if _, err := MeasureCheck(context.Background(), runner, "extra", 10*time.Second, directory, []string{"extra"}); err == nil || called {
+		t.Fatal("failed group allowed another check")
 	}
 }

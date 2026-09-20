@@ -32,6 +32,7 @@ func CheckGroupBudget(directory string, budget time.Duration, requireReports boo
 		return report, errors.New("check report directory and aggregate budget up to 10 seconds required")
 	}
 	seen := map[string]bool{}
+	var stageErr error
 	err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, walkErr error) error {
 		if os.IsNotExist(walkErr) && path == directory && !requireReports {
 			return nil
@@ -72,10 +73,11 @@ func CheckGroupBudget(directory string, budget time.Duration, requireReports boo
 		report.Stages = append(report.Stages, stage)
 		report.DurationSeconds += stage.DurationSeconds
 		if !stage.Success || stage.ExitCode != 0 || stage.BudgetExceeded || stage.DurationSeconds >= stage.BudgetSeconds {
-			return fmt.Errorf("check stage %q did not pass within its budget", stage.Stage)
+			stageErr = errors.Join(stageErr, fmt.Errorf("check stage %q did not pass within its budget", stage.Stage))
 		}
 		return nil
 	})
+	err = errors.Join(err, stageErr)
 	slices.SortFunc(report.Stages, func(a, b StageReport) int { return strings.Compare(a.Stage, b.Stage) })
 	report.RemainingSeconds = max(0, report.BudgetSeconds-report.DurationSeconds)
 	if err == nil && requireReports && len(report.Stages) == 0 {
