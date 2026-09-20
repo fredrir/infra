@@ -13,64 +13,54 @@ import (
 )
 
 func ExtractZstd(source io.Reader, directory, requiredRoot string, limit int64) error {
-	resolvedDirectory, err := filepath.EvalSymlinks(directory)
-	if err != nil {
-		return err
-	}
-	directory, err = filepath.Abs(resolvedDirectory)
-	if err != nil {
-		return err
-	}
 	decoder, err := zstd.NewReader(source, zstd.WithDecoderMaxMemory(256<<20))
 	if err != nil {
 		return err
 	}
 	defer decoder.Close()
-	archive := tar.NewReader(decoder)
+	return ExtractTar(decoder, directory, requiredRoot, limit)
+}
+
+func ExtractTar(source io.Reader, directory, requiredRoot string, limit int64) error {
+	root, err := os.OpenRoot(directory)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	valid := func(name string) bool {
+		return filepath.IsLocal(name) && (requiredRoot == "" || name == requiredRoot || strings.HasPrefix(name, requiredRoot+"/"))
+	}
+	archive := tar.NewReader(source)
 	var total int64
+	var directories []*tar.Header
 	for {
 		header, err := archive.Next()
 		if err == io.EOF {
-			return nil
+			break
 		}
 		if err != nil {
 			return err
 		}
 		name := filepath.ToSlash(filepath.Clean(strings.TrimPrefix(header.Name, "./")))
-		if !filepath.IsLocal(name) || (name != requiredRoot && !strings.HasPrefix(name, requiredRoot+"/")) {
-			return fmt.Errorf("archive entry escapes %s", requiredRoot)
+		if !valid(name) {
+			return fmt.Errorf("archive entry escapes root")
 		}
 		if header.Size < 0 || header.Size > limit-total {
 			return fmt.Errorf("archive exceeds extraction limit")
 		}
 		total += header.Size
-		path := filepath.Join(directory, filepath.FromSlash(name))
-		parent := filepath.Dir(path)
-		if err := os.MkdirAll(parent, 0755); err != nil {
+		if err := root.MkdirAll(filepath.Dir(name), 0755); err != nil {
 			return err
-		}
-		resolved, err := filepath.EvalSymlinks(parent)
-		if err != nil {
-			return err
-		}
-		absolute, err := filepath.Abs(parent)
-		if err != nil {
-			return err
-		}
-		resolved, err = filepath.Abs(resolved)
-		if err != nil {
-			return err
-		}
-		if absolute != resolved {
-			return fmt.Errorf("archive entry traverses a symlink")
 		}
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(path, os.FileMode(header.Mode)&0777); err != nil {
+			if err := root.MkdirAll(name, os.FileMode(header.Mode)&0777|0700); err != nil {
 				return err
 			}
+			header.Name = name
+			directories = append(directories, header)
 		case tar.TypeReg:
-			file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, os.FileMode(header.Mode)&0777)
+			file, err := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, os.FileMode(header.Mode)&0777)
 			if err != nil {
 				return err
 			}
@@ -82,21 +72,39 @@ func ExtractZstd(source io.Reader, directory, requiredRoot string, limit int64) 
 			if closeErr != nil {
 				return closeErr
 			}
+			if err := root.Chtimes(name, header.ModTime, header.ModTime); err != nil {
+				return err
+			}
 		case tar.TypeSymlink:
 			if filepath.IsAbs(header.Linkname) {
 				return fmt.Errorf("absolute archive link")
 			}
 			target := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(name), header.Linkname)))
-			if target != requiredRoot && !strings.HasPrefix(target, requiredRoot+"/") {
+			if !valid(target) {
 				return fmt.Errorf("archive link escapes root")
 			}
-			if err := os.Symlink(header.Linkname, path); err != nil {
+			if err := root.Symlink(header.Linkname, name); err != nil {
+				return err
+			}
+		case tar.TypeLink:
+			target := filepath.ToSlash(filepath.Clean(header.Linkname))
+			if !valid(target) {
+				return fmt.Errorf("archive hard link escapes root")
+			}
+			if err := root.Link(target, name); err != nil {
 				return err
 			}
 		default:
 			return fmt.Errorf("unsupported archive entry type %d", header.Typeflag)
 		}
 	}
+	for index := len(directories) - 1; index >= 0; index-- {
+		header := directories[index]
+		if err := root.Chtimes(header.Name, header.ModTime, header.ModTime); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func WriteZstd(destination io.Writer, directory, root string) error {

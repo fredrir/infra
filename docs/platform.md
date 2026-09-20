@@ -143,8 +143,8 @@ uv run --frozen infra onboard-rust fredrir/example \
 ```sh
 gh workflow run release.yml --repo fredrir/example
 gh workflow run publish.yml --repo fredrir/packages
-bash scripts/operations/macos_sdk.sh package .infra/macos-sdk
-SOPS_AGE_KEY_FILE=/path/to/age-key.txt bash scripts/operations/macos_sdk.sh upload .infra/macos-sdk/MacOSX<version>.sdk.tar.zst
+infra operations macos-sdk package .infra/macos-sdk
+SOPS_AGE_KEY_FILE=/path/to/age-key.txt infra operations macos-sdk upload .infra/macos-sdk/MacOSX<version>.sdk.tar.zst
 ```
 
 ## Onboarding
@@ -204,7 +204,7 @@ uv run --frozen --group ci ansible-playbook ansible/external.yml --limit fredrir
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | SSH                    | Verified host key, administrator public keys, root or passwordless sudo                                                         |
 | Transport              | Enrolled Tailscale role; native OpenSSH, embedded Tailscale SSH disabled                                                        |
-| New-node enrollment    | [Enrollment helper](../scripts/operations/tailscale_enrollment.py) and [bootstrap playbook](../ansible/tailscale-bootstrap.yml) |
+| New-node enrollment    | `infra operations enrollment`; verified `infra` binary on target; [bootstrap playbook](../ansible/tailscale-bootstrap.yml) |
 | Enrollment credentials | Doppler `infra/ops/TAILSCALE_ENROLL_CLIENT_ID` and `TAILSCALE_ENROLL_CLIENT_SECRET`; owner tag `tag:platform-enrollment`        |
 | K3s credentials        | Separate server/agent tokens in private `/etc/rancher/k3s/` files                                                               |
 | Registration seed      | Healthy, already clustered control server; default fresh-cluster initializer `fredrir-07`                                       |

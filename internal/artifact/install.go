@@ -114,6 +114,17 @@ func Install(ctx context.Context, o InstallOptions) (Receipt, error) {
 		}
 	}
 	result.Path = path
+	stamp, err := os.CreateTemp(directory, ".used-*")
+	if err != nil {
+		return result, err
+	}
+	defer os.Remove(stamp.Name())
+	if err := stamp.Close(); err != nil {
+		return result, err
+	}
+	if err := os.Rename(stamp.Name(), filepath.Join(directory, "last-used")); err != nil {
+		return result, err
+	}
 	if o.Destination != "" {
 		if err := installCopy(path, o.Destination); err != nil {
 			return result, err

@@ -1,0 +1,25 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "enrollment",
+    srcs = [
+        "api.go",
+        "enrollment.go",
+        "runtime.go",
+        "ssh.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/enrollment",
+    visibility = ["//:__subpackages__"],
+    deps = ["//internal/process"],
+)
+
+go_test(
+    name = "enrollment_test",
+    srcs = [
+        "api_test.go",
+        "enrollment_test.go",
+        "runtime_test.go",
+    ],
+    embed = [":enrollment"],
+    deps = ["//internal/process"],
+)

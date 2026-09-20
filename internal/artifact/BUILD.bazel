@@ -2,13 +2,19 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "artifact",
-    srcs = ["install.go"],
+    srcs = [
+        "install.go",
+        "prune.go",
+    ],
     importpath = "github.com/fredrir/infra/internal/artifact",
     visibility = ["//:__subpackages__"],
 )
 
 go_test(
     name = "artifact_test",
-    srcs = ["install_test.go"],
+    srcs = [
+        "install_test.go",
+        "prune_test.go",
+    ],
     embed = [":artifact"],
 )

@@ -1,0 +1,31 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "operations",
+    srcs = [
+        "mail.go",
+        "sdk.go",
+        "upload.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/operations",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/objectstore",
+        "//internal/process",
+        "@com_github_klauspost_compress//zstd",
+    ],
+)
+
+go_test(
+    name = "operations_test",
+    srcs = [
+        "mail_test.go",
+        "sdk_test.go",
+        "upload_test.go",
+    ],
+    embed = [":operations"],
+    deps = [
+        "//internal/process",
+        "@com_github_klauspost_compress//zstd",
+    ],
+)

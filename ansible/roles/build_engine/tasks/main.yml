@@ -3,6 +3,7 @@
     that:
     - build_engine_dedicated | bool
     - build_engine_qualified | bool
+    - build_engine_trust == 'trusted'
     - ansible_facts.system == 'Linux'
     - ansible_facts.architecture == 'x86_64'
     - inventory_hostname not in groups.get('k3s_cluster', [])

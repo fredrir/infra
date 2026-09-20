@@ -12,16 +12,20 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/images"
 	"github.com/fredrir/infra/internal/kata"
 	"github.com/spf13/cobra"
 )
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if filepath.Base(os.Args[0]) == "nix-hash" {
+		return ci.NixHash(args, stdout)
+	}
 	if filepath.Base(os.Args[0]) == "MAKEDEV" {
 		return kata.MakeDevices(ctx, args, stderr)
 	}
-	if filepath.Base(os.Args[0]) == "infra-runner-hook" {
+	if filepath.Base(os.Args[0]) == "infra-runner-hook" || filepath.Base(os.Args[0]) == "ci-job-started.sh" {
 		args = []string{"platform", "runner-hook"}
 	}
 	root := &cobra.Command{Use: "infra", Short: "Build, verify, and operate infrastructure", SilenceUsage: true, SilenceErrors: true}
@@ -41,7 +45,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 			return err
 		},
 	})
-	root.AddCommand(newKataCommand(), newPlatformCommand(), newArtifactCommand())
+	root.AddCommand(newKataCommand(), newPlatformCommand(), newArtifactCommand(), newOperationsCommand())
 	registerAutomationCommands(root, ci)
 	return root.ExecuteContext(ctx)
 }

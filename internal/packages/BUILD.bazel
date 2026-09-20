@@ -1,0 +1,46 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "packages",
+    srcs = [
+        "catalog.go",
+        "channels.go",
+        "index.go",
+        "package.go",
+        "pages.go",
+        "pipeline.go",
+        "smoke.go",
+    ],
+    embedsrcs = [
+        "assets/install.sh.in",
+        "assets/aur_known_hosts",
+        "assets/fredrir.asc",
+        "assets/fredrir.rsa.pub",
+    ],
+    importpath = "github.com/fredrir/infra/internal/packages",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/ci",
+        "//internal/pipeline",
+        "//internal/release",
+        "@in_yaml_go_yaml_v3//:yaml",
+        "@io_dagger_dagger//:dagger",
+    ],
+)
+
+go_test(
+    name = "packages_test",
+    srcs = [
+        "catalog_test.go",
+        "channels_test.go",
+        "package_test.go",
+        "qualification_test.go",
+    ],
+    embed = [":packages"],
+    deps = [
+        "//internal/ci",
+        "//internal/process",
+        "//internal/release",
+        "@io_dagger_dagger//:dagger",
+    ],
+)

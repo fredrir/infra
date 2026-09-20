@@ -36,22 +36,9 @@
       {% endfor %}
   no_log: true
 
-- name: Create the hook directory
-  ansible.builtin.file:
-    path: /usr/local/libexec
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Install the native recovery hook
-  ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../platform/components/backups/control.sh"
-    dest: /usr/local/libexec/platform-control-backup
-    owner: root
-    group: root
-    mode: "0755"
-    validate: /bin/bash -n %s
+- name: Install verified infrastructure binary
+  ansible.builtin.include_role:
+    name: infra_binary
 
 - name: Create the backup metric directory
   ansible.builtin.file:
@@ -60,15 +47,6 @@
     owner: root
     group: root
     mode: "0755"
-
-- name: Install the backup heartbeat hook
-  ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../platform/components/backup-job/heartbeat.sh"
-    dest: /usr/local/libexec/platform-backup-heartbeat
-    owner: root
-    group: root
-    mode: "0755"
-    validate: /bin/bash -n %s
 
 - name: Install the bounded recovery service
   ansible.builtin.copy:
@@ -85,7 +63,7 @@
       Type=oneshot
       EnvironmentFile=/etc/platform-backups/control.env
       Environment=RESTIC_CACHE_DIR=/var/lib/platform-backups/cache
-      ExecStart=/usr/local/libexec/platform-control-backup
+      ExecStart=/usr/local/bin/infra platform control-backup
       RuntimeMaxSec=1800
       TimeoutStartSec=1800
       TimeoutStopSec=90

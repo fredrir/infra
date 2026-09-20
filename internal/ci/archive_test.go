@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
 )
@@ -16,6 +17,10 @@ func TestCacheArchiveRoundTripPreservesExecutableAndRelativeLink(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "target/tool"), []byte("compiled artifact"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	modified := time.Unix(1700000000, 0)
+	if err := os.Chtimes(filepath.Join(root, "target/tool"), modified, modified); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink("tool", filepath.Join(root, "target/link")); err != nil {
@@ -36,6 +41,9 @@ func TestCacheArchiveRoundTripPreservesExecutableAndRelativeLink(t *testing.T) {
 	info, err := os.Stat(filepath.Join(destination, "target/tool"))
 	if err != nil || info.Mode()&0111 == 0 {
 		t.Fatalf("lost executable mode: %v", err)
+	}
+	if !info.ModTime().Equal(modified) {
+		t.Fatal("restored cache changed artifact modification time")
 	}
 }
 

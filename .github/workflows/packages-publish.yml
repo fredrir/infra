@@ -11,9 +11,12 @@ on:
 permissions:
   contents: read
 jobs:
+  cli:
+    uses: ./.github/workflows/infra-cli.yml
   build:
-    if: github.repository == 'fredrir/packages' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main'
-    runs-on: publish-amd64
+    needs: cli
+    if: github.repository == 'fredrir/packages' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name)
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: publish
     permissions:
@@ -26,16 +29,34 @@ jobs:
         path: .infra
         persist-credentials: false
         sparse-checkout: |
-          scripts
+          build
+          .bazelversion
           .github/rust-projects.yaml
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ needs.cli.outputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify infrastructure CLI
+      env:
+        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+        CLI_REVISION: ${{ needs.cli.outputs.revision }}
+        WORKFLOW_REVISION: ${{ job.workflow_sha }}
+      run: |
+        test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
     - name: Install release tools
-      run: bash .infra/scripts/ci/install-tools.sh gh nfpm yq
+      run: infra ci install-tools gh nfpm
+    - name: Start isolated Dagger engine
+      run: docker run --detach --name infra-dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
     - name: Build signed repositories
       env:
         GH_TOKEN: ${{ github.token }}
         PACKAGES_GPG_KEY: ${{ secrets.PACKAGES_GPG_KEY }}
         PACKAGES_APK_KEY: ${{ secrets.PACKAGES_APK_KEY }}
-      run: bash .infra/scripts/packages/build.sh
+        _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
+      run: infra packages build --root .infra --infra-binary "$RUNNER_TEMP/infra-cli/infra"
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: site
@@ -49,9 +70,12 @@ jobs:
         path: ${{ runner.temp }}/packages/channels
         if-no-files-found: error
         retention-days: 3
+    - name: Stop Dagger engine
+      if: always()
+      run: docker rm --force infra-dagger
   smoke:
-    needs: build
-    runs-on: publish-amd64
+    needs: [cli, build]
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       contents: read
@@ -62,7 +86,9 @@ jobs:
         ref: ${{ job.workflow_sha }}
         path: .infra
         persist-credentials: false
-        sparse-checkout: scripts/packages
+        sparse-checkout: |
+          build
+          .bazelversion
     - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
         name: site
@@ -71,14 +97,34 @@ jobs:
       with:
         name: channels
         path: ${{ runner.temp }}/channels
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ needs.cli.outputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify infrastructure CLI
+      env:
+        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+        CLI_REVISION: ${{ needs.cli.outputs.revision }}
+        WORKFLOW_REVISION: ${{ job.workflow_sha }}
+      run: |
+        test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+    - name: Start isolated Dagger engine
+      run: docker run --detach --name infra-dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
     - name: Install from the new repositories
       env:
         SCOPE: ${{ inputs.smoke-scope }}
-      run: bash .infra/scripts/packages/smoke-all.sh "$RUNNER_TEMP/site" "$RUNNER_TEMP/channels" "$SCOPE"
+        _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
+      run: infra packages smoke --root .infra --infra-binary "$RUNNER_TEMP/infra-cli/infra" "$RUNNER_TEMP/site" "$RUNNER_TEMP/channels" "$SCOPE"
+    - name: Stop Dagger engine
+      if: always()
+      run: docker rm --force infra-dagger
   publish:
-    needs: smoke
+    needs: [cli, smoke]
     if: '!inputs.dry-run'
-    runs-on: publish-amd64
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: publish
     permissions:
@@ -91,9 +137,25 @@ jobs:
         ref: ${{ job.workflow_sha }}
         path: .infra
         persist-credentials: false
-        sparse-checkout: scripts
+        sparse-checkout: |
+          build
+          .bazelversion
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ needs.cli.outputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify infrastructure CLI
+      env:
+        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+        CLI_REVISION: ${{ needs.cli.outputs.revision }}
+        WORKFLOW_REVISION: ${{ job.workflow_sha }}
+      run: |
+        test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
     - name: Install release tools
-      run: bash .infra/scripts/ci/install-tools.sh gh
+      run: infra ci install-tools gh
     - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
         name: site
@@ -105,8 +167,8 @@ jobs:
     - name: Publish the package site
       env:
         GH_TOKEN: ${{ github.token }}
-      run: bash .infra/scripts/packages/publish-pages.sh "$RUNNER_TEMP/site"
+      run: infra packages publish-pages "$RUNNER_TEMP/site"
     - name: Publish Homebrew, Nix and AUR packages
       env:
         AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
-      run: python3 .infra/scripts/packages/publish_channels.py --channels "$RUNNER_TEMP/channels"
+      run: infra packages publish-channels --channels "$RUNNER_TEMP/channels"

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "checked": "2026-09-20",
+  "consumers": [
+    {"repository": "fredrir/nsql", "workflow": ".github/workflows/ci.yml", "infra_workflow": "rust-ci.yml", "revision": "eb764b837d1fd10cb71fde1963500854aaef5d6c"},
+    {"repository": "fredrir/nsql", "workflow": ".github/workflows/release.yml", "infra_workflow": "rust-release.yml", "revision": "eb764b837d1fd10cb71fde1963500854aaef5d6c"},
+    {"repository": "fredrir/nsql", "workflow": ".github/workflows/auto-tag.yml", "infra_workflow": "rust-auto-tag.yml", "revision": "eb764b837d1fd10cb71fde1963500854aaef5d6c"},
+    {"repository": "fredrir/portfolio", "workflow": ".github/workflows/images.yml", "infra_workflow": "build-image.yml", "revision": "1f2eecbc81ba184252f9ed85f893fa5eb3b5150a"},
+    {"repository": "fredrir/Y", "workflow": ".github/workflows/images.yml", "infra_workflow": "build-image.yml", "revision": "1f2eecbc81ba184252f9ed85f893fa5eb3b5150a"},
+    {"repository": "fredrir/llunde-frontend", "workflow": ".github/workflows/images.yml", "infra_workflow": "build-image.yml", "revision": "1f2eecbc81ba184252f9ed85f893fa5eb3b5150a"},
+    {"repository": "fredrir/llunde-backend", "workflow": ".github/workflows/images.yml", "infra_workflow": "build-image.yml", "revision": "1f2eecbc81ba184252f9ed85f893fa5eb3b5150a"},
+    {"repository": "fredrir/llunde-pyparser", "workflow": ".github/workflows/images.yml", "infra_workflow": "build-image.yml", "revision": "1f2eecbc81ba184252f9ed85f893fa5eb3b5150a"},
+    {"repository": "fredrir/packages", "workflow": ".github/workflows/publish.yml", "infra_workflow": "packages-publish.yml", "revision": "2623cd04d593090e66eb418586a1fc1d246b449e"}
+  ]
+}

@@ -1,0 +1,6 @@
+- name: Install verified infrastructure binary
+  hosts: infra_cli_targets
+  become: true
+  gather_facts: true
+  roles:
+  - infra_binary

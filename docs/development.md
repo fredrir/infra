@@ -54,9 +54,26 @@ infra artifact install \
   --sha256 "$INFRA_SHA256" \
   --platform linux/amd64 \
   --destination "$HOME/.local/bin/infra"
+infra artifact prune --max-bytes 1073741824 --max-age 720h --keep-revision "$INFRA_REVISION"
 ```
 
 The SHA-256 and revision must come from the trusted build result; a checksum downloaded beside an untrusted binary does not establish provenance.
+
+| Host installation | Value |
+| --- | --- |
+| Playbook | `ansible/infra-cli.yml`; inventory group `infra_cli_targets` |
+| Required variables | `infra_binary_url`, `infra_binary_revision`, `infra_binary_sha256` |
+| Host cache | `/var/cache/infra/<revision>/linux-<architecture>/<sha256>/infra` |
+| Active command | `/usr/local/bin/infra` symlink |
+| Host recovery | `control_backup` includes `infra_binary` before enabling its service |
+
+```sh
+infra operations enrollment create-deliver --node fredrir-07 --role control --host fredrir-07
+infra operations enrollment revoke-unused --node fredrir-07 --role control \
+  --host fredrir-07 --key-id "$UNUSED_KEY_ID"
+```
+
+Enrollment requires the verified binary on the SSH target before creating a key; non-root remote execution uses noninteractive sudo, and key material travels only through standard input.
 
 | Cache | Stores | Trust boundary |
 | --- | --- | --- |
@@ -103,7 +120,7 @@ git diff -- platform
 | Bazel cache | `127.0.0.1:9092`; VM-local trust boundary |
 | Persistent caches | Separate Docker volumes for Dagger and Bazel |
 | Cache collection | 20 GiB per cache; Dagger additionally targets 10 GiB free disk |
-| Pool isolation | Separate VM and cache volumes for each trust boundary |
+| Pool isolation | Trusted jobs only; untrusted PR jobs use hosted isolated engines |
 
 ```sh
 ansible-playbook -i "$BUILD_ENGINE_INVENTORY" ansible/build-engines.yml \
@@ -111,6 +128,20 @@ ansible-playbook -i "$BUILD_ENGINE_INVENTORY" ansible/build-engines.yml \
 ```
 
 Cache collection thresholds are garbage-collection targets, not filesystem quotas; provision enough VM disk for active builds and both caches.
+
+The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary.
+
+## Consumer cutover
+
+| Boundary | Required evidence |
+| --- | --- |
+| External workflow pins | [Consumer inventory](../build/consumers.json); all callers use the accepted infrastructure revision |
+| Runner and tools images | Published immutable digests; smoke checks and provenance verification |
+| Native runtime | Candidate archive and passing native qualification report |
+| Retirement | No remaining callers of the old runner pools, scripts or cache service |
+| Rollback | Retained accepted image digests and cache data until the rollback window closes |
+
+The inventory records GitHub reads on its `checked` date; refresh it before retirement.
 
 ## Code quality
 
