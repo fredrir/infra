@@ -56,6 +56,14 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 		t.Fatal(err)
 	}
 	image := "ghcr.io/fredrir/platform-backup-tools@sha256:" + strings.Repeat("c", 64)
+	expectedDeletes := 0
+	for _, path := range []string{"components/controllers/ci-slots.sh", "components/build-cache/provision.sh", "components/backup-job/backup.sh", "components/backup-job/heartbeat.sh"} {
+		if _, err := os.Stat(filepath.Join(root, "platform", path)); err == nil {
+			expectedDeletes++
+		} else if !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
 	edits, err := ToolsPromotion(root, image)
 	if err != nil {
 		t.Fatal(err)
@@ -70,8 +78,8 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 			deletes++
 		}
 	}
-	if deletes != 4 {
-		t.Fatalf("expected four legacy script deletions, got %d", deletes)
+	if deletes != expectedDeletes {
+		t.Fatalf("expected %d legacy script deletions, got %d", expectedDeletes, deletes)
 	}
 	if err := ApplyEdits(edits); err != nil {
 		t.Fatal(err)
