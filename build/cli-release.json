@@ -2,5 +2,6 @@
   "schema": 1,
   "tag": "infra-v0.2.0",
   "revision": "25622d613c0b140154fe2d2d34f59083377ba259",
-  "sha256": "89d8f53fbc2d44390b946aefa11bac242634fff3c4442b1cbb96944fbdd90bb9"
+  "sha256": "89d8f53fbc2d44390b946aefa11bac242634fff3c4442b1cbb96944fbdd90bb9",
+  "inputs_sha256": "52160a0a8d0bfc285a9f681623cbd04e8fd44356ed7ad1f80a668eccdbc16d91"
 }

@@ -36,16 +36,34 @@ jobs:
           done < <(git ls-files -- '*.go')
           digest=$(git ls-tree -r HEAD -- "${sources[@]}" | sha256sum | cut -d' ' -f1)
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+          if [ "$digest" = "$(jq -r '.inputs_sha256 // ""' build/cli-release.json)" ]; then
+            printf 'released=true\n' >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         id: binary-cache
         if: runner.environment == 'github-hosted'
         with:
           path: ${{ runner.temp }}/infra-cli
           key: infra-cli-inputs-v2-${{ steps.inputs.outputs.digest }}
+      - uses: ./.github/actions/setup-infra
+        if: steps.inputs.outputs.released == 'true'
+        with:
+          root: .
+      - name: Reuse released CLI for matching source inputs
+        if: steps.inputs.outputs.released == 'true'
+        env:
+          INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/infra-cli"
+          cp "$INFRA_BINARY" "$RUNNER_TEMP/infra-cli/infra"
+          jq -er '.sha256' build/cli-release.json > "$RUNNER_TEMP/infra-cli/sha256"
+          jq -er '.revision' build/cli-release.json > "$RUNNER_TEMP/infra-cli/source-revision"
+          printf '%s\n' "$INPUT_DIGEST" > "$RUNNER_TEMP/infra-cli/inputs"
       - name: Reuse verified native CLI
         id: cached
         env:
           INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
+          RELEASED: ${{ steps.inputs.outputs.released }}
         run: |
           bundle="$RUNNER_TEMP/infra-cli"
           cache="$HOME/.cache/infra/source-cli"
@@ -56,7 +74,7 @@ jobs:
           exec 9>"$cache/.lock"
           flock 9
           persistent="$cache/$INPUT_DIGEST"
-          if [ "$RUNNER_ENVIRONMENT" = self-hosted ] && [ -f "$persistent/infra" ] && [ -f "$persistent/sha256" ] && [ -f "$persistent/inputs" ] && [ -f "$persistent/source-revision" ]; then
+          if [ "$RELEASED" != true ] && [ "$RUNNER_ENVIRONMENT" = self-hosted ] && [ -f "$persistent/infra" ] && [ -f "$persistent/sha256" ] && [ -f "$persistent/inputs" ] && [ -f "$persistent/source-revision" ]; then
             mkdir -p "$bundle"
             cp "$persistent/infra" "$persistent/sha256" "$persistent/inputs" "$persistent/source-revision" "$bundle/"
             touch "$persistent/last-used"
