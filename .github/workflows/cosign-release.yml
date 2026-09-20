@@ -90,6 +90,7 @@ jobs:
         env:
           COSIGN_PASSWORD: local-qualification
         run: |
+          # shellcheck disable=SC2016
           infra ci measure --stage cosign-qualification --budget 10s --report-dir "$RUNNER_TEMP/checks" -- bash -euo pipefail -c '
             tool="$RUNNER_TEMP/release/cosign-linux-amd64"
             work=$(mktemp -d "$RUNNER_TEMP/cosign-check.XXXXXX")

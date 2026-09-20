@@ -245,6 +245,7 @@ jobs:
           PUBLIC_PROVENANCE: ${{ !github.event.repository.private }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          # shellcheck disable=SC2016
           infra ci measure --stage scanner-preparation --budget 5m --report-dir "$RUNNER_TEMP/performance/preparation" -- bash -euo pipefail -c '
             trivy image --download-db-only --no-progress --timeout 2m
             if [[ "$SCANNER_JAVA" == true ]]; then

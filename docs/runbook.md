@@ -103,9 +103,9 @@ These activation steps provision external credentials once; merge and scheduled 
 | --- | --- | --- |
 | GitHub environment variable | `TAILSCALE_CLIENT_ID` | `TAILSCALE_CLIENT_ID` |
 | Issuer | `https://token.actions.githubusercontent.com` | Same issuer |
-| Subject | `repo:fredrir/infra:environment:infrastructure-plan` | `repo:fredrir/infra:environment:infrastructure-apply` |
+| Subject | `repo:fredrir@114402558/infra@1328085692:environment:infrastructure-plan` | `repo:fredrir@114402558/infra@1328085692:environment:infrastructure-apply` |
 | Audience | `infra-reconciliation-plan` | `infra-reconciliation-apply` |
-| Repository claim | `repository_id=1328085692` | Same repository |
+| Immutable identity | Owner `114402558`, repository `1328085692` in subject | Same identity |
 | Workflow claim | Pull request workflow revision | `workflow_ref=fredrir/infra/.github/workflows/reconcile.yml@refs/heads/main` |
 | Scope / tag | `auth_keys` / `tag:infra-plan` | `auth_keys` / `tag:infra-apply` |
 | Device lifetime | Ephemeral; removed after job completion | Same lifetime |

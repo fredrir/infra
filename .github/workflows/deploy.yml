@@ -63,7 +63,7 @@ jobs:
         run: infra ci measure --stage promotion --budget 30s --report-dir "$RUNNER_TEMP/performance" -- infra ci deploy "$GITHUB_WORKSPACE"
       - name: Report desired revision
         run: |
-          printf 'Desired infrastructure revision: `%s`\n\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Desired infrastructure revision: %s\n\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           echo 'The Reconcile infrastructure workflow applies and verifies production.' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

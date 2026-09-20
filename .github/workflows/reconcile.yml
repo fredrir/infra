@@ -85,9 +85,11 @@ jobs:
       if: always()
       run: |
         if [ -f "$RUNNER_TEMP/infrastructure-plan.txt" ]; then
-          printf '```text\n' >> "$GITHUB_STEP_SUMMARY"
-          tail -c 900000 "$RUNNER_TEMP/infrastructure-plan.txt" >> "$GITHUB_STEP_SUMMARY"
-          printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+          {
+            printf '```text\n'
+            tail -c 900000 "$RUNNER_TEMP/infrastructure-plan.txt"
+            printf '\n```\n'
+          } >> "$GITHUB_STEP_SUMMARY"
         fi
     - name: Remove session credentials
       if: always()
@@ -170,9 +172,11 @@ jobs:
       if: always()
       run: |
         if [ -f "$RUNNER_TEMP/reconciliation/status.json" ]; then
-          printf '```json\n' >> "$GITHUB_STEP_SUMMARY"
-          cat "$RUNNER_TEMP/reconciliation/status.json" >> "$GITHUB_STEP_SUMMARY"
-          printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+          {
+            printf '```json\n'
+            cat "$RUNNER_TEMP/reconciliation/status.json"
+            printf '\n```\n'
+          } >> "$GITHUB_STEP_SUMMARY"
         fi
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       if: always()
