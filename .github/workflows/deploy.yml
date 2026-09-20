@@ -29,33 +29,33 @@ jobs:
       packages: read
       id-token: write
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      with:
-        ref: main
-        persist-credentials: false
-    - name: Install tools
-      run: bash scripts/ci/install-tools.sh gh yq kustomize cosign
-    - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
-      id: deployment-token
-      with:
-        scope: fredrir/infra
-        identity: deploy
-    - name: Verify and deploy
-      env:
-        GH_TOKEN: ${{ github.token }}
-        DEPLOY_TOKEN: ${{ steps.deployment-token.outputs.token }}
-        REGISTRY_TOKEN: ${{ github.token }}
-        SOURCE_REPOSITORY_ID: ${{ inputs.repository-id }}
-        IMAGE_NAME: ${{ inputs.image }}
-        IMAGE_DIGEST: ${{ inputs.digest }}
-        SOURCE_REVISION: ${{ inputs.source-revision }}
-      run: |
-        export DOCKER_CONFIG="$RUNNER_TEMP/registry"
-        mkdir -m 700 "$DOCKER_CONFIG"
-        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-        umask 077
-        jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
-        unset REGISTRY_TOKEN
-        bash scripts/ci/deploy.sh "$GITHUB_WORKSPACE"
-    - name: Reconcile
-      run: curl --fail --silent --show-error --max-time 10 --request POST http://webhook-receiver.flux-system.svc.cluster.local/hook/273de0d9e70f699a6815cac41ac0e847b0ed56918dfff9301840383ef2760306 || printf '::warning::Flux was not notified; it reconciles on its next poll\n'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Install tools
+        run: bash scripts/ci/install-tools.sh gh yq kustomize cosign
+      - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
+        id: deployment-token
+        with:
+          scope: fredrir/infra
+          identity: deploy
+      - name: Verify and deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_TOKEN: ${{ steps.deployment-token.outputs.token }}
+          REGISTRY_TOKEN: ${{ github.token }}
+          SOURCE_REPOSITORY_ID: ${{ inputs.repository-id }}
+          IMAGE_NAME: ${{ inputs.image }}
+          IMAGE_DIGEST: ${{ inputs.digest }}
+          SOURCE_REVISION: ${{ inputs.source-revision }}
+        run: |
+          export DOCKER_CONFIG="$RUNNER_TEMP/registry"
+          mkdir -m 700 "$DOCKER_CONFIG"
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          umask 077
+          jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
+          unset REGISTRY_TOKEN
+          bash scripts/ci/deploy.sh "$GITHUB_WORKSPACE"
+      - name: Reconcile
+        run: curl --fail --silent --show-error --max-time 10 --request POST http://webhook-receiver.flux-system.svc.cluster.local/hook/273de0d9e70f699a6815cac41ac0e847b0ed56918dfff9301840383ef2760306 || printf '::warning::Flux was not notified; it reconciles on its next poll\n'

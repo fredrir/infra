@@ -3,21 +3,21 @@ on:
   push:
     branches: [main]
     paths:
-    - .dockerignore
-    - .github/workflows/images.yml
-    - images/catalog.yaml
-    - images/runner-buildkit/**
-    - images/runner-nix/**
-    - images/runner-rust/**
-    - images/runner-check/**
-    - flake.nix
-    - flake.lock
-    - pyproject.toml
-    - uv.lock
-    - images/caddy/**
-    - platform/components/backups/tools.Dockerfile
+      - .dockerignore
+      - .github/workflows/images.yml
+      - images/catalog.yaml
+      - images/runner-buildkit/**
+      - images/runner-nix/**
+      - images/runner-rust/**
+      - images/runner-check/**
+      - flake.nix
+      - flake.lock
+      - pyproject.toml
+      - uv.lock
+      - images/caddy/**
+      - platform/components/backups/tools.Dockerfile
   schedule:
-  - cron: 0 4 * * 1
+    - cron: 0 4 * * 1
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,15 +29,15 @@ jobs:
     outputs:
       images: ${{ steps.plan.outputs.images }}
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      with:
-        ref: ${{ github.sha }}
-        persist-credentials: false
-    - name: Plan
-      id: plan
-      env:
-        REFRESH: ${{ github.event_name != 'push' }}
-      run: bash scripts/ci/plan-images.sh
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Plan
+        id: plan
+        env:
+          REFRESH: ${{ github.event_name != 'push' }}
+        run: bash scripts/ci/plan-images.sh
   image:
     needs: plan
     if: needs.plan.outputs.images != '[]'
