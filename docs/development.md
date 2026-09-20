@@ -122,14 +122,15 @@ git diff -- platform
 | Activation gates | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true` |
 | Runner registration | Eight repository registrations share one VM; each accepts protected main pushes or manual runs only |
 | Runner slice | Four CPUs / 2 GiB aggregate for runner services and native child processes |
-| Production Dagger ceiling | Four CPUs / 4 GiB RAM / 1,024 processes / two parallel operations |
-| Standalone engine defaults | Four CPUs / 8 GiB RAM / four parallel operations; configurable within host capacity |
+| Production Dagger ceiling | Four CPUs / 4 GiB RAM / 1,024 processes / one parallel operation |
+| Standalone engine defaults | Four CPUs / 8 GiB RAM / one parallel operation; configurable within host capacity |
 | Dagger connection | Local `docker-container://infra-dagger`; no published engine port |
 | Bazel cache | `127.0.0.1:9092`; one CPU / 1 GiB RAM; VM-local trusted writes |
+| Bazel server retention | 300 s idle timeout; repository, disk and remote action caches persist |
 | Persistent caches | Separate Docker volumes for Dagger and Bazel; engine-local Bazel action cache; native repository downloads in `/var/cache/infra/bazel-repo` |
 | Runner cache environment | `BAZEL_REMOTE_CACHE=http://127.0.0.1:9092`; `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger` |
 | Runner enforcement | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected |
-| Cache collection | Dagger background GC; Bazel remote LRU with 20 GiB target and 21 GiB admission ceiling |
+| Cache collection | Dagger ordinary layers first; named caches preferred for 48 h; 20 GiB target / 4 GiB emergency free space; Bazel remote 20 GiB target / 21 GiB admission ceiling |
 | Background preparation | Six-hour systemd timer; low-priority client; ten-minute timeout; configured argv only |
 | Background maintenance | `infra artifact prune-source`; `infra pipeline cache-gc` |
 | Verified tooling | CLI release checksum and revision; pinned native Bazel; pinned GitHub runner archive |
