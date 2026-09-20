@@ -12,16 +12,18 @@
     kubectl version --client; kustomize version; helm version --short; actionlint -version; tofu version;
     ansible-playbook --version | head -n1; sops --version; age --version;
     LD_LIBRARY_PATH=$CHECK_LIBRARY_PATH /opt/venv/bin/python -c 'import ansible, celpy, jinja2, yaml'
-- image: ghcr.io/fredrir/infra-runner-buildkit
-  dockerfile: images/runner-buildkit/Containerfile
+- image: ghcr.io/fredrir/infra-runner-dagger
+  dockerfile: images/runner-dagger/Containerfile
   inputs:
-  - images/runner-buildkit
-  check: /home/runner/run.sh --version | grep -x 2.337.0; buildctl --version; buildkitd --version
-- image: ghcr.io/fredrir/infra-runner-nix
-  dockerfile: images/runner-nix/Containerfile
-  inputs:
-  - images/runner-nix
-  check: /home/runner/run.sh --version | grep -x 2.337.0; nix --version; nix config show | grep -x 'sandbox = true'
+  - images/runner-dagger
+  - cmd
+  - internal
+  - go.mod
+  - go.sum
+  - build
+  - MODULE.bazel
+  - MODULE.bazel.lock
+  check: /home/runner/run.sh --version | grep -x 2.337.0; dagger version; infra version
 - image: ghcr.io/fredrir/infra-runner-rust
   dockerfile: images/runner-rust/Containerfile
   inputs:
@@ -53,4 +55,11 @@
   dockerfile: platform/components/backups/tools.Dockerfile
   inputs:
   - platform/components/backups/tools.Dockerfile
+  - cmd
+  - internal
+  - go.mod
+  - go.sum
+  - build
+  - MODULE.bazel
+  - MODULE.bazel.lock
   check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version

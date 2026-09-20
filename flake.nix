@@ -63,11 +63,12 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in {
       default = pkgs.mkShell {
-        packages = toolchain system;
+        packages = toolchain system ++ [pkgs.go_1_27];
         LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.stdenv.cc.cc.lib]);
       };
     });
     packages = forAllSystems (system: {
+      infra = import ./nix/infra.nix {pkgs = nixpkgs.legacyPackages.${system};};
       attic-client = nixpkgs.legacyPackages.${system}.attic-client;
       check = nixpkgs.legacyPackages.${system}.buildEnv {
         name = "infra-check";

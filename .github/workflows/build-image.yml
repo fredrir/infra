@@ -20,6 +20,21 @@ on:
       test-command:
         type: string
         default: ''
+      image-test-command:
+        type: string
+        default: ''
+      image-test-shell:
+        type: string
+        default: bash
+      cli-artifact:
+        type: string
+        default: ''
+      cli-sha256:
+        type: string
+        default: ''
+      cli-revision:
+        type: string
+        default: ''
       deploy:
         type: boolean
         default: true
@@ -44,9 +59,13 @@ concurrency:
   group: image-${{ github.repository }}-${{ inputs.image }}
   cancel-in-progress: false
 jobs:
+  cli:
+    if: inputs.cli-artifact == ''
+    uses: ./.github/workflows/infra-cli.yml
   build:
-    if: github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected
-    runs-on: buildkit-amd64
+    needs: cli
+    if: always() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected
+    runs-on: ubuntu-24.04
     timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       contents: read
@@ -66,9 +85,27 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .infra-build-recipe
           persist-credentials: false
-          sparse-checkout: |
-            scripts/ci
-            platform/projects/y
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
+          path: ${{ runner.temp }}/infra-cli
+      - name: Verify CLI
+        env:
+          CLI_SHA256: ${{ inputs.cli-sha256 || needs.cli.outputs.sha256 }}
+          CLI_REVISION: ${{ inputs.cli-revision || needs.cli.outputs.revision }}
+          WORKFLOW_REVISION: ${{ job.workflow_sha }}
+        run: |
+          test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+          printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+          chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+          printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Start isolated Dagger engine
+        run: docker run --detach --name infra-dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
       - name: Select shared recipe
         if: inputs.recipe != ''
         env:
@@ -102,6 +139,8 @@ jobs:
           CONTEXT: ${{ inputs.context }}
           LAYER_CACHE: ${{ inputs.layer-cache }}
         run: bash -euo pipefail -c "$TEST_COMMAND"
+      - name: Install verification tools
+        run: infra ci install-tools gh trivy cosign
       - name: Build and publish
         id: build
         env:
@@ -110,33 +149,14 @@ jobs:
           DOCKERFILE: ${{ inputs.dockerfile }}
           REGISTRY_TOKEN: ${{ github.token }}
           BUILD_ARGS: ${{ inputs.build-args }}
-          LAYER_CACHE: ${{ inputs.layer-cache }}
+          IMAGE_TEST_COMMAND: ${{ inputs.image-test-command }}
+          IMAGE_TEST_SHELL: ${{ inputs.image-test-shell }}
+          _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
         run: |
-          set -euo pipefail
-          bash .infra-build-recipe/scripts/ci/install-tools.sh gh trivy cosign &
-          tools=$!
-          DOCKERFILE="${SHARED_DOCKERFILE:-$DOCKERFILE}"
-          export DOCKER_CONFIG="$RUNNER_TEMP/registry"
-          mkdir -m 700 "$DOCKER_CONFIG"
-          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-          umask 077
-          jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
-          unset REGISTRY_TOKEN
-          export BUILDKITD_FLAGS="$BUILDKITD_FLAGS --oci-worker-net=host"
-          source .infra-build-recipe/scripts/ci/build-args.sh
-          source .infra-build-recipe/scripts/ci/build-cache-args.sh
-          buildctl-daemonless.sh build --frontend dockerfile.v0 "${build_args[@]}" "${cache_args[@]}" \
-            --local "context=$CONTEXT" --local "dockerfile=$(dirname "$DOCKERFILE")" \
-            --opt "filename=$(basename "$DOCKERFILE")" --opt platform=linux/amd64 \
-            --opt attest:provenance=mode=min,version=v1 \
-            --opt "label:org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --opt "label:org.opencontainers.image.revision=$GITHUB_SHA" \
-            --output "type=image,name=$IMAGE:$GITHUB_SHA,push=true" \
-            --metadata-file "$RUNNER_TEMP/build.json"
-          digest=$(jq -er '."containerimage.digest"' "$RUNNER_TEMP/build.json")
-          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
-          printf 'image=%s@%s\ndigest=%s\n' "$IMAGE" "$digest" "$digest" >> "$GITHUB_OUTPUT"
-          wait "$tools"
+          infra pipeline image --root .infra-build-recipe --context "$CONTEXT" --dockerfile "${SHARED_DOCKERFILE:-$DOCKERFILE}" \
+            --infra-binary "$RUNNER_TEMP/infra-cli/infra" --image "$IMAGE:$GITHUB_SHA" --build-args "$(infra ci build-args)" \
+            --source-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" \
+            --test-command "$IMAGE_TEST_COMMAND" --test-shell "$IMAGE_TEST_SHELL"
       - name: Scan published image
         env:
           IMAGE: ${{ steps.build.outputs.image }}
@@ -198,7 +218,7 @@ jobs:
           IMAGE: ${{ steps.build.outputs.image }}
           TAG: ${{ inputs.verified-tag }}
           REGISTRY_TOKEN: ${{ github.token }}
-        run: bash .infra-build-recipe/scripts/ci/tag-image.sh
+        run: infra ci tag-image
       - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
         if: inputs.deploy
         id: deployment-token
@@ -214,3 +234,6 @@ jobs:
         run: |
           gh workflow run deploy.yml --repo fredrir/infra --ref main -f "repository-id=$GITHUB_REPOSITORY_ID" \
             -f "image=$IMAGE" -f "digest=$DIGEST" -f "source-revision=$GITHUB_SHA"
+      - name: Stop Dagger engine
+        if: always()
+        run: docker rm --force infra-dagger

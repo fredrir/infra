@@ -1,5 +1,6 @@
 self-hosted-runner:
   labels:
+  - dagger-amd64
   - buildkit-amd64
   - check-amd64
   - deploy-amd64
@@ -9,6 +10,9 @@ self-hosted-runner:
   - rust-release-amd64
   - publish-amd64
 paths:
+  .github/workflows/infra-cli.yml:
+    ignore:
+    - 'property "workflow_(sha|repository)" is not defined in object type'
   .github/workflows/build-image.yml:
     ignore:
     - 'property "workflow_(sha|repository)" is not defined in object type'

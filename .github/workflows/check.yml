@@ -2,54 +2,74 @@ name: Check
 on:
   push:
     branches: [main]
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: infra-main
-  cancel-in-progress: false
+  group: infra-check-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
+  cli:
+    uses: ./.github/workflows/infra-cli.yml
   check:
+    needs: cli
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ needs.cli.outputs.artifact }}
+          path: ${{ runner.temp }}/infra-cli
+      - name: Verify CLI
+        env:
+          CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+        run: |
+          printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+          chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+          printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+      - name: Start isolated Dagger engine
+        run: docker run --detach --name infra-dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+      - name: Check Go targets
+        env:
+          _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
+          BAZEL_REMOTE_CACHE: ${{ vars.BAZEL_REMOTE_CACHE }}
+        run: infra ci check --read-only-cache
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: build-reports-${{ github.sha }}
+          path: dist/reports
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Stop Dagger engine
+        if: always()
+        run: docker rm --force infra-dagger
+  validate:
+    needs: cli
     if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]'
     runs-on: check-amd64
-    timeout-minutes: 15
-    outputs:
-      toolchain: ${{ steps.check.outputs.toolchain }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
-      - name: Check
-        id: check
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ needs.cli.outputs.artifact }}
+          path: ${{ runner.temp }}/infra-cli
+      - name: Validate infrastructure declarations
         env:
+          CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
           BEFORE: ${{ github.event.before }}
-        run: bash scripts/ci/check.sh
-  toolchain:
-    needs: check
-    if: needs.check.outputs.toolchain == 'true'
-    runs-on: nix-amd64
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - name: Configure Nix cache
         run: |
-          echo "::add-mask::$ATTIC_TOKEN"
-          nix run .#attic-client -- login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
-          nix run .#attic-client -- use "infra:$ATTIC_CACHE"
-      - name: Check native toolchain
-        run: |
-          nix config show | grep -E '^(substituters|trusted-public-keys|netrc-file) '
-          test "$(uname -m)" = x86_64
-          test ! -e /var/run/secrets/kubernetes.io/serviceaccount/token
-          nix flake check --all-systems --no-build
-          nix build --no-link --print-out-paths > "$RUNNER_TEMP/toolchain-path"
-      - name: Publish Nix cache
-        run: |
-          echo "::add-mask::$ATTIC_TOKEN"
-          nix develop --command bash -euo pipefail <<'SCRIPT'
-            attic login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
-            attic push "infra:$ATTIC_CACHE" "$(cat "$RUNNER_TEMP/toolchain-path")"
-          SCRIPT
+          printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+          chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+          "$RUNNER_TEMP/infra-cli/infra" ci validate

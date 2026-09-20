@@ -3,7 +3,6 @@ import json
 import os
 import re
 import subprocess
-import tempfile
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,11 +12,6 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 TAG_IMAGE = ROOT / 'scripts/ci/tag-image.sh'
-PLAN_IMAGES = ROOT / 'scripts/ci/plan-images.sh'
-CATALOG = [
-    {'image': 'ghcr.io/fredrir/one', 'dockerfile': 'images/one/Containerfile', 'inputs': ['images/one', 'pins.lock'], 'check': 'one --version'},
-    {'image': 'ghcr.io/fredrir/two', 'dockerfile': 'images/two/Containerfile', 'inputs': ['images/two'], 'check': 'two --version'},
-]
 INDEX = json.dumps({'schemaVersion': 2, 'mediaType': 'application/vnd.oci.image.index.v1+json', 'manifests': []}).encode()
 DIGEST = 'sha256:' + hashlib.sha256(INDEX).hexdigest()
 
@@ -99,83 +93,6 @@ class TagImageTests(unittest.TestCase):
             with self.subTest(change=change):
                 self.assertNotEqual(self.tag(registry, **change).returncode, 0)
         self.assertFalse(registry.requests)
-
-
-class PlanImagesTests(unittest.TestCase):
-    def setUp(self):
-        directory = tempfile.TemporaryDirectory()
-        self.addCleanup(directory.cleanup)
-        self.repository = Path(directory.name) / 'repository'
-        self.output = Path(directory.name) / 'output'
-        for name, content in {'.github/workflows/images.yml': 'name: Images\n', '.dockerignore': '.git\n', 'pins.lock': 'one\n',
-                              'images/catalog.yaml': yaml.safe_dump(CATALOG), 'images/one/Containerfile': 'FROM scratch\n',
-                              'images/two/Containerfile': 'FROM scratch\n'}.items():
-            (self.repository / name).parent.mkdir(parents=True, exist_ok=True)
-            (self.repository / name).write_text(content)
-        self.git('init', '--quiet')
-        self.commit()
-
-    def git(self, *arguments):
-        subprocess.run(['git', '-c', 'user.name=test', '-c', 'user.email=test@example.com', *arguments],
-                       cwd=self.repository, check=True, capture_output=True)
-
-    def commit(self):
-        self.git('add', '--all')
-        self.git('commit', '--quiet', '--message', 'change')
-
-    def plan(self, registry, **environment):
-        self.output.write_text('')
-        result = subprocess.run(['bash', str(PLAN_IMAGES)], cwd=self.repository, capture_output=True, text=True, check=False,
-                                env=os.environ | {'REGISTRY_URL': registry.url, 'GITHUB_OUTPUT': str(self.output)} | environment)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        name, _, value = self.output.read_text().strip().partition('=')
-        self.assertEqual(name, 'images')
-        return {entry['image']: entry for entry in json.loads(value)}
-
-    def registry(self, **arguments):
-        registry = Registry(**arguments)
-        self.addCleanup(registry.close)
-        return registry
-
-    def test_only_images_without_a_published_inputs_tag_are_built(self):
-        planned = self.plan(self.registry())
-        self.assertEqual(sorted(planned), ['ghcr.io/fredrir/one', 'ghcr.io/fredrir/two'])
-        one = planned['ghcr.io/fredrir/one']
-        self.assertRegex(one['tag'], r'^inputs-[a-f0-9]{64}$')
-        self.assertEqual((one['dockerfile'], one['check']), ('images/one/Containerfile', 'one --version'))
-        self.assertNotIn('inputs', one)
-        published = self.registry(manifests={f"/v2/fredrir/one/manifests/{one['tag']}": INDEX})
-        self.assertEqual(sorted(self.plan(published)), ['ghcr.io/fredrir/two'])
-        everything = {f"/v2/{image.removeprefix('ghcr.io/')}/manifests/{entry['tag']}": INDEX for image, entry in planned.items()}
-        self.assertEqual(self.plan(self.registry(manifests=everything)), {})
-        self.assertEqual(len(self.plan(self.registry(manifests=everything), REFRESH='true')), 2)
-
-    def test_a_changed_input_only_retags_the_images_that_declare_it(self):
-        before = self.plan(self.registry())
-        (self.repository / 'pins.lock').write_text('two\n')
-        (self.repository / 'unrelated').write_text('change\n')
-        self.commit()
-        after = self.plan(self.registry())
-        self.assertNotEqual(after['ghcr.io/fredrir/one']['tag'], before['ghcr.io/fredrir/one']['tag'])
-        self.assertEqual(after['ghcr.io/fredrir/two']['tag'], before['ghcr.io/fredrir/two']['tag'])
-        (self.repository / '.github/workflows/images.yml').write_text('name: Changed\n')
-        self.commit()
-        self.assertNotEqual(self.plan(self.registry())['ghcr.io/fredrir/two']['tag'], after['ghcr.io/fredrir/two']['tag'])
-
-    def test_an_unavailable_registry_builds_everything(self):
-        self.assertEqual(len(self.plan(self.registry(status=500))), 2)
-        stopped = self.registry()
-        stopped.close()
-        self.assertEqual(len(self.plan(stopped)), 2)
-
-    def test_an_undeclared_or_missing_input_refuses(self):
-        for inputs in [[], ['images/missing']]:
-            with self.subTest(inputs=inputs):
-                (self.repository / 'images/catalog.yaml').write_text(yaml.safe_dump([CATALOG[0] | {'inputs': inputs}]))
-                self.commit()
-                result = subprocess.run(['bash', str(PLAN_IMAGES)], cwd=self.repository, capture_output=True, check=False,
-                                        env=os.environ | {'REGISTRY_URL': 'http://127.0.0.1:1', 'GITHUB_OUTPUT': os.devnull})
-                self.assertNotEqual(result.returncode, 0)
 
 
 class CatalogTests(unittest.TestCase):
