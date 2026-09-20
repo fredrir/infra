@@ -1,0 +1,38 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -10,7 +10,7 @@
+   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+ jobs:
+   rust:
+-    uses: fredrir/infra/.github/workflows/rust-ci.yml@eb764b837d1fd10cb71fde1963500854aaef5d6c
++    uses: fredrir/infra/.github/workflows/rust-ci.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
+     with:
+       postgres: true
+       postgres-url-env: NSQL_TEST_PG_URL
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -13,4 +13,4 @@
+   cancel-in-progress: false
+ jobs:
+   release:
+-    uses: fredrir/infra/.github/workflows/rust-release.yml@eb764b837d1fd10cb71fde1963500854aaef5d6c
++    uses: fredrir/infra/.github/workflows/rust-release.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
+--- a/.github/workflows/auto-tag.yml
++++ b/.github/workflows/auto-tag.yml
+@@ -9,4 +9,4 @@
+   cancel-in-progress: false
+ jobs:
+   tag:
+-    uses: fredrir/infra/.github/workflows/rust-auto-tag.yml@eb764b837d1fd10cb71fde1963500854aaef5d6c
++    uses: fredrir/infra/.github/workflows/rust-auto-tag.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
+--- a/.github/chainguard/auto-tag.sts.yaml
++++ b/.github/chainguard/auto-tag.sts.yaml
+@@ -6,6 +6,7 @@
+   runner_environment: ^self-hosted$
+   ref: ^refs/heads/main$
+   event_name: ^(push|workflow_dispatch)$
+-  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@[0-9a-f]{40}$
++  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
++  job_workflow_sha: ^(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
+ permissions:
+   contents: write

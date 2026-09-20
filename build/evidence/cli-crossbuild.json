@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "date": "2026-09-20",
+  "source_revision": "b2c97f0c98c09099d19696089e55f1e95bd6ac1d",
+  "toolchain": "build/toolchain.json",
+  "command": "bazel build --platforms=@rules_go//go/toolchain:<os>_<arch> --@rules_go//go/config:pure //cmd/infra:infra",
+  "scope": "Local cross-compilation; no release or attestation",
+  "binaries": [
+    {
+      "platform": "darwin/amd64",
+      "sha256": "8d0e62e03f7c57bbd60ef71fd4adfef33e67bed8677f8360591cb44f3ca6dccb",
+      "bytes": 15700672,
+      "format": "Mach-O 64-bit executable x86_64"
+    },
+    {
+      "platform": "darwin/arm64",
+      "sha256": "f8e9c40c3654431b483e19b9d79ae9961bf77c63703cdd53e551fcc8dfdd4341",
+      "bytes": 14522658,
+      "format": "Mach-O 64-bit executable arm64"
+    },
+    {
+      "platform": "linux/amd64",
+      "sha256": "c37acf10dd13009f61374b9fce811877b2a40c33b34a600a67e0c9e9dc39d0c1",
+      "bytes": 15442080,
+      "format": "ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=redacted, BuildID[sha1]=498919aff001d8366249403a2544fba2d833084f, stripped"
+    },
+    {
+      "platform": "linux/arm64",
+      "sha256": "0082dcd7ee26591bcddb7920bdbc3dd0cad89a95410227924e7743611a9c8a7d",
+      "bytes": 14155936,
+      "format": "ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, Go BuildID=redacted, BuildID[sha1]=498919aff001d8366249403a2544fba2d833084f, stripped"
+    }
+  ]
+}

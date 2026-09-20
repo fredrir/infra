@@ -10,6 +10,20 @@
 | VM engines | Dedicated trusted VM, native qualification and registered runner | Apply `ansible/build-engines.yml`; enable the qualified pool explicitly |
 | Retirement | All callers moved; old jobs drained; rollback data retained | Remove legacy runner and Attic service resources |
 
+## Prepared cutover
+
+| Name | Value |
+| --- | --- |
+| Source revision | `b2c97f0c98c09099d19696089e55f1e95bd6ac1d` |
+| External patches | [Manifest](../build/rollout/manifest.json): ten repositories, nine caller workflows, five trust policies |
+| Concurrency guard | Expected Git blob for every external file; refresh mismatches before applying |
+| Test migration | Native Dagger stage checks replace the removed shell helper |
+| Rollback overlap | Exact previous and new workflow SHAs accepted; remove previous SHAs after old jobs drain and rollback closes |
+
+```sh
+git -C "$CONSUMER_CHECKOUT" apply --check "$INFRA_CHECKOUT/build/rollout/$REPOSITORY.patch"
+```
+
 ## Tools and hosts
 
 ```sh
@@ -43,6 +57,8 @@ The current Flux cache Kustomization uses `prune: true`. Retain the `nix-cache` 
 
 | Check | Evidence |
 | --- | --- |
+| CLI cross-compilation | [Four-platform build receipts](../build/evidence/cli-crossbuild.json) |
+| Changed-source Dagger reuse | [Persistent action-cache experiment](../build/evidence/dagger-disk-cache-linux-amd64.json) |
 | Independent Bazel cache reuse | [Cold and warm action-cache experiment](../build/evidence/bazel-cache-linux-amd64.json) |
 | Native Linux quality | [Race tests and vet at the recorded revision](../build/evidence/go-validation-linux-amd64.json) |
 | Signed package installation | [Debian, Fedora and Alpine qualification](../build/evidence/packages-linux-amd64.json) |

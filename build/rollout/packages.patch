@@ -1,0 +1,22 @@
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -16,7 +16,7 @@
+     permissions:
+       contents: write
+       id-token: write
+-    uses: fredrir/infra/.github/workflows/packages-publish.yml@2623cd04d593090e66eb418586a1fc1d246b449e
++    uses: fredrir/infra/.github/workflows/packages-publish.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
+     secrets: inherit
+     with:
+       smoke-scope: ${{ github.event.schedule == '41 5 * * 1' && 'full' || 'quick' }}
+--- a/.github/chainguard/dispatch-1269406277.sts.yaml
++++ b/.github/chainguard/dispatch-1269406277.sts.yaml
+@@ -7,6 +7,7 @@
+   ref: ^refs/tags/v[0-9A-Za-z.+-]+$
+   event_name: ^push$
+   environment: ^release$
+-  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-release\.yml@[0-9a-f]{40}$
++  job_workflow_ref: ^fredrir/infra/\.github/workflows/rust-release\.yml@(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
++  job_workflow_sha: ^(eb764b837d1fd10cb71fde1963500854aaef5d6c|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
+ permissions:
+   actions: write

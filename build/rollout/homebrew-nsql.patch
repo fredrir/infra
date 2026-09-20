@@ -1,0 +1,16 @@
+--- a/.github/chainguard/publisher.sts.yaml
++++ b/.github/chainguard/publisher.sts.yaml
+@@ -3,10 +3,11 @@
+ claim_pattern:
+   repository_id: ^1374225208$
+   repository_owner_id: ^114402558$
+-  runner_environment: ^self-hosted$
++  runner_environment: ^(self-hosted|github-hosted)$
+   ref: ^refs/heads/main$
+   event_name: ^(push|schedule|workflow_dispatch)$
+   environment: ^publish$
+-  job_workflow_ref: ^fredrir/infra/\.github/workflows/packages-publish\.yml@[0-9a-f]{40}$
++  job_workflow_ref: ^fredrir/infra/\.github/workflows/packages-publish\.yml@(2623cd04d593090e66eb418586a1fc1d246b449e|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
++  job_workflow_sha: ^(2623cd04d593090e66eb418586a1fc1d246b449e|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
+ permissions:
+   contents: write

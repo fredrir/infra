@@ -1,0 +1,30 @@
+--- a/.github/workflows/images.yml
++++ b/.github/workflows/images.yml
+@@ -12,12 +12,12 @@
+       packages: write
+       id-token: write
+       attestations: write
+-    uses: fredrir/infra/.github/workflows/build-image.yml@1f2eecbc81ba184252f9ed85f893fa5eb3b5150a
++    uses: fredrir/infra/.github/workflows/build-image.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
+     with:
+       image: ghcr.io/fredrir/y-api
+       context: .
+       dockerfile: Dockerfile
+-      test-command: bash .infra-build-recipe/scripts/ci/build-test-target.sh ci/Containerfile api-tests
++      test-command: infra pipeline image --root .infra-build-recipe --context . --dockerfile ci/Containerfile --target api-tests --check-only --timeout 45m
+       recipe: y-api
+   web:
+     permissions:
+@@ -25,10 +25,10 @@
+       packages: write
+       id-token: write
+       attestations: write
+-    uses: fredrir/infra/.github/workflows/build-image.yml@1f2eecbc81ba184252f9ed85f893fa5eb3b5150a
++    uses: fredrir/infra/.github/workflows/build-image.yml@b2c97f0c98c09099d19696089e55f1e95bd6ac1d
+     with:
+       image: ghcr.io/fredrir/y-web
+       context: .
+       dockerfile: Dockerfile
+-      test-command: bash .infra-build-recipe/scripts/ci/build-test-target.sh ci/Containerfile web-tests
++      test-command: infra pipeline image --root .infra-build-recipe --context . --dockerfile ci/Containerfile --target web-tests --check-only --timeout 45m
+       recipe: y-web

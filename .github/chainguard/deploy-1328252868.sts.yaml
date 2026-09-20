@@ -5,8 +5,8 @@ claim_pattern:
   repository_owner_id: ^114402558$
   event_name: ^push$
   ref: ^refs/heads/main$
-  runner_environment: ^self-hosted$
-  job_workflow_ref: ^fredrir/infra/\.github/workflows/build-image\.yml@1f2eecbc81ba184252f9ed85f893fa5eb3b5150a$
-  job_workflow_sha: ^1f2eecbc81ba184252f9ed85f893fa5eb3b5150a$
+  runner_environment: ^(self-hosted|github-hosted)$
+  job_workflow_ref: ^fredrir/infra/\.github/workflows/build-image\.yml@(1f2eecbc81ba184252f9ed85f893fa5eb3b5150a|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
+  job_workflow_sha: ^(1f2eecbc81ba184252f9ed85f893fa5eb3b5150a|b2c97f0c98c09099d19696089e55f1e95bd6ac1d)$
 permissions:
   actions: write
