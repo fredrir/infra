@@ -15,41 +15,41 @@ jobs:
     outputs:
       toolchain: ${{ steps.check.outputs.toolchain }}
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      with:
-        ref: ${{ github.sha }}
-        persist-credentials: false
-    - name: Check
-      id: check
-      env:
-        BEFORE: ${{ github.event.before }}
-      run: bash scripts/ci/check.sh
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check
+        id: check
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: bash scripts/ci/check.sh
   toolchain:
     needs: check
     if: needs.check.outputs.toolchain == 'true'
     runs-on: nix-amd64
     timeout-minutes: 45
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      with:
-        ref: ${{ github.sha }}
-        persist-credentials: false
-    - name: Configure Nix cache
-      run: |
-        echo "::add-mask::$ATTIC_TOKEN"
-        nix run .#attic-client -- login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
-        nix run .#attic-client -- use "infra:$ATTIC_CACHE"
-    - name: Check native toolchain
-      run: |
-        nix config show | grep -E '^(substituters|trusted-public-keys|netrc-file) '
-        test "$(uname -m)" = x86_64
-        test ! -e /var/run/secrets/kubernetes.io/serviceaccount/token
-        nix flake check --all-systems --no-build
-        nix build --no-link --print-out-paths > "$RUNNER_TEMP/toolchain-path"
-    - name: Publish Nix cache
-      run: |
-        echo "::add-mask::$ATTIC_TOKEN"
-        nix develop --command bash -euo pipefail <<'SCRIPT'
-          attic login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
-          attic push "infra:$ATTIC_CACHE" "$(cat "$RUNNER_TEMP/toolchain-path")"
-        SCRIPT
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Configure Nix cache
+        run: |
+          echo "::add-mask::$ATTIC_TOKEN"
+          nix run .#attic-client -- login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
+          nix run .#attic-client -- use "infra:$ATTIC_CACHE"
+      - name: Check native toolchain
+        run: |
+          nix config show | grep -E '^(substituters|trusted-public-keys|netrc-file) '
+          test "$(uname -m)" = x86_64
+          test ! -e /var/run/secrets/kubernetes.io/serviceaccount/token
+          nix flake check --all-systems --no-build
+          nix build --no-link --print-out-paths > "$RUNNER_TEMP/toolchain-path"
+      - name: Publish Nix cache
+        run: |
+          echo "::add-mask::$ATTIC_TOKEN"
+          nix develop --command bash -euo pipefail <<'SCRIPT'
+            attic login infra "$ATTIC_SERVER" "$ATTIC_TOKEN"
+            attic push "infra:$ATTIC_CACHE" "$(cat "$RUNNER_TEMP/toolchain-path")"
+          SCRIPT
