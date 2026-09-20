@@ -2,21 +2,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: ci-portfolio
 resources:
-- ../base
+- ../ci-namespace
 - github-app.secret.sops.yaml
 - buildkit-cache.secret.sops.yaml
 components:
 - ../buildkit-cache
-patches:
-- target:
-    kind: HelmRelease
-    name: buildkit
-  patch: "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name:\
-    \ buildkit\nspec:\n  values:\n    githubConfigUrl: https://github.com/fredrir/portfolio\n"
-- target:
-    kind: HelmRelease
-    name: buildkit
-  patch: |
-    - op: replace
-      path: /spec/values/template/spec/activeDeadlineSeconds
-      value: 9600

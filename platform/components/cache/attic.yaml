@@ -40,18 +40,6 @@ data:
 
     '
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: attic
-  namespace: nix-cache
-spec:
-  selector:
-    app: attic
-  ports:
-  - port: 8080
-    targetPort: 8080
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -59,7 +47,7 @@ metadata:
   namespace: nix-cache
 spec:
   serviceName: attic
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: attic
@@ -143,26 +131,3 @@ spec:
       resources:
         requests:
           storage: 50Gi
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: attic-ingress
-  namespace: nix-cache
-spec:
-  podSelector:
-    matchLabels:
-      app: attic
-  policyTypes:
-  - Ingress
-  ingress:
-  - from:
-    - podSelector:
-        matchLabels:
-          app: attic-tunnel
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: ci-infra
-    ports:
-    - port: 8080
-      protocol: TCP

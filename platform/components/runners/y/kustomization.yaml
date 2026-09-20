@@ -2,15 +2,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: ci-y
 resources:
-- ../base
+- ../ci-namespace
 - github-app.secret.sops.yaml
 - buildkit-cache.secret.sops.yaml
 components:
 - ../buildkit-cache
 patches:
 - path: quota.yaml
-- target:
-    kind: HelmRelease
-    name: buildkit
-  patch: "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name:\
-    \ buildkit\nspec:\n  values:\n    githubConfigUrl: https://github.com/fredrir/Y\n    maxRunners: 2\n"

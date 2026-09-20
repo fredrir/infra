@@ -53,8 +53,8 @@ func TestEveryRunnerOverlayQuotaIncludesRuntimeOverhead(t *testing.T) {
 					releases = append(releases, at(r, "spec", "values").(object))
 				}
 			}
-			if quota == nil || len(releases) == 0 {
-				t.Fatal("runner quota or releases missing")
+			if quota == nil {
+				t.Fatal("runner quota missing")
 			}
 			pods := new(big.Rat)
 			for _, r := range releases {
