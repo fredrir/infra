@@ -1,7 +1,8 @@
 FROM --platform=$BUILDPLATFORM golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195 AS builder
 WORKDIR /source
-ADD --checksum=sha256:f01d3eb03353089627dc384842da2fe7fdfedc05178f25ded8104affb1e90d3f https://codeload.github.com/fluxcd/source-watcher/tar.gz/refs/tags/v2.2.4 /tmp/source.tar.gz
-RUN tar -xzf /tmp/source.tar.gz --strip-components=1 -C /source
+RUN curl --fail --silent --show-error --location --retry 2 --max-time 60 https://codeload.github.com/fluxcd/source-watcher/tar.gz/refs/tags/v2.2.4 --output /tmp/source.tar.gz && \
+    printf 'f01d3eb03353089627dc384842da2fe7fdfedc05178f25ded8104affb1e90d3f  /tmp/source.tar.gz\n' | sha256sum --check --strict && \
+    tar -xzf /tmp/source.tar.gz --strip-components=1 -C /source
 COPY build/rollout/flux-artifacts/image/dependencies.patch /tmp/dependencies.patch
 RUN git apply --check /tmp/dependencies.patch && git apply /tmp/dependencies.patch
 ENV GOTOOLCHAIN=local CGO_ENABLED=0
