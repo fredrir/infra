@@ -40,6 +40,9 @@ func ExpressionForPaths(root string, paths []string) string {
 		if !valid.MatchString(path) || !filepath.IsLocal(path) || filepath.ToSlash(filepath.Clean(path)) != path {
 			return "//..."
 		}
+		if filepath.Base(path) == "BUILD.bazel" || filepath.Base(path) == "BUILD" || strings.HasSuffix(path, ".bzl") {
+			return "//..."
+		}
 		if ignoredGoInput(path) {
 			continue
 		}
