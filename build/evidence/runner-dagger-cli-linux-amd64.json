@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-09-20T17:18:28.114753+00:00",
+  "platform": "linux/amd64",
+  "go": "1.27.1",
+  "trivy": "0.74.0",
+  "source": {
+    "url": "https://codeload.github.com/dagger/dagger/tar.gz/refs/tags/v0.21.9",
+    "sha256": "652fffab225340df36ea4f65eded61628a9cf5f1dd2ac2f667aadaa5d84eb430"
+  },
+  "dependency_patch_sha256": "ca67570cb1b68ce6a96722190dcd484465eb35c996b0f8bcbf348389c3b41271",
+  "binary_sha256": "0ea359561899d399f31d29e7edd5be20797771728a264f0179f17950f56fef70",
+  "scan": "rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1",
+  "scan_report_sha256": "8369bed63f1237a51544c0892deae544aa5a759bd0b79684c1fdc07f4d4d60db",
+  "fixed_high_critical": 0,
+  "scope": "rebuilt standalone CLI; final runner image requires its publication scan",
+  "smoke": [
+    "dagger version reports v0.21.9 on linux/amd64",
+    "dagger query --help"
+  ],
+  "go_tests": [
+    "internal/contracts",
+    "internal/images"
+  ]
+}
