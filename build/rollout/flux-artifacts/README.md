@@ -2,8 +2,8 @@
 
 | Name | Value |
 | --- | --- |
-| State | Optional; absent from the active production resource list |
-| Approval | Required before selecting an overlay in production |
+| State | Active production entrypoint: `./build/rollout/flux-artifacts/cutover` |
+| Qualification | `rollout.json` records the verified controller, complete inventory handoff and restored promotions |
 | Flux | 2.9.5 |
 | Extension | source-watcher v2.2.4-infra.1, immutable image digest in `controller/source-watcher.yaml` |
 | Image qualification | Hosted run 35535974900 passed smoke, current vulnerability scanning and provenance verification in 5.032s aggregate; `image/qualification.json` records the verified digest |
@@ -16,6 +16,7 @@
 | Secret access | None for the new controller; existing SOPS reconciliation remains unchanged |
 | Scope | Policy plus four projects; parser migration still precedes parser application |
 | Latency | Unmeasured; no sub-minute claim |
+| Preserved aggregate | `platform-projects` remains suspended with pruning disabled and deletion policy `Orphan` |
 
 The generator separates project inputs into content-addressed ExternalArtifacts, so an image-only commit does not invalidate the policy artifact or unrelated projects. Shared settings, backup jobs and their repository-maintenance component remain declared inputs. Existing non-project platform components still follow the GitRepository revision.
 

@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "qualified_at": "2026-09-20T20:46:00Z",
+  "active_path": "./build/rollout/flux-artifacts/cutover",
+  "image": "ghcr.io/fredrir/infra-source-watcher@sha256:632f482078fb655603c3648169e9f99c3647c91d83a04f1cb8591d6ac9849f76",
+  "source_revision": "main@sha1:9354b19939e672259c19e9ebe7742914ae10b61a",
+  "inventory": {
+    "before_count": 127,
+    "after_count": 127,
+    "missing": [],
+    "extra": [],
+    "duplicate_owners": [],
+    "owners": {
+      "project-llunde": 27,
+      "project-portfolio": 34,
+      "project-y": 33,
+      "project-llunde-pyparser": 28,
+      "llunde-pyparser-migration": 1,
+      "llunde-pyparser-application": 4
+    }
+  },
+  "artifact_payloads": [
+    {
+      "name": "platform-policy-f12037929eefe180c344468b72c86f63cab4f032",
+      "files": 11,
+      "digest": "sha256:4106554d6efe99cc3f12a31fb0a6b5e5b30ab217665c004cc4db3ccf58f51d70",
+      "exact_source_match": true
+    },
+    {
+      "name": "project-llunde",
+      "files": 13,
+      "digest": "sha256:a4309f1b549f8cd7635fb8d67f4ac60dd3ffb8668ff52e12fac9e0448e7bcb55",
+      "exact_source_match": true
+    },
+    {
+      "name": "project-llunde-pyparser",
+      "files": 21,
+      "digest": "sha256:dc3aea6930459813dec80df5a7539b38978d26c7bd791c03e3f333a4f9e2d62c",
+      "exact_source_match": true
+    },
+    {
+      "name": "project-portfolio",
+      "files": 19,
+      "digest": "sha256:f7f1e3e418e30c31ac77ed0e83da4936f2bfb6c83fb77b47d34418fe06d0ee7e",
+      "exact_source_match": true
+    },
+    {
+      "name": "project-y",
+      "files": 21,
+      "digest": "sha256:f5a42625f097ca67a3386c16da9bade98a2738dbd076bef69ad7c849f7f0debb",
+      "exact_source_match": true
+    }
+  ],
+  "old_owner": {
+    "name": "platform-projects",
+    "suspended": true,
+    "prune": false,
+    "deletion_policy": "Orphan"
+  },
+  "controller": {
+    "ready_replicas": 1,
+    "requests": {
+      "cpu": "50m",
+      "memory": "64Mi"
+    },
+    "limits": {
+      "cpu": "1",
+      "memory": "256Mi"
+    },
+    "observed_usage": {
+      "cpu": "2m",
+      "memory": "16Mi"
+    },
+    "secret_access": false,
+    "workload_write_access": false
+  },
+  "deploy_workflow": {
+    "before": "active",
+    "during": "disabled_manually",
+    "after": "active"
+  },
+  "all_desired_nonzero_deployments_available": true,
+  "parser_children_ready": true,
+  "end_to_end_latency_qualified": false
+}
