@@ -37,6 +37,9 @@ func PrepareRust(ctx context.Context, runner Runner, temporary, clippy, test str
 	if err != nil {
 		return err
 	}
+	if _, err := mergeRustTestArguments(testFlags, fastFlags); err != nil {
+		return err
+	}
 	data, err := json.Marshal(RustOptions{Clippy: clippyFlags, Test: testFlags, FastTest: fastFlags})
 	if err != nil {
 		return err
@@ -111,6 +114,8 @@ func CheckRust(ctx context.Context, runner Runner, temporary, stage string) erro
 		}
 	}
 	switch stage {
+	case "toolchain":
+		return QualifyRustToolchain(ctx, runner)
 	case "format":
 		return runner.Run(ctx, "cargo", "fmt", "--all", "--", "--check")
 	case "lint":
@@ -118,11 +123,16 @@ func CheckRust(ctx context.Context, runner Runner, temporary, stage string) erro
 		return runner.Run(ctx, "cargo", append(args, "--", "-D", "warnings")...)
 	case "test":
 		return runner.Run(ctx, "cargo", append([]string{"nextest", "run", "--all-targets", "--locked", "--no-tests=pass"}, options.Test...)...)
-	case "unit":
-		args := append([]string{"nextest", "run", "--bins", "--locked", "--no-tests=fail"}, options.Test...)
-		return runner.Run(ctx, "cargo", append(args, options.FastTest...)...)
-	case "prepare-fast":
-		return runner.Run(ctx, "cargo", append([]string{"nextest", "list", "--bins", "--locked", "--list-type", "binaries-only"}, options.Test...)...)
+	case "unit", "prepare-fast":
+		flags, err := mergeRustTestArguments(options.Test, options.FastTest)
+		if err != nil {
+			return err
+		}
+		args := []string{"nextest", "run", "--bins", "--locked", "--no-tests=fail"}
+		if stage == "prepare-fast" {
+			args = []string{"nextest", "list", "--bins", "--locked", "--list-type", "binaries-only"}
+		}
+		return runner.Run(ctx, "cargo", append(args, flags...)...)
 	case "docs":
 		metadata, err := cargoMetadata(ctx, runner)
 		if err != nil {

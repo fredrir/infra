@@ -74,3 +74,47 @@ func TestRustPreparationRejectsOverridesBeforeWritingOrExecuting(t *testing.T) {
 		})
 	}
 }
+
+func TestRustFastPreparationAndExecutionCombineBuildOptionsAndFilters(t *testing.T) {
+	directory := t.TempDir()
+	t.Setenv("RUSTC_WRAPPER", "")
+	t.Setenv("FAST_TEST_ARGS", "--release -- --skip editor")
+	var calls [][]string
+	runner := Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		if options.Name == "cargo" {
+			calls = append(calls, options.Args)
+		}
+		return process.Result{}, nil
+	}}
+	if err := PrepareRust(context.Background(), runner, directory, "", "--all-features -- --skip slow"); err != nil {
+		t.Fatal(err)
+	}
+	for _, stage := range []string{"prepare-fast", "unit", "test"} {
+		if err := CheckRust(context.Background(), runner, directory, stage); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := [][]string{
+		{"nextest", "list", "--bins", "--locked", "--list-type", "binaries-only", "--all-features", "--release", "--", "--skip", "slow", "--skip", "editor"},
+		{"nextest", "run", "--bins", "--locked", "--no-tests=fail", "--all-features", "--release", "--", "--skip", "slow", "--skip", "editor"},
+		{"nextest", "run", "--all-targets", "--locked", "--no-tests=pass", "--all-features", "--", "--skip", "slow"},
+	}
+	if !reflect.DeepEqual(calls, want) {
+		t.Fatalf("cargo invocations = %v, want %v", calls, want)
+	}
+}
+
+func TestRustPreparationRejectsAmbiguousFastFilters(t *testing.T) {
+	directory := t.TempDir()
+	t.Setenv("FAST_TEST_ARGS", "-- --skip slow -- --skip editor")
+	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+		t.Fatal("ambiguous filters executed a command")
+		return process.Result{}, nil
+	}}
+	if err := PrepareRust(context.Background(), runner, directory, "", ""); err == nil {
+		t.Fatal("multiple filter separators accepted")
+	}
+	if _, err := os.Stat(filepath.Join(directory, "rust-args.json")); !os.IsNotExist(err) {
+		t.Fatalf("invalid arguments wrote configuration: %v", err)
+	}
+}

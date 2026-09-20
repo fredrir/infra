@@ -50,3 +50,29 @@ func RustArguments(input string) ([]string, error) {
 	}
 	return arguments, nil
 }
+
+func mergeRustTestArguments(groups ...[]string) ([]string, error) {
+	var build, filters []string
+	for _, group := range groups {
+		separator := -1
+		for index, argument := range group {
+			if argument != "--" {
+				continue
+			}
+			if separator != -1 {
+				return nil, fmt.Errorf("Rust test arguments contain multiple separators")
+			}
+			separator = index
+		}
+		if separator == -1 {
+			build = append(build, group...)
+		} else {
+			build = append(build, group[:separator]...)
+			filters = append(filters, group[separator+1:]...)
+		}
+	}
+	if len(filters) > 0 {
+		build = append(append(build, "--"), filters...)
+	}
+	return build, nil
+}

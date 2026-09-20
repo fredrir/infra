@@ -23,6 +23,8 @@ type Options struct {
 	Operation         string
 	Targets           []string
 	Base              string
+	DiskCache         string
+	RepositoryCache   string
 	RemoteCache       string
 	RemoteExecutor    string
 	ReadOnlyCache     bool
@@ -128,6 +130,14 @@ func buildArgs(opts Options, config Toolchain, targets []string, reports string)
 	}
 	if opts.Operation == "test" {
 		args = append(args, "--build_tests_only")
+	}
+	if opts.Local {
+		if opts.DiskCache != "" {
+			args = append(args, "--disk_cache="+opts.DiskCache, "--experimental_disk_cache_gc_max_size=4G", "--experimental_disk_cache_gc_max_age=7d")
+		}
+		if opts.RepositoryCache != "" {
+			args = append(args, "--repository_cache="+opts.RepositoryCache)
+		}
 	}
 	if opts.RemoteCache != "" {
 		args = append(args, "--remote_cache="+opts.RemoteCache)

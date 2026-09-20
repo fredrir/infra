@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -40,6 +41,14 @@ func newBuildCommand(name, operation string) *cobra.Command {
 	cmd := &cobra.Command{Use: name + " [targets...]", Short: "Run Bazel through the pinned build environment", Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, targets []string) error {
 			opts.Targets, opts.Log = targets, cmd.ErrOrStderr()
+			if opts.RemoteCache != "" {
+				if !cmd.Flags().Changed("disk-cache") {
+					opts.DiskCache = ""
+				}
+				if !cmd.Flags().Changed("repository-cache") {
+					opts.RepositoryCache = ""
+				}
+			}
 			if timeout <= 0 {
 				return errors.New("timeout must be positive")
 			}
@@ -65,6 +74,14 @@ func newBuildCommand(name, operation string) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.Local, "local", name == "check-deep", "Run installed Bazel directly")
 	cmd.Flags().StringVar(&opts.Bazel, "bazel", "bazel", "Local Bazel executable")
 	cmd.Flags().StringVar(&opts.Base, "base", "", "Select targets affected since this Git revision")
+	cacheRoot, _ := os.UserCacheDir()
+	diskCache, repositoryCache := "", ""
+	if cacheRoot != "" {
+		diskCache = filepath.Join(cacheRoot, "infra-bazel-actions")
+		repositoryCache = filepath.Join(cacheRoot, "infra-bazel-repository")
+	}
+	cmd.Flags().StringVar(&opts.DiskCache, "disk-cache", diskCache, "Local Bazel action cache directory")
+	cmd.Flags().StringVar(&opts.RepositoryCache, "repository-cache", repositoryCache, "Local Bazel repository download cache directory")
 	cmd.Flags().StringVar(&opts.RemoteCache, "remote-cache", os.Getenv("BAZEL_REMOTE_CACHE"), "Bazel remote cache URL")
 	cmd.Flags().StringVar(&opts.RemoteExecutor, "remote-executor", os.Getenv("BAZEL_REMOTE_EXECUTOR"), "Optional Bazel remote execution endpoint")
 	cmd.Flags().BoolVar(&opts.ForwardLocalCache, "forward-local-cache", false, "Forward a client-host loopback cache into Dagger")
