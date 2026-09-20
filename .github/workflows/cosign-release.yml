@@ -34,8 +34,8 @@ jobs:
             printf 'Release %s already exists\n' "$tag" >&2
             exit 1
           fi
-          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.type')" = commit
-          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')" = "$GITHUB_SHA"
+          git -C "$GITHUB_WORKSPACE" -c credential.helper= -c http.extraHeader= fetch --quiet --force origin "refs/tags/$tag:refs/tags/$tag"
+          test "$(git -C "$GITHUB_WORKSPACE" rev-parse "refs/tags/$tag^{commit}")" = "$GITHUB_SHA"
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         id: go-cache
         with:
@@ -140,8 +140,8 @@ jobs:
           gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$tag" \
             --notes "Downstream Cosign build with the tracked dependency patch and Go 1.27.1; this is not an upstream Sigstore release. Verify provenance and SHA256SUMS before installation." \
             "${assets[@]}"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.type')" = commit
-          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')" = "$GITHUB_SHA"
+          git -C "$GITHUB_WORKSPACE" -c credential.helper= -c http.extraHeader= fetch --quiet --force origin "refs/tags/$tag:refs/tags/$tag"
+          test "$(git -C "$GITHUB_WORKSPACE" rev-parse "refs/tags/$tag^{commit}")" = "$GITHUB_SHA"
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
