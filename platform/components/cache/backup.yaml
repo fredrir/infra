@@ -34,75 +34,71 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           containers:
-          - name: backup
-            image: ghcr.io/fredrir/platform-backup-tools@sha256:1dd4da1509547564d4094dc03f6351d72600f76416f8e66d8dc5870dc38a36ce
-            imagePullPolicy: IfNotPresent
-            args:
-            - /hooks/backup.sh
-            envFrom:
-            - secretRef:
-                name: backup-repository
-            env:
-            - name: BACKUP_PROJECT
-              value: attic
-            - name: BACKUP_KIND
-              value: sqlite
-            - name: BACKUP_WRITERS
-              value: ''
-            - name: BACKUP_LOCAL_FILES
-              value: 'true'
-            - name: BACKUP_LOCAL_FILES_MAX_BYTES
-              value: '8589934592'
-            - name: BACKUP_LOCAL_FILES_EXCLUDE
-              value: './metadata.db*'
-            - name: RESTIC_CACHE_DIR
-              value: /cache
-            - name: TMPDIR
-              value: /tmp
-            resources:
-              requests:
-                cpu: 100m
-                memory: 128Mi
-                ephemeral-storage: 1Gi
-              limits:
-                cpu: '1'
-                memory: 512Mi
-                ephemeral-storage: 16Gi
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-              capabilities:
-                drop:
-                - ALL
-            volumeMounts:
-            - name: work
-              mountPath: /work
-            - name: tmp
-              mountPath: /tmp
-            - name: cache
-              mountPath: /cache
-            - name: hook
-              mountPath: /hooks
-              readOnly: true
-            - name: files
-              mountPath: /files
+            - name: backup
+              image: ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2
+              imagePullPolicy: IfNotPresent
+              args:
+                - platform
+                - backup
+              envFrom:
+                - secretRef:
+                    name: backup-repository
+              env:
+                - name: BACKUP_PROJECT
+                  value: attic
+                - name: BACKUP_KIND
+                  value: sqlite
+                - name: BACKUP_WRITERS
+                  value: ''
+                - name: BACKUP_LOCAL_FILES
+                  value: 'true'
+                - name: BACKUP_LOCAL_FILES_MAX_BYTES
+                  value: '8589934592'
+                - name: BACKUP_LOCAL_FILES_EXCLUDE
+                  value: './metadata.db*'
+                - name: RESTIC_CACHE_DIR
+                  value: /cache
+                - name: TMPDIR
+                  value: /tmp
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                  ephemeral-storage: 1Gi
+                limits:
+                  cpu: '1'
+                  memory: 512Mi
+                  ephemeral-storage: 16Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: work
+                  mountPath: /work
+                - name: tmp
+                  mountPath: /tmp
+                - name: cache
+                  mountPath: /cache
+                - name: files
+                  mountPath: /files
+              command:
+                - /usr/local/bin/infra
           volumes:
-          - name: work
-            emptyDir:
-              sizeLimit: 12Gi
-          - name: tmp
-            emptyDir:
-              sizeLimit: 128Mi
-          - name: cache
-            emptyDir:
-              sizeLimit: 1Gi
-          - name: hook
-            configMap:
-              name: backup-hook
-              defaultMode: 292
-          - name: files
-            persistentVolumeClaim:
-              claimName: data-attic-0
+            - name: work
+              emptyDir:
+                sizeLimit: 12Gi
+            - name: tmp
+              emptyDir:
+                sizeLimit: 128Mi
+            - name: cache
+              emptyDir:
+                sizeLimit: 1Gi
+            - name: files
+              persistentVolumeClaim:
+                claimName: data-attic-0
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -114,30 +110,30 @@ spec:
     matchLabels:
       app.kubernetes.io/name: data-backup
   policyTypes:
-  - Egress
+    - Egress
   egress:
-  - to:
-    - ipBlock:
-        cidr: 0.0.0.0/0
-        except:
-        - 10.0.0.0/8
-        - 172.16.0.0/12
-        - 192.168.0.0/16
-        - 100.64.0.0/10
-        - 169.254.0.0/16
-        - 127.0.0.0/8
-    ports:
-    - port: 443
-      protocol: TCP
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: kube-system
-      podSelector:
-        matchLabels:
-          k8s-app: kube-dns
-    ports:
-    - port: 53
-      protocol: TCP
-    - port: 53
-      protocol: UDP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+              - 127.0.0.0/8
+      ports:
+        - port: 443
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: TCP
+        - port: 53
+          protocol: UDP

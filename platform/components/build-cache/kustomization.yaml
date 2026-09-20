@@ -3,16 +3,12 @@ kind: Kustomization
 metadata:
   name: build-cache
 resources:
-- garage.yaml
-- garage.secret.sops.yaml
-- provisioner.yaml
-- provisioner.secret.sops.yaml
-- alerts.yaml
-- projects
-configMapGenerator:
-- name: build-cache-provisioner
-  files:
-  - provision.sh
+  - garage.yaml
+  - garage.secret.sops.yaml
+  - provisioner.yaml
+  - provisioner.secret.sops.yaml
+  - alerts.yaml
+  - projects
 generatorOptions:
   annotations:
     kustomize.toolkit.fluxcd.io/substitute: disabled

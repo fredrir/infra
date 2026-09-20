@@ -11,13 +11,13 @@ metadata:
   name: build-cache-provisioner
   namespace: build-cache
 rules:
-- apiGroups:
-  - ''
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
+  - apiGroups:
+      - ''
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -29,9 +29,9 @@ roleRef:
   kind: Role
   name: build-cache-provisioner
 subjects:
-- kind: ServiceAccount
-  name: build-cache-provisioner
-  namespace: build-cache
+  - kind: ServiceAccount
+    name: build-cache-provisioner
+    namespace: build-cache
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -68,73 +68,69 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           containers:
-          - name: provision
-            image: ghcr.io/fredrir/platform-backup-tools@sha256:1dd4da1509547564d4094dc03f6351d72600f76416f8e66d8dc5870dc38a36ce
-            imagePullPolicy: IfNotPresent
-            args:
-            - /scripts/provision.sh
-            env:
-            - name: GARAGE_ADMIN_URL
-              value: http://garage-admin.build-cache.svc.cluster.local:3903
-            - name: GARAGE_ADMIN_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: garage
-                  key: GARAGE_ADMIN_TOKEN
-            - name: PROVISIONER_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: build-cache-provisioner
-                  key: id
-            - name: PROVISIONER_KEY_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: build-cache-provisioner
-                  key: secret
-            - name: LAYOUT_CAPACITY_BYTES
-              value: '150000000000'
-            - name: MAIN_QUOTA_BYTES
-              value: '21474836480'
-            - name: RELEASE_QUOTA_BYTES
-              value: '10737418240'
-            - name: TOOLCHAINS_QUOTA_BYTES
-              value: '5368709120'
-            - name: EXPIRATION_DAYS
-              value: '14'
-            - name: QUOTA_ALERT_PERCENT
-              value: '90'
-            - name: TMPDIR
-              value: /tmp
-            resources:
-              requests:
-                cpu: 50m
-                memory: 64Mi
-                ephemeral-storage: 16Mi
-              limits:
-                cpu: 500m
-                memory: 128Mi
-                ephemeral-storage: 64Mi
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-              capabilities:
-                drop:
-                - ALL
-            volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-            - name: scripts
-              mountPath: /scripts
-              readOnly: true
+            - name: provision
+              image: ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2
+              imagePullPolicy: IfNotPresent
+              args:
+                - platform
+                - provision-cache
+              env:
+                - name: GARAGE_ADMIN_URL
+                  value: http://garage-admin.build-cache.svc.cluster.local:3903
+                - name: GARAGE_ADMIN_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: garage
+                      key: GARAGE_ADMIN_TOKEN
+                - name: PROVISIONER_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: build-cache-provisioner
+                      key: id
+                - name: PROVISIONER_KEY_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: build-cache-provisioner
+                      key: secret
+                - name: LAYOUT_CAPACITY_BYTES
+                  value: '150000000000'
+                - name: MAIN_QUOTA_BYTES
+                  value: '21474836480'
+                - name: RELEASE_QUOTA_BYTES
+                  value: '10737418240'
+                - name: TOOLCHAINS_QUOTA_BYTES
+                  value: '5368709120'
+                - name: EXPIRATION_DAYS
+                  value: '14'
+                - name: QUOTA_ALERT_PERCENT
+                  value: '90'
+                - name: TMPDIR
+                  value: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                  ephemeral-storage: 16Mi
+                limits:
+                  cpu: 500m
+                  memory: 128Mi
+                  ephemeral-storage: 64Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              command:
+                - /usr/local/bin/infra
           volumes:
-          - name: tmp
-            emptyDir:
-              medium: Memory
-              sizeLimit: 16Mi
-          - name: scripts
-            configMap:
-              name: build-cache-provisioner
-              defaultMode: 292
+            - name: tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: 16Mi
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -146,28 +142,28 @@ spec:
     matchLabels:
       app.kubernetes.io/name: build-cache-provisioner
   policyTypes:
-  - Egress
+    - Egress
   egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: garage
-    ports:
-    - port: 3903
-      protocol: TCP
-  - to:
-    - ipBlock:
-        cidr: 10.43.0.1/32
-    ports:
-    - port: 443
-      protocol: TCP
-  - to:
-    - ipBlock:
-        cidr: 10.60.0.5/32
-    - ipBlock:
-        cidr: 10.60.0.7/32
-    - ipBlock:
-        cidr: 10.60.0.8/32
-    ports:
-    - port: 6443
-      protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: garage
+      ports:
+        - port: 3903
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - port: 443
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 10.60.0.5/32
+        - ipBlock:
+            cidr: 10.60.0.7/32
+        - ipBlock:
+            cidr: 10.60.0.8/32
+      ports:
+        - port: 6443
+          protocol: TCP

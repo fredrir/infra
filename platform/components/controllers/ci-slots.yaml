@@ -9,19 +9,19 @@ kind: ClusterRole
 metadata:
   name: ci-slots
 rules:
-- apiGroups:
-  - ''
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - ''
-  resources:
-  - nodes/status
-  verbs:
-  - patch
+  - apiGroups:
+      - ''
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - ''
+    resources:
+      - nodes/status
+    verbs:
+      - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -32,9 +32,9 @@ roleRef:
   kind: ClusterRole
   name: ci-slots
 subjects:
-- kind: ServiceAccount
-  name: ci-slots
-  namespace: arc-system
+  - kind: ServiceAccount
+    name: ci-slots
+    namespace: arc-system
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -62,34 +62,30 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-      - name: reconciler
-        image: ghcr.io/fredrir/platform-backup-tools@sha256:1dd4da1509547564d4094dc03f6351d72600f76416f8e66d8dc5870dc38a36ce
-        command:
-        - /bin/bash
-        - /opt/ci-slots/ci-slots.sh
-        resources:
-          requests:
-            cpu: 10m
-            memory: 32Mi
-          limits:
-            cpu: 200m
-            memory: 128Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-            - ALL
-        volumeMounts:
-        - name: script
-          mountPath: /opt/ci-slots
-          readOnly: true
-        - name: tmp
-          mountPath: /tmp
+        - name: reconciler
+          image: ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2
+          command:
+            - /usr/local/bin/infra
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          args:
+            - platform
+            - ci-slots
       volumes:
-      - name: script
-        configMap:
-          name: ci-slots
-      - name: tmp
-        emptyDir:
-          sizeLimit: 16Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi

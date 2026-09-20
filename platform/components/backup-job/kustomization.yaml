@@ -1,14 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 components:
-- ../repository-maintenance
-configMapGenerator:
-- name: backup-hook
-  files:
-  - backup.sh
-  - heartbeat.sh
+  - ../repository-maintenance
 resources:
-- heartbeat.yaml
+  - heartbeat.yaml
 generatorOptions:
   annotations:
     kustomize.toolkit.fluxcd.io/substitute: disabled

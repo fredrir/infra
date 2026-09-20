@@ -32,45 +32,45 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           containers:
-          - name: maintenance
-            image: ghcr.io/fredrir/platform-backup-tools@sha256:1dd4da1509547564d4094dc03f6351d72600f76416f8e66d8dc5870dc38a36ce
-            imagePullPolicy: IfNotPresent
-            args:
-            - -ec
-            - |
-              restic --retry-lock 10m check --read-data-subset=10%
-              restic --retry-lock 10m forget --group-by host,tags --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
-            envFrom:
-            - secretRef:
-                name: backup-repository
-            env:
-            - name: RESTIC_CACHE_DIR
-              value: /cache
-            resources:
-              requests:
-                cpu: 100m
-                memory: 128Mi
-              limits:
-                cpu: '1'
-                memory: 512Mi
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-              capabilities:
-                drop:
-                - ALL
-            volumeMounts:
-            - name: cache
-              mountPath: /cache
-            - name: tmp
-              mountPath: /tmp
+            - name: maintenance
+              image: ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2
+              imagePullPolicy: IfNotPresent
+              args:
+                - platform
+                - repository-maintenance
+              envFrom:
+                - secretRef:
+                    name: backup-repository
+              env:
+                - name: RESTIC_CACHE_DIR
+                  value: /cache
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: '1'
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: cache
+                  mountPath: /cache
+                - name: tmp
+                  mountPath: /tmp
+              command:
+                - /usr/local/bin/infra
           volumes:
-          - name: cache
-            emptyDir:
-              sizeLimit: 1Gi
-          - name: tmp
-            emptyDir:
-              sizeLimit: 128Mi
+            - name: cache
+              emptyDir:
+                sizeLimit: 1Gi
+            - name: tmp
+              emptyDir:
+                sizeLimit: 128Mi
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -81,30 +81,30 @@ spec:
     matchLabels:
       app.kubernetes.io/name: repository-maintenance
   policyTypes:
-  - Egress
+    - Egress
   egress:
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: kube-system
-      podSelector:
-        matchLabels:
-          k8s-app: kube-dns
-    ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
-  - to:
-    - ipBlock:
-        cidr: 0.0.0.0/0
-        except:
-        - 10.0.0.0/8
-        - 172.16.0.0/12
-        - 192.168.0.0/16
-        - 100.64.0.0/10
-        - 169.254.0.0/16
-        - 127.0.0.0/8
-    ports:
-    - protocol: TCP
-      port: 443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+              - 127.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
