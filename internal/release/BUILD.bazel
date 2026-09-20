@@ -23,7 +23,9 @@ go_test(
     srcs = [
         "bundle_test.go",
         "render_test.go",
+        "tag_test.go",
         "version_test.go",
     ],
     embed = [":release"],
+    deps = ["//internal/ci"],
 )

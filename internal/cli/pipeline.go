@@ -134,7 +134,7 @@ func newImageCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.SourceURL, "source-url", "", "Source repository URL")
 	cmd.Flags().StringVar(&opts.Revision, "revision", "", "Source revision")
 	cmd.Flags().StringVar(&opts.Context, "context", ".", "Image build context")
-	cmd.Flags().StringVar(&opts.Dockerfile, "dockerfile", "Dockerfile", "Dockerfile relative to context")
+	cmd.Flags().StringVar(&opts.Dockerfile, "dockerfile", "Dockerfile", "Dockerfile relative to the working directory")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Dockerfile build stage")
 	cmd.Flags().BoolVar(&opts.CheckOnly, "check-only", false, "Build and verify without export or publication")
 	cmd.Flags().StringVar(&opts.InfraBinary, "infra-binary", "", "Prebuilt infrastructure binary for runner images")

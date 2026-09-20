@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -37,7 +39,13 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		return "", errors.New("image reference or export path required")
 	}
 	if !filepath.IsLocal(opts.Dockerfile) {
-		return "", errors.New("Dockerfile must be relative to build context")
+		return "", errors.New("Dockerfile must be relative to the working directory")
+	}
+	if opts.Target != "" && !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`).MatchString(opts.Target) {
+		return "", errors.New("invalid Dockerfile target")
+	}
+	if info, err := os.Stat(opts.Dockerfile); err != nil || !info.Mode().IsRegular() {
+		return "", errors.New("Dockerfile must be an existing regular file")
 	}
 	config, err := ReadToolchain(opts.Root)
 	if err != nil {
