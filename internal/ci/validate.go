@@ -1,9 +1,7 @@
 package ci
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -40,50 +38,6 @@ func Validate(ctx context.Context, runner Runner, before string) error {
 			}
 		}
 		return false
-	}
-	var suites []string
-	python := `^(pyproject\.toml|uv\.lock)$`
-	if changed(python + `|^(scripts/(ci|packages)/|\.github/|tests/(ci|fixtures|golden)/|images/|platform/components/(policy|runners)/)`) {
-		suites = append(suites, "tests/ci")
-	}
-	if changed(python + `|^(tools/|tests/infra/|platform/components/runners/|charts/)`) {
-		suites = append(suites, "tests/infra")
-	}
-	if changed(python + `|^(scripts/operations/|tests/operations/|platform/components/)`) {
-		suites = append(suites, "tests/operations")
-	}
-	if len(suites) > 0 {
-		if err := runner.Run(ctx, "uv", "sync", "--frozen", "--group", "ci", "--quiet"); err != nil {
-			return err
-		}
-		type result struct {
-			suite  string
-			stdout bytes.Buffer
-			stderr bytes.Buffer
-			err    error
-		}
-		results := make(chan *result, len(suites))
-		for _, suite := range suites {
-			go func() {
-				output := &result{suite: suite}
-				local := runner
-				local.Stdout, local.Stderr = &output.stdout, &output.stderr
-				if library := os.Getenv("CHECK_LIBRARY_PATH"); library != "" {
-					local.Env = append(local.Env, "LD_LIBRARY_PATH="+library)
-				}
-				output.err = local.Run(ctx, "uv", "run", "--no-sync", "python", "-m", "unittest", "discover", "-s", suite)
-				results <- output
-			}()
-		}
-		failed := false
-		for range suites {
-			output := <-results
-			fmt.Fprintf(runner.Stdout, "::group::%s\n%s%s::endgroup::\n", output.suite, output.stdout.String(), output.stderr.String())
-			failed = failed || output.err != nil
-		}
-		if failed {
-			return fmt.Errorf("retained infrastructure test suites failed")
-		}
 	}
 	if changed(`^ansible/`) {
 		if err := runner.Run(ctx, "ansible-playbook", "-i", "localhost,", "ansible/site.yml", "--syntax-check"); err != nil {

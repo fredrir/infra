@@ -24,6 +24,8 @@ go_library(
         "//internal/process",
         "@com_github_klauspost_compress//zstd",
         "@in_yaml_go_yaml_v3//:yaml",
+        "@io_k8s_sigs_kustomize_api//krusty",
+        "@io_k8s_sigs_kustomize_kyaml//filesys",
         "@org_golang_x_sync//errgroup",
     ],
 )
@@ -33,14 +35,20 @@ go_test(
     srcs = [
         "archive_test.go",
         "arguments_test.go",
+        "cache_test.go",
+        "deploy_integration_test.go",
         "deploy_test.go",
         "hash_test.go",
         "registry_test.go",
+        "rust_prepare_test.go",
         "tools_test.go",
     ],
     embed = [":ci"],
     deps = [
+        "//internal/process",
         "@com_github_klauspost_compress//zstd",
         "@in_yaml_go_yaml_v3//:yaml",
+        "@io_k8s_sigs_kustomize_api//krusty",
+        "@io_k8s_sigs_kustomize_kyaml//filesys",
     ],
 )

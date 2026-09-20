@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"go.yaml.in/yaml/v3"
+	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 type DeployOptions struct{ Root, RepositoryID, Revision, Image, Digest, Token string }
@@ -76,16 +78,26 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 	if err := readYAML(filepath.Join(root, ".github/chainguard", "deploy-"+options.RepositoryID+".sts.yaml"), &identity); err != nil {
 		return err
 	}
-	workflowRevision := strings.TrimSuffix(strings.TrimPrefix(identity.ClaimPattern.WorkflowSHA, "^"), "$")
-	if !revisionPattern.MatchString(workflowRevision) {
-		return fmt.Errorf("invalid deployment workflow revision")
-	}
-	name, arguments, err := ProvenanceCommand(mapping.Visibility, mapping.Repository, workflowRevision, options.Revision, options.Image+"@"+options.Digest)
+	revisions, err := WorkflowRevisions(identity.ClaimPattern.WorkflowSHA)
 	if err != nil {
 		return err
 	}
-	if err := runner.Run(ctx, name, arguments...); err != nil {
-		return err
+	verified := false
+	for _, workflowRevision := range revisions {
+		name, arguments, err := ProvenanceCommand(mapping.Visibility, mapping.Repository, workflowRevision, options.Revision, options.Image+"@"+options.Digest)
+		if err != nil {
+			return err
+		}
+		if err := runner.Run(ctx, name, arguments...); err == nil {
+			verified = true
+			break
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+	if !verified {
+		return fmt.Errorf("image provenance did not match an approved workflow revision")
 	}
 	allowed := map[string]bool{}
 	switch target.Mode {
@@ -121,12 +133,10 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 		}
 		slices.Sort(pins)
 		for _, path := range pins {
-			local := runner
-			local.Dir = filepath.Dir(path)
-			if err := local.Run(ctx, "kustomize", "edit", "set", "image", options.Image+"="+options.Image+"@"+options.Digest); err != nil {
+			if err := updateImagePin(path, options.Image, options.Digest); err != nil {
 				return err
 			}
-			if _, err := local.Output(ctx, "kustomize", "build", "."); err != nil {
+			if err := renderDeployment(filepath.Dir(path)); err != nil {
 				return err
 			}
 			relative, err := filepath.Rel(root, path)
@@ -147,7 +157,7 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 	default:
 		return fmt.Errorf("unsupported deployment mode %q", target.Mode)
 	}
-	if _, err := runner.Output(ctx, "kustomize", "build", project); err != nil {
+	if err := renderDeployment(project); err != nil {
 		return err
 	}
 	if err := runner.Run(ctx, "git", "diff", "--check"); err != nil {
@@ -207,6 +217,13 @@ func ProvenanceCommand(visibility, repository, workflowRevision, revision, image
 }
 
 func UpdateWorkload(path, workload, image, revision string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("HelmRelease must be a regular file")
+	}
 	var document yaml.Node
 	if err := readYAML(path, &document); err != nil {
 		return err
@@ -232,10 +249,6 @@ func UpdateWorkload(path, workload, image, revision string) error {
 	setYAMLValue(target, "image", image)
 	setYAMLValue(target, "sourceRevision", revision)
 	data, err := yaml.Marshal(&document)
-	if err != nil {
-		return err
-	}
-	info, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
@@ -270,4 +283,64 @@ func readYAML(path string, destination any) error {
 		return fmt.Errorf("decode %s: %w", path, err)
 	}
 	return nil
+}
+
+func WorkflowRevisions(pattern string) ([]string, error) {
+	single := regexp.MustCompile(`^\^([a-f0-9]{40})\$$`).FindStringSubmatch(pattern)
+	if single != nil {
+		return single[1:], nil
+	}
+	pair := regexp.MustCompile(`^\^\(([a-f0-9]{40})\|([a-f0-9]{40})\)\$$`).FindStringSubmatch(pattern)
+	if pair != nil && pair[1] != pair[2] {
+		return pair[1:], nil
+	}
+	return nil, fmt.Errorf("workflow trust requires one or two anchored exact revisions")
+}
+func renderDeployment(directory string) error {
+	_, err := krusty.MakeKustomizer(krusty.MakeDefaultOptions()).Run(filesys.MakeFsOnDisk(), directory)
+	return err
+}
+func updateImagePin(path, image, digest string) error {
+	var document yaml.Node
+	if err := readYAML(path, &document); err != nil {
+		return err
+	}
+	if len(document.Content) != 1 {
+		return fmt.Errorf("expected one Kustomization")
+	}
+	images := yamlValue(document.Content[0], "images")
+	if images == nil || images.Kind != yaml.SequenceNode {
+		return fmt.Errorf("image pins missing")
+	}
+	found := false
+	for _, entry := range images.Content {
+		name := yamlValue(entry, "name")
+		if name == nil || name.Value != image {
+			continue
+		}
+		found = true
+		setYAMLValue(entry, "newName", image)
+		setYAMLValue(entry, "digest", digest)
+		for i := 0; i < len(entry.Content); i += 2 {
+			if entry.Content[i].Value == "newTag" {
+				entry.Content = append(entry.Content[:i], entry.Content[i+2:]...)
+				break
+			}
+		}
+	}
+	if !found {
+		return fmt.Errorf("image pin missing")
+	}
+	data, err := yaml.Marshal(&document)
+	if err != nil {
+		return err
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("Kustomization must be regular")
+	}
+	return os.WriteFile(path, data, info.Mode().Perm())
 }
