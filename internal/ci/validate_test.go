@@ -69,3 +69,47 @@ func TestValidateBuildsAggregateAndChildKustomizations(t *testing.T) {
 		})
 	}
 }
+
+func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
+	var calls [][]string
+	changed := "tofu/main.tf\n"
+	failure := errors.New("invalid tofu declaration")
+	var validationFailure error
+	runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		switch options.Name {
+		case "git":
+			return process.Result{Stdout: []byte(changed)}, nil
+		case "tofu":
+			calls = append(calls, options.Args)
+			if options.Args[1] == "validate" {
+				return process.Result{}, validationFailure
+			}
+			return process.Result{}, nil
+		default:
+			t.Fatalf("unexpected validator: %s", options.Name)
+			return process.Result{}, nil
+		}
+	}}
+	if err := PrepareValidation(context.Background(), runner, ""); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(calls, [][]string{{"-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false"}}) {
+		t.Fatalf("preparation commands: %v", calls)
+	}
+	calls = nil
+	if err := Validate(context.Background(), runner, ""); err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{{"-chdir=tofu", "fmt", "-check", "-recursive"}, {"-chdir=tofu", "validate"}}
+	if !reflect.DeepEqual(calls, want) {
+		t.Fatalf("validation commands: %v, want %v", calls, want)
+	}
+	validationFailure = failure
+	if err := Validate(context.Background(), runner, ""); !errors.Is(err, failure) {
+		t.Fatalf("validation failure was lost: %v", err)
+	}
+	changed, calls = "docs/platform.md\n", nil
+	if err := PrepareValidation(context.Background(), runner, ""); err != nil || len(calls) != 0 {
+		t.Fatalf("unaffected declarations prepared: %v %v", calls, err)
+	}
+}

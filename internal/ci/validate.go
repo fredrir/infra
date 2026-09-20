@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func Validate(ctx context.Context, runner Runner, before string) error {
+func validationInputs(ctx context.Context, runner Runner, before string) ([]byte, error) {
 	var files []byte
 	var err error
 	if revisionPattern.MatchString(before) {
@@ -18,27 +18,48 @@ func Validate(ctx context.Context, runner Runner, before string) error {
 			_, present = runner.Output(ctx, "git", "cat-file", "-e", before+"^{commit}")
 		}
 		if present == nil {
-			files, err = runner.Output(ctx, "git", "diff", "--name-only", before, "HEAD")
+			files, err = runner.Output(ctx, "git", "diff", "--name-only", "--no-renames", before, "HEAD")
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 	if files == nil {
 		files, err = runner.Output(ctx, "git", "ls-files")
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	changed := func(pattern string) bool {
-		expression := regexp.MustCompile(pattern)
-		for _, path := range strings.Split(string(files), "\n") {
-			if expression.MatchString(path) {
-				return true
-			}
+	return files, nil
+}
+
+func declarationChanged(files []byte, pattern string) bool {
+	expression := regexp.MustCompile(pattern)
+	for _, path := range strings.Split(string(files), "\n") {
+		if expression.MatchString(path) {
+			return true
 		}
-		return false
 	}
+	return false
+}
+
+func PrepareValidation(ctx context.Context, runner Runner, before string) error {
+	files, err := validationInputs(ctx, runner, before)
+	if err != nil {
+		return err
+	}
+	if declarationChanged(files, `^tofu/`) {
+		return runner.Run(ctx, "tofu", "-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false")
+	}
+	return nil
+}
+
+func Validate(ctx context.Context, runner Runner, before string) error {
+	files, err := validationInputs(ctx, runner, before)
+	if err != nil {
+		return err
+	}
+	changed := func(pattern string) bool { return declarationChanged(files, pattern) }
 	if changed(`^ansible/`) {
 		playbooks, err := filepath.Glob(filepath.Join(runner.Dir, "ansible", "*.yml"))
 		if err != nil {
@@ -99,7 +120,7 @@ func Validate(ctx context.Context, runner Runner, before string) error {
 		}
 	}
 	if changed(`^tofu/`) {
-		for _, arguments := range [][]string{{"-chdir=tofu", "fmt", "-check", "-recursive"}, {"-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false"}, {"-chdir=tofu", "validate"}} {
+		for _, arguments := range [][]string{{"-chdir=tofu", "fmt", "-check", "-recursive"}, {"-chdir=tofu", "validate"}} {
 			if err := runner.Run(ctx, "tofu", arguments...); err != nil {
 				return err
 			}

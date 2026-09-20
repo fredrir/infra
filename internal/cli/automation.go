@@ -104,7 +104,12 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	}}
 	validate.Flags().StringVar(&validationRoot, "root", ".", "Source checkout")
 	validate.Flags().StringVar(&validationBefore, "before", os.Getenv("BEFORE"), "Previous Git revision")
-	ciCommand.AddCommand(validate)
+	prepareValidation := &cobra.Command{Use: "prepare-validation", Short: "Prepare declaration validator dependencies", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
+		return ci.PrepareValidation(command.Context(), ci.Runner{Dir: validationRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, validationBefore)
+	}}
+	prepareValidation.Flags().StringVar(&validationRoot, "root", ".", "Source checkout")
+	prepareValidation.Flags().StringVar(&validationBefore, "before", os.Getenv("BEFORE"), "Previous revision")
+	ciCommand.AddCommand(validate, prepareValidation)
 	releaseCommand := &cobra.Command{Use: "release", Short: "Prepare and verify release artifacts"}
 	var tagsPath string
 	version := &cobra.Command{Use: "next-version MANIFEST", Short: "Update a Cargo release version from published tags", Args: cobra.ExactArgs(1)}
