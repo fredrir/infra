@@ -62,13 +62,20 @@ func Validate(ctx context.Context, runner Runner, before string) error {
 		}
 	}
 	if changed(`^(platform|charts)/`) {
-		directories := []string{"platform/clusters/production"}
+		directories := []string{"platform/clusters/production", "platform/components", "platform/projects"}
 		for _, pattern := range []string{"platform/components/*", "platform/projects/*"} {
 			matches, err := filepath.Glob(filepath.Join(runner.Dir, pattern))
 			if err != nil {
 				return err
 			}
 			for _, match := range matches {
+				info, err := os.Stat(match)
+				if err != nil {
+					return err
+				}
+				if !info.IsDir() {
+					continue
+				}
 				relative, err := filepath.Rel(runner.Dir, match)
 				if err != nil {
 					return err

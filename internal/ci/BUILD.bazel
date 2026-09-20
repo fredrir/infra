@@ -42,6 +42,7 @@ go_test(
         "registry_test.go",
         "rust_prepare_test.go",
         "tools_test.go",
+        "validate_test.go",
     ],
     embed = [":ci"],
     deps = [
