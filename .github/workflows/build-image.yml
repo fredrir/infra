@@ -108,7 +108,7 @@ jobs:
           password: ${{ github.token }}
       - name: Start isolated Dagger engine
         if: runner.environment == 'github-hosted'
-        run: docker run --detach --name infra-dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+        run: docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
       - name: Verify dedicated engine
         if: runner.environment == 'self-hosted'
         run: infra doctor --root .infra-build-recipe --engine-only
@@ -251,4 +251,4 @@ jobs:
             -f "image=$IMAGE" -f "digest=$DIGEST" -f "source-revision=$GITHUB_SHA"
       - name: Stop Dagger engine
         if: always() && runner.environment == 'github-hosted'
-        run: docker rm --force infra-dagger
+        run: docker rm --force --volumes infra-dagger

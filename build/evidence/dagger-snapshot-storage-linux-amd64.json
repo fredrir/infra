@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-09-20T17:17:02.298649+00:00",
+  "host": "archie",
+  "platform": "linux/amd64",
+  "engine": "registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4",
+  "control": {
+    "storage_volume": false,
+    "snapshotter": "native",
+    "overlayfs_error": "invalid argument",
+    "fuse_overlayfs_error": "executable not installed"
+  },
+  "fixed": {
+    "storage_volume": "/var/lib/dagger",
+    "snapshotter": "overlayfs"
+  },
+  "cleanup": {
+    "docker_remove_volumes": true,
+    "anonymous_volume_absent_after_cleanup": true
+  },
+  "affected_runs": [
+    {
+      "repository": "fredrir/llunde-backend",
+      "run": 35524551763
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "run": 35524553360
+    }
+  ],
+  "failure": "native snapshotter copied full parent layers until hosted disk exhaustion",
+  "verification": "Engine startup A/B probe; application rebuilds still required"
+}

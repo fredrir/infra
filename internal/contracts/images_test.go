@@ -133,3 +133,32 @@ func triggered(patterns []string, candidate string) bool {
 	}
 	return included
 }
+
+func TestHostedDaggerEnginesUseDisposableStorageVolumes(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join(root(t), ".github/workflows/*.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range paths {
+		var workflow struct {
+			Jobs map[string]struct {
+				Steps []struct{ Run string }
+			}
+		}
+		if err := yaml.Unmarshal(read(t, path), &workflow); err != nil {
+			t.Fatal(err)
+		}
+		for job, configuration := range workflow.Jobs {
+			for _, step := range configuration.Steps {
+				for _, line := range strings.Split(step.Run, "\n") {
+					if strings.Contains(line, "docker run") && strings.Contains(line, "--name infra-dagger ") && !strings.Contains(line, "--volume /var/lib/dagger ") {
+						t.Errorf("%s job %s starts Dagger without its snapshot storage volume", filepath.Base(path), job)
+					}
+					if strings.Contains(line, "docker rm") && strings.Contains(line, "infra-dagger") && !strings.Contains(line, "--volumes") {
+						t.Errorf("%s job %s leaves the ephemeral engine volume behind", filepath.Base(path), job)
+					}
+				}
+			}
+		}
+	}
+}

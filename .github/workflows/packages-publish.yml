@@ -49,7 +49,7 @@ jobs:
     - name: Install release tools
       run: infra ci install-tools gh nfpm
     - name: Start isolated Dagger engine
-      run: docker run --detach --name infra-dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+      run: docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
     - name: Build signed repositories
       env:
         GH_TOKEN: ${{ github.token }}
@@ -72,7 +72,7 @@ jobs:
         retention-days: 3
     - name: Stop Dagger engine
       if: always()
-      run: docker rm --force infra-dagger
+      run: docker rm --force --volumes infra-dagger
   smoke:
     needs: [cli, build]
     runs-on: ubuntu-24.04
@@ -112,7 +112,7 @@ jobs:
         chmod 755 "$RUNNER_TEMP/infra-cli/infra"
         printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
     - name: Start isolated Dagger engine
-      run: docker run --detach --name infra-dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+      run: docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
     - name: Install from the new repositories
       env:
         SCOPE: ${{ inputs.smoke-scope }}
@@ -120,7 +120,7 @@ jobs:
       run: infra packages smoke --root .infra --infra-binary "$RUNNER_TEMP/infra-cli/infra" "$RUNNER_TEMP/site" "$RUNNER_TEMP/channels" "$SCOPE"
     - name: Stop Dagger engine
       if: always()
-      run: docker rm --force infra-dagger
+      run: docker rm --force --volumes infra-dagger
   publish:
     needs: [cli, smoke]
     if: '!inputs.dry-run'
