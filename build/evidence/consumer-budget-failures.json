@@ -1,0 +1,170 @@
+{
+  "parser": {
+    "run_id": 35537320004,
+    "aggregate": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 10.010344994,
+      "remaining_seconds": 0,
+      "success": false,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "parser-python",
+          "started": "2026-09-20T21:10:26.33275595Z",
+          "duration_seconds": 2.223066294,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 2.040193,
+          "peak_memory_bytes": 36544512
+        },
+        {
+          "schema": 1,
+          "stage": "parser-ui",
+          "started": "2026-09-20T21:10:28.756874182Z",
+          "duration_seconds": 2.382518529,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 2.253683,
+          "peak_memory_bytes": 135151616
+        },
+        {
+          "schema": 1,
+          "stage": "provenance-verification",
+          "revision": "7c2655aee83d33a00783e44d89347e6725e46337",
+          "started": "2026-09-20T21:15:16.114962162Z",
+          "duration_seconds": 1.9436544439999999,
+          "budget_seconds": 1.933309449,
+          "budget_exceeded": true,
+          "success": false,
+          "exit_code": -1,
+          "cpu_seconds": 0.148855,
+          "peak_memory_bytes": 66846720,
+          "error": "cosign failed: context deadline exceeded\nprovenance-verification exceeded 1.933309449s budget"
+        },
+        {
+          "schema": 1,
+          "stage": "vulnerability-scan",
+          "revision": "7c2655aee83d33a00783e44d89347e6725e46337",
+          "started": "2026-09-20T21:15:05.306317722Z",
+          "duration_seconds": 3.461105727,
+          "budget_seconds": 5.394415177,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.741407,
+          "peak_memory_bytes": 131989504
+        }
+      ]
+    }
+  },
+  "portfolio-web": {
+    "run_id": 35537321687,
+    "aggregate": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 10.004754076000001,
+      "remaining_seconds": 0,
+      "success": false,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "portfolio-web",
+          "started": "2026-09-20T21:08:11.091781405Z",
+          "duration_seconds": 4.114823425,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 9.257284,
+          "peak_memory_bytes": 522113024
+        },
+        {
+          "schema": 1,
+          "stage": "provenance-verification",
+          "revision": "c6fa3ce634563cb37f359d188858e4585e9b755a",
+          "started": "2026-09-20T21:09:00.325042186Z",
+          "duration_seconds": 0.105341803,
+          "budget_seconds": 0.100587727,
+          "budget_exceeded": true,
+          "success": false,
+          "exit_code": -1,
+          "cpu_seconds": 0.034591,
+          "peak_memory_bytes": 13762560,
+          "error": "gh failed: context deadline exceeded\nprovenance-verification exceeded 100.587727ms budget"
+        },
+        {
+          "schema": 1,
+          "stage": "vulnerability-scan",
+          "revision": "c6fa3ce634563cb37f359d188858e4585e9b755a",
+          "started": "2026-09-20T21:08:49.035445972Z",
+          "duration_seconds": 5.784588848,
+          "budget_seconds": 5.885176575,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 6.217947,
+          "peak_memory_bytes": 145432576
+        }
+      ]
+    }
+  },
+  "frontend": {
+    "run_id": 35535270926,
+    "aggregate": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 10.014362129,
+      "remaining_seconds": 0,
+      "success": false,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "frontend",
+          "started": "2026-09-20T20:21:36.589605719Z",
+          "duration_seconds": 5.5021941519999995,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 9.726585,
+          "peak_memory_bytes": 275251200
+        },
+        {
+          "schema": 1,
+          "stage": "provenance-verification",
+          "revision": "fd240f219a9441e2d027213ca7f24c626339e482",
+          "started": "2026-09-20T20:22:05.113543347Z",
+          "duration_seconds": 2.503032064,
+          "budget_seconds": 2.488669935,
+          "budget_exceeded": true,
+          "success": false,
+          "exit_code": -1,
+          "cpu_seconds": 0.208914,
+          "peak_memory_bytes": 66715648,
+          "error": "cosign failed: context deadline exceeded\nprovenance-verification exceeded 2.488669935s budget"
+        },
+        {
+          "schema": 1,
+          "stage": "vulnerability-scan",
+          "revision": "fd240f219a9441e2d027213ca7f24c626339e482",
+          "started": "2026-09-20T20:21:56.286827822Z",
+          "duration_seconds": 2.009135913,
+          "budget_seconds": 4.497805848,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.440486,
+          "peak_memory_bytes": 122814464
+        }
+      ]
+    }
+  }
+}

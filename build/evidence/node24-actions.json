@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "workflow_revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+  "runtime": "Node 24 LTS",
+  "workflow_environment": {
+    "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24": "true"
+  },
+  "native_node24_actions": {
+    "actions/cache": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    "docker/login-action": "dbcb813823bdd20940b903addbd779551569679f",
+    "actions/attest": "1e69f48acb82d1966a394da916b4c1698aa569d6"
+  },
+  "qualified_runners": {
+    "infra-build-09": {
+      "node": "24.19.0",
+      "actions_runner": "2.337.0"
+    },
+    "arc-deploy": {
+      "node": "24.19.0",
+      "actions_runner": "2.337.0"
+    }
+  },
+  "validation": {
+    "workflow_lint": true,
+    "contract_tests": true,
+    "frontend_build_run": 35538973695,
+    "frontend_build_result": "success",
+    "deployment_workflow_run": 35538709531,
+    "deployment_workflow_result": "success"
+  },
+  "scope": "JavaScript action runtimes; application Node versions are independent"
+}
