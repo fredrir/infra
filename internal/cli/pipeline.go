@@ -149,6 +149,7 @@ func newImageCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.TestCommand, "test-command", "", "Command to verify the built image")
 	cmd.Flags().StringVar(&opts.TestShell, "test-shell", "sh", "Shell used for image verification")
 	cmd.Flags().StringVar(&opts.Export, "export", "", "Export an OCI image archive")
+	cmd.Flags().StringVar(&opts.ExportDirectory, "export-directory", "", "Export the image filesystem to a directory")
 	cmd.Flags().StringVar(&opts.RegistryUser, "registry-user", os.Getenv("GITHUB_ACTOR"), "Registry username for REGISTRY_TOKEN")
 	cmd.Flags().StringVar(&output, "github-output", os.Getenv("GITHUB_OUTPUT"), "GitHub Actions output file")
 	return cmd

@@ -92,7 +92,14 @@ func TestDaggerImageBuildSelectsStageAndPreservesLiteralBuildArguments(t *testin
 	if config.Config.Labels["org.example.revision"] != "a b; $(literal)" {
 		t.Fatalf("build argument changed: %v", config.Config.Labels)
 	}
-	options.Export, options.CheckOnly = "", true
+	options.Export, options.ExportDirectory = "", filepath.Join(work, "reports")
+	if _, err := Image(ctx, options); err != nil {
+		t.Fatal(err)
+	}
+	if marker, err := os.ReadFile(filepath.Join(options.ExportDirectory, "marker")); err != nil || string(marker) != "fixture" {
+		t.Fatalf("exported stage contents differ: %q, %v", marker, err)
+	}
+	options.ExportDirectory, options.CheckOnly = "", true
 	if _, err := Image(ctx, options); err != nil {
 		t.Fatal(err)
 	}

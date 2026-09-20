@@ -15,27 +15,28 @@ import (
 )
 
 type ImageOptions struct {
-	Target        string
-	CheckOnly     bool
-	InfraBinary   string
-	SourceURL     string
-	Revision      string
-	Root          string
-	Context       string
-	Dockerfile    string
-	Image         string
-	Platform      string
-	BuildArgs     map[string]string
-	TestCommand   string
-	TestShell     string
-	RegistryUser  string
-	RegistryToken string
-	Export        string
-	Log           io.Writer
+	Target          string
+	CheckOnly       bool
+	InfraBinary     string
+	SourceURL       string
+	Revision        string
+	Root            string
+	Context         string
+	Dockerfile      string
+	Image           string
+	Platform        string
+	BuildArgs       map[string]string
+	TestCommand     string
+	TestShell       string
+	RegistryUser    string
+	RegistryToken   string
+	Export          string
+	ExportDirectory string
+	Log             io.Writer
 }
 
 func Image(ctx context.Context, opts ImageOptions) (string, error) {
-	if opts.Image == "" && opts.Export == "" && !opts.CheckOnly {
+	if opts.Image == "" && opts.Export == "" && opts.ExportDirectory == "" && !opts.CheckOnly {
 		return "", errors.New("image reference or export path required")
 	}
 	if !filepath.IsLocal(opts.Dockerfile) {
@@ -98,6 +99,11 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 	}
 	if opts.Export != "" {
 		if _, err := container.Export(ctx, opts.Export); err != nil {
+			return "", err
+		}
+	}
+	if opts.ExportDirectory != "" {
+		if _, err := container.Rootfs().Export(ctx, opts.ExportDirectory); err != nil {
 			return "", err
 		}
 	}
