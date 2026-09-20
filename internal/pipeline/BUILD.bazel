@@ -8,6 +8,7 @@ go_library(
         "config.go",
         "doctor.go",
         "image.go",
+        "metrics.go",
         "run.go",
     ],
     importpath = "github.com/fredrir/infra/internal/pipeline",
@@ -22,6 +23,7 @@ go_test(
     name = "pipeline_test",
     srcs = [
         "cache_test.go",
+        "metrics_test.go",
         "pipeline_test.go",
     ],
     embed = [":pipeline"],

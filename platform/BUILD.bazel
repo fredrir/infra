@@ -6,3 +6,5 @@ filegroup(
     ]),
     visibility = ["//internal/policy:__pkg__"],
 )
+
+exports_files(["components/backups/tools.Dockerfile"])

@@ -1,10 +1,8 @@
 self-hosted-runner:
   labels:
   - dagger-amd64
-  - buildkit-amd64
   - check-amd64
   - deploy-amd64
-  - nix-amd64
   - rust-amd64
   - rust-pr-amd64
   - rust-release-amd64

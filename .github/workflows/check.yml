@@ -40,6 +40,10 @@ jobs:
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
           BAZEL_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '' }}
         run: infra ci check --read-only-cache
+      - name: Check generated BUILD files
+        env:
+          _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
+        run: infra pipeline generate-check --report-dir dist/reports/generated
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:

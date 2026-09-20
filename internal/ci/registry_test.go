@@ -30,6 +30,9 @@ func TestTagImageVerifiesManifestBeforePublishing(t *testing.T) {
 				}
 				if r.Method == "PUT" {
 					data, _ := io.ReadAll(r.Body)
+					if r.Header.Get("Content-Type") != "application/vnd.oci.image.index.v1+json" {
+						t.Error("manifest content type changed")
+					}
 					if string(data) != string(manifest) {
 						t.Error("manifest changed")
 					}
@@ -62,6 +65,16 @@ func TestTagImageRejectsUnsafeReferencesBeforeRequests(t *testing.T) {
 	for _, reference := range []string{"ghcr.io/other/example@sha256:" + strings.Repeat("a", 64), "ghcr.io/fredrir/example:latest"} {
 		if err := TagImage(context.Background(), server.Client(), TagOptions{Image: reference, Tag: "tag", Registry: server.URL, Actor: "actor", Token: "secret"}); err == nil {
 			t.Error("accepted unsafe reference")
+		}
+	}
+	for _, options := range []TagOptions{
+		{Image: "ghcr.io/fredrir/example@sha256:" + strings.Repeat("a", 64), Tag: "../escape", Token: "secret"},
+		{Image: "ghcr.io/fredrir/example@sha256:" + strings.Repeat("a", 64), Tag: "", Token: "secret"},
+		{Image: "ghcr.io/fredrir/example@sha256:" + strings.Repeat("a", 64), Tag: "tag", Token: ""},
+	} {
+		options.Registry, options.Actor = server.URL, "actor"
+		if err := TagImage(context.Background(), server.Client(), options); err == nil {
+			t.Error("accepted invalid tag or missing credentials")
 		}
 	}
 	if requests != 0 {

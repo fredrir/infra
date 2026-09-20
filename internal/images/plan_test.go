@@ -33,7 +33,7 @@ func repository(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	for path, content := range map[string]string{
-		"images/catalog.yaml": catalog, ".github/workflows/images.yml": "name: Images\n",
+		"images/catalog.yaml": catalog, ".github/workflows/images.yml": "name: Images\n", ".github/workflows/build-image.yml": "name: Build\n", ".github/workflows/infra-cli.yml": "name: CLI\n",
 		".dockerignore": ".git\n", "pins.lock": "one\n",
 		"images/one/Containerfile": "FROM scratch\n", "images/two/Containerfile": "FROM scratch\n",
 	} {
@@ -150,7 +150,7 @@ func TestTagsTrackOnlyDeclaredInputsAndSharedBuildConfiguration(t *testing.T) {
 	if after[0].Tag == before[0].Tag || after[1].Tag != before[1].Tag {
 		t.Fatal("input change did not selectively invalidate its image")
 	}
-	for _, path := range []string{".github/workflows/images.yml", ".dockerignore"} {
+	for _, path := range []string{".github/workflows/images.yml", ".github/workflows/build-image.yml", ".github/workflows/infra-cli.yml", ".dockerignore"} {
 		before = after
 		write(t, p.Root, path, "changed\n")
 		commit(t, p.Root)

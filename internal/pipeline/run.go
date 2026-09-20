@@ -31,6 +31,8 @@ type Options struct {
 }
 
 type Report struct {
+	Schema          int       `json:"schema"`
+	Metrics         *Metrics  `json:"metrics,omitempty"`
 	Operation       string    `json:"operation"`
 	Targets         []string  `json:"targets"`
 	Started         time.Time `json:"started"`
@@ -41,9 +43,15 @@ type Report struct {
 }
 
 func Run(ctx context.Context, opts Options) (report Report, err error) {
-	report = Report{Operation: opts.Operation, Targets: opts.Targets, Started: time.Now().UTC(), TraceURL: os.Getenv("DAGGER_TRACE_URL")}
-	if opts.Operation != "test" && opts.Operation != "build" {
-		return report, errors.New("operation must be build or test")
+	report = Report{Schema: 1, Operation: opts.Operation, Targets: opts.Targets, Started: time.Now().UTC(), TraceURL: os.Getenv("DAGGER_TRACE_URL")}
+	if opts.Operation != "test" && opts.Operation != "build" && opts.Operation != "generate-check" {
+		return report, errors.New("operation must be build, test or generate-check")
+	}
+	if opts.Operation == "generate-check" {
+		if len(opts.Targets) != 0 || opts.Base != "" {
+			return report, errors.New("generated BUILD checks require the complete repository")
+		}
+		opts.Targets = []string{"//:gazelle", "--", "-mode=diff"}
 	}
 	if opts.ReportDir == "" {
 		opts.ReportDir = filepath.Join(opts.Root, "dist", "reports")
@@ -51,7 +59,15 @@ func Run(ctx context.Context, opts Options) (report Report, err error) {
 	if err := os.MkdirAll(opts.ReportDir, 0o755); err != nil {
 		return report, err
 	}
+	for _, name := range []string{"events.jsonl", "profile.json.gz"} {
+		if err := os.Remove(filepath.Join(opts.ReportDir, name)); err != nil && !os.IsNotExist(err) {
+			return report, err
+		}
+	}
 	defer func() {
+		if metrics, metricsErr := readMetrics(filepath.Join(opts.ReportDir, "events.jsonl")); metricsErr == nil {
+			report.Metrics = metrics
+		}
 		report.DurationSeconds = time.Since(report.Started).Seconds()
 		report.Success = err == nil
 		if err != nil {
@@ -91,7 +107,11 @@ func Run(ctx context.Context, opts Options) (report Report, err error) {
 }
 
 func buildArgs(opts Options, config Toolchain, targets []string, reports string) []string {
-	args := []string{"--batch", opts.Operation, "--config=ci", "--action_env=INFRA_BUILD_IMAGE=" + config.Image,
+	operation := opts.Operation
+	if operation == "generate-check" {
+		operation = "run"
+	}
+	args := []string{"--batch", operation, "--config=ci", "--action_env=INFRA_BUILD_IMAGE=" + config.Image,
 		"--build_event_json_file=" + filepath.Join(reports, "events.jsonl"), "--profile=" + filepath.Join(reports, "profile.json.gz")}
 	if opts.RemoteCache != "" {
 		args = append(args, "--remote_cache="+opts.RemoteCache)

@@ -9,6 +9,9 @@
   - build
   - MODULE.bazel
   - MODULE.bazel.lock
+  - .bazelversion
+  - .bazelrc
+  - BUILD.bazel
   - pyproject.toml
   - uv.lock
   check: >-
@@ -27,11 +30,24 @@
   - build
   - MODULE.bazel
   - MODULE.bazel.lock
+  - .bazelversion
+  - .bazelrc
+  - BUILD.bazel
   check: /home/runner/run.sh --version | grep -x 2.337.0; dagger version; infra version
 - image: ghcr.io/fredrir/infra-runner-rust
   dockerfile: images/runner-rust/Containerfile
   inputs:
   - images/runner-rust
+  - cmd
+  - internal
+  - go.mod
+  - go.sum
+  - build
+  - MODULE.bazel
+  - MODULE.bazel.lock
+  - .bazelversion
+  - .bazelrc
+  - BUILD.bazel
   check: >-
     /home/runner/run.sh --version | grep -x 2.337.0;
     rustc --version | grep '^rustc 1\.98\.1 ';
@@ -44,7 +60,7 @@
     /usr/lib/postgresql/16/bin/initdb --version | grep -F ' 16.';
     pkg-config --exists openssl zlib;
     printf test > /tmp/probe && nix-hash --type sha256 --flat --base32 /tmp/probe | grep -x 020ay2q1av2xs4n842rb3d7vz8qms1dcb87a5yd6azaci20x11lz;
-    bash -n /usr/local/bin/ci-job-started.sh;
+    infra version;
     cd "$(mktemp -d)" && cargo new --vcs none probe && cd probe
     && cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.28 --target x86_64-unknown-linux-musl
     && file target/aarch64-unknown-linux-gnu/release/probe | grep -F 'ARM aarch64'
@@ -66,4 +82,7 @@
   - build
   - MODULE.bazel
   - MODULE.bazel.lock
+  - .bazelversion
+  - .bazelrc
+  - BUILD.bazel
   check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version

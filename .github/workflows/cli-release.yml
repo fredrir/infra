@@ -1,0 +1,96 @@
+name: Release infrastructure CLI
+on:
+  push:
+    tags: ['infra-v*']
+permissions:
+  contents: read
+concurrency:
+  group: infra-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref_protected
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux_amd64, linux_arm64, darwin_amd64, darwin_arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require a release from main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cache/infra-bazel-actions
+            ~/.cache/infra-bazel-repository
+          key: infra-release-bazel9.2.0-go1.27.1-${{ matrix.platform }}-${{ github.sha }}
+          restore-keys: |
+            infra-release-bazel9.2.0-go1.27.1-${{ matrix.platform }}-
+      - name: Install pinned Bazel
+        env:
+          BAZEL_SHA256: 7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694
+        run: |
+          curl --fail --location --retry 3 https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-linux-x86_64 --output "$RUNNER_TEMP/bazel"
+          printf '%s  %s\n' "$BAZEL_SHA256" "$RUNNER_TEMP/bazel" | sha256sum --check --strict
+          chmod 755 "$RUNNER_TEMP/bazel"
+      - name: Test native targets
+        if: matrix.platform == 'linux_amd64'
+        run: '"$RUNNER_TEMP/bazel" --batch test --config=ci --disk_cache="$HOME/.cache/infra-bazel-actions" --repository_cache="$HOME/.cache/infra-bazel-repository" //...'
+      - name: Build platform binary
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          "$RUNNER_TEMP/bazel" --batch build --config=ci --platforms="@rules_go//go/toolchain:$PLATFORM" --@rules_go//go/config:pure --disk_cache="$HOME/.cache/infra-bazel-actions" --repository_cache="$HOME/.cache/infra-bazel-repository" //cmd/infra:infra
+          mkdir -p "$RUNNER_TEMP/release"
+          cp bazel-bin/cmd/infra/infra_/infra "$RUNNER_TEMP/release/infra-${PLATFORM/_/-}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: cli-release-${{ matrix.platform }}
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error
+          retention-days: 7
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: cli-release-*
+          path: ${{ runner.temp }}/release
+          merge-multiple: true
+      - name: Describe release binaries
+        run: |
+          cd "$RUNNER_TEMP/release"
+          for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do test -s "infra-$platform"; done
+          sha256sum infra-* > SHA256SUMS
+          jq -n --arg revision "$GITHUB_SHA" --arg tag "$GITHUB_REF_NAME" --slurpfile toolchain "$GITHUB_WORKSPACE/build/toolchain.json" --rawfile checksums SHA256SUMS '{schema:1, revision:$revision, tag:$tag, toolchain:$toolchain[0], binaries:[$checksums | split("\n")[] | select(length > 0) | capture("^(?<sha256>[a-f0-9]{64})  infra-(?<os>linux|darwin)-(?<arch>amd64|arm64)$") | {platform:(.os + "/" + .arch), file:("infra-" + .os + "-" + .arch), sha256}]}' > manifest.json
+          sha256sum manifest.json >> SHA256SUMS
+          sha256sum --check --strict SHA256SUMS
+          chmod 755 infra-linux-amd64
+          RUNNER_TEMP="$RUNNER_TEMP" ./infra-linux-amd64 ci install-tools gh
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        id: provenance
+        with:
+          subject-path: ${{ runner.temp }}/release/*
+      - name: Publish immutable version assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATTESTATION_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          cd "$RUNNER_TEMP/release"
+          cp "$ATTESTATION_BUNDLE" provenance.jsonl
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$GITHUB_REF_NAME" --notes "Infrastructure CLI binaries for revision $GITHUB_SHA. Verify provenance and SHA256SUMS before installation." infra-* manifest.json SHA256SUMS provenance.jsonl
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

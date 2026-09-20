@@ -1,0 +1,11 @@
+load("@rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "contracts_test",
+    srcs = ["images_test.go"],
+    data = ["//:image_contract_data"],
+    deps = [
+        "//internal/images",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)

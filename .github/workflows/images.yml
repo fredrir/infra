@@ -12,6 +12,11 @@ on:
       - build/**
       - go.mod
       - go.sum
+      - pyproject.toml
+      - uv.lock
+      - .bazelversion
+      - .bazelrc
+      - BUILD.bazel
       - MODULE.bazel*
       - '**/BUILD.bazel'
       - images/**

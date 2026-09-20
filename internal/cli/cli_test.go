@@ -17,7 +17,7 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 	root := t.TempDir()
 	for path, content := range map[string]string{
 		"images/catalog.yaml":          "- image: ghcr.io/fredrir/example\n  dockerfile: Containerfile\n  check: example --version\n  inputs: [Containerfile]\n",
-		".github/workflows/images.yml": "name: Images\n", ".dockerignore": ".git\n", "Containerfile": "FROM scratch\n",
+		".github/workflows/images.yml": "name: Images\n", ".github/workflows/build-image.yml": "name: Build\n", ".github/workflows/infra-cli.yml": "name: CLI\n", ".dockerignore": ".git\n", "Containerfile": "FROM scratch\n",
 	} {
 		path = filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

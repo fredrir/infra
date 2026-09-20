@@ -10,3 +10,23 @@ exports_files([
     "go.mod",
     "go.sum",
 ])
+
+filegroup(
+    name = "image_contract_data",
+    srcs = glob([
+        "images/**",
+        ".github/workflows/*.yml",
+    ]) + [
+        ".bazelrc",
+        ".bazelversion",
+        "BUILD.bazel",
+        "MODULE.bazel",
+        "MODULE.bazel.lock",
+        "go.mod",
+        "go.sum",
+        "pyproject.toml",
+        "uv.lock",
+        "//platform:components/backups/tools.Dockerfile",
+    ],
+    visibility = ["//internal/contracts:__pkg__"],
+)

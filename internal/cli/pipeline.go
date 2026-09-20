@@ -17,7 +17,7 @@ func newCheckCommand() *cobra.Command { return newBuildCommand("check", "test") 
 
 func newPipelineCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "pipeline", Short: "Execute reproducible builds", RunE: missingCommand}
-	cmd.AddCommand(newBuildCommand("build", "build"), newBuildCommand("check", "test"), newImageCommand())
+	cmd.AddCommand(newBuildCommand("build", "build"), newBuildCommand("check", "test"), newBuildCommand("generate-check", "generate-check"), newImageCommand())
 	var root, base string
 	affected := &cobra.Command{Use: "affected", Short: "Print a conservative Bazel query for changed targets", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

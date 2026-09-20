@@ -59,7 +59,8 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 		return nil, errors.New("catalog must contain one YAML document")
 	}
 	seen := make(map[string]bool)
-	paths := []string{".github/workflows/images.yml", ".dockerignore"}
+	sharedInputs := []string{".github/workflows/images.yml", ".github/workflows/build-image.yml", ".github/workflows/infra-cli.yml", ".dockerignore"}
+	paths := append([]string(nil), sharedInputs...)
 	for _, entry := range entries {
 		if !imageName.MatchString(entry.Image) || seen[entry.Image] {
 			return nil, fmt.Errorf("invalid or duplicate image: %q", entry.Image)
@@ -79,7 +80,10 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	shared := objects[paths[0]] + objects[paths[1]]
+	var shared strings.Builder
+	for _, path := range sharedInputs {
+		fmt.Fprintln(&shared, objects[path])
+	}
 	plan := make([]Image, 0, len(entries))
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
@@ -90,7 +94,7 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 			return nil, err
 		}
 		hash := sha256.New()
-		fmt.Fprintf(hash, "%s\n%s\n", data, shared)
+		fmt.Fprintf(hash, "%s\n%s\n", data, shared.String())
 		for _, path := range entry.Inputs {
 			fmt.Fprintln(hash, objects[path])
 		}
