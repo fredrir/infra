@@ -83,12 +83,20 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 		return err
 	}
 	verified := false
+	var order deploymentOrder
 	for _, workflowRevision := range revisions {
 		name, arguments, err := ProvenanceCommand(mapping.Visibility, mapping.Repository, workflowRevision, options.Revision, options.Image+"@"+options.Digest)
 		if err != nil {
 			return err
 		}
-		if err := runner.Run(ctx, name, arguments...); err == nil {
+		if mapping.Visibility == "public" {
+			arguments = append(arguments, "--format", "json")
+		}
+		if data, verifyErr := runner.Output(ctx, name, arguments...); verifyErr == nil {
+			order, err = verifiedDeploymentOrder(data, mapping.Visibility, mapping.Repository, options)
+			if err != nil {
+				return err
+			}
 			verified = true
 			break
 		}
@@ -99,7 +107,16 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 	if !verified {
 		return fmt.Errorf("image provenance did not match an approved workflow revision")
 	}
-	allowed := map[string]bool{}
+	receipt := deploymentReceiptPath(project, options.Image)
+	if err := checkLocalDeploymentOrder(receipt, order); err != nil {
+		return err
+	}
+	relativeReceipt, err := filepath.Rel(root, receipt)
+	if err != nil {
+		return err
+	}
+	relativeReceipt = filepath.ToSlash(relativeReceipt)
+	allowed := map[string]bool{relativeReceipt: true}
 	switch target.Mode {
 	case "kustomize":
 		var pins []string
@@ -160,6 +177,12 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 	if err := renderDeployment(project); err != nil {
 		return err
 	}
+	if err := writeDeploymentOrder(receipt, order); err != nil {
+		return err
+	}
+	if err := runner.Run(ctx, "git", "add", "--intent-to-add", "--", relativeReceipt); err != nil {
+		return err
+	}
 	if err := runner.Run(ctx, "git", "diff", "--check"); err != nil {
 		return err
 	}
@@ -192,6 +215,9 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 			return err
 		}
 		if err := publisher.Run(ctx, "git", "-c", "credential.helper=!gh auth git-credential", "fetch", "--quiet", "origin", "main"); err != nil {
+			return err
+		}
+		if err := checkFetchedDeploymentOrder(ctx, runner, relativeReceipt, order); err != nil {
 			return err
 		}
 		if err := runner.Run(ctx, "git", "-c", "user.name=infra-release", "-c", "user.email=infra-release@users.noreply.github.com", "rebase", "--quiet", "FETCH_HEAD"); err != nil {

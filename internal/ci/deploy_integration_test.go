@@ -70,9 +70,15 @@ func newDeployFixture(t *testing.T, mode, visibility string, nested bool) *deplo
 				t.Error("deployment token exposed in arguments")
 			}
 			if f.verify != nil {
-				return process.Result{}, f.verify(p)
+				if err := f.verify(p); err != nil {
+					return process.Result{}, err
+				}
 			}
-			return process.Result{}, nil
+			data := `[ {"optional":{"source-run-id":"100","source-run-attempt":"1"}} ]`
+			if p.Name == "gh" {
+				data = `[ {"verificationResult":{"statement":{"predicate":{"runDetails":{"metadata":{"invocationId":"https://github.com/fredrir/example/actions/runs/100/attempts/1"}}}}}} ]`
+			}
+			return process.Result{Stdout: []byte(data)}, nil
 		}
 		return process.Run(ctx, p)
 	}
@@ -148,7 +154,7 @@ func TestDeployVerifiesExactProvenanceAndPushesOnce(t *testing.T) {
 			if f.git("rev-parse", "HEAD") != f.deployed() || before == f.deployed() {
 				t.Fatal("deployment not published")
 			}
-			if f.git("diff", "--name-only", "HEAD^") != "platform/projects/example/kustomization.yaml" {
+			if f.git("diff", "--name-only", "HEAD^") != "platform/projects/example/.deployments/example.json\nplatform/projects/example/kustomization.yaml" {
 				t.Fatal("unexpected changed paths")
 			}
 			text := f.rendered("")
@@ -161,7 +167,7 @@ func TestDeployVerifiesExactProvenanceAndPushesOnce(t *testing.T) {
 			command := f.calls[0]
 			var args []string
 			if visibility == "public" {
-				args = []string{"attestation", "verify", "oci://" + f.options.Image + "@" + f.options.Digest, "--repo", "fredrir/example", "--signer-workflow", "fredrir/infra/.github/workflows/build-image.yml", "--signer-digest", strings.Repeat("d", 40), "--source-ref", "refs/heads/main", "--source-digest", f.options.Revision}
+				args = []string{"attestation", "verify", "oci://" + f.options.Image + "@" + f.options.Digest, "--repo", "fredrir/example", "--signer-workflow", "fredrir/infra/.github/workflows/build-image.yml", "--signer-digest", strings.Repeat("d", 40), "--source-ref", "refs/heads/main", "--source-digest", f.options.Revision, "--format", "json"}
 				if command.Name != "gh" {
 					t.Fatal(command.Name)
 				}
@@ -229,7 +235,7 @@ func TestDeployUpdatesEveryNestedPin(t *testing.T) {
 			t.Fatal("nested pin unchanged", stage)
 		}
 	}
-	if f.git("diff", "--name-only", "HEAD^") != "platform/projects/example/application/kustomization.yaml\nplatform/projects/example/migration/kustomization.yaml" {
+	if f.git("diff", "--name-only", "HEAD^") != "platform/projects/example/.deployments/example.json\nplatform/projects/example/application/kustomization.yaml\nplatform/projects/example/migration/kustomization.yaml" {
 		t.Fatal("unexpected nested mutations")
 	}
 }
