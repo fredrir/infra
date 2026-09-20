@@ -41,10 +41,18 @@ jobs:
           INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
         run: |
           bundle="$RUNNER_TEMP/infra-cli"
-          persistent="$HOME/.cache/infra/source-cli/$INPUT_DIGEST"
+          cache="$HOME/.cache/infra/source-cli"
+          mkdir -p "$cache"
+          chmod 700 "$cache"
+          touch "$cache/.lock"
+          chmod 600 "$cache/.lock"
+          exec 9>"$cache/.lock"
+          flock 9
+          persistent="$cache/$INPUT_DIGEST"
           if [ "$RUNNER_ENVIRONMENT" = self-hosted ] && [ -f "$persistent/infra" ] && [ -f "$persistent/sha256" ] && [ -f "$persistent/inputs" ] && [ -f "$persistent/source-revision" ]; then
             mkdir -p "$bundle"
             cp "$persistent/infra" "$persistent/sha256" "$persistent/inputs" "$persistent/source-revision" "$bundle/"
+            touch "$persistent/last-used"
           fi
           if [ -f "$bundle/inputs" ] && [ "$(cat "$bundle/inputs")" = "$INPUT_DIGEST" ] && printf '%s  %s\n' "$(cat "$bundle/sha256")" "$bundle/infra" | sha256sum --check --strict --status; then
             printf 'hit=true\n' >> "$GITHUB_OUTPUT"
@@ -99,9 +107,17 @@ jobs:
         env:
           INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
         run: |
-          persistent="$HOME/.cache/infra/source-cli/$INPUT_DIGEST"
+          cache="$HOME/.cache/infra/source-cli"
+          mkdir -p "$cache"
+          chmod 700 "$cache"
+          touch "$cache/.lock"
+          chmod 600 "$cache/.lock"
+          exec 9>"$cache/.lock"
+          flock 9
+          persistent="$cache/$INPUT_DIGEST"
           mkdir -p "$persistent"
           cp "$RUNNER_TEMP/infra-cli/"* "$persistent/"
+          touch "$persistent/last-used"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ steps.bundle.outputs.artifact }}
