@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     if: github.repository == 'fredrir/packages' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name)
-    runs-on: ${{ github.repository == 'fredrir/packages' && github.ref == 'refs/heads/main' && github.ref_protected && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
+    runs-on: ${{ github.repository == 'fredrir/packages' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: 45
     environment: publish
     permissions:
@@ -71,7 +71,7 @@ jobs:
       run: docker rm --force --volumes infra-dagger
   smoke:
     needs: build
-    runs-on: ${{ github.repository == 'fredrir/packages' && github.ref == 'refs/heads/main' && github.ref_protected && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
+    runs-on: ${{ github.repository == 'fredrir/packages' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: 45
     permissions:
       contents: read
@@ -118,7 +118,7 @@ jobs:
   publish:
     needs: smoke
     if: '!inputs.dry-run'
-    runs-on: ${{ github.repository == 'fredrir/packages' && github.ref == 'refs/heads/main' && github.ref_protected && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
+    runs-on: ${{ github.repository == 'fredrir/packages' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: 20
     environment: publish
     permissions:
