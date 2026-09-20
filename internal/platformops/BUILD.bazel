@@ -9,12 +9,16 @@ go_library(
         "control.go",
         "heartbeat.go",
         "hook.go",
+        "prefetch.go",
         "promote.go",
         "slots.go",
     ],
     importpath = "github.com/fredrir/infra/internal/platformops",
     visibility = ["//:__subpackages__"],
-    deps = ["@in_yaml_go_yaml_v3//:yaml"],
+    deps = [
+        "//internal/process",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
 )
 
 go_test(
@@ -26,6 +30,7 @@ go_test(
         "control_test.go",
         "heartbeat_test.go",
         "hook_test.go",
+        "prefetch_test.go",
         "promote_integration_test.go",
         "promote_test.go",
         "slots_test.go",
