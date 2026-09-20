@@ -28,7 +28,7 @@ func newPlatformCommand() *cobra.Command {
 	}}
 	slots.Flags().DurationVar(&interval, "interval", 30*time.Second, "Reconciliation interval")
 	slots.Flags().BoolVar(&once, "once", false, "Reconcile once")
-	root.AddCommand(newToolsPromotionCommand(), slots, &cobra.Command{Use: "runner-hook", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	root.AddCommand(newPrefetchCommand(), newToolsPromotionCommand(), slots, &cobra.Command{Use: "runner-hook", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		var event *os.File
 		if path := os.Getenv("GITHUB_EVENT_PATH"); path != "" {
 			var err error

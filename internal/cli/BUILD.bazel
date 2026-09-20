@@ -15,6 +15,7 @@ go_library(
         "performance.go",
         "pipeline.go",
         "platform.go",
+        "prefetch.go",
         "projects.go",
     ],
     importpath = "github.com/fredrir/infra/internal/cli",
