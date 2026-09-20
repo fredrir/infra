@@ -1,0 +1,135 @@
+name: Release patched Cosign
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cosign-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-infra
+        with:
+          root: .
+      - name: Install verification tools
+        run: infra ci install-tools gh trivy
+      - name: Require unpublished version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(jq -er .tag build/tools/cosign/source.json)
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            printf 'Release %s already exists\n' "$tag" >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            printf 'Tag %s already exists\n' "$tag" >&2
+            exit 1
+          fi
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.cache/infra-cosign-go
+          key: cosign-go1.27.1-linux-amd64-${{ hashFiles('build/tools/cosign/*') }}
+          restore-keys: |
+            cosign-go1.27.1-linux-amd64-
+      - name: Prepare checksum-verified patched source
+        run: |
+          source="$RUNNER_TEMP/cosign-source"
+          mkdir -p "$source" "$RUNNER_TEMP/release" "$HOME/.cache/infra-cosign-go"
+          url=$(jq -er .source_url build/tools/cosign/source.json)
+          digest=$(jq -er .source_sha256 build/tools/cosign/source.json)
+          curl --fail --silent --show-error --location --retry 2 --max-time 60 "$url" --output "$RUNNER_TEMP/cosign-source.tar.gz"
+          printf '%s  %s\n' "$digest" "$RUNNER_TEMP/cosign-source.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/cosign-source.tar.gz" --strip-components=1 -C "$source"
+          git -C "$source" apply --check "$GITHUB_WORKSPACE/build/tools/cosign/dependencies.patch"
+          git -C "$source" apply "$GITHUB_WORKSPACE/build/tools/cosign/dependencies.patch"
+      - name: Build patched Linux binary
+        run: |
+          image=$(jq -er .go_image build/tools/cosign/source.json)
+          version=$(jq -er .version build/tools/cosign/source.json)
+          revision=$(jq -er .upstream_revision build/tools/cosign/source.json)
+          docker run --rm --user "$(id -u):$(id -g)" --cpus=2 --memory=5g --memory-swap=5g \
+            --volume "$RUNNER_TEMP/cosign-source:/source" --volume "$RUNNER_TEMP/release:/release" \
+            --volume "$HOME/.cache/infra-cosign-go:/cache" --workdir /source \
+            --env CGO_ENABLED=0 --env GOOS=linux --env GOARCH=amd64 --env GOTOOLCHAIN=local \
+            --env GOCACHE=/cache/build --env GOMODCACHE=/cache/modules --env VERSION="$version" --env REVISION="$revision" "$image" \
+            sh -euc '
+              sha256sum go.mod go.sum > /tmp/module-inputs.sha256
+              go mod download
+              go mod verify
+              sha256sum --check --strict /tmp/module-inputs.sha256
+              exec go build -trimpath -buildvcs=false -mod=readonly \
+                -ldflags="-s -w -buildid= -X sigs.k8s.io/release-utils/version.gitVersion=$VERSION -X sigs.k8s.io/release-utils/version.gitCommit=$REVISION -X sigs.k8s.io/release-utils/version.gitTreeState=modified" \
+                -o /release/cosign-linux-amd64 ./cmd/cosign
+            '
+      - name: Prepare vulnerability database
+        run: |
+          trivy image --download-db-only
+          mkdir -p "$RUNNER_TEMP/scan/usr/local/bin"
+          cp "$RUNNER_TEMP/release/cosign-linux-amd64" "$RUNNER_TEMP/scan/usr/local/bin/cosign"
+      - name: Check signatures, reject tampering, and scan within aggregate budget
+        env:
+          COSIGN_PASSWORD: local-qualification
+        run: |
+          infra ci measure --stage cosign-qualification --budget 10s --report-dir "$RUNNER_TEMP/checks" -- bash -euo pipefail -c '
+            tool="$RUNNER_TEMP/release/cosign-linux-amd64"
+            work=$(mktemp -d "$RUNNER_TEMP/cosign-check.XXXXXX")
+            trap '\''rm -rf "$work"'\'' EXIT
+            "$tool" version
+            printf "trusted payload\n" > "$work/payload"
+            "$tool" generate-key-pair --output-key-prefix "$work/key"
+            "$tool" sign-blob --key "$work/key.key" --bundle "$work/bundle.json" --use-signing-config=false --tlog-upload=false "$work/payload"
+            "$tool" verify-blob --key "$work/key.pub" --bundle "$work/bundle.json" --insecure-ignore-tlog=true "$work/payload"
+            printf "tampered payload\n" > "$work/payload"
+            if "$tool" verify-blob --key "$work/key.pub" --bundle "$work/bundle.json" --insecure-ignore-tlog=true "$work/payload"; then exit 1; fi
+            trivy rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --skip-java-db-update --timeout 10s --format json --output "$RUNNER_TEMP/checks/scan.json" "$RUNNER_TEMP/scan"
+            jq -e '\''[.Results[] | select(.Type == "gobinary")] | length == 1'\'' "$RUNNER_TEMP/checks/scan.json"
+          '
+      - name: Describe downstream artifact
+        run: |
+          cp build/tools/cosign/source.json "$RUNNER_TEMP/release/source.json"
+          cp build/tools/cosign/dependencies.patch "$RUNNER_TEMP/release/dependencies.patch"
+          cp "$RUNNER_TEMP/checks/cosign-qualification.json" "$RUNNER_TEMP/release/qualification.json"
+          cp "$RUNNER_TEMP/checks/scan.json" "$RUNNER_TEMP/release/scan.json"
+          cd "$RUNNER_TEMP/release"
+          sha256sum cosign-linux-amd64 source.json dependencies.patch qualification.json scan.json > SHA256SUMS
+          jq -n --arg revision "$GITHUB_SHA" --arg sha256 "$(sha256sum cosign-linux-amd64 | cut -d' ' -f1)" --slurpfile source source.json '{schema:1, revision:$revision, source:$source[0], binary:{file:"cosign-linux-amd64", platform:"linux/amd64", sha256:$sha256}}' > manifest.json
+          sha256sum manifest.json >> SHA256SUMS
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        id: provenance
+        with:
+          subject-path: ${{ runner.temp }}/release/*
+      - name: Publish downstream version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATTESTATION_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          tag=$(jq -er .tag build/tools/cosign/source.json)
+          cd "$RUNNER_TEMP/release"
+          cp "$ATTESTATION_BUNDLE" provenance.jsonl
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --title "$tag" \
+            --notes "Downstream Cosign build with the tracked dependency patch and Go 1.27.1; this is not an upstream Sigstore release. Verify provenance and SHA256SUMS before installation." \
+            cosign-linux-amd64 source.json dependencies.patch qualification.json scan.json manifest.json SHA256SUMS provenance.jsonl
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.type')" = commit
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')" = "$GITHUB_SHA"
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: cosign-qualification-${{ github.run_id }}
+          path: ${{ runner.temp }}/checks
+          if-no-files-found: ignore
+          retention-days: 14

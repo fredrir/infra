@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "version": "v3.1.3-infra.1",
+  "tag": "cosign-v3.1.3-infra.1",
+  "upstream_version": "v3.1.3",
+  "upstream_revision": "11926fa5bbbbde47e88fc006b625a17769b743b2",
+  "source_url": "https://codeload.github.com/sigstore/cosign/tar.gz/refs/tags/v3.1.3",
+  "source_sha256": "ab8fcb8e0b4c0b8d01aefa37790cdd5ad099366b2efb8636b7a0250915b93362",
+  "go_image": "golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195",
+  "go": "1.27.1"
+}
