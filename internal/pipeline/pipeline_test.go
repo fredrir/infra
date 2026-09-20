@@ -3,6 +3,7 @@ package pipeline_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,7 +25,7 @@ func TestChangedPackageIncludesDependentsAndGlobalInputsSelectEverything(t *test
 	if got != "rdeps(//..., set(//internal/example:all))" {
 		t.Fatalf("dependent packages omitted: %s", got)
 	}
-	for _, path := range []string{"go.mod", "MODULE.bazel", "images/catalog.yaml", "internal/deleted/old.go", "internal/example/quote\".go"} {
+	for _, path := range []string{"go.mod", "MODULE.bazel", "internal/deleted/old.go", "internal/example/quote\".go"} {
 		if got := pipeline.ExpressionForPaths(root, []string{path}); got != "//..." {
 			t.Errorf("%s must conservatively select everything: %s", path, got)
 		}
@@ -57,5 +58,43 @@ func TestImageRejectsEscapingDockerfileBeforeConnecting(t *testing.T) {
 	_, err := pipeline.Image(context.Background(), pipeline.ImageOptions{Image: "registry.test/image:tag", Dockerfile: "../Dockerfile"})
 	if err == nil || !strings.Contains(err.Error(), "relative") {
 		t.Fatalf("escaping Dockerfile accepted: %v", err)
+	}
+}
+
+func TestNonGoInputsSelectOnlyDeclaredDataDependents(t *testing.T) {
+	for _, test := range []struct {
+		path string
+		want string
+	}{
+		{"docs/platform.md", "set()"},
+		{"README.md", "set()"},
+		{"build/evidence/run.json", "set()"},
+		{"build/rollout/project.patch", "set()"},
+		{".github/deployments/123.yaml", "set()"},
+		{"platform/projects/example/release.yaml", "rdeps(//..., set(//platform:promotion_testdata))"},
+		{"platform/components/runners/check/runner.yaml", "rdeps(//..., set(//platform:policy_testdata //platform:promotion_testdata))"},
+		{"platform/components/backups/tools.Dockerfile", "rdeps(//..., set(//:image_contract_data //platform:promotion_testdata))"},
+		{".github/workflows/check.yml", "rdeps(//..., set(//:image_contract_data))"},
+		{"images/catalog.yaml", "rdeps(//..., set(//:image_contract_data))"},
+		{"unknown/input.json", "//..."},
+		{"platform/BUILD.bazel", "//..."},
+		{"docs/../../go.mod", "//..."},
+		{"docs/BUILD.bazel", "//..."},
+		{"build/evidence/BUILD.bazel", "//..."},
+	} {
+		t.Run(test.path, func(t *testing.T) {
+			if got := pipeline.ExpressionForPaths(t.TempDir(), []string{test.path}); got != test.want {
+				t.Fatalf("selection = %s, want %s", got, test.want)
+			}
+		})
+	}
+}
+
+func TestFastChecksNeverReportCancellationAsSuccess(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	reports, err := pipeline.CheckFast(ctx, pipeline.Options{Root: t.TempDir(), Local: true})
+	if !errors.Is(err, context.Canceled) || len(reports) != 1 || reports[0].Success {
+		t.Fatalf("cancelled checks passed: reports=%+v error=%v", reports, err)
 	}
 }

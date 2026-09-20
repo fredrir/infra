@@ -44,14 +44,14 @@ type Report struct {
 
 func Run(ctx context.Context, opts Options) (report Report, err error) {
 	report = Report{Schema: 1, Operation: opts.Operation, Targets: opts.Targets, Started: time.Now().UTC(), TraceURL: os.Getenv("DAGGER_TRACE_URL")}
-	if opts.Operation != "test" && opts.Operation != "build" && opts.Operation != "generate-check" {
-		return report, errors.New("operation must be build, test or generate-check")
+	if opts.Operation != "test" && opts.Operation != "build" && opts.Operation != "generate-check" && opts.Operation != "cache-gc" && opts.Operation != "prepare-check" {
+		return report, errors.New("operation must be build, test, generate-check, prepare-check or cache-gc")
 	}
-	if opts.Operation == "generate-check" {
-		if len(opts.Targets) != 0 || opts.Base != "" {
-			return report, errors.New("generated BUILD checks require the complete repository")
-		}
-		opts.Targets = []string{"//:gazelle", "--", "-mode=diff"}
+	if opts.Operation == "cache-gc" && (opts.Local || len(opts.Targets) != 0 || opts.Base != "") {
+		return report, errors.New("cache maintenance requires Dagger and no targets or base")
+	}
+	if opts.Operation == "generate-check" && len(opts.Targets) != 0 {
+		return report, errors.New("generated BUILD checks do not accept targets")
 	}
 	if opts.ReportDir == "" {
 		opts.ReportDir = filepath.Join(opts.Root, "dist", "reports")
@@ -65,6 +65,7 @@ func Run(ctx context.Context, opts Options) (report Report, err error) {
 		}
 	}
 	defer func() {
+		err = errors.Join(err, ctx.Err())
 		if metrics, metricsErr := readMetrics(filepath.Join(opts.ReportDir, "events.jsonl")); metricsErr == nil {
 			report.Metrics = metrics
 		}
@@ -98,6 +99,12 @@ func Run(ctx context.Context, opts Options) (report Report, err error) {
 	if expression == "set()" && len(opts.Targets) == 0 {
 		return report, nil
 	}
+	if opts.Operation == "generate-check" {
+		if opts.Base != "" && expression != "//..." && !strings.Contains(expression, "//internal/") && !strings.Contains(expression, "//cmd/") && !strings.Contains(expression, "//integration/") {
+			return report, nil
+		}
+		opts.Targets = []string{"//:gazelle", "--", "-mode=diff"}
+	}
 	if opts.Local {
 		err = runLocal(ctx, opts, config, expression, &report)
 	} else {
@@ -111,8 +118,14 @@ func buildArgs(opts Options, config Toolchain, targets []string, reports string)
 	if operation == "generate-check" {
 		operation = "run"
 	}
-	args := []string{"--batch", operation, "--config=ci", "--action_env=INFRA_BUILD_IMAGE=" + config.Image,
+	if operation == "prepare-check" {
+		operation = "build"
+	}
+	args := []string{operation, "--config=ci", "--action_env=INFRA_BUILD_IMAGE=" + config.Image,
 		"--build_event_json_file=" + filepath.Join(reports, "events.jsonl"), "--profile=" + filepath.Join(reports, "profile.json.gz")}
+	if !opts.Local {
+		args = append([]string{"--batch"}, args...)
+	}
 	if opts.RemoteCache != "" {
 		args = append(args, "--remote_cache="+opts.RemoteCache)
 	}
@@ -140,7 +153,7 @@ func runLocal(ctx context.Context, opts Options, config Toolchain, expression st
 	}
 	targets := opts.Targets
 	if len(targets) == 0 && expression != "//..." {
-		query, err := process.Run(ctx, process.Options{Name: bazel, Args: []string{"--batch", "query", expression, "--output=label"}, Dir: opts.Root, Stderr: opts.Log})
+		query, err := process.Run(ctx, process.Options{Name: bazel, Args: []string{"query", expression, "--output=label"}, Dir: opts.Root, Stderr: opts.Log})
 		data := query.Stdout
 		if err != nil {
 			return fmt.Errorf("query affected targets: %w", err)
@@ -152,6 +165,9 @@ func runLocal(ctx context.Context, opts Options, config Toolchain, expression st
 	}
 	if len(targets) == 0 {
 		targets = []string{"//..."}
+	}
+	if opts.Operation == "prepare-check" {
+		targets = append(targets, "//:gazelle")
 	}
 	report.Targets = targets
 	reports, err := filepath.Abs(opts.ReportDir)
@@ -187,10 +203,10 @@ func runDagger(ctx context.Context, opts Options, config Toolchain, expression s
 		WithExec([]string{"sha256sum", "--check", "--strict"}, dagger.ContainerWithExecOpts{Stdin: config.BazelSHA256 + "  /usr/local/bin/bazel\n"}).
 		WithDirectory("/src", source).WithWorkdir("/src").
 		WithMountedCache("/root/.cache/bazel-repo", client.CacheVolume("infra-bazel-repository-v1")).
-		WithMountedCache(diskCachePath, client.CacheVolume("infra-bazel-actions-v1"), dagger.ContainerWithMountedCacheOpts{Sharing: dagger.CacheSharingModeLocked}).
+		WithMountedCache(diskCachePath, client.CacheVolume("infra-bazel-actions-v1"), dagger.ContainerWithMountedCacheOpts{Sharing: dagger.CacheSharingModeShared}).
 		WithExec([]string{"mkdir", "-p", "/reports"})
-	if err := pruneDiskCache(ctx, container); err != nil {
-		return err
+	if opts.Operation == "cache-gc" {
+		return pruneDiskCache(ctx, container)
 	}
 	if opts.ForwardLocalCache {
 		endpoint, host, port, err := localCache(opts.RemoteCache)
@@ -215,6 +231,9 @@ func runDagger(ctx context.Context, opts Options, config Toolchain, expression s
 	}
 	if len(targets) == 0 {
 		targets = []string{"//..."}
+	}
+	if opts.Operation == "prepare-check" {
+		targets = append(targets, "//:gazelle")
 	}
 	report.Targets = targets
 	args := buildArgs(opts, config, targets, "/reports")

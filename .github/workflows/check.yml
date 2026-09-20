@@ -33,23 +33,39 @@ jobs:
           printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
           chmod 755 "$RUNNER_TEMP/infra-cli/infra"
           printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+      - name: Select affected inputs
+        id: affected
+        env:
+          PUSH_BASE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="$PUSH_BASE"
+          if [ -n "$PR_BASE" ]; then
+            base=$(git merge-base "$PR_BASE" HEAD)
+          fi
+          if [ -n "$base" ] && ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base=''
+          fi
+          printf 'base=%s\n' "$base" >> "$GITHUB_OUTPUT"
+          expression=$(infra pipeline affected --base "$base")
+          printf 'expression=%s\n' "$expression" >> "$GITHUB_OUTPUT"
       - name: Start isolated Dagger engine
-        if: runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted' && steps.affected.outputs.expression != 'set()'
         run: docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
-      - name: Verify dedicated engine
-        if: runner.environment == 'self-hosted'
+      - name: Prepare cold hosted check artifacts
+        if: runner.environment == 'github-hosted' && steps.affected.outputs.expression != 'set()'
         env:
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
-        run: infra doctor --engine-only
-      - name: Check Go targets
+          BASE: ${{ steps.affected.outputs.base }}
+        run: |
+          echo 'Cold hosted qualification includes artifact preparation and does not meet the warm deployment budget.' >> "$GITHUB_STEP_SUMMARY"
+          infra pipeline prepare-check --base "$BASE" --read-only-cache --report-dir dist/reports/preparation
+      - name: Check affected targets within aggregate budget
         env:
           _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
           BAZEL_REMOTE_CACHE: ${{ runner.environment == 'self-hosted' && 'http://127.0.0.1:9092' || (github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '') }}
-        run: infra ci check --read-only-cache=${{ github.event_name == 'pull_request' }} --forward-local-cache=${{ runner.environment == 'self-hosted' }}
-      - name: Check generated BUILD files
-        env:
-          _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
-        run: infra pipeline generate-check --report-dir dist/reports/generated
+          BASE: ${{ steps.affected.outputs.base }}
+        run: infra pipeline check-fast --base "$BASE" --read-only-cache=${{ github.event_name == 'pull_request' }} --local=${{ runner.environment == 'self-hosted' }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -58,7 +74,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Stop Dagger engine
-        if: always() && runner.environment == 'github-hosted'
+        if: always() && runner.environment == 'github-hosted' && steps.affected.outputs.expression != 'set()'
         run: docker rm --force --volumes infra-dagger
   validate:
     needs: cli

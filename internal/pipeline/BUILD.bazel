@@ -8,6 +8,7 @@ go_library(
         "config.go",
         "diskcache.go",
         "doctor.go",
+        "fast.go",
         "image.go",
         "metrics.go",
         "run.go",
