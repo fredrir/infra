@@ -121,7 +121,7 @@ git diff -- platform
 | Host boundary | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding |
 | Activation gates | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true` |
 | Runner registration | Eight repository registrations share one VM; each accepts protected main pushes or manual runs only |
-| Runner slice | Two CPUs / 2 GiB aggregate for runner services and native child processes |
+| Runner slice | Four CPUs / 2 GiB aggregate for runner services and native child processes |
 | Production Dagger ceiling | Four CPUs / 4 GiB RAM / 1,024 processes / two parallel operations |
 | Standalone engine defaults | Four CPUs / 8 GiB RAM / four parallel operations; configurable within host capacity |
 | Dagger connection | Local `docker-container://infra-dagger`; no published engine port |
@@ -131,7 +131,7 @@ git diff -- platform
 | Runner enforcement | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected |
 | Cache collection | Dagger background GC; Bazel remote LRU with 20 GiB target and 21 GiB admission ceiling |
 | Background preparation | Six-hour systemd timer; low-priority client; ten-minute timeout; configured argv only |
-| Preparation commands | `infra pipeline cache-gc`; `infra pipeline prepare-check --local` |
+| Background maintenance | `infra artifact prune-source`; `infra pipeline cache-gc` |
 | Verified tooling | CLI release checksum and revision; pinned native Bazel; pinned GitHub runner archive |
 | Warm ARC capacity | One deploy runner and one declaration-check runner |
 | Pool isolation | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines |
@@ -222,3 +222,10 @@ infra platform prefetch --namespace llunde --node fredrir-09 \
 | Prefetch lifetime | At most one minute; cleanup on success, failure or cancellation; finished Job TTL 60 seconds |
 | Prefetch prerequisites | Kubernetes 1.36 image volumes; compatible container runtime; namespace pull credentials; verified owned image digests |
 | Native VM evidence | [Warm VM qualification](../build/evidence/warm-vm-linux-amd64.json) |
+
+Initial native preparation is explicit; periodic compilation is disabled to avoid contending with running CI jobs.
+
+```sh
+infra ci prepare-validation
+infra ci validate
+```
