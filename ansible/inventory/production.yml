@@ -30,6 +30,9 @@ all:
             server:
               hosts:
                 fredrir-07:
+                  infra_binary_url: https://github.com/fredrir/infra/releases/download/infra-v0.1.0/infra-linux-amd64
+                  infra_binary_revision: 73a5ca2e6b88b40a6f8c55deae12af4a3e058c78
+                  infra_binary_sha256: c37acf10dd13009f61374b9fce811877b2a40c33b34a600a67e0c9e9dc39d0c1
                   ansible_host: 89.167.88.128
                   private_ip: 10.60.0.7
                   tailscale_ip: 100.115.121.9
