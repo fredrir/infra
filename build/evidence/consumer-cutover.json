@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-09-20T17:02:36.063504+00:00",
+  "source_revision": "b2c97f0c98c09099d19696089e55f1e95bd6ac1d",
+  "state": "applied",
+  "validation": {
+    "baseline_blobs": 14,
+    "reviewed_updated_checksums": 14,
+    "remote_main_commits": 10,
+    "canary_repository": "fredrir/llunde-frontend",
+    "canary_run": 35524265298,
+    "canary_passed": [
+      "hosted CLI bootstrap",
+      "binary identity verification",
+      "bounded Dagger engine startup",
+      "build input checks",
+      "verification tool installation"
+    ],
+    "canary_build_state": "in_progress"
+  },
+  "packages_main_ruleset": {
+    "id": 23732572,
+    "protected": true,
+    "rules": [
+      "deletion",
+      "non_fast_forward"
+    ],
+    "bypass_actors": [
+      {
+        "actor_id": 5,
+        "actor_type": "RepositoryRole",
+        "bypass_mode": "always"
+      },
+      {
+        "actor_id": 801323,
+        "actor_type": "Integration",
+        "bypass_mode": "always"
+      }
+    ]
+  },
+  "repositories": [
+    {
+      "repository": "fredrir/Y",
+      "base": "b5cc6760f38b50c63db940eb3ba68905e4b6bd8f",
+      "caller_commit": "e419d598d479c061e5263be829426eebbdf89271",
+      "verified_main": "e419d598d479c061e5263be829426eebbdf89271",
+      "runs": [
+        {
+          "conclusion": "",
+          "databaseId": 35524551071,
+          "headSha": "e419d598d479c061e5263be829426eebbdf89271",
+          "status": "in_progress",
+          "url": "https://github.com/fredrir/Y/actions/runs/35524551071",
+          "workflowName": "Build images"
+        }
+      ],
+      "state": "applied"
+    },
+    {
+      "repository": "fredrir/homebrew-nsql",
+      "base": "15952dbe51c1a5a9fa674d5db483cba4fca31e6b",
+      "policy_commit": "adb9840625c564d94d20835094dbd76575a824e7",
+      "verified_main": "adb9840625c564d94d20835094dbd76575a824e7",
+      "state": "applied"
+    },
+    {
+      "repository": "fredrir/homebrew-tap",
+      "base": "69b30b03b1605c3edc3b620b79c18798e13bb408",
+      "policy_commit": "7bc2b86a2879bb16da5f68a51ac1e60f05a3d890",
+      "verified_main": "7bc2b86a2879bb16da5f68a51ac1e60f05a3d890",
+      "state": "applied"
+    },
+    {
+      "repository": "fredrir/llunde-backend",
+      "base": "30480f15731935b6cc272040b7014c78c2200376",
+      "caller_commit": "1f4211ae0b2e25ac24856db2df2f8875ee1ffac2",
+      "verified_main": "1f4211ae0b2e25ac24856db2df2f8875ee1ffac2",
+      "runs": [
+        {
+          "conclusion": "",
+          "databaseId": 35524551763,
+          "headSha": "1f4211ae0b2e25ac24856db2df2f8875ee1ffac2",
+          "status": "in_progress",
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35524551763",
+          "workflowName": "Build images"
+        }
+      ],
+      "state": "applied"
+    },
+    {
+      "repository": "fredrir/llunde-frontend",
+      "base": "2f048b573d02624281b5560af7bf488c6df49ef4",
+      "caller_commit": "11fed6e3ae475521dc28fee56916b974ae9d625c",
+      "verified_main": "11fed6e3ae475521dc28fee56916b974ae9d625c",
+      "runs": [
+        {
+          "conclusion": "",
+          "databaseId": 35524265298,
+          "headSha": "11fed6e3ae475521dc28fee56916b974ae9d625c",
+          "status": "in_progress",
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35524265298",
+          "workflowName": "Build images"
+        }
+      ],
+      "state": "applied"
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "base": "338831c5c716ac389e65d58bc1505859fe376a12",
+      "caller_commit": "69393c3834ad62e900a0e9ef9c5d0ebfed9d7feb",
+      "verified_main": "69393c3834ad62e900a0e9ef9c5d0ebfed9d7feb",
+      "runs": [
+        {
+          "conclusion": "",
+          "databaseId": 35524553360,
+          "headSha": "69393c3834ad62e900a0e9ef9c5d0ebfed9d7feb",
+          "status": "in_progress",
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35524553360",
+          "workflowName": "Build images"
+        }
+      ],
+      "state": "applied"
+    },
+    {
+      "repository": "fredrir/nsql",
+      "base": "c8c2cb496e43be9be25e1c9aadc656d9e158a75a",
+      "policy_commit": "ad339b13301a499c1341ae67078e4cb002296a6b",
+      "caller_commit": "278317b1d0fee43b44a9e6859d5c5dcdaca81936",
+      "verified_main": "278317b1d0fee43b44a9e6859d5c5dcdaca81936",
+      "runs": [
+        {
+          "conclusion": "",
+          "databaseId": 35524554632,
+          "headSha": "278317b1d0fee43b44a9e6859d5c5dcdaca81936",
+          "status": "in_progress",
+          "url": "https://github.com/fredrir/nsql/actions/runs/35524554632",
+          "workflowName": "CI"
+        }
+      ],
+      "state": "applied"
+    },
+    {
+      "repository": "fredrir/nur-packages",
+      "base": "70084f3347c34cc1b7e494f4255713691c106173",
+      "policy_commit": "8dacb7685a4db28f1e4d895a1b68a9228d53c363",
+      "verified_main": "8dacb7685a4db28f1e4d895a1b68a9228d53c363",
+      "state": "applied"
+    },
+    {
+      "repository": "fredrir/packages",
+      "base": "593bf23963c1765635c227271c6b7e4a4cbaa7b2",
+      "policy_commit": "d33c892b83f9536442fc09924c6b03394690f49e",
+      "caller_commit": "f636edc8e7a1ec7629393e41bd47714cb80eb4f3",
+      "verified_main": "f636edc8e7a1ec7629393e41bd47714cb80eb4f3",
+      "runs": [
+        {
+          "conclusion": "",
+          "databaseId": 35524555486,
+          "headSha": "f636edc8e7a1ec7629393e41bd47714cb80eb4f3",
+          "status": "queued",
+          "url": "https://github.com/fredrir/packages/actions/runs/35524555486",
+          "workflowName": "Publish packages"
+        }
+      ],
+      "state": "applied"
+    },
+    {
+      "repository": "fredrir/portfolio",
+      "base": "dba0df81f3482996a8e8000f7ddf8e3303aaa600",
+      "caller_commit": "08ef98631c9f3d88614c464ab130585bf0f014be",
+      "verified_main": "08ef98631c9f3d88614c464ab130585bf0f014be",
+      "runs": [
+        {
+          "conclusion": "",
+          "databaseId": 35524556506,
+          "headSha": "08ef98631c9f3d88614c464ab130585bf0f014be",
+          "status": "in_progress",
+          "url": "https://github.com/fredrir/portfolio/actions/runs/35524556506",
+          "workflowName": "Build images"
+        }
+      ],
+      "state": "applied"
+    }
+  ]
+}
