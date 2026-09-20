@@ -1,0 +1,16 @@
+name: Attest public image
+description: Publish GitHub provenance for a verified public image.
+inputs:
+  image:
+    description: Published image repository.
+    required: true
+  digest:
+    description: Published immutable image digest.
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661
+      with:
+        subject-name: ${{ inputs.image }}
+        subject-digest: ${{ inputs.digest }}

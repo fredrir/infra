@@ -94,12 +94,18 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .infra-build-recipe
-          persist-credentials: false
+      - name: Fetch immutable public infrastructure recipe
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          WORKFLOW_REVISION: ${{ job.workflow_sha }}
+        run: |
+          test "$WORKFLOW_REPOSITORY" = fredrir/infra
+          [[ "$WORKFLOW_REVISION" =~ ^[a-f0-9]{40}$ ]]
+          test ! -e .infra-build-recipe && test ! -L .infra-build-recipe
+          git init --quiet .infra-build-recipe
+          git -C .infra-build-recipe -c credential.helper= -c http.extraHeader= fetch --quiet --depth=1 https://github.com/fredrir/infra.git "$WORKFLOW_REVISION"
+          git -C .infra-build-recipe -c core.hooksPath=/dev/null checkout --quiet --detach FETCH_HEAD
+          test "$(git -C .infra-build-recipe rev-parse HEAD)" = "$WORKFLOW_REVISION"
       - uses: ./.infra-build-recipe/.github/actions/setup-infra
         if: github.repository != 'fredrir/infra'
         with:
@@ -276,11 +282,11 @@ jobs:
           fi
           infra ci measure-check --stage vulnerability-scan --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- \
             trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --skip-java-db-update --timeout 10s "${skip[@]}" "$IMAGE"
-      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661
+      - uses: ./.infra-build-recipe/.github/actions/attest-image
         if: steps.affected.outputs.changed == 'true' && (!github.event.repository.private)
         with:
-          subject-name: ${{ inputs.image }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          image: ${{ inputs.image }}
+          digest: ${{ steps.build.outputs.digest }}
       - name: Verify published provenance
         if: steps.affected.outputs.changed == 'true' && (!github.event.repository.private)
         env:

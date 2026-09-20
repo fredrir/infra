@@ -160,16 +160,16 @@ spec:
           httpGet:
             path: /
             port: http
-          timeoutSeconds: 5
-          periodSeconds: 5
+          timeoutSeconds: 1
+          periodSeconds: 1
           failureThreshold: 3
         startupProbe:
           httpGet:
             path: /
             port: http
-          timeoutSeconds: 5
-          periodSeconds: 5
-          failureThreshold: 60
+          timeoutSeconds: 1
+          periodSeconds: 1
+          failureThreshold: 300
       volumes:
       - name: tmp
         emptyDir:
