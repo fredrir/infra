@@ -15,6 +15,7 @@ import (
 
 func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	root.AddCommand(newPackagesCommand())
+	root.AddCommand(newProjectCommands()...)
 	tag := &cobra.Command{Use: "tag-image", Short: "Tag a checksum-verified OCI manifest", Args: cobra.NoArgs}
 	var tagOptions ci.TagOptions
 	tag.Flags().StringVar(&tagOptions.Image, "image", os.Getenv("IMAGE"), "Immutable image reference")

@@ -34,7 +34,7 @@ jobs:
         ref: ${{ job.workflow_sha }}
         path: .infra
         persist-credentials: false
-        sparse-checkout: scripts/ci
+        sparse-checkout: build/release
     - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
         name: ${{ needs.cli.outputs.artifact }}
@@ -53,4 +53,4 @@ jobs:
       run: infra ci install-tools git-cliff
     - name: Tag the next release
       working-directory: src
-      run: infra release tag --cliff-config ../.infra/scripts/ci/cliff.toml
+      run: infra release tag --cliff-config ../.infra/build/release/cliff.toml

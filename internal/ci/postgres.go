@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func StartPostgres(ctx context.Context, runner Runner, temporary, variable string) error {
@@ -32,8 +33,14 @@ func StartPostgres(ctx context.Context, runner Runner, temporary, variable strin
 		return err
 	}
 	started := false
+	initialized := false
 	defer func() {
 		if !started {
+			if initialized {
+				cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+				defer cancel()
+				_ = runner.Run(cleanup, "setpriv", "--reuid=postgres", "--regid=postgres", "--init-groups", "--", "/usr/lib/postgresql/16/bin/pg_ctl", "--pgdata="+filepath.Join(directory, "cluster"), "--wait", "--mode=fast", "stop")
+			}
 			os.RemoveAll(directory)
 		}
 	}()
@@ -44,14 +51,19 @@ func StartPostgres(ctx context.Context, runner Runner, temporary, variable strin
 	if err := runner.Run(ctx, "setpriv", append(identity, "/usr/lib/postgresql/16/bin/initdb", "--pgdata="+filepath.Join(directory, "cluster"), "--username=postgres", "--auth=trust")...); err != nil {
 		return err
 	}
+	initialized = true
 	if err := runner.Run(ctx, "setpriv", append(identity, "/usr/lib/postgresql/16/bin/pg_ctl", "--pgdata="+filepath.Join(directory, "cluster"), "--wait", "--log="+filepath.Join(directory, "server.log"), "--options=-c listen_addresses=127.0.0.1 -c port=5432 -c unix_socket_directories="+directory+" -c fsync=off", "start")...); err != nil {
 		return err
 	}
-	started = true
 	if err := os.WriteFile(filepath.Join(temporary, "postgres-directory"), []byte(directory), 0600); err != nil {
 		return err
 	}
-	return AppendEnvironment(os.Getenv("GITHUB_ENV"), variable, "postgres://postgres@127.0.0.1:5432/postgres")
+	if err := AppendEnvironment(os.Getenv("GITHUB_ENV"), variable, "postgres://postgres@127.0.0.1:5432/postgres"); err != nil {
+		_ = os.Remove(filepath.Join(temporary, "postgres-directory"))
+		return err
+	}
+	started = true
+	return nil
 }
 
 func StopPostgres(ctx context.Context, runner Runner, temporary string) error {

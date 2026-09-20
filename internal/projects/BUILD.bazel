@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "projects",
+    srcs = [
+        "onboard.go",
+        "rust.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/projects",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/ci",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)
+
+go_test(
+    name = "projects_test",
+    srcs = [
+        "integration_test.go",
+        "onboard_test.go",
+    ],
+    embed = [":projects"],
+    deps = [
+        "//internal/ci",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)

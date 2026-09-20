@@ -17,7 +17,10 @@ func releaseMetadata(t *testing.T) Metadata {
 }
 
 func TestReleaseConfigurationPreservesMetadataAndTargets(t *testing.T) {
-	settings, err := ReleaseSettings(releaseMetadata(t), "fredrir/tool")
+	metadata := releaseMetadata(t)
+	metadata.Packages[0].Metadata.Release.Section = "database"
+	metadata.Packages[0].Metadata.Release.Optional = []string{"neovim: inline editor"}
+	settings, err := ReleaseSettings(metadata, "fredrir/tool")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,6 +46,13 @@ func TestReleaseConfigurationPreservesMetadataAndTargets(t *testing.T) {
 	if got := config["aurs"].([]map[string]any)[0]["depends"].([]string); len(got) != 1 || got[0] != "dbus" {
 		t.Fatal("missing package dependency")
 	}
+	summary, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.Section != "database" || len(settings.Optional) != 1 || !strings.Contains(string(summary), "neovim: inline editor") || strings.Contains(string(summary), `"directory"`) {
+		t.Fatal("publisher metadata differs from the selected release")
+	}
 }
 
 func TestReleaseConfigurationRejectsAmbiguityAndUnsafeInputs(t *testing.T) {
@@ -66,6 +76,11 @@ func TestReleaseConfigurationRejectsAmbiguityAndUnsafeInputs(t *testing.T) {
 	}
 	if _, err := ReleaseSettings(releaseMetadata(t), "attacker/tool"); err == nil {
 		t.Fatal("accepted foreign repository")
+	}
+	metadata = releaseMetadata(t)
+	metadata.Packages[0].License = "LicenseRef-proprietary"
+	if _, err := ReleaseSettings(metadata, "fredrir/tool"); err == nil {
+		t.Fatal("accepted unsupported distribution license")
 	}
 	metadata = releaseMetadata(t)
 	metadata.Packages[0].Metadata.Release.Binary = "unknown"
