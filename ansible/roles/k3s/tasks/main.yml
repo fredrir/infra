@@ -94,6 +94,7 @@
     group: root
     mode: "0600"
   register: k3s_configuration
+  tags: [capacity]
 
 - name: Download the pinned K3s binary
   ansible.builtin.get_url:
@@ -148,7 +149,8 @@
     name: "{{ k3s_service }}"
     enabled: true
     daemon_reload: true
-    state: "{{ 'restarted' if k3s_configuration.changed or k3s_binary.changed or k3s_transport.changed else 'started' }}"
+    state: "{{ 'restarted' if k3s_configuration.changed or (k3s_binary | default({})).get('changed', false) or (k3s_transport | default({})).get('changed', false) else 'started' }}"
+  tags: [capacity]
 
 - name: Wait for the node to become ready
   ansible.builtin.command:
@@ -166,7 +168,7 @@
   until: k3s_ready.rc == 0 and k3s_ready.stdout == 'True'
   retries: 36
   delay: 5
-  tags: [worker-labels]
+  tags: [worker-labels, capacity]
 
 - name: Assign worker capabilities through the administrator API
   ansible.builtin.command:

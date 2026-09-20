@@ -93,6 +93,8 @@
     content: |
       [Service]
       Slice=infra-runners.slice
+      Environment=ACTIONS_RUNNER_HOOK_JOB_STARTED=/usr/local/bin/infra-runner-hook
+      Environment=CI_POOL=main
   register: build_runner_service_override
 
 - name: Start registered runner

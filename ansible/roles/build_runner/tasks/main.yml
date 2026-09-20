@@ -2,6 +2,7 @@
   ansible.builtin.assert:
     that:
     - build_engine_dedicated | bool
+    - build_engine_qualified | bool
     - ansible_facts.system == 'Linux'
     - ansible_facts.architecture == 'x86_64'
     - ansible_facts.virtualization_role == 'guest'
@@ -24,7 +25,7 @@
 
 - name: Install runner dependencies
   ansible.builtin.apt:
-    name: [docker.io, git, curl, jq, libicu74]
+    name: [docker.io, git, curl, jq, libicu74, build-essential]
     state: present
     update_cache: true
     cache_valid_time: 3600
@@ -57,6 +58,16 @@
     mode: '0755'
     timeout: 30
 
+- name: Bound native Bazel startup and compilation
+  ansible.builtin.copy:
+    dest: /etc/bazel.bazelrc
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      startup --host_jvm_args=-Xmx512m
+      build --jobs=2
+
 - name: Install aggregate runner resource limits
   ansible.builtin.copy:
     dest: /etc/systemd/system/infra-runners.slice
@@ -68,6 +79,15 @@
       CPUQuota={{ build_runner_cpus_percent }}%
       MemoryMax={{ build_runner_memory }}
       TasksMax=4096
+
+- name: Install immutable trusted-job hook
+  ansible.builtin.file:
+    src: /usr/local/bin/infra
+    dest: /usr/local/bin/infra-runner-hook
+    state: link
+    owner: root
+    group: root
+    force: true
 
 - name: Configure repository runners
   ansible.builtin.include_tasks: repository.yml
