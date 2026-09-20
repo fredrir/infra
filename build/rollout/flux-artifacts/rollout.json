@@ -113,5 +113,96 @@
       "ready_replicas": 1
     },
     "frontend_end_to_end_latency_qualified": false
+  },
+  "frontend_canary": {
+    "application_repository": "fredrir/llunde-frontend",
+    "application_revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+    "infra_revision": "7706a5b6176788dc2738068ce7da82037beacff6",
+    "image": "ghcr.io/fredrir/llunde-frontend@sha256:5a020d64ec9ef99ec2d8fd6d74d765dc75f252c72fd3de908c848db4aeb12141",
+    "build_run": "https://github.com/fredrir/llunde-frontend/actions/runs/35538973695",
+    "deployment_run": "https://github.com/fredrir/infra/actions/runs/35539028808",
+    "build_created_at": "2026-09-20T21:31:34Z",
+    "deployment_created_at": "2026-09-20T21:32:36Z",
+    "check_ledger": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 6.169446967,
+      "remaining_seconds": 3.830553033,
+      "success": true,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "frontend",
+          "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+          "started": "2026-09-20T21:32:03.678529576Z",
+          "duration_seconds": 1.20400055,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 4.114426,
+          "peak_memory_bytes": 282853376
+        },
+        {
+          "schema": 1,
+          "stage": "provenance-verification",
+          "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+          "started": "2026-09-20T21:32:27.283374158Z",
+          "duration_seconds": 3.073234563,
+          "budget_seconds": 6.903787596,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.311471,
+          "peak_memory_bytes": 69599232
+        },
+        {
+          "schema": 1,
+          "stage": "vulnerability-scan",
+          "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+          "started": "2026-09-20T21:32:18.779808644Z",
+          "duration_seconds": 1.8922118540000001,
+          "budget_seconds": 8.79599945,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.518008,
+          "peak_memory_bytes": 125566976
+        }
+      ]
+    },
+    "changed_artifacts": [
+      "project-llunde"
+    ],
+    "unchanged_artifacts": [
+      "platform-policy-95ec2fca6f8c2675459bbc41c21af122e9310580",
+      "project-llunde-pyparser",
+      "project-portfolio",
+      "project-y"
+    ],
+    "artifact_before": "latest@sha256:a4309f1b549f8cd7635fb8d67f4ac60dd3ffb8668ff52e12fac9e0448e7bcb55",
+    "artifact_after": "latest@sha256:8afb71f40c3e5a4e7be59d1894a261697d109d590f5bc4530142161cdba98a20",
+    "artifact_updated_at": "2026-09-20T21:33:00Z",
+    "reconciliation_finished_at": "2026-09-20T21:33:08.205Z",
+    "reconciliation_seconds": 0.597968067,
+    "pod_created_at": "2026-09-20T21:33:08Z",
+    "image_pull_seconds": 2.177,
+    "pod_ready_at": "2026-09-20T21:33:12Z",
+    "readiness_check": {
+      "success": false,
+      "duration_seconds": 19.012761383,
+      "completed_at": "2026-09-20T21:33:15.1983239Z",
+      "error": "Expected revision not observed before deadline; HTTP 200"
+    },
+    "served_revision_observation": {
+      "observed_at": "2026-09-20T21:33:28Z",
+      "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+      "method": "curl HTTPS response",
+      "seconds_from_build_creation": 114,
+      "measurement": "Observation upper bound, not exact first-serving time"
+    },
+    "deployment_available": true,
+    "subminute_end_to_end_qualified": false
   }
 }
