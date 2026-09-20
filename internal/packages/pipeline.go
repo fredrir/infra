@@ -191,15 +191,14 @@ func Smoke(ctx context.Context, options PipelineOptions, site, channels, scope s
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	var identities []string
-	for _, name := range names {
-		identities = append(identities, name, tools[name].Binary)
-	}
+	batches := smokePackageBatches(names, tools, scope)
 	if err := smokeDistributions(ctx, targets, func(ctx context.Context, target SmokeTarget) error {
-		args := append([]string{"infra", "packages", "smoke-install", target.Format}, identities...)
-		container := client.Container(dagger.ContainerOpts{Platform: "linux/amd64"}).From(target.Image).WithFile("/usr/local/bin/infra", cli, dagger.ContainerWithFileOpts{Permissions: 0755}).WithDirectory("/repo", repository).WithExec(args)
-		if _, err := container.Sync(ctx); err != nil {
-			return fmt.Errorf("packages on %s: %w", target.Image, err)
+		base := client.Container(dagger.ContainerOpts{Platform: "linux/amd64"}).From(target.Image).WithFile("/usr/local/bin/infra", cli, dagger.ContainerWithFileOpts{Permissions: 0755}).WithDirectory("/repo", repository)
+		for _, identities := range batches {
+			args := append([]string{"infra", "packages", "smoke-install", target.Format}, identities...)
+			if _, err := base.WithExec(args).Sync(ctx); err != nil {
+				return fmt.Errorf("packages %v on %s: %w", identities, target.Image, err)
+			}
 		}
 		return nil
 	}); err != nil {
@@ -225,4 +224,21 @@ func smokeDistributions(ctx context.Context, targets []SmokeTarget, check func(c
 		})
 	}
 	return group.Wait()
+}
+
+func smokePackageBatches(names []string, tools Tools, scope string) [][]string {
+	var batches [][]string
+	var combined []string
+	for _, name := range names {
+		identity := []string{name, tools[name].Binary}
+		if scope == "full" {
+			batches = append(batches, identity)
+		} else {
+			combined = append(combined, identity...)
+		}
+	}
+	if len(combined) > 0 {
+		batches = append(batches, combined)
+	}
+	return batches
 }

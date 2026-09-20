@@ -121,3 +121,16 @@ func TestSmokeDistributionsRunsTwoChecksAndCancelsAfterFailure(t *testing.T) {
 		t.Fatalf("peak concurrency = %d, want 2", peak.Load())
 	}
 }
+
+func TestFullSmokeKeepsPackageDependenciesIsolated(t *testing.T) {
+	names := []string{"one", "two"}
+	tools := Tools{"one": {Binary: "one-bin"}, "two": {Binary: "two-bin"}}
+	quick := smokePackageBatches(names, tools, "quick")
+	if !reflect.DeepEqual(quick, [][]string{{"one", "one-bin", "two", "two-bin"}}) {
+		t.Fatalf("quick smoke did not batch packages: %v", quick)
+	}
+	full := smokePackageBatches(names, tools, "full")
+	if !reflect.DeepEqual(full, [][]string{{"one", "one-bin"}, {"two", "two-bin"}}) {
+		t.Fatalf("full smoke lost independent package installation: %v", full)
+	}
+}
