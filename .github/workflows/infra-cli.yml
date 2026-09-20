@@ -12,7 +12,7 @@ permissions:
   contents: read
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository == 'fredrir/infra' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name != 'pull_request' && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: 25
     outputs:
       artifact: ${{ steps.bundle.outputs.artifact }}
@@ -31,11 +31,26 @@ jobs:
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         id: binary-cache
+        if: runner.environment == 'github-hosted'
         with:
           path: ${{ runner.temp }}/infra-cli
           key: infra-cli-inputs-v2-${{ steps.inputs.outputs.digest }}
+      - name: Reuse verified native CLI
+        id: cached
+        env:
+          INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
+        run: |
+          bundle="$RUNNER_TEMP/infra-cli"
+          persistent="$HOME/.cache/infra/source-cli/$INPUT_DIGEST"
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ] && [ -f "$persistent/infra" ] && [ -f "$persistent/sha256" ] && [ -f "$persistent/inputs" ] && [ -f "$persistent/source-revision" ]; then
+            mkdir -p "$bundle"
+            cp "$persistent/infra" "$persistent/sha256" "$persistent/inputs" "$persistent/source-revision" "$bundle/"
+          fi
+          if [ -f "$bundle/inputs" ] && [ "$(cat "$bundle/inputs")" = "$INPUT_DIGEST" ] && printf '%s  %s\n' "$(cat "$bundle/sha256")" "$bundle/infra" | sha256sum --check --strict --status; then
+            printf 'hit=true\n' >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        if: steps.binary-cache.outputs.cache-hit != 'true'
+        if: runner.environment == 'github-hosted' && steps.cached.outputs.hit != 'true'
         with:
           path: |
             ~/.cache/infra-bazel-actions
@@ -44,7 +59,7 @@ jobs:
           restore-keys: |
             bazel-linux-amd64-9.2.0-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock', 'go.sum') }}-
       - name: Install pinned Bazel
-        if: steps.binary-cache.outputs.cache-hit != 'true'
+        if: runner.environment == 'github-hosted' && steps.cached.outputs.hit != 'true'
         env:
           BAZEL_SHA256: 7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694
         run: |
@@ -52,10 +67,15 @@ jobs:
           printf '%s  %s\n' "$BAZEL_SHA256" "$RUNNER_TEMP/bazel" | sha256sum --check --strict
           chmod 755 "$RUNNER_TEMP/bazel"
       - name: Build CLI
-        if: steps.binary-cache.outputs.cache-hit != 'true'
-        run: '"$RUNNER_TEMP/bazel" --batch build --config=ci --disk_cache="$HOME/.cache/infra-bazel-actions" --repository_cache="$HOME/.cache/infra-bazel-repository" --@rules_go//go/config:pure //cmd/infra:infra'
+        if: steps.cached.outputs.hit != 'true'
+        run: |
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then
+            bazel build --config=ci --remote_cache="$BAZEL_REMOTE_CACHE" --@rules_go//go/config:pure //cmd/infra:infra
+          else
+            "$RUNNER_TEMP/bazel" --batch build --config=ci --disk_cache="$HOME/.cache/infra-bazel-actions" --repository_cache="$HOME/.cache/infra-bazel-repository" --@rules_go//go/config:pure //cmd/infra:infra
+          fi
       - name: Store binary identity
-        if: steps.binary-cache.outputs.cache-hit != 'true'
+        if: steps.cached.outputs.hit != 'true'
         env:
           REVISION: ${{ job.workflow_sha }}
           INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
@@ -74,6 +94,14 @@ jobs:
           test "$(cat "$RUNNER_TEMP/infra-cli/inputs")" = "$INPUT_DIGEST"
           printf '%s  %s\n' "$(cat "$RUNNER_TEMP/infra-cli/sha256")" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
           printf 'sha256=%s\nrevision=%s\nartifact=infra-cli-%s-%s\n' "$(cat "$RUNNER_TEMP/infra-cli/sha256")" "$REVISION" "$REVISION" "$(cat /proc/sys/kernel/random/uuid)" >> "$GITHUB_OUTPUT"
+      - name: Retain native CLI
+        if: runner.environment == 'self-hosted' && steps.cached.outputs.hit != 'true'
+        env:
+          INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
+        run: |
+          persistent="$HOME/.cache/infra/source-cli/$INPUT_DIGEST"
+          mkdir -p "$persistent"
+          cp "$RUNNER_TEMP/infra-cli/"* "$persistent/"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ steps.bundle.outputs.artifact }}
