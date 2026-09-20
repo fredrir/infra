@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "qualified_at": "2026-09-20T20:46:00Z",
+  "completed_at": "2026-09-20T20:45:37Z",
   "active_path": "./build/rollout/flux-artifacts/cutover",
   "image": "ghcr.io/fredrir/infra-source-watcher@sha256:632f482078fb655603c3648169e9f99c3647c91d83a04f1cb8591d6ac9849f76",
   "source_revision": "main@sha1:9354b19939e672259c19e9ebe7742914ae10b61a",
