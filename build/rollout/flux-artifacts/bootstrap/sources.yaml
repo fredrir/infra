@@ -1,0 +1,58 @@
+apiVersion: source.extensions.fluxcd.io/v1beta1
+kind: ArtifactGenerator
+metadata:
+  name: platform-artifacts
+  namespace: flux-system
+spec:
+  artifacts:
+    - copy:
+        - from: '@repo/platform/components/policy/**'
+          to: '@artifact/platform/components/policy/'
+        - from: '@repo/platform/clusters/production/settings.yaml'
+          to: '@artifact/platform/clusters/production/settings.yaml'
+      name: platform-policy-f12037929eefe180c344468b72c86f63cab4f032
+      originRevision: '@repo'
+    - copy:
+        - from: '@repo/platform/projects/llunde/**'
+          to: '@artifact/platform/projects/llunde/'
+        - from: '@repo/platform/clusters/production/settings.yaml'
+          to: '@artifact/platform/clusters/production/settings.yaml'
+      name: project-llunde
+      originRevision: '@repo'
+    - copy:
+        - from: '@repo/platform/projects/portfolio/**'
+          to: '@artifact/platform/projects/portfolio/'
+        - from: '@repo/platform/clusters/production/settings.yaml'
+          to: '@artifact/platform/clusters/production/settings.yaml'
+        - from: '@repo/platform/components/backup-job/**'
+          to: '@artifact/platform/components/backup-job/'
+        - from: '@repo/platform/components/repository-maintenance/**'
+          to: '@artifact/platform/components/repository-maintenance/'
+      name: project-portfolio
+      originRevision: '@repo'
+    - copy:
+        - from: '@repo/platform/projects/y/**'
+          to: '@artifact/platform/projects/y/'
+        - from: '@repo/platform/clusters/production/settings.yaml'
+          to: '@artifact/platform/clusters/production/settings.yaml'
+        - from: '@repo/platform/components/backup-job/**'
+          to: '@artifact/platform/components/backup-job/'
+        - from: '@repo/platform/components/repository-maintenance/**'
+          to: '@artifact/platform/components/repository-maintenance/'
+      name: project-y
+      originRevision: '@repo'
+    - copy:
+        - from: '@repo/platform/projects/llunde-pyparser/**'
+          to: '@artifact/platform/projects/llunde-pyparser/'
+        - from: '@repo/platform/clusters/production/settings.yaml'
+          to: '@artifact/platform/clusters/production/settings.yaml'
+        - from: '@repo/platform/components/backup-job/**'
+          to: '@artifact/platform/components/backup-job/'
+        - from: '@repo/platform/components/repository-maintenance/**'
+          to: '@artifact/platform/components/repository-maintenance/'
+      name: project-llunde-pyparser
+      originRevision: '@repo'
+  sources:
+    - alias: repo
+      kind: GitRepository
+      name: flux-system

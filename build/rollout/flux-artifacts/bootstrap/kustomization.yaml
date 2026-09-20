@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+patches:
+  - patch: |
+      - op: replace
+        path: /spec/path
+        value: ./build/rollout/flux-artifacts/bootstrap
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: flux-system
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --feature-gates=ExternalArtifact=true,AdditiveCELDependencyCheck=true
+    target:
+      kind: Deployment
+      name: kustomize-controller
+      namespace: flux-system
+resources:
+  - ../../../../platform/clusters/production
+  - ../controller
+  - sources.yaml

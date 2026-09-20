@@ -1,0 +1,112 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+patches:
+  - patch: |
+      - op: replace
+        path: /spec/path
+        value: ./build/rollout/flux-artifacts/pause
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: flux-system
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/suspend
+        value: true
+      - op: replace
+        path: /spec/prune
+        value: false
+      - op: add
+        path: /spec/deletionPolicy
+        value: Orphan
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-projects
+      namespace: flux-system
+  - patch: |
+      - op: replace
+        path: /spec/sourceRef
+        value:
+          kind: ExternalArtifact
+          name: platform-policy-f12037929eefe180c344468b72c86f63cab4f032
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-policy
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/dependsOn/0/readyExpr
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-f12037929eefe180c344468b72c86f63cab4f032' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-controllers
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/dependsOn/0/readyExpr
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-f12037929eefe180c344468b72c86f63cab4f032' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-ingress
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/dependsOn/0/readyExpr
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-f12037929eefe180c344468b72c86f63cab4f032' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-observability
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/dependsOn/1/readyExpr
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-f12037929eefe180c344468b72c86f63cab4f032' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-runners
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/dependsOn/0/readyExpr
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-f12037929eefe180c344468b72c86f63cab4f032' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-cache
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/dependsOn/0/readyExpr
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-f12037929eefe180c344468b72c86f63cab4f032' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-build-cache
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/dependsOn/0/readyExpr
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-f12037929eefe180c344468b72c86f63cab4f032' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-backups
+      namespace: flux-system
+  - patch: |
+      - op: add
+        path: /spec/dependsOn/0/readyExpr
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-f12037929eefe180c344468b72c86f63cab4f032' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: platform-projects
+      namespace: flux-system
+resources:
+  - ../bootstrap

@@ -1,0 +1,35 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: source-watcher-artifacts
+  namespace: flux-system
+rules:
+- apiGroups: [source.toolkit.fluxcd.io]
+  resources: [gitrepositories, ocirepositories, buckets, helmcharts]
+  verbs: [get, list, watch]
+- apiGroups: [source.toolkit.fluxcd.io]
+  resources: [externalartifacts, externalartifacts/status, externalartifacts/finalizers]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [source.extensions.fluxcd.io]
+  resources: [artifactgenerators, artifactgenerators/status, artifactgenerators/finalizers]
+  verbs: [get, list, watch, update, patch]
+- apiGroups: [coordination.k8s.io]
+  resources: [leases]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: ['']
+  resources: [events]
+  verbs: [create, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: source-watcher-artifacts
+  namespace: flux-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: source-watcher-artifacts
+subjects:
+- kind: ServiceAccount
+  name: source-watcher-artifacts
+  namespace: flux-system

@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+patches:
+  - patch: |
+      - op: replace
+        path: /spec/path
+        value: ./build/rollout/flux-artifacts/cutover
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: flux-system
+      namespace: flux-system
+  - patch: |
+      - op: replace
+        path: /spec/sourceRef
+        value:
+          kind: ExternalArtifact
+          name: project-llunde-pyparser
+      - op: replace
+        path: /spec/dependsOn
+        value:
+          - name: project-llunde-pyparser
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: llunde-pyparser-migration
+      namespace: flux-system
+  - patch: |
+      - op: replace
+        path: /spec/sourceRef
+        value:
+          kind: ExternalArtifact
+          name: project-llunde-pyparser
+    target:
+      group: kustomize.toolkit.fluxcd.io
+      kind: Kustomization
+      name: llunde-pyparser-application
+      namespace: flux-system
+resources:
+  - ../pause
+  - projects.yaml

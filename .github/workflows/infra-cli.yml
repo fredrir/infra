@@ -31,6 +31,11 @@ jobs:
           while IFS= read -r path; do
             case "$path" in
               cmd/*|internal/*) ;;
+              build/rollout/flux-artifacts/generate/*.go)
+                if [ ! -f go.work ] && grep -qx 'module github.com/fredrir/infra-tools/flux-artifacts' build/rollout/flux-artifacts/generate/go.mod && ! grep -Eq 'infra-tools/flux-artifacts|build/rollout/flux-artifacts/generate' go.mod; then
+                  continue
+                fi
+                sources=(.); break ;;
               *) sources=(.); break ;;
             esac
           done < <(git ls-files -- '*.go')
