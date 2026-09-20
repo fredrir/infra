@@ -2,10 +2,17 @@ load("@rules_go//go:def.bzl", "go_test")
 
 go_test(
     name = "contracts_test",
-    srcs = ["images_test.go"],
+    srcs = [
+        "cancellation_test.go",
+        "images_test.go",
+    ],
     data = ["//:image_contract_data"],
     deps = [
         "//internal/images",
+        "@dev_cel_cel_go//cel",
+        "@dev_cel_cel_go//common/types",
+        "@dev_cel_cel_go//common/types/ref",
+        "@dev_cel_cel_go//common/types/traits",
         "@in_yaml_go_yaml_v3//:yaml",
     ],
 )
