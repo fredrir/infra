@@ -23,7 +23,10 @@ on:
 permissions:
   contents: read
 jobs:
+  cli:
+    uses: ./.github/workflows/infra-cli.yml
   check:
+    needs: cli
     if: github.repository_owner_id == '114402558' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ${{ github.event_name == 'pull_request' && 'rust-pr-amd64' || 'rust-amd64' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
@@ -31,50 +34,52 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
-        repository: ${{ job.workflow_repository }}
-        ref: ${{ job.workflow_sha }}
-        path: .infra
-        persist-credentials: false
-        sparse-checkout: scripts/ci
+        name: ${{ needs.cli.outputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify infrastructure CLI
+      env:
+        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+        CLI_REVISION: ${{ needs.cli.outputs.revision }}
+        WORKFLOW_REVISION: ${{ job.workflow_sha }}
+      run: |
+        test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
     - name: Prepare
       env:
         CLIPPY_ARGS: ${{ inputs.clippy-args }}
         TEST_ARGS: ${{ inputs.test-args }}
-      run: bash .infra/scripts/ci/rust-prepare.sh
+      run: infra ci rust prepare
     - name: Restore build outputs
-      run: bash .infra/scripts/ci/rust-target-cache.sh restore
+      run: infra ci rust cache restore
     - name: Start PostgreSQL
       if: inputs.postgres
       env:
         URL_ENV: ${{ inputs.postgres-url-env }}
-      run: bash .infra/scripts/ci/start-postgres.sh
+      run: infra ci postgres start
     - name: Format
-      run: cargo fmt --all -- --check
+      run: infra ci rust check format
     - name: Lint
-      run: |
-        source "$RUNNER_TEMP/rust-args.sh"
-        cargo clippy --all-targets --locked "${CLIPPY_FLAGS[@]}" -- -D warnings
+      run: infra ci rust check lint
     - name: Test
-      run: |
-        source "$RUNNER_TEMP/rust-args.sh"
-        cargo nextest run --all-targets --locked --no-tests=pass "${TEST_FLAGS[@]}"
+      run: infra ci rust check test
     - name: Test documentation
-      run: |
-        source "$RUNNER_TEMP/rust-args.sh"
-        if cargo metadata --no-deps --format-version 1 | jq -e '[.packages[].targets[].kind[]] | index("lib")' >/dev/null; then
-          cargo test --doc --locked "${TEST_FLAGS[@]}"
-        fi
+      run: infra ci rust check docs
     - name: Build without default features
       if: inputs.minimal-build
-      run: cargo build --locked --no-default-features
+      run: infra ci rust check minimal
     - name: Check the minimum supported Rust version
-      run: bash .infra/scripts/ci/check-msrv.sh
+      run: infra ci rust check msrv
     - name: Audit dependencies
-      run: cargo audit
+      run: infra ci rust check audit
     - name: Save build outputs
-      run: bash .infra/scripts/ci/rust-target-cache.sh save
+      run: infra ci rust cache save
+    - name: Stop PostgreSQL
+      if: always() && inputs.postgres
+      run: infra ci postgres stop
     - name: Cache report
       if: always()
       run: sccache --show-stats >> "$GITHUB_STEP_SUMMARY" || true

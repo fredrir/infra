@@ -7,7 +7,10 @@ env:
   MACOS_SDK_OBJECT: MacOSX27.0.sdk.tar.zst
   MACOS_SDK_SHA256: 206f0ccf404784e98b1d1040fef4dbefce00273b1a4a668f4483c8b0370b52ab
 jobs:
+  cli:
+    uses: ./.github/workflows/infra-cli.yml
   build:
+    needs: cli
     if: github.repository_owner_id == '114402558' && github.ref_protected && ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
     runs-on: rust-release-amd64
     timeout-minutes: 80
@@ -29,42 +32,36 @@ jobs:
         path: .infra
         persist-credentials: false
         sparse-checkout: scripts/ci
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ needs.cli.outputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify infrastructure CLI
+      env:
+        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+        CLI_REVISION: ${{ needs.cli.outputs.revision }}
+        WORKFLOW_REVISION: ${{ job.workflow_sha }}
+      run: |
+        test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
     - name: Install release tools
-      run: bash .infra/scripts/ci/install-tools.sh goreleaser git-cliff
+      run: infra ci install-tools goreleaser git-cliff
     - name: Fetch the macOS SDK
-      run: bash .infra/scripts/ci/fetch-macos-sdk.sh
+      run: infra ci fetch-macos-sdk
     - name: Render the release configuration
       id: render
       working-directory: src
-      run: |
-        cargo metadata --format-version 1 --no-deps --locked > "$RUNNER_TEMP/cargo-metadata.json"
-        python3 ../.infra/scripts/ci/render_goreleaser.py --metadata "$RUNNER_TEMP/cargo-metadata.json" --root . \
-          --repository "$GITHUB_REPOSITORY" --dist "$RUNNER_TEMP/dist" --sdk "$RUNNER_TEMP/macos-sdk/MacOSX.sdk" \
-          --config "$RUNNER_TEMP/goreleaser.yaml" --summary "$RUNNER_TEMP/release.json"
-        printf 'name=%s\n' "$(jq -r .name "$RUNNER_TEMP/release.json")" >> "$GITHUB_OUTPUT"
-        if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" == *-* ]]; then prerelease=true; else prerelease=false; fi
-        printf 'prerelease=%s\n' "$prerelease" >> "$GITHUB_OUTPUT"
-        config=cliff.toml
-        [[ -f "$config" ]] || config=../.infra/scripts/ci/cliff.toml
-        if [[ "$GITHUB_REF_TYPE" == tag ]]; then
-          previous=$(git tag --list 'v*' --sort=-v:refname | grep -v -- '-' | grep -vx "$GITHUB_REF_NAME" | head -n1 || true)
-          git-cliff --config "$config" --tag "$GITHUB_REF_NAME" --strip all ${previous:+"$previous..$GITHUB_REF_NAME"} > "$RUNNER_TEMP/notes.md"
-        else
-          git-cliff --config "$config" --unreleased --tag v0.0.0-dry-run --strip all > "$RUNNER_TEMP/notes.md"
-        fi
-        test -z "$(git status --porcelain)"
+      run: infra release prepare --cliff-config ../.infra/scripts/ci/cliff.toml
     - name: Build every target
       working-directory: src
       env:
         GITHUB_TOKEN: ${{ github.token }}
         SNAPSHOT: ${{ github.ref_type != 'tag' }}
-      run: |
-        mode=()
-        [[ "$SNAPSHOT" == true ]] && mode=(--snapshot)
-        goreleaser release --config "$RUNNER_TEMP/goreleaser.yaml" --clean --skip=publish,announce \
-          --release-notes "$RUNNER_TEMP/notes.md" "${mode[@]}"
+      run: infra release build
     - name: Verify and bundle the artifacts
-      run: bash .infra/scripts/ci/bundle-release.sh "$RUNNER_TEMP/dist" "$RUNNER_TEMP/release.json" "$RUNNER_TEMP/notes.md" "$RUNNER_TEMP/bundle"
+      run: infra release bundle "$RUNNER_TEMP/dist" "$RUNNER_TEMP/release.json" "$RUNNER_TEMP/notes.md" "$RUNNER_TEMP/bundle"
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: release-bundle
@@ -75,7 +72,7 @@ jobs:
       if: always()
       run: sccache --show-stats >> "$GITHUB_STEP_SUMMARY" || true
   publish:
-    needs: build
+    needs: [cli, build]
     if: github.repository_owner_id == '114402558' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.ref_protected
     runs-on: rust-release-amd64
     timeout-minutes: 20
@@ -97,17 +94,27 @@ jobs:
         path: .infra
         persist-credentials: false
         sparse-checkout: scripts/ci
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ needs.cli.outputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify infrastructure CLI
+      env:
+        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+        CLI_REVISION: ${{ needs.cli.outputs.revision }}
+        WORKFLOW_REVISION: ${{ job.workflow_sha }}
+      run: |
+        test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
     - name: Install release tools
-      run: bash .infra/scripts/ci/install-tools.sh gh
+      run: infra ci install-tools gh
     - name: Draft the release
       env:
         GH_TOKEN: ${{ github.token }}
         PRERELEASE: ${{ needs.build.outputs.prerelease }}
-      run: |
-        flags=(--draft --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/bundle/notes.md")
-        [[ "$PRERELEASE" == true ]] && flags+=(--prerelease)
-        mapfile -t assets < <(find "$RUNNER_TEMP/bundle/assets" -type f | sort)
-        gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" "${flags[@]}" "${assets[@]}"
+      run: infra release draft --bundle "$RUNNER_TEMP/bundle"
     - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
       with:
         subject-checksums: ${{ runner.temp }}/bundle/assets/checksums.txt

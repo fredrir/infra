@@ -4,7 +4,10 @@ on:
 permissions:
   contents: read
 jobs:
+  cli:
+    uses: ./.github/workflows/infra-cli.yml
   tag:
+    needs: cli
     if: github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && !startsWith(github.event.head_commit.message, 'release:')
     runs-on: rust-amd64
     timeout-minutes: 20
@@ -32,8 +35,22 @@ jobs:
         path: .infra
         persist-credentials: false
         sparse-checkout: scripts/ci
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ needs.cli.outputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify infrastructure CLI
+      env:
+        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+        CLI_REVISION: ${{ needs.cli.outputs.revision }}
+        WORKFLOW_REVISION: ${{ job.workflow_sha }}
+      run: |
+        test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
     - name: Install release tools
-      run: bash .infra/scripts/ci/install-tools.sh git-cliff
+      run: infra ci install-tools git-cliff
     - name: Tag the next release
       working-directory: src
-      run: bash ../.infra/scripts/ci/tag-release.sh
+      run: infra release tag --cliff-config ../.infra/scripts/ci/cliff.toml

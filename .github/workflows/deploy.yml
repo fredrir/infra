@@ -20,7 +20,10 @@ concurrency:
   group: deploy-${{ inputs.image }}
   cancel-in-progress: false
 jobs:
+  cli:
+    uses: ./.github/workflows/infra-cli.yml
   deploy:
+    needs: cli
     if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref == 'refs/heads/main' && github.ref_protected
     runs-on: deploy-amd64
     timeout-minutes: 10
@@ -33,8 +36,22 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ needs.cli.outputs.artifact }}
+          path: ${{ runner.temp }}/infra-cli
+      - name: Verify infrastructure CLI
+        env:
+          CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+          CLI_REVISION: ${{ needs.cli.outputs.revision }}
+          WORKFLOW_REVISION: ${{ github.workflow_sha }}
+        run: |
+          test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+          printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+          chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+          printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
       - name: Install tools
-        run: bash scripts/ci/install-tools.sh gh yq kustomize cosign
+        run: infra ci install-tools gh kustomize cosign
       - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
         id: deployment-token
         with:
@@ -49,13 +66,6 @@ jobs:
           IMAGE_NAME: ${{ inputs.image }}
           IMAGE_DIGEST: ${{ inputs.digest }}
           SOURCE_REVISION: ${{ inputs.source-revision }}
-        run: |
-          export DOCKER_CONFIG="$RUNNER_TEMP/registry"
-          mkdir -m 700 "$DOCKER_CONFIG"
-          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-          umask 077
-          jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$DOCKER_CONFIG/config.json"
-          unset REGISTRY_TOKEN
-          bash scripts/ci/deploy.sh "$GITHUB_WORKSPACE"
+        run: infra ci deploy "$GITHUB_WORKSPACE"
       - name: Reconcile
-        run: curl --fail --silent --show-error --max-time 10 --request POST http://webhook-receiver.flux-system.svc.cluster.local/hook/273de0d9e70f699a6815cac41ac0e847b0ed56918dfff9301840383ef2760306 || printf '::warning::Flux was not notified; it reconciles on its next poll\n'
+        run: infra ci reconcile http://webhook-receiver.flux-system.svc.cluster.local/hook/273de0d9e70f699a6815cac41ac0e847b0ed56918dfff9301840383ef2760306
