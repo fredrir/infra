@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -49,12 +50,20 @@ func Install(ctx context.Context, o InstallOptions) (Receipt, error) {
 	if o.CacheDir == "" {
 		return result, fmt.Errorf("artifact cache directory required")
 	}
+	lock, err := lockCache(ctx, o.CacheDir)
+	if err != nil {
+		return result, err
+	}
+	defer lock.Close()
 	directory := filepath.Join(o.CacheDir, o.Revision, strings.ReplaceAll(o.Platform, "/", "-"), o.SHA256)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	if err := privateCache(o.CacheDir, o.Revision, strings.ReplaceAll(o.Platform, "/", "-"), o.SHA256); err != nil {
 		return result, err
 	}
 	path := filepath.Join(directory, "infra")
 	if err := verify(path, o.SHA256, o.Platform); err == nil {
+		if err := os.Chmod(path, 0o555); err != nil {
+			return result, err
+		}
 		result.CacheHit = true
 	} else {
 		u, err := url.Parse(o.URL)
@@ -209,4 +218,28 @@ func installCopy(source, destination string) error {
 		return err
 	}
 	return os.Rename(output.Name(), destination)
+}
+
+func privateCache(base string, parts ...string) error {
+	if err := os.MkdirAll(base, 0o700); err != nil {
+		return err
+	}
+	path := base
+	for i := 0; i <= len(parts); i++ {
+		if i > 0 {
+			path = filepath.Join(path, parts[i-1])
+			if err := os.Mkdir(path, 0o700); err != nil && !os.IsExist(err) {
+				return err
+			}
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		if !info.IsDir() || info.Mode().Perm()&0o077 != 0 || !ok || stat.Uid != uint32(os.Geteuid()) {
+			return fmt.Errorf("artifact cache requires owned private directories")
+		}
+	}
+	return nil
 }

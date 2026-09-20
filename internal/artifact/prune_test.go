@@ -10,6 +10,9 @@ import (
 
 func TestPruneUsesRecencyAndPreservesProtectedRevision(t *testing.T) {
 	root := t.TempDir()
+	if err := os.Chmod(root, 0700); err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now()
 	for i, prefix := range []string{"a", "b", "c"} {
 		directory := filepath.Join(root, strings.Repeat(prefix, 40), "linux-amd64", strings.Repeat(prefix, 64))
@@ -39,6 +42,9 @@ func TestPruneUsesRecencyAndPreservesProtectedRevision(t *testing.T) {
 
 func TestPruneLeavesUnrelatedFilesAndRejectsInvalidLimits(t *testing.T) {
 	root := t.TempDir()
+	if err := os.Chmod(root, 0700); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(root, "user-data"), []byte("keep"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -50,5 +56,29 @@ func TestPruneLeavesUnrelatedFilesAndRejectsInvalidLimits(t *testing.T) {
 	}
 	if _, err := Prune(PruneOptions{CacheDir: root}); err == nil {
 		t.Fatal("invalid limits accepted")
+	}
+}
+
+func TestPrunePreservesUnrecognizedFilesInsideArtifactDirectory(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Chmod(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	directory := filepath.Join(root, strings.Repeat("a", 40), "linux-amd64", strings.Repeat("b", 64))
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, data := range map[string]string{"infra": "obsolete binary", "notes": "keep"} {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := Prune(PruneOptions{CacheDir: root, MaxBytes: 1, MaxAge: time.Hour})
+	if err != nil || result.Removed != 1 {
+		t.Fatalf("prune: %+v %v", result, err)
+	}
+	data, err := os.ReadFile(filepath.Join(directory, "notes"))
+	if err != nil || string(data) != "keep" {
+		t.Fatalf("unrecognized data removed: %q %v", data, err)
 	}
 }

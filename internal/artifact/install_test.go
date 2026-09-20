@@ -19,7 +19,7 @@ func TestInstallVerifiesDownloadAndReusesCachedBinary(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.Write(data) }))
 	defer server.Close()
-	o := InstallOptions{URL: server.URL, Client: server.Client(), Revision: strings.Repeat("a", 40), SHA256: fmt.Sprintf("%x", sha256.Sum256(data)), Platform: "linux/amd64", CacheDir: t.TempDir(), Destination: filepath.Join(t.TempDir(), "infra")}
+	o := InstallOptions{URL: server.URL, Client: server.Client(), Revision: strings.Repeat("a", 40), SHA256: fmt.Sprintf("%x", sha256.Sum256(data)), Platform: "linux/amd64", CacheDir: filepath.Join(t.TempDir(), "cache"), Destination: filepath.Join(t.TempDir(), "infra")}
 	first, err := Install(context.Background(), o)
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +47,7 @@ func TestInstallRejectsCorruptDownloadWithoutReplacingDestination(t *testing.T) 
 	if err := os.WriteFile(destination, []byte("previous"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	o := InstallOptions{URL: server.URL, Client: server.Client(), Revision: strings.Repeat("a", 40), SHA256: strings.Repeat("b", 64), Platform: "linux/amd64", CacheDir: t.TempDir(), Destination: destination}
+	o := InstallOptions{URL: server.URL, Client: server.Client(), Revision: strings.Repeat("a", 40), SHA256: strings.Repeat("b", 64), Platform: "linux/amd64", CacheDir: filepath.Join(t.TempDir(), "cache"), Destination: destination}
 	if _, err := Install(context.Background(), o); err == nil || !strings.Contains(err.Error(), "checksum") {
 		t.Fatalf("corrupt download accepted: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestInstallRevalidatesCacheAndRejectsWrongArchitecture(t *testing.T) {
 	data := linuxFixture()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(data) }))
 	defer server.Close()
-	o := InstallOptions{URL: server.URL, Client: server.Client(), Revision: strings.Repeat("a", 40), SHA256: fmt.Sprintf("%x", sha256.Sum256(data)), Platform: "linux/amd64", CacheDir: t.TempDir()}
+	o := InstallOptions{URL: server.URL, Client: server.Client(), Revision: strings.Repeat("a", 40), SHA256: fmt.Sprintf("%x", sha256.Sum256(data)), Platform: "linux/amd64", CacheDir: filepath.Join(t.TempDir(), "cache")}
 	first, err := Install(context.Background(), o)
 	if err != nil {
 		t.Fatal(err)
@@ -92,4 +92,32 @@ func linuxFixture() []byte {
 	binary.LittleEndian.PutUint16(data[54:], 56)
 	binary.LittleEndian.PutUint16(data[58:], 64)
 	return data
+}
+
+func TestInstallRejectsSharedAndSymlinkedCacheBeforeDownloading(t *testing.T) {
+	for _, kind := range []string{"shared", "symlink"} {
+		t.Run(kind, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.Chmod(root, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			revision := strings.Repeat("a", 40)
+			outside := t.TempDir()
+			if kind == "shared" {
+				if err := os.Chmod(root, 0o777); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := os.Symlink(outside, filepath.Join(root, revision)); err != nil {
+				t.Fatal(err)
+			}
+			_, err := Install(context.Background(), InstallOptions{CacheDir: root, Revision: revision, SHA256: strings.Repeat("b", 64), Platform: "linux/amd64"})
+			if err == nil || !strings.Contains(err.Error(), "owned private") {
+				t.Fatalf("unsafe cache accepted: %v", err)
+			}
+			entries, err := os.ReadDir(outside)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("cache escaped: %v %v", entries, err)
+			}
+		})
+	}
 }

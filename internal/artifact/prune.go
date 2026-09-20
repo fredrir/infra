@@ -1,6 +1,8 @@
 package artifact
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -8,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -33,6 +36,18 @@ func Prune(o PruneOptions) (PruneResult, error) {
 	if o.Now.IsZero() {
 		o.Now = time.Now()
 	}
+	if _, err := os.Lstat(o.CacheDir); os.IsNotExist(err) {
+		return result, nil
+	} else if err != nil {
+		return result, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	lock, err := lockCache(ctx, o.CacheDir)
+	if err != nil {
+		return result, err
+	}
+	defer lock.Close()
 	root, err := os.OpenRoot(o.CacheDir)
 	if os.IsNotExist(err) {
 		return result, nil
@@ -50,6 +65,9 @@ func Prune(o PruneOptions) (PruneResult, error) {
 	var entries []entry
 	pattern := regexp.MustCompile(`^[a-f0-9]{40}/(?:linux|darwin)-(?:amd64|arm64)/[a-f0-9]{64}/infra$`)
 	err = fs.WalkDir(root.FS(), ".", func(path string, d fs.DirEntry, walkErr error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if walkErr != nil {
 			return walkErr
 		}
@@ -84,10 +102,19 @@ func Prune(o PruneOptions) (PruneResult, error) {
 		return entries[i].used.Before(entries[j].used)
 	})
 	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return result, err
+		}
 		if entry.keep || (o.Now.Sub(entry.used) <= o.MaxAge && result.RetainedBytes <= o.MaxBytes) {
 			continue
 		}
-		if err := root.RemoveAll(entry.directory); err != nil {
+		if err := root.Remove(filepath.Join(entry.directory, "infra")); err != nil {
+			return result, err
+		}
+		if err := root.Remove(filepath.Join(entry.directory, "last-used")); err != nil && !os.IsNotExist(err) {
+			return result, err
+		}
+		if err := root.Remove(entry.directory); err != nil && !errors.Is(err, syscall.ENOTEMPTY) && !os.IsNotExist(err) {
 			return result, err
 		}
 		result.Removed++

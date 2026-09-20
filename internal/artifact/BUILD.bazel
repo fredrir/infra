@@ -4,6 +4,7 @@ go_library(
     name = "artifact",
     srcs = [
         "install.go",
+        "lock.go",
         "prune.go",
     ],
     importpath = "github.com/fredrir/infra/internal/artifact",
@@ -14,6 +15,7 @@ go_test(
     name = "artifact_test",
     srcs = [
         "install_test.go",
+        "lock_test.go",
         "prune_test.go",
     ],
     embed = [":artifact"],
