@@ -14,3 +14,4 @@
 | [Kata Runtime](kata-runtime.md)   |                                                  |
 | [Platform Mail](platform-mail.md) |                                                  |
 | [Research](research/_INDEX.md)    |                                                  |
+| [CI performance](ci-performance.md) | Measurements, budgets and qualification |

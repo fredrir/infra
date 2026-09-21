@@ -1,0 +1,2617 @@
+{
+  "schema": 1,
+  "observed_at": "2026-09-21T02:17:06.290912+00:00",
+  "scope": "Historical workflow runs; includes previous agent canaries and failures, not qualified ordinary deployment traffic; no served-revision timestamps",
+  "percentile_method": "nearest-rank; successful completed workflows only; workflow end includes cleanup",
+  "repositories": [
+    {
+      "repository": "fredrir/llunde-frontend",
+      "sample_count": 20,
+      "successful_count": 12,
+      "successful_workflow_seconds": {
+        "p50": 335.0,
+        "p95": 1376.0
+      },
+      "runs": [
+        {
+          "id": 35538973695,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35538973695",
+          "event": "push",
+          "head_sha": "a555e9dffc435399d917d28782c3370ede9661a2",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T21:31:34Z",
+          "jobs": [
+            {
+              "id": 106153023997,
+              "name": "frontend / build",
+              "started_at": "2026-09-20T21:31:36Z",
+              "completed_at": "2026-09-20T21:32:42Z",
+              "conclusion": "success",
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:38Z",
+                  "completed_at": "2026-09-20T21:31:43Z"
+                },
+                {
+                  "name": "Set up runner",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:43Z",
+                  "completed_at": "2026-09-20T21:31:43Z"
+                },
+                {
+                  "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:43Z",
+                  "completed_at": "2026-09-20T21:31:45Z"
+                },
+                {
+                  "name": "Fetch immutable public infrastructure recipe",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:45Z",
+                  "completed_at": "2026-09-20T21:31:46Z"
+                },
+                {
+                  "name": "Run ./.infra-build-recipe/.github/actions/setup-infra",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:46Z",
+                  "completed_at": "2026-09-20T21:31:46Z"
+                },
+                {
+                  "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:31:46Z",
+                  "completed_at": "2026-09-20T21:31:46Z"
+                },
+                {
+                  "name": "Verify CLI",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:31:46Z",
+                  "completed_at": "2026-09-20T21:31:46Z"
+                },
+                {
+                  "name": "Select affected image",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:46Z",
+                  "completed_at": "2026-09-20T21:31:46Z"
+                },
+                {
+                  "name": "Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:46Z",
+                  "completed_at": "2026-09-20T21:31:48Z"
+                },
+                {
+                  "name": "Start isolated Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:31:48Z",
+                  "completed_at": "2026-09-20T21:31:48Z"
+                },
+                {
+                  "name": "Verify dedicated engine",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:48Z",
+                  "completed_at": "2026-09-20T21:31:48Z"
+                },
+                {
+                  "name": "Select shared recipe",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:31:48Z",
+                  "completed_at": "2026-09-20T21:31:48Z"
+                },
+                {
+                  "name": "Validate Dagger cache policy",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:48Z",
+                  "completed_at": "2026-09-20T21:31:48Z"
+                },
+                {
+                  "name": "Check inputs",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:48Z",
+                  "completed_at": "2026-09-20T21:31:49Z"
+                },
+                {
+                  "name": "Test",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:31:49Z",
+                  "completed_at": "2026-09-20T21:31:49Z"
+                },
+                {
+                  "name": "Install verification tools",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:49Z",
+                  "completed_at": "2026-09-20T21:31:49Z"
+                },
+                {
+                  "name": "Select isolated scanner cache",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:49Z",
+                  "completed_at": "2026-09-20T21:31:49Z"
+                },
+                {
+                  "name": "Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:31:49Z",
+                  "completed_at": "2026-09-20T21:31:49Z"
+                },
+                {
+                  "name": "Report scanner cache state",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:49Z",
+                  "completed_at": "2026-09-20T21:31:49Z"
+                },
+                {
+                  "name": "Prepare verification data",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:49Z",
+                  "completed_at": "2026-09-20T21:31:49Z"
+                },
+                {
+                  "name": "Build and publish",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:31:49Z",
+                  "completed_at": "2026-09-20T21:32:18Z"
+                },
+                {
+                  "name": "Scan published image",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:18Z",
+                  "completed_at": "2026-09-20T21:32:20Z"
+                },
+                {
+                  "name": "Run ./.infra-build-recipe/.github/actions/attest-image",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:32:20Z",
+                  "completed_at": "2026-09-20T21:32:20Z"
+                },
+                {
+                  "name": "Verify published provenance",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:32:20Z",
+                  "completed_at": "2026-09-20T21:32:20Z"
+                },
+                {
+                  "name": "Sign and verify private image provenance",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:20Z",
+                  "completed_at": "2026-09-20T21:32:30Z"
+                },
+                {
+                  "name": "Enforce aggregate check budget",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:30Z",
+                  "completed_at": "2026-09-20T21:32:30Z"
+                },
+                {
+                  "name": "Tag verified image",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:32:30Z",
+                  "completed_at": "2026-09-20T21:32:30Z"
+                },
+                {
+                  "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:30Z",
+                  "completed_at": "2026-09-20T21:32:34Z"
+                },
+                {
+                  "name": "Request deployment",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:34Z",
+                  "completed_at": "2026-09-20T21:32:36Z"
+                },
+                {
+                  "name": "Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:32:36Z",
+                  "completed_at": "2026-09-20T21:32:36Z"
+                },
+                {
+                  "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:36Z",
+                  "completed_at": "2026-09-20T21:32:38Z"
+                },
+                {
+                  "name": "Stop Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:32:38Z",
+                  "completed_at": "2026-09-20T21:32:38Z"
+                },
+                {
+                  "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:38Z",
+                  "completed_at": "2026-09-20T21:32:38Z"
+                },
+                {
+                  "name": "Post Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:38Z",
+                  "completed_at": "2026-09-20T21:32:39Z"
+                },
+                {
+                  "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:39Z",
+                  "completed_at": "2026-09-20T21:32:39Z"
+                },
+                {
+                  "name": "Complete job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:32:39Z",
+                  "completed_at": "2026-09-20T21:32:39Z"
+                }
+              ]
+            }
+          ],
+          "queue_seconds": 2.0,
+          "workflow_seconds": 68.0
+        },
+        {
+          "id": 35535270926,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35535270926",
+          "event": "push",
+          "head_sha": "fd240f219a9441e2d027213ca7f24c626339e482",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T20:21:14Z",
+          "jobs": [
+            {
+              "id": 106143058027,
+              "name": "frontend / build",
+              "started_at": "2026-09-20T20:21:17Z",
+              "completed_at": "2026-09-20T20:22:14Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 60.0
+        },
+        {
+          "id": 35534705437,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35534705437",
+          "event": "push",
+          "head_sha": "eb37f907afe55aa0d6808ecfa773c2456c768f05",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T20:10:50Z",
+          "jobs": [
+            {
+              "id": 106141529366,
+              "name": "frontend / build",
+              "started_at": "2026-09-20T20:10:53Z",
+              "completed_at": "2026-09-20T20:11:47Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 57.0
+        },
+        {
+          "id": 35533660342,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35533660342",
+          "event": "push",
+          "head_sha": "171f2387b3a5ce87a6fe555e2603121bd8a86229",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T19:51:23Z",
+          "jobs": [
+            {
+              "id": 106138709384,
+              "name": "frontend / build",
+              "started_at": "2026-09-20T19:51:26Z",
+              "completed_at": "2026-09-20T19:52:17Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 54.0
+        },
+        {
+          "id": 35533087208,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35533087208",
+          "event": "push",
+          "head_sha": "9f55ab1b993c9c42283085452d57944d6e7c628f",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T19:40:46Z",
+          "jobs": [
+            {
+              "id": 106137841056,
+              "name": "frontend / build",
+              "started_at": "2026-09-20T19:45:22Z",
+              "completed_at": "2026-09-20T19:46:49Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 276.0,
+          "workflow_seconds": 363.0
+        },
+        {
+          "id": 35525557284,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35525557284",
+          "event": "push",
+          "head_sha": "a465143b1abc2ddb0853ba33157594c22693bb24",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T17:20:36Z",
+          "jobs": [
+            {
+              "id": 106116972633,
+              "name": "frontend / cli / build",
+              "started_at": "2026-09-20T17:20:38Z",
+              "completed_at": "2026-09-20T17:22:13Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106117203581,
+              "name": "frontend / build",
+              "started_at": "2026-09-20T17:22:16Z",
+              "completed_at": "2026-09-20T17:23:58Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 2.0,
+          "workflow_seconds": 202.0
+        },
+        {
+          "id": 35524265298,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35524265298",
+          "event": "push",
+          "head_sha": "11fed6e3ae475521dc28fee56916b974ae9d625c",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T16:56:17Z",
+          "jobs": [
+            {
+              "id": 106113577156,
+              "name": "frontend / cli / build",
+              "started_at": "2026-09-20T16:56:19Z",
+              "completed_at": "2026-09-20T17:01:02Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106114220255,
+              "name": "frontend / build",
+              "started_at": "2026-09-20T17:01:05Z",
+              "completed_at": "2026-09-20T17:02:48Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 2.0,
+          "workflow_seconds": 391.0
+        },
+        {
+          "id": 35465046596,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35465046596",
+          "event": "push",
+          "head_sha": "858b13a0b898355b48d3ace9b8d5cb536970cb7e",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-19T19:40:01Z",
+          "jobs": [
+            {
+              "id": 105955725207,
+              "name": "frontend / build",
+              "started_at": "2026-09-19T19:40:13Z",
+              "completed_at": "2026-09-19T19:41:24Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 12.0,
+          "workflow_seconds": 83.0
+        },
+        {
+          "id": 35460723480,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35460723480",
+          "event": "push",
+          "head_sha": "74d84ed3f09df25664a75e80fd58cd20eec81340",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-19T18:17:33Z",
+          "jobs": [
+            {
+              "id": 105943977420,
+              "name": "frontend / build",
+              "started_at": "2026-09-19T18:17:44Z",
+              "completed_at": "2026-09-19T18:20:50Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 11.0,
+          "workflow_seconds": 197.0
+        },
+        {
+          "id": 35457931944,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35457931944",
+          "event": "push",
+          "head_sha": "3f8cf3611cb146d4eb8d5717fac69a567ad7c7f5",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-19T17:23:16Z",
+          "jobs": [
+            {
+              "id": 105936421680,
+              "name": "frontend / build",
+              "started_at": "2026-09-19T17:27:36Z",
+              "completed_at": "2026-09-19T17:28:51Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 260.0,
+          "workflow_seconds": 335.0
+        },
+        {
+          "id": 35455389663,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35455389663",
+          "event": "push",
+          "head_sha": "cba3219ec82da9b244ee97769a422fa3e5fd67cb",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-19T16:34:22Z",
+          "jobs": [
+            {
+              "id": 105930694968,
+              "name": "frontend / build",
+              "started_at": "2026-09-19T16:42:10Z",
+              "completed_at": "2026-09-19T16:43:29Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 468.0,
+          "workflow_seconds": 547.0
+        },
+        {
+          "id": 35336235055,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35336235055",
+          "event": "push",
+          "head_sha": "42fe3846280a18c1dae4c6830ca3b14081f1d628",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-18T10:45:00Z",
+          "jobs": [
+            {
+              "id": 105571604623,
+              "name": "frontend / build",
+              "started_at": "2026-09-18T10:45:08Z",
+              "completed_at": "2026-09-18T10:51:00Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 8.0,
+          "workflow_seconds": 360.0
+        },
+        {
+          "id": 35208872090,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35208872090",
+          "event": "push",
+          "head_sha": "adcd91967ecb901d925034d3c9d8b76e9b68cdeb",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T10:08:04Z",
+          "jobs": [
+            {
+              "id": 105161261602,
+              "name": "frontend / build",
+              "started_at": "2026-09-17T10:08:14Z",
+              "completed_at": "2026-09-17T10:15:51Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 10.0,
+          "workflow_seconds": 467.0
+        },
+        {
+          "id": 35207568683,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35207568683",
+          "event": "push",
+          "head_sha": "57f8d7e767b66befad86502203cf34d735526844",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-17T09:53:28Z",
+          "jobs": [
+            {
+              "id": 105156974401,
+              "name": "frontend / build",
+              "started_at": "2026-09-17T09:56:36Z",
+              "completed_at": "2026-09-17T09:56:59Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 188.0,
+          "workflow_seconds": 211.0
+        },
+        {
+          "id": 35205722271,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35205722271",
+          "event": "push",
+          "head_sha": "315ba3099c65960e97b06665ee3f0a5283bd170f",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-17T09:33:03Z",
+          "jobs": [
+            {
+              "id": 105150892728,
+              "name": "frontend / build",
+              "started_at": "2026-09-17T09:39:53Z",
+              "completed_at": "2026-09-17T09:40:18Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 410.0,
+          "workflow_seconds": 435.0
+        },
+        {
+          "id": 34785780931,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/34785780931",
+          "event": "push",
+          "head_sha": "e4199386bc164ef3f124f40705865e08b9a63a48",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-13T22:06:19Z",
+          "jobs": [
+            {
+              "id": 103800878312,
+              "name": "frontend / build",
+              "started_at": "2026-09-13T22:20:03Z",
+              "completed_at": "2026-09-13T22:29:15Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 824.0,
+          "workflow_seconds": 1376.0
+        },
+        {
+          "id": 34747820392,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/34747820392",
+          "event": "push",
+          "head_sha": "5497c3258c61911bf1fe9e70c540440d101e221d",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-13T08:29:42Z",
+          "jobs": [
+            {
+              "id": 103698877686,
+              "name": "frontend / build",
+              "started_at": "2026-09-13T08:55:19Z",
+              "completed_at": "2026-09-13T09:04:56Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 1537.0,
+          "workflow_seconds": 2114.0
+        },
+        {
+          "id": 34744718785,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/34744718785",
+          "event": "push",
+          "head_sha": "291bf6fb5fb56efc4dea0838e56f76706fd34eeb",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:14:07Z",
+          "jobs": [
+            {
+              "id": 103690393361,
+              "name": "frontend / build",
+              "started_at": "2026-09-13T07:19:28Z",
+              "completed_at": "2026-09-13T07:25:26Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 321.0,
+          "workflow_seconds": 679.0
+        },
+        {
+          "id": 34743694780,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/34743694780",
+          "event": "push",
+          "head_sha": "257e460640662651e95af005e9f28c621b51f11a",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-13T06:49:24Z",
+          "jobs": [
+            {
+              "id": 103687589053,
+              "name": "frontend / build",
+              "started_at": "2026-09-13T06:59:36Z",
+              "completed_at": "2026-09-13T07:05:15Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 612.0,
+          "workflow_seconds": 951.0
+        },
+        {
+          "id": 34727829181,
+          "url": "https://github.com/fredrir/llunde-frontend/actions/runs/34727829181",
+          "event": "push",
+          "head_sha": "92fff820dbda4e63e7179a3aba6c3547bacbfa1c",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-13T00:23:08Z",
+          "jobs": [
+            {
+              "id": 103645039391,
+              "name": "frontend / build",
+              "started_at": "2026-09-13T00:25:36Z",
+              "completed_at": "2026-09-13T00:31:21Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 148.0,
+          "workflow_seconds": 493.0
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/llunde-backend",
+      "sample_count": 20,
+      "successful_count": 15,
+      "successful_workflow_seconds": {
+        "p50": 813.0,
+        "p95": 1189.0
+      },
+      "runs": [
+        {
+          "id": 35540078113,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35540078113",
+          "event": "push",
+          "head_sha": "dbdff56a84ea6a15ebf0ac84f848b0815a1b5982",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T21:54:40Z",
+          "jobs": [
+            {
+              "id": 106156027548,
+              "name": "backend / build",
+              "started_at": "2026-09-20T21:54:43Z",
+              "completed_at": "2026-09-20T21:56:34Z",
+              "conclusion": "success",
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:44Z",
+                  "completed_at": "2026-09-20T21:54:48Z"
+                },
+                {
+                  "name": "Set up runner",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:48Z",
+                  "completed_at": "2026-09-20T21:54:48Z"
+                },
+                {
+                  "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:48Z",
+                  "completed_at": "2026-09-20T21:54:50Z"
+                },
+                {
+                  "name": "Fetch immutable public infrastructure recipe",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:50Z",
+                  "completed_at": "2026-09-20T21:54:51Z"
+                },
+                {
+                  "name": "Run ./.infra-build-recipe/.github/actions/setup-infra",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:51Z",
+                  "completed_at": "2026-09-20T21:54:51Z"
+                },
+                {
+                  "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:54:51Z",
+                  "completed_at": "2026-09-20T21:54:51Z"
+                },
+                {
+                  "name": "Verify CLI",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:54:51Z",
+                  "completed_at": "2026-09-20T21:54:51Z"
+                },
+                {
+                  "name": "Select affected image",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:51Z",
+                  "completed_at": "2026-09-20T21:54:51Z"
+                },
+                {
+                  "name": "Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:51Z",
+                  "completed_at": "2026-09-20T21:54:52Z"
+                },
+                {
+                  "name": "Start isolated Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:54:52Z",
+                  "completed_at": "2026-09-20T21:54:52Z"
+                },
+                {
+                  "name": "Verify dedicated engine",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:52Z",
+                  "completed_at": "2026-09-20T21:54:53Z"
+                },
+                {
+                  "name": "Select shared recipe",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:54:53Z",
+                  "completed_at": "2026-09-20T21:54:53Z"
+                },
+                {
+                  "name": "Validate Dagger cache policy",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:53Z",
+                  "completed_at": "2026-09-20T21:54:53Z"
+                },
+                {
+                  "name": "Check inputs",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:53Z",
+                  "completed_at": "2026-09-20T21:54:53Z"
+                },
+                {
+                  "name": "Test",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:54:53Z",
+                  "completed_at": "2026-09-20T21:54:53Z"
+                },
+                {
+                  "name": "Install verification tools",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:53Z",
+                  "completed_at": "2026-09-20T21:54:53Z"
+                },
+                {
+                  "name": "Select isolated scanner cache",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:53Z",
+                  "completed_at": "2026-09-20T21:54:53Z"
+                },
+                {
+                  "name": "Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:54:53Z",
+                  "completed_at": "2026-09-20T21:54:53Z"
+                },
+                {
+                  "name": "Report scanner cache state",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:53Z",
+                  "completed_at": "2026-09-20T21:54:53Z"
+                },
+                {
+                  "name": "Prepare verification data",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:53Z",
+                  "completed_at": "2026-09-20T21:54:54Z"
+                },
+                {
+                  "name": "Build and publish",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:54:54Z",
+                  "completed_at": "2026-09-20T21:56:10Z"
+                },
+                {
+                  "name": "Scan published image",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:10Z",
+                  "completed_at": "2026-09-20T21:56:12Z"
+                },
+                {
+                  "name": "Run ./.infra-build-recipe/.github/actions/attest-image",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:56:12Z",
+                  "completed_at": "2026-09-20T21:56:12Z"
+                },
+                {
+                  "name": "Verify published provenance",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:56:12Z",
+                  "completed_at": "2026-09-20T21:56:12Z"
+                },
+                {
+                  "name": "Sign and verify private image provenance",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:12Z",
+                  "completed_at": "2026-09-20T21:56:21Z"
+                },
+                {
+                  "name": "Enforce aggregate check budget",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:21Z",
+                  "completed_at": "2026-09-20T21:56:21Z"
+                },
+                {
+                  "name": "Tag verified image",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:56:21Z",
+                  "completed_at": "2026-09-20T21:56:21Z"
+                },
+                {
+                  "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:21Z",
+                  "completed_at": "2026-09-20T21:56:26Z"
+                },
+                {
+                  "name": "Request deployment",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:26Z",
+                  "completed_at": "2026-09-20T21:56:27Z"
+                },
+                {
+                  "name": "Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:56:27Z",
+                  "completed_at": "2026-09-20T21:56:27Z"
+                },
+                {
+                  "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:27Z",
+                  "completed_at": "2026-09-20T21:56:29Z"
+                },
+                {
+                  "name": "Stop Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:56:29Z",
+                  "completed_at": "2026-09-20T21:56:29Z"
+                },
+                {
+                  "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:29Z",
+                  "completed_at": "2026-09-20T21:56:30Z"
+                },
+                {
+                  "name": "Post Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:30Z",
+                  "completed_at": "2026-09-20T21:56:30Z"
+                },
+                {
+                  "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:30Z",
+                  "completed_at": "2026-09-20T21:56:31Z"
+                },
+                {
+                  "name": "Complete job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:31Z",
+                  "completed_at": "2026-09-20T21:56:31Z"
+                }
+              ]
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 114.0
+        },
+        {
+          "id": 35539105419,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35539105419",
+          "event": "push",
+          "head_sha": "4e4f62fbd34b2c64e14aafdc3559141cc5165fb8",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T21:34:07Z",
+          "jobs": [
+            {
+              "id": 106153378564,
+              "name": "backend / build",
+              "started_at": "2026-09-20T21:37:43Z",
+              "completed_at": "2026-09-20T21:41:25Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 216.0,
+          "workflow_seconds": 438.0
+        },
+        {
+          "id": 35537318927,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35537318927",
+          "event": "push",
+          "head_sha": "39b86045143ff952be8cce469d52a989a347b56d",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T21:00:27Z",
+          "jobs": [
+            {
+              "id": 106148567344,
+              "name": "backend / build",
+              "started_at": "2026-09-20T21:00:30Z",
+              "completed_at": "2026-09-20T21:02:29Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 122.0
+        },
+        {
+          "id": 35535821906,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35535821906",
+          "event": "push",
+          "head_sha": "efecf2a6edde47d7fa372c9ebd30eecffd034a84",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T20:31:29Z",
+          "jobs": [
+            {
+              "id": 106144542703,
+              "name": "backend / build",
+              "started_at": "2026-09-20T20:31:32Z",
+              "completed_at": "2026-09-20T20:38:24Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 415.0
+        },
+        {
+          "id": 35525554440,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35525554440",
+          "event": "push",
+          "head_sha": "40748097602eae867b4f158e015a19ee36c63ead",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T17:20:33Z",
+          "jobs": [
+            {
+              "id": 106116964788,
+              "name": "backend / cli / build",
+              "started_at": "2026-09-20T17:20:35Z",
+              "completed_at": "2026-09-20T17:21:38Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106117119577,
+              "name": "backend / build",
+              "started_at": "2026-09-20T17:21:41Z",
+              "completed_at": "2026-09-20T17:30:06Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 2.0,
+          "workflow_seconds": 573.0
+        },
+        {
+          "id": 35524551763,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35524551763",
+          "event": "push",
+          "head_sha": "1f4211ae0b2e25ac24856db2df2f8875ee1ffac2",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T17:01:47Z",
+          "jobs": [
+            {
+              "id": 106114333225,
+              "name": "backend / cli / build",
+              "started_at": "2026-09-20T17:01:50Z",
+              "completed_at": "2026-09-20T17:05:53Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106114916926,
+              "name": "backend / build",
+              "started_at": "2026-09-20T17:05:56Z",
+              "completed_at": "2026-09-20T17:08:00Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 373.0
+        },
+        {
+          "id": 35513344230,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35513344230",
+          "event": "push",
+          "head_sha": "30480f15731935b6cc272040b7014c78c2200376",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T13:23:10Z",
+          "jobs": [
+            {
+              "id": 106085007989,
+              "name": "backend / build",
+              "started_at": "2026-09-20T13:23:19Z",
+              "completed_at": "2026-09-20T13:24:53Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 9.0,
+          "workflow_seconds": 103.0
+        },
+        {
+          "id": 35509157386,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35509157386",
+          "event": "push",
+          "head_sha": "cc73fc9f4abfdfe318db2abff5f683708961a37d",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T11:55:15Z",
+          "jobs": [
+            {
+              "id": 106073929329,
+              "name": "backend / build",
+              "started_at": "2026-09-20T11:55:24Z",
+              "completed_at": "2026-09-20T12:06:50Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 9.0,
+          "workflow_seconds": 695.0
+        },
+        {
+          "id": 35457895915,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35457895915",
+          "event": "push",
+          "head_sha": "8994b9f4796447430bc9a2981ae4eb06fea73785",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-19T17:22:35Z",
+          "jobs": [
+            {
+              "id": 105936325724,
+              "name": "backend / build",
+              "started_at": "2026-09-19T17:22:44Z",
+              "completed_at": "2026-09-19T17:36:52Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 9.0,
+          "workflow_seconds": 857.0
+        },
+        {
+          "id": 35283429470,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35283429470",
+          "event": "push",
+          "head_sha": "111fb4e932148ab4adea824d1a63915bbdbf3a89",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T22:43:21Z",
+          "jobs": [
+            {
+              "id": 105410326512,
+              "name": "backend / build",
+              "started_at": "2026-09-17T22:43:27Z",
+              "completed_at": "2026-09-17T22:56:47Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 6.0,
+          "workflow_seconds": 806.0
+        },
+        {
+          "id": 35282325548,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35282325548",
+          "event": "push",
+          "head_sha": "8b0e6a3fb785639205541374b88b9045225f3f41",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T22:30:05Z",
+          "jobs": [
+            {
+              "id": 105406859867,
+              "name": "backend / build",
+              "started_at": "2026-09-17T22:30:12Z",
+              "completed_at": "2026-09-17T22:43:10Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 7.0,
+          "workflow_seconds": 785.0
+        },
+        {
+          "id": 35280924382,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35280924382",
+          "event": "push",
+          "head_sha": "b28999747f2be38507e1e45b34dcd854becbe716",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T22:13:29Z",
+          "jobs": [
+            {
+              "id": 105402403218,
+              "name": "backend / build",
+              "started_at": "2026-09-17T22:13:38Z",
+              "completed_at": "2026-09-17T22:26:35Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 9.0,
+          "workflow_seconds": 786.0
+        },
+        {
+          "id": 35277598420,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35277598420",
+          "event": "push",
+          "head_sha": "d480d2ac5fafcccddfdfe2ef18cc2294625012f5",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T21:36:14Z",
+          "jobs": [
+            {
+              "id": 105391839291,
+              "name": "backend / build",
+              "started_at": "2026-09-17T21:37:48Z",
+              "completed_at": "2026-09-17T21:50:45Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 94.0,
+          "workflow_seconds": 871.0
+        },
+        {
+          "id": 35276446949,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35276446949",
+          "event": "push",
+          "head_sha": "170bb91a5df5df8bed728852b340c09055e57023",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T21:24:05Z",
+          "jobs": [
+            {
+              "id": 105388132225,
+              "name": "backend / build",
+              "started_at": "2026-09-17T21:24:13Z",
+              "completed_at": "2026-09-17T21:37:38Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 8.0,
+          "workflow_seconds": 813.0
+        },
+        {
+          "id": 35274623221,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35274623221",
+          "event": "push",
+          "head_sha": "6af51f034008781d7fae77320f659b3147410207",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T21:04:51Z",
+          "jobs": [
+            {
+              "id": 105382081430,
+              "name": "backend / build",
+              "started_at": "2026-09-17T21:08:40Z",
+              "completed_at": "2026-09-17T21:21:35Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 229.0,
+          "workflow_seconds": 1004.0
+        },
+        {
+          "id": 35274038444,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35274038444",
+          "event": "push",
+          "head_sha": "70f8c2786f24159c6cba70d27235c6651d29e148",
+          "name": "Build images",
+          "conclusion": "cancelled",
+          "created_at": "2026-09-17T20:59:04Z",
+          "jobs": [],
+          "queue_seconds": null,
+          "workflow_seconds": null
+        },
+        {
+          "id": 35273626526,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35273626526",
+          "event": "push",
+          "head_sha": "2bf99fc26852976d2b4f28c73bea2fbc515541c6",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T20:54:46Z",
+          "jobs": [
+            {
+              "id": 105378770956,
+              "name": "backend / build",
+              "started_at": "2026-09-17T20:54:53Z",
+              "completed_at": "2026-09-17T21:08:30Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 7.0,
+          "workflow_seconds": 824.0
+        },
+        {
+          "id": 35271497222,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35271497222",
+          "event": "push",
+          "head_sha": "31145e5c512d19e9ed453911ea82959604909b8b",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T20:33:14Z",
+          "jobs": [
+            {
+              "id": 105371754412,
+              "name": "backend / build",
+              "started_at": "2026-09-17T20:33:25Z",
+              "completed_at": "2026-09-17T20:53:03Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 11.0,
+          "workflow_seconds": 1189.0
+        },
+        {
+          "id": 35240323638,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35240323638",
+          "event": "push",
+          "head_sha": "c8d92f505e08ed684eda5da1c31065d5cd940de8",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T15:27:09Z",
+          "jobs": [
+            {
+              "id": 105266793151,
+              "name": "backend / build",
+              "started_at": "2026-09-17T15:27:18Z",
+              "completed_at": "2026-09-17T15:40:44Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 9.0,
+          "workflow_seconds": 815.0
+        },
+        {
+          "id": 35237216426,
+          "url": "https://github.com/fredrir/llunde-backend/actions/runs/35237216426",
+          "event": "push",
+          "head_sha": "f5ba372f74d1a8e30f340becf6321608dd21459a",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-17T14:59:05Z",
+          "jobs": [
+            {
+              "id": 105256113870,
+              "name": "backend / build",
+              "started_at": "2026-09-17T14:59:14Z",
+              "completed_at": "2026-09-17T15:13:18Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 9.0,
+          "workflow_seconds": 853.0
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "sample_count": 20,
+      "successful_count": 7,
+      "successful_workflow_seconds": {
+        "p50": 1312.0,
+        "p95": 12086.0
+      },
+      "runs": [
+        {
+          "id": 35540314905,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35540314905",
+          "event": "push",
+          "head_sha": "94f090a7a9a3b0bab65bfdeb5bb3bfe5e5bb4c3b",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T22:00:10Z",
+          "jobs": [
+            {
+              "id": 106156657385,
+              "name": "dependencies",
+              "started_at": "2026-09-20T22:00:13Z",
+              "completed_at": "2026-09-20T22:00:20Z",
+              "conclusion": "success",
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:14Z",
+                  "completed_at": "2026-09-20T22:00:15Z"
+                },
+                {
+                  "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:15Z",
+                  "completed_at": "2026-09-20T22:00:17Z"
+                },
+                {
+                  "name": "Run set -euo pipefail",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:17Z",
+                  "completed_at": "2026-09-20T22:00:17Z"
+                },
+                {
+                  "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:17Z",
+                  "completed_at": "2026-09-20T22:00:17Z"
+                },
+                {
+                  "name": "Complete job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:17Z",
+                  "completed_at": "2026-09-20T22:00:17Z"
+                }
+              ]
+            },
+            {
+              "id": 106156682449,
+              "name": "parser / build",
+              "started_at": "2026-09-20T22:00:22Z",
+              "completed_at": "2026-09-20T22:04:10Z",
+              "conclusion": "success",
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:24Z",
+                  "completed_at": "2026-09-20T22:00:28Z"
+                },
+                {
+                  "name": "Set up runner",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:28Z",
+                  "completed_at": "2026-09-20T22:00:28Z"
+                },
+                {
+                  "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:28Z",
+                  "completed_at": "2026-09-20T22:00:30Z"
+                },
+                {
+                  "name": "Fetch immutable public infrastructure recipe",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:30Z",
+                  "completed_at": "2026-09-20T22:00:31Z"
+                },
+                {
+                  "name": "Run ./.infra-build-recipe/.github/actions/setup-infra",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:31Z",
+                  "completed_at": "2026-09-20T22:00:31Z"
+                },
+                {
+                  "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:00:31Z",
+                  "completed_at": "2026-09-20T22:00:31Z"
+                },
+                {
+                  "name": "Verify CLI",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:00:31Z",
+                  "completed_at": "2026-09-20T22:00:31Z"
+                },
+                {
+                  "name": "Select affected image",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:31Z",
+                  "completed_at": "2026-09-20T22:00:31Z"
+                },
+                {
+                  "name": "Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:31Z",
+                  "completed_at": "2026-09-20T22:00:32Z"
+                },
+                {
+                  "name": "Start isolated Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:00:32Z",
+                  "completed_at": "2026-09-20T22:00:32Z"
+                },
+                {
+                  "name": "Verify dedicated engine",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:32Z",
+                  "completed_at": "2026-09-20T22:00:33Z"
+                },
+                {
+                  "name": "Select shared recipe",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:00:33Z",
+                  "completed_at": "2026-09-20T22:00:33Z"
+                },
+                {
+                  "name": "Validate Dagger cache policy",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:33Z",
+                  "completed_at": "2026-09-20T22:00:33Z"
+                },
+                {
+                  "name": "Check inputs",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:33Z",
+                  "completed_at": "2026-09-20T22:00:33Z"
+                },
+                {
+                  "name": "Test",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:00:33Z",
+                  "completed_at": "2026-09-20T22:00:33Z"
+                },
+                {
+                  "name": "Install verification tools",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:33Z",
+                  "completed_at": "2026-09-20T22:00:33Z"
+                },
+                {
+                  "name": "Select isolated scanner cache",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:33Z",
+                  "completed_at": "2026-09-20T22:00:34Z"
+                },
+                {
+                  "name": "Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:00:34Z",
+                  "completed_at": "2026-09-20T22:00:34Z"
+                },
+                {
+                  "name": "Report scanner cache state",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:34Z",
+                  "completed_at": "2026-09-20T22:00:34Z"
+                },
+                {
+                  "name": "Prepare verification data",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:34Z",
+                  "completed_at": "2026-09-20T22:00:34Z"
+                },
+                {
+                  "name": "Build and publish",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:00:34Z",
+                  "completed_at": "2026-09-20T22:03:48Z"
+                },
+                {
+                  "name": "Scan published image",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:03:48Z",
+                  "completed_at": "2026-09-20T22:03:50Z"
+                },
+                {
+                  "name": "Run ./.infra-build-recipe/.github/actions/attest-image",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:03:50Z",
+                  "completed_at": "2026-09-20T22:03:50Z"
+                },
+                {
+                  "name": "Verify published provenance",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:03:50Z",
+                  "completed_at": "2026-09-20T22:03:50Z"
+                },
+                {
+                  "name": "Sign and verify private image provenance",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:03:50Z",
+                  "completed_at": "2026-09-20T22:04:00Z"
+                },
+                {
+                  "name": "Enforce aggregate check budget",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:04:00Z",
+                  "completed_at": "2026-09-20T22:04:00Z"
+                },
+                {
+                  "name": "Tag verified image",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:04:00Z",
+                  "completed_at": "2026-09-20T22:04:00Z"
+                },
+                {
+                  "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:04:00Z",
+                  "completed_at": "2026-09-20T22:04:02Z"
+                },
+                {
+                  "name": "Request deployment",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:04:02Z",
+                  "completed_at": "2026-09-20T22:04:03Z"
+                },
+                {
+                  "name": "Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:04:03Z",
+                  "completed_at": "2026-09-20T22:04:03Z"
+                },
+                {
+                  "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:04:03Z",
+                  "completed_at": "2026-09-20T22:04:05Z"
+                },
+                {
+                  "name": "Stop Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T22:04:05Z",
+                  "completed_at": "2026-09-20T22:04:05Z"
+                },
+                {
+                  "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:04:05Z",
+                  "completed_at": "2026-09-20T22:04:06Z"
+                },
+                {
+                  "name": "Post Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:04:06Z",
+                  "completed_at": "2026-09-20T22:04:06Z"
+                },
+                {
+                  "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:04:06Z",
+                  "completed_at": "2026-09-20T22:04:06Z"
+                },
+                {
+                  "name": "Complete job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T22:04:06Z",
+                  "completed_at": "2026-09-20T22:04:06Z"
+                }
+              ]
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 240.0
+        },
+        {
+          "id": 35539104604,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35539104604",
+          "event": "push",
+          "head_sha": "b8d6e766a5505261061468eb7d679496c1c661a8",
+          "name": "Prepare parser dependencies",
+          "conclusion": "success",
+          "created_at": "2026-09-20T21:34:06Z",
+          "jobs": [
+            {
+              "id": 106153375858,
+              "name": "plan",
+              "started_at": "2026-09-20T21:34:09Z",
+              "completed_at": "2026-09-20T21:34:20Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 14.0
+        },
+        {
+          "id": 35539104606,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35539104606",
+          "event": "push",
+          "head_sha": "b8d6e766a5505261061468eb7d679496c1c661a8",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T21:34:06Z",
+          "jobs": [
+            {
+              "id": 106153375834,
+              "name": "dependencies",
+              "started_at": "2026-09-20T21:34:09Z",
+              "completed_at": "2026-09-20T21:34:16Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106153398538,
+              "name": "parser / build",
+              "started_at": "2026-09-20T21:47:50Z",
+              "completed_at": "2026-09-20T21:57:40Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 1414.0
+        },
+        {
+          "id": 35537320004,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35537320004",
+          "event": "push",
+          "head_sha": "7c2655aee83d33a00783e44d89347e6725e46337",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T21:00:28Z",
+          "jobs": [
+            {
+              "id": 106148569116,
+              "name": "dependencies",
+              "started_at": "2026-09-20T21:00:30Z",
+              "completed_at": "2026-09-20T21:00:35Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106148587985,
+              "name": "parser / build",
+              "started_at": "2026-09-20T21:02:49Z",
+              "completed_at": "2026-09-20T21:15:25Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 2.0,
+          "workflow_seconds": 897.0
+        },
+        {
+          "id": 35537320008,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35537320008",
+          "event": "push",
+          "head_sha": "7c2655aee83d33a00783e44d89347e6725e46337",
+          "name": "Prepare parser dependencies",
+          "conclusion": "cancelled",
+          "created_at": "2026-09-20T21:00:28Z",
+          "jobs": [
+            {
+              "id": 106148569563,
+              "name": "image / build",
+              "started_at": "2026-09-20T21:00:31Z",
+              "completed_at": "2026-09-20T21:02:43Z",
+              "conclusion": "cancelled"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 135.0
+        },
+        {
+          "id": 35535271154,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35535271154",
+          "event": "push",
+          "head_sha": "7365b4414cd1f6f32bb6b1e0ab7627d3ad8e72aa",
+          "name": "Prepare parser dependencies",
+          "conclusion": "cancelled",
+          "created_at": "2026-09-20T20:21:15Z",
+          "jobs": [
+            {
+              "id": 106143058658,
+              "name": "image / build",
+              "started_at": "2026-09-20T20:21:17Z",
+              "completed_at": "2026-09-20T20:22:18Z",
+              "conclusion": "cancelled"
+            }
+          ],
+          "queue_seconds": 2.0,
+          "workflow_seconds": 63.0
+        },
+        {
+          "id": 35535271142,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35535271142",
+          "event": "push",
+          "head_sha": "7365b4414cd1f6f32bb6b1e0ab7627d3ad8e72aa",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T20:21:15Z",
+          "jobs": [
+            {
+              "id": 106143058166,
+              "name": "dependencies",
+              "started_at": "2026-09-20T20:21:17Z",
+              "completed_at": "2026-09-20T20:21:28Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106143091727,
+              "name": "parser / build",
+              "started_at": "2026-09-20T20:22:20Z",
+              "completed_at": "2026-09-20T20:28:27Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 2.0,
+          "workflow_seconds": 432.0
+        },
+        {
+          "id": 35534463752,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35534463752",
+          "event": "workflow_dispatch",
+          "head_sha": "aa6da3b78e247e0d8cc428749942f09af5957be3",
+          "name": "Import locally prepared parser dependencies",
+          "conclusion": "success",
+          "created_at": "2026-09-20T20:06:26Z",
+          "jobs": [
+            {
+              "id": 106140870262,
+              "name": "publish",
+              "started_at": "2026-09-20T20:06:29Z",
+              "completed_at": "2026-09-20T20:07:43Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 77.0
+        },
+        {
+          "id": 35534440967,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35534440967",
+          "event": "push",
+          "head_sha": "aa6da3b78e247e0d8cc428749942f09af5957be3",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T20:05:59Z",
+          "jobs": [
+            {
+              "id": 106140805850,
+              "name": "dependencies",
+              "started_at": "2026-09-20T20:06:02Z",
+              "completed_at": "2026-09-20T20:06:09Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 10.0
+        },
+        {
+          "id": 35534259973,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35534259973",
+          "event": "workflow_dispatch",
+          "head_sha": "64ec7ab2ca18d13c210dfa5ea2f3a467cf1705a8",
+          "name": "Import locally prepared parser dependencies",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T20:02:47Z",
+          "jobs": [
+            {
+              "id": 106140326748,
+              "name": "publish",
+              "started_at": "2026-09-20T20:02:50Z",
+              "completed_at": "2026-09-20T20:05:06Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 139.0
+        },
+        {
+          "id": 35534113265,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35534113265",
+          "event": "push",
+          "head_sha": "64ec7ab2ca18d13c210dfa5ea2f3a467cf1705a8",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T20:00:18Z",
+          "jobs": [
+            {
+              "id": 106139942542,
+              "name": "dependencies",
+              "started_at": "2026-09-20T20:00:21Z",
+              "completed_at": "2026-09-20T20:00:28Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 10.0
+        },
+        {
+          "id": 35533985990,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35533985990",
+          "event": "push",
+          "head_sha": "b90f4937d029d848c2f9cc80d9709fb7fed2bc61",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T19:57:47Z",
+          "jobs": [
+            {
+              "id": 106139598451,
+              "name": "dependencies",
+              "started_at": "2026-09-20T19:57:50Z",
+              "completed_at": "2026-09-20T19:57:55Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 8.0
+        },
+        {
+          "id": 35533985688,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35533985688",
+          "event": "push",
+          "head_sha": "b90f4937d029d848c2f9cc80d9709fb7fed2bc61",
+          "name": "Prepare parser dependencies",
+          "conclusion": "cancelled",
+          "created_at": "2026-09-20T19:57:47Z",
+          "jobs": [
+            {
+              "id": 106139597952,
+              "name": "image / build",
+              "started_at": "2026-09-20T19:57:50Z",
+              "completed_at": "2026-09-20T19:58:26Z",
+              "conclusion": "cancelled"
+            }
+          ],
+          "queue_seconds": 3.0,
+          "workflow_seconds": 39.0
+        },
+        {
+          "id": 35525555509,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35525555509",
+          "event": "push",
+          "head_sha": "55a0b84db3cc5915b24fb4144a6281d303aa1dd6",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-20T17:20:34Z",
+          "jobs": [
+            {
+              "id": 106116967744,
+              "name": "parser / cli / build",
+              "started_at": "2026-09-20T17:20:36Z",
+              "completed_at": "2026-09-20T17:21:49Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106117146101,
+              "name": "parser / build",
+              "started_at": "2026-09-20T17:21:52Z",
+              "completed_at": "2026-09-20T17:42:26Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 2.0,
+          "workflow_seconds": 1312.0
+        },
+        {
+          "id": 35524553360,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35524553360",
+          "event": "push",
+          "head_sha": "69393c3834ad62e900a0e9ef9c5d0ebfed9d7feb",
+          "name": "Build images",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T17:01:49Z",
+          "jobs": [
+            {
+              "id": 106114336530,
+              "name": "parser / cli / build",
+              "started_at": "2026-09-20T17:01:53Z",
+              "completed_at": "2026-09-20T17:06:04Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106114939072,
+              "name": "parser / build",
+              "started_at": "2026-09-20T17:06:06Z",
+              "completed_at": "2026-09-20T17:10:46Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 4.0,
+          "workflow_seconds": 537.0
+        },
+        {
+          "id": 35457898829,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/35457898829",
+          "event": "push",
+          "head_sha": "2fa95c3aba38efcdf771dc13b2b9acb26598fd8c",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-19T17:22:38Z",
+          "jobs": [
+            {
+              "id": 105936332817,
+              "name": "parser / build",
+              "started_at": "2026-09-19T17:22:48Z",
+              "completed_at": "2026-09-19T18:14:04Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 10.0,
+          "workflow_seconds": 3086.0
+        },
+        {
+          "id": 34785777300,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/34785777300",
+          "event": "push",
+          "head_sha": "da52d968a54608e74dd0cd90f061b7f8cb188c2f",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-13T22:06:14Z",
+          "jobs": [
+            {
+              "id": 103800869131,
+              "name": "parser / build",
+              "started_at": "2026-09-13T23:26:45Z",
+              "completed_at": "2026-09-14T00:27:11Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 4831.0,
+          "workflow_seconds": 8457.0
+        },
+        {
+          "id": 34747261732,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/34747261732",
+          "event": "push",
+          "head_sha": "d9de809263ab5959b2f8f4c165a8aa75f8720831",
+          "name": "Build images",
+          "conclusion": "success",
+          "created_at": "2026-09-13T08:16:10Z",
+          "jobs": [
+            {
+              "id": 103708953601,
+              "name": "parser / build",
+              "started_at": "2026-09-13T10:35:44Z",
+              "completed_at": "2026-09-13T11:37:36Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 8374.0,
+          "workflow_seconds": 12086.0
+        },
+        {
+          "id": 34744756489,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/34744756489",
+          "event": "push",
+          "head_sha": "9e4ad6e7ea31f65bcaaa09115f2241819807ac90",
+          "name": "Build images",
+          "conclusion": "cancelled",
+          "created_at": "2026-09-13T07:15:03Z",
+          "jobs": [],
+          "queue_seconds": null,
+          "workflow_seconds": null
+        },
+        {
+          "id": 34743697506,
+          "url": "https://github.com/fredrir/llunde-pyparser/actions/runs/34743697506",
+          "event": "push",
+          "head_sha": "4d06908d383837444a055a6c98757897c3a10230",
+          "name": "Build images",
+          "conclusion": "cancelled",
+          "created_at": "2026-09-13T06:49:27Z",
+          "jobs": [],
+          "queue_seconds": null,
+          "workflow_seconds": null
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/packages",
+      "sample_count": 17,
+      "successful_count": 6,
+      "successful_workflow_seconds": {
+        "p50": 208.0,
+        "p95": 380.0
+      },
+      "runs": [
+        {
+          "id": 35539109185,
+          "url": "https://github.com/fredrir/packages/actions/runs/35539109185",
+          "event": "push",
+          "head_sha": "cb0f493406f2740a679dcd7384935cf53fa87aa2",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T21:34:12Z",
+          "jobs": [
+            {
+              "id": 106153389357,
+              "name": "publish / build",
+              "started_at": "2026-09-20T21:56:31Z",
+              "completed_at": "2026-09-20T21:58:36Z",
+              "conclusion": "success",
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:33Z",
+                  "completed_at": "2026-09-20T21:56:35Z"
+                },
+                {
+                  "name": "Set up runner",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:35Z",
+                  "completed_at": "2026-09-20T21:56:35Z"
+                },
+                {
+                  "name": "Require the bounded CI smoke scope",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:35Z",
+                  "completed_at": "2026-09-20T21:56:35Z"
+                },
+                {
+                  "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:35Z",
+                  "completed_at": "2026-09-20T21:56:39Z"
+                },
+                {
+                  "name": "Run ./.infra/.github/actions/setup-infra",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:39Z",
+                  "completed_at": "2026-09-20T21:56:39Z"
+                },
+                {
+                  "name": "Install release tools",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:39Z",
+                  "completed_at": "2026-09-20T21:56:39Z"
+                },
+                {
+                  "name": "Start isolated Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:56:39Z",
+                  "completed_at": "2026-09-20T21:56:39Z"
+                },
+                {
+                  "name": "Build signed repositories",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:56:39Z",
+                  "completed_at": "2026-09-20T21:58:22Z"
+                },
+                {
+                  "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:22Z",
+                  "completed_at": "2026-09-20T21:58:29Z"
+                },
+                {
+                  "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:29Z",
+                  "completed_at": "2026-09-20T21:58:32Z"
+                },
+                {
+                  "name": "Stop Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:58:32Z",
+                  "completed_at": "2026-09-20T21:58:32Z"
+                },
+                {
+                  "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:32Z",
+                  "completed_at": "2026-09-20T21:58:33Z"
+                },
+                {
+                  "name": "Complete job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:33Z",
+                  "completed_at": "2026-09-20T21:58:33Z"
+                }
+              ]
+            },
+            {
+              "id": 106156476229,
+              "name": "publish / smoke",
+              "started_at": "2026-09-20T21:58:38Z",
+              "completed_at": "2026-09-20T21:59:09Z",
+              "conclusion": "failure",
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:39Z",
+                  "completed_at": "2026-09-20T21:58:42Z"
+                },
+                {
+                  "name": "Set up runner",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:42Z",
+                  "completed_at": "2026-09-20T21:58:42Z"
+                },
+                {
+                  "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:42Z",
+                  "completed_at": "2026-09-20T21:58:45Z"
+                },
+                {
+                  "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:45Z",
+                  "completed_at": "2026-09-20T21:58:51Z"
+                },
+                {
+                  "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:51Z",
+                  "completed_at": "2026-09-20T21:58:53Z"
+                },
+                {
+                  "name": "Run ./.infra/.github/actions/setup-infra",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:58:53Z",
+                  "completed_at": "2026-09-20T21:58:53Z"
+                },
+                {
+                  "name": "Start isolated Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:58:53Z",
+                  "completed_at": "2026-09-20T21:58:53Z"
+                },
+                {
+                  "name": "Install from the new repositories",
+                  "conclusion": "failure",
+                  "started_at": "2026-09-20T21:58:53Z",
+                  "completed_at": "2026-09-20T21:59:04Z"
+                },
+                {
+                  "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:59:04Z",
+                  "completed_at": "2026-09-20T21:59:06Z"
+                },
+                {
+                  "name": "Stop Dagger engine",
+                  "conclusion": "skipped",
+                  "started_at": "2026-09-20T21:59:06Z",
+                  "completed_at": "2026-09-20T21:59:06Z"
+                },
+                {
+                  "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:59:06Z",
+                  "completed_at": "2026-09-20T21:59:07Z"
+                },
+                {
+                  "name": "Complete job",
+                  "conclusion": "success",
+                  "started_at": "2026-09-20T21:59:07Z",
+                  "completed_at": "2026-09-20T21:59:07Z"
+                }
+              ]
+            }
+          ],
+          "queue_seconds": 1339.0,
+          "workflow_seconds": 1497.0
+        },
+        {
+          "id": 35537272214,
+          "url": "https://github.com/fredrir/packages/actions/runs/35537272214",
+          "event": "push",
+          "head_sha": "0da34c3de8cfcbe41dbb8bb66adfebb5b429e3e8",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T20:59:34Z",
+          "jobs": [
+            {
+              "id": 106148443231,
+              "name": "publish / build",
+              "started_at": "2026-09-20T20:59:38Z",
+              "completed_at": "2026-09-20T21:02:55Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106148935073,
+              "name": "publish / smoke",
+              "started_at": "2026-09-20T21:02:57Z",
+              "completed_at": "2026-09-20T21:03:33Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 4.0,
+          "workflow_seconds": 239.0
+        },
+        {
+          "id": 35535891974,
+          "url": "https://github.com/fredrir/packages/actions/runs/35535891974",
+          "event": "push",
+          "head_sha": "e1c57c4fc05e455dd2b550ae49ea1e4acebcf1e5",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T20:32:49Z",
+          "jobs": [
+            {
+              "id": 106144730860,
+              "name": "publish / build",
+              "started_at": "2026-09-20T20:32:54Z",
+              "completed_at": "2026-09-20T20:36:05Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106145202108,
+              "name": "publish / smoke",
+              "started_at": "2026-09-20T20:36:07Z",
+              "completed_at": "2026-09-20T20:36:20Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 5.0,
+          "workflow_seconds": 211.0
+        },
+        {
+          "id": 35525559259,
+          "url": "https://github.com/fredrir/packages/actions/runs/35525559259",
+          "event": "push",
+          "head_sha": "55cff712023208f7856a1f69e803fd02aa240555",
+          "name": "Publish packages",
+          "conclusion": "success",
+          "created_at": "2026-09-20T17:20:38Z",
+          "jobs": [
+            {
+              "id": 106116977619,
+              "name": "publish / cli / build",
+              "started_at": "2026-09-20T17:20:40Z",
+              "completed_at": "2026-09-20T17:21:34Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106117109211,
+              "name": "publish / build",
+              "started_at": "2026-09-20T17:21:37Z",
+              "completed_at": "2026-09-20T17:23:11Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106117338535,
+              "name": "publish / smoke",
+              "started_at": "2026-09-20T17:23:13Z",
+              "completed_at": "2026-09-20T17:23:37Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106117398238,
+              "name": "publish / publish",
+              "started_at": "2026-09-20T17:23:40Z",
+              "completed_at": "2026-09-20T17:24:14Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 2.0,
+          "workflow_seconds": 216.0
+        },
+        {
+          "id": 35524555486,
+          "url": "https://github.com/fredrir/packages/actions/runs/35524555486",
+          "event": "push",
+          "head_sha": "f636edc8e7a1ec7629393e41bd47714cb80eb4f3",
+          "name": "Publish packages",
+          "conclusion": "success",
+          "created_at": "2026-09-20T17:01:51Z",
+          "jobs": [
+            {
+              "id": 106114342428,
+              "name": "publish / cli / build",
+              "started_at": "2026-09-20T17:02:30Z",
+              "completed_at": "2026-09-20T17:05:10Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106114809619,
+              "name": "publish / build",
+              "started_at": "2026-09-20T17:05:13Z",
+              "completed_at": "2026-09-20T17:06:46Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106115039807,
+              "name": "publish / smoke",
+              "started_at": "2026-09-20T17:06:48Z",
+              "completed_at": "2026-09-20T17:07:33Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 106115146743,
+              "name": "publish / publish",
+              "started_at": "2026-09-20T17:07:37Z",
+              "completed_at": "2026-09-20T17:08:11Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 39.0,
+          "workflow_seconds": 380.0
+        },
+        {
+          "id": 35524108305,
+          "url": "https://github.com/fredrir/packages/actions/runs/35524108305",
+          "event": "push",
+          "head_sha": "d33c892b83f9536442fc09924c6b03394690f49e",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T16:53:09Z",
+          "jobs": [
+            {
+              "id": 106113149292,
+              "name": "publish / build",
+              "started_at": "2026-09-20T16:53:19Z",
+              "completed_at": "2026-09-20T16:54:35Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 10.0,
+          "workflow_seconds": 86.0
+        },
+        {
+          "id": 35502112888,
+          "url": "https://github.com/fredrir/packages/actions/runs/35502112888",
+          "event": "schedule",
+          "head_sha": "593bf23963c1765635c227271c6b7e4a4cbaa7b2",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-20T09:22:07Z",
+          "jobs": [
+            {
+              "id": 106055603402,
+              "name": "publish / build",
+              "started_at": "2026-09-20T09:22:18Z",
+              "completed_at": "2026-09-20T09:23:37Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 11.0,
+          "workflow_seconds": 90.0
+        },
+        {
+          "id": 35433181827,
+          "url": "https://github.com/fredrir/packages/actions/runs/35433181827",
+          "event": "schedule",
+          "head_sha": "593bf23963c1765635c227271c6b7e4a4cbaa7b2",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-19T08:52:41Z",
+          "jobs": [
+            {
+              "id": 105871273638,
+              "name": "publish / build",
+              "started_at": "2026-09-19T08:52:51Z",
+              "completed_at": "2026-09-19T08:54:07Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 10.0,
+          "workflow_seconds": 86.0
+        },
+        {
+          "id": 35327683529,
+          "url": "https://github.com/fredrir/packages/actions/runs/35327683529",
+          "event": "schedule",
+          "head_sha": "593bf23963c1765635c227271c6b7e4a4cbaa7b2",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-18T09:05:12Z",
+          "jobs": [
+            {
+              "id": 105544484525,
+              "name": "publish / build",
+              "started_at": "2026-09-18T09:05:22Z",
+              "completed_at": "2026-09-18T09:06:36Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 10.0,
+          "workflow_seconds": 84.0
+        },
+        {
+          "id": 35271458502,
+          "url": "https://github.com/fredrir/packages/actions/runs/35271458502",
+          "event": "workflow_dispatch",
+          "head_sha": "593bf23963c1765635c227271c6b7e4a4cbaa7b2",
+          "name": "Publish packages",
+          "conclusion": "success",
+          "created_at": "2026-09-17T20:32:53Z",
+          "jobs": [
+            {
+              "id": 105371642986,
+              "name": "publish / build",
+              "started_at": "2026-09-17T20:33:05Z",
+              "completed_at": "2026-09-17T20:35:24Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105372459787,
+              "name": "publish / smoke",
+              "started_at": "2026-09-17T20:35:32Z",
+              "completed_at": "2026-09-17T20:36:34Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105372841739,
+              "name": "publish / publish",
+              "started_at": "2026-09-17T20:36:42Z",
+              "completed_at": "2026-09-17T20:37:36Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 12.0,
+          "workflow_seconds": 283.0
+        },
+        {
+          "id": 35247523753,
+          "url": "https://github.com/fredrir/packages/actions/runs/35247523753",
+          "event": "push",
+          "head_sha": "593bf23963c1765635c227271c6b7e4a4cbaa7b2",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-17T16:35:28Z",
+          "jobs": [
+            {
+              "id": 105291391902,
+              "name": "publish / build",
+              "started_at": "2026-09-17T16:35:38Z",
+              "completed_at": "2026-09-17T16:37:54Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105292239813,
+              "name": "publish / smoke",
+              "started_at": "2026-09-17T16:38:02Z",
+              "completed_at": "2026-09-17T16:39:00Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105292613822,
+              "name": "publish / publish",
+              "started_at": "2026-09-17T16:39:38Z",
+              "completed_at": "2026-09-17T16:40:20Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 10.0,
+          "workflow_seconds": 292.0
+        },
+        {
+          "id": 35246045655,
+          "url": "https://github.com/fredrir/packages/actions/runs/35246045655",
+          "event": "workflow_dispatch",
+          "head_sha": "d1f49ef1195609fd556c1f4a094c05c25fb3a728",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-17T16:21:12Z",
+          "jobs": [
+            {
+              "id": 105286399797,
+              "name": "publish / build",
+              "started_at": "2026-09-17T16:21:24Z",
+              "completed_at": "2026-09-17T16:24:10Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105287438780,
+              "name": "publish / smoke",
+              "started_at": "2026-09-17T16:24:18Z",
+              "completed_at": "2026-09-17T16:25:17Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105287835547,
+              "name": "publish / publish",
+              "started_at": "2026-09-17T16:25:26Z",
+              "completed_at": "2026-09-17T16:26:11Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 12.0,
+          "workflow_seconds": 299.0
+        },
+        {
+          "id": 35226971877,
+          "url": "https://github.com/fredrir/packages/actions/runs/35226971877",
+          "event": "push",
+          "head_sha": "d1f49ef1195609fd556c1f4a094c05c25fb3a728",
+          "name": "Publish packages",
+          "conclusion": "success",
+          "created_at": "2026-09-17T13:25:25Z",
+          "jobs": [
+            {
+              "id": 105220931119,
+              "name": "publish / build",
+              "started_at": "2026-09-17T13:25:35Z",
+              "completed_at": "2026-09-17T13:26:46Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105221404620,
+              "name": "publish / smoke",
+              "started_at": "2026-09-17T13:27:24Z",
+              "completed_at": "2026-09-17T13:27:40Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105221723113,
+              "name": "publish / publish",
+              "started_at": "2026-09-17T13:27:49Z",
+              "completed_at": "2026-09-17T13:28:09Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 10.0,
+          "workflow_seconds": 164.0
+        },
+        {
+          "id": 35225993277,
+          "url": "https://github.com/fredrir/packages/actions/runs/35225993277",
+          "event": "workflow_dispatch",
+          "head_sha": "356d8dd75fedf597cac60e7769c33151e70398f1",
+          "name": "Publish packages",
+          "conclusion": "success",
+          "created_at": "2026-09-17T13:16:00Z",
+          "jobs": [
+            {
+              "id": 105217609444,
+              "name": "publish / build",
+              "started_at": "2026-09-17T13:16:12Z",
+              "completed_at": "2026-09-17T13:17:25Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105218092167,
+              "name": "publish / smoke",
+              "started_at": "2026-09-17T13:18:03Z",
+              "completed_at": "2026-09-17T13:18:19Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105218406436,
+              "name": "publish / publish",
+              "started_at": "2026-09-17T13:18:27Z",
+              "completed_at": "2026-09-17T13:18:46Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 12.0,
+          "workflow_seconds": 166.0
+        },
+        {
+          "id": 35213775686,
+          "url": "https://github.com/fredrir/packages/actions/runs/35213775686",
+          "event": "push",
+          "head_sha": "356d8dd75fedf597cac60e7769c33151e70398f1",
+          "name": "Publish packages",
+          "conclusion": "success",
+          "created_at": "2026-09-17T11:04:31Z",
+          "jobs": [
+            {
+              "id": 105177280062,
+              "name": "publish / build",
+              "started_at": "2026-09-17T11:05:21Z",
+              "completed_at": "2026-09-17T11:06:54Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105177950245,
+              "name": "publish / smoke",
+              "started_at": "2026-09-17T11:07:04Z",
+              "completed_at": "2026-09-17T11:07:25Z",
+              "conclusion": "success"
+            },
+            {
+              "id": 105178097526,
+              "name": "publish / publish",
+              "started_at": "2026-09-17T11:07:34Z",
+              "completed_at": "2026-09-17T11:07:59Z",
+              "conclusion": "success"
+            }
+          ],
+          "queue_seconds": 50.0,
+          "workflow_seconds": 208.0
+        },
+        {
+          "id": 35213634357,
+          "url": "https://github.com/fredrir/packages/actions/runs/35213634357",
+          "event": "push",
+          "head_sha": "f2ff152cd93696afe9ff789159122094f1834766",
+          "name": "Publish packages",
+          "conclusion": "failure",
+          "created_at": "2026-09-17T11:02:57Z",
+          "jobs": [
+            {
+              "id": 105176830060,
+              "name": "publish / build",
+              "started_at": "2026-09-17T11:03:20Z",
+              "completed_at": "2026-09-17T11:03:34Z",
+              "conclusion": "failure"
+            }
+          ],
+          "queue_seconds": 23.0,
+          "workflow_seconds": 37.0
+        },
+        {
+          "id": 35206875471,
+          "url": "https://github.com/fredrir/packages/actions/runs/35206875471",
+          "event": "push",
+          "head_sha": "d615e301240ae096f4371397e20144a5514f421d",
+          "name": "Publish packages",
+          "conclusion": "cancelled",
+          "created_at": "2026-09-17T09:45:43Z",
+          "jobs": [],
+          "queue_seconds": null,
+          "workflow_seconds": null
+        }
+      ]
+    }
+  ]
+}
