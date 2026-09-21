@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
+	"golang.org/x/sync/errgroup"
 
 	"dagger.io/dagger"
 )
@@ -83,20 +84,27 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 	if opts.InfraBinary != "" {
 		source = source.WithFile(".infra-artifacts/infra", client.Host().File(opts.InfraBinary), dagger.DirectoryWithFileOpts{Permissions: 0o755})
 	}
+	container := source.DockerBuild(dagger.DirectoryDockerBuildOpts{Platform: dagger.Platform(opts.Platform), Dockerfile: ".infra.Containerfile", Target: opts.Target, BuildArgs: args})
 	if opts.CheckTarget != "" {
 		checks := source.DockerBuild(dagger.DirectoryDockerBuildOpts{Platform: dagger.Platform(opts.Platform), Dockerfile: ".infra.Containerfile", Target: opts.CheckTarget, BuildArgs: args})
-		directory := filepath.Join(opts.CheckReportDir, "inline")
-		if _, err := checks.Directory("/infra-checks").Export(ctx, directory); err != nil {
-			return "", fmt.Errorf("export inline check receipts: %w", err)
-		}
-		if _, err := ci.CheckGroupBudget(directory, 10*time.Second, true); err != nil {
-			return "", err
-		}
-		if _, err := ci.CheckGroupBudget(opts.CheckReportDir, 10*time.Second, true); err != nil {
+		if err := prepareImage(ctx, func(ctx context.Context) error {
+			_, err := container.Sync(ctx)
+			return err
+		}, func(ctx context.Context) error {
+			directory := filepath.Join(opts.CheckReportDir, "inline")
+			if _, err := checks.Directory("/infra-checks").Export(ctx, directory); err != nil {
+				return fmt.Errorf("export inline check receipts: %w", err)
+			}
+			if _, err := ci.CheckGroupBudget(directory, 10*time.Second, true); err != nil {
+				return err
+			}
+			_, err := ci.CheckGroupBudget(opts.CheckReportDir, 10*time.Second, true)
+			return err
+		}); err != nil {
 			return "", err
 		}
 	}
-	container := source.DockerBuild(dagger.DirectoryDockerBuildOpts{Platform: dagger.Platform(opts.Platform), Dockerfile: ".infra.Containerfile", Target: opts.Target, BuildArgs: args})
+
 	if opts.SourceURL != "" {
 		container = container.WithLabel("org.opencontainers.image.source", opts.SourceURL)
 	}
@@ -160,4 +168,11 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		container = container.WithRegistryAuth(host, opts.RegistryUser, client.SetSecret("registry-token", opts.RegistryToken))
 	}
 	return container.Publish(ctx, opts.Image)
+}
+
+func prepareImage(ctx context.Context, build, checks func(context.Context) error) error {
+	group, branchContext := errgroup.WithContext(ctx)
+	group.Go(func() error { return build(branchContext) })
+	group.Go(func() error { return checks(branchContext) })
+	return errors.Join(group.Wait(), ctx.Err())
 }
