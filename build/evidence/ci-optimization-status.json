@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "observed_at": "2026-09-21T02:51:18.992141+00:00",
+  "observed_at": "2026-09-21T04:31:02.560250+00:00",
   "release": "infra-v0.2.5",
-  "workflow_revision": "cbbf64f0b9a383894e8f4c329d64b996260433c0",
+  "workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
   "source_check": {
-    "run": 35557495759,
+    "run": 35558880177,
     "success": true,
-    "aggregate_seconds": 4.297159578,
-    "scope": "Formatting-only delta: all Go tests and generation; no affected declaration checks."
+    "aggregate_seconds": 2.28175285,
+    "scope": "Final accepted changes; preparation recorded separately in runner-final-rollout.json."
   },
   "package_canary": {
     "run": 35554906277,
@@ -15,26 +15,28 @@
     "install_seconds": 7.486799162
   },
   "frontend_canary": {
-    "build_run": 35555161786,
+    "build_run": 35559691765,
     "build_success": true,
-    "deploy_run": 35555242396,
-    "expected_revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
-    "readiness_success": false,
-    "reason": "production branch publication awaits full infrastructure reconciliation",
+    "deploy_runs": [
+      35559739864,
+      35559972713
+    ],
+    "expected_revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+    "readiness_deadline_success": false,
     "eventually_served": true,
-    "observed_by": "2026-09-21T03:02:16Z",
-    "reconciliation_run": 35555262385,
-    "reconciliation_success": true
+    "reconciliation_run": 35559992436,
+    "reconciliation_success": true,
+    "evidence": "frontend-final-canary.json"
   },
   "ordinary_post_change_deployments": 0,
   "frontend_under_15_seconds_qualified": false,
   "remaining": [
-    "verified CLI and maintenance configuration apply",
-    "final image consumer workflow cutover",
+    "parser, portfolio and Y consumer rollout",
     "ordinary-traffic percentiles and sub-15-second qualification",
-    "cold changed-CLI dependency layer churn"
+    "cold changed-CLI dependency layer churn",
+    "workflow handoff and whole-cluster application planning overhead"
   ],
-  "installed_release": "infra-v0.2.3",
+  "installed_release": "infra-v0.2.5",
   "infrastructure_images": {
     "run": 35557495973,
     "success": true,
@@ -45,5 +47,19 @@
       "check": 9.138
     },
     "scope": "Bounded canaries; exact stage values retained in image receipts; no percentile claim."
+  },
+  "runner_apply": {
+    "run": 35558880286,
+    "success": true,
+    "revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+    "evidence": "runner-final-rollout.json"
+  },
+  "backend_canary": {
+    "run": 35560175603,
+    "cold_attempt_success": false,
+    "warm_attempt_success": true,
+    "warm_aggregate_seconds": 6.777630763,
+    "exact_digest_ready": true,
+    "evidence": "backend-final-canary.json"
   }
 }

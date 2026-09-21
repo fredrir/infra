@@ -16,6 +16,7 @@
 | Engine reconciliation | Exact cached image digests skip registry pulls; each changed service restarts independently | [Runner qualification](../build/evidence/scanner-cache-sharing.json) |
 | Failed publication recovery | Reuse completed host configuration only after a recent durable checkpoint, unchanged host inputs and a fresh no-change expansion proof; local Linux and real OpenTofu fixture checks pass | [Checkpoint qualification](../build/evidence/reconcile-host-checkpoint.json) |
 | Frontend production canaries | Expected revisions eventually served; the 60-second serving deadline failed during full host reconciliation and during application-only workflow startup plus planning | [Initial canary](../build/evidence/frontend-production-canary.json), [final canary](../build/evidence/frontend-final-canary.json) |
+| Backend production canary | Build/publish 199 seconds cold → 22 seconds warm; scanner preparation 32.65 → 0.017 seconds; checks 6.778 seconds; initial cold attempt failed the unchanged ten-second gate | [Backend canary](../build/evidence/backend-final-canary.json) |
 | Historical workflow sample | Includes earlier qualification runs and failures; not an ordinary-traffic deployment percentile | [Baseline](../build/evidence/ci-optimization-baseline.json) |
 | Frontend deployment below 15 seconds | Unqualified | [Previous observed timeline](../build/rollout/flux-artifacts/rollout.json) |
 
