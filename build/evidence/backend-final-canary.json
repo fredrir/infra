@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "recorded_at_utc": "2026-09-21T04:22:16.177706+00:00",
+  "recorded_at_utc": "2026-09-21T04:29:44.379352+00:00",
   "repository": "fredrir/llunde-backend",
   "source_revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
   "workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
   "cli_release": "infra-v0.2.5",
-  "state": "Initial build failed strict aggregate check budget; exact artifact qualification pending",
+  "state": "Exact verified image healthy in production after one failed-only retry; original cold failure retained",
   "push": {
     "before_revision": "dbdff56a84ea6a15ebf0ac84f848b0815a1b5982",
     "revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
@@ -79,12 +79,170 @@
         "cpu_seconds": 3.093372,
         "peak_memory_bytes": 133611520
       }
-    ]
+    ],
+    "gradle_preparation": {
+      "command": "./gradlew $GRADLE_ARGS prepareRuntimeLayers prepareFastTests",
+      "execution_seconds_rounded": 63,
+      "gradle_reported_seconds": 61,
+      "actionable_tasks": 8,
+      "executed_tasks": 8,
+      "configuration_cache_reused": false,
+      "observations": [
+        "Gradle started a new daemon; one incompatible and one stopped daemon could not be reused.",
+        "compileKotlin and compileTestKotlin executed.",
+        "Preparation and compilation are outside the measured fast test stage and remain part of deployment wall time."
+      ]
+    }
   },
   "limitations": [
     "This is one bounded canary, not a percentile estimate.",
     "Initial attempt failed honestly; no check threshold was changed.",
     "DockerBuild durations include preparation and execution beyond measured checks.",
-    "Backend readiness proves the exact deployed image and pod health; no exact served-revision HTTP endpoint is configured."
-  ]
+    "Backend readiness proves the exact deployed image and pod health; no exact served-revision HTTP endpoint is configured.",
+    "GitHub run created_at is retained from attempt1; ci timeline initial_queue_seconds649 for the rerun includes the previous attempt and manual recovery gap and is not runner queue latency.",
+    "Final app-only reconciliation still spent67.006seconds planning and48.134seconds reconciling Kubernetes."
+  ],
+  "retry_dispatch": {
+    "run_id": 35560175603,
+    "mode": "failed-only",
+    "started": "2026-09-21T04:24:28.127587+00:00",
+    "authorization": "One bounded retry authorized after local exact-artifact qualification was blocked by private registry authentication; no threshold change.",
+    "exit_code": 0,
+    "completed": "2026-09-21T04:24:29.457067+00:00",
+    "output": ""
+  },
+  "local_qualification": {
+    "state": "blocked",
+    "reason": "Private registry authentication unavailable after Actions logout; scan exited before a useful warm timing.",
+    "qualifies_warm_performance": false,
+    "evidence": "build/evidence/backend-local-qualification-auth-failure.json"
+  },
+  "retry_build": {
+    "run_id": 35560175603,
+    "attempt": 2,
+    "conclusion": "success",
+    "build_and_publish_seconds": 22,
+    "exact_same_image_digest": true,
+    "check_budget": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 6.7776307629999994,
+      "remaining_seconds": 3.2223692370000006,
+      "success": true,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "backend",
+          "started": "2026-09-21T04:17:12.252663473Z",
+          "duration_seconds": 1.268407418,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 3.093372,
+          "peak_memory_bytes": 133611520
+        },
+        {
+          "schema": 1,
+          "stage": "provenance-verification",
+          "revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
+          "started": "2026-09-21T04:25:14.876905162Z",
+          "duration_seconds": 4.237704107,
+          "budget_seconds": 7.4600733439999996,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.390237,
+          "peak_memory_bytes": 69074944
+        },
+        {
+          "schema": 1,
+          "stage": "vulnerability-scan",
+          "revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
+          "started": "2026-09-21T04:25:06.761534703Z",
+          "duration_seconds": 1.271519238,
+          "budget_seconds": 8.731592582,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.362026,
+          "peak_memory_bytes": 119144448
+        }
+      ]
+    },
+    "scanner_preparation": {
+      "schema": 1,
+      "stage": "scanner-preparation",
+      "revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
+      "started": "2026-09-21T04:24:44.85787708Z",
+      "duration_seconds": 0.016466258,
+      "budget_seconds": 300,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.019001,
+      "peak_memory_bytes": 14155776
+    },
+    "dagger_trace_summary": [
+      "backend / build\tUNKNOWN STEP\t2026-09-21T04:25:02.8159716Z 23  : Directory.dockerBuild DONE [16.4s]",
+      "backend / build\tUNKNOWN STEP\t2026-09-21T04:25:04.9196791Z 28  : Directory.dockerBuild DONE [2.2s]",
+      "backend / build\tUNKNOWN STEP\t2026-09-21T04:25:06.7223007Z 59  : Container.publish DONE [1.9s]",
+      "backend / build\tUNKNOWN STEP\t2026-09-21T04:25:06.7274345Z 5   : dagger-0.21.9 session --label dagger.io/sdk.name:go --label dagger.io/sdk.version:0.21.9 DONE [21.7s]"
+    ],
+    "cached_check_receipt_caveat": "Inline test receipt retains its original 04:17:12 timestamp and duration; reused evidence is not a current-execution wall measurement."
+  },
+  "deployment": {
+    "run_id": 35560916821,
+    "promotion_revision": "c7b525fb56e3158a74a14d33fc9bf479091ae7bb",
+    "reconcile_run_id": 35560941305,
+    "conclusion": "success",
+    "promotion_receipt": {
+      "schema": 1,
+      "stage": "promotion",
+      "revision": "aa6f885251ef36e59e527390b7d5f29c4ad06b1c",
+      "started": "2026-09-21T04:25:39.545016925Z",
+      "duration_seconds": 6.645843632,
+      "budget_seconds": 30,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.72,
+      "peak_memory_bytes": 130670592
+    },
+    "reconciliation": {
+      "desired_revision": "c7b525fb56e3158a74a14d33fc9bf479091ae7bb",
+      "applied_revision": "c7b525fb56e3158a74a14d33fc9bf479091ae7bb",
+      "stage": "complete",
+      "updated_at": "2026-09-21T04:29:06.864285123Z",
+      "stage_seconds": {
+        "kubernetes": 48.133969876,
+        "plan": 67.005770194,
+        "publish": 1.524340573,
+        "verify": 5.219227571
+      }
+    },
+    "reconcile_workflow": "success"
+  },
+  "runtime": {
+    "observed_at_utc": "2026-09-21T04:28:51.051293+00:00",
+    "namespace": "llunde",
+    "deployment": "api",
+    "pod": "api-54f796f7d7-rgrtv",
+    "pod_created_at": "2026-09-21T04:28:24Z",
+    "pod_ready_at": "2026-09-21T04:28:40Z",
+    "node": "fredrir-04",
+    "desired_image": "ghcr.io/fredrir/llunde-backend@sha256:05b4cff6f2d66dde3ee2d0b7da64f7ab0dae84bb4016d9a9bf7e7469ad30daf1",
+    "image_id": "ghcr.io/fredrir/llunde-backend@sha256:05b4cff6f2d66dde3ee2d0b7da64f7ab0dae84bb4016d9a9bf7e7469ad30daf1",
+    "container_started_at": "2026-09-21T04:28:32Z",
+    "restart_count": 0,
+    "ready": true,
+    "rollout_status": "success"
+  },
+  "latency": {
+    "initial_push_to_pod_ready_seconds": 899.371332,
+    "retry_dispatch_to_pod_ready_seconds": 251.872413,
+    "promotion_start_to_pod_ready_seconds": 180.454984,
+    "includes_failed_attempt_and_manual_qualification_wait": true
+  }
 }
