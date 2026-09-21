@@ -185,7 +185,6 @@ func Smoke(ctx context.Context, options PipelineOptions, site, channels, scope s
 	}
 	defer client.Close()
 	cli := client.Host().File(binary)
-	repository := client.Host().Directory(site)
 	names := make([]string, 0, len(tools))
 	for name := range tools {
 		names = append(names, name)
@@ -193,7 +192,8 @@ func Smoke(ctx context.Context, options PipelineOptions, site, channels, scope s
 	sort.Strings(names)
 	batches := smokePackageBatches(names, tools, scope)
 	if err := smokeDistributions(ctx, targets, func(ctx context.Context, target SmokeTarget) error {
-		base := client.Container(dagger.ContainerOpts{Platform: "linux/amd64"}).From(target.Image).WithFile("/usr/local/bin/infra", cli, dagger.ContainerWithFileOpts{Permissions: 0755}).WithDirectory("/repo", repository)
+		repository := smokeRepository(client, site, target.Format)
+		base := client.Container(dagger.ContainerOpts{Platform: "linux/amd64"}).From(target.Image).WithFile("/usr/local/bin/infra", cli, dagger.ContainerWithFileOpts{Permissions: 0755}).WithMountedDirectory("/repo", repository, dagger.ContainerWithMountedDirectoryOpts{ReadOnly: true})
 		for _, identities := range batches {
 			args := append([]string{"infra", "packages", "smoke-install", target.Format}, identities...)
 			if _, err := base.WithExec(args).Sync(ctx); err != nil {
@@ -241,4 +241,15 @@ func smokePackageBatches(names []string, tools Tools, scope string) [][]string {
 		batches = append(batches, combined)
 	}
 	return batches
+}
+
+func smokeRepository(client *dagger.Client, site, format string) *dagger.Directory {
+	paths := []string{format + "/**", "keys/fredrir.asc"}
+	if format == "rpm" || format == "apk" {
+		paths[0] = format + "/x86_64/**"
+	}
+	if format == "apk" {
+		paths[1] = "keys/fredrir.rsa.pub"
+	}
+	return client.Host().Directory(site, dagger.HostDirectoryOpts{Include: paths})
 }

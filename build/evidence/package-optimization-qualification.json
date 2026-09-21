@@ -1,0 +1,236 @@
+{
+  "schema": 1,
+  "observed_at": "2026-09-21T02:26:15.682470+00:00",
+  "environment": {
+    "host": "ssh ntnu",
+    "engine": "Dagger 0.21.9",
+    "cpu_limit": 4,
+    "memory_bytes": 4294967296,
+    "fixture": "one signed static package, amd64 and arm64, deb/rpm/apk",
+    "isolation": "/tmp/infra-packages-qualification; disposable signing keys; no production credentials"
+  },
+  "workflow": {
+    "jobs": {
+      "before": 3,
+      "after": 2
+    },
+    "checkouts": {
+      "before": 3,
+      "after": 2
+    },
+    "setups": {
+      "before": 3,
+      "after": 2
+    },
+    "artifact_downloads": {
+      "before": 4,
+      "after": 2
+    },
+    "github_hosted_engine_starts": {
+      "before": 2,
+      "after": 1
+    },
+    "signing_and_publish_credential_boundary": "publish retains separate job; smoke receives public artifacts only"
+  },
+  "qualification": {
+    "cold_signed_fixture_seconds": 67.73,
+    "warm_signed_fixture_seconds": 9.92,
+    "signed_installation_formats": [
+      "deb",
+      "rpm",
+      "apk"
+    ],
+    "corrupted_payload_rejection": [
+      "deb",
+      "rpm",
+      "apk"
+    ],
+    "directory_digest_cases": 39,
+    "directory_digest_seconds": 2.61,
+    "unchanged_checkout_reuse": true,
+    "unrelated_site_and_format_changes_reuse": true,
+    "rpm_apk_other_architecture_reuse": true,
+    "selected_payload_index_and_public_key_mutations_invalidate": true,
+    "production_gate_budget_seconds": 10
+  },
+  "smoke_cli_samples": [
+    {
+      "schema": 1,
+      "stage": "package-before-0",
+      "started": "2026-09-21T02:24:10.066916207Z",
+      "duration_seconds": 2.810403317,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 1.7975210000000001,
+      "peak_memory_bytes": 80027648,
+      "sample": 0,
+      "variant": "before"
+    },
+    {
+      "schema": 1,
+      "stage": "package-after-0",
+      "started": "2026-09-21T02:24:12.947151555Z",
+      "duration_seconds": 1.46451569,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 1.304205,
+      "peak_memory_bytes": 59449344,
+      "sample": 0,
+      "variant": "after"
+    },
+    {
+      "schema": 1,
+      "stage": "package-before-1",
+      "started": "2026-09-21T02:24:14.472352181Z",
+      "duration_seconds": 1.457507299,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 1.278653,
+      "peak_memory_bytes": 59781120,
+      "sample": 1,
+      "variant": "before"
+    },
+    {
+      "schema": 1,
+      "stage": "package-after-1",
+      "started": "2026-09-21T02:24:15.990234062Z",
+      "duration_seconds": 1.4473459069999999,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 1.273924,
+      "peak_memory_bytes": 59846656,
+      "sample": 1,
+      "variant": "after"
+    },
+    {
+      "schema": 1,
+      "stage": "package-before-2",
+      "started": "2026-09-21T02:24:17.467492994Z",
+      "duration_seconds": 1.459924762,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 1.328153,
+      "peak_memory_bytes": 60563456,
+      "sample": 2,
+      "variant": "before"
+    },
+    {
+      "schema": 1,
+      "stage": "package-after-2",
+      "started": "2026-09-21T02:24:18.994236896Z",
+      "duration_seconds": 2.292592625,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 1.348679,
+      "peak_memory_bytes": 59166720,
+      "sample": 2,
+      "variant": "after"
+    },
+    {
+      "schema": 1,
+      "stage": "package-before-3",
+      "started": "2026-09-21T02:24:21.322296781Z",
+      "duration_seconds": 1.457000762,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 1.299596,
+      "peak_memory_bytes": 59846656,
+      "sample": 3,
+      "variant": "before"
+    },
+    {
+      "schema": 1,
+      "stage": "package-after-3",
+      "started": "2026-09-21T02:24:22.844974448Z",
+      "duration_seconds": 1.467338311,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 1.347607,
+      "peak_memory_bytes": 60104704,
+      "sample": 3,
+      "variant": "after"
+    }
+  ],
+  "smoke_cli_medians_excluding_first": {
+    "before": 1.457507299,
+    "after": 1.467338311
+  },
+  "artifact_zip_compression": {
+    "site_bytes": 8341497,
+    "samples": [
+      {
+        "level": 6,
+        "sample": 0,
+        "seconds": 0.2331573180272244,
+        "compressed_bytes": 8326938
+      },
+      {
+        "level": 0,
+        "sample": 0,
+        "seconds": 0.022329547035042197,
+        "compressed_bytes": 8348394
+      },
+      {
+        "level": 6,
+        "sample": 1,
+        "seconds": 0.2267866150359623,
+        "compressed_bytes": 8326938
+      },
+      {
+        "level": 0,
+        "sample": 1,
+        "seconds": 0.01740865601459518,
+        "compressed_bytes": 8348394
+      },
+      {
+        "level": 6,
+        "sample": 2,
+        "seconds": 0.22495108796283603,
+        "compressed_bytes": 8326938
+      },
+      {
+        "level": 0,
+        "sample": 2,
+        "seconds": 0.01723622705321759,
+        "compressed_bytes": 8348394
+      }
+    ],
+    "aggregate_repository_input_bytes_before": 25024491,
+    "aggregate_repository_input_bytes_after": 5664372
+  },
+  "limitations": [
+    "Synthetic signed package fixture, not production package catalog or ordinary traffic percentiles.",
+    "CLI memory and CPU exclude the Dagger engine.",
+    "No steady-warm CLI latency improvement demonstrated; workflow handoff reduction has not yet been measured in production.",
+    "Build and smoke share the workspace and engine, but retain separate Dagger client sessions.",
+    "Compression benchmark uses Python ZIP deflate on actual fixture packages, not GitHub upload transfer timings.",
+    "Aggregate input bytes describe selected logical repository payloads, not measured physical disk allocation or network transfer.",
+    "Initial cold fixture overlapped frontend work and engine CPU limit changed from 2 to 4; warm CLI samples ran without deliberate competing engine work."
+  ],
+  "verification_commands": [
+    "go test ./internal/packages ./internal/cli",
+    "go test -race ./internal/packages",
+    "INFRA_PACKAGE_QUALIFY=1 INFRA_PACKAGE_FIXTURES=<cross-compiled-fixtures> INFRA_QUALIFICATION_BINARY=<linux-infra> INFRA_PACKAGE_SITE=<public-fixture-output> ./infra-packages-tests -test.run TestSignedPackageQualification -test.v",
+    "INFRA_PACKAGE_QUALIFY=1 ./infra-packages-tests -test.run TestSmokeRepositoryIsolationQualification -test.v"
+  ],
+  "independent_review": {
+    "claude": "two bounded attempts,90s and75s, timed out with no output",
+    "main_agent": "reviewed workflow/pipeline/qualification diff; no blockers"
+  }
+}

@@ -56,9 +56,22 @@ jobs:
         PACKAGES_APK_KEY: ${{ secrets.PACKAGES_APK_KEY }}
         _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
       run: infra packages build --root .infra --infra-binary "$INFRA_BINARY"
+    - name: Install from the new repositories
+      env:
+        SCOPE: ${{ inputs.smoke-scope }}
+        _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
+      run: infra ci measure --stage package-install --budget 10s --report-dir "$RUNNER_TEMP/performance" -- infra packages smoke --root .infra --infra-binary "$INFRA_BINARY" "$RUNNER_TEMP/packages/site" "$RUNNER_TEMP/packages/channels" "$SCOPE"
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      if: always()
+      with:
+        name: package-check-performance
+        path: ${{ runner.temp }}/performance
+        if-no-files-found: warn
+        retention-days: 14
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: site
+        compression-level: 0
         path: ${{ runner.temp }}/packages/site
         include-hidden-files: true
         if-no-files-found: error
@@ -72,55 +85,8 @@ jobs:
     - name: Stop Dagger engine
       if: always() && runner.environment == 'github-hosted'
       run: docker rm --force --volumes infra-dagger
-  smoke:
-    needs: build
-    runs-on: ${{ github.repository == 'fredrir/packages' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        repository: ${{ job.workflow_repository }}
-        ref: ${{ job.workflow_sha }}
-        path: .infra
-        persist-credentials: false
-        sparse-checkout-cone-mode: false
-        sparse-checkout: |
-          build
-          .bazelversion
-          .github/actions/setup-infra
-    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-      with:
-        name: site
-        path: ${{ runner.temp }}/site
-    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-      with:
-        name: channels
-        path: ${{ runner.temp }}/channels
-    - uses: ./.infra/.github/actions/setup-infra
-      with:
-        root: .infra
-    - name: Start isolated Dagger engine
-      if: runner.environment == 'github-hosted'
-      run: docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
-    - name: Install from the new repositories
-      env:
-        SCOPE: ${{ inputs.smoke-scope }}
-        _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
-      run: infra ci measure --stage package-install --budget 10s --report-dir "$RUNNER_TEMP/performance" -- infra packages smoke --root .infra --infra-binary "$INFRA_BINARY" "$RUNNER_TEMP/site" "$RUNNER_TEMP/channels" "$SCOPE"
-    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      if: always()
-      with:
-        name: package-check-performance
-        path: ${{ runner.temp }}/performance
-        if-no-files-found: warn
-        retention-days: 14
-    - name: Stop Dagger engine
-      if: always() && runner.environment == 'github-hosted'
-      run: docker rm --force --volumes infra-dagger
   publish:
-    needs: smoke
+    needs: build
     if: '!inputs.dry-run'
     runs-on: ${{ github.repository == 'fredrir/packages' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: 20
