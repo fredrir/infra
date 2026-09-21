@@ -1,0 +1,662 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-21T03:54:03.156593+00:00",
+  "run_id": 35555262385,
+  "run_url": "https://github.com/fredrir/infra/actions/runs/35555262385",
+  "revision": "3da86446ebb07bd86864b3f0e5e7a86ac705b498",
+  "scope": "Hosts stage only; full infrastructure reconciliation after frontend promotion",
+  "stage_started_at": "2026-09-21T02:49:36.073057Z",
+  "stage_finished_at_derived": "2026-09-21T03:00:13.246764Z",
+  "method": "Group timestamp intervals from each TASK marker to the next TASK or PLAY boundary; clip to the recorded Hosts stage window",
+  "observed_execution_shape": {
+    "transport_serial_hosts": 1,
+    "runner_registration_iterations": 8,
+    "tailscale_and_k3s_host_iterations": 5,
+    "facts_gathering_iterations": 17
+  },
+  "opportunities": [
+    "Avoid re-gathering unchanged host facts across repeated plays while preserving freshness needed for mutations",
+    "Reduce repeated remote module and service operations across repository registrations",
+    "Keep application-only reconciliation independent of full host convergence",
+    "Profile per-task SSH and Ansible setup costs before changing serial host safety boundaries"
+  ],
+  "limitations": [
+    "Task/play timestamp spans include controller, SSH and scheduling overhead; they are not exact task execution or CPU time",
+    "Skipped and unchanged tasks still contribute observed orchestration overhead",
+    "One prior full reconciliation sample, not ordinary-traffic percentiles",
+    "No additional host execution changes were implemented from this audit"
+  ],
+  "tasks": 435,
+  "stage_seconds": 637.173707476,
+  "task_span_seconds_by_role": {
+    "Gathering Facts": 72.96579799999999,
+    "Require an enrolled identity": 6.681203,
+    "Preserve enrolled transport": 0.174881,
+    "tailscale": 102.88247199999996,
+    "ubuntu": 18.720907,
+    "firewall": 30.599805000000003,
+    "k3s": 147.83656099999993,
+    "ci_runtime": 35.981347000000014,
+    "build_vm": 19.590209,
+    "Read SSH account": 6.860456,
+    "Create SSH directory": 2.582496,
+    "Install reconciliation identity": 2.652459,
+    "control_backup": 17.728508,
+    "Install verified infrastructure binary": 0.041241,
+    "infra_binary": 14.196102000000002,
+    "Read verified CLI identity": 0.041278,
+    "build_runner": 126.19808099999995,
+    "build_engine": 29.337272999999996
+  },
+  "task_span_by_name": {
+    "Gathering Facts": {
+      "count": 17,
+      "span_seconds": 72.96579799999999
+    },
+    "Require an enrolled identity": {
+      "count": 5,
+      "span_seconds": 6.681203
+    },
+    "Preserve enrolled transport": {
+      "count": 5,
+      "span_seconds": 0.174881
+    },
+    "tailscale : Install transport prerequisites": {
+      "count": 5,
+      "span_seconds": 15.203687
+    },
+    "tailscale : Create transport artifact directory": {
+      "count": 5,
+      "span_seconds": 6.499516
+    },
+    "tailscale : Install verified transport binaries": {
+      "count": 5,
+      "span_seconds": 0.152083
+    },
+    "tailscale : Download verified Tailscale archive": {
+      "count": 5,
+      "span_seconds": 5.868860999999999
+    },
+    "tailscale : Extract Tailscale binaries": {
+      "count": 5,
+      "span_seconds": 18.802011
+    },
+    "tailscale : Install Tailscale binaries": {
+      "count": 5,
+      "span_seconds": 23.177816999999997
+    },
+    "tailscale : Install transport service": {
+      "count": 5,
+      "span_seconds": 14.999727
+    },
+    "tailscale : Load tunnel support": {
+      "count": 5,
+      "span_seconds": 4.686407
+    },
+    "tailscale : Inspect tunnel device": {
+      "count": 5,
+      "span_seconds": 4.752312000000001
+    },
+    "tailscale : Require kernel tunnel support": {
+      "count": 5,
+      "span_seconds": 0.194503
+    },
+    "tailscale : Apply transport service changes": {
+      "count": 5,
+      "span_seconds": 0.0004720000000000001
+    },
+    "tailscale : Start transport service": {
+      "count": 5,
+      "span_seconds": 8.545076
+    },
+    "ubuntu : Require the common Ubuntu release": {
+      "count": 1,
+      "span_seconds": 0.122612
+    },
+    "ubuntu : Set the inventory hostname": {
+      "count": 1,
+      "span_seconds": 3.807882
+    },
+    "ubuntu : Install host prerequisites": {
+      "count": 1,
+      "span_seconds": 3.528358
+    },
+    "ubuntu : Harden SSH authentication": {
+      "count": 1,
+      "span_seconds": 6.168373
+    },
+    "ubuntu : Validate the complete SSH configuration": {
+      "count": 1,
+      "span_seconds": 2.47407
+    },
+    "ubuntu : Inspect effective SSH authentication": {
+      "count": 1,
+      "span_seconds": 2.469908
+    },
+    "ubuntu : Require public key authentication": {
+      "count": 1,
+      "span_seconds": 0.149704
+    },
+    "firewall : Install nftables": {
+      "count": 1,
+      "span_seconds": 3.533946
+    },
+    "firewall : Require the enrolled management interface": {
+      "count": 1,
+      "span_seconds": 2.51637
+    },
+    "firewall : Create the firewall configuration directory": {
+      "count": 1,
+      "span_seconds": 2.458726
+    },
+    "firewall : Configure host input filtering": {
+      "count": 1,
+      "span_seconds": 6.011007
+    },
+    "firewall : Install the host firewall service": {
+      "count": 1,
+      "span_seconds": 6.19609
+    },
+    "firewall : Enable host input filtering": {
+      "count": 1,
+      "span_seconds": 3.980066
+    },
+    "firewall : Apply firewall changes": {
+      "count": 6,
+      "span_seconds": 0.0006050000000000001
+    },
+    "firewall : Confirm management access": {
+      "count": 1,
+      "span_seconds": 5.902995
+    },
+    "k3s : Require the supported host and network": {
+      "count": 5,
+      "span_seconds": 0.184534
+    },
+    "k3s : Require an inventory control server for registration": {
+      "count": 5,
+      "span_seconds": 0.15537
+    },
+    "k3s : Verify the selected registration server API and datastore": {
+      "count": 5,
+      "span_seconds": 6.829267
+    },
+    "k3s : Inspect protected join credentials": {
+      "count": 5,
+      "span_seconds": 9.664455
+    },
+    "k3s : Require existing private token files": {
+      "count": 5,
+      "span_seconds": 0.295905
+    },
+    "k3s : Install kernel module configuration": {
+      "count": 5,
+      "span_seconds": 14.325294999999999
+    },
+    "k3s : Load kernel modules": {
+      "count": 5,
+      "span_seconds": 13.99457
+    },
+    "k3s : Configure Kubernetes kernel settings": {
+      "count": 5,
+      "span_seconds": 14.486553
+    },
+    "k3s : Apply Kubernetes kernel settings": {
+      "count": 5,
+      "span_seconds": 0.118007
+    },
+    "k3s : Create K3s configuration directory": {
+      "count": 5,
+      "span_seconds": 4.529974999999999
+    },
+    "k3s : Write native K3s configuration": {
+      "count": 5,
+      "span_seconds": 13.998674
+    },
+    "k3s : Download the pinned K3s binary": {
+      "count": 5,
+      "span_seconds": 5.765746
+    },
+    "k3s : Download the pinned official installer": {
+      "count": 5,
+      "span_seconds": 5.063007
+    },
+    "k3s : Install the upstream systemd service": {
+      "count": 5,
+      "span_seconds": 9.904428
+    },
+    "k3s : Create the service dependency directory": {
+      "count": 5,
+      "span_seconds": 5.728115999999999
+    },
+    "k3s : Order K3s after its existing transport": {
+      "count": 5,
+      "span_seconds": 14.316429
+    },
+    "k3s : Enable and reconcile K3s": {
+      "count": 5,
+      "span_seconds": 10.516196
+    },
+    "k3s : Wait for the node to become ready": {
+      "count": 5,
+      "span_seconds": 8.365971000000002
+    },
+    "k3s : Assign worker capabilities through the administrator API": {
+      "count": 5,
+      "span_seconds": 3.115459
+    },
+    "k3s : Advertise CI job slots through the administrator API": {
+      "count": 5,
+      "span_seconds": 3.256265
+    },
+    "k3s : Wait for the kubelet to publish the CI job slots": {
+      "count": 5,
+      "span_seconds": 3.222339
+    },
+    "ci_runtime : Require a supported worker": {
+      "count": 2,
+      "span_seconds": 0.060985
+    },
+    "ci_runtime : Install runtime archive support": {
+      "count": 2,
+      "span_seconds": 3.440811
+    },
+    "ci_runtime : Create the runtime directory": {
+      "count": 2,
+      "span_seconds": 2.1078010000000003
+    },
+    "ci_runtime : Download the pinned runtime": {
+      "count": 2,
+      "span_seconds": 2.0391310000000002
+    },
+    "ci_runtime : Extract the runtime and sidecar binaries": {
+      "count": 2,
+      "span_seconds": 2.781917
+    },
+    "ci_runtime : Expose the containerd shim": {
+      "count": 2,
+      "span_seconds": 3.258661
+    },
+    "ci_runtime : Create the runtime configuration directory": {
+      "count": 2,
+      "span_seconds": 1.656149
+    },
+    "ci_runtime : Configure the sandbox runtime": {
+      "count": 2,
+      "span_seconds": 5.1146709999999995
+    },
+    "ci_runtime : Configure the additional containerd runtime": {
+      "count": 2,
+      "span_seconds": 5.1514299999999995
+    },
+    "ci_runtime : Require a matching package and KVM": {
+      "count": 2,
+      "span_seconds": 0.808828
+    },
+    "ci_runtime : Verify KVM and package checksum": {
+      "count": 2,
+      "span_seconds": 0.079318
+    },
+    "ci_runtime : Copy the verified package": {
+      "count": 2,
+      "span_seconds": 0.061146
+    },
+    "ci_runtime : Download the verified package": {
+      "count": 2,
+      "span_seconds": 1.143981
+    },
+    "ci_runtime : Hash the delivered package": {
+      "count": 2,
+      "span_seconds": 0.981119
+    },
+    "ci_runtime : Require the exact runtime archive": {
+      "count": 2,
+      "span_seconds": 0.068952
+    },
+    "ci_runtime : Extract the runtime under opt": {
+      "count": 2,
+      "span_seconds": 2.902348
+    },
+    "ci_runtime : Expose the Kata shim": {
+      "count": 2,
+      "span_seconds": 0.803952
+    },
+    "ci_runtime : Create the local seccomp directory": {
+      "count": 2,
+      "span_seconds": 0.797453
+    },
+    "ci_runtime : Install the Nix guest seccomp profile": {
+      "count": 2,
+      "span_seconds": 2.7226939999999997
+    },
+    "build_vm : Require bounded dedicated guest resources": {
+      "count": 1,
+      "span_seconds": 0.058588
+    },
+    "build_vm : Read host capacity reservation": {
+      "count": 1,
+      "span_seconds": 1.310302
+    },
+    "build_vm : Require Kubernetes capacity reservation before boot": {
+      "count": 1,
+      "span_seconds": 0.039019
+    },
+    "build_vm : Check KVM device": {
+      "count": 1,
+      "span_seconds": 0.933203
+    },
+    "build_vm : Require native virtualization": {
+      "count": 1,
+      "span_seconds": 0.037184
+    },
+    "build_vm : Install VM tools": {
+      "count": 1,
+      "span_seconds": 1.487214
+    },
+    "build_vm : Create isolated VM account": {
+      "count": 1,
+      "span_seconds": 1.098357
+    },
+    "build_vm : Create VM storage": {
+      "count": 1,
+      "span_seconds": 0.910046
+    },
+    "build_vm : Download verified guest base": {
+      "count": 1,
+      "span_seconds": 1.671238
+    },
+    "build_vm : Create bounded persistent guest disk": {
+      "count": 1,
+      "span_seconds": 1.075499
+    },
+    "build_vm : Render guest initialization": {
+      "count": 1,
+      "span_seconds": 5.568844
+    },
+    "build_vm : Build guest initialization disk": {
+      "count": 1,
+      "span_seconds": 0.029617
+    },
+    "build_vm : Install bounded guest service": {
+      "count": 1,
+      "span_seconds": 2.774969
+    },
+    "build_vm : Reconcile guest service before readiness": {
+      "count": 1,
+      "span_seconds": 0.000128
+    },
+    "build_vm : Start build VM": {
+      "count": 1,
+      "span_seconds": 1.571203
+    },
+    "build_vm : Wait for guest SSH": {
+      "count": 1,
+      "span_seconds": 1.024798
+    },
+    "Read SSH account": {
+      "count": 1,
+      "span_seconds": 6.860456
+    },
+    "Create SSH directory": {
+      "count": 1,
+      "span_seconds": 2.582496
+    },
+    "Install reconciliation identity": {
+      "count": 1,
+      "span_seconds": 2.652459
+    },
+    "control_backup : Require scoped recovery credentials": {
+      "count": 1,
+      "span_seconds": 0.108772
+    },
+    "control_backup : Install Restic": {
+      "count": 1,
+      "span_seconds": 2.512855
+    },
+    "control_backup : Create private backup directories": {
+      "count": 1,
+      "span_seconds": 2.628814
+    },
+    "control_backup : Install recovery credentials": {
+      "count": 1,
+      "span_seconds": 3.269971
+    },
+    "Install verified infrastructure binary": {
+      "count": 1,
+      "span_seconds": 0.041241
+    },
+    "infra_binary : Require immutable binary identity": {
+      "count": 3,
+      "span_seconds": 0.140462
+    },
+    "infra_binary : Select artifact cache directory": {
+      "count": 3,
+      "span_seconds": 0.10892
+    },
+    "infra_binary : Create root-owned artifact cache": {
+      "count": 3,
+      "span_seconds": 3.7417290000000003
+    },
+    "infra_binary : Download verified compiled binary": {
+      "count": 3,
+      "span_seconds": 4.050311
+    },
+    "infra_binary : Check executable compatibility": {
+      "count": 3,
+      "span_seconds": 3.039115
+    },
+    "infra_binary : Activate verified binary": {
+      "count": 3,
+      "span_seconds": 3.1155649999999997
+    },
+    "control_backup : Create the backup metric directory": {
+      "count": 1,
+      "span_seconds": 1.095982
+    },
+    "control_backup : Install the bounded recovery service": {
+      "count": 1,
+      "span_seconds": 3.114471
+    },
+    "control_backup : Install the recovery timer": {
+      "count": 1,
+      "span_seconds": 3.082829
+    },
+    "control_backup : Configure the recovery schedule": {
+      "count": 1,
+      "span_seconds": 1.914814
+    },
+    "Read verified CLI identity": {
+      "count": 1,
+      "span_seconds": 0.041278
+    },
+    "build_runner : Require trusted dedicated runner guest": {
+      "count": 1,
+      "span_seconds": 0.058335
+    },
+    "build_runner : Wait for cloud initialization": {
+      "count": 1,
+      "span_seconds": 1.441055
+    },
+    "build_runner : Install runner dependencies": {
+      "count": 1,
+      "span_seconds": 1.960462
+    },
+    "build_runner : Start dedicated Docker engine": {
+      "count": 1,
+      "span_seconds": 1.580366
+    },
+    "build_runner : Create trusted runner account": {
+      "count": 1,
+      "span_seconds": 1.051421
+    },
+    "build_runner : Read pinned build toolchain": {
+      "count": 1,
+      "span_seconds": 0.043182
+    },
+    "build_runner : Create runner-owned CLI and tool caches": {
+      "count": 1,
+      "span_seconds": 4.154077
+    },
+    "build_runner : Seed verified CLI fast-path cache": {
+      "count": 1,
+      "span_seconds": 1.894344
+    },
+    "build_runner : Install verified native Bazel": {
+      "count": 1,
+      "span_seconds": 1.35511
+    },
+    "build_runner : Create shared native repository cache": {
+      "count": 1,
+      "span_seconds": 0.992348
+    },
+    "build_runner : Bound native Bazel startup and compilation": {
+      "count": 1,
+      "span_seconds": 2.946142
+    },
+    "build_runner : Install aggregate runner resource limits": {
+      "count": 1,
+      "span_seconds": 2.992956
+    },
+    "build_runner : Create trusted hook adapter directory": {
+      "count": 1,
+      "span_seconds": 1.000798
+    },
+    "build_runner : Install immutable trusted-job hook adapter": {
+      "count": 1,
+      "span_seconds": 2.753563
+    },
+    "build_runner : Configure repository runners": {
+      "count": 1,
+      "span_seconds": 0.116297
+    },
+    "build_runner : Create repository runner directory": {
+      "count": 8,
+      "span_seconds": 7.809069
+    },
+    "build_runner : Download verified runner archive": {
+      "count": 8,
+      "span_seconds": 10.536632
+    },
+    "build_runner : Read runner registration": {
+      "count": 8,
+      "span_seconds": 8.213622
+    },
+    "build_runner : Extract pinned runner": {
+      "count": 8,
+      "span_seconds": 11.075774000000001
+    },
+    "build_runner : Obtain single-use runner registration token": {
+      "count": 8,
+      "span_seconds": 0.148191
+    },
+    "build_runner : Register trusted repository runner": {
+      "count": 8,
+      "span_seconds": 0.12384599999999998
+    },
+    "build_runner : Install repository runner service": {
+      "count": 8,
+      "span_seconds": 7.674415000000001
+    },
+    "build_runner : Read installed service name": {
+      "count": 8,
+      "span_seconds": 7.718475999999999
+    },
+    "build_runner : Select runner service": {
+      "count": 8,
+      "span_seconds": 0.357242
+    },
+    "build_runner : Create runner resource override directory": {
+      "count": 8,
+      "span_seconds": 7.7887509999999995
+    },
+    "build_runner : Place repository runner in bounded resource slice": {
+      "count": 8,
+      "span_seconds": 23.456660999999997
+    },
+    "build_runner : Start registered runner": {
+      "count": 8,
+      "span_seconds": 12.786946
+    },
+    "build_runner : Select engine runner service": {
+      "count": 8,
+      "span_seconds": 0.300666
+    },
+    "build_runner : Create prewarming source directory": {
+      "count": 1,
+      "span_seconds": 0.964073
+    },
+    "build_runner : Checkout verified CLI source for prewarming": {
+      "count": 1,
+      "span_seconds": 2.903261
+    },
+    "build_engine : Require a qualified dedicated VM": {
+      "count": 1,
+      "span_seconds": 0.070012
+    },
+    "build_engine : Read runner services": {
+      "count": 1,
+      "span_seconds": 5.300749
+    },
+    "build_engine : Require an installed active GitHub runner": {
+      "count": 1,
+      "span_seconds": 0.041397
+    },
+    "build_engine : Read the registered runner account": {
+      "count": 1,
+      "span_seconds": 1.351226
+    },
+    "build_engine : Verify runner access to its dedicated Docker engine": {
+      "count": 1,
+      "span_seconds": 1.09884
+    },
+    "build_engine : Read engine pin": {
+      "count": 1,
+      "span_seconds": 0.040894
+    },
+    "build_engine : Validate engine pins": {
+      "count": 1,
+      "span_seconds": 0.043428
+    },
+    "build_engine : Check Docker availability": {
+      "count": 1,
+      "span_seconds": 1.048892
+    },
+    "build_engine : Inspect pinned engine images": {
+      "count": 1,
+      "span_seconds": 2.406325
+    },
+    "build_engine : Pull missing pinned engine images": {
+      "count": 1,
+      "span_seconds": 0.025573
+    },
+    "build_engine : Install bounded engine cache retention": {
+      "count": 1,
+      "span_seconds": 2.899984
+    },
+    "build_engine : Install Dagger unit": {
+      "count": 1,
+      "span_seconds": 2.926866
+    },
+    "build_engine : Install Bazel cache unit": {
+      "count": 1,
+      "span_seconds": 2.749779
+    },
+    "build_engine : Start build engines": {
+      "count": 1,
+      "span_seconds": 3.160171
+    },
+    "build_engine : Validate prewarming commands": {
+      "count": 1,
+      "span_seconds": 0.083591
+    },
+    "build_engine : Install background prewarming units": {
+      "count": 1,
+      "span_seconds": 5.876984
+    },
+    "build_engine : Configure background prewarming": {
+      "count": 1,
+      "span_seconds": 0.212562
+    }
+  },
+  "caveat": "Log-derived intervals between task/play boundaries, not process CPU or precise per-task execution duration"
+}
