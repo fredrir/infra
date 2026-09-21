@@ -25,6 +25,7 @@
     - build_engine_prewarm_cpu_percent | int <= 100
     - build_engine_prewarm_memory is match('^[1-9][0-9]*[MG]$')
     - build_engine_cache_gib | int >= 4
+    - build_engine_dagger_cache_gib | int >= 4
     - build_engine_named_cache_hours | int >= 1
     - build_engine_named_cache_hours | int <= 168
     - build_engine_gc_emergency_free_gib | int >= 1

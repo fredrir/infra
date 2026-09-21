@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "engine": "Dagger 0.21.9",
+  "settings": {
+    "scope": "Existing infra-build-09 VM; no VM disk, CPU, memory or concurrency increase.",
+    "dagger_default_gib": 20,
+    "dagger_production_gib": 32,
+    "production_regular_and_named_policy_gib": 25,
+    "reserved_gib": 1,
+    "free_space_targets_gib": [
+      8,
+      8,
+      4
+    ],
+    "named_cache_keep_hours": 48,
+    "bazel_max_size_unchanged": 20,
+    "bazel_hard_limit_unchanged": 21
+  },
+  "disk_budget": {
+    "vm_total_bytes": 82086711296,
+    "after_cleanup_used_bytes": 43008032768,
+    "after_cleanup_available_bytes": 39061901312,
+    "legacy_database_bytes_physically_reclaimed": 22683987968,
+    "dagger_maximum_increment_bytes": 12884901888,
+    "recovered_capacity_remaining_after_increment_bytes": 9799086080,
+    "available_after_increment_if_other_usage_unchanged_bytes": 26176999424,
+    "source": "Runner agent measured filesystem before and after drained legacy/v2 database cleanup; shared/v3 data and 37 analysis databases retained."
+  },
+  "policy_assessment": [
+    "The unfiltered all-cache policy can remove roots protected by keepDuration in an earlier policy.",
+    "The pinned engine greedily cuts persisted roots and releases their transitive dependencies, so reclaimed bytes can exceed the requested amount.",
+    "A separate Dagger limit avoids also increasing the Bazel cache limit.",
+    "Free-space targets remain active; they are collection targets, not a filesystem reservation or a hard upper bound on active builds."
+  ],
+  "sources": [
+    "https://github.com/dagger/dagger/blob/v0.21.9/dagql/cache_prune.go",
+    "https://github.com/dagger/dagger/blob/v0.21.9/engine/server/gc.go"
+  ],
+  "validation": {
+    "ansible_syntax": "pass: cd ansible && ansible-playbook -i inventory/production.yml build-engines.yml --syntax-check",
+    "template_render": "pass: strict Jinja rendering and TOML parsing for default and production; Dagger limits16/16/20 and25/25/32, free targets8/8/4, Bazel20/hard21 checked.",
+    "diff_check": "pass",
+    "independent_review": "Pipeline agent: no blockers.",
+    "ansible_lint": "pass: ansible-lint -x yaml ansible/build-engines.yml ansible/roles/build_engine",
+    "full_ansible_lint": "15 YAML style failures on existing document headers, indentation and long lines; repository/user yamllint settings conflict with ansible-lint defaults; no unrelated formatting changed."
+  },
+  "qualification_scope": "Configuration and available-capacity qualification; no retention hit-rate or production speed improvement claimed."
+}
