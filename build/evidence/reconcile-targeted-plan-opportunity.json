@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "status": "remaining bottleneck; not implemented or benchmarked",
+  "observation": {
+    "workflow_run": 35559992436,
+    "workflow_url": "https://github.com/fredrir/infra/actions/runs/35559992436",
+    "reconciliation": {
+      "desired_revision": "aa6f885251ef36e59e527390b7d5f29c4ad06b1c",
+      "applied_revision": "aa6f885251ef36e59e527390b7d5f29c4ad06b1c",
+      "stage": "complete",
+      "updated_at": "2026-09-21T04:13:00.660295441Z",
+      "stage_seconds": {
+        "kubernetes": 42.847921479,
+        "plan": 45.489363018,
+        "publish": 1.177535148,
+        "verify": 4.020130868
+      }
+    },
+    "changed_paths": [
+      "platform/projects/llunde/.deployments/llunde-frontend.json",
+      "platform/projects/llunde/kustomization.yaml"
+    ],
+    "host_and_tofu_stages_executed": false
+  },
+  "current_behavior": {
+    "selection": "internal/reconcile/config.go:13 retains only coarse Kubernetes/Tofu/Ansible booleans; project identity is discarded",
+    "command_location": "internal/reconcile/commands.go:94",
+    "command": [
+      "flux",
+      "build",
+      "kustomization",
+      "flux-system",
+      "--path=./platform/clusters/production",
+      "--recursive",
+      "--local-sources=GitRepository/flux-system/flux-system=."
+    ],
+    "effect": "A frontend image pin triggers recursive validation of the whole cluster declaration graph.",
+    "existing_project_render": "internal/ci/deploy.go:325 already renders each edited Kustomize directory before the verified promotion commit."
+  },
+  "bounded_candidate": {
+    "command": [
+      "flux",
+      "build",
+      "kustomization",
+      "platform-projects",
+      "--path=./platform/projects",
+      "--local-sources=GitRepository/flux-system/flux-system=."
+    ],
+    "scope": [
+      "portfolio",
+      "llunde-pyparser",
+      "llunde",
+      "y"
+    ],
+    "reason": "The existing platform-projects Flux Kustomization owns these project overlays. A nonrecursive build can avoid unrelated controller, CRD, storage, policy and monitoring builds while retaining the projects parent transformations.",
+    "limitations": [
+      "There is no independent llunde Flux Kustomization, so this candidate still renders all four projects.",
+      "A leaf-only Kustomize build is not equivalent to the parent Flux transformations without additional proof.",
+      "Parser migration/application are separate Flux Kustomizations and must fall back until their full dependency closure is modeled.",
+      "No wall-time improvement is claimed without measurement."
+    ],
+    "eligibility": [
+      "A present, valid last-applied baseline and a normal incremental reconciliation.",
+      "An exact recognized image-digest update and matching deployment receipt in an explicitly mapped existing project.",
+      "Semantic comparison proves no changes to resources, components, generators, patches, substitutions, namespace, policy, secrets, image names or other Kustomization fields.",
+      "Every changed path is accounted for; unknown paths and unproven dependencies fail closed to the existing full build."
+    ],
+    "full_build_fallback": [
+      "Full, scheduled, recovery or interrupted reconciliation requiring all systems.",
+      "Missing baseline, unknown project, unmapped Flux dependency or ambiguous diff.",
+      "Shared settings, parent/root Kustomizations, charts, keys, secrets, policy, toolchain or reconciler changes.",
+      "Migration-coupled projects or any non-image-pin manifest change until dependency-aware targeting is qualified."
+    ],
+    "preserved_authority": [
+      "Exact image digest, source, repository, signer and workflow provenance validation remains in internal/ci/deploy.go.",
+      "Deployment ordering, anti-rollback receipts and approved changed-file boundaries remain unchanged.",
+      "Protected-main revision and clean-checkout guards, state lock and production-branch publication remain in internal/reconcile/commands.go and run.go.",
+      "Keep live Flux substitutions and source mapping; do not use --dry-run because installed Flux help explicitly says it skips Secret/ConfigMap substitutions.",
+      "Keep existing post-publication Kubernetes readiness, expected source revision and served frontend revision checks."
+    ]
+  },
+  "existing_tests": [
+    "internal/reconcile/reconcile_test.go:TestAffectedCrossSystemInputs",
+    "internal/reconcile/reconcile_test.go:TestRecoveryUsesLastSuccessfulRevisionAndForcesAllSystems",
+    "internal/reconcile/reconcile_test.go:TestConcurrentApplyDoesNotExecute",
+    "internal/reconcile/reconcile_test.go:TestReadinessRejectsStaleGenerationAndRevision",
+    "internal/reconcile/reconcile_test.go:TestFluxBootstrapSwitchesThroughItsDeclaredRoot",
+    "internal/ci/deploy_integration_test.go:TestDeployVerifiesExactProvenanceAndPushesOnce",
+    "internal/ci/deploy_integration_test.go:TestDeployProvenanceFailuresNeverMutate",
+    "internal/ci/deploy_integration_test.go:TestDeployUpdatesEveryNestedPin",
+    "internal/ci/deploy_order_test.go:TestDeploymentOrderRejectsRollbackAndConflictingIdentity"
+  ],
+  "missing_qualification": [
+    "Direct Commands.Plan assertions for recognized pin targeting versus every fallback condition.",
+    "Equivalent project output under the current parent Flux substitutions and namespace transformations.",
+    "A malformed pin, changed policy or failed targeted build must prevent publication.",
+    "Bounded local/Linux and one production canary measurement before accepting a latency claim."
+  ],
+  "inspection_only": true,
+  "source_changes": false
+}
