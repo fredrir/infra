@@ -144,6 +144,7 @@ func (f *deployFixture) rendered(directory string) string {
 }
 
 func TestDeployVerifiesExactProvenanceAndPushesOnce(t *testing.T) {
+	t.Parallel()
 	for _, visibility := range []string{"public", "private"} {
 		t.Run(visibility, func(t *testing.T) {
 			f := newDeployFixture(t, "kustomize", visibility, false)
@@ -162,7 +163,7 @@ func TestDeployVerifiesExactProvenanceAndPushesOnce(t *testing.T) {
 				t.Fatal(text)
 			}
 			if len(f.calls) != 1 {
-				t.Fatal(f.calls)
+				t.Fatalf("unexpected provenance call count: %d", len(f.calls))
 			}
 			command := f.calls[0]
 			var args []string
@@ -192,6 +193,7 @@ func TestDeployVerifiesExactProvenanceAndPushesOnce(t *testing.T) {
 }
 
 func TestDeployProvenanceFailuresNeverMutate(t *testing.T) {
+	t.Parallel()
 	for _, visibility := range []string{"public", "private", "internal"} {
 		t.Run(visibility, func(t *testing.T) {
 			f := newDeployFixture(t, "kustomize", visibility, false)
@@ -208,6 +210,7 @@ func TestDeployProvenanceFailuresNeverMutate(t *testing.T) {
 }
 
 func TestDeployRebasesOntoMovedMain(t *testing.T) {
+	t.Parallel()
 	f := newDeployFixture(t, "kustomize", "public", false)
 	other := filepath.Join(t.TempDir(), "other")
 	f.git("clone", "--quiet", "--branch", "main", f.remote, other)
@@ -226,6 +229,7 @@ func TestDeployRebasesOntoMovedMain(t *testing.T) {
 }
 
 func TestDeployUpdatesEveryNestedPin(t *testing.T) {
+	t.Parallel()
 	f := newDeployFixture(t, "kustomize", "public", true)
 	if err := f.run(); err != nil {
 		t.Fatal(err)
@@ -241,6 +245,7 @@ func TestDeployUpdatesEveryNestedPin(t *testing.T) {
 }
 
 func TestDeployHelmReleasePreservesZeroScale(t *testing.T) {
+	t.Parallel()
 	f := newDeployFixture(t, "helmrelease", "public", false)
 	if err := f.run(); err != nil {
 		t.Fatal(err)
@@ -266,6 +271,7 @@ func TestDeployHelmReleasePreservesZeroScale(t *testing.T) {
 }
 
 func TestDeployRejectsInvalidMappingsAndPinsWithoutMutation(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"no-pin", "unknown-image", "traversal", "project-symlink", "helm-file-symlink", "invalid-workflow"} {
 		t.Run(scenario, func(t *testing.T) {
 			mode := "kustomize"
@@ -329,6 +335,7 @@ func TestDeployRejectsInvalidMappingsAndPinsWithoutMutation(t *testing.T) {
 }
 
 func TestDeployBoundedWorkflowOverlapVerifiesBeforeMutation(t *testing.T) {
+	t.Parallel()
 	old, newRevision := strings.Repeat("d", 40), strings.Repeat("e", 40)
 	for _, visibility := range []string{"public", "private"} {
 		for _, succeed := range []bool{true, false} {

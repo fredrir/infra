@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "host": "ntnu",
+  "scope": "Isolated Git deployment integration fixtures; serialized versus four concurrent fixtures; all assertions retained",
+  "samples": [
+    {
+      "parallel": 1,
+      "iteration": 0,
+      "wall_seconds": 4.976182462007273,
+      "cpu_seconds": 5.680319
+    },
+    {
+      "parallel": 4,
+      "iteration": 0,
+      "wall_seconds": 2.1919157599913888,
+      "cpu_seconds": 5.528534999999999
+    },
+    {
+      "parallel": 1,
+      "iteration": 1,
+      "wall_seconds": 5.030292797018774,
+      "cpu_seconds": 5.782242
+    },
+    {
+      "parallel": 4,
+      "iteration": 1,
+      "wall_seconds": 2.050998365972191,
+      "cpu_seconds": 5.6925609999999995
+    },
+    {
+      "parallel": 1,
+      "iteration": 2,
+      "wall_seconds": 4.949857159983367,
+      "cpu_seconds": 5.677960000000002
+    },
+    {
+      "parallel": 4,
+      "iteration": 2,
+      "wall_seconds": 1.9990898999967612,
+      "cpu_seconds": 5.647967000000001
+    }
+  ]
+}
