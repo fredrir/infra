@@ -606,6 +606,13 @@
   "latency_bounds": {
     "push_start_to_pod_ready_seconds": 969.514547,
     "push_start_to_late_exact_revision_observation_seconds": 1285.388743,
-    "interpretation": "Pod readiness is not exact first serving; HTTPS was checked after bounded observer windows ended"
+    "interpretation": "Pod readiness is not exact first serving; HTTPS was checked after bounded observer windows ended",
+    "push_start_to_orchestrator_observation_upper_bound_seconds": 1073.514547
+  },
+  "orchestrator_served_revision_observation": {
+    "observed_by": "root orchestrator",
+    "clock_bracket_upper_bound": "2026-09-21T03:02:16Z",
+    "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+    "method": "Exact endpoint response after03:02:14 UTC tools clock; command completed within1second;03:02:16 is conservative bracket"
   }
 }
