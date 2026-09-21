@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "host": "infra-build-09",
+  "image": "ghcr.io/fredrir/llunde-backend@sha256:05b4cff6f2d66dde3ee2d0b7da64f7ab0dae84bb4016d9a9bf7e7469ad30daf1",
+  "source_revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
+  "workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
+  "existing_ci_tests_seconds": 1.268407418,
+  "source_run": 35560175603,
+  "records": [
+    {
+      "schema": 1,
+      "stage": "warm-scan",
+      "started": "2026-09-21T04:23:31.175912001Z",
+      "duration_seconds": 0.457482807,
+      "budget_seconds": 8.731592582,
+      "budget_exceeded": false,
+      "success": false,
+      "exit_code": 1,
+      "cpu_seconds": 0.274605,
+      "peak_memory_bytes": 114819072,
+      "error": "infra failed: exit status 1"
+    }
+  ],
+  "ci_gate_changed": false,
+  "extra_build": false,
+  "preparation_seconds": 0.01635496500239242,
+  "aggregate_with_existing_ci_tests_seconds": 1.7258902250000001,
+  "remaining_seconds": 8.274109775,
+  "qualified": false,
+  "family_database_links_released": true,
+  "cleanup": {
+    "lease_absent": true,
+    "vuln_db_links_absent": true,
+    "java_db_links_absent": true,
+    "analysis_retained": true,
+    "analysis_bytes": 2097152
+  },
+  "authentication_observation": {
+    "runner_ghcr_entry_present": false,
+    "runner_registry_credential_helper_present": false,
+    "credentials_transferred": false
+  },
+  "limitations": [
+    "Local scan failed before analysis; no warm scan or private provenance success was measured.",
+    "Completed analysis from the original CI vulnerability scan is retained.",
+    "No additional credential plumbing or qualification loops were performed."
+  ]
+}
