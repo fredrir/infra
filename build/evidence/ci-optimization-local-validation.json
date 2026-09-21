@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "source_commit": "7855024",
+  "cli_inputs_sha256": "18194b9cb56f2c2dd6ff47209ba825f8e17bbdb00152abee5b558cfcbfe1ddcf",
+  "platform": "darwin/arm64",
+  "qualification": "Local correctness checks; not production latency or a percentile.",
+  "checks": [
+    {
+      "command": "go test ./...",
+      "result": "pass",
+      "ci_package_seconds": 2.53,
+      "reconcile_package_seconds": 0.487
+    },
+    {
+      "command": "bazel test --config=ci //...",
+      "result": "pass",
+      "targets_passed": 18,
+      "executed_tests": 9,
+      "elapsed_seconds": 5.14,
+      "critical_path_seconds": 4.84
+    },
+    {
+      "command": "actionlint .github/workflows/build-image.yml .github/workflows/reconcile.yml .github/workflows/packages-publish.yml",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ]
+}
