@@ -156,3 +156,4 @@ jobs:
           path: ${{ runner.temp }}/infra-cli
           if-no-files-found: error
           retention-days: 7
+          compression-level: 1

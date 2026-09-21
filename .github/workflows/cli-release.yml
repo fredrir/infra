@@ -63,6 +63,7 @@ jobs:
           path: ${{ runner.temp }}/release/*
           if-no-files-found: error
           retention-days: 7
+          compression-level: 1
   publish:
     needs: build
     runs-on: ubuntu-24.04

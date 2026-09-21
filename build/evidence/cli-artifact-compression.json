@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "host": "Linux-7.0.0-14-generic-x86_64-with-glibc2.43",
+  "input": "infra-v0.2.2/infra-linux-amd64",
+  "input_bytes": 15663264,
+  "sha256": "dc6d4d3c31efc3162158c4d21a4743d768c07c3639e5c798d98c42d33f5f815b",
+  "measurement": "Linux zlib compression only; excludes artifact upload and queueing",
+  "samples": [
+    {
+      "level": 1,
+      "iteration": 0,
+      "wall_seconds": 0.2549160539638251,
+      "cpu_seconds": 0.25490825100000003,
+      "compressed_bytes": 7097014
+    },
+    {
+      "level": 6,
+      "iteration": 0,
+      "wall_seconds": 0.7036542450077832,
+      "cpu_seconds": 0.7036487720000001,
+      "compressed_bytes": 6458416
+    },
+    {
+      "level": 1,
+      "iteration": 1,
+      "wall_seconds": 0.2481962059973739,
+      "cpu_seconds": 0.24819811499999989,
+      "compressed_bytes": 7097014
+    },
+    {
+      "level": 6,
+      "iteration": 1,
+      "wall_seconds": 0.694055721978657,
+      "cpu_seconds": 0.6939157649999999,
+      "compressed_bytes": 6458416
+    },
+    {
+      "level": 1,
+      "iteration": 2,
+      "wall_seconds": 0.24280328198801726,
+      "cpu_seconds": 0.2427804400000002,
+      "compressed_bytes": 7097014
+    },
+    {
+      "level": 6,
+      "iteration": 2,
+      "wall_seconds": 0.7118111490271986,
+      "cpu_seconds": 0.711781078,
+      "compressed_bytes": 6458416
+    },
+    {
+      "level": 1,
+      "iteration": 3,
+      "wall_seconds": 0.24256154795875773,
+      "cpu_seconds": 0.24247660400000015,
+      "compressed_bytes": 7097014
+    },
+    {
+      "level": 6,
+      "iteration": 3,
+      "wall_seconds": 0.7239242909708992,
+      "cpu_seconds": 0.723830295,
+      "compressed_bytes": 6458416
+    },
+    {
+      "level": 1,
+      "iteration": 4,
+      "wall_seconds": 0.2425258900038898,
+      "cpu_seconds": 0.24253049599999965,
+      "compressed_bytes": 7097014
+    },
+    {
+      "level": 6,
+      "iteration": 4,
+      "wall_seconds": 0.7011695499531925,
+      "cpu_seconds": 0.7009868990000001,
+      "compressed_bytes": 6458416
+    },
+    {
+      "level": 1,
+      "iteration": 5,
+      "wall_seconds": 0.24464009900111705,
+      "cpu_seconds": 0.24459349400000008,
+      "compressed_bytes": 7097014
+    },
+    {
+      "level": 6,
+      "iteration": 5,
+      "wall_seconds": 0.7259846689994447,
+      "cpu_seconds": 0.725802259,
+      "compressed_bytes": 6458416
+    },
+    {
+      "level": 1,
+      "iteration": 6,
+      "wall_seconds": 0.246676001988817,
+      "cpu_seconds": 0.24660175599999956,
+      "compressed_bytes": 7097014
+    },
+    {
+      "level": 6,
+      "iteration": 6,
+      "wall_seconds": 0.706255525990855,
+      "cpu_seconds": 0.7061752459999999,
+      "compressed_bytes": 6458416
+    }
+  ]
+}
