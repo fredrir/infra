@@ -66,7 +66,7 @@ jobs:
         env:
           SOURCE_REVISION: ${{ inputs.source-revision }}
         run: |
-          infra ci measure --stage served-revision --budget 65s --report-dir "$RUNNER_TEMP/performance" -- \
+          GITHUB_SHA="$SOURCE_REVISION" infra ci measure --stage served-revision --budget 65s --report-dir "$RUNNER_TEMP/performance" -- \
             infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "$SOURCE_REVISION" --budget 60s
       - name: Report desired revision
         run: |
