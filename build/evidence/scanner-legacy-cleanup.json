@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "host": "infra-build-09",
+  "listener_pause_seconds": 1.7410707473754883,
+  "listeners_restarted": 8,
+  "worker_active_during_cleanup": false,
+  "deleted": [
+    {
+      "path": "/home/runner/.cache/infra/trivy/infra-runner-check/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/infra-runner-dagger/db",
+      "apparent_bytes": 1413906585
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/infra-runner-deploy/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/infra-runner-rust/db",
+      "apparent_bytes": 1413980312
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/llunde-backend/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/llunde-backend/java-db",
+      "apparent_bytes": 1529786521
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/llunde-frontend/db",
+      "apparent_bytes": 1413906585
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/platform-backup-tools/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/platform-caddy/db",
+      "apparent_bytes": 1413906585
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/portfolio-api/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/portfolio-web/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/portfolio-worker/db",
+      "apparent_bytes": 1413980312
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/pyparser-dependencies/db",
+      "apparent_bytes": 1413906585
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/pyparser-review/db",
+      "apparent_bytes": 1413906585
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/y-api/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy/y-web/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy-v2/infra-runner-check/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy-v2/infra-runner-dagger/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy-v2/infra-runner-deploy/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy-v2/infra-runner-rust/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy-v2/llunde-frontend/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy-v2/platform-backup-tools/db",
+      "apparent_bytes": 1413980313
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy-v2/platform-caddy/db",
+      "apparent_bytes": 1413980313
+    }
+  ],
+  "fanal_files_preserved": 37,
+  "shared_and_v3_databases_removed": false,
+  "filesystem_before": {
+    "total": 82086711296,
+    "used": 65692020736,
+    "free": 16377913344
+  },
+  "filesystem_after": {
+    "total": 82086711296,
+    "used": 43008032768,
+    "free": 39061901312
+  },
+  "filesystem_recovered_bytes": 22683987968,
+  "rollback": "Previous workflows redownload current vulnerability databases; all original analysis databases retained."
+}
