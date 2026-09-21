@@ -36,5 +36,22 @@
   "limitations": [
     "Exact cause of source graph references and GC policy selection still under investigation",
     "Rebuilt output digests can change because RUN layers contain creation timestamps; digest difference alone does not prove source difference"
-  ]
+  ],
+  "disk_snapshot": {
+    "dagger_volume_bytes": 21665624064,
+    "filesystem_total_bytes": 82086711296,
+    "filesystem_used_bytes": 65692008448,
+    "filesystem_available_bytes": 16377925632,
+    "engine_no_reclaim_used_bytes_min_6h": 9627933083,
+    "engine_no_reclaim_used_bytes_max_6h": 18536347545,
+    "engine_no_reclaim_samples": 120,
+    "note": "Engine modeled cache bytes differ from filesystem allocated volume bytes; no-reclaim samples exclude pre-eviction peaks"
+  },
+  "runner_retry_identity": {
+    "source_revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+    "same_cli_artifact_id": 10619113256,
+    "same_cli_artifact_archive_sha256": "fe64182285144307ce952e468a759d9c028c029d92a4ba52462a32516c174293",
+    "first_image_digest": "sha256:ae5475e8457d0a304115ab444ba42e84f6f7a841a541d517bf5f8ca7b42787c6",
+    "retry_image_digest": "sha256:436b188c933980a360d8330310b22b35bdc0d4660ed420e14416999703faf98e"
+  }
 }
