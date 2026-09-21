@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "observed_at": "2026-09-21T02:51:18.992141+00:00",
+  "release": "infra-v0.2.3",
+  "workflow_revision": "cbbf64f0b9a383894e8f4c329d64b996260433c0",
+  "source_check": {
+    "run": 35554307314,
+    "success": true,
+    "aggregate_seconds": 6.519489596
+  },
+  "package_canary": {
+    "run": 35554906277,
+    "success": true,
+    "install_seconds": 7.486799162
+  },
+  "frontend_canary": {
+    "build_run": 35555161786,
+    "build_success": true,
+    "deploy_run": 35555242396,
+    "expected_revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+    "readiness_success": false,
+    "reason": "production branch publication awaits full infrastructure reconciliation"
+  },
+  "ordinary_post_change_deployments": 0,
+  "frontend_under_15_seconds_qualified": false,
+  "remaining": [
+    "current-main reconciliation publication",
+    "other image consumer workflow cutover",
+    "bounded infrastructure image cache qualification and retry",
+    "drained legacy scanner database cleanup"
+  ]
+}

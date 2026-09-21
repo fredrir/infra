@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "checked": "2026-09-20",
+  "checked": "2026-09-21",
   "consumers": [
     {
       "repository": "fredrir/llunde-frontend",
       "workflow": ".github/workflows/images.yml",
       "infra_workflow": "build-image.yml",
-      "revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610"
+      "revision": "cbbf64f0b9a383894e8f4c329d64b996260433c0"
     },
     {
       "repository": "fredrir/llunde-backend",
@@ -60,7 +60,7 @@
       "repository": "fredrir/packages",
       "workflow": ".github/workflows/publish.yml",
       "infra_workflow": "packages-publish.yml",
-      "revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610"
+      "revision": "cbbf64f0b9a383894e8f4c329d64b996260433c0"
     }
   ]
 }
