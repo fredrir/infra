@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "source_commit": "5c62458",
+  "scope": "Failed publication recovery only; ordinary converged application deployments already avoid host configuration.",
+  "observed_failure": {
+    "run_id": 35554307422,
+    "stage": "publish",
+    "reason": "main advanced; retry reconciliation at its current revision",
+    "hosts": "All seven hosts completed successfully; no failed or unreachable hosts."
+  },
+  "reuse_requirements": [
+    "Explicit full reconciliation is false.",
+    "Durable publish checkpoint has valid differing desired/applied revisions and positive finite plan, expand, and hosts durations.",
+    "Checkpoint is no older than 90 minutes and not future-dated.",
+    "Previous desired revision to current source selects no infrastructure or Ansible changes.",
+    "Fresh saved expansion plan proves existing resources and outputs unchanged, with no drift, imports, moves, deferred work, or uncertain checks."
+  ],
+  "preserved": [
+    "Full pending selection from applied revision",
+    "Plan and expansion execution",
+    "Source revision comparison before publication",
+    "Kubernetes reconciliation",
+    "Monitoring convergence",
+    "Verification",
+    "Retirement",
+    "Existing state lock"
+  ],
+  "validation": [
+    {
+      "command": "go test -race ./internal/reconcile ./internal/cli",
+      "result": "pass"
+    },
+    {
+      "command": "go test ./internal/reconcile ./internal/cli",
+      "result": "pass"
+    },
+    {
+      "command": "GOOS=linux GOARCH=amd64 go test -c ./internal/reconcile -o /tmp/infra-reconcile-checkpoint-tests; scp binary to ntnu; ssh ntnu timeout 15s /tmp/infra-reconcile-checkpoint-tests -test.timeout 10s",
+      "result": "pass"
+    },
+    {
+      "command": "INFRA_RECONCILE_PLAN_QUALIFY=1 go test ./internal/reconcile -run TestSavedExpansionProofWithLocalTofu -count=1 -v",
+      "result": "pass",
+      "tool": "OpenTofu 1.12.6",
+      "test_seconds": 0.2,
+      "fixture": "Local terraform_data; no cloud access; applied saved no-op and changed plans accepted and rejected respectively."
+    },
+    {
+      "command": "git diff --check -- internal/reconcile",
+      "result": "pass"
+    }
+  ],
+  "failure_coverage": [
+    "Explicit full request and incomplete or expired checkpoints rerun hosts.",
+    "Changed, malformed, or unreadable expansion proofs rerun hosts.",
+    "Errors in every retained stage still fail reconciliation.",
+    "Cancellation stops subsequent work and releases the state lock.",
+    "A failed resumed publication does not invent a completed hosts duration for another reuse."
+  ],
+  "independent_review": {
+    "reviewer": "pipeline agent",
+    "result": "No blocking findings; targeted resume and host-reuse tests passed."
+  },
+  "limitations": [
+    "No production latency result or percentile is claimed.",
+    "The 0.20-second fixture result is a correctness check, not a deployment benchmark.",
+    "Manual host configuration drift retains existing incremental reconciliation semantics; explicit full requests always rerun host configuration."
+  ]
+}
