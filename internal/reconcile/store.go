@@ -16,12 +16,13 @@ import (
 )
 
 type Status struct {
-	Desired   string             `json:"desired_revision"`
-	Applied   string             `json:"applied_revision"`
-	Stage     string             `json:"stage"`
-	Failure   string             `json:"failure,omitempty"`
-	Updated   time.Time          `json:"updated_at"`
-	Durations map[string]float64 `json:"stage_seconds,omitempty"`
+	HostsReusedFrom string             `json:"hosts_reused_from,omitempty"`
+	Desired         string             `json:"desired_revision"`
+	Applied         string             `json:"applied_revision"`
+	Stage           string             `json:"stage"`
+	Failure         string             `json:"failure,omitempty"`
+	Updated         time.Time          `json:"updated_at"`
+	Durations       map[string]float64 `json:"stage_seconds,omitempty"`
 }
 
 type Store interface {

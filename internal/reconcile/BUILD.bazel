@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "reconcile",
     srcs = [
+        "checkpoint.go",
         "commands.go",
         "config.go",
         "run.go",
@@ -20,7 +21,7 @@ go_library(
 
 go_test(
     name = "reconcile_test",
-    srcs = ["reconcile_test.go"],
+    srcs = ["checkpoint_test.go", "reconcile_test.go"],
     embed = [":reconcile"],
     deps = [
         "//internal/ci",

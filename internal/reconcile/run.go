@@ -20,6 +20,7 @@ type Operations interface {
 	Plan(context.Context, Plan) error
 	Expand(context.Context, Plan) error
 	Hosts(context.Context) error
+	ExpansionUnchanged(context.Context) (bool, error)
 	Publish(context.Context, string) error
 	Kubernetes(context.Context, string) error
 	Monitor(context.Context, Plan) error
@@ -50,12 +51,21 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	if err != nil {
 		return err
 	}
+	reuseHosts := false
+	previousDesired := status.Desired
+	if !full && reusableHosts(status, time.Now()) {
+		changed, err := r.Ops.Select(ctx, status.Desired, false)
+		if err != nil {
+			return err
+		}
+		reuseHosts = !changed.Tofu && !changed.Ansible
+	}
 	selected, err := r.Ops.Select(ctx, status.Applied, full || status.Desired != status.Applied)
 	if err != nil {
 		return err
 	}
 	plan := Plan{Revision: revision, Base: status.Applied, Affected: selected, Host: r.Host}
-	status.Desired, status.Failure = revision, ""
+	status.Desired, status.Failure, status.HostsReusedFrom = revision, "", ""
 	status.Durations = map[string]float64{}
 	save := func(ctx context.Context) error {
 		status.Updated = time.Now().UTC()
@@ -76,6 +86,9 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		}
 	}()
 	stage := func(name string, action func() error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		status.Stage = name
 		if err := save(ctx); err != nil {
 			return err
@@ -96,7 +109,19 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 			return err
 		}
 	}
-	if selected.Ansible && !selected.MonitorOnly {
+	if reuseHosts && selected.Tofu && selected.Ansible && !selected.MonitorOnly {
+		unchanged, proofErr := r.Ops.ExpansionUnchanged(ctx)
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		reuseHosts = proofErr == nil && unchanged
+		if reuseHosts {
+			status.HostsReusedFrom = previousDesired
+		}
+	} else {
+		reuseHosts = false
+	}
+	if selected.Ansible && !selected.MonitorOnly && !reuseHosts {
 		if err = stage("hosts", func() error { return r.Ops.Hosts(ctx) }); err != nil {
 			return err
 		}

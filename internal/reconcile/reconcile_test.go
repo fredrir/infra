@@ -60,14 +60,15 @@ func (o *fakeOps) Select(_ context.Context, base string, full bool) (Selection, 
 	o.full = full
 	return o.selection, nil
 }
-func (o *fakeOps) Plan(context.Context, Plan) error         { return o.call("plan") }
-func (o *fakeOps) Expand(context.Context, Plan) error       { return o.call("expand") }
-func (o *fakeOps) Hosts(context.Context) error              { return o.call("hosts") }
-func (o *fakeOps) Publish(context.Context, string) error    { return o.call("publish") }
-func (o *fakeOps) Kubernetes(context.Context, string) error { return o.call("kubernetes") }
-func (o *fakeOps) Monitor(context.Context, Plan) error      { return o.call("monitor") }
-func (o *fakeOps) Verify(context.Context, Plan) error       { return o.call("verify") }
-func (o *fakeOps) Retire(context.Context, Plan) error       { return o.call("retire") }
+func (o *fakeOps) Plan(context.Context, Plan) error                 { return o.call("plan") }
+func (o *fakeOps) Expand(context.Context, Plan) error               { return o.call("expand") }
+func (o *fakeOps) Hosts(context.Context) error                      { return o.call("hosts") }
+func (o *fakeOps) ExpansionUnchanged(context.Context) (bool, error) { return false, nil }
+func (o *fakeOps) Publish(context.Context, string) error            { return o.call("publish") }
+func (o *fakeOps) Kubernetes(context.Context, string) error         { return o.call("kubernetes") }
+func (o *fakeOps) Monitor(context.Context, Plan) error              { return o.call("monitor") }
+func (o *fakeOps) Verify(context.Context, Plan) error               { return o.call("verify") }
+func (o *fakeOps) Retire(context.Context, Plan) error               { return o.call("retire") }
 
 func TestTransitionRetiresOnlyAfterVerification(t *testing.T) {
 	want := []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}
