@@ -38,7 +38,217 @@
   "normal_workflow_gate_changed": false,
   "legacy_cache_removed": false,
   "limitations": [
-    "Diagnostic migration scan ran during other image compilation; measured duration is not an isolated scanner baseline.",
-    "No successful bounded warm qualification or CI retry is claimed."
-  ]
+    "The30.5s diagnostic migration scan ran during other compilation and is not an isolated scanner baseline.",
+    "The final1.324s warm scan ran after frontend/package heavy phases completed and passed the unchanged6.640422303s remaining scan budget.",
+    "One warm sample is not a deployment latency percentile.",
+    "No successful CI rerun is claimed by this evidence."
+  ],
+  "layer_comparison": {
+    "reference": "ghcr.io/fredrir/infra-runner-check@sha256:bfc11faad9e02ce555758e243ada83d7fabca99bb03e0e8c172dc00c7e6c97f6",
+    "old_layer_count": 21,
+    "new_layer_count": 21,
+    "reused_layer_count": 11,
+    "new_layers": [
+      {
+        "digest": "sha256:99dec52bd7521bf0c75e907229dc947a3a15652a23b8b2f206b5794e749dc938",
+        "size": 330
+      },
+      {
+        "digest": "sha256:787cffabd1aa436594d361a48a2a7ce59d4721d6cb7aada08295a792e290251d",
+        "size": 49474129
+      },
+      {
+        "digest": "sha256:c9385b51a985ac0ee6ad72bfa71dae109c9f1ebd6456549c0fe48f640f0d2f60",
+        "size": 600
+      },
+      {
+        "digest": "sha256:468c8070cbeb35a66201b1cd9d7ddd5714598b05c2e0f664fd27606d61526849",
+        "size": 6612994
+      },
+      {
+        "digest": "sha256:83d3b292558b65e599e6cba76d28025dc6d9ba65d3a768d261c9e25f5d012065",
+        "size": 78457811
+      },
+      {
+        "digest": "sha256:350d1d29396ead8dd8ab3cba0b7ee9971b22a255eb774a31964eb6637a5efcec",
+        "size": 53166407
+      },
+      {
+        "digest": "sha256:ac864a876f4b713d6dca934227b7f6a4e43612b51516c165475f4de3134baac8",
+        "size": 276
+      },
+      {
+        "digest": "sha256:4f038714d6f4e4431e7d37dfe6f829a927a199a65b15bb12b9c0a67814f97d7e",
+        "size": 18820
+      },
+      {
+        "digest": "sha256:1da41e1db2c9a83aa197f16c932776507c57cf3c2f89a011f0a606cbd1be66e0",
+        "size": 8080198
+      },
+      {
+        "digest": "sha256:a2aa8139e824257fee07db0f8e940c3b7e3ffbb9a07d5532dd2275b590e4f563",
+        "size": 228437960
+      }
+    ],
+    "new_layer_compressed_bytes": 424249525,
+    "scope": "Comparison to previously approved runner image, not attribution of all changed layers to this optimization commit."
+  },
+  "active_family_analysis_migration": {
+    "source": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-cache/fanal/fanal.db",
+    "destination": "/home/runner/.cache/infra/trivy-v2/infra-runner-check/fanal/fanal.db",
+    "backup": "/home/runner/.cache/infra/scanner-canary-63ab06a/active-fanal-before-migration",
+    "source_sha256": "188ade68e15688e2db1725f9c4cf4dd579ebcaa9523e732a176df23d282d4b20",
+    "destination_sha256": "188ade68e15688e2db1725f9c4cf4dd579ebcaa9523e732a176df23d282d4b20",
+    "family_lock_held": true,
+    "source_shared_lock_held": true,
+    "legacy_cache_mutated": false,
+    "github_job_inactive_before_copy": true,
+    "github_job_id": 106195034819
+  },
+  "other_failed_image_jobs": [
+    {
+      "family": "infra-runner-rust",
+      "job_id": 106195034870,
+      "image": "ghcr.io/fredrir/infra-runner-rust:63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1@sha256:da39b41e8c6957a23ca690dd7df234bb119f7642a2f80b713817052b4c3a535f",
+      "aggregate_report": {
+        "schema": 1,
+        "accounting": "sum-of-recorded-check-durations",
+        "budget_seconds": 10,
+        "duration_seconds": 10.105708949,
+        "remaining_seconds": 0,
+        "success": false,
+        "stages": [
+          {
+            "schema": 1,
+            "stage": "image-smoke",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T02:35:34.422735207Z",
+            "duration_seconds": 1.432982009,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.910193,
+            "peak_memory_bytes": 45563904
+          },
+          {
+            "schema": 1,
+            "stage": "vulnerability-scan",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T02:36:11.362703126Z",
+            "duration_seconds": 8.67272694,
+            "budget_seconds": 8.567017991,
+            "budget_exceeded": true,
+            "success": false,
+            "exit_code": -1,
+            "cpu_seconds": 0.019093,
+            "peak_memory_bytes": 14024704,
+            "error": "infra failed: context deadline exceeded\nvulnerability-scan exceeded 8.567017991s budget"
+          }
+        ]
+      },
+      "classification": "scanner timeout before extraction completed; no reported vulnerability finding"
+    },
+    {
+      "family": "infra-runner-dagger",
+      "job_id": 106195035041,
+      "image": "ghcr.io/fredrir/infra-runner-dagger:63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1@sha256:b2ee2ce4a81b5857066b48cc2f81a6cfd7fa8f510ee3a0cd98e07df95fa1eebc",
+      "aggregate_report": {
+        "schema": 1,
+        "accounting": "sum-of-recorded-check-durations",
+        "budget_seconds": 10,
+        "duration_seconds": 10.106605603999999,
+        "remaining_seconds": 0,
+        "success": false,
+        "stages": [
+          {
+            "schema": 1,
+            "stage": "image-smoke",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T02:43:19.970218151Z",
+            "duration_seconds": 0.310858659,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.335052,
+            "peak_memory_bytes": 46587904
+          },
+          {
+            "schema": 1,
+            "stage": "vulnerability-scan",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T02:43:28.783821936Z",
+            "duration_seconds": 9.795746945,
+            "budget_seconds": 9.689141341,
+            "budget_exceeded": true,
+            "success": false,
+            "exit_code": -1,
+            "cpu_seconds": 0.016765,
+            "peak_memory_bytes": 14286848,
+            "error": "infra failed: context deadline exceeded\nvulnerability-scan exceeded 9.689141341s budget"
+          }
+        ]
+      },
+      "classification": "scanner timeout before extraction completed; no reported vulnerability finding"
+    },
+    {
+      "family": "infra-runner-deploy",
+      "run_id": 35554867724,
+      "job_id": 106196429558,
+      "image": "ghcr.io/fredrir/infra-runner-deploy:d3bbb0a3f51c76f6b95853b15540208ccd38e965@sha256:b606f6cac0a31338af7d535b3e84eb11cfc547751fc093c83c845fa7cb0d6867",
+      "aggregate_report": {
+        "schema": 1,
+        "accounting": "sum-of-recorded-check-durations",
+        "budget_seconds": 10,
+        "duration_seconds": 10.107692142,
+        "remaining_seconds": 0,
+        "success": false,
+        "stages": [
+          {
+            "schema": 1,
+            "stage": "image-smoke",
+            "revision": "d3bbb0a3f51c76f6b95853b15540208ccd38e965",
+            "started": "2026-09-21T02:44:40.846079575Z",
+            "duration_seconds": 0.527130024,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.557613,
+            "peak_memory_bytes": 58851328
+          },
+          {
+            "schema": 1,
+            "stage": "vulnerability-scan",
+            "revision": "d3bbb0a3f51c76f6b95853b15540208ccd38e965",
+            "started": "2026-09-21T02:44:56.431066062Z",
+            "duration_seconds": 9.580562118,
+            "budget_seconds": 9.472869976,
+            "budget_exceeded": true,
+            "success": false,
+            "exit_code": -1,
+            "cpu_seconds": 0.018542,
+            "peak_memory_bytes": 14417920,
+            "error": "infra failed: context deadline exceeded\nvulnerability-scan exceeded 9.472869976s budget"
+          }
+        ]
+      },
+      "classification": "scanner timeout before extraction completed; no reported vulnerability finding"
+    }
+  ],
+  "warm_qualification": {
+    "schema": 1,
+    "stage": "runner-check-migration-warm",
+    "started": "2026-09-21T02:47:03.577835839Z",
+    "duration_seconds": 1.324050175,
+    "budget_seconds": 6.640422303,
+    "budget_exceeded": false,
+    "success": true,
+    "exit_code": 0,
+    "cpu_seconds": 0.651731,
+    "peak_memory_bytes": 146702336,
+    "waited_for_frontend_and_package_heavy_phases": true,
+    "smoke_plus_scan_seconds": 4.683627872000001
+  }
 }
