@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "release": {
+    "schema": 1,
+    "tag": "infra-v0.2.5",
+    "revision": "733dd41bc3d451b608b16d1848078d88cfe89323",
+    "sha256": "fb4401358a8cccf2fa1229c92af9e3443b30c42720e41c199d552d6c8d56ff1a",
+    "inputs_sha256": "235ddf0b27a6908296a4720e3cb11fba4bec51d212ccd4b6a0b157c18085ef93"
+  },
+  "run_id": 35557495448,
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64",
+    "darwin/amd64",
+    "darwin/arm64"
+  ],
+  "all_platforms_and_native_gate_passed": true,
+  "verification": {
+    "binary_sha256_matches_signed_manifest": true,
+    "checksums_match_binary_and_manifest": true,
+    "attestation_verified": true,
+    "repository": "fredrir/infra",
+    "signer_workflow": "fredrir/infra/.github/workflows/cli-release.yml",
+    "source_ref": "refs/tags/infra-v0.2.5",
+    "source_digest": "733dd41bc3d451b608b16d1848078d88cfe89323"
+  },
+  "superseded_unpublished_tag": {
+    "tag": "infra-v0.2.4",
+    "run_id": 35557056527,
+    "reason": "Generated Bazel declaration formatting rejected; all tests passed; immutable tag retained."
+  },
+  "batched_reconciliation": {
+    "cancelled_before_any_apply_steps": [
+      35557057021,
+      35557495766
+    ],
+    "reason": "Wait for the verified CLI manifest before installing its new maintenance command."
+  }
+}
