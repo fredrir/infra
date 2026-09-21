@@ -1,0 +1,318 @@
+{
+  "schema": 1,
+  "observed_at": "2026-09-21T02:44:28.033483+00:00",
+  "consumer": {
+    "repository": "fredrir/packages",
+    "path": ".github/workflows/publish.yml",
+    "old_commit": "cb0f493406f2740a679dcd7384935cf53fa87aa2",
+    "new_commit": "031057a2b21e7f9163f5abca06ed68b9fce46d53",
+    "old_workflow_revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+    "new_workflow_revision": "cbbf64f0b9a383894e8f4c329d64b996260433c0",
+    "cli_release": "infra-v0.2.3",
+    "actionlint": "pass"
+  },
+  "trust_updates": [
+    {
+      "repository": "fredrir/homebrew-tap",
+      "path": ".github/chainguard/publisher.sts.yaml",
+      "old_blob": "9672fc828ecd006760c715f3251263be3242fc1d",
+      "new_blob": "a7c76fc99ca2dc1b869a5de5a768d1048f6221d6",
+      "commit": "d268b856572dcf4df062f455e1e5d5813615acbb",
+      "retained_workflow_revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+      "added_workflow_revision": "cbbf64f0b9a383894e8f4c329d64b996260433c0",
+      "removed_workflow_revision": "d9016b2889c88f1ec99bfe9d7262343a759e4b69"
+    },
+    {
+      "repository": "fredrir/homebrew-nsql",
+      "path": ".github/chainguard/publisher.sts.yaml",
+      "old_blob": "9672fc828ecd006760c715f3251263be3242fc1d",
+      "new_blob": "a7c76fc99ca2dc1b869a5de5a768d1048f6221d6",
+      "commit": "b5389f0bbc4710c6f35b5c79943f5f874cc93fbd",
+      "retained_workflow_revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+      "added_workflow_revision": "cbbf64f0b9a383894e8f4c329d64b996260433c0",
+      "removed_workflow_revision": "d9016b2889c88f1ec99bfe9d7262343a759e4b69"
+    },
+    {
+      "repository": "fredrir/nur-packages",
+      "path": ".github/chainguard/publisher.sts.yaml",
+      "old_blob": "9672fc828ecd006760c715f3251263be3242fc1d",
+      "new_blob": "a7c76fc99ca2dc1b869a5de5a768d1048f6221d6",
+      "commit": "0a9c9ee05b10554d4577c73481d9a5d94bfcb338",
+      "retained_workflow_revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+      "added_workflow_revision": "cbbf64f0b9a383894e8f4c329d64b996260433c0",
+      "removed_workflow_revision": "d9016b2889c88f1ec99bfe9d7262343a759e4b69"
+    }
+  ],
+  "canary": {
+    "id": 35554906277,
+    "url": "https://github.com/fredrir/packages/actions/runs/35554906277",
+    "created_at": "2026-09-21T02:39:36Z",
+    "updated_at": "2026-09-21T02:42:22Z",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 106196550401,
+        "name": "publish / build",
+        "runner": "infra-build-09-packages",
+        "conclusion": "success",
+        "started_at": "2026-09-21T02:39:40Z",
+        "completed_at": "2026-09-21T02:41:43Z",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:39:42Z",
+            "completed_at": "2026-09-21T02:39:44Z",
+            "duration_seconds": 2.0
+          },
+          {
+            "name": "Set up runner",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:39:44Z",
+            "completed_at": "2026-09-21T02:39:44Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Require the bounded CI smoke scope",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:39:44Z",
+            "completed_at": "2026-09-21T02:39:44Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:39:44Z",
+            "completed_at": "2026-09-21T02:39:47Z",
+            "duration_seconds": 3.0
+          },
+          {
+            "name": "Run ./.infra/.github/actions/setup-infra",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:39:47Z",
+            "completed_at": "2026-09-21T02:39:47Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Install release tools",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:39:47Z",
+            "completed_at": "2026-09-21T02:39:47Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Start isolated Dagger engine",
+            "conclusion": "skipped",
+            "started_at": "2026-09-21T02:39:47Z",
+            "completed_at": "2026-09-21T02:39:47Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Build signed repositories",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:39:47Z",
+            "completed_at": "2026-09-21T02:41:24Z",
+            "duration_seconds": 97.0
+          },
+          {
+            "name": "Install from the new repositories",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:24Z",
+            "completed_at": "2026-09-21T02:41:31Z",
+            "duration_seconds": 7.0
+          },
+          {
+            "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:31Z",
+            "completed_at": "2026-09-21T02:41:33Z",
+            "duration_seconds": 2.0
+          },
+          {
+            "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:33Z",
+            "completed_at": "2026-09-21T02:41:37Z",
+            "duration_seconds": 4.0
+          },
+          {
+            "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:37Z",
+            "completed_at": "2026-09-21T02:41:39Z",
+            "duration_seconds": 2.0
+          },
+          {
+            "name": "Stop Dagger engine",
+            "conclusion": "skipped",
+            "started_at": "2026-09-21T02:41:39Z",
+            "completed_at": "2026-09-21T02:41:39Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:39Z",
+            "completed_at": "2026-09-21T02:41:39Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:39Z",
+            "completed_at": "2026-09-21T02:41:39Z",
+            "duration_seconds": 0.0
+          }
+        ]
+      },
+      {
+        "id": 106196881414,
+        "name": "publish / publish",
+        "runner": "infra-build-09-packages",
+        "conclusion": "success",
+        "started_at": "2026-09-21T02:41:46Z",
+        "completed_at": "2026-09-21T02:42:21Z",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:47Z",
+            "completed_at": "2026-09-21T02:41:49Z",
+            "duration_seconds": 2.0
+          },
+          {
+            "name": "Set up runner",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:49Z",
+            "completed_at": "2026-09-21T02:41:49Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:49Z",
+            "completed_at": "2026-09-21T02:41:51Z",
+            "duration_seconds": 2.0
+          },
+          {
+            "name": "Run ./.infra/.github/actions/setup-infra",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:51Z",
+            "completed_at": "2026-09-21T02:41:51Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Install release tools",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:51Z",
+            "completed_at": "2026-09-21T02:41:51Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:51Z",
+            "completed_at": "2026-09-21T02:41:57Z",
+            "duration_seconds": 6.0
+          },
+          {
+            "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:57Z",
+            "completed_at": "2026-09-21T02:41:59Z",
+            "duration_seconds": 2.0
+          },
+          {
+            "name": "Publish the package site",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:41:59Z",
+            "completed_at": "2026-09-21T02:42:06Z",
+            "duration_seconds": 7.0
+          },
+          {
+            "name": "Publish Homebrew, Nix and AUR packages",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:42:06Z",
+            "completed_at": "2026-09-21T02:42:18Z",
+            "duration_seconds": 12.0
+          },
+          {
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:42:18Z",
+            "completed_at": "2026-09-21T02:42:18Z",
+            "duration_seconds": 0.0
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:42:18Z",
+            "completed_at": "2026-09-21T02:42:18Z",
+            "duration_seconds": 0.0
+          }
+        ]
+      }
+    ],
+    "package_install": {
+      "schema": 1,
+      "stage": "package-install",
+      "revision": "031057a2b21e7f9163f5abca06ed68b9fce46d53",
+      "started": "2026-09-21T02:41:24.184042266Z",
+      "duration_seconds": 7.486799162,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 1.095613,
+      "peak_memory_bytes": 79069184
+    }
+  },
+  "publication": {
+    "gh_pages_commit": "cc86b7889cf7fe1ec8e9e9d53edcf709fc7fd15d",
+    "pages_status": "built",
+    "pages_created_at": "2026-09-21T02:42:06Z",
+    "pages_updated_at": "2026-09-21T02:42:27Z",
+    "served_signed_index": {
+      "path": "deb/dists/stable/InRelease",
+      "git_blob": "438a2206778d448524e2e0a87b7911e12f79f856",
+      "expected_sha256": "c069c472ee06bbfd0145f5f220fef131c71151e27a02d054a3ed4243b10c257d",
+      "served_sha256": "c069c472ee06bbfd0145f5f220fef131c71151e27a02d054a3ed4243b10c257d",
+      "matches_published_branch": true
+    }
+  },
+  "before_after": {
+    "baseline_run": 35539109185,
+    "baseline_scope": "previous production attempt failed the same10s gate; baseline workflow handoff timestamps are whole-second GitHub values",
+    "package_install_seconds": {
+      "before": 10.057034066,
+      "after": 7.486799162
+    },
+    "package_install_success": {
+      "before": false,
+      "after": true
+    },
+    "signed_build_seconds": {
+      "before": 103,
+      "after": 97
+    },
+    "signed_build_to_smoke_start_seconds": {
+      "before": 31,
+      "after": 0
+    },
+    "site_upload_seconds": {
+      "before": 7,
+      "after": 4
+    },
+    "jobs": {
+      "before": 3,
+      "after": 2
+    }
+  },
+  "limitations": [
+    "One bounded production canary, not ordinary traffic percentile qualification.",
+    "GitHub step timestamps have one-second precision; package_install duration uses the exact CLI measurement report.",
+    "GitHub Pages completion is separate from the package workflow; HTTPS signed-index bytes were compared with the published gh-pages branch.",
+    "97s signed repository construction remains dominant; historical unused channel attestations are still performed.",
+    "Publish credential isolation retained; no nsql dispatcher trust policies were changed."
+  ]
+}
