@@ -27,5 +27,22 @@
       "command": "git diff --check",
       "result": "pass"
     }
-  ]
+  ],
+  "release_generation_failure": {
+    "tag": "infra-v0.2.4",
+    "run": 35557056527,
+    "tests_passed": 18,
+    "test_seconds": 2.859261591,
+    "reason": "Gazelle declaration ordering and list formatting rejected; release unpublished."
+  },
+  "corrected_full_gate": {
+    "preparation_seconds": 31.895854,
+    "tests_seconds": 3.847192,
+    "generation_seconds": 0.730839,
+    "aggregate_seconds": 4.578031,
+    "budget_seconds": 10,
+    "success": true,
+    "preparation_in_aggregate": false,
+    "generated_declarations_checked": true
+  }
 }

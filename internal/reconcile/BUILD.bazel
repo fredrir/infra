@@ -21,7 +21,10 @@ go_library(
 
 go_test(
     name = "reconcile_test",
-    srcs = ["checkpoint_test.go", "reconcile_test.go"],
+    srcs = [
+        "checkpoint_test.go",
+        "reconcile_test.go",
+    ],
     embed = [":reconcile"],
     deps = [
         "//internal/ci",
