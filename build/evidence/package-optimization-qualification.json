@@ -232,5 +232,18 @@
   "independent_review": {
     "claude": "two bounded attempts,90s and75s, timed out with no output",
     "main_agent": "reviewed workflow/pipeline/qualification diff; no blockers"
+  },
+  "restart_cache_survival": {
+    "schema": 1,
+    "stage": "package-restart",
+    "started": "2026-09-21T02:28:57.59354586Z",
+    "duration_seconds": 1.440779877,
+    "budget_seconds": 10,
+    "budget_exceeded": false,
+    "success": true,
+    "exit_code": 0,
+    "cpu_seconds": 1.2782149999999999,
+    "peak_memory_bytes": 60497920,
+    "engine": "container recreated with same persisted Dagger state,4CPU/4GiB,pids1024,oci-max-parallelism=1"
   }
 }
