@@ -2,7 +2,7 @@ all:
   vars:
     ansible_user: root
     ansible_python_interpreter: /usr/bin/python3
-    ansible_ssh_common_args: -o StrictHostKeyChecking=yes -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=10
+    ansible_ssh_common_args: -o StrictHostKeyChecking=yes -o ConnectTimeout=10
     ubuntu_release: '26.04'
     firewall_admin_ipv4_cidrs:
     - 62.92.106.173/32
@@ -90,8 +90,7 @@ all:
             fredrir-06:
               ansible_host: 100.86.241.75
               tailscale_ip: 100.86.241.75
-              ansible_ssh_common_args: -o HostKeyAlias=fredrir-06 -o StrictHostKeyChecking=yes -o ControlMaster=no -o
-                ControlPath=none -o ConnectTimeout=10
+              ansible_ssh_common_args: -o HostKeyAlias=fredrir-06 -o StrictHostKeyChecking=yes -o ConnectTimeout=10
               provider: linode
               machine_type: Nanode 1 GB
               architecture: amd64
