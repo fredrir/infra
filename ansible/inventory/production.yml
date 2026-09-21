@@ -102,7 +102,7 @@ all:
         fredrir-09:
           build_vm_enabled: true
           build_vm_cpu_overhead_millicores: 250
-          build_vm_ssh_public_key: "{{ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'HOME') + '/.ssh/id_ed25519.pub') }}"
+          build_vm_ssh_public_key: "{{ lookup('ansible.builtin.file', playbook_dir + '/files/reconciliation.pub') }}"
     build_engines:
       hosts:
         infra-build-09:

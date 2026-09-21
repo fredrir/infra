@@ -50,7 +50,6 @@
   ansible.builtin.user:
     name: infra-build-vm
     system: true
-    home: '{{ build_vm_directory }}'
     groups: kvm
     shell: /usr/sbin/nologin
     create_home: false

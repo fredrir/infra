@@ -106,7 +106,7 @@ These activation steps provision external credentials once; merge and scheduled 
 | Subject | `repo:fredrir@114402558/infra@1328085692:environment:infrastructure-plan` | `repo:fredrir@114402558/infra@1328085692:environment:infrastructure-apply` |
 | Audience | `infra-reconciliation-plan` | `infra-reconciliation-apply` |
 | Immutable identity | Owner `114402558`, repository `1328085692` in subject | Same identity |
-| Workflow claim | Pull request workflow revision | `workflow_ref=fredrir/infra/.github/workflows/reconcile.yml@refs/heads/main` |
+| Workflow claim | Unset | `workflow_ref=fredrir/infra/.github/workflows/reconcile.yml@refs/heads/main` |
 | Scope / tag | `auth_keys` / `tag:infra-plan` | `auth_keys` / `tag:infra-apply` |
 | Device lifetime | Ephemeral; removed after job completion | Same lifetime |
 
