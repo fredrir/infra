@@ -12,6 +12,8 @@
 | Production package canary | Signed installation checks 7.487 seconds; build-to-smoke handoff 31 → 0 seconds; publication and HTTPS contents verified | [Production package canary](../build/evidence/package-production-canary.json) |
 | Package smoke payload | Logical fixture inputs 25,024,491 → 5,664,372 bytes; 39 cache-selection assertions; real signed installs and corrupt-package rejection | [Package qualification](../build/evidence/package-optimization-qualification.json) |
 | Engine reconciliation | Exact cached image digests skip registry pulls; each changed service restarts independently | [Runner qualification](../build/evidence/scanner-cache-sharing.json) |
+| Failed publication recovery | Reuse completed host configuration only after a recent durable checkpoint, unchanged host inputs and a fresh no-change expansion proof; local Linux and real OpenTofu fixture checks pass | [Checkpoint qualification](../build/evidence/reconcile-host-checkpoint.json) |
+| Frontend production canary | Expected revision eventually served; 60-second readiness deadline failed while full host reconciliation took 637.174 seconds | [Production canary](../build/evidence/frontend-production-canary.json) |
 | Historical workflow sample | Includes earlier qualification runs and failures; not an ordinary-traffic deployment percentile | [Baseline](../build/evidence/ci-optimization-baseline.json) |
 | Frontend deployment below 15 seconds | Unqualified | [Previous observed timeline](../build/rollout/flux-artifacts/rollout.json) |
 

@@ -19,14 +19,17 @@
     "deploy_run": 35555242396,
     "expected_revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
     "readiness_success": false,
-    "reason": "production branch publication awaits full infrastructure reconciliation"
+    "reason": "production branch publication awaits full infrastructure reconciliation",
+    "eventually_served": true,
+    "observed_by": "2026-09-21T03:02:16Z",
+    "reconciliation_run": 35555262385,
+    "reconciliation_success": true
   },
   "ordinary_post_change_deployments": 0,
   "frontend_under_15_seconds_qualified": false,
   "remaining": [
-    "current-main reconciliation publication",
-    "other image consumer workflow cutover",
-    "bounded infrastructure image cache qualification and retry",
+    "final scanner retention release and production qualification",
+    "remaining image consumer workflow cutover",
     "drained legacy scanner database cleanup"
   ]
 }
