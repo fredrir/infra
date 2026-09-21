@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-21T04:22:16.177706+00:00",
+  "repository": "fredrir/llunde-backend",
+  "source_revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
+  "workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
+  "cli_release": "infra-v0.2.5",
+  "state": "Initial build failed strict aggregate check budget; exact artifact qualification pending",
+  "push": {
+    "before_revision": "dbdff56a84ea6a15ebf0ac84f848b0815a1b5982",
+    "revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
+    "started": "2026-09-21T04:13:40.628668+00:00",
+    "exit_code": 0,
+    "completed": "2026-09-21T04:13:41.941420+00:00",
+    "output": "remote: Bypassed rule violations for refs/heads/main:        \nremote: \nremote: - Changes must be made through a pull request.        \nremote: \nTo github.com:fredrir/llunde-backend.git\n   dbdff56..d7cf3f2  HEAD -> main\n"
+  },
+  "initial_build": {
+    "run_id": 35560175603,
+    "attempt": 1,
+    "url": "https://github.com/fredrir/llunde-backend/actions/runs/35560175603/attempts/1",
+    "conclusion": "failure",
+    "image": "ghcr.io/fredrir/llunde-backend@sha256:05b4cff6f2d66dde3ee2d0b7da64f7ab0dae84bb4016d9a9bf7e7469ad30daf1",
+    "build_and_publish_seconds": 199,
+    "inline_dockerbuild_seconds": 159,
+    "runtime_dockerbuild_seconds": 26.8,
+    "publication_seconds": 10.7,
+    "scanner_preparation": {
+      "schema": 1,
+      "stage": "scanner-preparation",
+      "revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
+      "started": "2026-09-21T04:13:59.665477286Z",
+      "duration_seconds": 32.646801602,
+      "budget_seconds": 300,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 33.15356,
+      "peak_memory_bytes": 123600896
+    },
+    "scanner_preparation_observation": "Trace explicitly downloaded Java DB from mirror.gcr.io/aquasec/trivy-java-db:1",
+    "check_duration_sum_seconds": 10.019595357,
+    "checks": [
+      {
+        "schema": 1,
+        "stage": "provenance-verification",
+        "revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
+        "started": "2026-09-21T04:18:03.50592525Z",
+        "duration_seconds": 3.429866377,
+        "budget_seconds": 3.41027102,
+        "budget_exceeded": true,
+        "success": false,
+        "exit_code": -1,
+        "cpu_seconds": 0.227952,
+        "peak_memory_bytes": 67502080,
+        "error": "cosign failed: context deadline exceeded\nprovenance-verification exceeded 3.41027102s budget"
+      },
+      {
+        "schema": 1,
+        "stage": "vulnerability-scan",
+        "revision": "d7cf3f24ad27d3287bc8a27e3a76036f9c00dde8",
+        "started": "2026-09-21T04:17:51.174264903Z",
+        "duration_seconds": 5.321321562,
+        "budget_seconds": 8.731592582,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 5.209961,
+        "peak_memory_bytes": 237187072
+      },
+      {
+        "schema": 1,
+        "stage": "backend",
+        "started": "2026-09-21T04:17:12.252663473Z",
+        "duration_seconds": 1.268407418,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.093372,
+        "peak_memory_bytes": 133611520
+      }
+    ]
+  },
+  "limitations": [
+    "This is one bounded canary, not a percentile estimate.",
+    "Initial attempt failed honestly; no check threshold was changed.",
+    "DockerBuild durations include preparation and execution beyond measured checks.",
+    "Backend readiness proves the exact deployed image and pod health; no exact served-revision HTTP endpoint is configured."
+  ]
+}
