@@ -1,0 +1,492 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "source_revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+  "installed_release": {
+    "schema": 1,
+    "tag": "infra-v0.2.5",
+    "revision": "733dd41bc3d451b608b16d1848078d88cfe89323",
+    "sha256": "fb4401358a8cccf2fa1229c92af9e3443b30c42720e41c199d552d6c8d56ff1a",
+    "inputs_sha256": "235ddf0b27a6908296a4720e3cb11fba4bec51d212ccd4b6a0b157c18085ef93"
+  },
+  "workflow_receipts": [
+    {
+      "run": 35558880286,
+      "job": 106207774914,
+      "name": "cli / build",
+      "conclusion": "success",
+      "started_at": "2026-09-21T03:50:54Z",
+      "completed_at": "2026-09-21T03:51:07Z",
+      "checks": null,
+      "failed_steps": [],
+      "lease_cleanup": [],
+      "build_trace_durations": []
+    },
+    {
+      "run": 35558880398,
+      "job": 106207775417,
+      "name": "image / build",
+      "conclusion": "success",
+      "started_at": "2026-09-21T03:51:09Z",
+      "completed_at": "2026-09-21T03:53:14Z",
+      "checks": {
+        "schema": 1,
+        "accounting": "sum-of-recorded-check-durations",
+        "budget_seconds": 10,
+        "duration_seconds": 6.337247875999999,
+        "remaining_seconds": 3.6627521240000007,
+        "success": true,
+        "stages": [
+          {
+            "schema": 1,
+            "stage": "image-smoke",
+            "revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+            "started": "2026-09-21T03:51:49.721527724Z",
+            "duration_seconds": 0.315778411,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.418712,
+            "peak_memory_bytes": 60424192
+          },
+          {
+            "schema": 1,
+            "stage": "provenance-verification",
+            "revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+            "started": "2026-09-21T03:53:07.455820338Z",
+            "duration_seconds": 0.647202163,
+            "budget_seconds": 4.309954287,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.249643,
+            "peak_memory_bytes": 49676288
+          },
+          {
+            "schema": 1,
+            "stage": "vulnerability-scan",
+            "revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+            "started": "2026-09-21T03:52:58.083985619Z",
+            "duration_seconds": 5.374267302,
+            "budget_seconds": 9.684221589,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 5.389668,
+            "peak_memory_bytes": 445149184
+          }
+        ]
+      },
+      "failed_steps": [],
+      "lease_cleanup": [
+        {
+          "name": "Release scanner database lease",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-09-21T03:53:08Z",
+          "completed_at": "2026-09-21T03:53:08Z"
+        }
+      ],
+      "build_trace_durations": [
+        "27  : Directory.dockerBuild DONE [22.2s]",
+        "95  : Container.publish DONE [1m8s]"
+      ]
+    },
+    {
+      "run": 35558880286,
+      "job": 106207854175,
+      "name": "apply",
+      "conclusion": "success",
+      "started_at": "2026-09-21T03:51:11Z",
+      "completed_at": "2026-09-21T04:03:42Z",
+      "checks": null,
+      "failed_steps": [],
+      "lease_cleanup": [],
+      "build_trace_durations": []
+    }
+  ],
+  "source_checks": {
+    "run": 35558880177,
+    "revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+    "reports": [
+      {
+        "job": 106208283025,
+        "report": {
+          "schema": 1,
+          "accounting": "sum-of-recorded-check-durations",
+          "budget_seconds": 10,
+          "duration_seconds": 2.2817528499999997,
+          "remaining_seconds": 7.71824715,
+          "success": true,
+          "stages": [
+            {
+              "schema": 1,
+              "stage": "declarations",
+              "revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+              "started": "2026-09-21T03:54:10.042721213Z",
+              "duration_seconds": 0.054484857,
+              "budget_seconds": 7.772732007,
+              "budget_exceeded": false,
+              "success": true,
+              "exit_code": 0,
+              "cpu_seconds": 0.11,
+              "peak_memory_bytes": 37187584
+            },
+            {
+              "schema": 1,
+              "stage": "infra-fast",
+              "revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+              "started": "2026-09-21T03:53:43.859624086Z",
+              "duration_seconds": 2.227267993,
+              "budget_seconds": 10,
+              "budget_exceeded": false,
+              "success": true,
+              "exit_code": 0,
+              "cpu_seconds": 0.523394,
+              "peak_memory_bytes": 16252928
+            }
+          ]
+        }
+      }
+    ],
+    "check_job_records": [
+      {
+        "schema": 1,
+        "metrics": {
+          "actions_executed": 1,
+          "local_cache_hits": 1090,
+          "system_network_bytes_sent": 18483,
+          "system_network_bytes_received": 2949
+        },
+        "operation": "prepare-check",
+        "targets": [
+          "//...",
+          "//:gazelle"
+        ],
+        "started": "2026-09-21T03:53:25.095551415Z",
+        "duration_seconds": 18.714956193,
+        "success": true
+      },
+      [
+        {
+          "schema": 1,
+          "metrics": {
+            "actions_executed": 1,
+            "local_cache_hits": 18,
+            "system_network_bytes_sent": 47303,
+            "system_network_bytes_received": 8358
+          },
+          "operation": "test",
+          "targets": [
+            "//..."
+          ],
+          "started": "2026-09-21T03:53:43.873970548Z",
+          "duration_seconds": 1.091413758,
+          "success": true
+        },
+        {
+          "schema": 1,
+          "metrics": {
+            "actions_executed": 1,
+            "system_network_bytes_sent": 50599,
+            "system_network_bytes_received": 8929
+          },
+          "operation": "generate-check",
+          "targets": [
+            "//:gazelle",
+            "--",
+            "-mode=diff"
+          ],
+          "started": "2026-09-21T03:53:44.965774245Z",
+          "duration_seconds": 1.118519733,
+          "success": true
+        }
+      ],
+      {
+        "schema": 1,
+        "stage": "infra-fast",
+        "revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+        "started": "2026-09-21T03:53:43.859624086Z",
+        "duration_seconds": 2.227267993,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.523394,
+        "peak_memory_bytes": 16252928
+      }
+    ]
+  },
+  "reconciliation": {
+    "desired_revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+    "applied_revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+    "stage": "complete",
+    "updated_at": "2026-09-21T04:03:37.58204525Z",
+    "stage_seconds": {
+      "expand": 4.522304462,
+      "hosts": 524.451174069,
+      "kubernetes": 43.201703156,
+      "monitor": 55.117200509,
+      "plan": 66.289051051,
+      "publish": 1.280968037,
+      "retire": 7.360759329,
+      "verify": 15.086550418
+    }
+  },
+  "runner_before": {
+    "schema": 1,
+    "timestamp": "2026-09-21T03:52:28.669063+00:00",
+    "cli_sha256": "c351001bbbab6c6758309b3335bdcf89cd72c72b32c2794ad927c6d6cc3112c1",
+    "prewarm_commands": [
+      "ExecStart=\"/usr/local/bin/infra\" \"artifact\" \"prune-source\" \"--keep=16\" \"--max-age=168h\"",
+      "ExecStart=\"/usr/local/bin/infra\" \"pipeline\" \"cache-gc\" \"--timeout=30s\""
+    ],
+    "timer_settings": [
+      "OnBootSec=2min",
+      "OnUnitInactiveSec=6h",
+      "Persistent=true"
+    ],
+    "timer_active": "active",
+    "dagger": {
+      "running": true,
+      "started_at": "2026-09-21T03:15:43.967362435Z",
+      "memory_bytes": 4294967296,
+      "nano_cpus": 4000000000,
+      "cache_limits": [
+        "--oci-max-parallelism=1"
+      ]
+    },
+    "bazel": {
+      "running": true,
+      "started_at": "2026-09-20T19:15:16.710647067Z",
+      "memory_bytes": 1073741824,
+      "nano_cpus": 1000000000,
+      "cache_limits": [
+        "--max_size=20",
+        "--max_size_hard_limit=21"
+      ]
+    },
+    "dagger_gc_policy": {
+      "worker": {
+        "oci": {
+          "gcpolicy": [
+            {
+              "filters": [
+                "type==regular,type==source.local,type==source.git.checkout,type==source.http"
+              ],
+              "reservedSpace": "1GiB",
+              "maxUsedSpace": "25GiB",
+              "minFreeSpace": "8GiB"
+            },
+            {
+              "filters": [
+                "type==exec.cachemount"
+              ],
+              "keepDuration": "48h",
+              "reservedSpace": "1GiB",
+              "maxUsedSpace": "25GiB",
+              "minFreeSpace": "8GiB"
+            },
+            {
+              "all": true,
+              "reservedSpace": "1GiB",
+              "maxUsedSpace": "32GiB",
+              "minFreeSpace": "4GiB"
+            }
+          ]
+        }
+      }
+    },
+    "scanner": {
+      "databases": [
+        {
+          "path": "/home/runner/.cache/infra/trivy-v3/infra-runner-deploy/db/trivy.db",
+          "bytes": 1413980160,
+          "device": 64769,
+          "inode": 2622833,
+          "links": 6
+        },
+        {
+          "path": "/home/runner/.cache/infra/trivy-databases/2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a/db/trivy.db",
+          "bytes": 1413980160,
+          "device": 64769,
+          "inode": 2622833,
+          "links": 6
+        },
+        {
+          "path": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-infra-runner-deploy/db/trivy.db",
+          "bytes": 1413980160,
+          "device": 64769,
+          "inode": 2622833,
+          "links": 6
+        },
+        {
+          "path": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-infra-runner-dagger/db/trivy.db",
+          "bytes": 1413980160,
+          "device": 64769,
+          "inode": 2622833,
+          "links": 6
+        },
+        {
+          "path": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-cache/db/trivy.db",
+          "bytes": 1413980160,
+          "device": 64769,
+          "inode": 2622833,
+          "links": 6
+        },
+        {
+          "path": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-infra-runner-rust/db/trivy.db",
+          "bytes": 1413980160,
+          "device": 64769,
+          "inode": 2622833,
+          "links": 6
+        }
+      ],
+      "unique_database_inodes": 1,
+      "physical_database_bytes": 1413980160,
+      "v3_leases": [
+        "/home/runner/.cache/infra/trivy-v3/infra-runner-deploy/.database-lease.json"
+      ],
+      "v3_analysis_count": 15
+    },
+    "free_bytes": 28433563648
+  },
+  "runner_after": {
+    "schema": 1,
+    "timestamp": "2026-09-21T04:04:33.989801+00:00",
+    "cli_sha256": "fb4401358a8cccf2fa1229c92af9e3443b30c42720e41c199d552d6c8d56ff1a",
+    "prewarm_commands": [
+      "ExecStart=\"/usr/local/bin/infra\" \"artifact\" \"prune-source\" \"--keep=16\" \"--max-age=168h\"",
+      "ExecStart=\"/usr/local/bin/infra\" \"pipeline\" \"cache-gc\" \"--timeout=30s\"",
+      "ExecStart=\"/usr/local/bin/infra\" \"ci\" \"scanner\" \"prune\" \"--root\" \"/home/runner/.cache/infra/trivy-v3\""
+    ],
+    "timer_settings": [
+      "OnBootSec=2min",
+      "OnUnitInactiveSec=6h",
+      "Persistent=true"
+    ],
+    "timer_active": "active",
+    "dagger": {
+      "running": true,
+      "started_at": "2026-09-21T03:15:43.967362435Z",
+      "memory_bytes": 4294967296,
+      "nano_cpus": 4000000000,
+      "cache_limits": [
+        "--oci-max-parallelism=1"
+      ]
+    },
+    "bazel": {
+      "running": true,
+      "started_at": "2026-09-20T19:15:16.710647067Z",
+      "memory_bytes": 1073741824,
+      "nano_cpus": 1000000000,
+      "cache_limits": [
+        "--max_size=20",
+        "--max_size_hard_limit=21"
+      ]
+    },
+    "dagger_gc_policy": {
+      "worker": {
+        "oci": {
+          "gcpolicy": [
+            {
+              "filters": [
+                "type==regular,type==source.local,type==source.git.checkout,type==source.http"
+              ],
+              "reservedSpace": "1GiB",
+              "maxUsedSpace": "25GiB",
+              "minFreeSpace": "8GiB"
+            },
+            {
+              "filters": [
+                "type==exec.cachemount"
+              ],
+              "keepDuration": "48h",
+              "reservedSpace": "1GiB",
+              "maxUsedSpace": "25GiB",
+              "minFreeSpace": "8GiB"
+            },
+            {
+              "all": true,
+              "reservedSpace": "1GiB",
+              "maxUsedSpace": "32GiB",
+              "minFreeSpace": "4GiB"
+            }
+          ]
+        }
+      }
+    },
+    "scanner": {
+      "databases": [
+        {
+          "path": "/home/runner/.cache/infra/trivy-databases/2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a/db/trivy.db",
+          "bytes": 1413980160,
+          "device": 64769,
+          "inode": 2622833,
+          "links": 1
+        }
+      ],
+      "unique_database_inodes": 1,
+      "physical_database_bytes": 1413980160,
+      "v3_leases": [],
+      "v3_analysis_count": 15
+    },
+    "free_bytes": 28509265920
+  },
+  "diagnostic_database_cleanup": {
+    "schema": 1,
+    "date": "2026-09-21",
+    "removed_database_links": [
+      {
+        "path": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-infra-runner-deploy/db/trivy.db",
+        "bytes": 1413980160,
+        "inode": 2622833,
+        "links_before": 5
+      },
+      {
+        "path": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-infra-runner-dagger/db/trivy.db",
+        "bytes": 1413980160,
+        "inode": 2622833,
+        "links_before": 4
+      },
+      {
+        "path": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-cache/db/trivy.db",
+        "bytes": 1413980160,
+        "inode": 2622833,
+        "links_before": 3
+      },
+      {
+        "path": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-infra-runner-rust/db/trivy.db",
+        "bytes": 1413980160,
+        "inode": 2622833,
+        "links_before": 2
+      }
+    ],
+    "preserved_analysis": [
+      "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-infra-runner-deploy/fanal/fanal.db",
+      "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-infra-runner-dagger/fanal/fanal.db",
+      "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-cache/fanal/fanal.db",
+      "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-infra-runner-rust/fanal/fanal.db"
+    ],
+    "central_database_retained": true,
+    "central_database_links_after": 1,
+    "filesystem_free_change_bytes": 16384
+  },
+  "deploy_runner_image": "ghcr.io/fredrir/infra-runner-deploy@sha256:5b2fd7fcf88213cc756c5749aee9c4c92d42d8ed147b12dce234edfca994509b",
+  "assertions": {
+    "signed_release_digest_installed": true,
+    "scanner_prune_timer_active": true,
+    "dagger_and_bazel_not_restarted_by_final_apply": true,
+    "dagger_cache_32_gib_bazel_cache_20_gib_hard_21_gib": true,
+    "approved_cpu_memory_unchanged": true,
+    "one_physical_scanner_database_and_no_family_leases": true,
+    "all_15_family_analysis_databases_retained": true
+  },
+  "limitations": [
+    "This is one bounded production canary, not an ordinary-traffic percentile.",
+    "Source check artifact preparation took18.714956193s separately from2.28175285s aggregate checks.",
+    "Full infrastructure reconciliation remains dominated by524.451s host operations; application-only checkpoint behavior requires ordinary deployment observations."
+  ]
+}
