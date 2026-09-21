@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-21T03:11:31.814228+00:00",
+  "finding": "Recent expensive runner and frontend result graphs evicted by production Dagger garbage collection",
+  "engine": "0.21.9",
+  "capacity": {
+    "cpus": 4,
+    "memory_bytes": 4294967296,
+    "regular_cache_max_gib": 16,
+    "named_cache_max_gib": 16,
+    "named_cache_keep_hours": 48,
+    "all_cache_max_gib": 20
+  },
+  "runner_tools_eviction": {
+    "timestamp": "2026-09-21T02:37:29Z",
+    "reclaimed_bytes": 7824797728,
+    "target_bytes": 411492352,
+    "subsequent_run": 35554307508,
+    "retry_build_started": "2026-09-21T02:55:00Z",
+    "retry_tool_build_completed": "2026-09-21T03:04:06Z"
+  },
+  "log_excerpt": [
+    "time=2026-09-21T02:37:29.993Z level=INFO msg=\"dagql pruned result\" resultID=9463 call=Directory.__withDirectoryDockerfileCompat digest=xxh3:c28d6909d44f3ab6 args=\"[path=\\\"/tmp/actionlint.patch\\\" source=result:9461 srcPath=\\\"/images/runner-check/patches/actionlint.patch\\\" followSymlink=true dirCopyContents=true createDestPath=true allowWildcard=true allowEmptyWildcard=true]\" description=__withDirectoryDockerfileCompat measuredSizeBytes=8192 reclaimedBytes=8192",
+    "time=2026-09-21T02:37:29.993Z level=INFO msg=\"dagql pruned result\" resultID=8479 call=Container.withExec digest=xxh3:d9cf94cd8565b8cb args=\"[args=[\\\"/bin/sh\\\", \\\"-c\\\", \\\"mkdir -p /src/actionlint /out     && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source...\\\"]]\" description=withExec measuredSizeBytes=6627328 reclaimedBytes=0",
+    "time=2026-09-21T02:37:29.993Z level=INFO msg=\"dagql pruned result\" resultID=9467 call=Directory.__withDirectoryDockerfileCompat digest=xxh3:b46364458a89a480 args=\"[path=\\\"/tmp/kustomize.patch\\\" source=result:9461 srcPath=\\\"/images/runner-check/patches/kustomize.patch\\\" followSymlink=true dirCopyContents=true createDestPath=true allowWildcard=true allowEmptyWildcard=true]\" description=__withDirectoryDockerfileCompat measuredSizeBytes=8192 reclaimedBytes=8192",
+    "time=2026-09-21T02:37:29.994Z level=INFO msg=\"dagql pruned result\" resultID=8522 call=Container.withExec digest=xxh3:1881f3500e2aedd1 args=\"[args=[\\\"/bin/sh\\\", \\\"-c\\\", \\\"mkdir -p /src/kustomize /out     && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source....\\\"]]\" description=withExec measuredSizeBytes=16592896 reclaimedBytes=0",
+    "time=2026-09-21T02:37:29.994Z level=INFO msg=\"dagql pruned result\" resultID=9468 call=Directory.__withDirectoryDockerfileCompat digest=xxh3:88031bc462f523cc args=\"[path=\\\"/tmp/sops.patch\\\" source=result:9461 srcPath=\\\"/images/runner-check/patches/sops.patch\\\" followSymlink=true dirCopyContents=true createDestPath=true allowWildcard=true allowEmptyWildcard=true]\" description=__withDirectoryDockerfileCompat measuredSizeBytes=8192 reclaimedBytes=8192",
+    "time=2026-09-21T02:37:29.994Z level=INFO msg=\"dagql pruned result\" resultID=8543 call=Container.withExec digest=xxh3:9179bec245c9fe03 args=\"[args=[\\\"/bin/sh\\\", \\\"-c\\\", \\\"mkdir -p /src/sops /out     && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.g...\\\"]]\" description=withExec measuredSizeBytes=51617792 reclaimedBytes=0",
+    "time=2026-09-21T02:37:29.995Z level=INFO msg=\"dagql pruned result\" resultID=9469 call=Directory.__withDirectoryDockerfileCompat digest=xxh3:d5d90c35ad3e9077 args=\"[path=\\\"/tmp/tofu.patch\\\" source=result:9461 srcPath=\\\"/images/runner-check/patches/tofu.patch\\\" followSymlink=true dirCopyContents=true createDestPath=true allowWildcard=true allowEmptyWildcard=true]\" description=__withDirectoryDockerfileCompat measuredSizeBytes=8192 reclaimedBytes=8192",
+    "time=2026-09-21T02:37:29.996Z level=INFO msg=\"dagql pruned result\" resultID=8561 call=Container.withExec digest=xxh3:3aebeb90f725d5e0 args=\"[args=[\\\"/bin/sh\\\", \\\"-c\\\", \\\"mkdir -p /src/tofu /out     && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.g...\\\"]]\" description=withExec measuredSizeBytes=113278976 reclaimedBytes=0",
+    "time=2026-09-21T02:37:29.996Z level=INFO msg=\"dagql pruned result\" resultID=8576 call=Container.withExec digest=xxh3:d585e618c096cbf6 args=\"[args=[\\\"/bin/sh\\\", \\\"-c\\\", \\\"mkdir -p /src/kubectl /out     && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.ta...\\\"]]\" description=withExec measuredSizeBytes=59543552 reclaimedBytes=0",
+    "time=2026-09-21T02:37:30.019Z level=DEBUG msg=\"dagql prune applied plan\" policyIndex=2 plannedCandidates=37 appliedCandidates=37 plannedReclaimedBytes=7824797728 appliedReclaimedBytes=7824797728 policyTargetBytes=411492352",
+    "time=2026-09-21T03:05:24.546Z level=INFO msg=\"dagql pruned result\" resultID=9964 call=Container.withExec digest=xxh3:45b63d2cb954829d args=\"[args=[\\\"/bin/sh\\\", \\\"-c\\\", \\\"bun install --frozen-lockfile\\\"]]\" description=withExec measuredSizeBytes=627294208 reclaimedBytes=0",
+    "time=2026-09-21T03:05:24.627Z level=DEBUG msg=\"dagql prune applied plan\" policyIndex=2 plannedCandidates=26 appliedCandidates=26 plannedReclaimedBytes=766234929 appliedReclaimedBytes=766234929 policyTargetBytes=72396800"
+  ],
+  "limitations": [
+    "Exact cause of source graph references and GC policy selection still under investigation",
+    "Rebuilt output digests can change because RUN layers contain creation timestamps; digest difference alone does not prove source difference"
+  ]
+}

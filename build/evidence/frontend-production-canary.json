@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "recorded_at_utc": "2026-09-21T03:06:17.849899+00:00",
+  "recorded_at_utc": "2026-09-21T03:11:31.813351+00:00",
   "state": "build passed; promotion committed; served-revision gate failed; full reconciliation completed and exact revision observed",
   "repository": "fredrir/llunde-frontend",
   "source_revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
@@ -543,7 +543,7 @@
     "apk_upgrade_seconds": 0.8,
     "publication_seconds": 3.7,
     "cache_classification": "Dependency install missed cache; this is not a qualified warm application latency sample",
-    "dependency_cache_miss_cause": "Unresolved: changed input identity or retention; no engine restart since2026-09-20T21:29:20.738241224Z"
+    "dependency_cache_miss_cause": "First canary miss not individually traced; subsequent identical-checkout miss proven engine cache eviction at03:05:24Z"
   },
   "retained_checkout": {
     "package_json": {
@@ -573,7 +573,7 @@
     "The15second deployment target was not achieved",
     "Two bounded observer windows have a gap; no exact first-serving timestamp is claimed",
     "The ten-second aggregate check gate and sixty-second readiness gate were not weakened",
-    "Production warm-cache export remains pending"
+    "Production unchanged export succeeded but repeated dependency install after demonstrated engine eviction; no production warm reuse claim"
   ],
   "reconciliation_completed": {
     "desired_revision": "3da86446ebb07bd86864b3f0e5e7a86ac705b498",
@@ -614,5 +614,57 @@
     "clock_bracket_upper_bound": "2026-09-21T03:02:16Z",
     "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
     "method": "Exact endpoint response after03:02:14 UTC tools clock; command completed within1second;03:02:16 is conservative bracket"
+  },
+  "production_unchanged_export": {
+    "schema": 1,
+    "started": "2026-09-21T03:08:38.893819+00:00",
+    "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+    "scenario": "unchanged actual production checkout; static export only",
+    "binary_sha256": "c351001bbbab6c6758309b3335bdcf89cd72c72b32c2794ad927c6d6cc3112c1",
+    "build_argument_names": [
+      "CI_REVISION",
+      "GIT_SHA",
+      "REVISION",
+      "VITE_TURNSTILE_SITE_KEY"
+    ],
+    "published": false,
+    "wall_seconds": 38.40738265999971,
+    "exit_code": 0,
+    "engine_cpu_seconds": 22.388382,
+    "engine_throttled_seconds": 0.0,
+    "engine_peak_sampled": {
+      "anon_bytes": 2036875264,
+      "file_cache_bytes": 1543557120,
+      "memory_current_bytes": 3721801728
+    },
+    "cpu_pressure_before": "some avg10=0.00 avg60=0.38 avg300=1.05 total=185903675\nfull avg10=0.00 avg60=0.27 avg300=0.67 total=105285769\n",
+    "cpu_pressure_after": "some avg10=0.99 avg60=1.14 avg300=1.19 total=186978045\nfull avg10=0.62 avg60=0.66 avg300=0.74 total=105991345\n",
+    "check_receipts": [
+      {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "started": "2026-09-21T03:09:05.628425228Z",
+        "duration_seconds": 3.421449403,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 11.573878,
+        "peak_memory_bytes": 746229760
+      }
+    ],
+    "cache_classification": "Not warm: engine evicted frontend dependency and application result graph before export",
+    "dependency_install_seconds": 6.2,
+    "vite_seconds": 7.4,
+    "inline_dockerbuild_seconds": 29.4
+  },
+  "cache_eviction": {
+    "observed_at": "2026-09-21T03:05:24Z",
+    "policy_index": 2,
+    "frontend_install_result_id": 9964,
+    "reclaimed_bytes": 766234929,
+    "target_bytes": 72396800,
+    "evidence": "Dagger engine log explicitly pruned bun install, frontend source, checks, TypeScript cache volume and generated static/runtime result graph"
   }
 }
