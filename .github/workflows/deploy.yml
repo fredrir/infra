@@ -61,6 +61,13 @@ jobs:
           IMAGE_DIGEST: ${{ inputs.digest }}
           SOURCE_REVISION: ${{ inputs.source-revision }}
         run: infra ci measure --stage promotion --budget 30s --report-dir "$RUNNER_TEMP/performance" -- infra ci deploy "$GITHUB_WORKSPACE"
+      - name: Verify served frontend revision
+        if: inputs.image == 'ghcr.io/fredrir/llunde-frontend'
+        env:
+          SOURCE_REVISION: ${{ inputs.source-revision }}
+        run: |
+          infra ci measure --stage served-revision --budget 65s --report-dir "$RUNNER_TEMP/performance" -- \
+            infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "$SOURCE_REVISION" --budget 60s
       - name: Report desired revision
         run: |
           printf 'Desired infrastructure revision: %s\n\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"

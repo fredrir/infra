@@ -14,6 +14,7 @@
 | Aggregate checks | Sum recorded check durations; retain the ten-second ceiling |
 | Critical path | Current workflow timestamps and Dagger traces; cached receipt timestamps can belong to earlier executions |
 | Compression | CPU work only; upload throughput and queueing are excluded |
+| Frontend observation | Each deployment records `served-revision` in its performance artifact; `infra ci timeline` joins build creation to successful revision observation |
 | Deployment completion | Expected source revision served over HTTPS; HTTP 200 alone does not qualify |
 | Percentiles | Separate ordinary traffic, canaries, unchanged inputs, application changes and dependency changes |
 | Ordinary-traffic p95 | Require a representative post-change sample; do not infer from a warm canary |
