@@ -1,11 +1,14 @@
-- name: Restart build engines
+- name: Restart infra-dagger
   ansible.builtin.systemd_service:
-    name: '{{ item }}'
+    name: infra-dagger
     daemon_reload: true
     state: restarted
-  loop:
-  - infra-dagger
-  - infra-bazel-cache
+
+- name: Restart infra-bazel-cache
+  ansible.builtin.systemd_service:
+    name: infra-bazel-cache
+    daemon_reload: true
+    state: restarted
 
 - name: Restart build prewarming
   ansible.builtin.systemd_service:

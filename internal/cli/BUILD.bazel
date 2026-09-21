@@ -18,6 +18,7 @@ go_library(
         "prefetch.go",
         "projects.go",
         "reconcile.go",
+        "scanner.go",
     ],
     importpath = "github.com/fredrir/infra/internal/cli",
     visibility = ["//:__subpackages__"],

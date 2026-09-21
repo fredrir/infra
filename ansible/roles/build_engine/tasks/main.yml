@@ -74,12 +74,24 @@
   changed_when: false
   failed_when: build_engine_docker.rc != 0 or build_engine_docker.stdout != 'linux'
 
-- name: Pull pinned engine images
+- name: Inspect pinned engine images
   ansible.builtin.command:
-    argv: [docker, pull, '{{ item }}']
+    argv: [docker, image, inspect, --format, '{{ "{{.Id}}" }}', '{{ item }}']
   loop:
   - '{{ build_engine_image }}'
   - '{{ build_engine_bazel_image }}'
+  register: build_engine_local_images
+  changed_when: false
+  failed_when: build_engine_local_images.rc not in [0, 1]
+  check_mode: false
+
+- name: Pull missing pinned engine images
+  ansible.builtin.command:
+    argv: [docker, pull, '{{ item.item }}']
+  loop: '{{ build_engine_local_images.results }}'
+  loop_control:
+    label: '{{ item.item }}'
+  when: item.rc != 0
   register: build_engine_pull
   changed_when: "'Downloaded newer image' in build_engine_pull.stdout"
 
@@ -90,19 +102,25 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Restart build engines
+  notify: Restart infra-dagger
 
-- name: Install engine units
+- name: Install Dagger unit
   ansible.builtin.template:
-    src: '{{ item }}.service.j2'
-    dest: '/etc/systemd/system/{{ item }}.service'
+    src: infra-dagger.service.j2
+    dest: /etc/systemd/system/infra-dagger.service
     owner: root
     group: root
     mode: '0644'
-  loop:
-  - infra-dagger
-  - infra-bazel-cache
-  notify: Restart build engines
+  notify: Restart infra-dagger
+
+- name: Install Bazel cache unit
+  ansible.builtin.template:
+    src: infra-bazel-cache.service.j2
+    dest: /etc/systemd/system/infra-bazel-cache.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart infra-bazel-cache
 
 - name: Start build engines
   ansible.builtin.systemd_service:

@@ -214,7 +214,7 @@ jobs:
         run: |
           family="${IMAGE##*/}"
           [[ "$family" =~ ^[a-z0-9][a-z0-9._-]*$ ]]
-          cache="$HOME/.cache/infra/trivy/$family"
+          cache="$HOME/.cache/infra/trivy-v2/$family"
           mkdir -p "$cache"
           chmod 700 "$cache"
           export TRIVY_CACHE_DIR="$cache"
@@ -227,9 +227,9 @@ jobs:
         id: scanner-restore
         with:
           path: ${{ steps.scanner-cache.outputs.path }}
-          key: trivy-v1-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-${{ github.sha }}
+          key: trivy-v2-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-${{ github.sha }}
           restore-keys: |
-            trivy-v1-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-
+            trivy-v2-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-
       - name: Report scanner cache state
         if: steps.affected.outputs.changed == 'true'
         run: |
@@ -247,10 +247,7 @@ jobs:
         run: |
           # shellcheck disable=SC2016
           infra ci measure --stage scanner-preparation --budget 5m --report-dir "$RUNNER_TEMP/performance/preparation" -- bash -euo pipefail -c '
-            trivy image --download-db-only --no-progress --timeout 2m
-            if [[ "$SCANNER_JAVA" == true ]]; then
-              trivy image --download-java-db-only --no-progress --timeout 2m
-            fi
+            infra ci scanner prepare --java="$SCANNER_JAVA"
             if [[ "$PUBLIC_PROVENANCE" == true ]]; then
               umask 077
               gh attestation trusted-root > "$RUNNER_TEMP/github-trusted-root.jsonl"
@@ -297,7 +294,7 @@ jobs:
             skip=(--skip-dirs "$SKIP_DIRS")
           fi
           infra ci measure-check --stage vulnerability-scan --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- \
-            trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --skip-java-db-update --timeout 10s "${skip[@]}" "$IMAGE"
+            infra ci scanner scan -- image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --skip-java-db-update --timeout 10s "${skip[@]}" "$IMAGE"
       - uses: ./.infra-build-recipe/.github/actions/attest-image
         id: provenance
         if: steps.affected.outputs.changed == 'true' && (!github.event.repository.private)

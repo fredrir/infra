@@ -1,0 +1,288 @@
+{
+  "schema": 1,
+  "host": "ntnu",
+  "scope": "bounded isolated synthetic rootfs qualification",
+  "records": [
+    {
+      "name": "prepare-frontend",
+      "wall_seconds": 0.01,
+      "cpu_seconds": 0.0,
+      "peak_rss_kib": 13632,
+      "exit_code": 0
+    },
+    {
+      "name": "prepare-backend",
+      "wall_seconds": 0.01,
+      "cpu_seconds": 0.0,
+      "peak_rss_kib": 13760,
+      "exit_code": 0
+    },
+    {
+      "name": "prepare-parser",
+      "wall_seconds": 0.01,
+      "cpu_seconds": 0.01,
+      "peak_rss_kib": 13504,
+      "exit_code": 0
+    },
+    {
+      "name": "prepare-worker",
+      "wall_seconds": 0.01,
+      "cpu_seconds": 0.01,
+      "peak_rss_kib": 13632,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-0",
+      "wall_seconds": 0.01,
+      "cpu_seconds": 0.0,
+      "peak_rss_kib": 13632,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-1",
+      "wall_seconds": 0.01,
+      "cpu_seconds": 0.0,
+      "peak_rss_kib": 13632,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-2",
+      "wall_seconds": 0.01,
+      "cpu_seconds": 0.0,
+      "peak_rss_kib": 13632,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-3",
+      "wall_seconds": 0.02,
+      "cpu_seconds": 0.01,
+      "peak_rss_kib": 13760,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-4",
+      "wall_seconds": 0.01,
+      "cpu_seconds": 0.01,
+      "peak_rss_kib": 13632,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-5",
+      "wall_seconds": 0.02,
+      "cpu_seconds": 0.02,
+      "peak_rss_kib": 13632,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-6",
+      "wall_seconds": 0.02,
+      "cpu_seconds": 0.01,
+      "peak_rss_kib": 13696,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-7",
+      "wall_seconds": 0.02,
+      "cpu_seconds": 0.02,
+      "peak_rss_kib": 13632,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-8",
+      "wall_seconds": 0.02,
+      "cpu_seconds": 0.01,
+      "peak_rss_kib": 13632,
+      "exit_code": 0
+    },
+    {
+      "name": "warm-prepare-9",
+      "wall_seconds": 0.02,
+      "cpu_seconds": 0.02,
+      "peak_rss_kib": 13760,
+      "exit_code": 0
+    },
+    {
+      "name": "scan-clean",
+      "wall_seconds": 0.2,
+      "cpu_seconds": 0.34,
+      "peak_rss_kib": 106228,
+      "exit_code": 0
+    },
+    {
+      "name": "scan-vulnerable",
+      "wall_seconds": 0.19,
+      "cpu_seconds": 0.34,
+      "peak_rss_kib": 113780,
+      "exit_code": 1
+    },
+    {
+      "name": "direct-warm-0",
+      "wall_seconds": 0.14,
+      "cpu_seconds": 0.25,
+      "peak_rss_kib": 106292,
+      "exit_code": 0
+    },
+    {
+      "name": "wrapped-warm-0",
+      "wall_seconds": 0.22,
+      "cpu_seconds": 0.35,
+      "peak_rss_kib": 106336,
+      "exit_code": 0
+    },
+    {
+      "name": "direct-warm-1",
+      "wall_seconds": 0.17,
+      "cpu_seconds": 0.30000000000000004,
+      "peak_rss_kib": 107292,
+      "exit_code": 0
+    },
+    {
+      "name": "wrapped-warm-1",
+      "wall_seconds": 0.2,
+      "cpu_seconds": 0.33999999999999997,
+      "peak_rss_kib": 108212,
+      "exit_code": 0
+    },
+    {
+      "name": "direct-warm-2",
+      "wall_seconds": 0.16,
+      "cpu_seconds": 0.3,
+      "peak_rss_kib": 108772,
+      "exit_code": 0
+    },
+    {
+      "name": "wrapped-warm-2",
+      "wall_seconds": 0.2,
+      "cpu_seconds": 0.35,
+      "peak_rss_kib": 106552,
+      "exit_code": 0
+    },
+    {
+      "name": "direct-warm-3",
+      "wall_seconds": 0.14,
+      "cpu_seconds": 0.25,
+      "peak_rss_kib": 107168,
+      "exit_code": 0
+    },
+    {
+      "name": "wrapped-warm-3",
+      "wall_seconds": 0.17,
+      "cpu_seconds": 0.31,
+      "peak_rss_kib": 106720,
+      "exit_code": 0
+    },
+    {
+      "name": "direct-warm-4",
+      "wall_seconds": 0.17,
+      "cpu_seconds": 0.33,
+      "peak_rss_kib": 106740,
+      "exit_code": 0
+    },
+    {
+      "name": "wrapped-warm-4",
+      "wall_seconds": 0.17,
+      "cpu_seconds": 0.27,
+      "peak_rss_kib": 107700,
+      "exit_code": 0
+    },
+    {
+      "name": "application-change",
+      "wall_seconds": 0.2,
+      "cpu_seconds": 0.33999999999999997,
+      "peak_rss_kib": 107572,
+      "exit_code": 0
+    },
+    {
+      "name": "dependency-change",
+      "wall_seconds": 0.2,
+      "cpu_seconds": 0.35,
+      "peak_rss_kib": 112924,
+      "exit_code": 1
+    },
+    {
+      "name": "concurrent-backend",
+      "wall_seconds": 0.19,
+      "cpu_seconds": 0.31,
+      "peak_rss_kib": 112540,
+      "exit_code": 1
+    },
+    {
+      "name": "concurrent-parser",
+      "wall_seconds": 0.19,
+      "cpu_seconds": 0.31,
+      "peak_rss_kib": 114144,
+      "exit_code": 1
+    },
+    {
+      "name": "concurrent-worker",
+      "wall_seconds": 0.19,
+      "cpu_seconds": 0.30000000000000004,
+      "peak_rss_kib": 113568,
+      "exit_code": 1
+    },
+    {
+      "name": "concurrent-frontend",
+      "wall_seconds": 0.2,
+      "cpu_seconds": 0.30000000000000004,
+      "peak_rss_kib": 113900,
+      "exit_code": 1
+    }
+  ],
+  "db_files": 5,
+  "db_unique_inodes": 1,
+  "db_size_bytes": 1413980160,
+  "process_restart_reuse": true,
+  "local_only": true,
+  "date": "2026-09-21",
+  "trivy_version": "0.74.0",
+  "trivy_archive_sha256": "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a",
+  "production_before": {
+    "host": "infra-build-09",
+    "scanner_cache_du": "22G",
+    "root_disk_used": "62G",
+    "root_disk_size": "77G",
+    "family_vulnerability_database_bytes": 1413906432,
+    "frontend_fanal_bytes": 524288,
+    "backend_java_database_bytes": 1529786368
+  },
+  "qualification": {
+    "unchanged_input": true,
+    "application_change_passed": true,
+    "vulnerable_dependency_change_failed": true,
+    "four_concurrent_scans_failed_for_vulnerabilities": true,
+    "process_restart_cache_survival": true,
+    "unit_failed_refresh_preserves_database": true,
+    "unit_expired_invalid_future_schema_rejected": true,
+    "local_race_detector_passed": true,
+    "new_cache_namespace": "trivy-v2",
+    "legacy_cache_mutated": false
+  },
+  "limitations": [
+    "Synthetic local rootfs measurements are not production deployment latency percentiles.",
+    "Process restart reuse is qualified; host reboot not performed.",
+    "Existing production cache directories require drained, explicit migration before their disk space is recovered.",
+    "Prepared cache and shared database root must reside on the same filesystem for hardlinks."
+  ],
+  "upstream_references": [
+    "https://github.com/aquasecurity/trivy/blob/v0.74.0/pkg/db/db.go",
+    "https://github.com/aquasecurity/trivy/blob/v0.74.0/pkg/javadb/client.go"
+  ],
+  "java_database": {
+    "size_bytes": 1529786368,
+    "paths": 3,
+    "unique_inodes": 1,
+    "cold_prepare_seconds": 22.2,
+    "warm_prepare_seconds": 0.02,
+    "warm_peak_rss_kib": 13632
+  },
+  "engine_reconciliation": {
+    "exact_pinned_images_local": 2,
+    "registry_pulls_skipped": 2,
+    "read_only_ansible_check_changed": 0,
+    "handlers_selected": 0,
+    "production_mutated": false,
+    "syntax_check_passed": true,
+    "ansible_lint_non_yaml_rules_passed": true,
+    "ansible_lint_yaml": "Existing repository yamllint conventions disagree with ansible-lint defaults; no unrelated style edits."
+  }
+}
