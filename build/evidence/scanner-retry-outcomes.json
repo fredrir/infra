@@ -1,0 +1,201 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "retry_policy": "One authorized failed-job retry per workflow; no third retry",
+  "runs": [
+    {
+      "family": "check",
+      "run": 35554307508,
+      "job": 106198482875,
+      "initial_digest": "sha256:ae5475e8457d0a304115ab444ba42e84f6f7a841a541d517bf5f8ca7b42787c6",
+      "retry_digest": "sha256:436b188c933980a360d8330310b22b35bdc0d4660ed420e14416999703faf98e",
+      "artifact_changed": true,
+      "checks": {
+        "schema": 1,
+        "accounting": "sum-of-recorded-check-durations",
+        "budget_seconds": 10,
+        "duration_seconds": 10.108190423,
+        "remaining_seconds": 0,
+        "success": false,
+        "stages": [
+          {
+            "schema": 1,
+            "stage": "image-smoke",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T03:04:06.476643967Z",
+            "duration_seconds": 3.421916461,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 2.6979509999999998,
+            "peak_memory_bytes": 65667072
+          },
+          {
+            "schema": 1,
+            "stage": "vulnerability-scan",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T03:05:23.508255216Z",
+            "duration_seconds": 6.686273962,
+            "budget_seconds": 6.578083539,
+            "budget_exceeded": true,
+            "success": false,
+            "exit_code": -1,
+            "cpu_seconds": 0.016691,
+            "peak_memory_bytes": 14155776,
+            "error": "infra failed: context deadline exceeded\nvulnerability-scan exceeded 6.578083539s budget"
+          }
+        ]
+      },
+      "conclusion": "scan budget timeout before extraction completed"
+    },
+    {
+      "family": "deploy",
+      "run": 35554867724,
+      "job": 106198484912,
+      "initial_digest": "sha256:b606f6cac0a31338af7d535b3e84eb11cfc547751fc093c83c845fa7cb0d6867",
+      "retry_digest": "sha256:ecb0c4f4fdb22cadc9ee41b8d70816508276b7d5f881fbe4a3848b3ed2f47515",
+      "artifact_changed": true,
+      "checks": {
+        "schema": 1,
+        "accounting": "sum-of-recorded-check-durations",
+        "budget_seconds": 10,
+        "duration_seconds": 10.114435327999999,
+        "remaining_seconds": 0,
+        "success": false,
+        "stages": [
+          {
+            "schema": 1,
+            "stage": "image-smoke",
+            "revision": "d3bbb0a3f51c76f6b95853b15540208ccd38e965",
+            "started": "2026-09-21T03:06:40.510296543Z",
+            "duration_seconds": 0.298932991,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.40386,
+            "peak_memory_bytes": 60817408
+          },
+          {
+            "schema": 1,
+            "stage": "vulnerability-scan",
+            "revision": "d3bbb0a3f51c76f6b95853b15540208ccd38e965",
+            "started": "2026-09-21T03:06:54.319563469Z",
+            "duration_seconds": 9.815502337,
+            "budget_seconds": 9.701067008999999,
+            "budget_exceeded": true,
+            "success": false,
+            "exit_code": -1,
+            "cpu_seconds": 0.019169,
+            "peak_memory_bytes": 14155776,
+            "error": "infra failed: context deadline exceeded\nvulnerability-scan exceeded 9.701067009s budget"
+          }
+        ]
+      },
+      "conclusion": "scan budget timeout before extraction completed"
+    },
+    {
+      "family": "rust",
+      "run": 35554307508,
+      "job": 106198482780,
+      "conclusion": "success",
+      "checks": {
+        "schema": 1,
+        "accounting": "sum-of-recorded-check-durations",
+        "budget_seconds": 10,
+        "duration_seconds": 2.8430235440000002,
+        "remaining_seconds": 7.156976456,
+        "success": true,
+        "stages": [
+          {
+            "schema": 1,
+            "stage": "image-smoke",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T02:53:17.463451701Z",
+            "duration_seconds": 1.7025806970000001,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.972796,
+            "peak_memory_bytes": 45088768
+          },
+          {
+            "schema": 1,
+            "stage": "vulnerability-scan",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T02:53:21.065873922Z",
+            "duration_seconds": 1.140442847,
+            "budget_seconds": 8.297419303,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.746029,
+            "peak_memory_bytes": 154038272
+          }
+        ]
+      }
+    },
+    {
+      "family": "dagger",
+      "run": 35554307508,
+      "job": 106198482846,
+      "conclusion": "success",
+      "checks": {
+        "schema": 1,
+        "accounting": "sum-of-recorded-check-durations",
+        "budget_seconds": 10,
+        "duration_seconds": 1.274600229,
+        "remaining_seconds": 8.725399771,
+        "success": true,
+        "stages": [
+          {
+            "schema": 1,
+            "stage": "image-smoke",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T02:54:22.101040334Z",
+            "duration_seconds": 0.324319648,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.346012,
+            "peak_memory_bytes": 46698496
+          },
+          {
+            "schema": 1,
+            "stage": "vulnerability-scan",
+            "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+            "started": "2026-09-21T02:54:24.11909304Z",
+            "duration_seconds": 0.950280581,
+            "budget_seconds": 9.675680352,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.463424,
+            "peak_memory_bytes": 129630208
+          }
+        ]
+      }
+    }
+  ],
+  "check_layer_comparison": {
+    "initial_layers": 21,
+    "retry_layers": 21,
+    "unchanged_layers": 11,
+    "changed_compressed_bytes": 424249446,
+    "unchanged_copy_input_example": {
+      "file": "/etc/apt/sources.list.d/ubuntu.sources",
+      "mode": "0644",
+      "uid": 0,
+      "gid": 0,
+      "bytes": 219,
+      "file_mtime_both": 1789933648,
+      "parent_directory_mtime_initial": 1789945764,
+      "parent_directory_mtime_retry": 1789959302
+    },
+    "inference": "Reexecuted Dockerfile operations produce different parent directory timestamps even when copied input file metadata is identical, causing layer identity and scanner analysis misses."
+  },
+  "remaining_bottleneck": "Engine GC evicted compiled tool results before retry; separate engine logs reviewed by pipeline agent. Cache capacity and reexecution metadata identity require qualification before another image build."
+}
