@@ -383,6 +383,9 @@ func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
 					rootReconciles++
 				}
 				if o.Name == "kubectl" && strings.HasPrefix(args, "annotate ") {
+					if !strings.Contains(args, "--field-manager=flux-client-side-apply") {
+						t.Fatal("reconciliation request can be removed by Flux")
+					}
 					for _, arg := range o.Args {
 						if strings.HasPrefix(arg, "reconcile.fluxcd.io/requestedAt=") {
 							token = strings.TrimPrefix(arg, "reconcile.fluxcd.io/requestedAt=")

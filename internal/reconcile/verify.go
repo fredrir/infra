@@ -105,7 +105,7 @@ func (c *Commands) Kubernetes(ctx context.Context, revision string) error {
 		return c.bootstrapProduction(ctx, revision)
 	}
 	token := time.Now().UTC().Format(time.RFC3339Nano)
-	if err := c.Runner.Run(ctx, "kubectl", "annotate", "kustomizations.kustomize.toolkit.fluxcd.io", "--all", "--all-namespaces", "--overwrite", "reconcile.fluxcd.io/requestedAt="+token, "--request-timeout=30s"); err != nil {
+	if err := c.Runner.Run(ctx, "kubectl", "annotate", "kustomizations.kustomize.toolkit.fluxcd.io", "--all", "--all-namespaces", "--overwrite", "--field-manager=flux-client-side-apply", "reconcile.fluxcd.io/requestedAt="+token, "--request-timeout=30s"); err != nil {
 		return err
 	}
 	wait, cancel := context.WithTimeout(ctx, 20*time.Minute)
@@ -113,7 +113,7 @@ func (c *Commands) Kubernetes(ctx context.Context, revision string) error {
 	if err := poll(wait, func() error { return c.verifyKubernetes(wait, revision, token) }); err != nil {
 		return err
 	}
-	if err := c.Runner.Run(ctx, "kubectl", "annotate", "helmreleases.helm.toolkit.fluxcd.io", "--all", "--all-namespaces", "--overwrite", "reconcile.fluxcd.io/requestedAt="+token, "--request-timeout=30s"); err != nil {
+	if err := c.Runner.Run(ctx, "kubectl", "annotate", "helmreleases.helm.toolkit.fluxcd.io", "--all", "--all-namespaces", "--overwrite", "--field-manager=flux-client-side-apply", "reconcile.fluxcd.io/requestedAt="+token, "--request-timeout=30s"); err != nil {
 		return err
 	}
 	return poll(wait, func() error { return c.verifyHelm(wait, token, "") })
