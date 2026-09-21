@@ -8,6 +8,8 @@
 | Image assembly experiment | Concurrent check/runtime evaluation reverted after no measured application benefit | [Rejected experiments](../build/evidence/frontend-source-filter-linux-amd64.json) |
 | Isolated deployment integration tests, Linux | Median 4.976 → 2.051 seconds with four concurrent fixtures; CPU 5.680 → 5.648 seconds; three samples each | [Fixture samples](../build/evidence/ci-fixture-parallelism.json) |
 | Scanner database sharing, Linux | Five paths share one 1.414 GB vulnerability database; warm preparation 10–20 ms; separate analysis cache per image | [Scanner qualification](../build/evidence/scanner-cache-sharing.json) |
+| Production cache retention | Unchanged frontend export 38.407 seconds after eviction → 1.703 seconds after restart with retained cache; one sample per condition | [Eviction and restart evidence](../build/evidence/dagger-production-eviction.json) |
+| Cache budget | Dagger maximum 20 → 32 GiB; Bazel unchanged; 22.68 GB physically reclaimed from duplicated scanner databases funds the increase | [Budget evidence](../build/evidence/dagger-cache-budget.json) |
 | Package publication structure | Three jobs → two; four artifact downloads → two; two hosted engines → one | [Package qualification](../build/evidence/package-optimization-qualification.json) |
 | Production package canary | Signed installation checks 7.487 seconds; build-to-smoke handoff 31 → 0 seconds; publication and HTTPS contents verified | [Production package canary](../build/evidence/package-production-canary.json) |
 | Package smoke payload | Logical fixture inputs 25,024,491 → 5,664,372 bytes; 39 cache-selection assertions; real signed installs and corrupt-package rejection | [Package qualification](../build/evidence/package-optimization-qualification.json) |
@@ -45,8 +47,9 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 
 | Scanner rollout constraint | Requirement |
 | --- | --- |
-| Shared storage | `trivy-v2` family directories and shared database root must use the same filesystem |
+| Shared storage | `trivy-v3` family directories and shared database root must use the same filesystem |
 | Freshness | Pinned Trivy metadata policy; failed or stale refresh blocks preparation |
 | Concurrency | Shared refresh lock; per-family scan lock; immutable database replacement |
-| Legacy cache | Retain until old pinned workflow jobs drain and consumers cut over |
-| Rollback | Previous CLI/workflow pins and legacy cache remain usable |
+| Database lifetime | Per-attempt leases release family database links after jobs; six-hour maintenance removes expired abandoned leases under family locks |
+| Legacy cache | Database copies removed after draining listeners; analysis caches retained and seeded into the new namespace |
+| Rollback | Previous CLI/workflow pins can reuse retained analysis and download current databases; remove the new prune command before downgrading the installed CLI |
