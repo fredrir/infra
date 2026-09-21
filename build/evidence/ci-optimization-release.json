@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "tag": "infra-v0.2.3",
+  "revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+  "run": 35554385900,
+  "sha256": "c351001bbbab6c6758309b3335bdcf89cd72c72b32c2794ad927c6d6cc3112c1",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64",
+    "darwin/amd64",
+    "darwin/arm64"
+  ],
+  "attestation_verified": true,
+  "signer_workflow": "fredrir/infra/.github/workflows/cli-release.yml",
+  "source_ref": "refs/tags/infra-v0.2.3",
+  "source_digest": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+  "local_go_all_passed": true,
+  "local_bazel_tests_passed": 18,
+  "production_source_check_run": 35554307314
+}
