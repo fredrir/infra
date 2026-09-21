@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "host": "infra-build-09",
+  "date": "2026-09-21",
+  "families": [
+    {
+      "family": "infra-runner-check",
+      "source": "/home/runner/.cache/infra/trivy-v2/infra-runner-check/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/infra-runner-check/fanal/fanal.db",
+      "bytes": 4194304,
+      "sha256": "23d53556636c438fc85735e45c4348936b8770d6f812b2d7e68e434448823ea2",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "infra-runner-dagger",
+      "source": "/home/runner/.cache/infra/trivy-v2/infra-runner-dagger/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/infra-runner-dagger/fanal/fanal.db",
+      "bytes": 4194304,
+      "sha256": "869f393837d81cbc89117428c2d721e9fc3af15abfd8f7f846f713d1c54b1b2e",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "infra-runner-deploy",
+      "source": "/home/runner/.cache/infra/trivy-v2/infra-runner-deploy/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/infra-runner-deploy/fanal/fanal.db",
+      "bytes": 4194304,
+      "sha256": "a06ac20d52dc44bec0919b6111bb428734af3be4574f2b3a9694e7c61af7eb92",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "infra-runner-rust",
+      "source": "/home/runner/.cache/infra/trivy-v2/infra-runner-rust/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/infra-runner-rust/fanal/fanal.db",
+      "bytes": 4194304,
+      "sha256": "856f8eb715339e0486dfc3524165f5a7952bd4213eaa5bbb34bc9052617ed9d0",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "llunde-frontend",
+      "source": "/home/runner/.cache/infra/trivy-v2/llunde-frontend/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/llunde-frontend/fanal/fanal.db",
+      "bytes": 524288,
+      "sha256": "21825c2fc226f2b1fa2c17adc24075bc509f0467d3ca0a4cb767d30becce174a",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "llunde-backend",
+      "source": "/home/runner/.cache/infra/trivy/llunde-backend/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/llunde-backend/fanal/fanal.db",
+      "bytes": 1048576,
+      "sha256": "e6d5a0c10ea2232b13f8990c695de71c96fd0aabb579b3a00500a65202871581",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "platform-backup-tools",
+      "source": "/home/runner/.cache/infra/trivy-v2/platform-backup-tools/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/platform-backup-tools/fanal/fanal.db",
+      "bytes": 262144,
+      "sha256": "af8743e9e23969e42c0067023076732a46cc5419ca85e7c0c23807ff7a6d5e9f",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "platform-caddy",
+      "source": "/home/runner/.cache/infra/trivy-v2/platform-caddy/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/platform-caddy/fanal/fanal.db",
+      "bytes": 262144,
+      "sha256": "2f66522e9ebabe3a6d18bceb3091e2cfc0d9abb4891a898e4d1ac02e474ff747",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "portfolio-api",
+      "source": "/home/runner/.cache/infra/trivy/portfolio-api/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/portfolio-api/fanal/fanal.db",
+      "bytes": 524288,
+      "sha256": "517e906bbb00f312ff0390e726ccf5d66e38f82139e3abbb99478fb2bf931081",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "portfolio-web",
+      "source": "/home/runner/.cache/infra/trivy/portfolio-web/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/portfolio-web/fanal/fanal.db",
+      "bytes": 1048576,
+      "sha256": "18ab0d9b92a71cd5045a48bb98963c886e6e81f5a32050322d7ae45dc0e8547d",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "portfolio-worker",
+      "source": "/home/runner/.cache/infra/trivy/portfolio-worker/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/portfolio-worker/fanal/fanal.db",
+      "bytes": 262144,
+      "sha256": "4734548184adfe21478ba2b9a83f3936144f847d588fe351e7f86e07bd072ec3",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "pyparser-dependencies",
+      "source": "/home/runner/.cache/infra/trivy/pyparser-dependencies/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/pyparser-dependencies/fanal/fanal.db",
+      "bytes": 2097152,
+      "sha256": "549b360c89dcccc11be5f67179a8f7c95674db6fc05eabc7af4fac97d0fc8e99",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "pyparser-review",
+      "source": "/home/runner/.cache/infra/trivy/pyparser-review/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/pyparser-review/fanal/fanal.db",
+      "bytes": 2097152,
+      "sha256": "e6c294f5905dd847483f76acca2e2d6caa1dcd651224f75031e4f05c525e35f9",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "y-api",
+      "source": "/home/runner/.cache/infra/trivy/y-api/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/y-api/fanal/fanal.db",
+      "bytes": 2097152,
+      "sha256": "411ddbb009a1e827b25fc892d3b434195c73b0797e401d74d82b3a5e2d3c1297",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    },
+    {
+      "family": "y-web",
+      "source": "/home/runner/.cache/infra/trivy/y-web/fanal/fanal.db",
+      "destination": "/home/runner/.cache/infra/trivy-v3/y-web/fanal/fanal.db",
+      "bytes": 524288,
+      "sha256": "d1884406cfb3a83f558c85de07510dc3d16287159e814e6496b568c99bad793a",
+      "source_shared_lock": true,
+      "destination_exclusive_lock": true
+    }
+  ],
+  "old_namespaces_mutated": false,
+  "database_files_copied": false,
+  "fanals_copied_bytes": 27525120,
+  "job_checks_skipped": false,
+  "retention": {
+    "namespace": "trivy-v3",
+    "lease_expiry": "workflow timeout plus five minutes",
+    "normal_cleanup": "always step releases matching workflow-attempt lease and only family db/java-db links",
+    "interrupted_cleanup": "nonblocking expired-lease sweep during prepare and existing six-hour maintenance timer",
+    "active_scan_protection": "family flock excludes release and sweep",
+    "central_database_and_private_analysis_retained": true,
+    "older_cli_namespaces_untouched": true,
+    "hosted_cache": "family analysis and central DB root saved/restored together",
+    "bound": "Expired idle family DB links reclaimed by next preparation or six-hour timer; active readers retain their generation until scan releases its lock. Timer requires final signed CLI installed before Ansible apply."
+  },
+  "validation": {
+    "macos": "go test -race ./internal/ci ./internal/cli -run Scanner -count=1 passed",
+    "linux": "ntnu crosscompiled internal/ci Scanner tests repeated five times passed",
+    "workflow": "actionlint passed",
+    "ansible": "production playbook syntax check passed",
+    "independent_review": "pipeline agent found no blockers",
+    "cases": [
+      "shared DB and fanal survive lease release",
+      "newer lease survives cancelled older cleanup",
+      "active scan protected during expiry sweep",
+      "expired lease removed after cancellation",
+      "prepared unexpired lease survives sweep",
+      "v2 namespace remains unchanged",
+      "failed preparation can release lease",
+      "invalid expiration and symlink rejected"
+    ]
+  },
+  "rollback": "Pin consumers to previous workflow; v2 caches and legacy caches remain. Remove v3 timer command before downgrading installed CLI."
+}

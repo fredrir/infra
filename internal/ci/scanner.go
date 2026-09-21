@@ -24,9 +24,20 @@ var scannerDatabases = []scannerDatabase{
 	{"java-db", "trivy-java.db", "--download-java-db-only", 1, 24 * time.Hour},
 }
 
-func PrepareScanner(ctx context.Context, runner Runner, cache, shared string, java bool) error {
+func PrepareScanner(ctx context.Context, runner Runner, cache, shared string, java bool, leases ...ScannerLease) error {
 	if cache == "" || shared == "" {
 		return fmt.Errorf("scanner cache and shared directory are required")
+	}
+	if len(leases) > 1 {
+		return fmt.Errorf("only one scanner lease is allowed")
+	}
+	if len(leases) == 1 {
+		if !scannerLeaseID.MatchString(leases[0].ID) || !leases[0].ExpiresAt.After(time.Now()) || leases[0].ExpiresAt.After(time.Now().Add(7*24*time.Hour)) {
+			return fmt.Errorf("invalid scanner lease ID or expiration")
+		}
+		if err := PruneScanner(ctx, filepath.Dir(cache), time.Now()); err != nil {
+			return err
+		}
 	}
 	shared = filepath.Join(shared, ToolAssets["trivy"].Digest)
 	family, err := scannerLock(ctx, cache)
@@ -34,6 +45,13 @@ func PrepareScanner(ctx context.Context, runner Runner, cache, shared string, ja
 		return err
 	}
 	defer family.Close()
+	if len(leases) == 1 {
+		if err := writeScannerLease(cache, leases[0]); err != nil {
+			return err
+		}
+	} else if err := os.Remove(filepath.Join(cache, scannerLeaseFile)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	global, err := scannerLock(ctx, shared)
 	if err != nil {
 		return err
@@ -140,6 +158,10 @@ func linkScannerDatabase(source, destination string, database scannerDatabase) e
 }
 
 func scannerLock(ctx context.Context, directory string) (*os.File, error) {
+	return scannerCacheLock(ctx, directory, true)
+}
+
+func scannerCacheLock(ctx context.Context, directory string, wait bool) (*os.File, error) {
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return nil, err
 	}
@@ -177,6 +199,10 @@ func scannerLock(ctx context.Context, directory string) (*os.File, error) {
 		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
 			lock.Close()
 			return nil, err
+		}
+		if !wait {
+			lock.Close()
+			return nil, errScannerBusy
 		}
 		timer := time.NewTimer(20 * time.Millisecond)
 		select {

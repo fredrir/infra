@@ -214,22 +214,24 @@ jobs:
         run: |
           family="${IMAGE##*/}"
           [[ "$family" =~ ^[a-z0-9][a-z0-9._-]*$ ]]
-          cache="$HOME/.cache/infra/trivy-v2/$family"
+          cache="$HOME/.cache/infra/trivy-v3/$family"
           mkdir -p "$cache"
           chmod 700 "$cache"
           export TRIVY_CACHE_DIR="$cache"
           version=$(trivy --version | sed -n 's/^Version: //p')
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           printf 'TRIVY_CACHE_DIR=%s\n' "$cache" >> "$GITHUB_ENV"
-          printf 'path=%s\nfamily=%s\nversion=%s\n' "$cache" "$family" "$version" >> "$GITHUB_OUTPUT"
+          printf 'path=%s\nshared-path=%s\nfamily=%s\nversion=%s\n' "$cache" "$HOME/.cache/infra/trivy-databases" "$family" "$version" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: steps.affected.outputs.changed == 'true' && runner.environment == 'github-hosted'
         id: scanner-restore
         with:
-          path: ${{ steps.scanner-cache.outputs.path }}
-          key: trivy-v2-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-${{ github.sha }}
+          path: |
+            ${{ steps.scanner-cache.outputs.path }}
+            ${{ steps.scanner-cache.outputs.shared-path }}
+          key: trivy-v3-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-${{ github.sha }}
           restore-keys: |
-            trivy-v2-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-
+            trivy-v3-linux-amd64-${{ steps.scanner-cache.outputs.version }}-${{ steps.scanner-cache.outputs.family }}-
       - name: Report scanner cache state
         if: steps.affected.outputs.changed == 'true'
         run: |
@@ -242,12 +244,13 @@ jobs:
         if: steps.affected.outputs.changed == 'true'
         env:
           SCANNER_JAVA: ${{ inputs.scanner-java }}
+          SCANNER_LEASE_DURATION: ${{ inputs.timeout-minutes }}m
           PUBLIC_PROVENANCE: ${{ !github.event.repository.private }}
           GH_TOKEN: ${{ github.token }}
         run: |
           # shellcheck disable=SC2016
           infra ci measure --stage scanner-preparation --budget 5m --report-dir "$RUNNER_TEMP/performance/preparation" -- bash -euo pipefail -c '
-            infra ci scanner prepare --java="$SCANNER_JAVA"
+            infra ci scanner prepare --java="$SCANNER_JAVA" --lease-id "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --lease-duration "$SCANNER_LEASE_DURATION"
             if [[ "$PUBLIC_PROVENANCE" == true ]]; then
               umask 077
               gh attestation trusted-root > "$RUNNER_TEMP/github-trusted-root.jsonl"
@@ -370,10 +373,15 @@ jobs:
         run: |
           gh workflow run deploy.yml --repo fredrir/infra --ref main -f "repository-id=$GITHUB_REPOSITORY_ID" \
             -f "image=$IMAGE" -f "digest=$DIGEST" -f "source-revision=$GITHUB_SHA"
+      - name: Release scanner database lease
+        if: always() && steps.scanner-cache.outcome == 'success'
+        run: infra ci scanner release --lease-id "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: always() && runner.environment == 'github-hosted' && steps.scanner-restore.outputs.cache-primary-key != '' && steps.scanner-restore.outputs.cache-hit != 'true'
         with:
-          path: ${{ steps.scanner-cache.outputs.path }}
+          path: |
+            ${{ steps.scanner-cache.outputs.path }}
+            ${{ steps.scanner-cache.outputs.shared-path }}
           key: ${{ steps.scanner-restore.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
