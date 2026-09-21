@@ -2,7 +2,7 @@
   "schema": 1,
   "date": "2026-09-21",
   "host": "infra-build-09",
-  "cli_source_revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+  "cli_source_revision": "6963b2b045f05ecee2d1b69f6eb596a249aa30dd",
   "cli_installation": "isolated temporary canary; installed CLI unchanged",
   "user_id": 1001,
   "image": "ghcr.io/fredrir/llunde-frontend@sha256:5a020d64ec9ef99ec2d8fd6d74d765dc75f252c72fd3de908c848db4aeb12141",
@@ -505,5 +505,7 @@
     "Disk usage includes concurrent CI activity and retained legacy caches; no production space recovery is claimed.",
     "No legacy database or package-analysis caches were removed.",
     "Installed production CLI remains the signed previous release until orchestrated promotion."
-  ]
+  ],
+  "scanner_implementation_revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+  "cli_worktree_modified": false
 }
