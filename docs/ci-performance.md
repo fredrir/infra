@@ -27,3 +27,8 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | --- | --- |
 | Artifact compression levels | [Upload artifact](https://github.com/actions/upload-artifact#altering-compressions-level-speed-v-size) |
 | Push-only path filters | [GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushpull_requestpull_request_targetpathspaths-ignore) |
+
+| Remaining bottleneck | Evidence | Candidate |
+| --- | --- | --- |
+| Historical package channel downloads and attestations | [`GitHub.Download`](../internal/packages/catalog.go) requests all six Homebrew, Nix and AUR channel files for each of three retained releases; `Collect` publishes channel files only for the newest release | Download channel files only for the newest release; omit twelve unused channel downloads and individual attestation verifications per project with three releases; preserve verification of every consumed package and metadata asset |
+| Package smoke process startup and workflow handoff | [Package qualification](../build/evidence/package-optimization-qualification.json): unchanged-input CLI medians 1.458 → 1.467 seconds; local signed fixture, no steady-warm latency improvement | Qualify the merged build/smoke job against the production catalog; retain the ten-second installation gate and separate publish credentials |
