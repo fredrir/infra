@@ -215,7 +215,7 @@
     "aggregate_repository_input_bytes_after": 5664372
   },
   "limitations": [
-    "Synthetic signed package fixture, not production package catalog or ordinary traffic percentiles.",
+    "smoke_cli_samples uses a synthetic signed package fixture; actual_catalog separately qualifies the unmodified production artifacts; neither is ordinary traffic percentile evidence.",
     "CLI memory and CPU exclude the Dagger engine.",
     "No steady-warm CLI latency improvement demonstrated; workflow handoff reduction has not yet been measured in production.",
     "Build and smoke share the workspace and engine, but retain separate Dagger client sessions.",
