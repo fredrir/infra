@@ -2,6 +2,10 @@ name: Reconcile infrastructure
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "*.md"
+      - "docs/**/*.md"
+      - "build/evidence/*.json"
   pull_request:
   schedule:
   - cron: '17,47 * * * *'

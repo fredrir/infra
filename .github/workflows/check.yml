@@ -2,6 +2,10 @@ name: Check
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "*.md"
+      - "docs/**/*.md"
+      - "build/evidence/*.json"
   pull_request:
   workflow_dispatch:
 env:
