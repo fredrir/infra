@@ -2,7 +2,8 @@
 
 | Scope                                 | Location                                                                                                                                                                               |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Infrastructure APIs, runner App, mail | Doppler `infra → ops`                                                                                                                                                                  |
+| Operator infrastructure APIs, runner App, mail | Doppler `infra → ops`                                                                                                                                                           |
+| CI reconciliation                    | Doppler `infra → prd_reconciliation_plan` and `infra → prd_reconciliation_apply`; each GitHub environment stores only its config-scoped `DOPPLER_TOKEN`                                  |
 | Package signing and AUR keys          | Doppler `infra → ops` (`PACKAGES_GPG_KEY`, `PACKAGES_APK_KEY`, `AUR_SSH_KEY`); `fredrir/packages` environment `publish`                                                                |
 | Build cache keys                      | `platform/components/runners/<project>/sccache-*.secret.sops.yaml`, `platform/components/build-cache/**/*.secret.sops.yaml`; legacy BuildKit credentials remain through caller cutover |
 | Flux deploy receiver                  | `platform/components/sources/deploy-receiver.secret.sops.yaml`                                                                                                                         |
