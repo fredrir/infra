@@ -6,6 +6,10 @@
 | Documentation and evidence push | Check and reconciliation workflows exclude root Markdown, Markdown under `docs`, and JSON under `build/evidence` | [Check](../.github/workflows/check.yml), [reconciliation](../.github/workflows/reconcile.yml) |
 | Image assembly experiment | Concurrent check/runtime evaluation reverted after unchanged latency and SIGKILL at 4 GiB | `ntnu` bounded qualification |
 | Isolated deployment integration tests, Linux | Median 4.976 → 2.051 seconds with four concurrent fixtures; CPU 5.680 → 5.648 seconds; three samples each | [Fixture samples](../build/evidence/ci-fixture-parallelism.json) |
+| Scanner database sharing, Linux | Five paths share one 1.414 GB vulnerability database; warm preparation 10–20 ms; separate analysis cache per image | [Scanner qualification](../build/evidence/scanner-cache-sharing.json) |
+| Package publication structure | Three jobs → two; four artifact downloads → two; two hosted engines → one | [Package qualification](../build/evidence/package-optimization-qualification.json) |
+| Package smoke payload | Logical fixture inputs 25,024,491 → 5,664,372 bytes; 39 cache-selection assertions; real signed installs and corrupt-package rejection | [Package qualification](../build/evidence/package-optimization-qualification.json) |
+| Engine reconciliation | Exact cached image digests skip registry pulls; each changed service restarts independently | [Runner qualification](../build/evidence/scanner-cache-sharing.json) |
 | Historical workflow sample | Includes earlier qualification runs and failures; not an ordinary-traffic deployment percentile | [Baseline](../build/evidence/ci-optimization-baseline.json) |
 | Frontend deployment below 15 seconds | Unqualified | [Previous observed timeline](../build/rollout/flux-artifacts/rollout.json) |
 
@@ -33,3 +37,11 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | --- | --- | --- |
 | Historical package channel downloads and attestations | [`GitHub.Download`](../internal/packages/catalog.go) requests all six Homebrew, Nix and AUR channel files for each of three retained releases; `Collect` publishes channel files only for the newest release | Download channel files only for the newest release; omit twelve unused channel downloads and individual attestation verifications per project with three releases; preserve verification of every consumed package and metadata asset |
 | Package smoke process startup and workflow handoff | [Package qualification](../build/evidence/package-optimization-qualification.json): unchanged-input CLI medians 1.458 → 1.467 seconds; local signed fixture, no steady-warm latency improvement | Qualify the merged build/smoke job against the production catalog; retain the ten-second installation gate and separate publish credentials |
+
+| Scanner rollout constraint | Requirement |
+| --- | --- |
+| Shared storage | `trivy-v2` family directories and shared database root must use the same filesystem |
+| Freshness | Pinned Trivy metadata policy; failed or stale refresh blocks preparation |
+| Concurrency | Shared refresh lock; per-family scan lock; immutable database replacement |
+| Legacy cache | Retain until old pinned workflow jobs drain and consumers cut over |
+| Rollback | Previous CLI/workflow pins and legacy cache remain usable |
