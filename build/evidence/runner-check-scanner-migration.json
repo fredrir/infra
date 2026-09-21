@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "image": "ghcr.io/fredrir/infra-runner-check@sha256:ae5475e8457d0a304115ab444ba42e84f6f7a841a541d517bf5f8ca7b42787c6",
+  "source_analysis_cache": "/home/runner/.cache/infra/trivy/infra-runner-check/fanal/fanal.db",
+  "source_lock": "shared flock held during copy",
+  "destination_cache": "/home/runner/.cache/infra/scanner-canary-63ab06a/migration-cache",
+  "active_v2_family_overwritten": false,
+  "wall_seconds": 30.5365,
+  "cpu_seconds": 56.489999999999995,
+  "peak_rss_kib": 655380,
+  "exit_code": 0,
+  "stderr": "2026-09-21T02:38:50Z\tINFO\t[vuln] Vulnerability scanning is enabled\n2026-09-21T02:39:03Z\tINFO\t[python] Licenses acquired from one or more METADATA files may be subject to additional terms. Use `--debug` flag to see all affected packages.\n2026-09-21T02:39:20Z\tINFO\tDetected OS\tfamily=\"ubuntu\" version=\"24.04\"\n2026-09-21T02:39:20Z\tINFO\t[ubuntu] Detecting vulnerabilities...\tos_version=\"24.04\" pkg_num=231\n2026-09-21T02:39:20Z\tINFO\tNumber of language-specific files\tnum=19\n2026-09-21T02:39:20Z\tINFO\t[dotnet-core] Detecting vulnerabilities...\n2026-09-21T02:39:20Z\tINFO\t[gobinary] Detecting vulnerabilities...\n2026-09-21T02:39:20Z\tINFO\t[python-pkg] Detecting vulnerabilities...\n2026-09-21T02:39:20Z\tINFO\t[rustbinary] Detecting vulnerabilities...\n2026-09-21T02:39:20Z\tWARN\tUsing severities from other vendors for some vulnerabilities. Read https://trivy.dev/docs/v0.74/guide/scanner/vulnerability#severity-selection for details.\n",
+  "cpu_pressure_before": "some avg10=28.14 avg60=47.89 avg300=21.44 total=2097747839\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+  "cpu_pressure_after": "some avg10=23.61 avg60=38.64 avg300=21.76 total=2105410990\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+  "qualification_timeout_seconds": 30,
+  "production_gate_changed": false,
+  "source_analysis_cache_copied": true,
+  "ci_failure": {
+    "run_id": 35554307508,
+    "job_id": 106195034819,
+    "image_smoke_seconds": 3.359577697,
+    "remaining_scan_budget_seconds": 6.640422303,
+    "failed_scan_seconds": 6.74495095,
+    "aggregate_seconds": 10.104528647,
+    "failure": "aggregate check budget exceeded before analysis completed",
+    "vulnerability_found": false
+  },
+  "first_bounded_retry": {
+    "scanner_timeout_seconds": 7,
+    "wall_seconds": 9.77,
+    "cpu_seconds": 15.13,
+    "peak_rss_kib": 518076,
+    "success": false,
+    "observed_dagger_cpu_percent": 318.62,
+    "cpu_pressure_some_avg10": 62.54
+  },
+  "diagnosis": "Copied legacy analysis did not avoid extraction for this newly built image; migration scan completed clean under a separate diagnostic timeout, but it does not qualify the unchanged production aggregate budget.",
+  "normal_workflow_gate_changed": false,
+  "legacy_cache_removed": false,
+  "limitations": [
+    "Diagnostic migration scan ran during other image compilation; measured duration is not an isolated scanner baseline.",
+    "No successful bounded warm qualification or CI retry is claimed."
+  ]
+}
