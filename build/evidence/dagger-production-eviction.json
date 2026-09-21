@@ -53,5 +53,18 @@
     "same_cli_artifact_archive_sha256": "fe64182285144307ce952e468a759d9c028c029d92a4ba52462a32516c174293",
     "first_image_digest": "sha256:ae5475e8457d0a304115ab444ba42e84f6f7a841a541d517bf5f8ca7b42787c6",
     "retry_image_digest": "sha256:436b188c933980a360d8330310b22b35bdc0d4660ed420e14416999703faf98e"
+  },
+  "post_change_qualification": {
+    "source_revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+    "engine_restart_at": "2026-09-21T03:15:43.967Z",
+    "max_cache_gib": [
+      25,
+      25,
+      32
+    ],
+    "unchanged_export_seconds": 1.7027417460012657,
+    "previous_evicted_export_seconds": 38.40738265999971,
+    "same_historical_check_receipt": true,
+    "scope": "One restart-survival sample; no ordinary-traffic percentile claim"
   }
 }

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "recorded_at_utc": "2026-09-21T03:11:31.813351+00:00",
+  "recorded_at_utc": "2026-09-21T03:16:56.679624+00:00",
   "state": "build passed; promotion committed; served-revision gate failed; full reconciliation completed and exact revision observed",
   "repository": "fredrir/llunde-frontend",
   "source_revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
@@ -573,7 +573,7 @@
     "The15second deployment target was not achieved",
     "Two bounded observer windows have a gap; no exact first-serving timestamp is claimed",
     "The ten-second aggregate check gate and sixty-second readiness gate were not weakened",
-    "Production unchanged export succeeded but repeated dependency install after demonstrated engine eviction; no production warm reuse claim"
+    "One post-restart unchanged export reused cached results in1.703seconds; sustained production workload eviction resistance remains to be observed"
   ],
   "reconciliation_completed": {
     "desired_revision": "3da86446ebb07bd86864b3f0e5e7a86ac705b498",
@@ -666,5 +666,53 @@
     "reclaimed_bytes": 766234929,
     "target_bytes": 72396800,
     "evidence": "Dagger engine log explicitly pruned bun install, frontend source, checks, TypeScript cache volume and generated static/runtime result graph"
+  },
+  "production_post_restart_export": {
+    "schema": 1,
+    "started": "2026-09-21T03:16:13.898355+00:00",
+    "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+    "scenario": "unchanged actual production checkout; static export only",
+    "binary_sha256": "c351001bbbab6c6758309b3335bdcf89cd72c72b32c2794ad927c6d6cc3112c1",
+    "build_argument_names": [
+      "CI_REVISION",
+      "GIT_SHA",
+      "REVISION",
+      "VITE_TURNSTILE_SITE_KEY"
+    ],
+    "published": false,
+    "wall_seconds": 1.7027417460012657,
+    "exit_code": 0,
+    "engine_cpu_seconds": 1.413066,
+    "engine_throttled_seconds": 0.0,
+    "engine_peak_sampled": {
+      "anon_bytes": 130875392,
+      "file_cache_bytes": 55492608,
+      "memory_current_bytes": 217468928
+    },
+    "cpu_pressure_before": "some avg10=1.19 avg60=1.13 avg300=0.31 total=1061010\nfull avg10=0.67 avg60=0.58 avg300=0.15 total=540579\n",
+    "cpu_pressure_after": "some avg10=0.97 avg60=1.09 avg300=0.30 total=1202665\nfull avg10=0.54 avg60=0.56 avg300=0.15 total=622428\n",
+    "check_receipts": [
+      {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "started": "2026-09-21T03:09:05.628425228Z",
+        "duration_seconds": 3.421449403,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 11.573878,
+        "peak_memory_bytes": 746229760
+      }
+    ],
+    "engine_restart_at": "2026-09-21T03:15:43.967Z",
+    "policy_max_gib": [
+      25,
+      25,
+      32
+    ],
+    "historical_check_receipt_reused": true,
+    "interpretation": "Unchanged results survived engine restart; one retained-cache sample does not prove sustained capacity or deployment percentiles"
   }
 }
