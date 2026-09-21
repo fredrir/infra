@@ -1,0 +1,483 @@
+{
+  "schema": 1,
+  "measured_at_utc": "2026-09-21T02:38:00.339857+00:00",
+  "host": "ssh ntnu",
+  "scope": "Isolated frontend static-stage exports; excludes GitHub scheduling, image publication, scanning, provenance and serving",
+  "frontend_revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+  "change": {
+    "path": "Containerfile",
+    "before": "COPY . .",
+    "after": "COPY --exclude=.infra-artifacts . .",
+    "preserved": [
+      "FROM base AS source",
+      "checks-before-build static COPY order",
+      "frozen dependency installation",
+      "typecheck and lint",
+      "ten-second aggregate check budget"
+    ]
+  },
+  "engine": {
+    "version": "0.21.9",
+    "image_digest": "sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4",
+    "cpus": 4,
+    "memory_bytes": 4294967296,
+    "swap_bytes": 0,
+    "pids_limit": 1024,
+    "oci_max_parallelism": 1,
+    "persistent_state": "/tmp/infra-packages-qualification/dagger",
+    "production_capacity_match": true
+  },
+  "binaries": {
+    "orchestrator_sha256": "d8c64ebc799f7b8e1dcafbb3e8d465e7674123fddccae4c10f23b0adb723b049",
+    "orchestrator_pipeline_image_go_sha256": "8dcab7dbf697f06a9eb8048ad5f97433a49c86b4b0f3ca86a536ab39f4875a93",
+    "measurement_release": "infra-v0.2.2",
+    "measurement_bytes": 15663264,
+    "measurement_sha256": "dc6d4d3c31efc3162158c4d21a4743d768c07c3639e5c798d98c42d33f5f815b"
+  },
+  "application_pair_summary": {
+    "samples_per_variant": 2,
+    "order": [
+      "before",
+      "after",
+      "after",
+      "before"
+    ],
+    "before_wall_median_seconds": 13.642733866465278,
+    "after_wall_median_seconds": 11.884567420027452,
+    "wall_reduction_percent": 12.887200348894243,
+    "before_engine_cpu_median_seconds": 35.4597285,
+    "after_engine_cpu_median_seconds": 29.0902635,
+    "engine_cpu_reduction_percent": 17.962531777421813
+  },
+  "fixtures": {
+    "application": "Add a valid src/ci-qualification.ts module with a distinct exported string for each fresh application sample",
+    "dependency": "Change prettier constraint from ^3.9.6 to 3.9.6 in both package.json and bun.lock; selected package version remains3.9.6",
+    "type_failure": "export const qualification: number = \"this must fail typecheck\";",
+    "contention": "Two distinct valid application source directories, two CLI sessions, same engine and TypeScript cache",
+    "restart": "Restart engine retaining persistent state, then export unchanged filtered source"
+  },
+  "cache_evidence": {
+    "application_dependency_install_execution": false,
+    "dependency_fixture_install": "377 packages installed in2.40s",
+    "unchanged_check_receipt_started": "2026-09-21T02:32:51.904739919Z",
+    "restart_check_receipt_started": "2026-09-21T02:32:51.904739919Z",
+    "type_failure": "TS2322; exit1; no export directory"
+  },
+  "resource_accounting": {
+    "engine_cpu": "cgroup cpu.stat usage_usec delta",
+    "memory": "Peak sampled cgroup memory.stat anon/file and memory.current at100ms intervals; shared engine total, not isolated process RSS",
+    "throttling": "cgroup cpu.stat throttled_usec delta",
+    "contention": "Overlapping per-session engine counters refer to shared resources and must not be summed",
+    "check_receipts": "Cached receipts preserve historical execution durations and are not current-run wall timings",
+    "network_bytes": "Not collected"
+  },
+  "samples": [
+    {
+      "scenario": "production-binary-baseline",
+      "binary": "infra-baseline",
+      "seconds": 13.94305150595028,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 36.915575,
+      "engine_throttled_seconds": 23.825861,
+      "engine_peak_sampled": {
+        "anon_bytes": 1866264576,
+        "file_cache_bytes": 218062848,
+        "memory_current_bytes": 2160148480
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:31:18.809231374Z",
+        "duration_seconds": 1.230348065,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.602829,
+        "peak_memory_bytes": 305946624
+      }
+    },
+    {
+      "scenario": "production-binary-filtered",
+      "binary": "infra-baseline",
+      "seconds": 11.884581210033502,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 29.279437,
+      "engine_throttled_seconds": 10.559628,
+      "engine_peak_sampled": {
+        "anon_bytes": 1863585792,
+        "file_cache_bytes": 253837312,
+        "memory_current_bytes": 2196099072
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:31:32.991511345Z",
+        "duration_seconds": 1.18963313,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.996595,
+        "peak_memory_bytes": 293167104
+      }
+    },
+    {
+      "scenario": "production-binary-filtered-2",
+      "binary": "infra-baseline",
+      "seconds": 11.8845536300214,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 28.90109,
+      "engine_throttled_seconds": 11.057003,
+      "engine_peak_sampled": {
+        "anon_bytes": 1865584640,
+        "file_cache_bytes": 289988608,
+        "memory_current_bytes": 2235805696
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:32:51.904739919Z",
+        "duration_seconds": 1.028182049,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.470904,
+        "peak_memory_bytes": 298274816
+      }
+    },
+    {
+      "scenario": "production-binary-baseline-2",
+      "binary": "infra-baseline",
+      "seconds": 13.342416226980276,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 34.003882,
+      "engine_throttled_seconds": 17.989586,
+      "engine_peak_sampled": {
+        "anon_bytes": 1902182400,
+        "file_cache_bytes": 326160384,
+        "memory_current_bytes": 2314104832
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:33:04.124439211Z",
+        "duration_seconds": 1.083502306,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.574928,
+        "peak_memory_bytes": 301871104
+      }
+    },
+    {
+      "scenario": "filtered-unchanged-1",
+      "binary": "infra-baseline",
+      "seconds": 1.474779890035279,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 0.96989,
+      "engine_throttled_seconds": 0.0,
+      "engine_peak_sampled": {
+        "anon_bytes": 369524736,
+        "file_cache_bytes": 325369856,
+        "memory_current_bytes": 759894016
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:32:51.904739919Z",
+        "duration_seconds": 1.028182049,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.470904,
+        "peak_memory_bytes": 298274816
+      }
+    },
+    {
+      "scenario": "filtered-unchanged-2",
+      "binary": "infra-baseline",
+      "seconds": 1.5242360520060174,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 0.688616,
+      "engine_throttled_seconds": 0.0,
+      "engine_peak_sampled": {
+        "anon_bytes": 364244992,
+        "file_cache_bytes": 325369856,
+        "memory_current_bytes": 760725504
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:32:51.904739919Z",
+        "duration_seconds": 1.028182049,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.470904,
+        "peak_memory_bytes": 298274816
+      }
+    },
+    {
+      "scenario": "filtered-unchanged-3",
+      "binary": "infra-baseline",
+      "seconds": 1.4739653209690005,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 0.626104,
+      "engine_throttled_seconds": 0.0,
+      "engine_peak_sampled": {
+        "anon_bytes": 371740672,
+        "file_cache_bytes": 324968448,
+        "memory_current_bytes": 762683392
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:32:51.904739919Z",
+        "duration_seconds": 1.028182049,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.470904,
+        "peak_memory_bytes": 298274816
+      }
+    },
+    {
+      "scenario": "filtered-dependency",
+      "binary": "infra-baseline",
+      "seconds": 21.29139936499996,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 54.476424,
+      "engine_throttled_seconds": 21.591458,
+      "engine_peak_sampled": {
+        "anon_bytes": 1944137728,
+        "file_cache_bytes": 954691584,
+        "memory_current_bytes": 3061276672
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:33:31.300521145Z",
+        "duration_seconds": 2.150493833,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 7.738257,
+        "peak_memory_bytes": 721186816
+      }
+    },
+    {
+      "scenario": "filtered-type-failure",
+      "binary": "infra-baseline",
+      "seconds": 4.94455321400892,
+      "exit_code": 1,
+      "export_exists": false,
+      "engine_cpu_seconds": 8.776105,
+      "engine_throttled_seconds": 0.975015,
+      "engine_peak_sampled": {
+        "anon_bytes": 493772800,
+        "file_cache_bytes": 979976192,
+        "memory_current_bytes": 1859514368
+      }
+    },
+    {
+      "scenario": "filtered-contention-a",
+      "binary": "infra-baseline",
+      "seconds": 17.52265407599043,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 61.324635,
+      "engine_throttled_seconds": 38.56223,
+      "engine_peak_sampled": {
+        "anon_bytes": 2520559616,
+        "file_cache_bytes": 1244729344,
+        "memory_current_bytes": 3965771776
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:35:07.393747521Z",
+        "duration_seconds": 1.082907018,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.559468,
+        "peak_memory_bytes": 300818432
+      }
+    },
+    {
+      "scenario": "filtered-contention-b",
+      "binary": "infra-baseline",
+      "seconds": 19.173325092997402,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 65.246032,
+      "engine_throttled_seconds": 39.859815,
+      "engine_peak_sampled": {
+        "anon_bytes": 2520559616,
+        "file_cache_bytes": 1252577280,
+        "memory_current_bytes": 3965771776
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:35:08.713249636Z",
+        "duration_seconds": 1.547016943,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 4.295383,
+        "peak_memory_bytes": 304111616
+      }
+    },
+    {
+      "scenario": "filtered-restart-survival",
+      "binary": "infra-baseline",
+      "seconds": 1.725063573976513,
+      "exit_code": 0,
+      "export_exists": true,
+      "engine_cpu_seconds": 2.540243,
+      "engine_throttled_seconds": 0.0,
+      "engine_peak_sampled": {
+        "anon_bytes": 125054976,
+        "file_cache_bytes": 27611136,
+        "memory_current_bytes": 199221248
+      },
+      "receipt": {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "started": "2026-09-21T02:32:51.904739919Z",
+        "duration_seconds": 1.028182049,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 3.470904,
+        "peak_memory_bytes": 298274816
+      }
+    }
+  ],
+  "contention_summary": {
+    "wall_seconds": 19.302093086997047,
+    "workers": 2,
+    "results": [
+      {
+        "scenario": "filtered-contention-a",
+        "binary": "infra-baseline",
+        "seconds": 17.52265407599043,
+        "exit_code": 0,
+        "export_exists": true,
+        "engine_cpu_seconds": 61.324635,
+        "engine_throttled_seconds": 38.56223,
+        "engine_peak_sampled": {
+          "anon_bytes": 2520559616,
+          "file_cache_bytes": 1244729344,
+          "memory_current_bytes": 3965771776
+        },
+        "receipt": {
+          "schema": 1,
+          "stage": "frontend",
+          "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+          "started": "2026-09-21T02:35:07.393747521Z",
+          "duration_seconds": 1.082907018,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 3.559468,
+          "peak_memory_bytes": 300818432
+        }
+      },
+      {
+        "scenario": "filtered-contention-b",
+        "binary": "infra-baseline",
+        "seconds": 19.173325092997402,
+        "exit_code": 0,
+        "export_exists": true,
+        "engine_cpu_seconds": 65.246032,
+        "engine_throttled_seconds": 39.859815,
+        "engine_peak_sampled": {
+          "anon_bytes": 2520559616,
+          "file_cache_bytes": 1252577280,
+          "memory_current_bytes": 3965771776
+        },
+        "receipt": {
+          "schema": 1,
+          "stage": "frontend",
+          "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+          "started": "2026-09-21T02:35:08.713249636Z",
+          "duration_seconds": 1.547016943,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 4.295383,
+          "peak_memory_bytes": 304111616
+        }
+      }
+    ],
+    "note": "Engine resource counters are shared and must not be added across overlapping samples."
+  },
+  "rejected_experiments": [
+    {
+      "change": "Concurrent image runtime/check API evaluation",
+      "committed": "d2ba4d4",
+      "reverted": "6517ae1",
+      "outcome": "No application latency benefit in two exploratory pairs; source COPY reorder with concurrent execution hit memory limit",
+      "before_seconds": [
+        13.489127561042551,
+        13.695648753026035
+      ],
+      "after_seconds": [
+        14.10941376897972,
+        14.002578960033134
+      ],
+      "limitations": "Exploration injected22,792,605-byte development measurement binary; initial engine omitted production oci_max_parallelism1; not a production-equivalent contention claim"
+    },
+    {
+      "change": "FROM deps AS source and remove node_modules bind mounts",
+      "outcome": "Rejected due larger Dockerfile conversion cost",
+      "before_seconds": 17.923657956009265,
+      "after_seconds": 23.852448908961378,
+      "limitations": "Exploration injected22,792,605-byte development measurement binary; source inherited dependency tree increased conversion work"
+    },
+    {
+      "change": "agy -p bounded independent audit",
+      "outcome": "Headless command permission auto-denied; no audit findings; permission policy not bypassed"
+    }
+  ],
+  "limitations": [
+    "Two paired application samples establish a local directional improvement, not an ordinary-traffic percentile",
+    "Static-stage export timing does not establish frontend deployment under15seconds",
+    "Dependency fixture tests changed constraints and installation invalidation, not a new resolved package version",
+    "No production VM capacity changes",
+    "Full consumer production canary and ordinary-traffic collection are separate qualification"
+  ]
+}

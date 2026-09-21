@@ -4,7 +4,8 @@
 | --- | --- | --- |
 | CLI compression, Linux amd64, level 6 → 1 | Median 0.706 → 0.245 seconds; 6,458,416 → 7,097,014 bytes; seven samples per level | [Compression samples](../build/evidence/cli-artifact-compression.json) |
 | Documentation and evidence push | Check and reconciliation workflows exclude root Markdown, Markdown under `docs`, and JSON under `build/evidence` | [Check](../.github/workflows/check.yml), [reconciliation](../.github/workflows/reconcile.yml) |
-| Image assembly experiment | Concurrent check/runtime evaluation reverted after unchanged latency and SIGKILL at 4 GiB | `ntnu` bounded qualification |
+| Frontend source COPY filtering, Linux amd64 | Static export median 13.643 → 11.885 seconds; engine CPU 35.460 → 29.090 seconds; two application samples per variant | [Source filter qualification](../build/evidence/frontend-source-filter-linux-amd64.json) |
+| Image assembly experiment | Concurrent check/runtime evaluation reverted after no measured application benefit | [Rejected experiments](../build/evidence/frontend-source-filter-linux-amd64.json) |
 | Isolated deployment integration tests, Linux | Median 4.976 → 2.051 seconds with four concurrent fixtures; CPU 5.680 → 5.648 seconds; three samples each | [Fixture samples](../build/evidence/ci-fixture-parallelism.json) |
 | Scanner database sharing, Linux | Five paths share one 1.414 GB vulnerability database; warm preparation 10–20 ms; separate analysis cache per image | [Scanner qualification](../build/evidence/scanner-cache-sharing.json) |
 | Package publication structure | Three jobs → two; four artifact downloads → two; two hosted engines → one | [Package qualification](../build/evidence/package-optimization-qualification.json) |
