@@ -1,0 +1,577 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-21T02:59:16.570286+00:00",
+  "state": "build passed; promotion committed; served-revision gate failed; full reconciliation pending",
+  "repository": "fredrir/llunde-frontend",
+  "source_revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+  "previous_revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+  "workflow_revision": "cbbf64f0b9a383894e8f4c329d64b996260433c0",
+  "cli_release": "infra-v0.2.3",
+  "push_started_at": "2026-09-21T02:44:22.485453+00:00",
+  "push_completed_at": "2026-09-21T02:44:24.033552+00:00",
+  "image": "ghcr.io/fredrir/llunde-frontend@sha256:3ee8854551b4c9f85b450f4df7a85d5eb140230a34340788f1829c62e8eba513",
+  "promotion_commit": "3da86446ebb07bd86864b3f0e5e7a86ac705b498",
+  "runs": {
+    "build": {
+      "id": 35555161786,
+      "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35555161786",
+      "conclusion": "success"
+    },
+    "deployment": {
+      "id": 35555242396,
+      "url": "https://github.com/fredrir/infra/actions/runs/35555242396",
+      "conclusion": "failure",
+      "failed_step": "Verify served frontend revision"
+    },
+    "reconciliation": {
+      "id": 35555262385,
+      "url": "https://github.com/fredrir/infra/actions/runs/35555262385",
+      "status": "in_progress"
+    }
+  },
+  "check_budget": {
+    "schema": 1,
+    "accounting": "sum-of-recorded-check-durations",
+    "budget_seconds": 10,
+    "duration_seconds": 8.825463624,
+    "remaining_seconds": 1.1745363760000007,
+    "success": true,
+    "stages": [
+      {
+        "schema": 1,
+        "stage": "frontend",
+        "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "started": "2026-09-21T02:45:12.517103292Z",
+        "duration_seconds": 3.921268485,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 12.240864,
+        "peak_memory_bytes": 751960064
+      },
+      {
+        "schema": 1,
+        "stage": "provenance-verification",
+        "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "started": "2026-09-21T02:45:40.153991111Z",
+        "duration_seconds": 2.956732989,
+        "budget_seconds": 4.1312693639999996,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.183224,
+        "peak_memory_bytes": 68157440
+      },
+      {
+        "schema": 1,
+        "stage": "vulnerability-scan",
+        "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "started": "2026-09-21T02:45:31.063564228Z",
+        "duration_seconds": 1.94746215,
+        "budget_seconds": 6.078731514,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.434408,
+        "peak_memory_bytes": 126615552
+      }
+    ]
+  },
+  "served_revision_gate": {
+    "schema": 1,
+    "stage": "served-revision",
+    "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+    "started": "2026-09-21T02:46:07.965906676Z",
+    "duration_seconds": 60.025994317,
+    "budget_seconds": 65,
+    "budget_exceeded": false,
+    "success": false,
+    "exit_code": 1,
+    "cpu_seconds": 0.31,
+    "peak_memory_bytes": 38445056,
+    "error": "infra failed: exit status 1"
+  },
+  "observer_windows": [
+    {
+      "schema": 1,
+      "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+      "url": "https://llunde.no/.well-known/revision",
+      "started": "2026-09-21T02:44:08.404265+00:00",
+      "poll_interval_seconds": 0.5,
+      "deadline_seconds": 300,
+      "success": false,
+      "observer_seconds": 300.4747970419994,
+      "observation_count": 416,
+      "first_observation": {
+        "requested_at": "2026-09-21T02:44:08.404591+00:00",
+        "status": 200,
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "observed_at": "2026-09-21T02:44:08.526034+00:00"
+      },
+      "last_observation": {
+        "requested_at": "2026-09-21T02:49:08.132956+00:00",
+        "status": 200,
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "observed_at": "2026-09-21T02:49:08.236576+00:00"
+      }
+    },
+    {
+      "schema": 1,
+      "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+      "url": "https://llunde.no/.well-known/revision",
+      "started": "2026-09-21T02:51:14.926790+00:00",
+      "poll_interval_seconds": 0.5,
+      "deadline_seconds": 307,
+      "success": false,
+      "observer_seconds": 307.63709854100307,
+      "observation_count": 427,
+      "first_observation": {
+        "requested_at": "2026-09-21T02:51:14.927074+00:00",
+        "status": 200,
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "observed_at": "2026-09-21T02:51:15.070503+00:00"
+      },
+      "last_observation": {
+        "requested_at": "2026-09-21T02:56:21.875366+00:00",
+        "status": 200,
+        "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+        "observed_at": "2026-09-21T02:56:21.983004+00:00"
+      }
+    }
+  ],
+  "timeline": {
+    "schema": 1,
+    "runs": [
+      {
+        "repository_name": "fredrir/llunde-frontend",
+        "repository_id": 1328144104,
+        "head_sha": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "display_title": "Avoid copying CI binary into frontend source and pin optimized workflow",
+        "id": 35555161786,
+        "created_at": "2026-09-21T02:44:26Z",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "frontend / build",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-09-21T02:44:29Z",
+            "completed_at": "2026-09-21T02:45:54Z",
+            "steps": [
+              {
+                "name": "Set up job",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:30Z",
+                "completed_at": "2026-09-21T02:44:35Z"
+              },
+              {
+                "name": "Set up runner",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:35Z",
+                "completed_at": "2026-09-21T02:44:35Z"
+              },
+              {
+                "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:35Z",
+                "completed_at": "2026-09-21T02:44:37Z"
+              },
+              {
+                "name": "Fetch immutable public infrastructure recipe",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:37Z",
+                "completed_at": "2026-09-21T02:44:38Z"
+              },
+              {
+                "name": "Run ./.infra-build-recipe/.github/actions/setup-infra",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:38Z",
+                "completed_at": "2026-09-21T02:44:38Z"
+              },
+              {
+                "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:44:38Z",
+                "completed_at": "2026-09-21T02:44:38Z"
+              },
+              {
+                "name": "Verify CLI",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:44:38Z",
+                "completed_at": "2026-09-21T02:44:38Z"
+              },
+              {
+                "name": "Select affected image",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:38Z",
+                "completed_at": "2026-09-21T02:44:38Z"
+              },
+              {
+                "name": "Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:38Z",
+                "completed_at": "2026-09-21T02:44:39Z"
+              },
+              {
+                "name": "Start isolated Dagger engine",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:44:39Z",
+                "completed_at": "2026-09-21T02:44:39Z"
+              },
+              {
+                "name": "Verify dedicated engine",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:39Z",
+                "completed_at": "2026-09-21T02:44:40Z"
+              },
+              {
+                "name": "Select shared recipe",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:44:40Z",
+                "completed_at": "2026-09-21T02:44:40Z"
+              },
+              {
+                "name": "Validate Dagger cache policy",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:40Z",
+                "completed_at": "2026-09-21T02:44:40Z"
+              },
+              {
+                "name": "Check inputs",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:40Z",
+                "completed_at": "2026-09-21T02:44:40Z"
+              },
+              {
+                "name": "Test",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:44:40Z",
+                "completed_at": "2026-09-21T02:44:40Z"
+              },
+              {
+                "name": "Install verification tools",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:40Z",
+                "completed_at": "2026-09-21T02:44:40Z"
+              },
+              {
+                "name": "Select isolated scanner cache",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:40Z",
+                "completed_at": "2026-09-21T02:44:41Z"
+              },
+              {
+                "name": "Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:44:41Z",
+                "completed_at": "2026-09-21T02:44:41Z"
+              },
+              {
+                "name": "Report scanner cache state",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:41Z",
+                "completed_at": "2026-09-21T02:44:41Z"
+              },
+              {
+                "name": "Prepare verification data",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:41Z",
+                "completed_at": "2026-09-21T02:44:41Z"
+              },
+              {
+                "name": "Build and publish",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:44:41Z",
+                "completed_at": "2026-09-21T02:45:31Z"
+              },
+              {
+                "name": "Scan published image",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:31Z",
+                "completed_at": "2026-09-21T02:45:33Z"
+              },
+              {
+                "name": "Run ./.infra-build-recipe/.github/actions/attest-image",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:45:33Z",
+                "completed_at": "2026-09-21T02:45:33Z"
+              },
+              {
+                "name": "Verify published provenance",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:45:33Z",
+                "completed_at": "2026-09-21T02:45:33Z"
+              },
+              {
+                "name": "Sign and verify private image provenance",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:33Z",
+                "completed_at": "2026-09-21T02:45:43Z"
+              },
+              {
+                "name": "Enforce aggregate check budget",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:43Z",
+                "completed_at": "2026-09-21T02:45:43Z"
+              },
+              {
+                "name": "Tag verified image",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:45:43Z",
+                "completed_at": "2026-09-21T02:45:43Z"
+              },
+              {
+                "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:43Z",
+                "completed_at": "2026-09-21T02:45:45Z"
+              },
+              {
+                "name": "Request deployment",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:45Z",
+                "completed_at": "2026-09-21T02:45:47Z"
+              },
+              {
+                "name": "Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:45:47Z",
+                "completed_at": "2026-09-21T02:45:47Z"
+              },
+              {
+                "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:47Z",
+                "completed_at": "2026-09-21T02:45:49Z"
+              },
+              {
+                "name": "Stop Dagger engine",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:45:49Z",
+                "completed_at": "2026-09-21T02:45:49Z"
+              },
+              {
+                "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:49Z",
+                "completed_at": "2026-09-21T02:45:50Z"
+              },
+              {
+                "name": "Post Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:50Z",
+                "completed_at": "2026-09-21T02:45:50Z"
+              },
+              {
+                "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:50Z",
+                "completed_at": "2026-09-21T02:45:51Z"
+              },
+              {
+                "name": "Complete job",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:51Z",
+                "completed_at": "2026-09-21T02:45:51Z"
+              }
+            ]
+          },
+          {
+            "name": "frontend / cli",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-09-21T02:44:34Z",
+            "completed_at": "2026-09-21T02:44:27Z",
+            "steps": []
+          }
+        ],
+        "initial_queue_seconds": 3,
+        "elapsed_seconds": 88
+      },
+      {
+        "repository_name": "fredrir/infra",
+        "repository_id": 1328085692,
+        "head_sha": "d3bbb0a3f51c76f6b95853b15540208ccd38e965",
+        "display_title": "Deploy 1328144104 ghcr.io/fredrir/llunde-frontend a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "id": 35555242396,
+        "created_at": "2026-09-21T02:45:47Z",
+        "status": "completed",
+        "conclusion": "failure",
+        "jobs": [
+          {
+            "name": "deploy",
+            "status": "completed",
+            "conclusion": "failure",
+            "started_at": "2026-09-21T02:45:50Z",
+            "completed_at": "2026-09-21T02:47:14Z",
+            "steps": [
+              {
+                "name": "Set up job",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:53Z",
+                "completed_at": "2026-09-21T02:45:56Z"
+              },
+              {
+                "name": "Fetch current deployment configuration",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:56Z",
+                "completed_at": "2026-09-21T02:45:58Z"
+              },
+              {
+                "name": "Run ./.github/actions/setup-infra",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:58Z",
+                "completed_at": "2026-09-21T02:45:59Z"
+              },
+              {
+                "name": "Install tools",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:45:59Z",
+                "completed_at": "2026-09-21T02:46:00Z"
+              },
+              {
+                "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:46:00Z",
+                "completed_at": "2026-09-21T02:46:02Z"
+              },
+              {
+                "name": "Verify and deploy",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:46:02Z",
+                "completed_at": "2026-09-21T02:46:07Z"
+              },
+              {
+                "name": "Verify served frontend revision",
+                "status": "completed",
+                "conclusion": "failure",
+                "started_at": "2026-09-21T02:46:07Z",
+                "completed_at": "2026-09-21T02:47:08Z"
+              },
+              {
+                "name": "Report desired revision",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-21T02:47:08Z",
+                "completed_at": "2026-09-21T02:47:08Z"
+              },
+              {
+                "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:47:08Z",
+                "completed_at": "2026-09-21T02:47:10Z"
+              },
+              {
+                "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:47:10Z",
+                "completed_at": "2026-09-21T02:47:10Z"
+              },
+              {
+                "name": "Complete job",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-21T02:47:10Z",
+                "completed_at": "2026-09-21T02:47:10Z"
+              }
+            ]
+          }
+        ],
+        "initial_queue_seconds": 3,
+        "elapsed_seconds": 87
+      }
+    ],
+    "budget_seconds": 15
+  },
+  "build_trace": {
+    "dagger_session_seconds": 49.7,
+    "inline_dockerbuild_seconds": 34.0,
+    "dependency_install_execution_seconds": 7.1,
+    "dependency_install_tool_seconds": 5.69,
+    "dependency_packages_installed": 377,
+    "post_install_to_check_gap_seconds": 16.45,
+    "post_install_gap_explanation": "Consistent with Dockerfile dependency-filesystem hashing; inference from timestamps, not a separately measured span",
+    "runtime_dockerbuild_seconds": 10.6,
+    "vite_execution_seconds": 8.5,
+    "apk_upgrade_seconds": 0.8,
+    "publication_seconds": 3.7,
+    "cache_classification": "Dependency install missed cache; this is not a qualified warm application latency sample",
+    "dependency_cache_miss_cause": "Unresolved: changed input identity or retention; no engine restart since2026-09-20T21:29:20.738241224Z"
+  },
+  "retained_checkout": {
+    "package_json": {
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "sha256": "d76085ea64ae3bb26b912abe3b0f19c40d514fc00ceb6f1f8ce103d41978d37b"
+    },
+    "bun_lock": {
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "sha256": "c9a0c73ff346322c254dc3896db066ad940f40e38d2bf81898774663547325d2"
+    }
+  },
+  "reconciliation_handoff": {
+    "created_at": "2026-09-21T02:46:09Z",
+    "cli_job_started_at": "2026-09-21T02:47:10Z",
+    "initial_cli_queue_seconds": 61,
+    "apply_job_started_at": "2026-09-21T02:47:28Z",
+    "reconcile_step_started_at": "2026-09-21T02:47:52Z",
+    "readiness_gate_expired_at": "2026-09-21T02:47:07.9894003Z",
+    "finding": "Readiness gate expired before reconciliation started; previous frontend remained served and no new pod existed during this interval"
+  },
+  "limitations": [
+    "One bounded production canary, not ordinary-traffic percentiles",
+    "The15second deployment target was not achieved",
+    "Two bounded observer windows have a gap; no exact first-serving timestamp is claimed",
+    "The ten-second aggregate check gate and sixty-second readiness gate were not weakened",
+    "Full reconciliation completion and production warm-cache export remain pending"
+  ]
+}
