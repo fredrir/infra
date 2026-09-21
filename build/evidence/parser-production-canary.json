@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "repository": "fredrir/llunde-pyparser",
+  "previous_commit": "94f090a7a9a3b0bab65bfdeb5bb3bfe5e5bb4c3b",
+  "source_revision": "b6c3810404872db3e96dec484ac23854efbd1ca4",
+  "workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
+  "build_run": 35561190186,
+  "dependency_run": 35561190200,
+  "dependency_reuse": {
+    "planner_success": true,
+    "build": false,
+    "image_job": "skipped",
+    "pin_job": "skipped",
+    "image": "ghcr.io/fredrir/pyparser-dependencies@sha256:3f0d7afca910cc28c6d4a41b9088fe92622319f9aa50d1602209b92d5319f3de",
+    "contract_sha256": "f3ecd65b003243f2920f14e09cd0b2978e8d3a1e2d248ea8d30c8cd89e3be13d",
+    "qualification": "Reviewed dependency build semantics; original image origin and prior runtime receipts preserved."
+  },
+  "before_workloads": [
+    {
+      "kind": "Deployment",
+      "name": "review",
+      "replicas": 0,
+      "suspend": null,
+      "images": [
+        "ghcr.io/fredrir/pyparser-review@sha256:6ce37e92770d3fd903af229d0cd7eb8fe8fe05c04c12d0eb2633ea5d0cf2d531"
+      ]
+    },
+    {
+      "kind": "Deployment",
+      "name": "worker-extract",
+      "replicas": 0,
+      "suspend": null,
+      "images": [
+        "ghcr.io/fredrir/pyparser-review@sha256:6ce37e92770d3fd903af229d0cd7eb8fe8fe05c04c12d0eb2633ea5d0cf2d531"
+      ]
+    },
+    {
+      "kind": "Deployment",
+      "name": "worker-light",
+      "replicas": 0,
+      "suspend": null,
+      "images": [
+        "ghcr.io/fredrir/pyparser-review@sha256:6ce37e92770d3fd903af229d0cd7eb8fe8fe05c04c12d0eb2633ea5d0cf2d531"
+      ]
+    },
+    {
+      "kind": "Job",
+      "name": "migrate",
+      "replicas": null,
+      "suspend": false,
+      "images": [
+        "ghcr.io/fredrir/pyparser-review@sha256:6ce37e92770d3fd903af229d0cd7eb8fe8fe05c04c12d0eb2633ea5d0cf2d531"
+      ]
+    }
+  ],
+  "scope": "One production canary; preserve scaled-zero application deployments; no serving-latency or population percentile claim.",
+  "first_attempt_checks": {
+    "schema": 1,
+    "accounting": "sum-of-recorded-check-durations",
+    "budget_seconds": 10,
+    "duration_seconds": 10.013685334,
+    "remaining_seconds": 0,
+    "success": false,
+    "stages": [
+      {
+        "schema": 1,
+        "stage": "parser-python",
+        "started": "2026-09-21T04:33:49.550643767Z",
+        "duration_seconds": 2.484254412,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 2.193467,
+        "peak_memory_bytes": 36175872
+      },
+      {
+        "schema": 1,
+        "stage": "parser-ui",
+        "started": "2026-09-21T04:33:52.244840561Z",
+        "duration_seconds": 2.375849815,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 2.748115,
+        "peak_memory_bytes": 136421376
+      },
+      {
+        "schema": 1,
+        "stage": "provenance-verification",
+        "revision": "b6c3810404872db3e96dec484ac23854efbd1ca4",
+        "started": "2026-09-21T04:34:41.930833596Z",
+        "duration_seconds": 1.894677529,
+        "budget_seconds": 1.8809921950000001,
+        "budget_exceeded": true,
+        "success": false,
+        "exit_code": -1,
+        "cpu_seconds": 0.27131,
+        "peak_memory_bytes": 69337088,
+        "error": "cosign failed: context deadline exceeded\nprovenance-verification exceeded 1.880992195s budget"
+      },
+      {
+        "schema": 1,
+        "stage": "vulnerability-scan",
+        "revision": "b6c3810404872db3e96dec484ac23854efbd1ca4",
+        "started": "2026-09-21T04:34:31.638003691Z",
+        "duration_seconds": 3.258903578,
+        "budget_seconds": 5.139895773,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.972251,
+        "peak_memory_bytes": 129454080
+      }
+    ]
+  },
+  "first_attempt_conclusion": "failure",
+  "retry": "One authorized failed-only warm retry; unchanged ten-second aggregate gate.",
+  "second_attempt_checks": {
+    "schema": 1,
+    "accounting": "sum-of-recorded-check-durations",
+    "budget_seconds": 10,
+    "duration_seconds": 10.113826309,
+    "remaining_seconds": 0,
+    "success": false,
+    "stages": [
+      {
+        "schema": 1,
+        "stage": "parser-python",
+        "started": "2026-09-21T04:33:49.550643767Z",
+        "duration_seconds": 2.484254412,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 2.193467,
+        "peak_memory_bytes": 36175872
+      },
+      {
+        "schema": 1,
+        "stage": "parser-ui",
+        "started": "2026-09-21T04:33:52.244840561Z",
+        "duration_seconds": 2.375849815,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 2.748115,
+        "peak_memory_bytes": 136421376
+      },
+      {
+        "schema": 1,
+        "stage": "provenance-verification",
+        "revision": "b6c3810404872db3e96dec484ac23854efbd1ca4",
+        "started": "2026-09-21T04:37:22.138398676Z",
+        "duration_seconds": 3.8684206679999997,
+        "budget_seconds": 3.754594359,
+        "budget_exceeded": true,
+        "success": false,
+        "exit_code": -1,
+        "cpu_seconds": 0.20668,
+        "peak_memory_bytes": 70647808,
+        "error": "cosign failed: context deadline exceeded\nprovenance-verification exceeded 3.754594359s budget"
+      },
+      {
+        "schema": 1,
+        "stage": "vulnerability-scan",
+        "revision": "b6c3810404872db3e96dec484ac23854efbd1ca4",
+        "started": "2026-09-21T04:37:13.815702488Z",
+        "duration_seconds": 1.385301414,
+        "budget_seconds": 5.139895773,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.599816,
+        "peak_memory_bytes": 126222336
+      }
+    ]
+  },
+  "second_attempt_conclusion": "failure",
+  "second_attempt_build_publish_seconds": 63,
+  "promotion": "Not requested: private provenance verification exhausted remaining aggregate budget in both attempts.",
+  "after_workloads": [
+    {
+      "kind": "Deployment",
+      "name": "review",
+      "replicas": 0,
+      "suspend": null,
+      "images": [
+        "ghcr.io/fredrir/pyparser-review@sha256:6ce37e92770d3fd903af229d0cd7eb8fe8fe05c04c12d0eb2633ea5d0cf2d531"
+      ]
+    },
+    {
+      "kind": "Deployment",
+      "name": "worker-extract",
+      "replicas": 0,
+      "suspend": null,
+      "images": [
+        "ghcr.io/fredrir/pyparser-review@sha256:6ce37e92770d3fd903af229d0cd7eb8fe8fe05c04c12d0eb2633ea5d0cf2d531"
+      ]
+    },
+    {
+      "kind": "Deployment",
+      "name": "worker-light",
+      "replicas": 0,
+      "suspend": null,
+      "images": [
+        "ghcr.io/fredrir/pyparser-review@sha256:6ce37e92770d3fd903af229d0cd7eb8fe8fe05c04c12d0eb2633ea5d0cf2d531"
+      ]
+    },
+    {
+      "kind": "Job",
+      "name": "migrate",
+      "replicas": null,
+      "suspend": false,
+      "images": [
+        "ghcr.io/fredrir/pyparser-review@sha256:6ce37e92770d3fd903af229d0cd7eb8fe8fe05c04c12d0eb2633ea5d0cf2d531"
+      ]
+    }
+  ],
+  "production_unchanged": true,
+  "remaining_bottleneck": "Private cosign verification exceeded3.754594359 seconds remaining despite successful warm scan; no further CI retry performed."
+}
