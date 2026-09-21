@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "host": "infra-build-09",
+  "baseline_analysis_seed": "/home/runner/.cache/infra/trivy-v3/infra-runner-check/fanal/fanal.db",
+  "changed_cli_first_scan_budget_seconds": 6.815030587,
+  "ci_gate_changed": false,
+  "records": [
+    {
+      "phase": "baseline-analysis",
+      "archive": "/home/runner/.cache/infra/runner-check-reorder/before.tar",
+      "archive_size_bytes": 966949888,
+      "measurement": {
+        "schema": 1,
+        "stage": "layer-identity-baseline-analysis",
+        "started": "2026-09-21T03:42:58.437484265Z",
+        "duration_seconds": 15.011816736,
+        "budget_seconds": 60,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 14.105433,
+        "peak_memory_bytes": 149815296
+      },
+      "process_tree_cpu_seconds": 14.13,
+      "process_tree_peak_rss_kib": 146304
+    },
+    {
+      "phase": "changed-cli-first-scan",
+      "archive": "/home/runner/.cache/infra/runner-check-reorder/after.tar",
+      "archive_size_bytes": 966959616,
+      "measurement": {
+        "schema": 1,
+        "stage": "layer-identity-changed-cli-first-scan",
+        "started": "2026-09-21T03:43:13.465682916Z",
+        "duration_seconds": 6.924750057,
+        "budget_seconds": 6.815030587,
+        "budget_exceeded": true,
+        "success": false,
+        "exit_code": -1,
+        "cpu_seconds": 0.019348,
+        "peak_memory_bytes": 13762560,
+        "error": "infra-scanner-lease-linux failed: context deadline exceeded\nlayer-identity-changed-cli-first-scan exceeded 6.815030587s budget"
+      },
+      "process_tree_cpu_seconds": 0.04,
+      "process_tree_peak_rss_kib": 13824,
+      "error": "2026-09-21T03:43:13Z\tINFO\t[vuln] Vulnerability scanning is enabled\n2026-09-21T03:43:20Z\tINFO\tReceived signal, attempting graceful shutdown...\n2026-09-21T03:43:20Z\tINFO\tPress Ctrl+C again to force exit\ninfra: infra-scanner-lease-linux failed: context deadline exceeded\nlayer-identity-changed-cli-first-scan exceeded 6.815030587s budget\n"
+    }
+  ],
+  "family_db_released": true,
+  "fanal_retained": true,
+  "artifacts": {
+    "before_manifest": "sha256:4ccdfa2aa562e04f93bda6566499d26b3626f9dee13c91a0f7b4912694ab0b4c",
+    "after_manifest": "sha256:cd1ddb57460cd591314c395afd21330cf4d4aeb0274c159de0c420e18bdf788b",
+    "before_smoke_seconds": 3.082194818,
+    "after_smoke_seconds": 3.184969413
+  },
+  "limitations": [
+    "Local OCI archive scanning includes archive loading and excludes registry requests; it is not an exact production scan timing comparison.",
+    "The actual exported tools layer still changed across the CLI change, so the small fixture reuse result did not generalize.",
+    "Failed scans remain failures; no warm retry or gate change."
+  ]
+}
