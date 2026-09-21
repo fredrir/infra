@@ -9,6 +9,7 @@
 | Isolated deployment integration tests, Linux | Median 4.976 → 2.051 seconds with four concurrent fixtures; CPU 5.680 → 5.648 seconds; three samples each | [Fixture samples](../build/evidence/ci-fixture-parallelism.json) |
 | Scanner database sharing, Linux | Five paths share one 1.414 GB vulnerability database; warm preparation 10–20 ms; separate analysis cache per image | [Scanner qualification](../build/evidence/scanner-cache-sharing.json) |
 | Package publication structure | Three jobs → two; four artifact downloads → two; two hosted engines → one | [Package qualification](../build/evidence/package-optimization-qualification.json) |
+| Production package canary | Signed installation checks 7.487 seconds; build-to-smoke handoff 31 → 0 seconds; publication and HTTPS contents verified | [Production package canary](../build/evidence/package-production-canary.json) |
 | Package smoke payload | Logical fixture inputs 25,024,491 → 5,664,372 bytes; 39 cache-selection assertions; real signed installs and corrupt-package rejection | [Package qualification](../build/evidence/package-optimization-qualification.json) |
 | Engine reconciliation | Exact cached image digests skip registry pulls; each changed service restarts independently | [Runner qualification](../build/evidence/scanner-cache-sharing.json) |
 | Historical workflow sample | Includes earlier qualification runs and failures; not an ordinary-traffic deployment percentile | [Baseline](../build/evidence/ci-optimization-baseline.json) |
@@ -37,7 +38,8 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Remaining bottleneck | Evidence | Candidate |
 | --- | --- | --- |
 | Historical package channel downloads and attestations | [`GitHub.Download`](../internal/packages/catalog.go) requests all six Homebrew, Nix and AUR channel files for each of three retained releases; `Collect` publishes channel files only for the newest release | Download channel files only for the newest release; omit twelve unused channel downloads and individual attestation verifications per project with three releases; preserve verification of every consumed package and metadata asset |
-| Package smoke process startup and workflow handoff | [Package qualification](../build/evidence/package-optimization-qualification.json): unchanged-input CLI medians 1.458 → 1.467 seconds; local signed fixture, no steady-warm latency improvement | Qualify the merged build/smoke job against the production catalog; retain the ten-second installation gate and separate publish credentials |
+| Signed package build | [Production canary](../build/evidence/package-production-canary.json): build step 97 seconds; installation checks 7.487 seconds | Profile catalog downloads and repeated attestation verification; preserve the ten-second installation gate and separate publish credentials |
+| Production revision publication | Frontend canary promotion reached `main`, then waited for a full infrastructure reconciliation before Flux could consume `production`; the 60-second serving check failed | Qualify publication after infrastructure convergence; reuse completed host work only with a valid checkpoint, unchanged host inputs and a live no-change expansion plan |
 
 | Scanner rollout constraint | Requirement |
 | --- | --- |
