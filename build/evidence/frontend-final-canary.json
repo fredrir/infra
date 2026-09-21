@@ -1,0 +1,243 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-21T04:15:00.193407+00:00",
+  "repository": "fredrir/llunde-frontend",
+  "source_revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+  "workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
+  "cli_release": "infra-v0.2.5",
+  "state": "Expected revision healthy in production; original trust failure and subsequent60second readiness failure retained",
+  "push": {
+    "before_revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+    "revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+    "started": "2026-09-21T04:05:03.636182+00:00",
+    "exit_code": 0,
+    "completed": "2026-09-21T04:05:04.946198+00:00"
+  },
+  "build": {
+    "run_id": 35559691765,
+    "url": "https://github.com/fredrir/llunde-frontend/actions/runs/35559691765",
+    "conclusion": "success",
+    "build_and_publish_seconds": 17,
+    "dagger_session_seconds": 16.4,
+    "inline_dockerbuild_seconds": 5.9,
+    "runtime_dockerbuild_seconds": 4.8,
+    "publication_seconds": 4.2,
+    "dependency_install_executed": false,
+    "check_budget": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 7.426233115,
+      "remaining_seconds": 2.5737668850000004,
+      "success": true,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "frontend",
+          "revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+          "started": "2026-09-21T04:05:27.221012736Z",
+          "duration_seconds": 2.646262438,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 5.309251,
+          "peak_memory_bytes": 273022976
+        },
+        {
+          "schema": 1,
+          "stage": "provenance-verification",
+          "revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+          "started": "2026-09-21T04:05:47.705520236Z",
+          "duration_seconds": 2.9778571769999997,
+          "budget_seconds": 5.551624062,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.24914,
+          "peak_memory_bytes": 70647808
+        },
+        {
+          "schema": 1,
+          "stage": "vulnerability-scan",
+          "revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+          "started": "2026-09-21T04:05:39.036600997Z",
+          "duration_seconds": 1.8021135,
+          "budget_seconds": 7.353737562,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.491801,
+          "peak_memory_bytes": 125435904
+        }
+      ]
+    }
+  },
+  "deployment_attempts": [
+    {
+      "run_id": 35559739864,
+      "conclusion": "failure",
+      "reason": "Configuration had three trusted revisions; released CLI accepts one or two anchored exact revisions",
+      "receipts": {
+        "promotion": {
+          "schema": 1,
+          "stage": "promotion",
+          "revision": "17f9478e1a8b2e16151ee401f3b5d9062d57bff3",
+          "started": "2026-09-21T04:06:11.358633102Z",
+          "duration_seconds": 0.144177201,
+          "budget_seconds": 30,
+          "budget_exceeded": false,
+          "success": false,
+          "exit_code": 1,
+          "cpu_seconds": 0.1,
+          "peak_memory_bytes": 32284672,
+          "error": "infra failed: exit status 1"
+        }
+      }
+    },
+    {
+      "run_id": 35559972713,
+      "conclusion": "failure",
+      "reason": "Exact served revision not ready within60seconds after promotion; workflow handoff and recursive Flux planning delayed publication",
+      "dispatch": {
+        "started": "2026-09-21T04:10:07.830557+00:00",
+        "image": "ghcr.io/fredrir/llunde-frontend",
+        "digest": "sha256:6a081fbceb94d6177fcaefaf5e1da853710a70b29e41702291427817c2c3f8a9",
+        "source_revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+        "exit_code": 0,
+        "completed": "2026-09-21T04:10:09.409173+00:00",
+        "output": "https://github.com/fredrir/infra/actions/runs/35559972713\n"
+      },
+      "receipts": {
+        "served-revision": {
+          "schema": 1,
+          "stage": "served-revision",
+          "revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+          "started": "2026-09-21T04:10:27.602077624Z",
+          "duration_seconds": 60.0521561,
+          "budget_seconds": 65,
+          "budget_exceeded": false,
+          "success": false,
+          "exit_code": 1,
+          "cpu_seconds": 0.21,
+          "peak_memory_bytes": 40624128,
+          "error": "infra failed: exit status 1"
+        },
+        "promotion": {
+          "schema": 1,
+          "stage": "promotion",
+          "revision": "167c4a30892840e3d7264f8388134824342d17e9",
+          "started": "2026-09-21T04:10:21.867994988Z",
+          "duration_seconds": 5.666758869,
+          "budget_seconds": 30,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.82,
+          "peak_memory_bytes": 132124672
+        }
+      }
+    }
+  ],
+  "reconciliation": {
+    "run_id": 35559992436,
+    "conclusion": "success",
+    "state": {
+      "desired_revision": "aa6f885251ef36e59e527390b7d5f29c4ad06b1c",
+      "applied_revision": "aa6f885251ef36e59e527390b7d5f29c4ad06b1c",
+      "stage": "complete",
+      "updated_at": "2026-09-21T04:13:00.660295441Z",
+      "stage_seconds": {
+        "kubernetes": 42.847921479,
+        "plan": 45.489363018,
+        "publish": 1.177535148,
+        "verify": 4.020130868
+      }
+    }
+  },
+  "observer_windows": [
+    {
+      "schema": 1,
+      "url": "https://llunde.no/.well-known/revision",
+      "expected_revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+      "started": "2026-09-21T04:05:01.892929+00:00",
+      "duration_seconds": 300.60877808299847,
+      "deadline_seconds": 300,
+      "poll_interval_seconds": 0.5,
+      "observation_count": 427,
+      "first_observation": {
+        "requested_at": "2026-09-21T04:05:01.893223+00:00",
+        "status": 200,
+        "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "observed_at": "2026-09-21T04:05:02.045223+00:00"
+      },
+      "last_observation": {
+        "requested_at": "2026-09-21T04:10:01.785411+00:00",
+        "status": 200,
+        "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "observed_at": "2026-09-21T04:10:01.862921+00:00"
+      },
+      "success": false
+    },
+    {
+      "schema": 1,
+      "url": "https://llunde.no/.well-known/revision",
+      "expected_revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+      "started": "2026-09-21T04:10:06.664375+00:00",
+      "duration_seconds": 120.45472045800125,
+      "deadline_seconds": 120,
+      "poll_interval_seconds": 0.5,
+      "observation_count": 171,
+      "first_observation": {
+        "requested_at": "2026-09-21T04:10:06.664732+00:00",
+        "status": 200,
+        "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "observed_at": "2026-09-21T04:10:06.739430+00:00"
+      },
+      "last_observation": {
+        "requested_at": "2026-09-21T04:12:06.377279+00:00",
+        "status": 200,
+        "revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
+        "observed_at": "2026-09-21T04:12:06.499120+00:00"
+      },
+      "success": false
+    }
+  ],
+  "pod": {
+    "name": "web-6c5bc6bdd7-7lrhz",
+    "created_at": "2026-09-21T04:12:25Z",
+    "ready_at": "2026-09-21T04:12:29Z",
+    "image": "ghcr.io/fredrir/llunde-frontend@sha256:6a081fbceb94d6177fcaefaf5e1da853710a70b29e41702291427817c2c3f8a9"
+  },
+  "final_verification": {
+    "started": "2026-09-21T04:12:58.432070+00:00",
+    "desired_image_wait": {
+      "exit_code": 0,
+      "output": "deployment.apps/web condition met\n",
+      "completed": "2026-09-21T04:12:58.665948+00:00"
+    },
+    "rollout": {
+      "exit_code": 0,
+      "output": "deployment \"web\" successfully rolled out\n",
+      "completed": "2026-09-21T04:12:58.920745+00:00"
+    },
+    "served_revision": {
+      "status": 200,
+      "revision": "2ed5c68cd3f806722f9be7e1eb9cc677b7b4d6b8",
+      "observed_at": "2026-09-21T04:12:59.013010+00:00"
+    }
+  },
+  "latency": {
+    "push_to_pod_ready_seconds": 445.363818,
+    "push_to_late_exact_revision_observation_seconds": 475.376828,
+    "recovery_dispatch_to_pod_ready_seconds": 141.169443
+  },
+  "limitations": [
+    "One rollout including configuration repair, not an ordinary-traffic latency percentile",
+    "Observer windows expired before service changed; exact first-serving time is unknown",
+    "PodReady timestamp is not an HTTP first-serving timestamp",
+    "No build retry; one deployment-only retry reused the exact previously verified image",
+    "Ten-second aggregate checks and sixty-second served-revision gate were not weakened",
+    "Sub15second deployment target remains unachieved"
+  ]
+}
