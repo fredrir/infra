@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "host": "infra-build-09",
+  "date": "2026-09-21",
+  "families": [
+    {
+      "family": "infra-runner-rust",
+      "image": "ghcr.io/fredrir/infra-runner-rust@sha256:da39b41e8c6957a23ca690dd7df234bb119f7642a2f80b713817052b4c3a535f",
+      "source_analysis_cache": "/home/runner/.cache/infra/trivy/infra-runner-rust/fanal/fanal.db",
+      "cold_diagnostic": {
+        "wall_seconds": 56.3517,
+        "cpu_seconds": 118.36,
+        "peak_rss_kib": 569864,
+        "exit_code": 0,
+        "budget_seconds": 90
+      },
+      "production_remaining_budget_seconds": 8.567017991,
+      "production_gate_changed": false,
+      "analysis_backup": "/home/runner/.cache/infra/scanner-canary-63ab06a/infra-runner-rust-active-fanal-before-migration",
+      "analysis_source_sha256": "d68a85221e5f1f50e0d36458537b345c105fe9729062686b47507d4da8e0aa95",
+      "analysis_destination_sha256": "d68a85221e5f1f50e0d36458537b345c105fe9729062686b47507d4da8e0aa95",
+      "warm_qualification": {
+        "schema": 1,
+        "stage": "infra-runner-rust-warm",
+        "started": "2026-09-21T02:50:46.172866405Z",
+        "duration_seconds": 1.208860809,
+        "budget_seconds": 8.567017991,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.751487,
+        "peak_memory_bytes": 166395904
+      }
+    },
+    {
+      "family": "infra-runner-dagger",
+      "image": "ghcr.io/fredrir/infra-runner-dagger@sha256:b2ee2ce4a81b5857066b48cc2f81a6cfd7fa8f510ee3a0cd98e07df95fa1eebc",
+      "source_analysis_cache": "/home/runner/.cache/infra/trivy/infra-runner-dagger/fanal/fanal.db",
+      "cold_diagnostic": {
+        "wall_seconds": 18.9691,
+        "cpu_seconds": 27.98,
+        "peak_rss_kib": 418404,
+        "exit_code": 0,
+        "budget_seconds": 90
+      },
+      "production_remaining_budget_seconds": 9.689141341,
+      "production_gate_changed": false,
+      "analysis_backup": "/home/runner/.cache/infra/scanner-canary-63ab06a/infra-runner-dagger-active-fanal-before-migration",
+      "analysis_source_sha256": "48b9f2649722cd3732cb632f17049448a1b9dcff0bfe9506329c96a64ba97c58",
+      "analysis_destination_sha256": "48b9f2649722cd3732cb632f17049448a1b9dcff0bfe9506329c96a64ba97c58",
+      "warm_qualification": {
+        "schema": 1,
+        "stage": "infra-runner-dagger-warm",
+        "started": "2026-09-21T02:51:06.451054788Z",
+        "duration_seconds": 0.966510036,
+        "budget_seconds": 9.689141341,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.551854,
+        "peak_memory_bytes": 140177408
+      }
+    },
+    {
+      "family": "infra-runner-deploy",
+      "image": "ghcr.io/fredrir/infra-runner-deploy@sha256:b606f6cac0a31338af7d535b3e84eb11cfc547751fc093c83c845fa7cb0d6867",
+      "source_analysis_cache": "/home/runner/.cache/infra/trivy/infra-runner-deploy/fanal/fanal.db",
+      "cold_diagnostic": {
+        "wall_seconds": 5.5054,
+        "cpu_seconds": 7.02,
+        "peak_rss_kib": 509604,
+        "exit_code": 0,
+        "budget_seconds": 90
+      },
+      "production_remaining_budget_seconds": 9.472869976,
+      "production_gate_changed": false,
+      "analysis_backup": "/home/runner/.cache/infra/scanner-canary-63ab06a/infra-runner-deploy-active-fanal-before-migration",
+      "analysis_source_sha256": "a103840a1fbaa1e2e7c1eb2dd1c7e0c7a5b80fe897d1c55c7575484b444a56a4",
+      "analysis_destination_sha256": "a103840a1fbaa1e2e7c1eb2dd1c7e0c7a5b80fe897d1c55c7575484b444a56a4",
+      "warm_qualification": {
+        "schema": 1,
+        "stage": "infra-runner-deploy-warm",
+        "started": "2026-09-21T02:51:13.076910149Z",
+        "duration_seconds": 1.152886185,
+        "budget_seconds": 9.472869976,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.842074,
+        "peak_memory_bytes": 147718144
+      }
+    }
+  ],
+  "legacy_cache_removed": false,
+  "dagger_restarted": false,
+  "production_gate_changed": false,
+  "policy": {
+    "scanners": [
+      "vuln"
+    ],
+    "severities": [
+      "HIGH",
+      "CRITICAL"
+    ],
+    "ignore_unfixed": true,
+    "exit_code_on_findings": 1,
+    "skip_dirs": [],
+    "java_database": false
+  },
+  "limitations": [
+    "Cold analyses are bounded one-time namespace migration qualification, included explicitly as migration cost.",
+    "Warm measurements are single samples and do not establish deployment percentiles.",
+    "Normal CI scan and aggregate10s budgets are unchanged.",
+    "No legacy database purge or production engine restart was performed."
+  ],
+  "ci_reruns": [
+    {
+      "run_id": 35554307508,
+      "mode": "failed-only",
+      "authorized_attempts": 1,
+      "status": "requested"
+    },
+    {
+      "run_id": 35554867724,
+      "mode": "failed-only",
+      "authorized_attempts": 1,
+      "status": "requested"
+    }
+  ]
+}
