@@ -1,0 +1,509 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "host": "infra-build-09",
+  "cli_source_revision": "63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+  "cli_installation": "isolated temporary canary; installed CLI unchanged",
+  "user_id": 1001,
+  "image": "ghcr.io/fredrir/llunde-frontend@sha256:5a020d64ec9ef99ec2d8fd6d74d765dc75f252c72fd3de908c848db4aeb12141",
+  "records": [
+    {
+      "name": "prepare-existing-shared-database",
+      "wall_seconds": 0.019,
+      "exit_code": 0,
+      "cpu_seconds": 0.01,
+      "peak_rss_kib": 13440
+    },
+    {
+      "name": "prepare-warm",
+      "wall_seconds": 0.0149,
+      "exit_code": 0,
+      "cpu_seconds": 0.01,
+      "peak_rss_kib": 13312
+    },
+    {
+      "name": "first-canary-scan",
+      "wall_seconds": 4.1866,
+      "exit_code": 0,
+      "cpu_seconds": 4.35,
+      "peak_rss_kib": 369152
+    },
+    {
+      "name": "scan-warm",
+      "wall_seconds": 1.1976,
+      "exit_code": 0,
+      "cpu_seconds": 0.31,
+      "peak_rss_kib": 118528
+    }
+  ],
+  "database_files": [
+    {
+      "path": "/home/runner/.cache/infra/trivy-databases/2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a/db/trivy.db",
+      "inode": 2622833,
+      "bytes": 1413980160,
+      "links": 3
+    },
+    {
+      "path": "/home/runner/.cache/infra/trivy-v2/llunde-frontend/db/trivy.db",
+      "inode": 2622833,
+      "bytes": 1413980160,
+      "links": 3
+    }
+  ],
+  "database_unique_inodes": 1,
+  "disk_available_bytes_before": 14792794112,
+  "disk_available_bytes_after": 14747693056,
+  "legacy_families": [
+    {
+      "family": "infra-runner-check",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 4234326
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 4234328
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 2097152,
+          "inode": 4194354
+        }
+      ],
+      "repository": "fredrir/infra",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "infra-runner-dagger",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413906432,
+          "inode": 4194875
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 4194876
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 2097152,
+          "inode": 4232552
+        }
+      ],
+      "repository": "fredrir/infra",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "infra-runner-deploy",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 4980801
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 4980820
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 4194304,
+          "inode": 4980830
+        }
+      ],
+      "repository": "fredrir/infra",
+      "workflow": ".github/workflows/deploy-runner-image.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "infra-runner-rust",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 4981419
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 152,
+          "inode": 4981951
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 2097152,
+          "inode": 4981472
+        }
+      ],
+      "repository": "fredrir/infra",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "llunde-backend",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 4980779
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 4980782
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 1048576,
+          "inode": 4980739
+        },
+        {
+          "path": "java-db/trivy-java.db",
+          "bytes": 1529786368,
+          "inode": 4984888
+        },
+        {
+          "path": "java-db/metadata.json",
+          "bytes": 153,
+          "inode": 4980842
+        }
+      ],
+      "repository": "fredrir/llunde-backend",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "llunde-frontend",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413906432,
+          "inode": 2659927
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 2659942
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 524288,
+          "inode": 2659925
+        }
+      ],
+      "repository": "fredrir/llunde-frontend",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "platform-backup-tools",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 5048015
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 5048016
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 524288,
+          "inode": 4980787
+        }
+      ],
+      "repository": "fredrir/infra",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "platform-caddy",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413906432,
+          "inode": 2674104
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 2674105
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 524288,
+          "inode": 2916182
+        }
+      ],
+      "repository": "fredrir/infra",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "portfolio-api",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 4984668
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 4984669
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 524288,
+          "inode": 4984681
+        }
+      ],
+      "repository": "fredrir/portfolio",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "portfolio-web",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 4984664
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 4984665
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 1048576,
+          "inode": 4984709
+        }
+      ],
+      "repository": "fredrir/portfolio",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "portfolio-worker",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 4983832
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 152,
+          "inode": 4984014
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 262144,
+          "inode": 4984694
+        }
+      ],
+      "repository": "fredrir/portfolio",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "pyparser-dependencies",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413906432,
+          "inode": 4194367
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 4232990
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 2097152,
+          "inode": 2916196
+        }
+      ],
+      "repository": "fredrir/llunde-pyparser",
+      "workflow": ".github/workflows/dependencies.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "pyparser-review",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413906432,
+          "inode": 4547322
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 4547323
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 2097152,
+          "inode": 2916189
+        }
+      ],
+      "repository": "fredrir/llunde-pyparser",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "y-api",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 4984611
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 4984661
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 2097152,
+          "inode": 4984671
+        }
+      ],
+      "repository": "fredrir/Y",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    },
+    {
+      "family": "y-web",
+      "files": [
+        {
+          "path": "db/trivy.db",
+          "bytes": 1413980160,
+          "inode": 5048019
+        },
+        {
+          "path": "db/metadata.json",
+          "bytes": 153,
+          "inode": 5048020
+        },
+        {
+          "path": "fanal/fanal.db",
+          "bytes": 524288,
+          "inode": 4984712
+        }
+      ],
+      "repository": "fredrir/Y",
+      "workflow": ".github/workflows/images.yml",
+      "cleanup_status": "pending consumer cutover and all legacy executions drained"
+    }
+  ],
+  "legacy_cache_deleted": false,
+  "dagger_restarted": false,
+  "scanner": {
+    "version": "0.74.0",
+    "asset_sha256": "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a",
+    "binary_sha256": "d89bcc6510a267f11b773398cbf1be5520ce39f9e8b6633178c4487f05b7d791",
+    "binary_matches_installer_receipt": true
+  },
+  "scan_result": {
+    "exact_deployed_digest_confirmed_with": "kubectl get deployment -n llunde web",
+    "os": "alpine3.23.5",
+    "package_classes": [
+      "os-pkgs",
+      "lang-pkgs"
+    ],
+    "fixed_high_critical_findings": 0,
+    "warm_fanal_database_bytes": 262144
+  },
+  "workflow_origins": [
+    {
+      "repository": "fredrir/llunde-frontend",
+      "workflow": ".github/workflows/images.yml",
+      "git_blob": "f50871b56ed3d8aa40ed2033d3757722cc140c42",
+      "selected": [
+        "uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+        "image: ghcr.io/fredrir/llunde-frontend"
+      ]
+    },
+    {
+      "repository": "fredrir/llunde-backend",
+      "workflow": ".github/workflows/images.yml",
+      "git_blob": "b1f4758ce5a92b7c2c96e6227d195e07f9df6153",
+      "selected": [
+        "uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+        "image: ghcr.io/fredrir/llunde-backend"
+      ]
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "workflow": ".github/workflows/images.yml",
+      "git_blob": "4cdc844ebdf55518628e74d315d43a3cc0685e9a",
+      "selected": [
+        "uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+        "image: ghcr.io/fredrir/pyparser-review"
+      ]
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "workflow": ".github/workflows/dependencies.yml",
+      "git_blob": "312de05276416a3a043fa07521f92fc05eaeb6d6",
+      "selected": [
+        "uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610"
+      ]
+    },
+    {
+      "repository": "fredrir/Y",
+      "workflow": ".github/workflows/images.yml",
+      "git_blob": "0ae607f23442418135b208110e4699c65b9aa585",
+      "selected": [
+        "uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+        "image: ghcr.io/fredrir/y-api",
+        "uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+        "image: ghcr.io/fredrir/y-web"
+      ]
+    },
+    {
+      "repository": "fredrir/portfolio",
+      "workflow": ".github/workflows/images.yml",
+      "git_blob": "1a6883d38ec4014169939abf7f46d2e4bdba90d3",
+      "selected": [
+        "uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+        "image: ghcr.io/fredrir/portfolio-api",
+        "uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+        "image: ghcr.io/fredrir/portfolio-web",
+        "uses: fredrir/infra/.github/workflows/build-image.yml@a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+        "image: ghcr.io/fredrir/portfolio-worker"
+      ]
+    }
+  ],
+  "legacy_database_apparent_bytes": 22739122574,
+  "live_v2_coexistence": {
+    "families": [
+      "infra-runner-check",
+      "llunde-frontend"
+    ],
+    "database_inode": 2622833,
+    "shared_database_bytes": 1413980160,
+    "legacy_writers_use_separate_namespace": true
+  },
+  "limitations": [
+    "One bounded production canary with one warm repeat; these are not latency percentiles.",
+    "The database was already prepared by an active v2 infra-runner-check job; no cold download latency is claimed.",
+    "Disk usage includes concurrent CI activity and retained legacy caches; no production space recovery is claimed.",
+    "No legacy database or package-analysis caches were removed.",
+    "Installed production CLI remains the signed previous release until orchestrated promotion."
+  ]
+}
