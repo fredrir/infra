@@ -69,8 +69,8 @@ RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
         /home/runner/externals/node20/lib/node_modules /home/runner/externals/node24/lib/node_modules \
         /home/runner/externals/node20/bin/npm /home/runner/externals/node20/bin/npx /home/runner/externals/node20/bin/corepack \
         /home/runner/externals/node24/bin/npm /home/runner/externals/node24/bin/npx /home/runner/externals/node24/bin/corepack
-COPY --chmod=755 .infra-artifacts/infra /usr/local/bin/infra
 COPY --from=tools /out/ /opt/tools/
+COPY --chmod=755 .infra-artifacts/infra /usr/local/bin/infra
 RUN RUNNER_TEMP=/opt infra ci install-tools age age-keygen uv helm yq \
     && chmod 755 /opt/tools \
     && ln -s /usr/local/bin/infra /usr/local/bin/infra-runner-hook

@@ -1,0 +1,569 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-21T03:36:20.739821+00:00",
+  "engine": "Dagger0.21.9",
+  "environment": "ntnu isolated persistent engine; separate CLI process per sample",
+  "scenarios": {
+    "unused_context_change": {
+      "recipe": "FROM scratch\nCOPY stable.txt /opt/tools/stable.txt\n",
+      "samples": [
+        {
+          "scenario": "initial",
+          "wall_seconds": 1.5231422450160608,
+          "exit_code": 0,
+          "manifest_digest": "sha256:61f3de9d0bd34587281ca334a3f1b36e9eb6ebbfdbdbf9c76abcb1fc4fabb9e6",
+          "diff_ids": [
+            "sha256:96bff416078703984d79f19897c18aa5360fcc9450631cd92dbab18b37f05abc"
+          ],
+          "layers": [
+            {
+              "digest": "sha256:e9e113fcf1dc5ced6a4cc63983d2ce684a2eaddb15effa297298b05d8618ab5f",
+              "entries": [
+                {
+                  "name": "opt",
+                  "mtime": 1789961544,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools",
+                  "mtime": 1789961544,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools/stable.txt",
+                  "mtime": 1789961542,
+                  "mode": "0o664",
+                  "size": 13,
+                  "sha256": "96df0717cefffafa5fc5b0ed0fdddd83a352b4d2344b4ef51f94ef169d2684f5"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "unchanged",
+          "wall_seconds": 1.4726459829835221,
+          "exit_code": 0,
+          "manifest_digest": "sha256:61f3de9d0bd34587281ca334a3f1b36e9eb6ebbfdbdbf9c76abcb1fc4fabb9e6",
+          "diff_ids": [
+            "sha256:96bff416078703984d79f19897c18aa5360fcc9450631cd92dbab18b37f05abc"
+          ],
+          "layers": [
+            {
+              "digest": "sha256:e9e113fcf1dc5ced6a4cc63983d2ce684a2eaddb15effa297298b05d8618ab5f",
+              "entries": [
+                {
+                  "name": "opt",
+                  "mtime": 1789961544,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools",
+                  "mtime": 1789961544,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools/stable.txt",
+                  "mtime": 1789961542,
+                  "mode": "0o664",
+                  "size": 13,
+                  "sha256": "96df0717cefffafa5fc5b0ed0fdddd83a352b4d2344b4ef51f94ef169d2684f5"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "unrelated-change",
+          "wall_seconds": 1.4726636559935287,
+          "exit_code": 0,
+          "manifest_digest": "sha256:61f3de9d0bd34587281ca334a3f1b36e9eb6ebbfdbdbf9c76abcb1fc4fabb9e6",
+          "diff_ids": [
+            "sha256:96bff416078703984d79f19897c18aa5360fcc9450631cd92dbab18b37f05abc"
+          ],
+          "layers": [
+            {
+              "digest": "sha256:e9e113fcf1dc5ced6a4cc63983d2ce684a2eaddb15effa297298b05d8618ab5f",
+              "entries": [
+                {
+                  "name": "opt",
+                  "mtime": 1789961544,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools",
+                  "mtime": 1789961544,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools/stable.txt",
+                  "mtime": 1789961542,
+                  "mode": "0o664",
+                  "size": 13,
+                  "sha256": "96df0717cefffafa5fc5b0ed0fdddd83a352b4d2344b4ef51f94ef169d2684f5"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "finding": "Unchanged and unused-context change retained exact manifest and layer identities"
+    },
+    "used_host_context_change": {
+      "recipe": "FROM scratch\nCOPY stable.txt /opt/tools/stable.txt\nCOPY unrelated.txt /usr/local/bin/infra\n",
+      "samples": [
+        {
+          "scenario": "reordered-fourth-cli",
+          "wall_seconds": 1.4733843649737537,
+          "exit_code": 0,
+          "manifest_digest": "sha256:7a336aab48e5f6f66d12f9982b0823353c3f4b0d32b461b917a3862de5acdcb4",
+          "diff_ids": [
+            "sha256:d7060ce2539ccf02da79594dd38ee9cec93f3c1c2af1a6c062fb0b27450ce912",
+            "sha256:50df47b86184daaeab223c03d68ca6d3005b619ff791f7af1b7b0b3144d1e3f7"
+          ],
+          "layers": [
+            {
+              "digest": "sha256:36a300fe45dfabf062b67d64dac0c613dcb8e53ad9c6519e77c8c5a3194e5c3a",
+              "entries": [
+                {
+                  "name": "opt",
+                  "mtime": 1789961657,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools",
+                  "mtime": 1789961657,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools/stable.txt",
+                  "mtime": 1789961608,
+                  "mode": "0o664",
+                  "size": 13,
+                  "sha256": "96df0717cefffafa5fc5b0ed0fdddd83a352b4d2344b4ef51f94ef169d2684f5"
+                }
+              ]
+            },
+            {
+              "digest": "sha256:b8e3d4b3abbeb7b26465971b4bc60140b9ce256fa3f8d0508f830cf72bb46236",
+              "entries": [
+                {
+                  "name": "usr",
+                  "mtime": 1789961657,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local",
+                  "mtime": 1789961657,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin",
+                  "mtime": 1789961657,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin/infra",
+                  "mtime": 1789961656,
+                  "mode": "0o664",
+                  "size": 38,
+                  "sha256": "353d20254cc054f8189c000f2c3417e4be961ae5f13a2e2e7a27f3fdb6f05dfc"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "reordered-fifth-cli",
+          "wall_seconds": 1.4740493760327809,
+          "exit_code": 0,
+          "manifest_digest": "sha256:09255710dca680a0a4ca92d4a1e1301be1d88656fe01a22e89970d8d31b4fccd",
+          "diff_ids": [
+            "sha256:7583ea793a6f381b2aef8db0d343e42aedbacd22a505ac79774c4107486fc937",
+            "sha256:02932600cc659248a24fc26edadb04fd573bd83b5070e59da3dde380f4f409d3"
+          ],
+          "layers": [
+            {
+              "digest": "sha256:c85b6e37341e788125a8cc107e0941ccdacfce6e61fc6b97a037be88a90795a6",
+              "entries": [
+                {
+                  "name": "opt",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools/stable.txt",
+                  "mtime": 1789961608,
+                  "mode": "0o664",
+                  "size": 13,
+                  "sha256": "96df0717cefffafa5fc5b0ed0fdddd83a352b4d2344b4ef51f94ef169d2684f5"
+                }
+              ]
+            },
+            {
+              "digest": "sha256:fd4bec3663882962e882b5a1cc204939c044f9f688bf4c859ee2609552379c74",
+              "entries": [
+                {
+                  "name": "usr",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin/infra",
+                  "mtime": 1789961658,
+                  "mode": "0o664",
+                  "size": 37,
+                  "sha256": "4579d8633c6d7f8be805b69c05abe292bb3a5f38e4ff0dc0b08922b4f0bc8dbd"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "reordered-fifth-unchanged",
+          "wall_seconds": 1.4732773599680513,
+          "exit_code": 0,
+          "manifest_digest": "sha256:09255710dca680a0a4ca92d4a1e1301be1d88656fe01a22e89970d8d31b4fccd",
+          "diff_ids": [
+            "sha256:7583ea793a6f381b2aef8db0d343e42aedbacd22a505ac79774c4107486fc937",
+            "sha256:02932600cc659248a24fc26edadb04fd573bd83b5070e59da3dde380f4f409d3"
+          ],
+          "layers": [
+            {
+              "digest": "sha256:c85b6e37341e788125a8cc107e0941ccdacfce6e61fc6b97a037be88a90795a6",
+              "entries": [
+                {
+                  "name": "opt",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools/stable.txt",
+                  "mtime": 1789961608,
+                  "mode": "0o664",
+                  "size": 13,
+                  "sha256": "96df0717cefffafa5fc5b0ed0fdddd83a352b4d2344b4ef51f94ef169d2684f5"
+                }
+              ]
+            },
+            {
+              "digest": "sha256:fd4bec3663882962e882b5a1cc204939c044f9f688bf4c859ee2609552379c74",
+              "entries": [
+                {
+                  "name": "usr",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin",
+                  "mtime": 1789961659,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin/infra",
+                  "mtime": 1789961658,
+                  "mode": "0o664",
+                  "size": 37,
+                  "sha256": "4579d8633c6d7f8be805b69c05abe292bb3a5f38e4ff0dc0b08922b4f0bc8dbd"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "finding": "Used CLI input changes recreated stable COPY parent timestamps despite identical stable-file content, mode and mtime"
+    },
+    "multistage_tools_before_cli": {
+      "recipe": "FROM scratch AS tools\nCOPY stable.txt /out/stable.txt\nFROM scratch\nCOPY --from=tools /out/ /opt/tools/\nCOPY unrelated.txt /usr/local/bin/infra\n",
+      "samples": [
+        {
+          "scenario": "cli-change-one",
+          "wall_seconds": 1.4730845920275897,
+          "exit_code": 0,
+          "manifest_digest": "sha256:62d8ff17ae325f539451cad043e9d597937123df64da02528744699492bede26",
+          "diff_ids": [
+            "sha256:7890ab304967b6fc9599c2c21a5037e63bf513cd10b28560cff73d1c49f8fe3c",
+            "sha256:bf36c43749696c0c505f698e60876dc1e036931d54aefbd9d66e982c33047658"
+          ],
+          "layers": [
+            {
+              "digest": "sha256:94d3cb7d0d0f2a2cf219c2739a71a3dd20532da6670fe8ce4b1bf16e279fffc3",
+              "entries": [
+                {
+                  "name": "opt",
+                  "mtime": 1789961698,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools",
+                  "mtime": 1789961698,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools/stable.txt",
+                  "mtime": 1789961697,
+                  "mode": "0o664",
+                  "size": 13,
+                  "sha256": "96df0717cefffafa5fc5b0ed0fdddd83a352b4d2344b4ef51f94ef169d2684f5"
+                }
+              ]
+            },
+            {
+              "digest": "sha256:08f4f2ac4a7f4ecba862debb2b7c8a6978dcd5ad30bf58d6df648f28fa73b434",
+              "entries": [
+                {
+                  "name": "usr",
+                  "mtime": 1789961699,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local",
+                  "mtime": 1789961699,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin",
+                  "mtime": 1789961699,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin/infra",
+                  "mtime": 1789961698,
+                  "mode": "0o664",
+                  "size": 26,
+                  "sha256": "3a06bd88fdda7710632dfe7f0e4d3150794d206dcd3bf6817a551a405e06b79e"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "cli-change-two",
+          "wall_seconds": 1.4731376930139959,
+          "exit_code": 0,
+          "manifest_digest": "sha256:c69e44089b3e171166cc9585499fe805eb64a2071026ee55736e329f475af2b0",
+          "diff_ids": [
+            "sha256:7890ab304967b6fc9599c2c21a5037e63bf513cd10b28560cff73d1c49f8fe3c",
+            "sha256:69733b3403fef705ad129f5b2ceaa84c9376b7175fecf3fb5ee8d8b5356ba5fa"
+          ],
+          "layers": [
+            {
+              "digest": "sha256:94d3cb7d0d0f2a2cf219c2739a71a3dd20532da6670fe8ce4b1bf16e279fffc3",
+              "entries": [
+                {
+                  "name": "opt",
+                  "mtime": 1789961698,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools",
+                  "mtime": 1789961698,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools/stable.txt",
+                  "mtime": 1789961697,
+                  "mode": "0o664",
+                  "size": 13,
+                  "sha256": "96df0717cefffafa5fc5b0ed0fdddd83a352b4d2344b4ef51f94ef169d2684f5"
+                }
+              ]
+            },
+            {
+              "digest": "sha256:73d91cced098b89c5e38097536b456c2652196e4c57efe5c5280e0ae1ab7192e",
+              "entries": [
+                {
+                  "name": "usr",
+                  "mtime": 1789961701,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local",
+                  "mtime": 1789961701,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin",
+                  "mtime": 1789961701,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin/infra",
+                  "mtime": 1789961700,
+                  "mode": "0o664",
+                  "size": 35,
+                  "sha256": "8773c90e5fb4d82bb6fc6eb95cb08376a7594392761bc52861caef0bfabc1638"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario": "unchanged",
+          "wall_seconds": 1.5228344679926522,
+          "exit_code": 0,
+          "manifest_digest": "sha256:c69e44089b3e171166cc9585499fe805eb64a2071026ee55736e329f475af2b0",
+          "diff_ids": [
+            "sha256:7890ab304967b6fc9599c2c21a5037e63bf513cd10b28560cff73d1c49f8fe3c",
+            "sha256:69733b3403fef705ad129f5b2ceaa84c9376b7175fecf3fb5ee8d8b5356ba5fa"
+          ],
+          "layers": [
+            {
+              "digest": "sha256:94d3cb7d0d0f2a2cf219c2739a71a3dd20532da6670fe8ce4b1bf16e279fffc3",
+              "entries": [
+                {
+                  "name": "opt",
+                  "mtime": 1789961698,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools",
+                  "mtime": 1789961698,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "opt/tools/stable.txt",
+                  "mtime": 1789961697,
+                  "mode": "0o664",
+                  "size": 13,
+                  "sha256": "96df0717cefffafa5fc5b0ed0fdddd83a352b4d2344b4ef51f94ef169d2684f5"
+                }
+              ]
+            },
+            {
+              "digest": "sha256:73d91cced098b89c5e38097536b456c2652196e4c57efe5c5280e0ae1ab7192e",
+              "entries": [
+                {
+                  "name": "usr",
+                  "mtime": 1789961701,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local",
+                  "mtime": 1789961701,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin",
+                  "mtime": 1789961701,
+                  "mode": "0o755",
+                  "size": 0,
+                  "sha256": null
+                },
+                {
+                  "name": "usr/local/bin/infra",
+                  "mtime": 1789961700,
+                  "mode": "0o664",
+                  "size": 35,
+                  "sha256": "8773c90e5fb4d82bb6fc6eb95cb08376a7594392761bc52861caef0bfabc1638"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "finding": "Two distinct CLI variants retained exact stable tools layer identity and parent timestamps; unchanged repeat retained complete image identity"
+    }
+  },
+  "candidate_change": "Move runner-check COPY --from=tools before injected infra CLI COPY",
+  "qualification": "Small fixture passed; actual runner image qualification pending",
+  "limitations": [
+    "No production latency claim from tiny fixture",
+    "Package installation layers after CLI remain dependent on CLI behavior"
+  ]
+}
