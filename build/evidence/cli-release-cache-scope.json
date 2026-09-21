@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "observed_at": "2026-09-21T03:29:59.319616+00:00",
+  "finding": "Release caches are isolated between version tags, and no default-branch producer populates the release cache prefix.",
+  "workflow": ".github/workflows/cli-release.yml",
+  "release_cache_prefix": "infra-release-bazel9.2.0-go1.27.1-",
+  "ordinary_cli_cache_prefix": "bazel-linux-amd64-9.2.0-",
+  "source": "https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache",
+  "documented_rule": "A workflow can restore its own ref or default-branch caches; a cache from another tag cannot be restored.",
+  "cache_inventory": {
+    "total_count": 18,
+    "returned_count": 18,
+    "default_branch_entries": 0,
+    "entries": [
+      {
+        "id": 7915705616,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_amd64-733dd41bc3d451b608b16d1848078d88cfe89323",
+        "ref": "refs/heads/refs/tags/infra-v0.2.5",
+        "size_in_bytes": 440064935,
+        "created_at": "2026-09-21T03:28:42.818273Z",
+        "last_accessed_at": "2026-09-21T03:28:42.818273Z"
+      },
+      {
+        "id": 7915702601,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_arm64-733dd41bc3d451b608b16d1848078d88cfe89323",
+        "ref": "refs/heads/refs/tags/infra-v0.2.5",
+        "size_in_bytes": 436526769,
+        "created_at": "2026-09-21T03:28:32.556181Z",
+        "last_accessed_at": "2026-09-21T03:28:32.556181Z"
+      },
+      {
+        "id": 7915687841,
+        "key": "infra-release-bazel9.2.0-go1.27.1-linux_arm64-733dd41bc3d451b608b16d1848078d88cfe89323",
+        "ref": "refs/heads/refs/tags/infra-v0.2.5",
+        "size_in_bytes": 431421262,
+        "created_at": "2026-09-21T03:27:51.236767Z",
+        "last_accessed_at": "2026-09-21T03:27:51.236767Z"
+      },
+      {
+        "id": 7915547087,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_arm64-e7a6b18334ef27f4b6f1b62ff5d6b88fe7803769",
+        "ref": "refs/heads/refs/tags/infra-v0.2.4",
+        "size_in_bytes": 436476302,
+        "created_at": "2026-09-21T03:20:46.777446Z",
+        "last_accessed_at": "2026-09-21T03:20:46.777446Z"
+      },
+      {
+        "id": 7915544562,
+        "key": "infra-release-bazel9.2.0-go1.27.1-linux_arm64-e7a6b18334ef27f4b6f1b62ff5d6b88fe7803769",
+        "ref": "refs/heads/refs/tags/infra-v0.2.4",
+        "size_in_bytes": 431466767,
+        "created_at": "2026-09-21T03:20:39.589207Z",
+        "last_accessed_at": "2026-09-21T03:20:39.589207Z"
+      },
+      {
+        "id": 7915542652,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_amd64-e7a6b18334ef27f4b6f1b62ff5d6b88fe7803769",
+        "ref": "refs/heads/refs/tags/infra-v0.2.4",
+        "size_in_bytes": 440038405,
+        "created_at": "2026-09-21T03:20:32.549286Z",
+        "last_accessed_at": "2026-09-21T03:20:32.549286Z"
+      },
+      {
+        "id": 7914635021,
+        "key": "infra-release-bazel9.2.0-go1.27.1-linux_amd64-63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+        "ref": "refs/heads/refs/tags/infra-v0.2.3",
+        "size_in_bytes": 575458976,
+        "created_at": "2026-09-21T02:35:11.977697Z",
+        "last_accessed_at": "2026-09-21T02:35:11.977697Z"
+      },
+      {
+        "id": 7914595912,
+        "key": "infra-release-bazel9.2.0-go1.27.1-linux_arm64-63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+        "ref": "refs/heads/refs/tags/infra-v0.2.3",
+        "size_in_bytes": 431400052,
+        "created_at": "2026-09-21T02:33:01.009194Z",
+        "last_accessed_at": "2026-09-21T02:33:01.009194Z"
+      },
+      {
+        "id": 7914594062,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_amd64-63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+        "ref": "refs/heads/refs/tags/infra-v0.2.3",
+        "size_in_bytes": 440154212,
+        "created_at": "2026-09-21T02:32:54.530535Z",
+        "last_accessed_at": "2026-09-21T02:32:54.530535Z"
+      },
+      {
+        "id": 7914592441,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_arm64-63ab06abcb79a88d2b6a3d8b244f177c4d5f17f1",
+        "ref": "refs/heads/refs/tags/infra-v0.2.3",
+        "size_in_bytes": 436449206,
+        "created_at": "2026-09-21T02:32:48.083980Z",
+        "last_accessed_at": "2026-09-21T02:32:48.083980Z"
+      },
+      {
+        "id": 7908967385,
+        "key": "infra-release-bazel9.2.0-go1.27.1-linux_amd64-9354b19939e672259c19e9ebe7742914ae10b61a",
+        "ref": "refs/heads/refs/tags/infra-v0.2.2",
+        "size_in_bytes": 566366651,
+        "created_at": "2026-09-20T20:51:05.562129Z",
+        "last_accessed_at": "2026-09-20T20:51:05.562129Z"
+      },
+      {
+        "id": 7908929553,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_arm64-9354b19939e672259c19e9ebe7742914ae10b61a",
+        "ref": "refs/heads/refs/tags/infra-v0.2.2",
+        "size_in_bytes": 436233238,
+        "created_at": "2026-09-20T20:48:57.037921Z",
+        "last_accessed_at": "2026-09-20T20:48:57.037921Z"
+      },
+      {
+        "id": 7908928295,
+        "key": "infra-release-bazel9.2.0-go1.27.1-linux_arm64-9354b19939e672259c19e9ebe7742914ae10b61a",
+        "ref": "refs/heads/refs/tags/infra-v0.2.2",
+        "size_in_bytes": 431083235,
+        "created_at": "2026-09-20T20:48:51.281202Z",
+        "last_accessed_at": "2026-09-20T20:48:51.281202Z"
+      },
+      {
+        "id": 7908926245,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_amd64-9354b19939e672259c19e9ebe7742914ae10b61a",
+        "ref": "refs/heads/refs/tags/infra-v0.2.2",
+        "size_in_bytes": 439468778,
+        "created_at": "2026-09-20T20:48:43.181574Z",
+        "last_accessed_at": "2026-09-20T20:48:43.181574Z"
+      },
+      {
+        "id": 7908027767,
+        "key": "infra-release-bazel9.2.0-go1.27.1-linux_amd64-d21db9aba6e1f9b3467c6b218e3ab21a0e0eabf6",
+        "ref": "refs/heads/refs/tags/infra-v0.2.1",
+        "size_in_bytes": 562392019,
+        "created_at": "2026-09-20T19:59:23.729997Z",
+        "last_accessed_at": "2026-09-20T19:59:23.729997Z"
+      },
+      {
+        "id": 7907988262,
+        "key": "infra-release-bazel9.2.0-go1.27.1-linux_arm64-d21db9aba6e1f9b3467c6b218e3ab21a0e0eabf6",
+        "ref": "refs/heads/refs/tags/infra-v0.2.1",
+        "size_in_bytes": 431099944,
+        "created_at": "2026-09-20T19:57:03.121722Z",
+        "last_accessed_at": "2026-09-20T19:57:03.121722Z"
+      },
+      {
+        "id": 7907983069,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_arm64-d21db9aba6e1f9b3467c6b218e3ab21a0e0eabf6",
+        "ref": "refs/heads/refs/tags/infra-v0.2.1",
+        "size_in_bytes": 436273805,
+        "created_at": "2026-09-20T19:56:43.133782Z",
+        "last_accessed_at": "2026-09-20T19:56:43.133782Z"
+      },
+      {
+        "id": 7907973574,
+        "key": "infra-release-bazel9.2.0-go1.27.1-darwin_amd64-d21db9aba6e1f9b3467c6b218e3ab21a0e0eabf6",
+        "ref": "refs/heads/refs/tags/infra-v0.2.1",
+        "size_in_bytes": 439350440,
+        "created_at": "2026-09-20T19:56:09.706763Z",
+        "last_accessed_at": "2026-09-20T19:56:09.706763Z"
+      }
+    ]
+  },
+  "run_evidence": [
+    {
+      "run_id": 35557056527,
+      "tag": "infra-v0.2.4",
+      "cache_restore": "All four platforms logged Cache not found for exact and platform-prefix keys.",
+      "native_binary_seconds": 129,
+      "native_check_preparation_seconds": 125.66605224,
+      "native_preparation_actions_executed": 1010,
+      "native_preparation_local_cache_hits": 81
+    },
+    {
+      "run_id": 35557495448,
+      "tag": "infra-v0.2.5",
+      "job_id": 106203867130,
+      "platform": "darwin_amd64",
+      "cache_restore": "Cache not found at2026-09-21T03:25:57.9289586Z; platform prefix unchanged; new cache saved at2026-09-21T03:28:42.8722179Z."
+    }
+  ],
+  "scope": "Confirmed cross-tag cache isolation; no claim that all native preparation time is avoidable.",
+  "deferred_options": [
+    "Populate matching platform caches from a trusted default-branch workflow.",
+    "Use a separately reviewed persistent or remote cache with equivalent release trust boundaries."
+  ],
+  "implementation": "No workflow or release architecture changes applied."
+}
