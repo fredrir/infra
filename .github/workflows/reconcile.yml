@@ -47,17 +47,22 @@ jobs:
         printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
         chmod 755 "$RUNNER_TEMP/infra-cli/infra"
         printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+    - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
+      if: github.event.pull_request.head.repo.full_name == github.repository
+      id: doppler
+      with:
+        doppler-token: ${{ secrets.DOPPLER_TOKEN }}
     - uses: ./.github/actions/setup-reconciliation
       with:
         network: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
-        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
+        KUBE_CONFIG: ${{ steps.doppler.outputs.KUBE_CONFIG }}
     - name: Validate affected declarations
       env:
         BEFORE: ${{ github.event.pull_request.base.sha }}
@@ -68,11 +73,11 @@ jobs:
       if: github.event.pull_request.head.repo.full_name == github.repository
       env:
         BASE: ${{ github.event.pull_request.base.sha }}
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
+        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
       run: |
         set -o pipefail
         infra reconcile plan --base "$BASE" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
@@ -120,22 +125,26 @@ jobs:
         printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
         chmod 755 "$RUNNER_TEMP/infra-cli/infra"
         printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+    - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
+      id: doppler
+      with:
+        doppler-token: ${{ secrets.DOPPLER_TOKEN }}
     - uses: ./.github/actions/setup-reconciliation
       with:
         network: 'true'
         identity: apply
         tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
-        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
+        KUBE_CONFIG: ${{ steps.doppler.outputs.KUBE_CONFIG }}
     - name: Configure host identity
       env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        SSH_PRIVATE_KEY: ${{ steps.doppler.outputs.SSH_PRIVATE_KEY }}
+        SSH_KNOWN_HOSTS: ${{ steps.doppler.outputs.SSH_KNOWN_HOSTS }}
       run: |
         test -n "$SSH_PRIVATE_KEY" && test -n "$SSH_KNOWN_HOSTS"
         umask 077
@@ -152,19 +161,19 @@ jobs:
     - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
       id: runner-token
       with:
-        app-id: ${{ secrets.RUNNER_APP_ID }}
-        private-key: ${{ secrets.RUNNER_APP_PRIVATE_KEY }}
+        app-id: ${{ steps.doppler.outputs.RUNNER_APP_ID }}
+        private-key: ${{ steps.doppler.outputs.RUNNER_APP_PRIVATE_KEY }}
         owner: fredrir
         repositories: infra,Y,llunde-frontend,llunde-backend,llunde-pyparser,packages,nsql,portfolio
         permission-administration: write
     - name: Reconcile merged revision
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
-        SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
+        SOPS_AGE_KEY: ${{ steps.doppler.outputs.SOPS_AGE_KEY }}
         GH_TOKEN: ${{ steps.runner-token.outputs.token }}
         FULL: ${{ github.event_name != 'push' }}
       run: infra reconcile apply --full="$FULL" --report="$RUNNER_TEMP/reconciliation/status.json"

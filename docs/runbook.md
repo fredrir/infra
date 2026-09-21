@@ -80,14 +80,19 @@ go build -o .infra/bin/infra ./cmd/infra
 | 3 | Apply the IAM policies from `tofu/reconciliation.tf` using an administrator OpenTofu session; let Flux install the Kubernetes identities |
 | 4 | Confirm the IAM users, managed policy attachments and Kubernetes service accounts exist; point Flux at `production` |
 | 5 | Create GitHub environments `infrastructure-plan` and `infrastructure-apply`; restrict `infrastructure-apply` to `main` without deployment reviewers |
-| 6 | Configure the environment secrets below; use separate plan and apply identities |
+| 6 | Populate the scoped Doppler configurations below; install their read-only service tokens as `DOPPLER_TOKEN` in the matching GitHub environments |
 | 7 | Run `ansible-playbook reconciliation-identity.yml` with administrator SSH access; retain existing administrator keys |
 | 8 | Apply `tailscale/policy.hujson`; create the environment-bound OIDC identities below |
 | 9 | Run the workflow manually and confirm `desired_revision == applied_revision` with `stage == complete` |
 
-These activation steps provision external credentials once; merge and scheduled reconciliation use the configured GitHub environments.
+These activation steps provision external credentials once; merge and scheduled reconciliation fetch credentials from Doppler.
 
-| Environment secret | `infrastructure-plan` | `infrastructure-apply` |
+| GitHub environment | Doppler project / config | GitHub secret |
+| --- | --- | --- |
+| `infrastructure-plan` | `infra / prd_reconciliation_plan` | `DOPPLER_TOKEN`, read-only access to this config |
+| `infrastructure-apply` | `infra / prd_reconciliation_apply` | `DOPPLER_TOKEN`, read-only access to this config |
+
+| Doppler secret | `prd_reconciliation_plan` | `prd_reconciliation_apply` |
 | --- | --- | --- |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Keys for `/automation/infra-reconciliation-plan` | Keys for `/automation/infra-reconciliation-apply` |
 | `CLOUDFLARE_API_TOKEN` | Read managed DNS zones and account tunnels | Edit managed DNS zones and account tunnels |
@@ -112,6 +117,9 @@ These activation steps provision external credentials once; merge and scheduled 
 
 | Credential boundary | Value |
 | --- | --- |
+| Secret source | Doppler; operational credentials are fetched per job and are not duplicated in GitHub environment secrets |
+| Doppler scope | Separate config-scoped read tokens; neither token can edit secrets or read `infra/ops` |
+| Doppler parent config | `infra/prd` contains no credentials; reconciliation configs contain only their scoped identities |
 | AWS identity policies | `tofu/reconciliation.tf`; attached managed policies; deployment identities cannot change their own grants |
 | Kubernetes identities | `platform/components/policy/reconciliation.yaml` |
 | Kubernetes tokens | Controller-populated `infrastructure-plan-credentials` and `infrastructure-apply-credentials` Secrets in `flux-system` |
@@ -124,12 +132,8 @@ These activation steps provision external credentials once; merge and scheduled 
 | Provider-policy changes or revoked credentials | Administrator repair required |
 
 ```sh
-gh secret set AWS_ACCESS_KEY_ID --env infrastructure-plan < /private/plan-access-key-id
-gh secret set AWS_SECRET_ACCESS_KEY --env infrastructure-plan < /private/plan-secret-access-key
-gh secret set KUBE_CONFIG --env infrastructure-plan < /private/plan-kubeconfig
-gh secret set AWS_ACCESS_KEY_ID --env infrastructure-apply < /private/apply-access-key-id
-gh secret set AWS_SECRET_ACCESS_KEY --env infrastructure-apply < /private/apply-secret-access-key
-gh secret set KUBE_CONFIG --env infrastructure-apply < /private/apply-kubeconfig
+doppler configs tokens create github-reconciliation-plan --project infra --config prd_reconciliation_plan --access read --plain | gh secret set DOPPLER_TOKEN --env infrastructure-plan
+doppler configs tokens create github-reconciliation-apply --project infra --config prd_reconciliation_apply --access read --plain | gh secret set DOPPLER_TOKEN --env infrastructure-apply
 gh workflow run reconcile.yml --ref main
 ```
 
