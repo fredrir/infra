@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "host": "infra-build-09",
+  "cli_sha256": "0964e54aa02ae501190821d4db4129af754f953c98ab98128b0ab13b4c94f6ea",
+  "cli_source_commit": "03385ad",
+  "purpose": "One-time exact artifact analysis qualification after cache namespace migration; not deployment timing",
+  "records": [
+    {
+      "family": "infra-runner-check",
+      "image": "ghcr.io/fredrir/infra-runner-check@sha256:436b188c933980a360d8330310b22b35bdc0d4660ed420e14416999703faf98e",
+      "cache": "/home/runner/.cache/infra/trivy-v3/infra-runner-check",
+      "cold_budget_seconds": 60,
+      "warm_budget_seconds": 6.578083539,
+      "prepare_seconds": 0.0326620659980108,
+      "cold": {
+        "measurement": {
+          "schema": 1,
+          "stage": "v3-infra-runner-check-cold",
+          "started": "2026-09-21T03:16:42.772286969Z",
+          "duration_seconds": 16.939977266,
+          "budget_seconds": 60,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 28.895835,
+          "peak_memory_bytes": 497086464
+        },
+        "process_tree_cpu_seconds": 28.92,
+        "process_tree_peak_rss_kib": 485436
+      },
+      "warm": {
+        "measurement": {
+          "schema": 1,
+          "stage": "v3-infra-runner-check-warm",
+          "started": "2026-09-21T03:16:59.732886735Z",
+          "duration_seconds": 1.030176244,
+          "budget_seconds": 6.578083539,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.649579,
+          "peak_memory_bytes": 138260480
+        },
+        "process_tree_cpu_seconds": 0.6599999999999999,
+        "process_tree_peak_rss_kib": 135020
+      },
+      "family_db_released": true,
+      "fanal_retained": true
+    },
+    {
+      "family": "infra-runner-deploy",
+      "image": "ghcr.io/fredrir/infra-runner-deploy@sha256:ecb0c4f4fdb22cadc9ee41b8d70816508276b7d5f881fbe4a3848b3ed2f47515",
+      "cache": "/home/runner/.cache/infra/trivy-v3/infra-runner-deploy",
+      "cold_budget_seconds": 60,
+      "warm_budget_seconds": 9.701067009,
+      "prepare_seconds": 0.016160876999492757,
+      "cold": {
+        "measurement": {
+          "schema": 1,
+          "stage": "v3-infra-runner-deploy-cold",
+          "started": "2026-09-21T03:17:00.8084191Z",
+          "duration_seconds": 4.6782668,
+          "budget_seconds": 60,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 5.433193,
+          "peak_memory_bytes": 392560640
+        },
+        "process_tree_cpu_seconds": 5.44,
+        "process_tree_peak_rss_kib": 383360
+      },
+      "warm": {
+        "measurement": {
+          "schema": 1,
+          "stage": "v3-infra-runner-deploy-warm",
+          "started": "2026-09-21T03:17:05.501247174Z",
+          "duration_seconds": 1.005098181,
+          "budget_seconds": 9.701067008999999,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.638345,
+          "peak_memory_bytes": 146374656
+        },
+        "process_tree_cpu_seconds": 0.65,
+        "process_tree_peak_rss_kib": 142944
+      },
+      "family_db_released": true,
+      "fanal_retained": true
+    }
+  ],
+  "ci_gate_changed": false,
+  "ci_reruns": 0
+}
