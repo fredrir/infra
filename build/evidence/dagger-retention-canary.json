@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "host": "infra-build-09",
+  "restart_seconds": 16.913873928999237,
+  "dagger_started": "2026-09-21T03:15:43.967362435Z",
+  "memory_limit": 4294967296,
+  "nano_cpus": 4000000000,
+  "bazel_start_unchanged": true,
+  "backup": "/etc/infra-dagger.toml.before-retention-canary",
+  "first_attempt": "Readiness check raced Type=simple container startup; automatically rolled back old config and restarted before corrected bounded readiness poll.",
+  "policy": "[[worker.oci.gcpolicy]]\nfilters = [\"type==regular,type==source.local,type==source.git.checkout,type==source.http\"]\nreservedSpace = \"1GiB\"\nmaxUsedSpace = \"25GiB\"\nminFreeSpace = \"8GiB\"\n\n[[worker.oci.gcpolicy]]\nfilters = [\"type==exec.cachemount\"]\nkeepDuration = \"48h\"\nreservedSpace = \"1GiB\"\nmaxUsedSpace = \"25GiB\"\nminFreeSpace = \"8GiB\"\n\n[[worker.oci.gcpolicy]]\nall = true\nreservedSpace = \"1GiB\"\nmaxUsedSpace = \"32GiB\"\nminFreeSpace = \"4GiB\"\n",
+  "cli_and_timer_changed": false
+}
