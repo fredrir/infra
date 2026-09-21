@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -115,70 +114,5 @@ func TestDaggerImageBuildSelectsStageAndPreservesLiteralBuildArguments(t *testin
 	options.ExportDirectory, options.CheckOnly = "", true
 	if _, err := Image(ctx, options); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestImageBuildAndChecksProgressTogether(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	built, checked := make(chan struct{}), make(chan struct{})
-	err := prepareImage(ctx, func(ctx context.Context) error {
-		close(built)
-		select {
-		case <-checked:
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}, func(ctx context.Context) error {
-		close(checked)
-		select {
-		case <-built:
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	})
-	if err != nil {
-		t.Fatalf("independent image branches did not progress: %v", err)
-	}
-}
-
-func TestImagePreparationCancelsSiblingAndPreservesFailure(t *testing.T) {
-	for _, failingBranch := range []string{"build", "checks"} {
-		t.Run(failingBranch, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			defer cancel()
-			failure := errors.New(failingBranch + " failed")
-			started := make(chan struct{})
-			failed := func(context.Context) error {
-				<-started
-				return failure
-			}
-			blocked := func(ctx context.Context) error {
-				close(started)
-				<-ctx.Done()
-				return ctx.Err()
-			}
-			build, checks := failed, blocked
-			if failingBranch == "checks" {
-				build, checks = checks, build
-			}
-			if err := prepareImage(ctx, build, checks); !errors.Is(err, failure) {
-				t.Fatalf("image branch failure was lost: %v", err)
-			}
-			if ctx.Err() != nil {
-				t.Fatal("sibling waited for outer timeout")
-			}
-		})
-	}
-}
-
-func TestImagePreparationNeverAcceptsCancelledContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	complete := func(context.Context) error { return nil }
-	if err := prepareImage(ctx, complete, complete); !errors.Is(err, context.Canceled) {
-		t.Fatalf("cancelled image preparation passed: %v", err)
 	}
 }

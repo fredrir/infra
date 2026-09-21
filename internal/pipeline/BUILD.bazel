@@ -19,7 +19,6 @@ go_library(
         "//internal/ci",
         "//internal/process",
         "@io_dagger_dagger//:dagger",
-        "@org_golang_x_sync//errgroup",
     ],
 )
 
