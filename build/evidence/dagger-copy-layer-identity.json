@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "recorded_at_utc": "2026-09-21T03:36:20.739821+00:00",
+  "recorded_at_utc": "2026-09-21T03:44:22.617832+00:00",
   "engine": "Dagger0.21.9",
   "environment": "ntnu isolated persistent engine; separate CLI process per sample",
   "scenarios": {
@@ -561,9 +561,565 @@
     }
   },
   "candidate_change": "Move runner-check COPY --from=tools before injected infra CLI COPY",
-  "qualification": "Small fixture passed; actual runner image qualification pending",
+  "qualification": "REJECTED: tiny multi-stage result did not transfer to actual runner image; Dockerfile change reverted",
   "limitations": [
     "No production latency claim from tiny fixture",
-    "Package installation layers after CLI remain dependent on CLI behavior"
-  ]
+    "Package installation layers after CLI remain dependent on CLI behavior",
+    "Actual tool layer and all changed-CLI downstream layers13\u201318 changed despite candidate reorder",
+    "Actual archives reused persisted filesystem lineage; exported history retained earlier layer ordering",
+    "Archive load of approximately967MB adds I/O absent from registry cached-layer scans",
+    "First-newCLI layer churn remains an unresolved bottleneck; no further experiment adopted"
+  ],
+  "actual_image_pair": {
+    "source_revision": "c5f86f9eae77182492bd63df1ddd0e26c9fe8b8d",
+    "platform": "linux/amd64",
+    "engine_resources": {
+      "cpus": 4,
+      "memory_gib": 4
+    },
+    "input_permissions": "713 tracked regular files0644; one generated recipe copy0664; no input rewrite between pair",
+    "before": {
+      "scenario": "before",
+      "started": "2026-09-21T03:39:01.955673+00:00",
+      "injected_cli_sha256": "c351001bbbab6c6758309b3335bdcf89cd72c72b32c2794ad927c6d6cc3112c1",
+      "published": false,
+      "exit_code": 0,
+      "wall_seconds": 103.46077780900305,
+      "manifest_digest": "sha256:4ccdfa2aa562e04f93bda6566499d26b3626f9dee13c91a0f7b4912694ab0b4c",
+      "layers": [
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:73847a9ca5f43d3e20daf439041354298a045adbb2c67cfde8149d28e8dde760",
+          "size": 30613439
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:b6e37e41a07dfea5d69aee421dd7e7048962d3e1334b309d972de74ca2b9cee1",
+          "size": 16778479
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:49ae12ea0a1e2857192f5d49c256e8192d07e70ec3207413f140f0c0c3db1a6a",
+          "size": 3534
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:4ccb2ff4fd190096a59926faeb8eb937d516bd967704b0868a672ceb6a6377b8",
+          "size": 36231078
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:2b9c970847397df0ce733e44af6c55d82c170e259664a198b05510b197638628",
+          "size": 27852952
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:b512cccf5884dadeb0431d918789bbaf46f33b1602cafa75681d1d659d429abb",
+          "size": 3835
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+          "size": 32
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:aecebaef270fd7162b6086045d2dd8f5e4b3fa6136eead4f3e401d7a5745dd9b",
+          "size": 321349159
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:b3cb48e168cd68b3605735cb7f32c761ef47c65b3f1cb166a122a6a4aa297cc9",
+          "size": 22880293
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:2946970b00fedc443425e63c1ef39048bb56b5c77c73972f3fab9a37bafdd04e",
+          "size": 86955148
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:e59a1bb8f60778b374da4f345f8bc94511cf62ee82d973e190c602a58a399ca9",
+          "size": 329
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:4b507dee3aa7ae50c20fbeef3b49943d7e5ff0ea932e90ffeec8aecca0911dad",
+          "size": 49474034
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:b970aa072b907018d7d8afe729fdb42514897a64a263da579ff2f557e5f7a9dd",
+          "size": 596
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:c4acc3314a837420c54efed5ba70397fe4d77895f0121ffacbb70848053b9a05",
+          "size": 6612984
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:2b1f2fe54f28ef63ed0331d4c32e2d8132c3de24fde1dce7ce974f3467ed804e",
+          "size": 78457798
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:cd543dc00da641018b183994ab78162d5cbbefef393cd5643a180365c4e9b4d6",
+          "size": 53166408
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:321ce7bc703107c1a515c9f0035fb8dbee131aef61743b106f759e8e6f8b6386",
+          "size": 277
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:473ef2df3e2e0a4ffdd526f6ec6b835a5c1b5c84dfa902e22d2674ad949a91d0",
+          "size": 18820
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:baee5d1ae90346676e75b136cf425f775e97097b15aafdd4da62976ea6e6a2b9",
+          "size": 8080377
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+          "size": 32
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:600a12cd3db00ab5d6c03f15c88198525898d53afcf54fd954ae76477797c6c0",
+          "size": 228437963
+        }
+      ],
+      "diff_ids": [
+        "sha256:b9a65b3c65ab22d490085bd0bf5490e2409da8748b406870f2463bdc41cd6795",
+        "sha256:b8700007f10739e59f54d460970b8d5fd8605dd2cf1b85c3100cb3dc57ffc34b",
+        "sha256:48d52113a83e3a28d2738605f0499a4afb4743485f9b8cf3945d6e09a12915d1",
+        "sha256:3e2dcc99343f0aeb423e4e9a05eb86e7ce0eee2a46c7bcf9de8d13015315f937",
+        "sha256:9764f134ae4b10f0ea9e4547f8d817cb77be5418a155d93370a530da9d92f387",
+        "sha256:01c65e06e88c5402a92649069ef11f76c93babd7e4ee03b4e6bc6907c6781f5e",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:e5401003e089b6de6367ade8e03345bfc2ee166f3a2087bd424940d3285b9520",
+        "sha256:132744ac4856eaddbca9d5f1c8bcf0352e77d75a367a96889ecc1930aef1e28f",
+        "sha256:dbec351c38e365dc2fd63860e0e18cc713cd180baed9739d337ba5eff673ec4b",
+        "sha256:9a954631048a8a3d9f17e3fe7f05d50a67fccd647ebce1eb15bd613512a31b21",
+        "sha256:6ef9c342337cc0bbb28aebff2f7244ba4051077680bf1717b9e068e32ce29796",
+        "sha256:b0b6d74fb6529d175c0acae952a64eed99660e8239e8d19bda6b213b606c8234",
+        "sha256:e915fadc8a5b3206572e73b5d7b9bcde2bac5e91cff8fcc240b8e639f3ead6a4",
+        "sha256:80eed158c99edfff66dbf26e43bec68cea5adcc7cce53d07ed7a3653c806a954",
+        "sha256:7a833cad3ff6a07908297ed15285b30a0f3f48285a2c7839e16f50d8f4fae632",
+        "sha256:b8435c2e5f042c653b36fec834c8e254c93fa46d2b3f3a81625e5fcb992a9912",
+        "sha256:5a5c2ece72037be1c6b1cfcd50d51bae8498cc640b833f8a98c5b5822f64ba7d",
+        "sha256:8365654c6574a56b02c2fdd1c3f1e4633358510d54b0b562c9b7ad4d5d658cc4",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:de58891779dda5b97a9e87d12ecbfb795330933926a18c327a75285de06ba1e5"
+      ],
+      "history": [
+        {
+          "created": "2026-09-21T03:19:38.398368458Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:41.814705916Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:43.526851288Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:43.573385453Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:48.272909075Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:51.91455423Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:51.984103923Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:52.016782371Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:20:30.365253413Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:15.907825824Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:31.129013255Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:31.131542185Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:31.133951685Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:39:40.782197771Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:39:24.942892396Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:39:51.889476579Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:39:57.984226563Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:39:32.85162326Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:39:32.933462752Z",
+          "created_by": "mount / from exec /bin/sh -c cd /tmp/pins && uv sync --frozen --group ci --no-install-project     && chmod -R a+rX /opt/venv     && rm -rf /tmp/pins /root/.cache",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:39:34.353497318Z",
+          "created_by": "withNewDirectory /home/runner",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:39:34.359856029Z",
+          "created_by": "chown /home/runner 0",
+          "comment": "buildkit.exporter.image.v0"
+        }
+      ],
+      "checks": [
+        {
+          "schema": 1,
+          "stage": "image-smoke",
+          "revision": "c5f86f9eae77182492bd63df1ddd0e26c9fe8b8d",
+          "started": "2026-09-21T03:39:37.074334479Z",
+          "duration_seconds": 3.082194818,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 2.228748,
+          "peak_memory_bytes": 66977792
+        }
+      ]
+    },
+    "after": {
+      "scenario": "after",
+      "started": "2026-09-21T03:40:52.835973+00:00",
+      "injected_cli_sha256": "fb4401358a8cccf2fa1229c92af9e3443b30c42720e41c199d552d6c8d56ff1a",
+      "published": false,
+      "exit_code": 0,
+      "wall_seconds": 86.07651877300304,
+      "manifest_digest": "sha256:cd1ddb57460cd591314c395afd21330cf4d4aeb0274c159de0c420e18bdf788b",
+      "layers": [
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:73847a9ca5f43d3e20daf439041354298a045adbb2c67cfde8149d28e8dde760",
+          "size": 30613439
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:b6e37e41a07dfea5d69aee421dd7e7048962d3e1334b309d972de74ca2b9cee1",
+          "size": 16778479
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:49ae12ea0a1e2857192f5d49c256e8192d07e70ec3207413f140f0c0c3db1a6a",
+          "size": 3534
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:4ccb2ff4fd190096a59926faeb8eb937d516bd967704b0868a672ceb6a6377b8",
+          "size": 36231078
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:2b9c970847397df0ce733e44af6c55d82c170e259664a198b05510b197638628",
+          "size": 27852952
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:b512cccf5884dadeb0431d918789bbaf46f33b1602cafa75681d1d659d429abb",
+          "size": 3835
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+          "size": 32
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:aecebaef270fd7162b6086045d2dd8f5e4b3fa6136eead4f3e401d7a5745dd9b",
+          "size": 321349159
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:b3cb48e168cd68b3605735cb7f32c761ef47c65b3f1cb166a122a6a4aa297cc9",
+          "size": 22880293
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:2946970b00fedc443425e63c1ef39048bb56b5c77c73972f3fab9a37bafdd04e",
+          "size": 86955148
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:e59a1bb8f60778b374da4f345f8bc94511cf62ee82d973e190c602a58a399ca9",
+          "size": 329
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:4b507dee3aa7ae50c20fbeef3b49943d7e5ff0ea932e90ffeec8aecca0911dad",
+          "size": 49474034
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:b970aa072b907018d7d8afe729fdb42514897a64a263da579ff2f557e5f7a9dd",
+          "size": 596
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:ee20540e7daa0741cddc97bc0d24950afebd692e417ca3f10b409ecbe8a435c3",
+          "size": 6622242
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:085e698480dea80e9f112df8d26252a45ac0945890768c94cb570f2189f97bcb",
+          "size": 78457791
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:4e6f932ad79afed99f0ffb77d62900f8cc52037983fdbcbd1473a67ee9c40606",
+          "size": 53166408
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:ea9ac36e0e6279e3530cd646c1892850c483ec441853709053aeebc5fede7782",
+          "size": 277
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:d387937832fa1604675554861facd50e09ac14371530528b8f9204aa8132f9c0",
+          "size": 18820
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:f27f1ad57a23ccd973072098afc9aa9f1f27312a2e9bd707af0179197abc82da",
+          "size": 8080213
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+          "size": 32
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:600a12cd3db00ab5d6c03f15c88198525898d53afcf54fd954ae76477797c6c0",
+          "size": 228437963
+        }
+      ],
+      "diff_ids": [
+        "sha256:b9a65b3c65ab22d490085bd0bf5490e2409da8748b406870f2463bdc41cd6795",
+        "sha256:b8700007f10739e59f54d460970b8d5fd8605dd2cf1b85c3100cb3dc57ffc34b",
+        "sha256:48d52113a83e3a28d2738605f0499a4afb4743485f9b8cf3945d6e09a12915d1",
+        "sha256:3e2dcc99343f0aeb423e4e9a05eb86e7ce0eee2a46c7bcf9de8d13015315f937",
+        "sha256:9764f134ae4b10f0ea9e4547f8d817cb77be5418a155d93370a530da9d92f387",
+        "sha256:01c65e06e88c5402a92649069ef11f76c93babd7e4ee03b4e6bc6907c6781f5e",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:e5401003e089b6de6367ade8e03345bfc2ee166f3a2087bd424940d3285b9520",
+        "sha256:132744ac4856eaddbca9d5f1c8bcf0352e77d75a367a96889ecc1930aef1e28f",
+        "sha256:dbec351c38e365dc2fd63860e0e18cc713cd180baed9739d337ba5eff673ec4b",
+        "sha256:9a954631048a8a3d9f17e3fe7f05d50a67fccd647ebce1eb15bd613512a31b21",
+        "sha256:6ef9c342337cc0bbb28aebff2f7244ba4051077680bf1717b9e068e32ce29796",
+        "sha256:b0b6d74fb6529d175c0acae952a64eed99660e8239e8d19bda6b213b606c8234",
+        "sha256:3085d432f2ae27dce6e92c40173676f93c29587553fa80efffb022d22f96d33a",
+        "sha256:f9f63a6d916d6bb7bf63f2a7a7ce874498db03d34573baa1c5ef1ffacf0a9d96",
+        "sha256:32b75fc7b4cdca287fb7d5d084d7b7432d1c13362654fd326d88e2ce938e8900",
+        "sha256:62192d274c1b5c3f2f3968a4b9c64a031637277f934fee84eeb0b6c29c1109c9",
+        "sha256:00bc6d62c0e2668494f5676262e2302783c7871b72a0fd97eaf45b9ed2f1e23c",
+        "sha256:d314be79cc6566e9286dbff97d90585ab9e90a84c81c5fff90262ed564ab08d5",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:de58891779dda5b97a9e87d12ecbfb795330933926a18c327a75285de06ba1e5"
+      ],
+      "history": [
+        {
+          "created": "2026-09-21T03:19:38.398368458Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:41.814705916Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:43.526851288Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:43.573385453Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:48.272909075Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:51.91455423Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:51.984103923Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:52.016782371Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:20:30.365253413Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:19:15.907825824Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:31.129013255Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:31.131542185Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:31.133951685Z",
+          "created_by": "rehydrated persisted snapshot",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:31.137442244Z",
+          "created_by": "Directory.withDirectoryDockerfileCompat",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:45.510803156Z",
+          "created_by": "Directory.withDirectoryDockerfileCompat",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:49.245720832Z",
+          "created_by": "mount / from exec /bin/sh -c RUNNER_TEMP=/opt infra ci install-tools age age-keygen uv helm yq     && chmod 755 /opt/tools     && ln -s /usr/local/bin/infra /usr/local/bin/infra-runner-hook",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:51.284355861Z",
+          "created_by": "Directory.withDirectoryDockerfileCompat",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:27:54.132874262Z",
+          "created_by": "Directory.withDirectoryDockerfileCompat",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:41:24.09303154Z",
+          "created_by": "mount / from exec /bin/sh -c cd /tmp/pins && uv sync --frozen --group ci --no-install-project     && chmod -R a+rX /opt/venv     && rm -rf /tmp/pins /root/.cache",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:41:25.382942908Z",
+          "created_by": "withNewDirectory /home/runner",
+          "comment": "buildkit.exporter.image.v0"
+        },
+        {
+          "created": "2026-09-21T03:41:25.389375712Z",
+          "created_by": "chown /home/runner 0",
+          "comment": "buildkit.exporter.image.v0"
+        }
+      ],
+      "checks": [
+        {
+          "schema": 1,
+          "stage": "image-smoke",
+          "revision": "c5f86f9eae77182492bd63df1ddd0e26c9fe8b8d",
+          "started": "2026-09-21T03:41:28.765061301Z",
+          "duration_seconds": 3.184969413,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 2.221291,
+          "peak_memory_bytes": 67108864
+        }
+      ]
+    },
+    "changed_diff_id_indices": [
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "tool_layer_index": 14,
+    "tool_layer_bytes_before": 78457798,
+    "tool_layer_bytes_after": 78457791,
+    "tool_layer_reused": false,
+    "scanner": {
+      "baseline_analysis_seconds": 15.012,
+      "changed_artifact_first_scan_seconds": 6.925,
+      "changed_artifact_remaining_budget_seconds": 6.815030587,
+      "changed_artifact_success": false,
+      "mode": "OCIarchive input; not equivalent to registry layer-cache I/O",
+      "finding": "Exact changed artifact failed remaining budget; no warm retry performed"
+    },
+    "published": false
+  }
 }
