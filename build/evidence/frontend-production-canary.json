@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "recorded_at_utc": "2026-09-21T02:59:16.570286+00:00",
-  "state": "build passed; promotion committed; served-revision gate failed; full reconciliation pending",
+  "recorded_at_utc": "2026-09-21T03:06:17.849899+00:00",
+  "state": "build passed; promotion committed; served-revision gate failed; full reconciliation completed and exact revision observed",
   "repository": "fredrir/llunde-frontend",
   "source_revision": "a49a0f7d0091fb664d235e538cba188e0c9ed026",
   "previous_revision": "a555e9dffc435399d917d28782c3370ede9661a2",
@@ -26,7 +26,8 @@
     "reconciliation": {
       "id": 35555262385,
       "url": "https://github.com/fredrir/infra/actions/runs/35555262385",
-      "status": "in_progress"
+      "status": "completed",
+      "conclusion": "success"
     }
   },
   "check_budget": {
@@ -565,13 +566,46 @@
     "apply_job_started_at": "2026-09-21T02:47:28Z",
     "reconcile_step_started_at": "2026-09-21T02:47:52Z",
     "readiness_gate_expired_at": "2026-09-21T02:47:07.9894003Z",
-    "finding": "Readiness gate expired before reconciliation started; previous frontend remained served and no new pod existed during this interval"
+    "finding": "Readiness gate expired before reconciliation started; full host convergence then consumed637.174seconds before publication"
   },
   "limitations": [
     "One bounded production canary, not ordinary-traffic percentiles",
     "The15second deployment target was not achieved",
     "Two bounded observer windows have a gap; no exact first-serving timestamp is claimed",
     "The ten-second aggregate check gate and sixty-second readiness gate were not weakened",
-    "Full reconciliation completion and production warm-cache export remain pending"
-  ]
+    "Production warm-cache export remains pending"
+  ],
+  "reconciliation_completed": {
+    "desired_revision": "3da86446ebb07bd86864b3f0e5e7a86ac705b498",
+    "applied_revision": "3da86446ebb07bd86864b3f0e5e7a86ac705b498",
+    "stage": "complete",
+    "updated_at": "2026-09-21T03:02:46.578181928Z",
+    "stage_seconds": {
+      "expand": 5.812104075,
+      "hosts": 637.173707476,
+      "kubernetes": 41.07884972,
+      "monitor": 74.169808191,
+      "plan": 89.566178881,
+      "publish": 1.556512718,
+      "retire": 9.068704934,
+      "verify": 18.958379499
+    }
+  },
+  "served_revision_observation": {
+    "observed_at": "2026-09-21T03:05:47.874196+00:00",
+    "status": 200,
+    "body": "a49a0f7d0091fb664d235e538cba188e0c9ed026\n",
+    "url": "https://llunde.no/.well-known/revision"
+  },
+  "pod_rollout": {
+    "name": "web-7f67947668-s2r7l",
+    "created_at": "2026-09-21T03:00:28Z",
+    "ready_at": "2026-09-21T03:00:32Z",
+    "image": "ghcr.io/fredrir/llunde-frontend@sha256:3ee8854551b4c9f85b450f4df7a85d5eb140230a34340788f1829c62e8eba513"
+  },
+  "latency_bounds": {
+    "push_start_to_pod_ready_seconds": 969.514547,
+    "push_start_to_late_exact_revision_observation_seconds": 1285.388743,
+    "interpretation": "Pod readiness is not exact first serving; HTTPS was checked after bounded observer windows ended"
+  }
 }
