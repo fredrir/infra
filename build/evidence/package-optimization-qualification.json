@@ -245,5 +245,53 @@
     "cpu_seconds": 1.2782149999999999,
     "peak_memory_bytes": 60497920,
     "engine": "container recreated with same persisted Dagger state,4CPU/4GiB,pids1024,oci-max-parallelism=1"
+  },
+  "actual_catalog": {
+    "source_repository": "fredrir/packages",
+    "source_run": 35539109185,
+    "source_revision": "cb0f493406f2740a679dcd7384935cf53fa87aa2",
+    "source_site_artifact_bytes": 42338161,
+    "tool": "nsql 0.1.14",
+    "scope": "quick: signed deb/rpm/apk installation from original unmodified site/channels artifacts",
+    "mounted_cli_release": "infra-v0.2.2",
+    "mounted_cli_sha256": "dc6d4d3c31efc3162158c4d21a4743d768c07c3639e5c798d98c42d33f5f815b",
+    "host_smoke_source": "format-isolated read-only mounts from ab47c81",
+    "engine": "Dagger0.21.9,4CPU4GiB,oci-max-parallelism=1",
+    "qualification": [
+      {
+        "schema": 1,
+        "stage": "package-production-first-import",
+        "started": "2026-09-21T02:34:27.497152463Z",
+        "duration_seconds": 3.363957813,
+        "budget_seconds": 60,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 2.760257,
+        "peak_memory_bytes": 94085120
+      },
+      {
+        "schema": 1,
+        "stage": "package-production-warm",
+        "started": "2026-09-21T02:34:30.927175752Z",
+        "duration_seconds": 1.444718421,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 1.329099,
+        "peak_memory_bytes": 59977728
+      }
+    ],
+    "limitations": [
+      "Pinned distro base images already warm; first-import sample includes new site transfer, current real packages, signature verification and binary execution, but not registry base pulls.",
+      "One first-import and one warm sample; no production latency percentile claim."
+    ],
+    "commands": [
+      "gh run download 35539109185 -R fredrir/packages -n site -D <site>",
+      "gh run download 35539109185 -R fredrir/packages -n channels -D <channels>",
+      "infra ci measure --stage package-production-first-import --budget 60s --report-dir <reports> -- infra packages smoke --root <root> --infra-binary <released-infra-v0.2.2> <site> <channels> quick",
+      "infra ci measure --stage package-production-warm --budget 10s --report-dir <reports> -- infra packages smoke --root <root> --infra-binary <released-infra-v0.2.2> <site> <channels> quick"
+    ]
   }
 }
