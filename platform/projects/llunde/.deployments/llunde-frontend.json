@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "image": "ghcr.io/fredrir/llunde-frontend",
-  "revision": "579e3a2f53ef9707b46d2685355f53b930aadecf",
-  "digest": "sha256:3a1c31eecd3fe55daf7e224eaa13809bee968be25d0cc9bf98f4dc272c161421",
-  "run_id": 35619397991,
-  "attempt": 2
+  "revision": "e600cd999f5b58b29357d7751574522d75c7d87b",
+  "digest": "sha256:6a73c423592d074bd057d4a6c50191ddb0bb236ce10404060c1ae66dc6ce59b4",
+  "run_id": 35774817568,
+  "attempt": 1
 }
