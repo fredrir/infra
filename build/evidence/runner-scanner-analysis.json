@@ -1,0 +1,73 @@
+{
+ "schema": 1,
+ "recorded_at_utc": "2026-09-22T20:45:00+00:00",
+ "workflow_revision": "bf0041b6c518f41f8d729c8606d2996195e28eef",
+ "run_url": "https://github.com/fredrir/infra/actions/runs/35780519231",
+ "host": "infra-build-09",
+ "change": "scanner-analysis preparation stage runs the exact vulnerability-scan arguments with a 5m budget before the 10s check",
+ "images": [
+  {
+   "image": "ghcr.io/fredrir/infra-runner-rust",
+   "before": {
+    "run_url": "https://github.com/fredrir/infra/actions/runs/35776595575",
+    "vulnerability_scan_seconds": 8.65,
+    "conclusion": "budget exceeded"
+   },
+   "after": {
+    "scanner_analysis_seconds": 50.36,
+    "vulnerability_scan_seconds": 1.09,
+    "aggregate_checks_seconds": 3.87,
+    "conclusion": "success"
+   },
+   "layers_changed_since_last_analysis_mb": 1385
+  },
+  {
+   "image": "ghcr.io/fredrir/infra-runner-check",
+   "before": {
+    "run_url": "https://github.com/fredrir/infra/actions/runs/35776595575",
+    "vulnerability_scan_seconds": 6.22,
+    "conclusion": "budget exceeded"
+   },
+   "after": {
+    "scanner_analysis_seconds": 16.73,
+    "vulnerability_scan_seconds": 1.1,
+    "aggregate_checks_seconds": 6.06,
+    "conclusion": "success"
+   },
+   "layers_changed_per_cli_change_mb": 146
+  },
+  {
+   "image": "ghcr.io/fredrir/infra-runner-dagger",
+   "after": {
+    "scanner_analysis_seconds": 1.33,
+    "vulnerability_scan_seconds": 0.97,
+    "aggregate_checks_seconds": 2.3,
+    "conclusion": "success"
+   }
+  },
+  {
+   "image": "ghcr.io/fredrir/platform-caddy",
+   "after": {
+    "scanner_analysis_seconds": 1.01,
+    "vulnerability_scan_seconds": 0.91,
+    "aggregate_checks_seconds": 2.05,
+    "conclusion": "success"
+   }
+  },
+  {
+   "image": "ghcr.io/fredrir/platform-backup-tools",
+   "after": {
+    "scanner_analysis_seconds": 1.11,
+    "vulnerability_scan_seconds": 0.95,
+    "aggregate_checks_seconds": 2.06,
+    "conclusion": "success"
+   }
+  }
+ ],
+ "local_cache_key_check": {
+  "trivy": "0.74.0",
+  "image": "ghcr.io/fredrir/platform-backup-tools@sha256:fae5ec1e022274171e39c2b999c49a7f04668aa772db5d8a8cefe7ecab2b5107",
+  "cold_seconds": 11,
+  "warm_seconds": 1
+ }
+}

@@ -32,7 +32,7 @@ git -C "$CONSUMER_CHECKOUT" apply --check "$INFRA_CHECKOUT/build/rollout/$REPOSI
 | Backup host CLI   | [`infra-v0.1.0`](https://github.com/fredrir/infra/releases/tag/infra-v0.1.0); source `73a5ca2e6b88b40a6f8c55deae12af4a3e058c78` |
 | Linux host binary | SHA-256 `c37acf10dd13009f61374b9fce811877b2a40c33b34a600a67e0c9e9dc39d0c1`                                                      |
 | Control backup    | `fredrir-07`; Go command completed successfully on 2026-09-20 at 17:05:08 UTC                                                   |
-| Go tools image    | `ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2`                 |
+| Go tools image    | `ghcr.io/fredrir/platform-backup-tools@sha256:fae5ec1e022274171e39c2b999c49a7f04668aa772db5d8a8cefe7ecab2b5107`                 |
 | Monitoring        | Gatus healthy; retired cache endpoint removed; backup heartbeats retained                                                       |
 | Build execution   | GitHub-hosted Dagger; dedicated VM pool awaits native qualification                                                             |
 
