@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-22T17:31:00Z",
+  "scope": "Production stage timings for an application-only change after project-scoped reconciliation planning",
+  "change": {
+    "revision": "b07ac21",
+    "behaviour": "Planning renders only the affected project subtree when every changed path sits inside one platform/projects/<project>/ tree.",
+    "workflow": "Reconcile infrastructure"
+  },
+  "sample": {
+    "run": 35760909713,
+    "trigger": "Deploy portfolio-web b1f1d533ecebf5d95280b870ed82acc72dd597c4",
+    "changed_paths": ["platform/projects/portfolio/.deployments/portfolio-web.json", "platform/projects/portfolio/kustomization.yaml"],
+    "desired_revision": "66473091b714",
+    "conclusion": "success",
+    "stage_seconds": {"plan": 5.285, "kubernetes": 45.948, "publish": 1.243, "verify": 3.829}
+  },
+  "baseline_application_only_runs": [
+    {"run": 35559992436, "stage_seconds": {"plan": 45.489363018, "kubernetes": 42.847921479, "publish": 1.177535148, "verify": 4.020130868}},
+    {"run": 35730117830, "stage_seconds": {"plan": 51.089823711, "kubernetes": 51.362043003, "publish": 1.513008792, "verify": 4.608254589}}
+  ],
+  "result": {
+    "plan_seconds_before": [45.489, 51.09],
+    "plan_seconds_after": 5.285,
+    "plan_reduction_factor": "8.6x to 9.7x",
+    "total_stage_seconds_before": [93.535, 108.574],
+    "total_stage_seconds_after": 56.305,
+    "remaining_dominant_stage": "kubernetes apply, 45.948 seconds"
+  },
+  "limitations": [
+    "One bounded production run after the change; the baseline is two bounded runs, so these are single-sample comparisons rather than percentiles.",
+    "The kubernetes apply stage still re-reconciles and verifies the whole cluster graph; narrowing it requires verifying the live Kustomization topology for project ownership.",
+    "Runner queueing delayed this run before it started, and queue time is excluded from the stage timings."
+  ]
+}
