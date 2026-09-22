@@ -298,6 +298,21 @@ jobs:
             --source-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" \
             --test-command "$IMAGE_TEST_COMMAND" --test-shell "$IMAGE_TEST_SHELL" --timeout "${BUILD_TIMEOUT}m"
           printf 'report-id=%s-%s\n' "${IMAGE##*/}" "$(cat /proc/sys/kernel/random/uuid)" >> "$GITHUB_OUTPUT"
+      - name: Analyze published image layers
+        if: steps.affected.outputs.changed == 'true'
+        env:
+          IMAGE: ${{ steps.build.outputs.image }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ github.token }}
+          SKIP_DIRS: ${{ inputs.scan-skip-dirs }}
+        run: |
+          skip=()
+          if [[ -n "$SKIP_DIRS" ]]; then
+            [[ "$SKIP_DIRS" =~ ^/[a-z/]+$ ]]
+            skip=(--skip-dirs "$SKIP_DIRS")
+          fi
+          infra ci measure --stage scanner-analysis --budget 5m --report-dir "$RUNNER_TEMP/performance/preparation" -- \
+            infra ci scanner scan -- image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 --skip-db-update --skip-java-db-update --timeout 5m --quiet --format json --output /dev/null "${skip[@]}" "$IMAGE"
       - name: Scan published image
         if: steps.affected.outputs.changed == 'true'
         env:
