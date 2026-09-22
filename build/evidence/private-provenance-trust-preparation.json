@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-22T16:40:00Z",
+  "scope": "Bounded Linux measurement of cosign verification cost with and without a prepared Sigstore trusted root; public keyless-signed image used because private GHCR package reads are only available inside the runner job",
+  "host": {
+    "name": "llunde-core",
+    "architecture": "x86_64",
+    "access": "ssh ntnu",
+    "cpus": 16,
+    "memory_gb": 62,
+    "docker": "29.8.1",
+    "podman": "5.7.0"
+  },
+  "tool": {
+    "name": "cosign",
+    "version": "v3.1.3-infra.1",
+    "source": "https://github.com/fredrir/infra/releases/download/cosign-v3.1.3-infra.1/cosign-linux-amd64",
+    "sha256_verified": "05e004d22d93dc6dffb1b1633c1a03fcf0369b2f6eb247b714e236b61a742c71"
+  },
+  "subject": {
+    "image": "ghcr.io/fluxcd/source-controller:v1.4.1",
+    "reason": "public keyless signature from a GitHub Actions workflow, same Sigstore public-good trust path as the private consumer images"
+  },
+  "command_shape": {
+    "baseline": "cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp ^https://github.com/.* <image>",
+    "prepared": "cosign verify --trusted-root <prepared trusted_root.json> --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp ^https://github.com/.* <image>"
+  },
+  "samples": {
+    "cold_state_no_sigstore_cache_seconds": [2.13, 2.03, 2.03, 2.03, 2.03],
+    "warm_state_default_tuf_seconds": [2.03, 2.03, 2.03, 2.33, 2.03],
+    "prepared_trusted_root_seconds": [1.63, 1.63, 1.53, 1.73, 1.54]
+  },
+  "medians_seconds": {
+    "cold_state_no_sigstore_cache": 2.03,
+    "warm_state_default_tuf": 2.03,
+    "prepared_trusted_root": 1.63
+  },
+  "preparation_cost_seconds": {
+    "cosign_initialize": 1.23,
+    "copy_trusted_root": 0.13
+  },
+  "negative_cases": [
+    {
+      "case": "wrong signer identity",
+      "exit_code": 12,
+      "passed": true
+    },
+    {
+      "case": "missing trusted root file",
+      "exit_code": 1,
+      "passed": true
+    },
+    {
+      "case": "digest without signatures",
+      "exit_code": 10,
+      "passed": true
+    }
+  ],
+  "observations": [
+    "Caching the Sigstore TUF material in $HOME does not change verification time: 2.03s cold and 2.03s warm median.",
+    "Verifying with a prepared trusted root measured a 1.63s median, a 0.40s reduction against the 2.03s baseline on this host.",
+    "Preparing the trusted root costs 1.23s once per job in the unmeasured preparation step and also warms the TUF material used by signing."
+  ],
+  "implementation": {
+    "file": ".github/workflows/build-image.yml",
+    "steps": [
+      "Prepare private provenance trust runs cosign initialize, copies the TUF trusted root into RUNNER_TEMP and exports SIGSTORE_TRUSTED_ROOT.",
+      "Sign and verify private image provenance passes --trusted-root when SIGSTORE_TRUSTED_ROOT is set and non-empty."
+    ],
+    "fallback": "When the trusted root is unavailable the measured verification runs unchanged through the TUF cache, so verification never weakens."
+  },
+  "limitations": [
+    "Measurements were taken on ntnu against a public keyless-signed image; the private runner measured 3.263s for the equivalent private verification on 2026-09-22, so the absolute saving on the runner is not directly established by this file.",
+    "Five samples per variant on one host; no percentile claim.",
+    "The runner-side effect is qualified separately by the llunde-pyparser production canary that follows this change."
+  ]
+}
