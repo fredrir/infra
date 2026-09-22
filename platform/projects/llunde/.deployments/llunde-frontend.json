@@ -2,7 +2,7 @@
   "schema": 1,
   "image": "ghcr.io/fredrir/llunde-frontend",
   "revision": "579e3a2f53ef9707b46d2685355f53b930aadecf",
-  "digest": "sha256:e5595075718bcbe1f9827dbff52956caa7dd3221a1b57890f2cf51fb2f350d24",
+  "digest": "sha256:3a1c31eecd3fe55daf7e224eaa13809bee968be25d0cc9bf98f4dc272c161421",
   "run_id": 35619397991,
-  "attempt": 1
+  "attempt": 2
 }
