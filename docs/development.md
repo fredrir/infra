@@ -210,7 +210,7 @@ The inventory records GitHub reads on its `checked` date; refresh it before reti
 Slow suites remain explicit local operations. Failed, missing or timed-out checks fail the gate. Preparation and qualification costs remain visible; the target budgets are not evidence of achieved end-to-end latency.
 
 ```sh
-TOOLS_IMAGE=ghcr.io/fredrir/platform-backup-tools@sha256:5d350bdc39e4bf66e4db23944d63cdac7c1098eda71e9a5fde0364191b33d5e2
+TOOLS_IMAGE=ghcr.io/fredrir/platform-backup-tools@sha256:fae5ec1e022274171e39c2b999c49a7f04668aa772db5d8a8cefe7ecab2b5107
 infra platform prefetch --namespace llunde --node fredrir-09 \
   --utility-image "$TOOLS_IMAGE" --pull-secret ghcr --timeout 30s \
   "$VERIFIED_IMAGE" --apply
