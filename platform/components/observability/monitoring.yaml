@@ -28,6 +28,9 @@ spec:
     fullnameOverride: monitoring
     defaultRules:
       create: true
+      disabled:
+        KubeCPUQuotaOvercommit: true
+        KubeMemoryQuotaOvercommit: true
     kubeEtcd:
       enabled: false
     kubeControllerManager:
