@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-22T17:05:00Z",
+  "scope": "Local equivalence and timing for rendering only the affected project during reconciliation planning",
+  "motivation": {
+    "observation": "An application-only change promoted by the Deploy workflow re-rendered and re-applied the whole cluster.",
+    "production_stage_seconds": {
+      "run_35559992436": {"plan": 45.489363018, "kubernetes": 42.847921479, "publish": 1.177535148, "verify": 4.020130868},
+      "run_35730117830": {"plan": 51.089823711, "kubernetes": 51.362043003, "publish": 1.513008792, "verify": 4.608254589}
+    },
+    "source": "reconciliation report artifacts reconciliation-35559992436-1 and reconciliation-35730117830-1"
+  },
+  "change": {
+    "files": ["internal/reconcile/config.go", "internal/reconcile/commands.go"],
+    "behaviour": "Planning renders only the affected project subtree when every changed path sits inside exactly one platform/projects/<project>/ tree.",
+    "fallback": "Any other change set keeps the full flux-system recursive render.",
+    "commands": {
+      "narrowed": "flux build kustomization platform-projects --path=./platform/projects/<project> --recursive --local-sources=GitRepository/flux-system/flux-system=.",
+      "full": "flux build kustomization flux-system --path=./platform/clusters/production --recursive --local-sources=GitRepository/flux-system/flux-system=."
+    }
+  },
+  "environment": {
+    "host": "developer macOS arm64 workstation",
+    "flux": "flux CLI from /opt/homebrew/bin/flux",
+    "offline_renders": true,
+    "note": "Renders used --kustomization-file with the in-repo platform-projects Kustomization and --dry-run so the comparison is reproducible without cluster access."
+  },
+  "timings_seconds": {
+    "full_recursive_render": 0.525,
+    "project_scoped_render": 0.097,
+    "kustomizations_resolved_full": 13,
+    "kustomizations_resolved_scoped": 1
+  },
+  "equivalence": {
+    "method": "Documents labelled kustomize.toolkit.fluxcd.io/name=platform-projects for the project were extracted from the full recursive render and compared byte-for-byte after YAML canonicalisation against the scoped render.",
+    "llunde": {"project_documents": 27, "scoped_documents": 27, "missing": 0, "differing": 0, "extra": 0},
+    "y": {"project_documents": 33, "scoped_documents": 33, "missing": 0, "differing": 0, "extra": 0},
+    "negative_control": {"comparison": "llunde scoped render compared against the y project expectation", "missing": 33, "extra": 27, "detects_mismatch": true}
+  },
+  "selection_tests": [
+    "one project narrows",
+    "nested project files narrow",
+    "two projects keep the full render",
+    "cluster, component, charts and parent paths keep the full render",
+    "empty change set keeps the full render",
+    "internal/ tooling changes force the full scope"
+  ],
+  "limitations": [
+    "The production stage numbers come from two bounded runs and are not percentiles.",
+    "Local render time is dominated by a warm kustomize cache; production time is dominated by cluster API round trips, so the measured local ratio understates the production effect.",
+    "Only the plan stage is scoped by this change; the kubernetes apply stage still reconciles the whole cluster graph and remains the next candidate.",
+    "The scoped render still resolves the live platform-projects Kustomization from the cluster, so the exact production command shape differs from the offline equivalence command by the --kustomization-file and --dry-run flags."
+  ]
+}

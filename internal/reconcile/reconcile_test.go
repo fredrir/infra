@@ -150,13 +150,41 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 		{"platform/clusters/production/settings.yaml", Selection{Tofu: true, Kubernetes: true, Ansible: true, MonitorOnly: true}},
 		{"tofu/platform-dns.tf", Selection{Tofu: true, Ansible: true}},
 		{"ansible/roles/gatus/tasks/main.yml", Selection{Ansible: true, MonitorOnly: true}},
-		{"platform/projects/y/application.yaml", Selection{Kubernetes: true}},
+		{"platform/projects/y/application.yaml", Selection{Kubernetes: true, Projects: []string{"y"}}},
 		{"build/cli-release.json", Selection{Ansible: true}},
 		{"README.md", Selection{}},
 	} {
-		if got := Affected([]string{test.path}); got != test.want {
+		if got := Affected([]string{test.path}); !reflect.DeepEqual(got, test.want) {
 			t.Errorf("%s: %+v", test.path, got)
 		}
+	}
+}
+
+func TestAffectedNarrowsKubernetesScopeToASingleProject(t *testing.T) {
+	narrowed := Selection{Kubernetes: true, Projects: []string{"llunde"}}
+	for name, paths := range map[string][]string{
+		"one project":         {"platform/projects/llunde/kustomization.yaml"},
+		"nested project file": {"platform/projects/llunde/.deployments/llunde-frontend.json", "platform/projects/llunde/kustomization.yaml"},
+	} {
+		if got := Affected(paths); !reflect.DeepEqual(got, narrowed) {
+			t.Errorf("%s: %+v", name, got)
+		}
+	}
+	for name, paths := range map[string][]string{
+		"two projects":     {"platform/projects/llunde/kustomization.yaml", "platform/projects/y/kustomization.yaml"},
+		"cluster manifest": {"platform/clusters/production/root.yaml"},
+		"shared component": {"platform/projects/llunde/kustomization.yaml", "platform/components/cache/kustomization.yaml"},
+		"charts directory": {"charts/llunde/values.yaml"},
+		"projects parent":  {"platform/projects/kustomization.yaml"},
+		"unrelated file":   {"README.md"},
+		"empty change set": {},
+	} {
+		if got := Affected(paths); len(got.Projects) != 0 {
+			t.Errorf("%s: narrowed %+v", name, got)
+		}
+	}
+	if got := Affected([]string{"platform/projects/llunde/kustomization.yaml", "internal/reconcile/config.go"}); !reflect.DeepEqual(got, All()) {
+		t.Errorf("tooling change must keep the full scope: %+v", got)
 	}
 }
 
@@ -189,6 +217,27 @@ func TestReadinessRejectsStaleGenerationAndRevision(t *testing.T) {
 	}}}
 	if c.verifyKubernetes(context.Background(), "new", "") == nil {
 		t.Fatal("stale revision accepted")
+	}
+}
+
+func TestPlanRendersOnlyTheAffectedProject(t *testing.T) {
+	var commands []string
+	c := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		commands = append(commands, strings.Join(append([]string{options.Name}, options.Args...), " "))
+		return process.Result{}, nil
+	}}}
+	if err := c.Plan(context.Background(), Plan{Revision: strings.Repeat("a", 40), Affected: Affected([]string{"platform/projects/llunde/kustomization.yaml"})}); err != nil {
+		t.Fatal(err)
+	}
+	if len(commands) != 1 || !strings.Contains(commands[0], "build kustomization platform-projects --path=./platform/projects/llunde") {
+		t.Fatalf("scoped render missing: %v", commands)
+	}
+	commands = nil
+	if err := c.Plan(context.Background(), Plan{Revision: strings.Repeat("a", 40), Affected: Affected([]string{"platform/clusters/production/root.yaml"})}); err != nil {
+		t.Fatal(err)
+	}
+	if len(commands) != 1 || !strings.Contains(commands[0], "build kustomization flux-system --path=./platform/clusters/production") {
+		t.Fatalf("full render missing: %v", commands)
 	}
 }
 

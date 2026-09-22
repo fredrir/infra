@@ -109,7 +109,7 @@ func TestReconciliationResumesOnlyDurablyCompletedHosts(t *testing.T) {
 	if len(second.selections) != 2 || second.selections[0].base != prior || second.selections[0].full || second.selections[1].base != applied || !second.selections[1].full {
 		t.Fatalf("checkpoint comparison lost: %+v", second.selections)
 	}
-	if second.plans[0].Affected != All() || second.plans[0].Base != applied || store.status.Applied != current || store.status.HostsReusedFrom != prior {
+	if !reflect.DeepEqual(second.plans[0].Affected, All()) || second.plans[0].Base != applied || store.status.Applied != current || store.status.HostsReusedFrom != prior {
 		t.Fatalf("original transition or reuse receipt lost: %+v, %+v", second.plans, store.status)
 	}
 }

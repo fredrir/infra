@@ -11,11 +11,14 @@ import (
 )
 
 type Selection struct {
-	Tofu        bool `json:"tofu"`
-	Kubernetes  bool `json:"kubernetes"`
-	Ansible     bool `json:"ansible"`
-	MonitorOnly bool `json:"monitor_only"`
+	Tofu        bool     `json:"tofu"`
+	Kubernetes  bool     `json:"kubernetes"`
+	Ansible     bool     `json:"ansible"`
+	MonitorOnly bool     `json:"monitor_only"`
+	Projects    []string `json:"projects,omitempty"`
 }
+
+var projectNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
 func All() Selection { return Selection{Tofu: true, Kubernetes: true, Ansible: true} }
 
@@ -42,7 +45,31 @@ func Affected(paths []string) Selection {
 		}
 	}
 	selected.MonitorOnly = selected.Ansible && !hosts
+	if selected.Kubernetes && !selected.Tofu && !selected.Ansible {
+		selected.Projects = projectScope(paths)
+	}
 	return selected
+}
+
+func projectScope(paths []string) []string {
+	var project string
+	for _, path := range paths {
+		parts := strings.Split(path, "/")
+		if len(parts) < 3 || parts[0] != "platform" || parts[1] != "projects" || !projectNamePattern.MatchString(parts[2]) {
+			return nil
+		}
+		if project == "" {
+			project = parts[2]
+			continue
+		}
+		if project != parts[2] {
+			return nil
+		}
+	}
+	if project == "" || len(paths) == 0 {
+		return nil
+	}
+	return []string{project}
 }
 
 func Host(root string) (string, error) {

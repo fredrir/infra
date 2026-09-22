@@ -91,7 +91,11 @@ func (c *Commands) Plan(ctx context.Context, plan Plan) error {
 		}
 	}
 	if plan.Affected.Kubernetes {
-		if _, err := c.Runner.Output(ctx, "flux", "build", "kustomization", "flux-system", "--path=./platform/clusters/production", "--recursive", "--local-sources=GitRepository/flux-system/flux-system=."); err != nil {
+		name, path := "flux-system", "./platform/clusters/production"
+		if len(plan.Affected.Projects) == 1 {
+			name, path = "platform-projects", "./platform/projects/"+plan.Affected.Projects[0]
+		}
+		if _, err := c.Runner.Output(ctx, "flux", "build", "kustomization", name, "--path="+path, "--recursive", "--local-sources=GitRepository/flux-system/flux-system=."); err != nil {
 			return err
 		}
 	}
