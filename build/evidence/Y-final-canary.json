@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-22T18:20:00Z",
+  "repository": "fredrir/Y",
+  "scope": "One bounded production canary of the optimized image workflow for a public consumer; no percentile claim",
+  "source_revision": "02ef1187d735",
+  "workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
+  "previous_workflow_revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+  "build_run": 35764567474,
+  "build_conclusion": "success",
+  "verification_path": "public attestation bundle with prepared trusted root",
+  "checks": {
+    "y-api": {
+      "duration_seconds": 3.196,
+      "success": true,
+      "stages": {
+        "vulnerability-scan": 2.52,
+        "provenance-verification": 0.67
+      }
+    },
+    "y-web": {
+      "duration_seconds": 4.208,
+      "success": true,
+      "stages": {
+        "y-web": 2.08,
+        "vulnerability-scan": 1.45,
+        "provenance-verification": 0.68
+      }
+    }
+  },
+  "deployments": [
+    {
+      "image": "ghcr.io/fredrir/y-web",
+      "deploy_run": 35765324071,
+      "conclusion": "success",
+      "reconcile_run": 35765367504,
+      "reconcile_conclusion": "success",
+      "digest": "sha256:b5f56ce7f0e70f5fb3042bcc60d7e0e6773f3a4da3eee36ca75afcb2098c183a"
+    },
+    {
+      "image": "ghcr.io/fredrir/y-api",
+      "deploy_run": 35765567273,
+      "conclusion": "success",
+      "reconcile_run": 35765611950,
+      "reconcile_conclusion": "success",
+      "digest": "sha256:acf95b8a266bd0f98e932c640aa7bfdf16458581be208d4e748452e543b5968d"
+    }
+  ],
+  "production_state": {
+    "receipts": "platform/projects/y/.deployments/{y-api,y-web}.json record revision 02ef1187 and the digests above",
+    "pins": "platform/projects/y/kustomization.yaml lists the matching digest pins",
+    "replica_state": "y-api stays scaled to zero by configuration"
+  },
+  "observations": [
+    "Public provenance verification stayed below 0.7 seconds for both images.",
+    "Both reconciliations succeeded on the first attempt because the two pins landed far enough apart."
+  ],
+  "limitations": [
+    "Single bounded canary per image; no percentile claim.",
+    "Build wall time is not reported because the runner queue was saturated by concurrent runner-image rebuilds.",
+    "y-api is intentionally scaled to zero, so readiness was verified through Flux reconciliation rather than a running pod."
+  ]
+}

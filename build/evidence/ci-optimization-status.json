@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "observed_at": "2026-09-22T16:48:25.473020+00:00",
+  "observed_at": "2026-09-22T18:17:05.185163+00:00",
   "release": "infra-v0.2.5",
   "workflow_revision": "b07ac21",
   "source_check": {
@@ -32,12 +32,10 @@
   "frontend_under_15_seconds_qualified": false,
   "remaining": [
     "ordinary-traffic percentiles and sub-15-second qualification",
-    "cold changed-CLI dependency layer churn",
-    "workflow handoff and whole-cluster application planning overhead",
-    "portfolio and Y public consumer rollout",
-    "ordinary-traffic percentiles and sub-15-second qualification",
-    "kubernetes apply stage still reconciles the whole cluster graph",
-    "build and publish wall time on cold dependency layers"
+    "kubernetes apply stage still reconciles and verifies the whole cluster graph (45.948s observed)",
+    "runner images rebuild on every internal/** push and currently fail the ten-second scan gate, monopolizing the single build runner",
+    "single-runner-per-repository serializes multi-image builds (portfolio web/api/worker built sequentially)",
+    "cold dependency layers still dominate build and publish wall time"
   ],
   "installed_release": "infra-v0.2.5",
   "infrastructure_images": {
@@ -88,5 +86,30 @@
       "after": 1.63
     },
     "evidence": "private-provenance-trust-preparation.json"
+  },
+  "consumers": {
+    "llunde-frontend": {
+      "pinned_revision": "221abb2f",
+      "served_revision": "579e3a2f",
+      "state": "deployed and serving"
+    },
+    "llunde-backend": {
+      "pinned_revision": "221abb2f",
+      "state": "deployed, exact digest healthy"
+    },
+    "llunde-pyparser": {
+      "pinned_revision": "6320a6f",
+      "state": "deployed via prepared-trust canary"
+    },
+    "portfolio": {
+      "pinned_revision": "221abb2f",
+      "state": "three images deployed and reconciled",
+      "evidence": "portfolio-final-canary.json"
+    },
+    "Y": {
+      "pinned_revision": "221abb2f",
+      "state": "two images deployed and reconciled",
+      "evidence": "Y-final-canary.json"
+    }
   }
 }

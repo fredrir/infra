@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-22T18:05:00Z",
+  "repository": "fredrir/portfolio",
+  "scope": "One bounded production canary of the optimized image workflow for a public consumer; no percentile claim",
+  "source_revision": "b1f1d533ecebf5d95280b870ed82acc72dd597c4",
+  "workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
+  "previous_workflow_revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610",
+  "build_run": 35760426164,
+  "build_conclusion": "success",
+  "verification_path": "public attestation bundle with prepared trusted root",
+  "checks": {
+    "portfolio-api": {"duration_seconds": 3.841, "success": true, "stages": {"portfolio-rust": 0.31, "vulnerability-scan": 2.38, "provenance-verification": 1.15}},
+    "portfolio-web": {"duration_seconds": 6.134, "success": true, "stages": {"portfolio-web": 2.69, "vulnerability-scan": 2.42, "provenance-verification": 1.02}},
+    "portfolio-worker": {"duration_seconds": 4.355, "success": true, "stages": {"portfolio-rust": 0.31, "vulnerability-scan": 3.41, "provenance-verification": 0.64}}
+  },
+  "deployments": [
+    {"image": "ghcr.io/fredrir/portfolio-web", "deploy_run": 35760860430, "conclusion": "success", "reconcile_run": 35760909713, "reconcile_conclusion": "success", "digest": "sha256:ebadc0c3e8ebdaf70ee58f2c6c16b671a1b3596366d88db170dc3c3e465aa8e0"},
+    {"image": "ghcr.io/fredrir/portfolio-api", "deploy_run": 35762629645, "conclusion": "success", "reconcile_run": 35762673006, "reconcile_conclusion": "failure", "reconcile_failure": "main advanced; retry reconciliation at its current revision", "digest": "sha256:f193416daaa41ace5249be4edc813cdc26b6f4c95b3d55d88b8575fee47028c4"},
+    {"image": "ghcr.io/fredrir/portfolio-worker", "deploy_run": 35762724058, "conclusion": "success", "reconcile_run": 35762768834, "reconcile_conclusion": "success", "digest": "sha256:b6b2589451ccfcbb7374b7da00c54002b7a720ecb56621bbd1ce512340513205"}
+  ],
+  "production_state": {
+    "receipts": "platform/projects/portfolio/.deployments/{portfolio-api,portfolio-web,portfolio-worker}.json all record revision b1f1d533 and the digests above",
+    "pins": "platform/projects/portfolio/kustomization.yaml lists the matching digest pins",
+    "replica_state": "unchanged by this rollout"
+  },
+  "observations": [
+    "The public verification path stayed between 0.64 and 1.15 seconds, matching the earlier 0.85 second measurement.",
+    "The api pin reconcile failed only because the worker pin advanced main while it was publishing; the worker run then converged.",
+    "Successive pins for one repository invalidate an in-flight reconciliation, so multi-image repositories converge after the last pin."
+  ],
+  "limitations": [
+    "Single bounded canary per image; no percentile claim.",
+    "Build and queue wall time is not reported here because the runner queue was saturated by concurrent runner-image rebuilds.",
+    "Workload readiness for the scaled-to-zero or idle components was not exercised beyond Flux reconciliation success."
+  ]
+}
