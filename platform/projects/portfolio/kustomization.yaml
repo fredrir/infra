@@ -18,7 +18,7 @@ resources:
 components:
     - ../../components/backup-job
 images:
-    - digest: sha256:e11c056d837d1545d250de579ca044c8f672b876b2c29e8fc19dda9f8a29f9a9
+    - digest: sha256:f193416daaa41ace5249be4edc813cdc26b6f4c95b3d55d88b8575fee47028c4
       name: ghcr.io/fredrir/portfolio-api
       newName: ghcr.io/fredrir/portfolio-api
     - digest: sha256:ebadc0c3e8ebdaf70ee58f2c6c16b671a1b3596366d88db170dc3c3e465aa8e0
