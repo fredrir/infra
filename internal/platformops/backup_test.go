@@ -14,6 +14,14 @@ import (
 	"time"
 )
 
+func mergePatchReplicas(r *http.Request) (int, bool) {
+	var patch struct{ Spec struct{ Replicas *int } }
+	if r.Header.Get("Content-Type") != "application/merge-patch+json" || json.NewDecoder(r.Body).Decode(&patch) != nil || patch.Spec.Replicas == nil {
+		return 0, false
+	}
+	return *patch.Spec.Replicas, true
+}
+
 func TestBackupRecoversWritersAfterExportFailure(t *testing.T) {
 	for _, canceled := range []bool{false, true} {
 		t.Run(fmt.Sprint(canceled), func(t *testing.T) {
@@ -23,18 +31,12 @@ func TestBackupRecoversWritersAfterExportFailure(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				switch {
 				case r.Method == "PATCH":
-					var patch []struct {
-						Op    string
-						Value int
-					}
-					if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
-						t.Error(err)
-					}
-					if len(patch) != 2 || patch[0].Value != replicas {
-						http.Error(w, "conflict", 409)
+					patched, ok := mergePatchReplicas(r)
+					if !ok {
+						http.Error(w, "unprocessable patch", 422)
 						return
 					}
-					replicas = patch[1].Value
+					replicas = patched
 					transitions = append(transitions, replicas)
 					fmt.Fprint(w, `{}`)
 				case strings.HasSuffix(r.URL.Path, "/pods"):

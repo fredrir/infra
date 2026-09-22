@@ -38,15 +38,12 @@ func TestBackupRestoresOnlyOriginallyRunningWriters(t *testing.T) {
 					name = parts[len(parts)-2]
 				}
 				if r.Method == http.MethodPatch {
-					var patch []struct{ Value int }
-					if e := json.NewDecoder(r.Body).Decode(&patch); e != nil {
-						t.Error(e)
-					}
-					if len(patch) != 2 || patch[0].Value != state[name] {
-						w.WriteHeader(409)
+					replicas, ok := mergePatchReplicas(r)
+					if !ok {
+						w.WriteHeader(422)
 						return
 					}
-					state[name] = patch[1].Value
+					state[name] = replicas
 					transitions[name] = append(transitions[name], state[name])
 					if failScale && !failed && state[name] == 0 {
 						failed = true

@@ -169,7 +169,7 @@ func exportBackup(ctx context.Context, c BackupConfig) (result error) {
 			if err := writeJSON(journal, writers); err != nil {
 				return err
 			}
-			if err := scaleWriter(ctx, c, name, 1, 0); err != nil {
+			if err := scaleWriter(ctx, c, name, 0); err != nil {
 				return err
 			}
 		}
@@ -302,10 +302,10 @@ func deployment(ctx context.Context, c BackupConfig, name string) (int, string, 
 	return *object.Spec.Replicas, strings.Join(labels, ","), nil
 }
 
-func scaleWriter(ctx context.Context, c BackupConfig, name string, before, after int) error {
+func scaleWriter(ctx context.Context, c BackupConfig, name string, replicas int) error {
 	api := c.Kubernetes
-	api.ContentType = "application/json-patch+json"
-	body := []map[string]any{{"op": "test", "path": "/spec/replicas", "value": before}, {"op": "replace", "path": "/spec/replicas", "value": after}}
+	api.ContentType = "application/merge-patch+json"
+	body := map[string]any{"spec": map[string]any{"replicas": replicas}}
 	_, err := api.Call(ctx, http.MethodPatch, "/apis/apps/v1/namespaces/"+url.PathEscape(c.Namespace)+"/deployments/"+url.PathEscape(name)+"/scale", body, nil)
 	return err
 }
@@ -352,7 +352,7 @@ func ResumeBackup(ctx context.Context, c BackupConfig) error {
 		current, _, err := deployment(ctx, c, writer.Name)
 		if err == nil {
 			if current == 0 {
-				err = scaleWriter(ctx, c, writer.Name, 0, writer.Replicas)
+				err = scaleWriter(ctx, c, writer.Name, writer.Replicas)
 			} else if current != writer.Replicas {
 				err = fmt.Errorf("writer %s changed replicas", writer.Name)
 			}
