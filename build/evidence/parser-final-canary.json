@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-22T16:38:00Z",
+  "repository": "fredrir/llunde-pyparser",
+  "source_revision": "edbb2fc1d16be412a323124bfc599cf08b5e1aaf",
+  "workflow_revision": "6320a6f1fe35818d852d5cd76ef337633b8f8af1",
+  "previous_workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
+  "cli_release": "infra-v0.2.5",
+  "build_run": 35754360530,
+  "dependency_run": 35754360530,
+  "dependency_reuse": {
+    "planner_success": true,
+    "build": false,
+    "image_job": "skipped",
+    "pin_job": "skipped",
+    "qualification": "Dependency image reused; only the application image and provenance steps ran."
+  },
+  "checks": {
+    "accounting": "sum-of-recorded-check-durations",
+    "budget_seconds": 10,
+    "duration_seconds": 9.394,
+    "remaining_seconds": 0.606,
+    "success": true,
+    "stages": {
+      "parser-python": 2.297,
+      "parser-ui": 2.030,
+      "vulnerability-scan": 2.465,
+      "provenance-verification": 2.602
+    }
+  },
+  "comparison": {
+    "previous_green_run": {
+      "run": 35540314905,
+      "duration_seconds": 9.957579818,
+      "stages": {
+        "parser-python": 2.604,
+        "parser-ui": 2.383,
+        "vulnerability-scan": 1.674,
+        "provenance-verification": 3.297
+      }
+    },
+    "failed_runs_before_the_change": [
+      {"run": 35561190186, "attempt": 1, "duration_seconds": 10.013685334, "provenance_verification": "deadline exceeded at 1.881s budget"},
+      {"run": 35561190186, "attempt": 2, "duration_seconds": 10.113826309, "provenance_verification": "deadline exceeded"}
+    ],
+    "provenance_verification_seconds": {"before": 3.297, "after": 2.602, "change": -0.695}
+  },
+  "scanner_preparation_seconds": 0.018,
+  "deployment": {
+    "deploy_run": 35755266883,
+    "deploy_conclusion": "success",
+    "reconcile_run": 35755310650
+  },
+  "limitations": [
+    "One bounded production canary; no percentile claim.",
+    "The vulnerability scan varies with image layer changes, so the aggregate comparison is not a controlled experiment.",
+    "Provenance verification still costs 2.602s inside a 10s aggregate budget; the remaining margin is 0.606s.",
+    "Workloads for this project are scaled to zero, so this canary proves image, provenance and reconciliation behaviour rather than serving latency."
+  ]
+}

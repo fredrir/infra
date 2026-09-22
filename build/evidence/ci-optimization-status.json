@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "observed_at": "2026-09-21T04:31:02.560250+00:00",
+  "observed_at": "2026-09-22T16:48:25.473020+00:00",
   "release": "infra-v0.2.5",
-  "workflow_revision": "221abb2fced72788b616c9334819bd01db24b773",
+  "workflow_revision": "b07ac21",
   "source_check": {
     "run": 35558880177,
     "success": true,
@@ -31,10 +31,13 @@
   "ordinary_post_change_deployments": 0,
   "frontend_under_15_seconds_qualified": false,
   "remaining": [
-    "parser, portfolio and Y consumer rollout",
     "ordinary-traffic percentiles and sub-15-second qualification",
     "cold changed-CLI dependency layer churn",
-    "workflow handoff and whole-cluster application planning overhead"
+    "workflow handoff and whole-cluster application planning overhead",
+    "portfolio and Y public consumer rollout",
+    "ordinary-traffic percentiles and sub-15-second qualification",
+    "kubernetes apply stage still reconciles the whole cluster graph",
+    "build and publish wall time on cold dependency layers"
   ],
   "installed_release": "infra-v0.2.5",
   "infrastructure_images": {
@@ -61,5 +64,29 @@
     "warm_aggregate_seconds": 6.777630763,
     "exact_digest_ready": true,
     "evidence": "backend-final-canary.json"
+  },
+  "parser_canary": {
+    "build_run": 35754360530,
+    "source_revision": "edbb2fc1d16be412a323124bfc599cf08b5e1aaf",
+    "checks_seconds": 9.394,
+    "provenance_seconds": 2.602,
+    "dependency_reused": true,
+    "deploy_run": 35755266883,
+    "deploy_conclusion": "success",
+    "reconcile_run": 35755310650,
+    "evidence": "parser-final-canary.json"
+  },
+  "project_scoped_planning": {
+    "revision": "b07ac21",
+    "equivalence": "llunde 27/27, y 33/33, negative control detects mismatch",
+    "evidence": "reconcile-project-scoped-plan.json"
+  },
+  "private_provenance_trust": {
+    "revision": "6320a6f1fe35818d852d5cd76ef337633b8f8af1",
+    "median_seconds": {
+      "before": 2.03,
+      "after": 1.63
+    },
+    "evidence": "private-provenance-trust-preparation.json"
   }
 }
