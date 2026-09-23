@@ -45,15 +45,17 @@ git diff --exit-code -- '*BUILD.bazel'
 | --- | --- |
 | `infra dev doctor` | JSON diagnostics: Go, Bazel, pinned tools, Docker, KVM, kubeconfig, Ansible environment; non-zero exit on any failure |
 | `infra dev setup` | Pinned tools installed into `.cache/dev/tools`; Ansible environment synced with `uv sync --frozen --group ci` |
-| `infra dev clean` | `.cache/dev` removed |
+| `infra dev clean [--all]` | `.cache/dev` removed; `--all` also stops the engine and removes its cache volume |
 | `infra dev render [--project P] [--out FILE]` | Offline `flux build --dry-run` with `settings.yaml` substitution; `.cache/dev/render/platform.yaml`; JSON report: document count, unsubstituted variables |
 | `infra dev diff` | `flux diff kustomization`: server-side dry-run against `KUBECONFIG`; `*.sops.yaml` ignored; exit 1 on differences |
+| `infra dev engine start\|stop\|status [--profile build\|kata]` | `build/toolchain.json` engine image; `build`: `infra-dagger-dev` with 4 CPUs, 8 GiB, 1024 pids from the build engine role; `kata`: `infra-dagger-dev-kata` with 2 CPUs, 4 GiB, 256 pids from `kata.DefaultLimits`; 20 GiB GC policy; `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://NAME` |
+| `infra dev qualify SUITE [-- go test flags]` | Gated suites `onboarding`, `image`, `reconcile-plan`, `packages`, `kata`; builds `.cache/dev/bin/infra` and starts the engine when the suite needs them |
 
 | Setting | Value |
 | --- | --- |
 | Tool pins | `internal/ci/toolchain.go`, `internal/ci/tools.go` |
 | Tool lookup | `.cache/dev/tools`, then `PATH` |
-| `PATH`, `KUBECONFIG`, `INFRA_TOOL_CACHE` | `.envrc` |
+| `PATH`, `KUBECONFIG`, `INFRA_TOOL_CACHE`, `_EXPERIMENTAL_DAGGER_RUNNER_HOST` | `.envrc`; `direnv reload` after `engine start` |
 | Local state | `.cache/dev`; ignored by Git |
 | Linux amd64 | Full support |
 | macOS | `doctor` and `clean`; tools installed manually to the pinned versions |

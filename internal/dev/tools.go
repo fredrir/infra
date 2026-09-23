@@ -29,6 +29,7 @@ var Tools = []Tool{
 	{"k3d", []string{"version"}},
 	{"hyperfine", []string{"--version"}},
 	{"uv", []string{"--version"}},
+	{"nfpm", []string{"--version"}},
 }
 
 var versionPattern = regexp.MustCompile(`v?(\d+\.\d+\.\d+)`)

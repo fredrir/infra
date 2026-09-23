@@ -15,6 +15,7 @@ type Toolchain struct {
 	Dagger      string `json:"dagger"`
 	Image       string `json:"image"`
 	BazelSHA256 string `json:"bazel_sha256"`
+	EngineImage string `json:"engine_image"`
 }
 
 func ReadToolchain(root string) (Toolchain, error) {
@@ -32,6 +33,9 @@ func ReadToolchain(root string) (Toolchain, error) {
 	}
 	if !regexp.MustCompile(`@sha256:[a-f0-9]{64}$`).MatchString(result.Image) || !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(result.BazelSHA256) {
 		return result, errors.New("toolchain image and Bazel download require SHA-256 pins")
+	}
+	if !regexp.MustCompile(`^registry\.dagger\.io/engine:v` + regexp.QuoteMeta(result.Dagger) + `@sha256:[a-f0-9]{64}$`).MatchString(result.EngineImage) {
+		return result, errors.New("toolchain engine image must pin the Dagger version and digest")
 	}
 	pinned, err := os.ReadFile(filepath.Join(root, ".bazelversion"))
 	if err != nil {

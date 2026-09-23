@@ -1,9 +1,7 @@
 package dev
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -52,17 +50,7 @@ func Doctor(ctx context.Context, opts DoctorOptions) []pipeline.Diagnostic {
 }
 
 func (opts DoctorOptions) output(ctx context.Context, name string, args ...string) (string, error) {
-	runner := opts.Runner
-	var stderr bytes.Buffer
-	runner.Stderr = &stderr
-	output, err := runner.Output(ctx, name, args...)
-	if err != nil {
-		if detail := firstLine(stderr.String()); detail != "" {
-			return "", fmt.Errorf("%w: %s", err, detail)
-		}
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
+	return capture(ctx, opts.Runner, name, args...)
 }
 
 func checkTool(ctx context.Context, opts DoctorOptions, tool Tool) pipeline.Diagnostic {

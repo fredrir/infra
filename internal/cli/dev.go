@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
@@ -44,10 +46,12 @@ func newDevCommand() *cobra.Command {
 			return dev.Setup(ctx, dev.SetupOptions{State: dev.NewState(root), Runner: runner, Client: &http.Client{Timeout: 2 * time.Minute}, Log: cmd.ErrOrStderr()})
 		}}
 	setup.Flags().DurationVar(&timeout, "timeout", 10*time.Minute, "Installation timeout")
+	var all bool
 	clean := &cobra.Command{Use: "clean", Short: "Remove local development state", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return dev.Clean(cmd.Context(), dev.CleanOptions{State: dev.NewState(root), Log: cmd.ErrOrStderr()})
+			return dev.Clean(cmd.Context(), dev.CleanOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: io.Discard}, All: all, Log: cmd.ErrOrStderr()})
 		}}
+	clean.Flags().BoolVar(&all, "all", false, "Also stop the engine and remove its cache volume")
 	var project, out string
 	render := &cobra.Command{Use: "render", Short: "Render the platform tree offline with the controller's Flux build and settings substitution", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -66,6 +70,57 @@ func newDevCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return dev.Diff(cmd.Context(), dev.DiffOptions{State: dev.NewState(root), Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()})
 		}}
-	cmd.AddCommand(doctor, setup, clean, render, diff)
+	engine := &cobra.Command{Use: "engine", Short: "Bounded local Dagger engines: build (engine role limits) and kata (Kata worker limits)", RunE: missingCommand}
+	var profile string
+	engine.PersistentFlags().StringVar(&profile, "profile", "build", "Engine profile: build or kata")
+	engineOptions := func(cmd *cobra.Command) (dev.EngineOptions, error) {
+		selected, ok := dev.EngineProfiles()[profile]
+		if !ok {
+			return dev.EngineOptions{}, fmt.Errorf("unknown engine profile %q", profile)
+		}
+		return dev.EngineOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: io.Discard}, Profile: selected, Log: cmd.ErrOrStderr()}, nil
+	}
+	engineStart := &cobra.Command{Use: "start", Short: "Start the pinned engine image", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			options, err := engineOptions(cmd)
+			if err != nil {
+				return err
+			}
+			status, err := dev.StartEngine(cmd.Context(), options)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(cmd.ErrOrStderr(), "export _EXPERIMENTAL_DAGGER_RUNNER_HOST="+status.RunnerHost)
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(status)
+		}}
+	var volumes bool
+	engineStop := &cobra.Command{Use: "stop", Short: "Stop the engine", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			options, err := engineOptions(cmd)
+			if err != nil {
+				return err
+			}
+			return dev.StopEngine(cmd.Context(), options, volumes)
+		}}
+	engineStop.Flags().BoolVar(&volumes, "volumes", false, "Also remove the engine cache volume")
+	engineStatus := &cobra.Command{Use: "status", Short: "Print the engine state", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			options, err := engineOptions(cmd)
+			if err != nil {
+				return err
+			}
+			status, err := dev.InspectEngine(cmd.Context(), options)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(status)
+		}}
+	engine.AddCommand(engineStart, engineStop, engineStatus)
+	qualify := &cobra.Command{Use: "qualify SUITE [-- go test flags]", Short: "Run a gated qualification suite: " + strings.Join(dev.SuiteNames(), ", "), Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			runner := ci.Runner{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()}
+			return dev.Qualify(cmd.Context(), dev.QualifyOptions{State: dev.NewState(root), Runner: runner, Suite: args[0], Args: args[1:], Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr(), Log: cmd.ErrOrStderr()})
+		}}
+	cmd.AddCommand(doctor, setup, clean, render, diff, engine, qualify)
 	return cmd
 }
