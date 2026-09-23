@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -121,6 +122,123 @@ func newDevCommand() *cobra.Command {
 			runner := ci.Runner{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()}
 			return dev.Qualify(cmd.Context(), dev.QualifyOptions{State: dev.NewState(root), Runner: runner, Suite: args[0], Args: args[1:], Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr(), Log: cmd.ErrOrStderr()})
 		}}
-	cmd.AddCommand(doctor, setup, clean, render, diff, engine, qualify)
+	cluster := &cobra.Command{Use: "cluster", Short: "Disposable K3s cluster reconciling the local platform tree with Flux", RunE: missingCommand}
+	var clusterProfile string
+	var clusterTimeout time.Duration
+	cluster.PersistentFlags().StringVar(&clusterProfile, "profile", "minimal", "Kustomization profile: minimal or platform")
+	cluster.PersistentFlags().DurationVar(&clusterTimeout, "timeout", 5*time.Minute, "Readiness timeout per Kustomization")
+	clusterOptions := func(cmd *cobra.Command) dev.ClusterOptions {
+		return dev.ClusterOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: cmd.ErrOrStderr()}, Profile: clusterProfile, Timeout: clusterTimeout, Log: cmd.ErrOrStderr()}
+	}
+	report := func(cmd *cobra.Command, status dev.ClusterStatus, err error) error {
+		return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(status))
+	}
+	clusterUp := &cobra.Command{Use: "up", Short: "Create or start the cluster, then sync", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			status, err := dev.ClusterUp(cmd.Context(), clusterOptions(cmd))
+			return report(cmd, status, err)
+		}}
+	clusterSync := &cobra.Command{Use: "sync", Short: "Push the working tree as an OCI artifact and wait for the Kustomizations", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			status, err := dev.ClusterSync(cmd.Context(), clusterOptions(cmd))
+			return report(cmd, status, err)
+		}}
+	clusterStatus := &cobra.Command{Use: "status", Short: "Print cluster and Kustomization state", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			status, err := dev.InspectCluster(cmd.Context(), clusterOptions(cmd))
+			return report(cmd, status, err)
+		}}
+	clusterDown := &cobra.Command{Use: "down", Short: "Delete the cluster", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return dev.ClusterDown(cmd.Context(), clusterOptions(cmd))
+		}}
+	cluster.AddCommand(clusterUp, clusterSync, clusterStatus, clusterDown)
+	hosts := &cobra.Command{Use: "hosts", Short: "Ubuntu guests under QEMU/KVM for Ansible playbooks", RunE: missingCommand}
+	var hostsTimeout time.Duration
+	hosts.PersistentFlags().DurationVar(&hostsTimeout, "timeout", 10*time.Minute, "Boot timeout until SSH answers")
+	hostsOptions := func(cmd *cobra.Command) dev.HostsOptions {
+		return dev.HostsOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: cmd.ErrOrStderr()}, Timeout: hostsTimeout, Log: cmd.ErrOrStderr()}
+	}
+	hostsUp := &cobra.Command{Use: "up", Short: "Download the pinned image, boot the guests and write the dev inventory", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			status, err := dev.HostsUp(cmd.Context(), hostsOptions(cmd))
+			return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(status))
+		}}
+	hostsStatus := &cobra.Command{Use: "status", Short: "Print guest state", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			status, err := dev.InspectHosts(cmd.Context(), hostsOptions(cmd))
+			return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(status))
+		}}
+	var purge bool
+	hostsDown := &cobra.Command{Use: "down", Short: "Stop the guests", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return dev.HostsDown(cmd.Context(), hostsOptions(cmd), purge)
+		}}
+	hostsDown.Flags().BoolVar(&purge, "purge", false, "Also remove guest disks, the inventory and known hosts")
+	play := func(check bool) func(cmd *cobra.Command, args []string) error {
+		return func(cmd *cobra.Command, args []string) error {
+			return dev.HostsPlay(cmd.Context(), dev.PlayOptions{Hosts: hostsOptions(cmd), Playbook: args[0], Check: check, Args: args[1:], Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()})
+		}
+	}
+	hostsPlay := &cobra.Command{Use: "play PLAYBOOK [-- ansible-playbook flags]", Short: "Run a playbook against the guests", Args: cobra.MinimumNArgs(1), RunE: play(false)}
+	hostsCheck := &cobra.Command{Use: "check PLAYBOOK [-- ansible-playbook flags]", Short: "Run a playbook in check and diff mode", Args: cobra.MinimumNArgs(1), RunE: play(true)}
+	hostsSSH := &cobra.Command{Use: "ssh NODE [-- command]", Short: "Open a shell on a guest", Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return dev.HostsSSH(cmd.Context(), dev.SSHOptions{Hosts: hostsOptions(cmd), Node: args[0], Args: args[1:], Stdin: os.Stdin, Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()})
+		}}
+	hosts.AddCommand(hostsUp, hostsStatus, hostsDown, hostsPlay, hostsCheck, hostsSSH)
+	bench := &cobra.Command{Use: "bench", Short: "Benchmark local commands with hyperfine and Go benchmarks with benchstat", RunE: missingCommand}
+	var baseline string
+	var threshold float64
+	benchRun := &cobra.Command{Use: "run [SCENARIO...]", Short: "Sample dev/bench/scenarios.yaml; JSON summary under .cache/dev/bench", Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			runner := ci.Runner{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()}
+			summary, err := dev.BenchRun(cmd.Context(), dev.BenchOptions{State: dev.NewState(root), Runner: runner, Names: args, Threshold: threshold, Log: cmd.ErrOrStderr()})
+			if baseline == "" {
+				return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(summary))
+			}
+			base, readErr := dev.ReadBenchSummary(baseline)
+			if readErr != nil {
+				return errors.Join(err, readErr)
+			}
+			deltas, regressed := dev.BenchCompare(base, summary, threshold)
+			if regressed {
+				err = errors.Join(err, errors.New("benchmark regression against baseline"))
+			}
+			return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(deltas))
+		}}
+	benchRun.Flags().StringVar(&baseline, "baseline", "", "Summary JSON to compare against")
+	benchRun.Flags().Float64Var(&threshold, "threshold", 0.10, "Median regression fraction that fails the comparison")
+	var compareThreshold float64
+	benchCompare := &cobra.Command{Use: "compare BASE CANDIDATE", Short: "Compare two summary files", Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			base, err := dev.ReadBenchSummary(args[0])
+			if err != nil {
+				return err
+			}
+			candidate, err := dev.ReadBenchSummary(args[1])
+			if err != nil {
+				return err
+			}
+			deltas, regressed := dev.BenchCompare(base, candidate, compareThreshold)
+			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(deltas); err != nil {
+				return err
+			}
+			if regressed {
+				return errors.New("benchmark regression against baseline")
+			}
+			return nil
+		}}
+	benchCompare.Flags().Float64Var(&compareThreshold, "threshold", 0.10, "Median regression fraction that fails the comparison")
+	var count int
+	benchGo := &cobra.Command{Use: "go [PACKAGE...]", Short: "Run Go benchmarks; benchstat against .cache/dev/bench/go-baseline.txt when present", Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			output, err := dev.BenchGo(cmd.Context(), dev.BenchGoOptions{State: dev.NewState(root), Packages: args, Count: count, Stdout: cmd.OutOrStdout(), Log: cmd.ErrOrStderr()})
+			fmt.Fprintln(cmd.ErrOrStderr(), "Recorded:", output)
+			return err
+		}}
+	benchGo.Flags().IntVar(&count, "count", 6, "Benchmark repetitions")
+	bench.AddCommand(benchRun, benchCompare, benchGo)
+	cmd.AddCommand(doctor, setup, clean, render, diff, engine, qualify, cluster, hosts, bench)
 	return cmd
 }

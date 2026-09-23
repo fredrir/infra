@@ -46,7 +46,7 @@ func Doctor(ctx context.Context, opts DoctorOptions) []pipeline.Diagnostic {
 	for _, tool := range Tools {
 		checks = append(checks, checkTool(ctx, opts, tool))
 	}
-	return append(checks, checkDocker(ctx, opts), checkKVM(opts), checkKubeconfig(opts), checkCluster(ctx, opts), checkAnsible(ctx, opts))
+	return append(checks, checkDocker(ctx, opts), checkKVM(opts), checkQEMU(ctx, opts), checkKubeconfig(opts), checkCluster(ctx, opts), checkAnsible(ctx, opts))
 }
 
 func (opts DoctorOptions) output(ctx context.Context, name string, args ...string) (string, error) {
@@ -139,4 +139,20 @@ func checkCluster(ctx context.Context, opts DoctorOptions) pipeline.Diagnostic {
 		}
 	}
 	return pipeline.Diagnostic{Name: "cluster", Detail: "server version missing from kubectl output"}
+}
+
+func checkQEMU(ctx context.Context, opts DoctorOptions) pipeline.Diagnostic {
+	if opts.Platform != "linux" {
+		return pipeline.Diagnostic{Name: "qemu", OK: true, Detail: "hosts unsupported on " + opts.Platform}
+	}
+	for _, tool := range []string{"qemu-system-x86_64", "qemu-img"} {
+		if _, err := opts.State.toolPath(tool); err != nil {
+			return pipeline.Diagnostic{Name: "qemu", Detail: tool + " missing; install qemu"}
+		}
+	}
+	output, err := opts.output(ctx, "qemu-system-x86_64", "--version")
+	if err != nil {
+		return pipeline.Diagnostic{Name: "qemu", Detail: err.Error()}
+	}
+	return pipeline.Diagnostic{Name: "qemu", OK: true, Detail: firstLine(output)}
 }

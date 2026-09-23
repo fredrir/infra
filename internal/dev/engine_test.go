@@ -39,6 +39,9 @@ func (d *fakeDocker) runner(t *testing.T, root string) ci.Runner {
 		}
 		call := append([]string{options.Name}, options.Args...)
 		d.commands = append(d.commands, call)
+		if filepath.Base(options.Name) == "k3d" {
+			return process.Result{Stdout: []byte("[]")}, nil
+		}
 		if options.Name != "docker" {
 			return process.Result{}, nil
 		}

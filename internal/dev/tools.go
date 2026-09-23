@@ -54,3 +54,11 @@ func firstLine(text string) string {
 	line, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
 	return strings.TrimSpace(line)
 }
+
+func (s State) devPath(tools string) string {
+	venv, err := filepath.Abs(filepath.Join(s.Venv(), "bin"))
+	if err != nil {
+		venv = filepath.Join(s.Venv(), "bin")
+	}
+	return strings.Join([]string{tools, venv, os.Getenv("PATH")}, string(os.PathListSeparator))
+}

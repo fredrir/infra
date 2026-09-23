@@ -6,6 +6,7 @@ require (
 	cel.dev/cel-go v0.32.0
 	dagger.io/dagger v0.21.9
 	github.com/aws/aws-sdk-go-v2 v1.47.0
+	github.com/kdomanski/iso9660 v0.4.0
 	github.com/klauspost/compress v1.20.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/spf13/cobra v1.10.2

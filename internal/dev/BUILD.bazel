@@ -3,11 +3,15 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "dev",
     srcs = [
+        "artifact.go",
+        "bench.go",
         "clean.go",
+        "cluster.go",
         "diff.go",
         "doctor.go",
         "engine.go",
         "exec.go",
+        "hosts.go",
         "qualify.go",
         "render.go",
         "setup.go",
@@ -21,6 +25,7 @@ go_library(
         "//internal/kata",
         "//internal/pipeline",
         "//internal/process",
+        "@com_github_kdomanski_iso9660//:iso9660",
         "@in_yaml_go_yaml_v3//:yaml",
         "@org_golang_x_sync//errgroup",
     ],
@@ -29,8 +34,11 @@ go_library(
 go_test(
     name = "dev_test",
     srcs = [
+        "bench_test.go",
+        "cluster_test.go",
         "doctor_test.go",
         "engine_test.go",
+        "hosts_test.go",
         "qualify_test.go",
         "render_test.go",
         "setup_test.go",
@@ -40,5 +48,7 @@ go_test(
         "//internal/ci",
         "//internal/pipeline",
         "//internal/process",
+        "@com_github_kdomanski_iso9660//:iso9660",
+        "@in_yaml_go_yaml_v3//:yaml",
     ],
 )

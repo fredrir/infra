@@ -16,4 +16,8 @@ func (s State) Reports() string { return filepath.Join(s.Cache, "reports") }
 func (s State) Render() string  { return filepath.Join(s.Cache, "render") }
 func (s State) Engine() string  { return filepath.Join(s.Cache, "engine") }
 func (s State) Bin() string     { return filepath.Join(s.Cache, "bin") }
-func (s State) Venv() string    { return filepath.Join(s.Root, ".venv") }
+func (s State) Cluster() string { return filepath.Join(s.Cache, "cluster") }
+func (s State) Kubeconfig() string {
+	return filepath.Join(s.Cluster(), "kubeconfig")
+}
+func (s State) Venv() string { return filepath.Join(s.Root, ".venv") }

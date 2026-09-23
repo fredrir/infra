@@ -83,7 +83,7 @@ func Qualify(ctx context.Context, opts QualifyOptions) error {
 	if err != nil {
 		return err
 	}
-	env := append([]string{"PATH=" + tools + string(os.PathListSeparator) + os.Getenv("PATH")}, suite.Env...)
+	env := append([]string{"PATH=" + opts.State.devPath(tools)}, suite.Env...)
 	if suite.RootVariable != "" {
 		env = append(env, suite.RootVariable+"="+root)
 	}

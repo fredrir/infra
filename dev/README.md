@@ -8,7 +8,15 @@
 | `.cache/dev/tools` | Pinned tools from `infra dev setup` |
 | `.cache/dev/render` | Offline Flux renders |
 | `.cache/dev/engine` | Engine GC policy |
-| `.cache/dev/bin` | Binary built for qualification suites |
+| `.cache/dev/bin` | Binary built for qualification suites and benchmark scenarios |
+| `dev/cluster/k3d.yaml` | Cluster shape, pinned K3s image, local registry |
+| `dev/cluster/patches.yaml` | Flux Kustomization patches applied in the dev cluster |
+| `dev/cluster/secrets/` | Plaintext Secrets replacing synthesized placeholders, same relative path as under `platform/` |
+| `.cache/dev/cluster` | Kubeconfig, dev age key, pushed artifact, generated `root.yaml` |
+| `dev/hosts/hosts.yaml` | Guest nodes, pinned Ubuntu cloud image, multicast segment |
+| `.cache/dev/hosts` | Base image, guest disks, seeds, serial logs, SSH key, inventory, known hosts |
+| `dev/bench/scenarios.yaml` | Commands, optional setup, runs, warmups and budgets sampled by hyperfine; `{infra}` is the built binary |
+| `.cache/dev/bench` | Timestamped samples, `latest.json`, `go-baseline.txt` |
 
 ```sh
 infra dev doctor
@@ -20,8 +28,33 @@ infra dev diff
 infra dev engine start
 infra dev qualify onboarding
 infra dev qualify packages -- -timeout=20m
+infra dev cluster up
+infra dev cluster sync --profile platform
+KUBECONFIG=.cache/dev/cluster/kubeconfig kubectl get kustomizations -A
+infra dev cluster down
+infra dev hosts up
+infra dev hosts check site.yml
+infra dev hosts play site.yml
+infra dev hosts ssh dev-server-1 -- sudo k3s kubectl get nodes
+infra dev hosts down --purge
+infra dev bench run
+cp .cache/dev/bench/latest.json .cache/dev/bench/baseline.json
+infra dev bench run --baseline .cache/dev/bench/baseline.json render affected
+infra dev bench go ./internal/ci
 infra dev clean --all
 ```
+
+| Role | Guests |
+| --- | --- |
+| `ubuntu`, `firewall`, `k3s` | `site.yml` runs against `dev-server-1` and `dev-agent-1` |
+| `tailscale` | Skipped; `tailscale0` is a renamed multicast NIC carrying the fake tailnet address at MTU 1280, and a stub `tailscaled.service` satisfies the K3s unit dependency |
+| `build_vm`, `build_engine`, `build_runner`, `ci_runtime`, `gatus`, `control_backup` | Need nested KVM, GitHub credentials or production SOPS keys |
+
+| Cluster profile | Kustomizations |
+| --- | --- |
+| `minimal` | `platform-policy`, `platform-projects` |
+| `platform` | minimal plus `platform-sources`, `platform-ingress`, `platform-observability`, `platform-cache`, `platform-build-cache`, `platform-backups` |
+| never | `platform-controllers`, `platform-runners`, `llunde-pyparser-migration`, `llunde-pyparser-application` |
 
 | Suite | Gate | Needs |
 | --- | --- | --- |
@@ -34,4 +67,4 @@ infra dev clean --all
 | Platform | Support |
 | --- | --- |
 | Linux amd64 | Full |
-| macOS | `doctor`, `clean`, `render`, `diff`, `engine`; tools installed manually; Linux images run emulated |
+| macOS | `doctor`, `clean`, `render`, `diff`, `engine`, `cluster`, `bench`; tools installed manually; Linux images run emulated; no `hosts` |

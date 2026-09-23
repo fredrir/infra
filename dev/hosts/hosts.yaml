@@ -1,0 +1,22 @@
+image:
+  url: https://cloud-images.ubuntu.com/releases/26.04/release-20260918/ubuntu-26.04-server-cloudimg-amd64.img
+  sha256: 4908fb59ccd4e87ae4e8e973b7ef56f535448eacb24a87fd787270c0048987bc
+network:
+  multicast: 230.0.0.1:12160
+nodes:
+- name: dev-server-1
+  role: server
+  cpus: 2
+  memory_mib: 3072
+  disk_gib: 40
+  private_ip: 10.60.0.11
+  tailscale_ip: 100.64.0.11
+  ssh_port: 2211
+- name: dev-agent-1
+  role: agent
+  cpus: 2
+  memory_mib: 3072
+  disk_gib: 40
+  private_ip: 10.60.0.21
+  tailscale_ip: 100.64.0.21
+  ssh_port: 2221

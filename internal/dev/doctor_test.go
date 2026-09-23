@@ -104,6 +104,15 @@ func TestDoctorComparesToolsWithPinsAndReportsEnvironment(t *testing.T) {
 	if check := diagnostic(t, checks, "cluster"); check.OK || check.Detail != "kubectl missing" {
 		t.Errorf("cluster check ran without kubectl: %+v", check)
 	}
+	if check := diagnostic(t, checks, "qemu"); check.OK || !strings.Contains(check.Detail, "qemu-system-x86_64 missing") {
+		t.Errorf("missing QEMU not reported: %+v", check)
+	}
+	for _, tool := range []string{"qemu-system-x86_64", "qemu-img"} {
+		executable(t, filepath.Join(os.Getenv("PATH"), tool))
+	}
+	if check := diagnostic(t, Doctor(context.Background(), DoctorOptions{State: state, Runner: runner, Kubeconfig: kubeconfig, KVMDevice: kvm, Platform: "linux", Assets: pinnedAssets}), "qemu"); !check.OK || check.Detail != "qemu-system-x86_64 v1.2.3" {
+		t.Errorf("QEMU not accepted: %+v", check)
+	}
 	for _, call := range []string{"tofu version", "kubectl version --client", "docker info --format {{.OSType}}", "ansible-playbook --version"} {
 		if strings.Contains(strings.Join(calls, "\n"), call) == (call == "kubectl version --client") {
 			t.Errorf("unexpected command set %q: %v", call, calls)
@@ -147,6 +156,9 @@ func TestDoctorRejectsDirectoriesAndMissingKubeconfigs(t *testing.T) {
 	opts.Platform = "darwin"
 	if check := diagnostic(t, Doctor(context.Background(), opts), "kvm"); !check.OK || check.Detail != "not required on darwin" {
 		t.Errorf("kvm required on darwin: %+v", check)
+	}
+	if check := diagnostic(t, Doctor(context.Background(), opts), "qemu"); !check.OK || check.Detail != "hosts unsupported on darwin" {
+		t.Errorf("qemu required on darwin: %+v", check)
 	}
 }
 

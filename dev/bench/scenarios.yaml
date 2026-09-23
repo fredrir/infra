@@ -1,0 +1,35 @@
+- name: check-fast
+  command: "{infra} pipeline check-fast --local --report-dir .cache/dev/reports/bench-check-fast"
+  budget: 10s
+  warmup: 1
+  runs: 5
+- name: go-test
+  command: go test -count=1 ./...
+  warmup: 1
+  runs: 5
+- name: render
+  command: "{infra} dev render"
+  warmup: 1
+  runs: 10
+- name: render-project
+  command: "{infra} dev render --project llunde"
+  warmup: 1
+  runs: 10
+- name: affected
+  command: "{infra} pipeline affected --base HEAD~1"
+  warmup: 1
+  runs: 10
+- name: validate
+  command: "{infra} ci validate"
+  setup: "{infra} ci prepare-validation"
+  budget: 10s
+  warmup: 1
+  runs: 3
+- name: policy-tests
+  command: go test -count=1 ./internal/policy
+  warmup: 1
+  runs: 5
+- name: promotion-render
+  command: go test -count=1 -run TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts ./internal/platformops
+  warmup: 1
+  runs: 5

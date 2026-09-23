@@ -43,12 +43,19 @@ git diff --exit-code -- '*BUILD.bazel'
 
 | Command | Result |
 | --- | --- |
-| `infra dev doctor` | JSON diagnostics: Go, Bazel, pinned tools, Docker, KVM, kubeconfig, Ansible environment; non-zero exit on any failure |
+| `infra dev doctor` | JSON diagnostics: Go, Bazel, pinned tools, Docker, KVM, QEMU, kubeconfig, cluster reachability, Ansible environment; non-zero exit on any failure |
 | `infra dev setup` | Pinned tools installed into `.cache/dev/tools`; Ansible environment synced with `uv sync --frozen --group ci` |
-| `infra dev clean [--all]` | `.cache/dev` removed; `--all` also stops the engine and removes its cache volume |
+| `infra dev clean [--all]` | `.cache/dev` removed; `--all` also stops the engines, removes their cache volumes, deletes the cluster and stops the guests |
 | `infra dev render [--project P] [--out FILE]` | Offline `flux build --dry-run` with `settings.yaml` substitution; `.cache/dev/render/platform.yaml`; JSON report: document count, unsubstituted variables |
 | `infra dev diff` | `flux diff kustomization`: server-side dry-run against `KUBECONFIG`; `*.sops.yaml` ignored; exit 1 on differences |
 | `infra dev engine start\|stop\|status [--profile build\|kata]` | `build/toolchain.json` engine image; `build`: `infra-dagger-dev` with 4 CPUs, 8 GiB, 1024 pids from the build engine role; `kata`: `infra-dagger-dev-kata` with 2 CPUs, 4 GiB, 256 pids from `kata.DefaultLimits`; 20 GiB GC policy; `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://NAME` |
+| `infra dev cluster up\|sync\|status\|down [--profile minimal\|platform]` | k3d cluster `infra-dev` from `dev/cluster/k3d.yaml` with the production K3s image and committed Flux components; working tree pushed as OCI artifact `platform:dev` to the cluster registry; `root.yaml` Kustomizations retargeted with `dev/cluster/patches.yaml` (zero replicas, suspended jobs); encrypted Secrets replaced by dev-key placeholders or `dev/cluster/secrets` overrides; `STORAGE_CLASS=local-path`; kubeconfig `.cache/dev/cluster/kubeconfig` |
+| `infra dev hosts up\|status\|down [--purge]` | Ubuntu 26.04 guests from `dev/hosts/hosts.yaml` under QEMU/KVM: pinned cloud image, cloud-init seed, user-mode SSH forwarding, shared multicast segment carrying `tailscale0` with the fake tailnet and private addresses, stub `tailscaled.service`, seeded K3s join tokens; inventory `.cache/dev/hosts/inventory.yml` mirrors the production groups |
+| `infra dev hosts play\|check PLAYBOOK [-- flags]` | `ansible-playbook` from `.venv` against the dev inventory; `check` adds `--check --diff` |
+| `infra dev hosts ssh NODE [-- command]` | Shell on a guest with the generated key |
+| `infra dev bench run [--baseline FILE] [SCENARIO...]` | hyperfine samples of `dev/bench/scenarios.yaml` with the freshly built binary; median, p95, CPU, peak memory and budget per scenario in `.cache/dev/bench/<timestamp>/summary.json` and `latest.json`; non-zero exit on failures, budget breaches or regressions beyond `--threshold` |
+| `infra dev bench compare BASE CANDIDATE` | Median deltas between two summaries |
+| `infra dev bench go [PACKAGE...]` | `go test -bench` with repetitions; benchstat against `.cache/dev/bench/go-baseline.txt` when present |
 | `infra dev qualify SUITE [-- go test flags]` | Gated suites `onboarding`, `image`, `reconcile-plan`, `packages`, `kata`; builds `.cache/dev/bin/infra` and starts the engine when the suite needs them |
 
 | Setting | Value |
@@ -57,8 +64,8 @@ git diff --exit-code -- '*BUILD.bazel'
 | Tool lookup | `.cache/dev/tools`, then `PATH` |
 | `PATH`, `KUBECONFIG`, `INFRA_TOOL_CACHE`, `_EXPERIMENTAL_DAGGER_RUNNER_HOST` | `.envrc`; `direnv reload` after `engine start` |
 | Local state | `.cache/dev`; ignored by Git |
-| Linux amd64 | Full support |
-| macOS | `doctor` and `clean`; tools installed manually to the pinned versions |
+| Linux amd64 | Full support; `hosts` needs `qemu-system-x86_64`, `qemu-img` and `/dev/kvm` |
+| macOS | `doctor`, `clean`, `render`, `diff`, `engine`, `cluster`, `bench`; tools installed manually to the pinned versions; no `hosts` |
 | Image inputs | `images/catalog.yaml` `excludes`; `internal/dev` changes do not rebuild images |
 
 [Local development layout](../dev/README.md)

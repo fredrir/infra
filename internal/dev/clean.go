@@ -26,6 +26,12 @@ func Clean(ctx context.Context, opts CleanOptions) error {
 				return err
 			}
 		}
+		if err := ClusterDown(ctx, ClusterOptions{State: opts.State, Runner: opts.Runner, Log: opts.Log}); err != nil {
+			return err
+		}
+		if err := HostsDown(ctx, HostsOptions{State: opts.State, Runner: opts.Runner, Log: opts.Log}, true); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
 	if err := os.RemoveAll(opts.State.Cache); err != nil {
 		return err
