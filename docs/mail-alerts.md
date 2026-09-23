@@ -27,7 +27,7 @@
 Successful backup producers POST to `/api/v1/endpoints/backups_<name>/external?success=true` with separate Bearer tokens from their encrypted repository credentials. Producers keep tokens in private curl configuration files. Tailnet policy permits the control and worker producers to reach the monitor; Kubernetes network policies restrict backup pods to this destination.
 
 ```sh
-export SOPS_AGE_KEY_FILE=/path/to/age-key.txt
+export SOPS_AGE_KEY_FILE="$HOME/.config/age/keys.txt"
 export ANSIBLE_CONFIG=ansible/ansible.cfg
 uv run --frozen --group ci ansible-playbook ansible/external.yml --limit fredrir-06
 sops ansible/roles/gatus/files/config.sops.yaml

@@ -146,7 +146,7 @@ infra onboard-rust fredrir/example \
 gh workflow run release.yml --repo fredrir/example
 gh workflow run publish.yml --repo fredrir/packages
 infra operations macos-sdk package .infra/macos-sdk
-SOPS_AGE_KEY_FILE=/path/to/age-key.txt infra operations macos-sdk upload .infra/macos-sdk/MacOSX<version>.sdk.tar.zst
+SOPS_AGE_KEY_FILE="$HOME/.config/age/keys.txt" infra operations macos-sdk upload .infra/macos-sdk/MacOSX<version>.sdk.tar.zst
 ```
 
 ## Onboarding
@@ -183,7 +183,7 @@ The shared [project chart](../charts/project) supports web services, workers and
 
 ```sh
 export ANSIBLE_CONFIG=ansible/ansible.cfg
-export SOPS_AGE_KEY_FILE=/path/to/age-key.txt
+export SOPS_AGE_KEY_FILE="$HOME/.config/age/keys.txt"
 uv run --frozen --group ci ansible-playbook ansible/site.yml --limit fredrir-NN
 uv run --frozen --group ci ansible-playbook ansible/k3s.yml --limit fredrir-NN -e k3s_registration_server=fredrir-08
 uv run --frozen --group ci ansible-playbook ansible/ci-runtimes.yml --limit fredrir-NN

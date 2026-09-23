@@ -11,14 +11,25 @@
 | Application source environments       | Each project's existing Doppler configuration                                                                                                                                          |
 | Cluster runtime secrets               | `platform/**/*.secret.sops.yaml`                                                                                                                                                       |
 | Independent monitoring                | `ansible/roles/gatus/files/config.sops.yaml`                                                                                                                                           |
-| Decryption                            | Macie, Archie and Flux age recipients                                                                                                                                                  |
+| Decryption                            | Macie, Archie `~/.config/age/keys.txt`; Flux `flux-system/sops-age`; CI apply Doppler `prd_reconciliation_apply` `SOPS_AGE_KEY`                                                        |
 | Host tokens                           | Private `/etc/rancher/k3s/server-token` and `agent-token`                                                                                                                              |
 | Recovery archives                     | Private `.infra/` on Macie and independent Archie copies                                                                                                                               |
 | Git                                   | Encrypted values only; private keys and decrypted files stay outside tracked paths                                                                                                     |
 
+| Recipient | Public key |
+| --- | --- |
+| Macie | `age1wflp6cynwm97wndq5zxmpaxwz59h62a7dku8qdyue5zm9g4djfnqwj9n0m` |
+| Archie | `age1mxszcn7gs8gnvhpq8ku748szqe8u6raferefg986slu83r3zkcmswe29zs` |
+| Flux | `age1eva47ddzjgmvrzjd8mxm7h0n6vvamw5xp94aqvlm2d3yf3uvracqypxu7x` |
+| CI apply | `age1jm6xj8qlmfjlhw0vdseaaqkpt3mqj3yl0upx3smwutsaghcq6pesvrka2t`; backup secret and Gatus config only |
+
+| Env | Value |
+| --- | --- |
+| `SOPS_AGE_KEY_FILE` | `$HOME/.config/age/keys.txt`; set by `.envrc` |
+
 ```sh
-export SOPS_AGE_KEY_FILE=/path/to/age-key.txt
 sops platform/projects/<project>/<name>.secret.sops.yaml
+sops rotate -i --add-age "$NEW" --rm-age "$OLD" platform/projects/<project>/<name>.secret.sops.yaml
 ```
 
 [Platform operation](platform.md) · [Mail credentials](mail-alerts.md)
