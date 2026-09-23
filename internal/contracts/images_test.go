@@ -63,6 +63,9 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 			covered := func(path string) bool {
 				return slices.ContainsFunc(image.Inputs, func(input string) bool { return path == input || strings.HasPrefix(path, input+"/") })
 			}
+			if slices.Contains(image.Inputs, "internal") && !slices.Contains(image.Excludes, "internal/dev") {
+				t.Error("development tooling changes rebuild image")
+			}
 			for _, receipt := range []string{"build/evidence/production-rollout.json", "build/rollout/manifest.json", "build/consumers.json"} {
 				if covered(receipt) || triggered(workflow.On.Push.Paths, receipt) {
 					t.Errorf("rollout record %s unnecessarily rebuilds image", receipt)

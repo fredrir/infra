@@ -12,7 +12,11 @@ var checkToolAssets = map[string]ToolAsset{
 	"tofu":       {"https://github.com/opentofu/opentofu/releases/download/v1.12.6/tofu_1.12.6_linux_amd64.tar.gz", "50a6106fa4de523d09c87af85f3db1dd47535fc005727fdca6852146476b88ec", "tofu"},
 	"helm":       {"https://get.helm.sh/helm-v4.3.0-linux-amd64.tar.gz", "86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb", "linux-amd64/helm"},
 	"kubectl":    {"https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl", "ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336", ""},
+	"k3d":        {"https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64", "06d8f25bc3a971c4eb29e0ff08429b180402db0f4dec838c9eac427e296800a0", ""},
+	"hyperfine":  {"https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-x86_64-unknown-linux-musl.tar.gz", "3285ec7959285288137043dd81dce0dde056227018a8277532d9a364b4f03c2b", "hyperfine-v1.20.0-x86_64-unknown-linux-musl/hyperfine"},
 }
+
+func Tool(name string) (ToolAsset, bool) { return toolAsset(name) }
 
 func toolAsset(name string) (ToolAsset, bool) {
 	if asset, ok := ToolAssets[name]; ok {

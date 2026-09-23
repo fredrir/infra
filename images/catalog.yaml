@@ -16,6 +16,8 @@
   - BUILD.bazel
   - pyproject.toml
   - uv.lock
+  excludes:
+  - internal/dev
   check: >-
     /home/runner/run.sh --version | grep -x 2.337.0;
     kubectl version --client; kustomize version; helm version --short; actionlint -version; tofu version;
@@ -37,6 +39,8 @@
   - .bazelversion
   - .bazelrc
   - BUILD.bazel
+  excludes:
+  - internal/dev
   check: /home/runner/run.sh --version | grep -x 2.337.0; dagger version; infra version
 - image: ghcr.io/fredrir/infra-runner-rust
   dockerfile: images/runner-rust/Containerfile
@@ -54,6 +58,8 @@
   - .bazelversion
   - .bazelrc
   - BUILD.bazel
+  excludes:
+  - internal/dev
   check: >-
     /home/runner/run.sh --version | grep -x 2.337.0;
     rustc --version | grep '^rustc 1\.98\.1 ';
@@ -89,4 +95,6 @@
   - .bazelversion
   - .bazelrc
   - BUILD.bazel
+  excludes:
+  - internal/dev
   check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version

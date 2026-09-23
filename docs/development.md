@@ -39,6 +39,26 @@ git diff --exit-code -- '*BUILD.bazel'
 | Structured results            | Standard output; command-specific JSON             |
 | Build evidence                | Result JSON, Bazel build events and timing profile |
 
+## Local development
+
+| Command | Result |
+| --- | --- |
+| `infra dev doctor` | JSON diagnostics: Go, Bazel, pinned tools, Docker, KVM, kubeconfig, Ansible environment; non-zero exit on any failure |
+| `infra dev setup` | Pinned tools installed into `.cache/dev/tools`; Ansible environment synced with `uv sync --frozen --group ci` |
+| `infra dev clean` | `.cache/dev` removed |
+
+| Setting | Value |
+| --- | --- |
+| Tool pins | `internal/ci/toolchain.go`, `internal/ci/tools.go` |
+| Tool lookup | `.cache/dev/tools`, then `PATH` |
+| `PATH`, `KUBECONFIG`, `INFRA_TOOL_CACHE` | `.envrc` |
+| Local state | `.cache/dev`; ignored by Git |
+| Linux amd64 | Full support |
+| macOS | `doctor` and `clean`; tools installed manually to the pinned versions |
+| Image inputs | `images/catalog.yaml` `excludes`; `internal/dev` changes do not rebuild images |
+
+[Local development layout](../dev/README.md)
+
 ## Binary reuse
 
 | Consumer                 | Binary identity                                   | Cache                                                     |

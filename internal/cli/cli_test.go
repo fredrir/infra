@@ -66,13 +66,13 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 }
 
 func TestCommandValidation(t *testing.T) {
-	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}} {
+	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err == nil {
 			t.Errorf("accepted invalid command %q", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
 			t.Errorf("command %q: %v, output=%q", args, err, &output)

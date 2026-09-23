@@ -46,7 +46,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 			return err
 		},
 	})
-	root.AddCommand(newReconcileCommand(), newKataCommand(), newPlatformCommand(), newArtifactCommand(), newOperationsCommand())
+	root.AddCommand(newReconcileCommand(), newKataCommand(), newPlatformCommand(), newArtifactCommand(), newOperationsCommand(), newDevCommand())
 	registerAutomationCommands(root, ci)
 	return root.ExecuteContext(ctx)
 }

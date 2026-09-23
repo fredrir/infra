@@ -220,6 +220,9 @@ func TestInvalidCatalogFailsBeforeRegistryRequests(t *testing.T) {
 		"multiple-documents": catalog + "---\n[]\n",
 		"escaping-input":     strings.Replace(catalog, "pins.lock", "../pins.lock", 1),
 		"missing-dockerfile": strings.Replace(catalog, "  dockerfile: images/one/Containerfile\n", "", 1),
+		"exclude-outside":    strings.Replace(catalog, "  inputs: [images/two]\n", "  inputs: [images/two]\n  excludes: [images/one/dev]\n", 1),
+		"exclude-is-input":   strings.Replace(catalog, "  inputs: [images/two]\n", "  inputs: [images/two]\n  excludes: [images/two]\n", 1),
+		"escaping-exclude":   strings.Replace(catalog, "  inputs: [images/two]\n", "  inputs: [images/two]\n  excludes: [images/two/../two]\n", 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			p := planner(t, func(w http.ResponseWriter, r *http.Request) { t.Error("invalid catalog contacted registry") })
@@ -240,5 +243,38 @@ func TestCancellationStopsPlanning(t *testing.T) {
 	defer cancel()
 	if _, err := p.Plan(ctx, "images/catalog.yaml"); err != context.Canceled {
 		t.Fatalf("expected cancellation, got %v", err)
+	}
+}
+
+func TestExcludedPathsDoNotInvalidateTags(t *testing.T) {
+	p := planner(t, http.NotFound)
+	p.Refresh = true
+	write(t, p.Root, "images/catalog.yaml", strings.Replace(catalog, "  inputs: [images/one, pins.lock]\n", "  inputs: [images/one, pins.lock]\n  excludes: [images/one/dev]\n", 1))
+	write(t, p.Root, "images/one/dev/tool", "one\n")
+	write(t, p.Root, "images/one/entrypoint", "one\n")
+	commit(t, p.Root)
+	before := plan(t, p)
+	if before[0].Excludes != nil {
+		t.Fatalf("matrix exposed excludes: %+v", before[0])
+	}
+	write(t, p.Root, "images/one/dev/tool", "changed\n")
+	write(t, p.Root, "images/one/dev/nested/tool", "added\n")
+	commit(t, p.Root)
+	if after := plan(t, p); !reflect.DeepEqual(before, after) {
+		t.Fatal("excluded change invalidated tags")
+	}
+	write(t, p.Root, "images/one/entrypoint", "changed\n")
+	commit(t, p.Root)
+	after := plan(t, p)
+	if after[0].Tag == before[0].Tag || after[1].Tag != before[1].Tag {
+		t.Fatal("retained input change did not selectively invalidate its image")
+	}
+	before = after
+	if err := os.Chmod(filepath.Join(p.Root, "images/one/entrypoint"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	commit(t, p.Root)
+	if after := plan(t, p); after[0].Tag == before[0].Tag {
+		t.Fatal("file mode change did not invalidate the image")
 	}
 }

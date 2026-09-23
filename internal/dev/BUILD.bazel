@@ -1,0 +1,33 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "dev",
+    srcs = [
+        "clean.go",
+        "doctor.go",
+        "setup.go",
+        "state.go",
+        "tools.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/dev",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/ci",
+        "//internal/pipeline",
+        "@org_golang_x_sync//errgroup",
+    ],
+)
+
+go_test(
+    name = "dev_test",
+    srcs = [
+        "doctor_test.go",
+        "setup_test.go",
+    ],
+    embed = [":dev"],
+    deps = [
+        "//internal/ci",
+        "//internal/pipeline",
+        "//internal/process",
+    ],
+)
