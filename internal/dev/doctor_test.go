@@ -71,6 +71,11 @@ func TestDoctorComparesToolsWithPinsAndReportsEnvironment(t *testing.T) {
 			return process.Result{ExitCode: 1}, errors.New("docker failed: exit status 1")
 		case "ansible-playbook":
 			return process.Result{Stdout: []byte("ansible-playbook [core 2.21.4]\n  config file = None\n")}, nil
+		case "kubectl":
+			if len(options.Args) > 1 && options.Args[1] == "--request-timeout=5s" {
+				fmt.Fprintln(options.Stderr, "Unable to connect to the server: dial tcp: i/o timeout")
+				return process.Result{Stdout: []byte("Client Version: v1.2.3\n"), ExitCode: 1}, errors.New("kubectl failed: exit status 1")
+			}
 		}
 		return process.Result{Stdout: []byte(filepath.Base(options.Name) + " v1.2.3\nextra\n")}, nil
 	}}
@@ -96,6 +101,9 @@ func TestDoctorComparesToolsWithPinsAndReportsEnvironment(t *testing.T) {
 	if check := diagnostic(t, checks, "ansible"); !check.OK || check.Detail != "ansible-playbook [core 2.21.4]" {
 		t.Errorf("ansible environment not accepted: %+v", check)
 	}
+	if check := diagnostic(t, checks, "cluster"); check.OK || check.Detail != "kubectl missing" {
+		t.Errorf("cluster check ran without kubectl: %+v", check)
+	}
 	for _, call := range []string{"tofu version", "kubectl version --client", "docker info --format {{.OSType}}", "ansible-playbook --version"} {
 		if strings.Contains(strings.Join(calls, "\n"), call) == (call == "kubectl version --client") {
 			t.Errorf("unexpected command set %q: %v", call, calls)
@@ -119,6 +127,23 @@ func TestDoctorRejectsDirectoriesAndMissingKubeconfigs(t *testing.T) {
 	if check := diagnostic(t, checks, "docker"); !check.OK || check.Detail != "OSType linux" {
 		t.Errorf("docker not accepted: %+v", check)
 	}
+	executable(t, filepath.Join(opts.State.Tools(), "kubectl"))
+	reachable := ci.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+		return process.Result{Stdout: []byte("Client Version: v1.36.3\nKustomize Version: v5.7.1\nServer Version: v1.36.3+k3s1\n")}, nil
+	}}
+	opts.Runner = reachable
+	if check := diagnostic(t, Doctor(context.Background(), opts), "cluster"); !check.OK || check.Detail != "v1.36.3+k3s1" {
+		t.Errorf("reachable cluster not reported: %+v", check)
+	}
+	unreachable := ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		fmt.Fprintln(options.Stderr, "Unable to connect to the server: dial tcp: i/o timeout")
+		return process.Result{ExitCode: 1}, errors.New("kubectl failed: exit status 1")
+	}}
+	opts.Runner = unreachable
+	if check := diagnostic(t, Doctor(context.Background(), opts), "cluster"); check.OK || !strings.Contains(check.Detail, "Unable to connect") {
+		t.Errorf("unreachable cluster not reported: %+v", check)
+	}
+	opts.Runner = runner
 	opts.Platform = "darwin"
 	if check := diagnostic(t, Doctor(context.Background(), opts), "kvm"); !check.OK || check.Detail != "not required on darwin" {
 		t.Errorf("kvm required on darwin: %+v", check)

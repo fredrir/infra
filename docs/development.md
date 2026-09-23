@@ -46,6 +46,8 @@ git diff --exit-code -- '*BUILD.bazel'
 | `infra dev doctor` | JSON diagnostics: Go, Bazel, pinned tools, Docker, KVM, kubeconfig, Ansible environment; non-zero exit on any failure |
 | `infra dev setup` | Pinned tools installed into `.cache/dev/tools`; Ansible environment synced with `uv sync --frozen --group ci` |
 | `infra dev clean` | `.cache/dev` removed |
+| `infra dev render [--project P] [--out FILE]` | Offline `flux build --dry-run` with `settings.yaml` substitution; `.cache/dev/render/platform.yaml`; JSON report: document count, unsubstituted variables |
+| `infra dev diff` | `flux diff kustomization`: server-side dry-run against `KUBECONFIG`; `*.sops.yaml` ignored; exit 1 on differences |
 
 | Setting | Value |
 | --- | --- |

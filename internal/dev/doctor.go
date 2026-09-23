@@ -48,7 +48,7 @@ func Doctor(ctx context.Context, opts DoctorOptions) []pipeline.Diagnostic {
 	for _, tool := range Tools {
 		checks = append(checks, checkTool(ctx, opts, tool))
 	}
-	return append(checks, checkDocker(ctx, opts), checkKVM(opts), checkKubeconfig(opts), checkAnsible(ctx, opts))
+	return append(checks, checkDocker(ctx, opts), checkKVM(opts), checkKubeconfig(opts), checkCluster(ctx, opts), checkAnsible(ctx, opts))
 }
 
 func (opts DoctorOptions) output(ctx context.Context, name string, args ...string) (string, error) {
@@ -134,4 +134,21 @@ func checkAnsible(ctx context.Context, opts DoctorOptions) pipeline.Diagnostic {
 		return pipeline.Diagnostic{Name: "ansible", Detail: path + ": " + err.Error()}
 	}
 	return pipeline.Diagnostic{Name: "ansible", OK: true, Detail: firstLine(output)}
+}
+
+func checkCluster(ctx context.Context, opts DoctorOptions) pipeline.Diagnostic {
+	kubectl, err := opts.State.toolPath("kubectl")
+	if err != nil {
+		return pipeline.Diagnostic{Name: "cluster", Detail: "kubectl missing"}
+	}
+	output, err := opts.output(ctx, kubectl, "version", "--request-timeout=5s")
+	if err != nil {
+		return pipeline.Diagnostic{Name: "cluster", Detail: err.Error()}
+	}
+	for _, line := range strings.Split(output, "\n") {
+		if version, ok := strings.CutPrefix(line, "Server Version: "); ok {
+			return pipeline.Diagnostic{Name: "cluster", OK: true, Detail: version}
+		}
+	}
+	return pipeline.Diagnostic{Name: "cluster", Detail: "server version missing from kubectl output"}
 }

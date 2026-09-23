@@ -4,7 +4,10 @@ go_library(
     name = "dev",
     srcs = [
         "clean.go",
+        "diff.go",
         "doctor.go",
+        "exec.go",
+        "render.go",
         "setup.go",
         "state.go",
         "tools.go",
@@ -14,6 +17,8 @@ go_library(
     deps = [
         "//internal/ci",
         "//internal/pipeline",
+        "//internal/process",
+        "@in_yaml_go_yaml_v3//:yaml",
         "@org_golang_x_sync//errgroup",
     ],
 )
@@ -22,6 +27,7 @@ go_test(
     name = "dev_test",
     srcs = [
         "doctor_test.go",
+        "render_test.go",
         "setup_test.go",
     ],
     embed = [":dev"],

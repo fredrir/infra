@@ -48,6 +48,24 @@ func newDevCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return dev.Clean(cmd.Context(), dev.CleanOptions{State: dev.NewState(root), Log: cmd.ErrOrStderr()})
 		}}
-	cmd.AddCommand(doctor, setup, clean)
+	var project, out string
+	render := &cobra.Command{Use: "render", Short: "Render the platform tree offline with the controller's Flux build and settings substitution", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			report, err := dev.Render(cmd.Context(), dev.RenderOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: cmd.ErrOrStderr()}, Project: project, Output: out, Stdout: cmd.OutOrStdout()})
+			if err != nil {
+				return err
+			}
+			if out == "-" {
+				return json.NewEncoder(cmd.ErrOrStderr()).Encode(report)
+			}
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(report)
+		}}
+	render.Flags().StringVar(&project, "project", "", "Render one project under platform/projects")
+	render.Flags().StringVar(&out, "out", "", "Output file; - streams YAML to standard output")
+	diff := &cobra.Command{Use: "diff", Short: "Server-side dry-run of the local platform tree against the KUBECONFIG cluster", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return dev.Diff(cmd.Context(), dev.DiffOptions{State: dev.NewState(root), Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()})
+		}}
+	cmd.AddCommand(doctor, setup, clean, render, diff)
 	return cmd
 }
