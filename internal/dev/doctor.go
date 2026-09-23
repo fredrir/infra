@@ -67,11 +67,10 @@ func checkTool(ctx context.Context, opts DoctorOptions, tool Tool) pipeline.Diag
 	if err != nil {
 		return pipeline.Diagnostic{Name: tool.Name, Detail: path + ": " + err.Error()}
 	}
-	detail := path + ": " + firstLine(output)
 	if !strings.Contains(output, pinned) {
-		return pipeline.Diagnostic{Name: tool.Name, Detail: detail + "; pinned " + pinned}
+		return pipeline.Diagnostic{Name: tool.Name, Detail: path + ": " + firstLine(output) + "; pinned " + pinned}
 	}
-	return pipeline.Diagnostic{Name: tool.Name, OK: true, Detail: detail}
+	return pipeline.Diagnostic{Name: tool.Name, OK: true, Detail: path + ": " + versionLine(output, pinned)}
 }
 
 func checkDocker(ctx context.Context, opts DoctorOptions) pipeline.Diagnostic {
@@ -155,4 +154,13 @@ func checkQEMU(ctx context.Context, opts DoctorOptions) pipeline.Diagnostic {
 		return pipeline.Diagnostic{Name: "qemu", Detail: err.Error()}
 	}
 	return pipeline.Diagnostic{Name: "qemu", OK: true, Detail: firstLine(output)}
+}
+
+func versionLine(output, version string) string {
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, version) {
+			return strings.TrimSpace(line)
+		}
+	}
+	return firstLine(output)
 }

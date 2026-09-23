@@ -71,6 +71,8 @@ func TestDoctorComparesToolsWithPinsAndReportsEnvironment(t *testing.T) {
 			return process.Result{ExitCode: 1}, errors.New("docker failed: exit status 1")
 		case "ansible-playbook":
 			return process.Result{Stdout: []byte("ansible-playbook [core 2.21.4]\n  config file = None\n")}, nil
+		case "nfpm":
+			return process.Result{Stdout: []byte("  _____ ____  __  __\nnfpm: packager\n\nGitVersion:    1.2.3\n")}, nil
 		case "kubectl":
 			if len(options.Args) > 1 && options.Args[1] == "--request-timeout=5s" {
 				fmt.Fprintln(options.Stderr, "Unable to connect to the server: dial tcp: i/o timeout")
@@ -82,6 +84,9 @@ func TestDoctorComparesToolsWithPinsAndReportsEnvironment(t *testing.T) {
 	checks := Doctor(context.Background(), DoctorOptions{State: state, Runner: runner, Kubeconfig: kubeconfig, KVMDevice: kvm, Platform: "linux", Assets: pinnedAssets})
 	if check := diagnostic(t, checks, "tofu"); !check.OK || !strings.HasSuffix(check.Detail, "tofu: tofu v1.2.3") {
 		t.Errorf("pinned tool not accepted: %+v", check)
+	}
+	if check := diagnostic(t, checks, "nfpm"); !check.OK || !strings.HasSuffix(check.Detail, "nfpm: GitVersion:    1.2.3") {
+		t.Errorf("banner output not reduced to its version line: %+v", check)
 	}
 	if check := diagnostic(t, checks, "flux"); check.OK || !strings.Contains(check.Detail, "flux version 9.9.9; pinned 1.2.3") {
 		t.Errorf("version drift not reported: %+v", check)

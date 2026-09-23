@@ -50,7 +50,14 @@ func TestSetupInstallsPinnedToolsAndSyncsAnsible(t *testing.T) {
 			t.Errorf("%s missing from the installation log", tool.Name)
 		}
 	}
-	if len(calls) != 1 || calls[0].Name != filepath.Join(state.Tools(), "uv") || calls[0].Dir != root || !reflect.DeepEqual(calls[0].Args, []string{"sync", "--frozen", "--group", "ci", "--no-install-project"}) {
+	binary, err := filepath.Abs(filepath.Join(state.Bin(), "infra"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 2 || calls[0].Name != "go" || !reflect.DeepEqual(calls[0].Args, []string{"build", "-o", binary, "./cmd/infra"}) {
+		t.Fatalf("infra binary not built first: %+v", calls)
+	}
+	if calls[1].Name != filepath.Join(state.Tools(), "uv") || calls[1].Dir != root || !reflect.DeepEqual(calls[1].Args, []string{"sync", "--frozen", "--group", "ci", "--no-install-project"}) {
 		t.Fatalf("unexpected Ansible environment sync: %+v", calls)
 	}
 	server.Close()
@@ -59,18 +66,22 @@ func TestSetupInstallsPinnedToolsAndSyncsAnsible(t *testing.T) {
 	}
 }
 
-func TestSetupRefusesUnsupportedPlatforms(t *testing.T) {
+func TestSetupBuildsTheBinaryButRefusesToolsOnUnsupportedPlatforms(t *testing.T) {
 	state := NewState(t.TempDir())
-	runner := ci.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
-		t.Fatal("command executed on unsupported platform")
+	var calls []process.Options
+	runner := ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		calls = append(calls, options)
 		return process.Result{}, nil
 	}}
 	err := Setup(context.Background(), SetupOptions{State: state, Runner: runner, Platform: "darwin/arm64"})
 	if err == nil || !strings.Contains(err.Error(), "darwin/arm64") {
 		t.Fatalf("unsupported platform accepted: %v", err)
 	}
-	if _, err := os.Stat(state.Cache); !os.IsNotExist(err) {
-		t.Fatal("state directory created on unsupported platform")
+	if len(calls) != 1 || calls[0].Name != "go" || calls[0].Args[0] != "build" {
+		t.Fatalf("expected only the binary build, got %+v", calls)
+	}
+	if _, err := os.Stat(state.Tools()); !os.IsNotExist(err) {
+		t.Fatal("tools directory created on unsupported platform")
 	}
 }
 

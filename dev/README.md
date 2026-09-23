@@ -8,7 +8,7 @@
 | `.cache/dev/tools` | Pinned tools from `infra dev setup` |
 | `.cache/dev/render` | Offline Flux renders |
 | `.cache/dev/engine` | Engine GC policy |
-| `.cache/dev/bin` | Binary built for qualification suites and benchmark scenarios |
+| `.cache/dev/bin` | `infra` built by `setup`, qualification suites and benchmark scenarios; first on `PATH` through `.envrc` |
 | `dev/cluster/k3d.yaml` | Cluster shape, pinned K3s image, local registry |
 | `dev/cluster/patches.yaml` | Flux Kustomization patches applied in the dev cluster |
 | `dev/cluster/secrets/` | Plaintext Secrets replacing synthesized placeholders, same relative path as under `platform/` |

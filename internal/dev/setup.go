@@ -44,6 +44,17 @@ func (opts SetupOptions) defaults() SetupOptions {
 
 func Setup(ctx context.Context, opts SetupOptions) error {
 	opts = opts.defaults()
+	binary, err := filepath.Abs(filepath.Join(opts.State.Bin(), "infra"))
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(binary), 0o755); err != nil {
+		return err
+	}
+	if err := opts.Runner.Run(ctx, "go", "build", "-o", binary, "./cmd/infra"); err != nil {
+		return fmt.Errorf("build infra: %w", err)
+	}
+	fmt.Fprintln(opts.Log, "Built:", binary)
 	if opts.Platform != "linux/amd64" {
 		return fmt.Errorf("pinned tools are published for linux/amd64 only; install the tools reported by infra dev doctor on %s", opts.Platform)
 	}

@@ -44,7 +44,7 @@ git diff --exit-code -- '*BUILD.bazel'
 | Command | Result |
 | --- | --- |
 | `infra dev doctor` | JSON diagnostics: Go, Bazel, pinned tools, Docker, KVM, QEMU, kubeconfig, cluster reachability, Ansible environment; non-zero exit on any failure |
-| `infra dev setup` | Pinned tools installed into `.cache/dev/tools`; Ansible environment synced with `uv sync --frozen --group ci` |
+| `infra dev setup` | `infra` built into `.cache/dev/bin`; pinned tools installed into `.cache/dev/tools`; Ansible environment synced with `uv sync --frozen --group ci` |
 | `infra dev clean [--all]` | `.cache/dev` removed; `--all` also stops the engines, removes their cache volumes, deletes the cluster and stops the guests |
 | `infra dev render [--project P] [--out FILE]` | Offline `flux build --dry-run` with `settings.yaml` substitution; `.cache/dev/render/platform.yaml`; JSON report: document count, unsubstituted variables |
 | `infra dev diff` | `flux diff kustomization`: server-side dry-run against `KUBECONFIG`; `*.sops.yaml` ignored; exit 1 on differences |
@@ -65,7 +65,7 @@ git diff --exit-code -- '*BUILD.bazel'
 | `PATH`, `KUBECONFIG`, `INFRA_TOOL_CACHE`, `_EXPERIMENTAL_DAGGER_RUNNER_HOST` | `.envrc`; `direnv reload` after `engine start` |
 | Local state | `.cache/dev`; ignored by Git |
 | Linux amd64 | Full support; `hosts` needs `qemu-system-x86_64`, `qemu-img` and `/dev/kvm` |
-| macOS | `doctor`, `clean`, `render`, `diff`, `engine`, `cluster`, `bench`; tools installed manually to the pinned versions; no `hosts` |
+| macOS | `setup` builds the binary and then refuses tools; `doctor`, `clean`, `render`, `diff`, `engine`, `cluster`, `bench`; tools installed manually to the pinned versions; no `hosts` |
 | Image inputs | `images/catalog.yaml` `excludes`; `internal/dev` changes do not rebuild images |
 
 [Local development layout](../dev/README.md)
