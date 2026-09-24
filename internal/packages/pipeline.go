@@ -30,7 +30,7 @@ var PublicAPK []byte
 var AURKnownHosts []byte
 
 const aptBuilder = "public.ecr.aws/docker/library/buildpack-deps:trixie-curl@sha256:04907bdd423bdac4bdf6b7ce84562eea9f75916b55be1fa279b271879f116802"
-const rpmBuilder = "quay.io/fedora/fedora:44@sha256:a65912511863a7d25139928fb283da04367f2224f37313e1cbb59d44fa02e755"
+const rpmBuilder = "docker.io/library/fedora:44@sha256:43b29f65a41eb9c35e1cd5323e3bdf3b655c2357a9f4f1ff2f9c2798e5045d80"
 const apkBuilder = "public.ecr.aws/docker/library/alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b"
 
 type PipelineOptions struct {

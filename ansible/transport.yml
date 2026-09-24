@@ -21,3 +21,7 @@
     ansible.builtin.import_role:
       name: tailscale
       tasks_from: install.yml
+  - name: Refresh changed transport facts
+    ansible.builtin.setup:
+      gather_subset: ['!all', '!min', network]
+    when: not ansible_check_mode and (platform_tailscale_start.changed or (platform_tailscale_restart.changed | default(false)))

@@ -6,16 +6,6 @@
     group: runner
     mode: '0750'
 
-- name: Download verified runner archive
-  ansible.builtin.get_url:
-    url: 'https://github.com/actions/runner/releases/download/v{{ build_runner_version }}/actions-runner-linux-x64-{{ build_runner_version }}.tar.gz'
-    dest: '/var/cache/actions-runner-{{ build_runner_version }}.tar.gz'
-    checksum: 'sha256:{{ build_runner_sha256 }}'
-    owner: root
-    group: root
-    mode: '0644'
-    timeout: 30
-
 - name: Read runner registration
   ansible.builtin.stat:
     path: '/home/runner/{{ build_runner_repository }}/.runner'
@@ -66,6 +56,7 @@
     argv: ['/home/runner/{{ build_runner_repository }}/svc.sh', install, runner]
     chdir: '/home/runner/{{ build_runner_repository }}'
     creates: '/home/runner/{{ build_runner_repository }}/.service'
+  register: build_runner_service_install
 
 - name: Read installed service name
   ansible.builtin.slurp:
@@ -103,7 +94,7 @@
   ansible.builtin.systemd_service:
     name: '{{ build_runner_service_name }}'
     enabled: true
-    daemon_reload: true
+    daemon_reload: '{{ build_runner_resource_slice.changed or build_runner_service_install.changed or build_runner_service_override.changed }}'
     state: '{{ "restarted" if build_runner_service_override.changed else "started" }}'
 
 - name: Select engine runner service

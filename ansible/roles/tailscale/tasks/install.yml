@@ -3,6 +3,7 @@
     name: [ca-certificates, tar, iproute2, kmod]
     state: present
     update_cache: true
+    cache_valid_time: 3600
     policy_rc_d: 101
 
 - name: Create transport artifact directory
@@ -54,5 +55,5 @@
     enabled: true
     state: started
     daemon_reload: true
+  register: platform_tailscale_start
   when: not ansible_check_mode
-

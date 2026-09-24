@@ -114,6 +114,7 @@
       CPUQuota={{ build_runner_cpus_percent }}%
       MemoryMax={{ build_runner_memory }}
       TasksMax=4096
+  register: build_runner_resource_slice
 
 - name: Create trusted hook adapter directory
   ansible.builtin.file:
@@ -132,6 +133,16 @@
     content: |
       #!/bin/sh
       CI_POOL=main exec /usr/local/bin/infra platform runner-hook
+
+- name: Download verified runner archive
+  ansible.builtin.get_url:
+    url: 'https://github.com/actions/runner/releases/download/v{{ build_runner_version }}/actions-runner-linux-x64-{{ build_runner_version }}.tar.gz'
+    dest: '/var/cache/actions-runner-{{ build_runner_version }}.tar.gz'
+    checksum: 'sha256:{{ build_runner_sha256 }}'
+    owner: root
+    group: root
+    mode: '0644'
+    timeout: 30
 
 - name: Configure repository runners
   ansible.builtin.include_tasks: repository.yml

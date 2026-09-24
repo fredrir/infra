@@ -33,6 +33,8 @@ jobs:
           key: infra-release-bazel9.2.0-go1.27.1-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: |
             infra-release-bazel9.2.0-go1.27.1-${{ matrix.platform }}-
+            ${{ matrix.platform == 'linux_amd64' && format('infra-bazel-linux-amd64-v1-{0}-check-', hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc')) || '' }}
+            ${{ matrix.platform == 'linux_amd64' && format('infra-bazel-linux-amd64-v1-{0}-', hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc')) || '' }}
       - name: Install pinned Bazel
         env:
           BAZEL_SHA256: 7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694

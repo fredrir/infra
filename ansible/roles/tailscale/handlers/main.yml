@@ -3,4 +3,5 @@
     name: tailscaled
     state: restarted
     daemon_reload: true
+  register: platform_tailscale_restart
   when: not ansible_check_mode

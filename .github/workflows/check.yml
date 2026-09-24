@@ -22,7 +22,7 @@ jobs:
     needs: cli
     outputs:
       base: ${{ steps.affected.outputs.base }}
-    runs-on: ${{ github.repository == 'fredrir/infra' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -57,8 +57,19 @@ jobs:
           printf 'base=%s\n' "$base" >> "$GITHUB_OUTPUT"
           expression=$(infra pipeline affected --base "$base")
           printf 'expression=%s\n' "$expression" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        id: bazel-cache
+        if: steps.affected.outputs.expression != 'set()'
+        with:
+          path: |
+            ~/.cache/infra-bazel-actions
+            ~/.cache/infra-bazel-repository
+          key: infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-check-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-check-
+            infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-
       - name: Install checksum-pinned native Bazel
-        if: runner.environment == 'github-hosted' && steps.affected.outputs.expression != 'set()'
+        if: steps.affected.outputs.expression != 'set()'
         run: |
           version=$(jq -er '.bazel' build/toolchain.json)
           checksum=$(jq -er '.bazel_sha256' build/toolchain.json)
@@ -70,16 +81,23 @@ jobs:
       - name: Prepare affected check artifacts
         if: steps.affected.outputs.expression != 'set()'
         env:
-          BAZEL_REMOTE_CACHE: ${{ runner.environment == 'self-hosted' && 'http://127.0.0.1:9092' || (github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '') }}
+          BAZEL_REMOTE_CACHE: ''
           BASE: ${{ steps.affected.outputs.base }}
         run: |
           echo 'Artifact preparation is measured separately from the check budget.' >> "$GITHUB_STEP_SUMMARY"
           infra pipeline prepare-check --local --base "$BASE" --read-only-cache=${{ github.event_name == 'pull_request' }} --report-dir dist/reports/preparation
       - name: Check affected targets within aggregate budget
         env:
-          BAZEL_REMOTE_CACHE: ${{ runner.environment == 'self-hosted' && 'http://127.0.0.1:9092' || (github.event_name != 'pull_request' && vars.BAZEL_REMOTE_CACHE || '') }}
+          BAZEL_REMOTE_CACHE: ''
           BASE: ${{ steps.affected.outputs.base }}
         run: infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ github.event_name == 'pull_request' }} --local
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: github.repository == 'fredrir/infra' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && steps.affected.outputs.expression != 'set()'
+        with:
+          path: |
+            ~/.cache/infra-bazel-actions
+            ~/.cache/infra-bazel-repository
+          key: ${{ steps.bazel-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:

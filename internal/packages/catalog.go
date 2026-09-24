@@ -134,7 +134,7 @@ func VerifyChecksum(path, expected string) error {
 
 type ReleaseSource interface {
 	Releases(context.Context, string) ([]PublishedRelease, error)
-	Download(context.Context, string, string, string) error
+	Download(context.Context, string, string, string, bool) error
 	Verify(context.Context, string, string, string) error
 }
 
@@ -158,8 +158,12 @@ func (source *GitHub) Releases(ctx context.Context, repository string) ([]Publis
 	return releases, err
 }
 
-func (source *GitHub) Download(ctx context.Context, repository, tag, destination string) error {
-	return source.Runner.Run(ctx, "gh", "release", "download", tag, "--repo", repository, "--dir", destination, "--pattern", "*-unknown-linux-*.tar.gz", "--pattern", "checksums.txt", "--pattern", "release.json", "--pattern", "*.rb", "--pattern", "*.nix", "--pattern", "*.pkgbuild", "--pattern", "*.srcinfo")
+func (source *GitHub) Download(ctx context.Context, repository, tag, destination string, channels bool) error {
+	args := []string{"release", "download", tag, "--repo", repository, "--dir", destination, "--pattern", "*-unknown-linux-*.tar.gz", "--pattern", "checksums.txt", "--pattern", "release.json"}
+	if channels {
+		args = append(args, "--pattern", "*.rb", "--pattern", "*.nix", "--pattern", "*.pkgbuild", "--pattern", "*.srcinfo")
+	}
+	return source.Runner.Run(ctx, "gh", args...)
 }
 
 func (source *GitHub) Verify(ctx context.Context, path, repository, tag string) error {
@@ -267,7 +271,7 @@ func Collect(ctx context.Context, source ReleaseSource, builder PackageBuilder, 
 			if err := os.MkdirAll(directory, 0755); err != nil {
 				return nil, err
 			}
-			if err := source.Download(ctx, project.Repository, tag, directory); err != nil {
+			if err := source.Download(ctx, project.Repository, tag, directory, position == 0); err != nil {
 				return nil, err
 			}
 			sums, err := Checksums(filepath.Join(directory, "checksums.txt"))
