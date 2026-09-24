@@ -65,6 +65,10 @@ func (client Client) RequestHeaders(ctx context.Context, method, bucket, key str
 	if err := v4.NewSigner().SignHTTP(ctx, aws.Credentials{AccessKeyID: client.AccessKey, SecretAccessKey: client.SecretKey, SessionToken: client.SessionToken}, request, payloadHash, "s3", client.Region, time.Now().UTC()); err != nil {
 		return nil, fmt.Errorf("sign object store request: %w", err)
 	}
+	if request.Header.Get("If-Match") == "" && request.Header.Get("If-None-Match") == "" {
+		// A nil Idempotency-Key lets net/http replay the request on a stale keep-alive connection without sending the header.
+		request.Header["Idempotency-Key"] = nil
+	}
 	httpClient := client.HTTP
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 10 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}

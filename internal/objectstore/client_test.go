@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -32,6 +33,49 @@ func TestObjectUploadSignsPayloadAndKeepsCredentialsOutOfURL(t *testing.T) {
 	client := Client{Endpoint: server.URL, Region: "garage", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}
 	if err := client.Upload(context.Background(), "bucket", "target/file", strings.NewReader("artifact")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestOnlyUnconditionalWritesReplayOnStaleConnection(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		headers  http.Header
+		replayed bool
+	}{
+		{"unconditional", nil, true},
+		{"conditional", http.Header{"If-Match": {`"etag"`}}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var puts atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if len(r.Header.Values("Idempotency-Key")) > 0 {
+					t.Error("idempotency marker sent")
+				}
+				io.Copy(io.Discard, r.Body)
+				if r.Method == http.MethodPut && puts.Add(1) == 1 {
+					connection, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					connection.Close()
+					return
+				}
+				w.WriteHeader(200)
+			}))
+			defer server.Close()
+			client := Client{Endpoint: server.URL, Region: "garage", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}
+			if err := client.Download(context.Background(), "bucket", "warm", io.Discard); err != nil {
+				t.Fatal(err)
+			}
+			response, err := client.RequestHeaders(context.Background(), http.MethodPut, "bucket", "status.json", strings.NewReader("{}"), test.headers)
+			if err == nil {
+				response.Body.Close()
+			}
+			if (err == nil) != test.replayed || puts.Load() != map[bool]int32{true: 2, false: 1}[test.replayed] {
+				t.Fatalf("replayed=%v attempts=%d err=%v", test.replayed, puts.Load(), err)
+			}
+		})
 	}
 }
 
