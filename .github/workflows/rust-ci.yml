@@ -23,6 +23,9 @@ on:
       timeout-minutes:
         type: number
         default: 45
+      build-output-cache:
+        type: boolean
+        default: true
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
@@ -54,15 +57,17 @@ jobs:
         CLIPPY_ARGS: ${{ inputs.clippy-args }}
         TEST_ARGS: ${{ inputs.test-args }}
         FAST_TEST_ARGS: ${{ inputs.fast-test-args }}
-      run: infra ci rust prepare
+      run: infra ci measure --stage rust-environment --budget '${{ inputs.timeout-minutes }}m' --report-dir "$RUNNER_TEMP/performance" -- infra ci rust prepare
     - name: Restore build outputs
-      run: infra ci rust cache restore
+      if: inputs.build-output-cache
+      run: infra ci measure --stage rust-cache-restore --budget '${{ inputs.timeout-minutes }}m' --report-dir "$RUNNER_TEMP/performance" -- infra ci rust cache restore
     - name: Prepare changed test executables
-      run: infra ci rust check prepare-fast
+      run: infra ci measure --stage rust-preparation --budget '${{ inputs.timeout-minutes }}m' --report-dir "$RUNNER_TEMP/performance" -- infra ci rust check prepare-fast
     - name: Check within aggregate budget
       run: infra ci measure --stage checks --budget 10s --report-dir "$RUNNER_TEMP/performance" -- infra ci rust check fast
     - name: Save build outputs
-      run: infra ci rust cache save
+      if: inputs.build-output-cache
+      run: infra ci measure --stage rust-cache-save --budget '${{ inputs.timeout-minutes }}m' --report-dir "$RUNNER_TEMP/performance" -- infra ci rust cache save
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       if: always()
       with:

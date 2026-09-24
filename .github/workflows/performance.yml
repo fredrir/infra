@@ -41,7 +41,10 @@ jobs:
               page += 1
           started = timestamp(run['run_started_at'])
           completed = max([timestamp(job['completed_at']) for job in jobs if job.get('completed_at')] or [started])
-          report = {'schema': 1, 'run_id': run_id, 'attempt': attempt, 'revision': run['head_sha'], 'conclusion': run['conclusion'], 'attempt_seconds': (completed - started).total_seconds(), 'jobs': jobs}
+          for job in jobs:
+              if job.get('created_at') and job.get('started_at'):
+                  job['queue_seconds'] = (timestamp(job['started_at']) - timestamp(job['created_at'])).total_seconds()
+          report = {'schema': 1, 'run_id': run_id, 'attempt': attempt, 'revision': run['head_sha'], 'conclusion': run['conclusion'], 'created_at': run['created_at'], 'run_started_at': run['run_started_at'], 'initial_queue_seconds': (started - timestamp(run['created_at'])).total_seconds() if attempt == 1 else None, 'attempt_seconds': (completed - started).total_seconds(), 'submission_to_completion_seconds': (completed - timestamp(run['created_at'])).total_seconds(), 'jobs': jobs}
           path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'workflow-performance.json'
           path.write_text(json.dumps(report, indent=2) + '\n')
           rows = []
