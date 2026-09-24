@@ -11,6 +11,60 @@
     path: '/home/runner/{{ build_runner_repository }}/.runner'
   register: build_runner_registration
 
+- name: Read installed runner executable
+  ansible.builtin.stat:
+    path: '/home/runner/{{ build_runner_repository }}/bin/Runner.Listener'
+  register: build_runner_executable
+
+- name: Read installed runner version
+  ansible.builtin.command:
+    argv: ['/home/runner/{{ build_runner_repository }}/bin/Runner.Listener', --version]
+  register: build_runner_installed_version
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: build_runner_executable.stat.exists
+
+- name: Read incomplete runner replacement
+  ansible.builtin.stat:
+    path: '/home/runner/{{ build_runner_repository }}/.infra-runner-pending'
+  register: build_runner_pending
+
+- name: Select runner replacement
+  ansible.builtin.set_fact:
+    build_runner_replace: '{{ build_runner_pending.stat.exists or not build_runner_executable.stat.exists or build_runner_installed_version.rc | default(1) != 0 or build_runner_installed_version.stdout | default("") | trim != build_runner_version }}'
+
+- name: Read existing runner service registration
+  ansible.builtin.stat:
+    path: '/home/runner/{{ build_runner_repository }}/.service'
+  register: build_runner_existing_service
+  when: build_runner_replace
+
+- name: Read service before runner replacement
+  ansible.builtin.slurp:
+    src: '/home/runner/{{ build_runner_repository }}/.service'
+  register: build_runner_previous_service
+  when: build_runner_replace and build_runner_existing_service.stat.exists
+
+- name: Require a valid existing runner service
+  ansible.builtin.assert:
+    that: (build_runner_previous_service.content | b64decode | trim) is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]service$')
+  when: build_runner_replace and build_runner_existing_service.stat.exists
+
+- name: Record incomplete runner replacement
+  ansible.builtin.copy:
+    dest: '/home/runner/{{ build_runner_repository }}/.infra-runner-pending'
+    content: '{{ build_runner_version }}\n'
+    owner: root
+    group: root
+    mode: '0600'
+  when: build_runner_replace
+
+- name: Stop runner before replacement
+  ansible.builtin.command:
+    argv: [systemctl, stop, '{{ build_runner_previous_service.content | b64decode | trim }}']
+  when: build_runner_replace and build_runner_existing_service.stat.exists
+
 - name: Extract pinned runner
   ansible.builtin.unarchive:
     src: '/var/cache/actions-runner-{{ build_runner_version }}.tar.gz'
@@ -18,7 +72,13 @@
     remote_src: true
     owner: runner
     group: runner
-    creates: '/home/runner/{{ build_runner_repository }}/bin/Runner.Listener'
+  when: build_runner_replace
+
+- name: Complete runner replacement
+  ansible.builtin.file:
+    path: '/home/runner/{{ build_runner_repository }}/.infra-runner-pending'
+    state: absent
+  when: build_runner_replace
 
 - name: Obtain single-use runner registration token
   delegate_to: localhost

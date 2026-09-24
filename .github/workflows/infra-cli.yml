@@ -33,8 +33,8 @@ jobs:
           while IFS= read -r path; do
             case "$path" in
               cmd/*|internal/*) ;;
-              build/rollout/flux-artifacts/generate/*.go)
-                if [ ! -f go.work ] && grep -qx 'module github.com/fredrir/infra-tools/flux-artifacts' build/rollout/flux-artifacts/generate/go.mod && ! grep -Eq 'infra-tools/flux-artifacts|build/rollout/flux-artifacts/generate' go.mod; then
+              build/rollout/flux-artifacts/generate/*.go|tests/infra/*.go|ansible/tests/*.go)
+                if grep -qx 'package main' "$path"; then
                   continue
                 fi
                 sources=(.); break ;;

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/fredrir/infra/internal/fluxartifacts"
 )
 
 func validationInputs(ctx context.Context, runner Runner, before string) ([]byte, error) {
@@ -82,9 +84,16 @@ func Validate(ctx context.Context, runner Runner, before string) error {
 			return err
 		}
 	}
-	if changed(`^(platform|charts)/`) {
-		directories := []string{"platform/clusters/production", "platform/components", "platform/projects"}
-		for _, pattern := range []string{"platform/components/*", "platform/projects/*"} {
+	if changed(`^(platform/projects/|platform/components/(policy|backup-job|repository-maintenance)/|platform/clusters/production/(root|settings)\.yaml$|build/rollout/flux-artifacts/|internal/fluxartifacts/|internal/ci/validate\.go$)`) {
+		if err := fluxartifacts.Check(runner.Dir, func(path string) ([]byte, error) {
+			return runner.Output(ctx, "kubectl", "kustomize", path)
+		}); err != nil {
+			return err
+		}
+	}
+	if changed(`^(platform/|charts/|build/rollout/flux-artifacts/)`) {
+		directories := []string{"platform/clusters/production", "platform/components", "platform/projects", "build/rollout/flux-artifacts/cutover"}
+		for _, pattern := range []string{"platform/components/*", "platform/projects/*", "platform/projects/llunde-pyparser/*"} {
 			matches, err := filepath.Glob(filepath.Join(runner.Dir, pattern))
 			if err != nil {
 				return err

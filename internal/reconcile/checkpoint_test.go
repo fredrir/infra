@@ -85,7 +85,7 @@ func (s *checkpointStore) Lock(ctx context.Context) (func() error, error) {
 }
 
 func hostCheckpoint() Status {
-	return Status{Applied: strings.Repeat("a", 40), Desired: strings.Repeat("b", 40), Stage: "publish", Updated: time.Now().Add(-time.Minute), Durations: map[string]float64{"plan": 1, "expand": 2, "hosts": 600}}
+	return Status{HostScope: HostScopeFull, Applied: strings.Repeat("a", 40), Desired: strings.Repeat("b", 40), Stage: "publish", Updated: time.Now().Add(-time.Minute), Durations: map[string]float64{"plan": 1, "expand": 2, "hosts": 600}}
 }
 
 func TestReconciliationResumesOnlyDurablyCompletedHosts(t *testing.T) {

@@ -9,21 +9,41 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
 )
 
 type resource struct {
-	Metadata struct {
+	APIVersion, Kind string
+	Metadata         struct {
 		Name       string
+		UID        string
+		Labels     map[string]string
 		Namespace  string
 		Generation int64
 	}
 	Spec struct {
-		Suspend   bool
-		SourceRef struct{ Kind, Name string }
-		Values    struct {
+		Ref         struct{ Branch string }
+		Suspend     bool
+		Path        string
+		Replicas    *int64
+		Completions *int64
+		Paused      bool
+		SourceRef   struct{ Kind, Name, Namespace string }
+		DependsOn   []struct{ Name, Namespace, ReadyExpr string }
+		Artifacts   []struct {
+			Name, OriginRevision string
+			Copy                 []struct{ From, To string }
+		}
+		Sources  []struct{ Alias, Kind, Name string }
+		Template struct {
+			Spec struct {
+				Containers, InitContainers []struct{ Name, Image string }
+			}
+		}
+		Values struct {
 			Grafana struct {
 				INI struct {
 					Server struct {
@@ -34,7 +54,14 @@ type resource struct {
 		}
 	}
 	Status struct {
-		ObservedGeneration     int64
+		ObservedGeneration                                                                                                                                           int64
+		Replicas, UpdatedReplicas, ReadyReplicas, AvailableReplicas, UpdatedNumberScheduled, NumberReady, NumberAvailable, DesiredNumberScheduled, Succeeded, Failed int64
+		CurrentRevision, UpdateRevision                                                                                                                              string
+		Artifact                                                                                                                                                     struct {
+			Revision, Digest string
+			Metadata         map[string]string
+		}
+		Inventory              json.RawMessage
 		LastAppliedRevision    string
 		LastHandledReconcileAt string
 		Conditions             []struct {
@@ -80,7 +107,18 @@ func (c *Commands) resources(ctx context.Context, kind string) ([]resource, erro
 	return result.Items, nil
 }
 
-func (c *Commands) Kubernetes(ctx context.Context, revision string) error {
+func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
+	revision := plan.Revision
+	if c.VerifyArtifacts {
+		if err := c.loadKubernetes(ctx); err != nil {
+			return err
+		}
+		if len(c.kubernetes.workloads) == 0 {
+			if err := c.RenderKubernetes(ctx, plan); err != nil {
+				return err
+			}
+		}
+	}
 	if err := c.Runner.Run(ctx, "flux", "reconcile", "source", "git", "flux-system", "--timeout=5m"); err != nil {
 		return err
 	}
@@ -102,7 +140,23 @@ func (c *Commands) Kubernetes(ctx context.Context, revision string) error {
 		return err
 	}
 	if source.Spec.Ref.Branch == "main" {
-		return c.bootstrapProduction(ctx, revision)
+		return c.bootstrapProduction(ctx, plan)
+	}
+	if c.VerifyArtifacts && len(plan.Affected.Projects) == 1 {
+		wait, cancel := context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+		started := time.Now()
+		requested := false
+		return poll(wait, func() error {
+			err := c.verifyDeployment(wait, plan)
+			if err != nil && !requested && time.Since(started) >= 10*time.Second {
+				if requestErr := c.requestSelected(wait, plan); requestErr != nil {
+					return requestErr
+				}
+				requested = true
+			}
+			return err
+		})
 	}
 	token := time.Now().UTC().Format(time.RFC3339Nano)
 	if err := c.Runner.Run(ctx, "kubectl", "annotate", "kustomizations.kustomize.toolkit.fluxcd.io", "--all", "--all-namespaces", "--overwrite", "--field-manager=flux-client-side-apply", "reconcile.fluxcd.io/requestedAt="+token, "--request-timeout=30s"); err != nil {
@@ -116,10 +170,16 @@ func (c *Commands) Kubernetes(ctx context.Context, revision string) error {
 	if err := c.Runner.Run(ctx, "kubectl", "annotate", "helmreleases.helm.toolkit.fluxcd.io", "--all", "--all-namespaces", "--overwrite", "--field-manager=flux-client-side-apply", "reconcile.fluxcd.io/requestedAt="+token, "--request-timeout=30s"); err != nil {
 		return err
 	}
-	return poll(wait, func() error { return c.verifyHelm(wait, token, "") })
+	if err := poll(wait, func() error { return c.verifyHelm(wait, token, "") }); err != nil {
+		return err
+	}
+	if c.VerifyArtifacts {
+		return poll(wait, func() error { return c.verifyDeployment(wait, plan) })
+	}
+	return nil
 }
 
-func (c *Commands) bootstrapProduction(ctx context.Context, revision string) error {
+func (c *Commands) bootstrapProduction(ctx context.Context, plan Plan) error {
 	data, err := c.Runner.Output(ctx, "kubectl", "get", "gitrepository", "flux-system", "-n=flux-system", "-o=jsonpath={.spec.ref.branch}", "--request-timeout=30s")
 	if err != nil {
 		return err
@@ -127,7 +187,7 @@ func (c *Commands) bootstrapProduction(ctx context.Context, revision string) err
 	if string(data) != "production" {
 		return fmt.Errorf("Flux bootstrap did not select the production branch")
 	}
-	return c.Kubernetes(ctx, revision)
+	return c.Kubernetes(ctx, plan)
 }
 
 func (c *Commands) verifyKubernetes(ctx context.Context, revision, token string) error {
@@ -191,32 +251,102 @@ func (c *Commands) verifyHelm(ctx context.Context, token, host string) error {
 }
 
 func (c *Commands) Verify(ctx context.Context, plan Plan) error {
-	if err := c.verifyKubernetes(ctx, plan.Revision, ""); err != nil {
-		return err
-	}
-	if err := c.verifyHelm(ctx, "", plan.Host); err != nil {
-		return err
-	}
-	if plan.Affected.Ansible {
-		if err := c.ansible(ctx, "verify.yml"); err != nil {
+	if c.VerifyArtifacts {
+		if err := c.verifyDeployment(ctx, plan); err != nil {
 			return err
 		}
+	} else {
+		if err := c.verifyKubernetes(ctx, plan.Revision, ""); err != nil {
+			return err
+		}
+		if err := c.verifyHelm(ctx, "", plan.Host); err != nil {
+			return err
+		}
+	}
+	if err := c.VerifyHosts(ctx, plan); err != nil {
+		return err
 	}
 	wait, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	client := &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	if err := poll(wait, func() error { return verifyGrafana(wait, client, "https://"+plan.Host) }); err != nil {
-		return err
+	if len(plan.Affected.Projects) == 0 {
+		if err := poll(wait, func() error { return verifyGrafana(wait, client, "https://"+plan.Host) }); err != nil {
+			return err
+		}
+	}
+	if len(plan.Affected.Projects) > 0 && plan.Affected.Projects[0] != "llunde" {
+		return nil
 	}
 	data, err := os.ReadFile(filepath.Join(c.Runner.Dir, "platform/projects/llunde/.deployments/llunde-frontend.json"))
 	if err != nil {
 		return err
 	}
 	var frontend struct{ Revision string }
-	if err := json.Unmarshal(data, &frontend); err != nil {
+	if err = json.Unmarshal(data, &frontend); err != nil {
 		return err
 	}
 	return ci.WaitRevision(wait, client, "https://llunde.no/.well-known/revision", frontend.Revision, 2*time.Second)
+}
+
+func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
+	if c.kubernetes == nil || len(c.kubernetes.workloads) == 0 {
+		return fmt.Errorf("desired Kubernetes workloads have not been rendered")
+	}
+	source, err := c.getResource(ctx, "gitrepositories.source.toolkit.fluxcd.io", "flux-system", "flux-system")
+	if err != nil {
+		return err
+	}
+	if source.Spec.Ref.Branch != "production" || !strings.HasSuffix(source.Status.Artifact.Revision, ":"+plan.Revision) {
+		return fmt.Errorf("Flux source has changed from %s", plan.Revision)
+	}
+	if err = conditionReady(source); err != nil {
+		return err
+	}
+	names := c.selectedOwners(plan)
+	for _, name := range names {
+		if _, ok := c.kubernetes.workloads[name]; !ok {
+			return fmt.Errorf("desired workloads for %s have not been rendered", name)
+		}
+	}
+	if len(plan.Affected.Projects) == 1 {
+		names = append(names, "platform-policy", "flux-system")
+	}
+	owners := make([]resource, 0, len(names))
+	for _, name := range names {
+		item, err := c.getResource(ctx, "kustomizations.kustomize.toolkit.fluxcd.io", "flux-system", name)
+		if err != nil {
+			return err
+		}
+		if item.Spec.Suspend {
+			return fmt.Errorf("selected Kustomization %s is suspended", name)
+		}
+		expected := c.kubernetes.owners[name]
+		if item.Spec.Path != expected.Spec.Path || item.Spec.SourceRef != expected.Spec.SourceRef || !reflect.DeepEqual(item.Spec.DependsOn, expected.Spec.DependsOn) {
+			return fmt.Errorf("%s source topology differs", name)
+		}
+		if token := c.kubernetes.requested["kustomizations.kustomize.toolkit.fluxcd.io/flux-system/"+name]; token != "" && item.Status.LastHandledReconcileAt != token {
+			return fmt.Errorf("%s has not handled its requested reconciliation", name)
+		}
+		if err = ready(item); err != nil {
+			return err
+		}
+		if item.Spec.SourceRef.Kind == "GitRepository" && !strings.HasSuffix(item.Status.LastAppliedRevision, ":"+plan.Revision) {
+			return fmt.Errorf("%s has not applied %s", name, plan.Revision)
+		}
+		owners = append(owners, item)
+	}
+	if err = c.verifyArtifacts(ctx, plan, owners); err != nil {
+		return err
+	}
+	for _, owner := range owners {
+		if err = c.verifyOwnedWorkloads(ctx, owner); err != nil {
+			return err
+		}
+	}
+	if len(plan.Affected.Projects) == 0 {
+		return c.verifyHelm(ctx, "", plan.Host)
+	}
+	return nil
 }
 
 func verifyGrafana(ctx context.Context, client *http.Client, base string) error {

@@ -1,0 +1,133 @@
+package reconcile
+
+import (
+	"context"
+	"errors"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
+)
+
+func TestIndependentChangePreservesDeployedBaseline(t *testing.T) {
+	verified := time.Now().Add(-time.Hour).UTC()
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "old", LastFullVerified: verified}}
+	ops := &fakeOps{selection: Affected([]string{"docs/example.md"})}
+	err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true}).Apply(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ops.calls) != 0 || store.status.Desired != "old" || store.status.Applied != "old" || store.status.Evaluated != "new" || store.status.Stage != "evaluated" {
+		t.Fatalf("independent change affected deployment: %+v, %v", store.status, ops.calls)
+	}
+	if store.status.LastFullRevision != "old" || !store.status.LastFullVerified.Equal(verified) {
+		t.Fatal("evaluation replaced full verification evidence")
+	}
+}
+
+func TestFullAndRecoveryCannotSkipIndependentChange(t *testing.T) {
+	for _, scenario := range []string{"explicit", "recovery", "initial", "failed-same-revision", "interrupted-same-revision"} {
+		t.Run(scenario, func(t *testing.T) {
+			store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
+			if scenario == "recovery" {
+				store.status.Desired = "failed"
+			}
+			if scenario == "initial" {
+				store.status = Status{}
+			}
+			if scenario == "failed-same-revision" {
+				store.status.Failure = "scheduled verification failed"
+				store.status.Stage = "complete"
+			}
+			if scenario == "interrupted-same-revision" {
+				store.status.Stage = "verify"
+			}
+			ops := &fakeOps{selection: Selection{}}
+			if err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true}).Apply(context.Background(), scenario == "explicit"); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(ops.calls, []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}) {
+				t.Fatalf("full convergence skipped: %v", ops.calls)
+			}
+		})
+	}
+}
+
+func TestRunnerConvergenceCannotCreateFullCheckpoint(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
+	ops := &fakeOps{selection: Selection{Ansible: true, HostScope: HostScopeRunners}, fail: "publish"}
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
+		t.Fatal("publish failure lost")
+	}
+	if store.status.HostScope != HostScopeRunners || store.status.Durations["hosts"] != 0 || store.status.Durations["hosts-runners"] <= 0 {
+		t.Fatalf("subset convergence resembles a full checkpoint: %+v", store.status)
+	}
+	if reusableHosts(store.status, time.Now()) {
+		t.Fatal("runner checkpoint accepted for full recovery")
+	}
+}
+
+func TestRunnerSuccessDoesNotRefreshFullVerification(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "older"}}
+	ops := &fakeOps{selection: Selection{Ansible: true, HostScope: HostScopeRunners}}
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(ops.calls, []string{"plan", "hosts", "publish", "kubernetes", "verify"}) || store.status.LastFullRevision != "older" {
+		t.Fatalf("runner scope expanded or mislabeled: %v, %+v", ops.calls, store.status)
+	}
+}
+
+func TestCompletionWriteFailurePreservesVerificationBaseline(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "older"}, fail: "complete"}
+	ops := &fakeOps{selection: All()}
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
+		t.Fatal("status persistence failure lost")
+	}
+	if store.status.Applied != "old" || store.status.LastFullRevision != "older" {
+		t.Fatalf("failed persistence advanced the baseline: %+v", store.status)
+	}
+}
+
+type rejectedPreflight struct{ fakeOps }
+
+func (o *rejectedPreflight) Preflight(context.Context, Plan) (Plan, error) {
+	return Plan{}, errors.New("missing artifact read permission")
+}
+
+func TestPreflightFailurePreventsMutations(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
+	ops := &rejectedPreflight{fakeOps{selection: All()}}
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
+		t.Fatal("preflight failure lost")
+	}
+	if len(ops.calls) != 0 || store.status.Applied != "old" || store.status.Failure == "" {
+		t.Fatalf("preflight failure allowed mutations: %v, %+v", ops.calls, store.status)
+	}
+}
+
+func TestScopeControlsApplyToSelection(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		for _, path := range []string{"build/cli-release.json", "platform/projects/portfolio/kustomization.yaml"} {
+			commands := &Commands{ScopeHosts: enabled, ScopeProjects: enabled, VerifyArtifacts: enabled, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				if options.Args[0] == "diff" {
+					return process.Result{Stdout: []byte(path + "\n")}, nil
+				}
+				return process.Result{}, nil
+			}}}
+			selected, err := commands.Select(context.Background(), strings.Repeat("a", 40), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if selected.Ansible && (effectiveHostScope(selected) == HostScopeRunners) != enabled {
+				t.Fatalf("host control ignored: %+v", selected)
+			}
+			if selected.Kubernetes && (len(selected.Projects) == 1) != enabled {
+				t.Fatalf("project control ignored: %+v", selected)
+			}
+		}
+	}
+}

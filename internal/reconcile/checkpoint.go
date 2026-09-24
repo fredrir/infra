@@ -13,7 +13,7 @@ var checkpointRevision = regexp.MustCompile(`^[a-f0-9]{40}$`)
 var planFormat = regexp.MustCompile(`^1\.[0-9]+$`)
 
 func reusableHosts(status Status, now time.Time) bool {
-	if status.Stage != "publish" || status.Desired == status.Applied {
+	if status.HostScope != HostScopeFull || status.Stage != "publish" || status.Desired == status.Applied {
 		return false
 	}
 	if !checkpointRevision.MatchString(status.Desired) || !checkpointRevision.MatchString(status.Applied) {

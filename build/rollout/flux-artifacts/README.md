@@ -25,7 +25,7 @@ The policy artifact name includes a content hash of policy files, shared setting
 ```sh
 go -C build/rollout/flux-artifacts/generate run .
 go -C build/rollout/flux-artifacts/generate run . --check
-go -C build/rollout/flux-artifacts/generate test ./...
+go test ./internal/fluxartifacts
 kubectl kustomize build/rollout/flux-artifacts/bootstrap >/tmp/flux-bootstrap.yaml
 kubectl kustomize build/rollout/flux-artifacts/pause >/tmp/flux-pause.yaml
 kubectl kustomize build/rollout/flux-artifacts/cutover >/tmp/flux-cutover.yaml

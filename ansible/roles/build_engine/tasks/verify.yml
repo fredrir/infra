@@ -1,0 +1,19 @@
+- name: Read pinned engine containers
+  ansible.builtin.command:
+    argv: [docker, inspect, '{{ item.name }}']
+  loop:
+  - name: '{{ build_engine_dagger_name }}'
+    image: '{{ build_runner_toolchain.engine_image }}'
+  - name: infra-bazel-cache
+    image: '{{ build_engine_bazel_image }}'
+  register: runner_container
+  changed_when: false
+  failed_when: >-
+    runner_container.rc != 0 or
+    not (runner_container.stdout | from_json | first).State.Running or
+    (runner_container.stdout | from_json | first).Config.Image != item.image
+- name: Verify build cache health
+  ansible.builtin.uri:
+    url: 'http://127.0.0.1:{{ build_engine_cache_port }}/status'
+    status_code: 200
+    use_proxy: false

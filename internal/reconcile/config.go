@@ -16,39 +16,114 @@ type Selection struct {
 	Ansible     bool     `json:"ansible"`
 	MonitorOnly bool     `json:"monitor_only"`
 	Projects    []string `json:"projects,omitempty"`
+	HostScope   string   `json:"host_scope"`
+	Reasons     []string `json:"reasons,omitempty"`
 }
 
 var projectNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
-func All() Selection { return Selection{Tofu: true, Kubernetes: true, Ansible: true} }
+const (
+	HostScopeFull    = "full"
+	HostScopeRunners = "runners"
+	HostScopeMonitor = "monitor"
+	HostScopeNone    = "none"
+)
+
+func All() Selection {
+	return Selection{Tofu: true, Kubernetes: true, Ansible: true, HostScope: HostScopeFull, Reasons: []string{"full reconciliation"}}
+}
 
 func Affected(paths []string) Selection {
-	var selected Selection
-	hosts := false
+	selected := Selection{HostScope: HostScopeNone}
+	var deploymentPaths []string
 	for _, path := range paths {
+		if deploymentIndependent(path) {
+			selected.Reasons = append(selected.Reasons, "deployment-independent input: "+path)
+			continue
+		}
+		deploymentPaths = append(deploymentPaths, path)
+		selected.Reasons = append(selected.Reasons, "deployment input: "+path)
 		switch {
 		case path == "platform/clusters/production/settings.yaml":
-			selected.Tofu, selected.Kubernetes, selected.Ansible = true, true, true
+			selected.Tofu, selected.Kubernetes = true, true
+			selectHosts(&selected, HostScopeMonitor)
 		case strings.HasPrefix(path, "ansible/roles/gatus/"):
-			selected.Ansible = true
+			selectHosts(&selected, HostScopeMonitor)
+		case path == "build/cli-release.json", path == "ansible/build-runners.yml", path == "ansible/verify-runners.yml", strings.HasPrefix(path, "ansible/roles/build_runner/"), strings.HasPrefix(path, "ansible/roles/build_engine/"):
+			selectHosts(&selected, HostScopeRunners)
 		case strings.HasPrefix(path, "tofu/"):
-			selected.Tofu, selected.Ansible, hosts = true, true, true
+			selected.Tofu = true
+			selectHosts(&selected, HostScopeFull)
+		case sharedDeploymentInput(path):
+			full := All()
+			full.Reasons = []string{"shared deployment input: " + path}
+			return full
 		case strings.HasPrefix(path, "platform/"), strings.HasPrefix(path, "charts/"), strings.HasPrefix(path, "keys/"):
 			selected.Kubernetes = true
 			if strings.HasPrefix(path, "platform/components/backups/") {
-				selected.Ansible, hosts = true, true
+				selectHosts(&selected, HostScopeFull)
 			}
-		case strings.HasPrefix(path, "ansible/"), strings.HasPrefix(path, "secrets/"), path == "build/cli-release.json", path == "build/toolchain.json":
-			selected.Ansible, hosts = true, true
-		case strings.HasPrefix(path, "cmd/"), strings.HasPrefix(path, "internal/"), path == "go.mod", path == "go.sum", path == ".github/workflows/reconcile.yml", strings.HasPrefix(path, ".github/actions/setup-reconciliation/"):
-			return All()
+		case strings.HasPrefix(path, "ansible/"), strings.HasPrefix(path, "secrets/"):
+			selectHosts(&selected, HostScopeFull)
+		default:
+			full := All()
+			full.Reasons = []string{"unclassified input: " + path}
+			return full
 		}
 	}
-	selected.MonitorOnly = selected.Ansible && !hosts
 	if selected.Kubernetes && !selected.Tofu && !selected.Ansible {
-		selected.Projects = projectScope(paths)
+		selected.Projects = projectScope(deploymentPaths)
 	}
 	return selected
+}
+
+func sharedDeploymentInput(path string) bool {
+	for _, prefix := range []string{"cmd/", "internal/", "build/", ".github/", "tailscale/", ".vscode/", "platform/components/policy/", "platform/clusters/production/flux-system/"} {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	switch path {
+	case "platform/clusters/production/root.yaml", "go.mod", "go.sum", "BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelrc", ".bazelversion", ".sops.yaml", ".dockerignore", ".editorconfig", ".envrc", ".gitignore", ".gitleaks.toml", ".gitleaksignore", ".taplo.toml", ".yamllint.yaml", "biome.json", "pyproject.toml", "renovate.json", "ruff.toml", "uv.lock":
+		return true
+	default:
+		return false
+	}
+}
+
+func deploymentIndependent(path string) bool {
+	if strings.HasPrefix(path, "/") || strings.Contains(path, "\\") || filepath.ToSlash(filepath.Clean(path)) != path {
+		return false
+	}
+	return strings.HasPrefix(path, "docs/") || strings.HasPrefix(path, "build/evidence/") ||
+		strings.HasPrefix(path, "images/") || strings.HasPrefix(path, "dev/") ||
+		strings.HasPrefix(path, "tests/") || path == "README.md" || path == "AGENTS.md" || path == "CLAUDE.md" ||
+		((strings.HasPrefix(path, "internal/") || strings.HasPrefix(path, "cmd/")) && strings.HasSuffix(path, "_test.go"))
+}
+
+func selectHosts(selected *Selection, scope string) {
+	current := selected.HostScope
+	if current == HostScopeFull || (current != HostScopeNone && current != "" && current != scope) {
+		scope = HostScopeFull
+	}
+	selected.HostScope = scope
+	selected.Ansible = scope != HostScopeNone
+	selected.MonitorOnly = scope == HostScopeMonitor
+}
+
+func effectiveHostScope(selected Selection) string {
+	if !selected.Ansible {
+		return HostScopeNone
+	}
+	switch selected.HostScope {
+	case HostScopeFull, HostScopeRunners, HostScopeMonitor:
+		return selected.HostScope
+	default:
+		if selected.MonitorOnly {
+			return HostScopeMonitor
+		}
+		return HostScopeFull
+	}
 }
 
 func projectScope(paths []string) []string {

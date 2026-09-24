@@ -15,10 +15,14 @@ import (
 )
 
 type Commands struct {
-	Runner      ci.Runner
-	Work        string
-	Retained    []string
-	RequireMain bool
+	Runner          ci.Runner
+	Work            string
+	Retained        []string
+	RequireMain     bool
+	ScopeHosts      bool
+	ScopeProjects   bool
+	VerifyArtifacts bool
+	kubernetes      *kubernetesState
 }
 
 func (c *Commands) Revision(ctx context.Context) (string, error) {
@@ -59,7 +63,16 @@ func (c *Commands) Select(ctx context.Context, base string, full bool) (Selectio
 	if err != nil {
 		return Selection{}, err
 	}
-	return Affected(strings.Fields(string(data))), nil
+	selection := Affected(strings.Fields(string(data)))
+	if !c.ScopeHosts && effectiveHostScope(selection) == HostScopeRunners {
+		selection.HostScope = HostScopeFull
+		selection.Reasons = append(selection.Reasons, "host scoping disabled")
+	}
+	if len(selection.Projects) > 0 && (!c.ScopeProjects || !c.VerifyArtifacts || len(projectOwners(selection.Projects[0])) == 0) {
+		selection.Projects = nil
+		selection.Reasons = append(selection.Reasons, "full Kubernetes verification required")
+	}
+	return selection, nil
 }
 
 func (c *Commands) Plan(ctx context.Context, plan Plan) error {
@@ -91,27 +104,12 @@ func (c *Commands) Plan(ctx context.Context, plan Plan) error {
 		}
 	}
 	if plan.Affected.Kubernetes {
-		name, path := "flux-system", "./platform/clusters/production"
-		if len(plan.Affected.Projects) == 1 {
-			name, path = "platform-projects", "./platform/projects/"+plan.Affected.Projects[0]
-		}
-		if _, err := c.Runner.Output(ctx, "flux", "build", "kustomization", name, "--path="+path, "--recursive", "--local-sources=GitRepository/flux-system/flux-system=."); err != nil {
+		if err := c.RenderKubernetes(ctx, plan); err != nil {
 			return err
 		}
 	}
-	if plan.Affected.Ansible {
-		if err := c.ansible(ctx, "reconcile.yml", "--syntax-check"); err != nil {
-			return err
-		}
-		if err := c.ansible(ctx, "external.yml", "--syntax-check"); err != nil {
-			return err
-		}
-		if err := c.ansible(ctx, "reconcile.yml", "--list-tasks"); err != nil {
-			return err
-		}
-		if err := c.ansible(ctx, "external.yml", "--list-tasks"); err != nil {
-			return err
-		}
+	if err := c.PlanHosts(ctx, plan); err != nil {
+		return err
 	}
 	return nil
 }
@@ -205,14 +203,6 @@ func (c *Commands) ansible(ctx context.Context, playbook string, extra ...string
 		args = append(args, "--extra-vars", "infra_reconcile_tailnet=true")
 	}
 	return runner.Run(ctx, "ansible-playbook", args...)
-}
-
-func (c *Commands) Hosts(ctx context.Context) error { return c.ansible(ctx, "reconcile.yml") }
-func (c *Commands) Monitor(ctx context.Context, plan Plan) error {
-	if plan.Affected.MonitorOnly {
-		return c.ansible(ctx, "external.yml", "--tags=gatus")
-	}
-	return c.ansible(ctx, "external.yml")
 }
 
 func (c *Commands) currentMain(ctx context.Context, revision string) error {

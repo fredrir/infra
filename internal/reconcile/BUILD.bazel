@@ -3,12 +3,16 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "reconcile",
     srcs = [
+        "artifacts.go",
         "checkpoint.go",
         "commands.go",
         "config.go",
+        "host_scope.go",
+        "projects.go",
         "run.go",
         "store.go",
         "verify.go",
+        "workloads.go",
     ],
     importpath = "github.com/fredrir/infra/internal/reconcile",
     visibility = ["//:__subpackages__"],
@@ -22,12 +26,19 @@ go_library(
 go_test(
     name = "reconcile_test",
     srcs = [
+        "ansible_integration_test.go",
+        "artifacts_test.go",
         "checkpoint_test.go",
+        "host_scope_test.go",
+        "projects_test.go",
         "reconcile_test.go",
+        "run_scope_test.go",
+        "workloads_test.go",
     ],
     embed = [":reconcile"],
     deps = [
         "//internal/ci",
         "//internal/process",
+        "@in_yaml_go_yaml_v3//:yaml",
     ],
 )

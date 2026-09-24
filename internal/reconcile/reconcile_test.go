@@ -60,15 +60,16 @@ func (o *fakeOps) Select(_ context.Context, base string, full bool) (Selection, 
 	o.full = full
 	return o.selection, nil
 }
-func (o *fakeOps) Plan(context.Context, Plan) error                 { return o.call("plan") }
-func (o *fakeOps) Expand(context.Context, Plan) error               { return o.call("expand") }
-func (o *fakeOps) Hosts(context.Context) error                      { return o.call("hosts") }
-func (o *fakeOps) ExpansionUnchanged(context.Context) (bool, error) { return false, nil }
-func (o *fakeOps) Publish(context.Context, string) error            { return o.call("publish") }
-func (o *fakeOps) Kubernetes(context.Context, string) error         { return o.call("kubernetes") }
-func (o *fakeOps) Monitor(context.Context, Plan) error              { return o.call("monitor") }
-func (o *fakeOps) Verify(context.Context, Plan) error               { return o.call("verify") }
-func (o *fakeOps) Retire(context.Context, Plan) error               { return o.call("retire") }
+func (o *fakeOps) Preflight(_ context.Context, plan Plan) (Plan, error) { return plan, nil }
+func (o *fakeOps) Plan(context.Context, Plan) error                     { return o.call("plan") }
+func (o *fakeOps) Expand(context.Context, Plan) error                   { return o.call("expand") }
+func (o *fakeOps) Hosts(context.Context, Plan) error                    { return o.call("hosts") }
+func (o *fakeOps) ExpansionUnchanged(context.Context) (bool, error)     { return false, nil }
+func (o *fakeOps) Publish(context.Context, string) error                { return o.call("publish") }
+func (o *fakeOps) Kubernetes(context.Context, Plan) error               { return o.call("kubernetes") }
+func (o *fakeOps) Monitor(context.Context, Plan) error                  { return o.call("monitor") }
+func (o *fakeOps) Verify(context.Context, Plan) error                   { return o.call("verify") }
+func (o *fakeOps) Retire(context.Context, Plan) error                   { return o.call("retire") }
 
 func TestTransitionRetiresOnlyAfterVerification(t *testing.T) {
 	want := []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}
@@ -142,6 +143,12 @@ func TestConcurrentApplyDoesNotExecute(t *testing.T) {
 	}
 }
 
+func sameSelection(a, b Selection) bool {
+	a.Reasons, b.Reasons = nil, nil
+	a.HostScope, b.HostScope = effectiveHostScope(a), effectiveHostScope(b)
+	return reflect.DeepEqual(a, b)
+}
+
 func TestAffectedCrossSystemInputs(t *testing.T) {
 	for _, test := range []struct {
 		path string
@@ -151,10 +158,10 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 		{"tofu/platform-dns.tf", Selection{Tofu: true, Ansible: true}},
 		{"ansible/roles/gatus/tasks/main.yml", Selection{Ansible: true, MonitorOnly: true}},
 		{"platform/projects/y/application.yaml", Selection{Kubernetes: true, Projects: []string{"y"}}},
-		{"build/cli-release.json", Selection{Ansible: true}},
+		{"build/cli-release.json", Selection{Ansible: true, HostScope: HostScopeRunners}},
 		{"README.md", Selection{}},
 	} {
-		if got := Affected([]string{test.path}); !reflect.DeepEqual(got, test.want) {
+		if got := Affected([]string{test.path}); !sameSelection(got, test.want) {
 			t.Errorf("%s: %+v", test.path, got)
 		}
 	}
@@ -166,7 +173,7 @@ func TestAffectedNarrowsKubernetesScopeToASingleProject(t *testing.T) {
 		"one project":         {"platform/projects/llunde/kustomization.yaml"},
 		"nested project file": {"platform/projects/llunde/.deployments/llunde-frontend.json", "platform/projects/llunde/kustomization.yaml"},
 	} {
-		if got := Affected(paths); !reflect.DeepEqual(got, narrowed) {
+		if got := Affected(paths); !sameSelection(got, narrowed) {
 			t.Errorf("%s: %+v", name, got)
 		}
 	}
@@ -183,7 +190,7 @@ func TestAffectedNarrowsKubernetesScopeToASingleProject(t *testing.T) {
 			t.Errorf("%s: narrowed %+v", name, got)
 		}
 	}
-	if got := Affected([]string{"platform/projects/llunde/kustomization.yaml", "internal/reconcile/config.go"}); !reflect.DeepEqual(got, All()) {
+	if got := Affected([]string{"platform/projects/llunde/kustomization.yaml", "internal/reconcile/config.go"}); !sameSelection(got, All()) {
 		t.Errorf("tooling change must keep the full scope: %+v", got)
 	}
 }
@@ -217,27 +224,6 @@ func TestReadinessRejectsStaleGenerationAndRevision(t *testing.T) {
 	}}}
 	if c.verifyKubernetes(context.Background(), "new", "") == nil {
 		t.Fatal("stale revision accepted")
-	}
-}
-
-func TestPlanRendersOnlyTheAffectedProject(t *testing.T) {
-	var commands []string
-	c := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
-		commands = append(commands, strings.Join(append([]string{options.Name}, options.Args...), " "))
-		return process.Result{}, nil
-	}}}
-	if err := c.Plan(context.Background(), Plan{Revision: strings.Repeat("a", 40), Affected: Affected([]string{"platform/projects/llunde/kustomization.yaml"})}); err != nil {
-		t.Fatal(err)
-	}
-	if len(commands) != 1 || !strings.Contains(commands[0], "build kustomization platform-projects --path=./platform/projects/llunde") {
-		t.Fatalf("scoped render missing: %v", commands)
-	}
-	commands = nil
-	if err := c.Plan(context.Background(), Plan{Revision: strings.Repeat("a", 40), Affected: Affected([]string{"platform/clusters/production/root.yaml"})}); err != nil {
-		t.Fatal(err)
-	}
-	if len(commands) != 1 || !strings.Contains(commands[0], "build kustomization flux-system --path=./platform/clusters/production") {
-		t.Fatalf("full render missing: %v", commands)
 	}
 }
 
@@ -458,7 +444,7 @@ func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
 				}
 				return process.Result{}, nil
 			}}}
-			if err := c.Kubernetes(context.Background(), "revision"); err != nil {
+			if err := c.Kubernetes(context.Background(), Plan{Revision: "revision", Affected: All()}); err != nil {
 				t.Fatal(err)
 			}
 			if branch != "production" || rootReconciles == 0 || token == "" {

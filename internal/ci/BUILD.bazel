@@ -29,6 +29,7 @@ go_library(
     importpath = "github.com/fredrir/infra/internal/ci",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/fluxartifacts",
         "//internal/objectstore",
         "//internal/process",
         "@com_github_klauspost_compress//zstd",
@@ -63,6 +64,7 @@ go_test(
     ],
     embed = [":ci"],
     deps = [
+        "//internal/fluxartifacts",
         "//internal/process",
         "@com_github_klauspost_compress//zstd",
         "@in_yaml_go_yaml_v3//:yaml",

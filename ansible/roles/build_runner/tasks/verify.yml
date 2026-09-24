@@ -1,0 +1,20 @@
+- name: Read active CLI checksum
+  ansible.builtin.stat:
+    path: /usr/local/bin/infra
+    follow: true
+    checksum_algorithm: sha256
+  register: runner_binary
+- name: Verify active CLI identity
+  ansible.builtin.assert:
+    that:
+    - runner_binary.stat.checksum | default('') == build_runner_cli.sha256
+- name: Verify build services
+  ansible.builtin.command:
+    argv: [systemctl, is-active, '{{ item }}']
+  loop: [docker, infra-dagger, infra-bazel-cache]
+  changed_when: false
+- name: Verify repository runners
+  ansible.builtin.include_tasks: verify-repository.yml
+  loop: '{{ build_runner_repositories }}'
+  loop_control:
+    loop_var: build_runner_repository

@@ -10,6 +10,11 @@ on:
   schedule:
   - cron: '17,47 * * * *'
   workflow_dispatch:
+    inputs:
+      full:
+        type: boolean
+        default: true
+        description: Reconcile all systems
 permissions:
   contents: read
 env:
@@ -19,6 +24,9 @@ env:
   AWS_PAGER: ''
   TF_IN_AUTOMATION: 'true'
   INFRA_RECONCILE_TAILNET: 'true'
+  SCOPE_HOSTS: ${{ vars.INFRA_SCOPE_HOSTS == 'true' }}
+  SCOPE_PROJECTS: ${{ vars.INFRA_SCOPE_PROJECTS == 'true' }}
+  VERIFY_ARTIFACTS: ${{ vars.INFRA_VERIFY_ARTIFACTS == 'true' }}
 concurrency:
   group: infrastructure-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'production' }}
   cancel-in-progress: false
@@ -84,7 +92,7 @@ jobs:
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
       run: |
         set -o pipefail
-        infra reconcile plan --base "$BASE" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
+        infra reconcile plan --base "$BASE" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
     - name: Require a trusted branch for the live plan
       if: github.event.pull_request.head.repo.full_name != github.repository
       run: |
@@ -113,6 +121,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
+      actions: read
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
@@ -179,8 +188,16 @@ jobs:
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
         SOPS_AGE_KEY: ${{ steps.doppler.outputs.SOPS_AGE_KEY }}
         GH_TOKEN: ${{ steps.runner-token.outputs.token }}
-        FULL: ${{ github.event_name != 'push' }}
-      run: infra reconcile apply --full="$FULL" --report="$RUNNER_TEMP/reconciliation/status.json"
+        FULL: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full) }}
+      run: infra reconcile apply --full="$FULL" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/status.json"
+    - name: Record workflow timing
+      if: always()
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        mkdir -p "$RUNNER_TEMP/reconciliation"
+        gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID" --jq '{created_at, run_started_at, start_delay_seconds: ((.run_started_at | fromdateiso8601) - (.created_at | fromdateiso8601))}' > "$RUNNER_TEMP/reconciliation/workflow-timing.json"
     - name: Summarize reconciliation
       if: always()
       run: |
@@ -195,7 +212,7 @@ jobs:
       if: always()
       with:
         name: reconciliation-${{ github.run_id }}-${{ github.run_attempt }}
-        path: ${{ runner.temp }}/reconciliation/status.json
+        path: ${{ runner.temp }}/reconciliation/*.json
         if-no-files-found: warn
         retention-days: 30
     - name: Remove session credentials

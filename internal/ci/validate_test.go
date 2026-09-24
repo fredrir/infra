@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/fredrir/infra/internal/fluxartifacts"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -21,6 +22,9 @@ func TestValidateBuildsAggregateAndChildKustomizations(t *testing.T) {
 				"platform/components/policy.yaml",
 				"platform/projects/kustomization.yaml",
 				"platform/projects/example/kustomization.yaml",
+				"platform/projects/llunde-pyparser/migration/kustomization.yaml",
+				"platform/projects/llunde-pyparser/application/kustomization.yaml",
+				"build/rollout/flux-artifacts/cutover/kustomization.yaml",
 				"platform/projects/settings.yaml",
 			} {
 				filename := filepath.Join(root, path)
@@ -30,6 +34,19 @@ func TestValidateBuildsAggregateAndChildKustomizations(t *testing.T) {
 				if err := os.WriteFile(filename, []byte("resources: []\n"), 0644); err != nil {
 					t.Fatal(err)
 				}
+			}
+			for _, directory := range []string{"platform/components/policy", "platform/components/backup-job", "platform/components/repository-maintenance", "platform/projects/llunde", "platform/projects/portfolio", "platform/projects/y"} {
+				if err := os.MkdirAll(filepath.Join(root, directory), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for name, value := range map[string]string{"settings.yaml": "settings: fixture\n", "root.yaml": "metadata:\n  name: platform-projects\nspec: {}\n"} {
+				if err := os.WriteFile(filepath.Join(root, "platform/clusters/production", name), []byte(value), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := fluxartifacts.Run(root, false); err != nil {
+				t.Fatal(err)
 			}
 			var rendered []string
 			broken := errors.New("invalid project resource")
@@ -45,6 +62,9 @@ func TestValidateBuildsAggregateAndChildKustomizations(t *testing.T) {
 					if len(options.Args) != 2 || options.Args[0] != "kustomize" {
 						t.Fatalf("unexpected kubectl command: %v", options.Args)
 					}
+					if filepath.IsAbs(options.Args[1]) {
+						return process.Result{}, nil
+					}
 					rendered = append(rendered, options.Args[1])
 					if options.Args[1] == "platform/projects/example" {
 						return process.Result{}, failure
@@ -58,7 +78,7 @@ func TestValidateBuildsAggregateAndChildKustomizations(t *testing.T) {
 			if err := Validate(context.Background(), runner, ""); err != nil {
 				t.Fatal(err)
 			}
-			want := []string{"platform/clusters/production", "platform/projects", "platform/components/common", "platform/projects/example"}
+			want := []string{"platform/clusters/production", "platform/projects", "build/rollout/flux-artifacts/cutover", "platform/components/common", "platform/projects/example", "platform/projects/llunde-pyparser/application", "platform/projects/llunde-pyparser/migration"}
 			if !reflect.DeepEqual(rendered, want) {
 				t.Fatalf("rendered %v, want %v", rendered, want)
 			}
@@ -111,5 +131,31 @@ func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
 	changed, calls = "docs/platform.md\n", nil
 	if err := PrepareValidation(context.Background(), runner, ""); err != nil || len(calls) != 0 {
 		t.Fatalf("unaffected declarations prepared: %v %v", calls, err)
+	}
+}
+
+func TestGeneratedOverlaysValidateOnEveryGeneratorInput(t *testing.T) {
+	for _, path := range []string{
+		"platform/components/policy/reconciliation.yaml",
+		"platform/components/backup-job/job.yaml",
+		"platform/projects/portfolio/deployment.yaml",
+		"platform/clusters/production/root.yaml",
+		"platform/clusters/production/settings.yaml",
+		"build/rollout/flux-artifacts/cutover/kustomization.yaml",
+		"build/rollout/flux-artifacts/generate/main.go",
+		"internal/fluxartifacts/generate.go",
+		"internal/ci/validate.go",
+	} {
+		t.Run(path, func(t *testing.T) {
+			runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				if options.Name != "git" {
+					t.Fatalf("unexpected command: %s", options.Name)
+				}
+				return process.Result{Stdout: []byte(path + "\n")}, nil
+			}}
+			if err := Validate(context.Background(), runner, ""); err == nil {
+				t.Fatal("missing generator inputs accepted")
+			}
+		})
 	}
 }

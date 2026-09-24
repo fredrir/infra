@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "fluxartifacts",
+    srcs = ["generate.go"],
+    importpath = "github.com/fredrir/infra/internal/fluxartifacts",
+    visibility = ["//:__subpackages__"],
+    deps = ["@in_yaml_go_yaml_v3//:yaml"],
+)
+
+go_test(
+    name = "fluxartifacts_test",
+    srcs = ["generate_test.go"],
+    embed = [":fluxartifacts"],
+)

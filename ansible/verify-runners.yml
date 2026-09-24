@@ -1,0 +1,16 @@
+- name: Verify dedicated build runners
+  hosts: build_engines
+  become: true
+  gather_facts: false
+  vars:
+    build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
+    build_runner_toolchain: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json }}"
+  tasks:
+  - name: Verify installed runners
+    ansible.builtin.import_role:
+      name: build_runner
+      tasks_from: verify.yml
+  - name: Verify installed build engines
+    ansible.builtin.import_role:
+      name: build_engine
+      tasks_from: verify.yml

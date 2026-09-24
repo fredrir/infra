@@ -1,0 +1,18 @@
+- name: Read registered runner service
+  ansible.builtin.slurp:
+    src: '/home/runner/{{ build_runner_repository }}/.service'
+  register: runner_service
+- name: Verify runner service identity
+  ansible.builtin.assert:
+    that:
+    - (runner_service.content | b64decode | trim) is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]service$')
+- name: Verify registered runner service
+  ansible.builtin.command:
+    argv: [systemctl, is-active, '{{ runner_service.content | b64decode | trim }}']
+  changed_when: false
+- name: Verify installed runner version
+  ansible.builtin.command:
+    argv: ['/home/runner/{{ build_runner_repository }}/bin/Runner.Listener', --version]
+  register: runner_version
+  changed_when: false
+  failed_when: runner_version.stdout | trim != build_runner_version

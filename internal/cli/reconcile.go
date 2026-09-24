@@ -13,13 +13,16 @@ import (
 
 func newReconcileCommand() *cobra.Command {
 	var root, bucket, prefix, base, report string
-	var full bool
+	var full, scopeHosts, scopeProjects, verifyArtifacts bool
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
 	command.PersistentFlags().StringVar(&root, "root", ".", "Source checkout")
 	command.PersistentFlags().StringVar(&bucket, "state-bucket", "llunde-pyparser-bucket", "Reconciliation state bucket")
 	command.PersistentFlags().StringVar(&prefix, "state-prefix", "reconciliation/production", "Reconciliation state prefix")
 	command.PersistentFlags().StringVar(&report, "report", "", "Status report path")
 	command.PersistentFlags().BoolVar(&full, "full", false, "Reconcile all systems, including external drift")
+	command.PersistentFlags().BoolVar(&scopeHosts, "scope-hosts", false, "Limit host convergence to affected playbooks")
+	command.PersistentFlags().BoolVar(&scopeProjects, "scope-projects", false, "Limit project deployment to affected owners")
+	command.PersistentFlags().BoolVar(&verifyArtifacts, "verify-artifacts", false, "Verify artifact provenance and workload readiness")
 	for _, action := range []string{"plan", "apply", "verify", "status"} {
 		child := &cobra.Command{Use: action, Args: cobra.NoArgs}
 		if action == "plan" {
@@ -48,9 +51,9 @@ func newReconcileCommand() *cobra.Command {
 				return err
 			}
 			defer os.RemoveAll(work)
-			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply"}
+			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ScopeHosts: scopeHosts, ScopeProjects: scopeProjects, VerifyArtifacts: verifyArtifacts}
 			if action == "apply" {
-				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, Report: func(status reconcile.Status) error {
+				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, SkipUnchanged: scopeHosts, Report: func(status reconcile.Status) error {
 					data, err := json.MarshalIndent(status, "", "  ")
 					if err != nil {
 						return err
@@ -76,6 +79,13 @@ func newReconcileCommand() *cobra.Command {
 			}
 			plan := reconcile.Plan{Revision: revision, Base: base, Affected: selected, Host: host}
 			if action == "verify" {
+				plan, err = ops.Preflight(cmd.Context(), plan)
+				if err != nil {
+					return err
+				}
+				if err := ops.RenderKubernetes(cmd.Context(), plan); err != nil {
+					return err
+				}
 				return ops.Verify(cmd.Context(), plan)
 			}
 			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(plan); err != nil {
