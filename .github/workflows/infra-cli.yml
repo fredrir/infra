@@ -61,7 +61,7 @@ jobs:
           INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
         run: |
           mkdir -p "$RUNNER_TEMP/infra-cli"
-          cp "$INFRA_BINARY" "$RUNNER_TEMP/infra-cli/infra"
+          cp --remove-destination "$INFRA_BINARY" "$RUNNER_TEMP/infra-cli/infra"
           jq -er '.sha256' build/cli-release.json > "$RUNNER_TEMP/infra-cli/sha256"
           jq -er '.revision' build/cli-release.json > "$RUNNER_TEMP/infra-cli/source-revision"
           printf '%s\n' "$INPUT_DIGEST" > "$RUNNER_TEMP/infra-cli/inputs"
