@@ -80,7 +80,7 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 	cli := "#!/bin/sh\necho fixture\n"
 	write("infra", cli, true)
 	write("vars.json", fmt.Sprintf(`{"build_runner_cli":{"sha256":"%x"}}`, sha256.Sum256([]byte(cli))), false)
-	write("inventory.yml", "all:\n  children:\n    build_engines:\n      hosts:\n        localhost:\n          ansible_connection: local\n          ansible_python_interpreter: /usr/bin/python3\n          build_runner_repositories: [infra, Y]\n", false)
+	write("inventory.yml", "all:\n  children:\n    build_engines:\n      hosts:\n        localhost:\n          ansible_connection: local\n          ansible_user: root\n          ansible_python_interpreter: /usr/bin/python3\n          build_runner_repositories: [infra, Y]\n", false)
 	for _, repository := range []string{"infra", "Y"} {
 		write("runners/"+repository+"/.service", "actions.runner.fixture."+repository+".service", false)
 		write("runners/"+repository+"/bin/Runner.Listener", "#!/bin/sh\ncat /fixture/state/version-"+repository+"\n", true)

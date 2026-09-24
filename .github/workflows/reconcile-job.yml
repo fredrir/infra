@@ -161,7 +161,9 @@ jobs:
         GH_TOKEN: ${{ steps.runner-token.outputs.token }}
         FULL: ${{ github.event.schedule == '17 */6 * * *' || (github.event_name == 'workflow_dispatch' && inputs.full) }}
         DRIFT_ONLY: ${{ github.event.schedule == '47 * * * *' }}
+        STRATEGY_OVERRIDE: ${{ vars.INFRA_ANSIBLE_STRATEGY }}
       run: |
+        if [ -n "$STRATEGY_OVERRIDE" ]; then export ANSIBLE_STRATEGY="$STRATEGY_OVERRIDE"; fi
         if [ "$DRIFT_ONLY" = true ]; then
           infra ci measure --stage drift-verification --budget 5m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --verify-artifacts="$VERIFY_ARTIFACTS"
         else

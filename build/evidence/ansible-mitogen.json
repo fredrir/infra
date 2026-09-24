@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-25T00:00:00Z",
+  "versions": {
+    "ansible_core": "2.21.4",
+    "mitogen": "0.3.53"
+  },
+  "production_baseline": {
+    "run": "https://github.com/fredrir/infra/actions/runs/36062371906",
+    "strategy": "linear",
+    "hosts_stage_seconds": 469.2,
+    "play_seconds": {
+      "Register trusted dedicated build runners": 141.4,
+      "Reconcile enrolled cluster transport": 90.4,
+      "Configure K3s servers in bootstrap order": 72.7,
+      "Configure K3s workers": 49.1,
+      "Configure isolated build runtimes": 27.3,
+      "Configure host network access": 22.4,
+      "Configure Ubuntu hosts": 19.7,
+      "Configure control-plane recovery backups": 18.2,
+      "Provision capacity-reserved build VMs": 14.8,
+      "Maintain reconciliation host access": 8.6,
+      "Install verified infrastructure binary": 3.9
+    },
+    "remote_no_op_task_seconds": "0.7-2.3",
+    "controller_only_task_seconds": 0.04,
+    "fact_gatherings": 7
+  },
+  "latency_benchmark": {
+    "target": "Ubuntu 26.04 container over SSH with 120 ms netem egress delay",
+    "play": "facts plus 8 repositories x 8 file, stat, command, copy and slurp tasks with become",
+    "tasks": 73,
+    "seconds": [
+      {"strategy": "linear", "seconds": 53.5, "changed": 24},
+      {"strategy": "mitogen_linear", "seconds": 13.5, "changed": 0},
+      {"strategy": "linear", "seconds": 41.1, "changed": 0},
+      {"strategy": "mitogen_linear", "seconds": 12.5, "changed": 0}
+    ]
+  },
+  "integration_test": {
+    "command": "INFRA_ANSIBLE_TEST_IMAGE=<ubuntu-26.04-image> go test ./internal/reconcile -run '^TestAnsibleScopeWithLocalContainers$' -count=1 -v",
+    "mitogen_linear": {"passed": "6/6", "seconds": 9.2},
+    "linear": {"passed": "6/6", "seconds": 15.56}
+  },
+  "become": {
+    "rule": "Mitogen applies become unless become_user equals remote_user",
+    "ssh_root_inventory": "no sudo under either strategy; identical PATH",
+    "local_without_ansible_user": "Mitogen wraps tasks in sudo and resets PATH; the local fixture sets ansible_user root like production",
+    "delegated_localhost_tasks": "one task, become false"
+  },
+  "rollback": "Set repository variable INFRA_ANSIBLE_STRATEGY=linear; reconciliation exports it as ANSIBLE_STRATEGY",
+  "limitations": [
+    "Production hosts-stage duration with Mitogen is not yet measured",
+    "ansible-core 2.21 deprecates third-party strategy plugins without a planned alternative",
+    "Serial transport and K3s plays are unchanged"
+  ]
+}
