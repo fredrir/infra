@@ -51,9 +51,8 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Runner dependency layer identity | [Actual rejected reorder](../build/evidence/dagger-copy-layer-identity.json): a small fixture retained its tool layer, but the real image did not; runner-check re-analyses 146 MB after each CLI change inside the `scanner-analysis` preparation stage | Separate stable dependency assembly from changing CLI payloads; require actual image evidence before adoption |
 | CLI release caches | [Cache scope](../build/evidence/cli-release-cache-scope.json): sibling release tags cannot restore each other's caches, and no matching cache is produced on the default branch | Qualify a trusted default-branch cache producer or persistent release cache without adding speculative compilation to ordinary commits |
 | Signed package build | [Production canary](../build/evidence/package-production-canary.json): build step 97 seconds; installation checks 7.487 seconds | Profile catalog downloads and repeated attestation verification; preserve the ten-second installation gate and separate publish credentials |
-| Application-only planning | [Frontend plan](../build/evidence/reconcile-targeted-plan-opportunity.json): 45.489 seconds rendering the full cluster for a frontend image pin and receipt | Qualify a project-only render with equivalent live substitutions and full-render fallback for shared or unknown changes |
-| Runner queueing | Observed 2026-09-22: runner-image rebuilds triggered by `internal/**` and workflow pushes held every other build for tens of minutes on one build runner | Split the pool or stop rebuilding runner images when the change does not affect them |
-| Cluster-wide apply stage | [Application-only sample](../build/evidence/reconcile-scoped-plan-production.json): 45.948 seconds re-reconciling and verifying the whole cluster graph after the plan stage was scoped to 5.285 seconds | Verify the live Kustomization topology, then reconcile only the affected project Kustomizations |
+| Runner queueing | Whole-job admission limits the build VM to one expensive job; short canaries do not establish queue percentiles | Compare admission wait, GitHub queue time and memory pressure before increasing slots or moving workloads |
+| Application delivery handoff | [Frontend sample](../build/evidence/ci-execution-optimization.json): 195.3 seconds from workflow creation to observed served revision, including a failed 60-second serving wait; project-scoped Kubernetes reconciliation and verification took 26.1 seconds | Profile workflow startup, CLI setup and promotion-to-reconciliation handoff separately from rollout readiness |
 | Full host reconciliation | [Task spans](../build/evidence/reconciliation-host-overhead.json): 435 task starts and 637.174 seconds total in one historical run; smart gathering already caches facts within a run | Profile remaining role work and preserve drift detection and registration checks |
 | Production revision publication | Frontend canary promotion reached `main`, then waited for a full infrastructure reconciliation before Flux could consume `production`; the 60-second serving check failed | Qualify publication after infrastructure convergence; reuse completed host work only with a valid checkpoint, unchanged host inputs and a live no-change expansion plan |
 
@@ -84,3 +83,35 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; the default slot count is one for the 8 GiB build VM.
 The hourly verification does not replace the full OpenTofu and host drift repair cycle.
 These controls do not establish an ordinary-traffic latency percentile; compare the completion observer's post-rollout samples with equivalent workloads.
+
+## Execution measurements
+
+[Execution evidence](../build/evidence/ci-execution-optimization.json) records production qualification on 2026-09-24, exact workflow attempts, job queues, setup and preparation steps, checks, publication, reconciliation and HTTPS revision observation.
+Failed attempts remain part of the evidence, including the frontend serving deadline failure and its successful recovery rerun.
+
+| Measurement | Result | Scope |
+| --- | --- | --- |
+| Scheduled full reconciliation | 48 → 4 runs/day, plus 24 read-only verifications/day | Configured frequency; daily resource savings are not yet measured |
+| Workload API reads | 49 → 16 kubectl calls; median 6.21 → 2.08 seconds; client CPU 2.10 → 0.67 seconds | Three alternating samples per mode, 49 matching resources over the local tailnet; excludes rollout waiting |
+| Read-only drift verification | 36.76 seconds; 5.26 client CPU seconds; no Ansible changes | Local tailnet execution of the hourly command |
+| Whole-job admission | One active lease; a second worker timed out without displacing the owner | Installed production CLI; live acquire and release hooks verified |
+| Active build memory | Runner slice 1.81 GiB peak; engine 3.62 GiB peak; no OOM event increase | Twenty-second sample at four samples/second; includes page cache |
+| Frontend delivery | 195.33 seconds from workflow creation to observed expected revision | Metadata-only canary; initial 60-second serving wait failed; the 15-second target remains unqualified |
+| Frontend scoped apply | Plan 10.89 seconds; publish 1.96; Kubernetes 18.63; verify 7.42 | Only `llunde` selected; no host or OpenTofu application |
+| Frontend VM resource use | Runner CPU 26.00 seconds and engine CPU 9.38 seconds; peaks 1.83/3.36 GiB; no OOM event increase | Cgroup samples across delivery; includes background activity and excludes hosted CI and cluster node CPU |
+
+| Rust target archive condition | Job | Restore | Preparation | Save |
+| --- | ---: | ---: | ---: | ---: |
+| Refresh outputs | 208 s | 45 s | 19 s | 115 s |
+| Reuse identical outputs | 83 s | 36 s | 18 s | 1 s |
+| Archive disabled | 132 s | — | 102.65 s | — |
+
+The Rust samples use unchanged `nsql` Rust source with workflow metadata changes; they are single observations, not a cold compiler-cache comparison or a latency percentile.
+Source-content fingerprint tests verify that source-only changes refresh the target archive, while identical inputs skip publication.
+The restored archive still recompiled the workspace in 7.60–7.84 seconds.
+`nsql` sets `build-output-cache: false` to avoid archive refresh costs on source-changing builds while retaining compiler `sccache`; repeated identical builds can benefit from enabling the archive.
+The reusable workflow defaults the archive to enabled and records environment, restore, preparation, save and checks independently.
+The no-archive checks took 4.29 seconds under the unchanged ten-second ceiling.
+
+Admission remains at one slot with the existing 2 GiB runner and 4 GiB engine limits because these short samples do not justify higher concurrency.
+Workflow completion reports retain attempt identity and queue timestamps for 30 days; compare total delivery latency, failures and resource use alongside the check metric.

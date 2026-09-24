@@ -1,0 +1,2675 @@
+{
+  "schema": 1,
+  "qualified_on": "2026-09-24",
+  "release": {
+    "tag": "infra-v0.2.6",
+    "revision": "38b8511cf102cae112c116b36d0ccfe5929523c6",
+    "linux_amd64_sha256": "dfdd415ef33408859e6b79b6d28e03147d77532cb30a3c824a7101de02eeb3d7",
+    "checksum_and_github_attestation_verified": true
+  },
+  "controls": {
+    "shared_cli_artifacts_per_parent_run": 1,
+    "full_reconciliations_per_day": {
+      "before": 48,
+      "after": 4
+    },
+    "read_only_verifications_per_day": 24,
+    "checks_budget_seconds": 10,
+    "rust_target_archive_default": true,
+    "nsql_target_archive_enabled": false,
+    "nsql_compiler_cache_enabled": true
+  },
+  "api_reads": {
+    "schema": 1,
+    "scope": "Read-only local tailnet reads of active Flux owners and their inventoried workloads; excludes rollout and readiness waiting",
+    "resource_count": 49,
+    "samples": [
+      {
+        "mode": "individual",
+        "seconds": 6.260128871999768,
+        "cpu_seconds": 2.094833,
+        "kubectl_calls": 49
+      },
+      {
+        "mode": "batched",
+        "seconds": 2.06563018900124,
+        "cpu_seconds": 0.6685300000000003,
+        "kubectl_calls": 16
+      },
+      {
+        "mode": "batched",
+        "seconds": 2.078211937998276,
+        "cpu_seconds": 0.6663479999999997,
+        "kubectl_calls": 16
+      },
+      {
+        "mode": "individual",
+        "seconds": 6.210437752000871,
+        "cpu_seconds": 2.0906569999999993,
+        "kubectl_calls": 49
+      },
+      {
+        "mode": "individual",
+        "seconds": 6.207573939998838,
+        "cpu_seconds": 2.1051950000000006,
+        "kubectl_calls": 49
+      },
+      {
+        "mode": "batched",
+        "seconds": 2.0873146490012005,
+        "cpu_seconds": 0.6705460000000001,
+        "kubectl_calls": 16
+      }
+    ],
+    "median_seconds": {
+      "individual": 6.210437752000871,
+      "batched": 2.078211937998276
+    }
+  },
+  "admission": {
+    "sample_seconds": 20.09937348999665,
+    "sample_interval_seconds": 0.25,
+    "max_admitted_jobs": 1,
+    "peak_runner_memory_bytes": 1947291648,
+    "peak_engine_memory_bytes": 3884699648,
+    "memory_event_deltas": {
+      "runners": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "engine": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      }
+    },
+    "contention_fixture": "A second Runner.Worker timed out waiting for the occupied slot; the live owner lease remained intact",
+    "limits": {
+      "slots": 1,
+      "runner_memory_bytes": 2147483648,
+      "engine_memory_bytes": 4294967296
+    },
+    "limitation": "Short qualification sample; memory includes page cache and does not prove capacity for every workload"
+  },
+  "rust": {
+    "source_equivalence": "The three qualification jobs changed workflow metadata only; Rust source was unchanged",
+    "archive_refresh": {
+      "run_id": 36037111345,
+      "attempt": 1,
+      "job_seconds": 208,
+      "restore_seconds": 45,
+      "preparation_seconds": 19,
+      "save_seconds": 115,
+      "checks": {
+        "schema": 1,
+        "stage": "checks",
+        "revision": "ec7b15e92ecab0d3b668fac627aec89746ec3937",
+        "started": "2026-09-24T17:52:09.224834457Z",
+        "duration_seconds": 3.415566598,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 9.88,
+        "peak_memory_bytes": 334512128
+      }
+    },
+    "archive_current": {
+      "run_id": 36037111345,
+      "attempt": 2,
+      "job_seconds": 83,
+      "restore_seconds": 36,
+      "preparation_seconds": 18,
+      "save_seconds": 1
+    },
+    "archive_disabled": {
+      "run_id": 36039942541,
+      "attempt": 1,
+      "job_seconds": 132,
+      "metrics": [
+        {
+          "schema": 1,
+          "stage": "rust-environment",
+          "revision": "dd54f41bde69c742824cfaf030b490628ebcb631",
+          "started": "2026-09-24T18:15:41.907738911Z",
+          "duration_seconds": 0.943068931,
+          "budget_seconds": 2700,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.17,
+          "peak_memory_bytes": 37416960
+        },
+        {
+          "schema": 1,
+          "stage": "rust-preparation",
+          "revision": "dd54f41bde69c742824cfaf030b490628ebcb631",
+          "started": "2026-09-24T18:15:42.919400219Z",
+          "duration_seconds": 102.646181318,
+          "budget_seconds": 2700,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 121.94,
+          "peak_memory_bytes": 1214459904
+        },
+        {
+          "schema": 1,
+          "stage": "checks",
+          "revision": "dd54f41bde69c742824cfaf030b490628ebcb631",
+          "started": "2026-09-24T18:17:25.631029057Z",
+          "duration_seconds": 4.291494515,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 10.98,
+          "peak_memory_bytes": 334180352
+        }
+      ]
+    },
+    "policy": "nsql disables the target archive to avoid refresh upload cost on source-changing builds; sccache remains enabled, and the reusable workflow retains an opt-in-by-default archive for workloads that benefit from repeated identical outputs",
+    "limitations": [
+      "One sample per condition; not a latency percentile or cold compiler-cache comparison",
+      "The restored archive still recompiled the workspace in 7.60-7.84 seconds",
+      "Freshness is covered by source-only-change unit tests; the production samples changed workflow metadata"
+    ]
+  },
+  "delivery": {
+    "source_revision": "0d8239001ecd5ff5ffdb83380d64d7ac4e89fddc",
+    "workflow_created_at": "2026-09-24T18:15:37Z",
+    "first_matching_revision_observed_at": "2026-09-24T18:18:52.332668+00:00",
+    "workflow_creation_to_observed_served_seconds": 195.332668,
+    "observation": {
+      "schema": 1,
+      "stage": "delivery-observation",
+      "revision": "0d8239001ecd5ff5ffdb83380d64d7ac4e89fddc",
+      "started": "2026-09-24T18:16:20.417652357Z",
+      "duration_seconds": 151.915015963,
+      "budget_seconds": 1200,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.124457,
+      "peak_memory_bytes": 33112064
+    },
+    "first_promotion": {
+      "schema": 1,
+      "stage": "promotion",
+      "revision": "36c2709cbba520c695d6c302dfdca68869907fe7",
+      "started": "2026-09-24T18:16:59.792204743Z",
+      "duration_seconds": 5.824714977,
+      "budget_seconds": 30,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.82,
+      "peak_memory_bytes": 133476352
+    },
+    "first_serving_wait": {
+      "schema": 1,
+      "stage": "served-revision",
+      "revision": "0d8239001ecd5ff5ffdb83380d64d7ac4e89fddc",
+      "started": "2026-09-24T18:17:05.671725965Z",
+      "duration_seconds": 60.013460061,
+      "budget_seconds": 65,
+      "budget_exceeded": false,
+      "success": false,
+      "exit_code": 1,
+      "cpu_seconds": 0.3,
+      "peak_memory_bytes": 39469056,
+      "error": "infra failed: exit status 1"
+    },
+    "reconciliation": {
+      "evaluated_revision": "fede0599c3a4abb2f32692748c795fe0f26014bb",
+      "artifacts_verified_revision": "fede0599c3a4abb2f32692748c795fe0f26014bb",
+      "selection": {
+        "tofu": false,
+        "kubernetes": true,
+        "ansible": false,
+        "monitor_only": false,
+        "projects": [
+          "llunde"
+        ],
+        "host_scope": "none",
+        "reasons": [
+          "deployment-independent input: .github/workflows/performance.yml",
+          "deployment-independent input: .github/workflows/rust-ci.yml",
+          "deployment input: platform/projects/llunde/.deployments/llunde-frontend.json",
+          "deployment input: platform/projects/llunde/kustomization.yaml"
+        ]
+      },
+      "last_full_revision": "2161a8bd1e03aad0dcf8dd63fba78772592c103d",
+      "last_full_verified_at": "2026-09-24T18:14:19.930890329Z",
+      "desired_revision": "fede0599c3a4abb2f32692748c795fe0f26014bb",
+      "applied_revision": "fede0599c3a4abb2f32692748c795fe0f26014bb",
+      "stage": "complete",
+      "updated_at": "2026-09-24T18:18:44.665528216Z",
+      "stage_seconds": {
+        "kubernetes": 18.633910358,
+        "plan": 10.88768279,
+        "publish": 1.9640841500000001,
+        "verify": 7.417646402
+      }
+    },
+    "vm_resources": {
+      "scope": "Build VM cgroups only; includes background activity and page cache, excludes hosted CI and Kubernetes node CPU",
+      "interval_seconds": 1,
+      "first_sample": "2026-09-24T18:15:37.183669+00:00",
+      "last_sample": "2026-09-24T18:18:52.252439+00:00",
+      "sample_count": 193,
+      "max_admitted_jobs": 1,
+      "runners": {
+        "peak_memory_bytes": 1960222720,
+        "cpu_seconds": 26.003227,
+        "memory_event_deltas": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        }
+      },
+      "engine": {
+        "peak_memory_bytes": 3602661376,
+        "cpu_seconds": 9.378678,
+        "memory_event_deltas": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        }
+      }
+    },
+    "limitations": [
+      "Metadata-only frontend canary; no ordinary-traffic percentile",
+      "The first 60-second deployment serving wait failed; the recovery rerun checked an already-serving revision",
+      "The 15-second end-to-end target remains unqualified",
+      "External observation includes polling delay; cgroup resource samples do not cover every delivery machine"
+    ]
+  },
+  "read_only_drift": {
+    "measurement": {
+      "schema": 1,
+      "stage": "drift-verification",
+      "started": "2026-09-24T18:24:37.210080254Z",
+      "duration_seconds": 36.755879922,
+      "budget_seconds": 300,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 5.259288,
+      "peak_memory_bytes": 112533504
+    },
+    "execution": "Local tailnet invocation of the same command used by hourly verification; not a scheduled hosted-run measurement",
+    "ansible_changed": 0
+  },
+  "baseline": [
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36027342601,
+      "url": "https://github.com/fredrir/infra/actions/runs/36027342601",
+      "workflow": "Check",
+      "revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+      "conclusion": "success",
+      "attempt_seconds": 198.0,
+      "jobs": [
+        {
+          "name": "cli / build",
+          "conclusion": "success",
+          "seconds": 62.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Identify CLI inputs",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Reuse verified native CLI",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 8.0
+            },
+            {
+              "name": "Install pinned Bazel",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Build CLI",
+              "conclusion": "success",
+              "seconds": 40.0
+            },
+            {
+              "name": "Store binary identity",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Verify binary identity",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "seconds": 2.0
+            },
+            {
+              "name": "Post Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 6.0
+            },
+            {
+              "name": "Post Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 2.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "seconds": 0.0
+            }
+          ]
+        },
+        {
+          "name": "check",
+          "conclusion": "success",
+          "seconds": 98.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "seconds": 2.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 3.0
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Verify CLI",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Select affected inputs",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 8.0
+            },
+            {
+              "name": "Install checksum-pinned native Bazel",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Prepare affected check artifacts",
+              "conclusion": "success",
+              "seconds": 66.0
+            },
+            {
+              "name": "Check affected targets within aggregate budget",
+              "conclusion": "success",
+              "seconds": 4.0
+            },
+            {
+              "name": "Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 8.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "seconds": 0.0
+            }
+          ]
+        },
+        {
+          "name": "validate",
+          "conclusion": "success",
+          "seconds": 29.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "seconds": 3.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 3.0
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "seconds": 6.0
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "seconds": 2.0
+            },
+            {
+              "name": "Prepare declaration dependencies",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Validate declarations within remaining check budget",
+              "conclusion": "success",
+              "seconds": 5.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "seconds": 2.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "seconds": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36027342376,
+      "url": "https://github.com/fredrir/infra/actions/runs/36027342376",
+      "workflow": "Reconcile infrastructure",
+      "revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+      "conclusion": "success",
+      "attempt_seconds": 871.0,
+      "jobs": [
+        {
+          "name": "cli / build",
+          "conclusion": "success",
+          "seconds": 70.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 2.0
+            },
+            {
+              "name": "Identify CLI inputs",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Reuse verified native CLI",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 12.0
+            },
+            {
+              "name": "Install pinned Bazel",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Build CLI",
+              "conclusion": "success",
+              "seconds": 40.0
+            },
+            {
+              "name": "Store binary identity",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Verify binary identity",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "seconds": 2.0
+            },
+            {
+              "name": "Post Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 10.0
+            },
+            {
+              "name": "Post Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "seconds": 0.0
+            }
+          ]
+        },
+        {
+          "name": "apply",
+          "conclusion": "success",
+          "seconds": 792.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Verify CLI",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "seconds": 12.0
+            },
+            {
+              "name": "Configure host identity",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Validate affected declarations",
+              "conclusion": "success",
+              "seconds": 5.0
+            },
+            {
+              "name": "Run actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Reconcile merged revision",
+              "conclusion": "success",
+              "seconds": 768.0
+            },
+            {
+              "name": "Record workflow timing",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Summarize reconciliation",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Remove session credentials",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Post Run actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Post Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "seconds": 1.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "seconds": 0.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "seconds": 0.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "repository": "fredrir/llunde-frontend",
+      "run_id": 36039984815,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/llunde-frontend/actions/runs/36039984815/attempts/1",
+      "revision": "0d8239001ecd5ff5ffdb83380d64d7ac4e89fddc",
+      "conclusion": "success",
+      "created_at": "2026-09-24T18:15:37Z",
+      "run_started_at": "2026-09-24T18:15:37Z",
+      "initial_queue_seconds": 0.0,
+      "attempt_seconds": 75.0,
+      "jobs": [
+        {
+          "name": "config",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:15:38Z",
+          "started_at": "2026-09-24T18:15:41Z",
+          "completed_at": "2026-09-24T18:15:48Z",
+          "duration_seconds": 7.0,
+          "queue_seconds": 3.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:42Z",
+              "completed_at": "2026-09-24T18:15:43Z"
+            },
+            {
+              "name": "Run dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:43Z",
+              "completed_at": "2026-09-24T18:15:44Z"
+            },
+            {
+              "name": "Run set -euo pipefail",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:44Z",
+              "completed_at": "2026-09-24T18:15:45Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:45Z",
+              "completed_at": "2026-09-24T18:15:45Z"
+            }
+          ]
+        },
+        {
+          "name": "frontend / build",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:15:49Z",
+          "started_at": "2026-09-24T18:15:51Z",
+          "completed_at": "2026-09-24T18:16:52Z",
+          "duration_seconds": 61.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:53Z",
+              "completed_at": "2026-09-24T18:15:58Z"
+            },
+            {
+              "name": "Set up runner",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:58Z",
+              "completed_at": "2026-09-24T18:15:58Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:58Z",
+              "completed_at": "2026-09-24T18:16:01Z"
+            },
+            {
+              "name": "Fetch immutable public infrastructure recipe",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:01Z",
+              "completed_at": "2026-09-24T18:16:03Z"
+            },
+            {
+              "name": "Run ./.infra-build-recipe/.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:03Z",
+              "completed_at": "2026-09-24T18:16:03Z"
+            },
+            {
+              "name": "Select affected image",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:03Z",
+              "completed_at": "2026-09-24T18:16:03Z"
+            },
+            {
+              "name": "Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:03Z",
+              "completed_at": "2026-09-24T18:16:04Z"
+            },
+            {
+              "name": "Verify dedicated engine",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:04Z",
+              "completed_at": "2026-09-24T18:16:05Z"
+            },
+            {
+              "name": "Validate Dagger cache policy",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:05Z",
+              "completed_at": "2026-09-24T18:16:05Z"
+            },
+            {
+              "name": "Check inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:05Z",
+              "completed_at": "2026-09-24T18:16:05Z"
+            },
+            {
+              "name": "Install verification tools",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:05Z",
+              "completed_at": "2026-09-24T18:16:05Z"
+            },
+            {
+              "name": "Select isolated scanner cache",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:05Z",
+              "completed_at": "2026-09-24T18:16:06Z"
+            },
+            {
+              "name": "Report scanner cache state",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:06Z",
+              "completed_at": "2026-09-24T18:16:06Z"
+            },
+            {
+              "name": "Prepare verification data",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:06Z",
+              "completed_at": "2026-09-24T18:16:06Z"
+            },
+            {
+              "name": "Build and publish",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:06Z",
+              "completed_at": "2026-09-24T18:16:22Z"
+            },
+            {
+              "name": "Scan published image",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:22Z",
+              "completed_at": "2026-09-24T18:16:25Z"
+            },
+            {
+              "name": "Sign and verify private image provenance",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:25Z",
+              "completed_at": "2026-09-24T18:16:36Z"
+            },
+            {
+              "name": "Enforce aggregate check budget",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:36Z",
+              "completed_at": "2026-09-24T18:16:36Z"
+            },
+            {
+              "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:36Z",
+              "completed_at": "2026-09-24T18:16:41Z"
+            },
+            {
+              "name": "Request deployment",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:41Z",
+              "completed_at": "2026-09-24T18:16:44Z"
+            },
+            {
+              "name": "Release scanner database lease",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:44Z",
+              "completed_at": "2026-09-24T18:16:44Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:44Z",
+              "completed_at": "2026-09-24T18:16:46Z"
+            },
+            {
+              "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:46Z",
+              "completed_at": "2026-09-24T18:16:46Z"
+            },
+            {
+              "name": "Post Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:46Z",
+              "completed_at": "2026-09-24T18:16:47Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:47Z",
+              "completed_at": "2026-09-24T18:16:47Z"
+            },
+            {
+              "name": "Complete runner",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:47Z",
+              "completed_at": "2026-09-24T18:16:47Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:47Z",
+              "completed_at": "2026-09-24T18:16:47Z"
+            }
+          ]
+        },
+        {
+          "name": "frontend / cli",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:15:49Z",
+          "started_at": "2026-09-24T18:15:49Z",
+          "completed_at": "2026-09-24T18:15:48Z",
+          "duration_seconds": -1.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36040113949,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36040113949/attempts/1",
+      "revision": "36c2709cbba520c695d6c302dfdca68869907fe7",
+      "conclusion": "failure",
+      "created_at": "2026-09-24T18:16:43Z",
+      "run_started_at": "2026-09-24T18:16:43Z",
+      "initial_queue_seconds": 0.0,
+      "attempt_seconds": 89.0,
+      "jobs": [
+        {
+          "name": "deploy",
+          "conclusion": "failure",
+          "created_at": "2026-09-24T18:16:45Z",
+          "started_at": "2026-09-24T18:16:47Z",
+          "completed_at": "2026-09-24T18:18:12Z",
+          "duration_seconds": 85.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:50Z",
+              "completed_at": "2026-09-24T18:16:53Z"
+            },
+            {
+              "name": "Fetch current deployment configuration",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:53Z",
+              "completed_at": "2026-09-24T18:16:54Z"
+            },
+            {
+              "name": "Run ./.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:54Z",
+              "completed_at": "2026-09-24T18:16:57Z"
+            },
+            {
+              "name": "Install tools",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:57Z",
+              "completed_at": "2026-09-24T18:16:57Z"
+            },
+            {
+              "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:57Z",
+              "completed_at": "2026-09-24T18:16:59Z"
+            },
+            {
+              "name": "Verify and deploy",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:16:59Z",
+              "completed_at": "2026-09-24T18:17:05Z"
+            },
+            {
+              "name": "Verify served frontend revision",
+              "conclusion": "failure",
+              "started_at": "2026-09-24T18:17:05Z",
+              "completed_at": "2026-09-24T18:18:05Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:05Z",
+              "completed_at": "2026-09-24T18:18:08Z"
+            },
+            {
+              "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:08Z",
+              "completed_at": "2026-09-24T18:18:08Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:08Z",
+              "completed_at": "2026-09-24T18:18:08Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36040113949,
+      "attempt": 2,
+      "url": "https://github.com/fredrir/infra/actions/runs/36040113949/attempts/2",
+      "revision": "36c2709cbba520c695d6c302dfdca68869907fe7",
+      "conclusion": "success",
+      "created_at": "2026-09-24T18:24:27Z",
+      "run_started_at": "2026-09-24T18:24:26Z",
+      "initial_queue_seconds": null,
+      "attempt_seconds": 30.0,
+      "jobs": [
+        {
+          "name": "deploy",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:24:28Z",
+          "started_at": "2026-09-24T18:24:30Z",
+          "completed_at": "2026-09-24T18:24:56Z",
+          "duration_seconds": 26.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:33Z",
+              "completed_at": "2026-09-24T18:24:36Z"
+            },
+            {
+              "name": "Fetch current deployment configuration",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:36Z",
+              "completed_at": "2026-09-24T18:24:37Z"
+            },
+            {
+              "name": "Run ./.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:37Z",
+              "completed_at": "2026-09-24T18:24:39Z"
+            },
+            {
+              "name": "Install tools",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:39Z",
+              "completed_at": "2026-09-24T18:24:39Z"
+            },
+            {
+              "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:39Z",
+              "completed_at": "2026-09-24T18:24:45Z"
+            },
+            {
+              "name": "Verify and deploy",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:45Z",
+              "completed_at": "2026-09-24T18:24:48Z"
+            },
+            {
+              "name": "Verify served frontend revision",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:48Z",
+              "completed_at": "2026-09-24T18:24:49Z"
+            },
+            {
+              "name": "Report desired revision",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:49Z",
+              "completed_at": "2026-09-24T18:24:49Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:49Z",
+              "completed_at": "2026-09-24T18:24:51Z"
+            },
+            {
+              "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:51Z",
+              "completed_at": "2026-09-24T18:24:52Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:24:52Z",
+              "completed_at": "2026-09-24T18:24:52Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36040160878,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36040160878/attempts/1",
+      "revision": "fede0599c3a4abb2f32692748c795fe0f26014bb",
+      "conclusion": "success",
+      "created_at": "2026-09-24T18:17:08Z",
+      "run_started_at": "2026-09-24T18:17:08Z",
+      "initial_queue_seconds": 0.0,
+      "attempt_seconds": 141.0,
+      "jobs": [
+        {
+          "name": "cli / build",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:17:09Z",
+          "started_at": "2026-09-24T18:17:11Z",
+          "completed_at": "2026-09-24T18:17:23Z",
+          "duration_seconds": 12.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:12Z",
+              "completed_at": "2026-09-24T18:17:13Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:13Z",
+              "completed_at": "2026-09-24T18:17:15Z"
+            },
+            {
+              "name": "Identify CLI inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:15Z",
+              "completed_at": "2026-09-24T18:17:15Z"
+            },
+            {
+              "name": "Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:15Z",
+              "completed_at": "2026-09-24T18:17:17Z"
+            },
+            {
+              "name": "Run ./.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:17Z",
+              "completed_at": "2026-09-24T18:17:18Z"
+            },
+            {
+              "name": "Reuse released CLI for matching source inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:18Z",
+              "completed_at": "2026-09-24T18:17:18Z"
+            },
+            {
+              "name": "Reuse verified native CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:18Z",
+              "completed_at": "2026-09-24T18:17:18Z"
+            },
+            {
+              "name": "Verify binary identity",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:18Z",
+              "completed_at": "2026-09-24T18:17:18Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:18Z",
+              "completed_at": "2026-09-24T18:17:20Z"
+            },
+            {
+              "name": "Post Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:20Z",
+              "completed_at": "2026-09-24T18:17:20Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:20Z",
+              "completed_at": "2026-09-24T18:17:20Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:20Z",
+              "completed_at": "2026-09-24T18:17:20Z"
+            }
+          ]
+        },
+        {
+          "name": "reconcile / apply",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:17:23Z",
+          "started_at": "2026-09-24T18:17:28Z",
+          "completed_at": "2026-09-24T18:18:53Z",
+          "duration_seconds": 85.0,
+          "queue_seconds": 5.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:29Z",
+              "completed_at": "2026-09-24T18:17:31Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:31Z",
+              "completed_at": "2026-09-24T18:17:32Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:32Z",
+              "completed_at": "2026-09-24T18:17:35Z"
+            },
+            {
+              "name": "Verify CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:35Z",
+              "completed_at": "2026-09-24T18:17:35Z"
+            },
+            {
+              "name": "Run dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:35Z",
+              "completed_at": "2026-09-24T18:17:35Z"
+            },
+            {
+              "name": "Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:35Z",
+              "completed_at": "2026-09-24T18:17:51Z"
+            },
+            {
+              "name": "Configure host identity",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:51Z",
+              "completed_at": "2026-09-24T18:17:51Z"
+            },
+            {
+              "name": "Validate affected declarations",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:51Z",
+              "completed_at": "2026-09-24T18:17:53Z"
+            },
+            {
+              "name": "Run actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:53Z",
+              "completed_at": "2026-09-24T18:17:54Z"
+            },
+            {
+              "name": "Reconcile merged revision",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:54Z",
+              "completed_at": "2026-09-24T18:18:47Z"
+            },
+            {
+              "name": "Record workflow timing",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:47Z",
+              "completed_at": "2026-09-24T18:18:47Z"
+            },
+            {
+              "name": "Summarize reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:47Z",
+              "completed_at": "2026-09-24T18:18:47Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:47Z",
+              "completed_at": "2026-09-24T18:18:49Z"
+            },
+            {
+              "name": "Remove session credentials",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:49Z",
+              "completed_at": "2026-09-24T18:18:49Z"
+            },
+            {
+              "name": "Post Run actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:49Z",
+              "completed_at": "2026-09-24T18:18:49Z"
+            },
+            {
+              "name": "Post Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:49Z",
+              "completed_at": "2026-09-24T18:18:50Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:50Z",
+              "completed_at": "2026-09-24T18:18:50Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:18:50Z",
+              "completed_at": "2026-09-24T18:18:50Z"
+            }
+          ]
+        },
+        {
+          "name": "images / plan",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:17:23Z",
+          "started_at": "2026-09-24T18:17:25Z",
+          "completed_at": "2026-09-24T18:17:30Z",
+          "duration_seconds": 5.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:26Z",
+              "completed_at": "2026-09-24T18:17:27Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:27Z",
+              "completed_at": "2026-09-24T18:17:28Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:28Z",
+              "completed_at": "2026-09-24T18:17:28Z"
+            },
+            {
+              "name": "Plan",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:28Z",
+              "completed_at": "2026-09-24T18:17:29Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:29Z",
+              "completed_at": "2026-09-24T18:17:29Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:29Z",
+              "completed_at": "2026-09-24T18:17:29Z"
+            }
+          ]
+        },
+        {
+          "name": "check / check",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:17:24Z",
+          "started_at": "2026-09-24T18:17:26Z",
+          "completed_at": "2026-09-24T18:19:29Z",
+          "duration_seconds": 123.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:26Z",
+              "completed_at": "2026-09-24T18:17:29Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:29Z",
+              "completed_at": "2026-09-24T18:17:30Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:30Z",
+              "completed_at": "2026-09-24T18:17:33Z"
+            },
+            {
+              "name": "Verify CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:33Z",
+              "completed_at": "2026-09-24T18:17:33Z"
+            },
+            {
+              "name": "Select affected inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:33Z",
+              "completed_at": "2026-09-24T18:17:33Z"
+            },
+            {
+              "name": "Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:33Z",
+              "completed_at": "2026-09-24T18:17:53Z"
+            },
+            {
+              "name": "Install checksum-pinned native Bazel",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:53Z",
+              "completed_at": "2026-09-24T18:17:54Z"
+            },
+            {
+              "name": "Prepare affected check artifacts",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:54Z",
+              "completed_at": "2026-09-24T18:19:14Z"
+            },
+            {
+              "name": "Check affected targets within aggregate budget",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:19:14Z",
+              "completed_at": "2026-09-24T18:19:16Z"
+            },
+            {
+              "name": "Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:19:16Z",
+              "completed_at": "2026-09-24T18:19:25Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:19:25Z",
+              "completed_at": "2026-09-24T18:19:26Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:19:26Z",
+              "completed_at": "2026-09-24T18:19:26Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:19:27Z",
+              "completed_at": "2026-09-24T18:19:27Z"
+            }
+          ]
+        },
+        {
+          "name": "images / cli",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:17:24Z",
+          "started_at": "2026-09-24T18:17:24Z",
+          "completed_at": "2026-09-24T18:17:23Z",
+          "duration_seconds": -1.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "reconcile / plan",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:17:24Z",
+          "started_at": "2026-09-24T18:17:24Z",
+          "completed_at": "2026-09-24T18:17:23Z",
+          "duration_seconds": -1.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "check / cli",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:17:24Z",
+          "started_at": "2026-09-24T18:17:24Z",
+          "completed_at": "2026-09-24T18:17:23Z",
+          "duration_seconds": -1.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "images / image",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:17:31Z",
+          "started_at": "2026-09-24T18:17:31Z",
+          "completed_at": "2026-09-24T18:17:31Z",
+          "duration_seconds": 0.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "check / validate",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:19:29Z",
+          "started_at": "2026-09-24T18:19:29Z",
+          "completed_at": "2026-09-24T18:19:29Z",
+          "duration_seconds": 0.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/nsql",
+      "run_id": 36037111345,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/nsql/actions/runs/36037111345/attempts/1",
+      "revision": "ec7b15e92ecab0d3b668fac627aec89746ec3937",
+      "conclusion": "success",
+      "created_at": "2026-09-24T17:50:38Z",
+      "run_started_at": "2026-09-24T17:50:38Z",
+      "initial_queue_seconds": 0.0,
+      "attempt_seconds": 219.0,
+      "jobs": [
+        {
+          "name": "rust / check",
+          "conclusion": "success",
+          "created_at": "2026-09-24T17:50:39Z",
+          "started_at": "2026-09-24T17:50:49Z",
+          "completed_at": "2026-09-24T17:54:17Z",
+          "duration_seconds": 208.0,
+          "queue_seconds": 10.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:51Z",
+              "completed_at": "2026-09-24T17:50:55Z"
+            },
+            {
+              "name": "Set up runner",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:55Z",
+              "completed_at": "2026-09-24T17:50:55Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:55Z",
+              "completed_at": "2026-09-24T17:50:58Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:58Z",
+              "completed_at": "2026-09-24T17:51:03Z"
+            },
+            {
+              "name": "Run ./.infra-build-recipe/.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:51:03Z",
+              "completed_at": "2026-09-24T17:51:04Z"
+            },
+            {
+              "name": "Prepare",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:51:04Z",
+              "completed_at": "2026-09-24T17:51:05Z"
+            },
+            {
+              "name": "Restore build outputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:51:05Z",
+              "completed_at": "2026-09-24T17:51:50Z"
+            },
+            {
+              "name": "Prepare changed test executables",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:51:50Z",
+              "completed_at": "2026-09-24T17:52:09Z"
+            },
+            {
+              "name": "Check within aggregate budget",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:52:09Z",
+              "completed_at": "2026-09-24T17:52:12Z"
+            },
+            {
+              "name": "Save build outputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:52:12Z",
+              "completed_at": "2026-09-24T17:54:07Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:54:07Z",
+              "completed_at": "2026-09-24T17:54:10Z"
+            },
+            {
+              "name": "Cache report",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:54:10Z",
+              "completed_at": "2026-09-24T17:54:11Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:54:11Z",
+              "completed_at": "2026-09-24T17:54:12Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:54:12Z",
+              "completed_at": "2026-09-24T17:54:13Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:54:13Z",
+              "completed_at": "2026-09-24T17:54:13Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/nsql",
+      "run_id": 36037111345,
+      "attempt": 2,
+      "url": "https://github.com/fredrir/nsql/actions/runs/36037111345/attempts/2",
+      "revision": "ec7b15e92ecab0d3b668fac627aec89746ec3937",
+      "conclusion": "success",
+      "created_at": "2026-09-24T18:02:25Z",
+      "run_started_at": "2026-09-24T18:02:24Z",
+      "initial_queue_seconds": null,
+      "attempt_seconds": 94.0,
+      "jobs": [
+        {
+          "name": "rust / check",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:02:26Z",
+          "started_at": "2026-09-24T18:02:35Z",
+          "completed_at": "2026-09-24T18:03:58Z",
+          "duration_seconds": 83.0,
+          "queue_seconds": 9.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:37Z",
+              "completed_at": "2026-09-24T18:02:41Z"
+            },
+            {
+              "name": "Set up runner",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:41Z",
+              "completed_at": "2026-09-24T18:02:41Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:41Z",
+              "completed_at": "2026-09-24T18:02:44Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:44Z",
+              "completed_at": "2026-09-24T18:02:48Z"
+            },
+            {
+              "name": "Run ./.infra-build-recipe/.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:48Z",
+              "completed_at": "2026-09-24T18:02:50Z"
+            },
+            {
+              "name": "Prepare",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:50Z",
+              "completed_at": "2026-09-24T18:02:51Z"
+            },
+            {
+              "name": "Restore build outputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:51Z",
+              "completed_at": "2026-09-24T18:03:27Z"
+            },
+            {
+              "name": "Prepare changed test executables",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:27Z",
+              "completed_at": "2026-09-24T18:03:45Z"
+            },
+            {
+              "name": "Check within aggregate budget",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:45Z",
+              "completed_at": "2026-09-24T18:03:49Z"
+            },
+            {
+              "name": "Save build outputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:49Z",
+              "completed_at": "2026-09-24T18:03:50Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:50Z",
+              "completed_at": "2026-09-24T18:03:53Z"
+            },
+            {
+              "name": "Cache report",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:53Z",
+              "completed_at": "2026-09-24T18:03:53Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:53Z",
+              "completed_at": "2026-09-24T18:03:54Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:54Z",
+              "completed_at": "2026-09-24T18:03:55Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:55Z",
+              "completed_at": "2026-09-24T18:03:55Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/nsql",
+      "run_id": 36039942541,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/nsql/actions/runs/36039942541/attempts/1",
+      "revision": "dd54f41bde69c742824cfaf030b490628ebcb631",
+      "conclusion": "success",
+      "created_at": "2026-09-24T18:15:15Z",
+      "run_started_at": "2026-09-24T18:15:15Z",
+      "initial_queue_seconds": 0.0,
+      "attempt_seconds": 143.0,
+      "jobs": [
+        {
+          "name": "rust / check",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:15:16Z",
+          "started_at": "2026-09-24T18:15:26Z",
+          "completed_at": "2026-09-24T18:17:38Z",
+          "duration_seconds": 132.0,
+          "queue_seconds": 10.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:28Z",
+              "completed_at": "2026-09-24T18:15:32Z"
+            },
+            {
+              "name": "Set up runner",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:32Z",
+              "completed_at": "2026-09-24T18:15:32Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:32Z",
+              "completed_at": "2026-09-24T18:15:36Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:36Z",
+              "completed_at": "2026-09-24T18:15:40Z"
+            },
+            {
+              "name": "Run ./.infra-build-recipe/.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:40Z",
+              "completed_at": "2026-09-24T18:15:41Z"
+            },
+            {
+              "name": "Prepare",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:41Z",
+              "completed_at": "2026-09-24T18:15:42Z"
+            },
+            {
+              "name": "Prepare changed test executables",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:15:42Z",
+              "completed_at": "2026-09-24T18:17:25Z"
+            },
+            {
+              "name": "Check within aggregate budget",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:25Z",
+              "completed_at": "2026-09-24T18:17:29Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:29Z",
+              "completed_at": "2026-09-24T18:17:32Z"
+            },
+            {
+              "name": "Cache report",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:32Z",
+              "completed_at": "2026-09-24T18:17:32Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:32Z",
+              "completed_at": "2026-09-24T18:17:34Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:34Z",
+              "completed_at": "2026-09-24T18:17:35Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:17:35Z",
+              "completed_at": "2026-09-24T18:17:35Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36038372361,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36038372361/attempts/1",
+      "revision": "2161a8bd1e03aad0dcf8dd63fba78772592c103d",
+      "conclusion": "success",
+      "created_at": "2026-09-24T18:01:38Z",
+      "run_started_at": "2026-09-24T18:01:38Z",
+      "initial_queue_seconds": 0.0,
+      "attempt_seconds": 768.0,
+      "jobs": [
+        {
+          "name": "cli / build",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:01:39Z",
+          "started_at": "2026-09-24T18:01:40Z",
+          "completed_at": "2026-09-24T18:01:49Z",
+          "duration_seconds": 9.0,
+          "queue_seconds": 1.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:41Z",
+              "completed_at": "2026-09-24T18:01:41Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:41Z",
+              "completed_at": "2026-09-24T18:01:43Z"
+            },
+            {
+              "name": "Identify CLI inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:43Z",
+              "completed_at": "2026-09-24T18:01:43Z"
+            },
+            {
+              "name": "Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:43Z",
+              "completed_at": "2026-09-24T18:01:44Z"
+            },
+            {
+              "name": "Run ./.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:44Z",
+              "completed_at": "2026-09-24T18:01:45Z"
+            },
+            {
+              "name": "Reuse released CLI for matching source inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:45Z",
+              "completed_at": "2026-09-24T18:01:45Z"
+            },
+            {
+              "name": "Reuse verified native CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:45Z",
+              "completed_at": "2026-09-24T18:01:45Z"
+            },
+            {
+              "name": "Verify binary identity",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:45Z",
+              "completed_at": "2026-09-24T18:01:45Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:45Z",
+              "completed_at": "2026-09-24T18:01:47Z"
+            },
+            {
+              "name": "Post Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:47Z",
+              "completed_at": "2026-09-24T18:01:47Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:47Z",
+              "completed_at": "2026-09-24T18:01:47Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:47Z",
+              "completed_at": "2026-09-24T18:01:47Z"
+            }
+          ]
+        },
+        {
+          "name": "reconcile / apply",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:01:49Z",
+          "started_at": "2026-09-24T18:02:28Z",
+          "completed_at": "2026-09-24T18:14:26Z",
+          "duration_seconds": 718.0,
+          "queue_seconds": 39.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:29Z",
+              "completed_at": "2026-09-24T18:02:30Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:30Z",
+              "completed_at": "2026-09-24T18:02:31Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:31Z",
+              "completed_at": "2026-09-24T18:02:31Z"
+            },
+            {
+              "name": "Verify CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:31Z",
+              "completed_at": "2026-09-24T18:02:32Z"
+            },
+            {
+              "name": "Run dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:32Z",
+              "completed_at": "2026-09-24T18:02:32Z"
+            },
+            {
+              "name": "Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:32Z",
+              "completed_at": "2026-09-24T18:02:42Z"
+            },
+            {
+              "name": "Configure host identity",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:42Z",
+              "completed_at": "2026-09-24T18:02:42Z"
+            },
+            {
+              "name": "Validate affected declarations",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:42Z",
+              "completed_at": "2026-09-24T18:02:43Z"
+            },
+            {
+              "name": "Run actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:43Z",
+              "completed_at": "2026-09-24T18:02:44Z"
+            },
+            {
+              "name": "Reconcile merged revision",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:44Z",
+              "completed_at": "2026-09-24T18:14:22Z"
+            },
+            {
+              "name": "Record workflow timing",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:14:22Z",
+              "completed_at": "2026-09-24T18:14:22Z"
+            },
+            {
+              "name": "Summarize reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:14:22Z",
+              "completed_at": "2026-09-24T18:14:22Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:14:22Z",
+              "completed_at": "2026-09-24T18:14:23Z"
+            },
+            {
+              "name": "Remove session credentials",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:14:23Z",
+              "completed_at": "2026-09-24T18:14:23Z"
+            },
+            {
+              "name": "Post Run actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:14:23Z",
+              "completed_at": "2026-09-24T18:14:23Z"
+            },
+            {
+              "name": "Post Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:14:23Z",
+              "completed_at": "2026-09-24T18:14:24Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:14:24Z",
+              "completed_at": "2026-09-24T18:14:24Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:14:24Z",
+              "completed_at": "2026-09-24T18:14:24Z"
+            }
+          ]
+        },
+        {
+          "name": "check / check",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:01:49Z",
+          "started_at": "2026-09-24T18:01:52Z",
+          "completed_at": "2026-09-24T18:04:06Z",
+          "duration_seconds": 134.0,
+          "queue_seconds": 3.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:53Z",
+              "completed_at": "2026-09-24T18:01:55Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:55Z",
+              "completed_at": "2026-09-24T18:01:58Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:58Z",
+              "completed_at": "2026-09-24T18:02:00Z"
+            },
+            {
+              "name": "Verify CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:00Z",
+              "completed_at": "2026-09-24T18:02:00Z"
+            },
+            {
+              "name": "Select affected inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:00Z",
+              "completed_at": "2026-09-24T18:02:00Z"
+            },
+            {
+              "name": "Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:00Z",
+              "completed_at": "2026-09-24T18:02:15Z"
+            },
+            {
+              "name": "Install checksum-pinned native Bazel",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:15Z",
+              "completed_at": "2026-09-24T18:02:15Z"
+            },
+            {
+              "name": "Prepare affected check artifacts",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:02:15Z",
+              "completed_at": "2026-09-24T18:03:51Z"
+            },
+            {
+              "name": "Check affected targets within aggregate budget",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:51Z",
+              "completed_at": "2026-09-24T18:03:53Z"
+            },
+            {
+              "name": "Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:03:53Z",
+              "completed_at": "2026-09-24T18:04:02Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:02Z",
+              "completed_at": "2026-09-24T18:04:04Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:04Z",
+              "completed_at": "2026-09-24T18:04:04Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:04Z",
+              "completed_at": "2026-09-24T18:04:04Z"
+            }
+          ]
+        },
+        {
+          "name": "images / plan",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:01:49Z",
+          "started_at": "2026-09-24T18:01:52Z",
+          "completed_at": "2026-09-24T18:01:59Z",
+          "duration_seconds": 7.0,
+          "queue_seconds": 3.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:52Z",
+              "completed_at": "2026-09-24T18:01:53Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:53Z",
+              "completed_at": "2026-09-24T18:01:55Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:55Z",
+              "completed_at": "2026-09-24T18:01:56Z"
+            },
+            {
+              "name": "Plan",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:56Z",
+              "completed_at": "2026-09-24T18:01:57Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:57Z",
+              "completed_at": "2026-09-24T18:01:57Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:01:57Z",
+              "completed_at": "2026-09-24T18:01:57Z"
+            }
+          ]
+        },
+        {
+          "name": "images / cli",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:01:49Z",
+          "started_at": "2026-09-24T18:01:49Z",
+          "completed_at": "2026-09-24T18:01:49Z",
+          "duration_seconds": 0.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "reconcile / plan",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:01:50Z",
+          "started_at": "2026-09-24T18:01:50Z",
+          "completed_at": "2026-09-24T18:01:49Z",
+          "duration_seconds": -1.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "check / cli",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:01:50Z",
+          "started_at": "2026-09-24T18:01:50Z",
+          "completed_at": "2026-09-24T18:01:49Z",
+          "duration_seconds": -1.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "images / image",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T18:01:59Z",
+          "started_at": "2026-09-24T18:01:59Z",
+          "completed_at": "2026-09-24T18:01:59Z",
+          "duration_seconds": 0.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "check / validate",
+          "conclusion": "success",
+          "created_at": "2026-09-24T18:04:06Z",
+          "started_at": "2026-09-24T18:04:08Z",
+          "completed_at": "2026-09-24T18:04:32Z",
+          "duration_seconds": 24.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:10Z",
+              "completed_at": "2026-09-24T18:04:13Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:13Z",
+              "completed_at": "2026-09-24T18:04:16Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:16Z",
+              "completed_at": "2026-09-24T18:04:22Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:22Z",
+              "completed_at": "2026-09-24T18:04:25Z"
+            },
+            {
+              "name": "Prepare declaration dependencies",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:25Z",
+              "completed_at": "2026-09-24T18:04:25Z"
+            },
+            {
+              "name": "Validate declarations within remaining check budget",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:25Z",
+              "completed_at": "2026-09-24T18:04:25Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:25Z",
+              "completed_at": "2026-09-24T18:04:28Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:28Z",
+              "completed_at": "2026-09-24T18:04:28Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T18:04:28Z",
+              "completed_at": "2026-09-24T18:04:28Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36037070630,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36037070630/attempts/1",
+      "revision": "670664407064fc601020ffe068271579823ed877",
+      "conclusion": "failure",
+      "created_at": "2026-09-24T17:50:17Z",
+      "run_started_at": "2026-09-24T17:50:17Z",
+      "initial_queue_seconds": 0.0,
+      "attempt_seconds": 11.0,
+      "jobs": [
+        {
+          "name": "cli / build",
+          "conclusion": "failure",
+          "created_at": "2026-09-24T17:50:18Z",
+          "started_at": "2026-09-24T17:50:20Z",
+          "completed_at": "2026-09-24T17:50:27Z",
+          "duration_seconds": 7.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:21Z",
+              "completed_at": "2026-09-24T17:50:21Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:21Z",
+              "completed_at": "2026-09-24T17:50:23Z"
+            },
+            {
+              "name": "Identify CLI inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:23Z",
+              "completed_at": "2026-09-24T17:50:23Z"
+            },
+            {
+              "name": "Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:23Z",
+              "completed_at": "2026-09-24T17:50:24Z"
+            },
+            {
+              "name": "Run ./.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:24Z",
+              "completed_at": "2026-09-24T17:50:25Z"
+            },
+            {
+              "name": "Reuse released CLI for matching source inputs",
+              "conclusion": "failure",
+              "started_at": "2026-09-24T17:50:25Z",
+              "completed_at": "2026-09-24T17:50:25Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:25Z",
+              "completed_at": "2026-09-24T17:50:25Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:50:25Z",
+              "completed_at": "2026-09-24T17:50:25Z"
+            }
+          ]
+        },
+        {
+          "name": "images",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T17:50:28Z",
+          "started_at": "2026-09-24T17:50:28Z",
+          "completed_at": "2026-09-24T17:50:28Z",
+          "duration_seconds": 0.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "check",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T17:50:28Z",
+          "started_at": "2026-09-24T17:50:28Z",
+          "completed_at": "2026-09-24T17:50:28Z",
+          "duration_seconds": 0.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        },
+        {
+          "name": "reconcile",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T17:50:28Z",
+          "started_at": "2026-09-24T17:50:28Z",
+          "completed_at": "2026-09-24T17:50:28Z",
+          "duration_seconds": 0.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36033749313,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36033749313/attempts/1",
+      "revision": "448c4a8aa1b1c0a6119473bdc0287f4465c9a27a",
+      "conclusion": "failure",
+      "created_at": "2026-09-24T17:21:38Z",
+      "run_started_at": "2026-09-24T17:21:38Z",
+      "initial_queue_seconds": 0.0,
+      "attempt_seconds": 704.0,
+      "jobs": [
+        {
+          "name": "cli / build",
+          "conclusion": "success",
+          "created_at": "2026-09-24T17:21:39Z",
+          "started_at": "2026-09-24T17:21:41Z",
+          "completed_at": "2026-09-24T17:21:51Z",
+          "duration_seconds": 10.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:42Z",
+              "completed_at": "2026-09-24T17:21:43Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:43Z",
+              "completed_at": "2026-09-24T17:21:44Z"
+            },
+            {
+              "name": "Identify CLI inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:44Z",
+              "completed_at": "2026-09-24T17:21:44Z"
+            },
+            {
+              "name": "Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:44Z",
+              "completed_at": "2026-09-24T17:21:46Z"
+            },
+            {
+              "name": "Reuse verified native CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:46Z",
+              "completed_at": "2026-09-24T17:21:46Z"
+            },
+            {
+              "name": "Verify binary identity",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:46Z",
+              "completed_at": "2026-09-24T17:21:46Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:46Z",
+              "completed_at": "2026-09-24T17:21:48Z"
+            },
+            {
+              "name": "Post Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:48Z",
+              "completed_at": "2026-09-24T17:21:48Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:48Z",
+              "completed_at": "2026-09-24T17:21:48Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:48Z",
+              "completed_at": "2026-09-24T17:21:48Z"
+            }
+          ]
+        },
+        {
+          "name": "apply",
+          "conclusion": "failure",
+          "created_at": "2026-09-24T17:21:52Z",
+          "started_at": "2026-09-24T17:21:55Z",
+          "completed_at": "2026-09-24T17:33:22Z",
+          "duration_seconds": 687.0,
+          "queue_seconds": 3.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:56Z",
+              "completed_at": "2026-09-24T17:21:58Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:58Z",
+              "completed_at": "2026-09-24T17:21:59Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:21:59Z",
+              "completed_at": "2026-09-24T17:22:01Z"
+            },
+            {
+              "name": "Verify CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:22:01Z",
+              "completed_at": "2026-09-24T17:22:01Z"
+            },
+            {
+              "name": "Run dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:22:01Z",
+              "completed_at": "2026-09-24T17:22:02Z"
+            },
+            {
+              "name": "Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:22:02Z",
+              "completed_at": "2026-09-24T17:22:18Z"
+            },
+            {
+              "name": "Configure host identity",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:22:18Z",
+              "completed_at": "2026-09-24T17:22:18Z"
+            },
+            {
+              "name": "Validate affected declarations",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:22:18Z",
+              "completed_at": "2026-09-24T17:22:20Z"
+            },
+            {
+              "name": "Run actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:22:20Z",
+              "completed_at": "2026-09-24T17:22:21Z"
+            },
+            {
+              "name": "Reconcile merged revision",
+              "conclusion": "failure",
+              "started_at": "2026-09-24T17:22:21Z",
+              "completed_at": "2026-09-24T17:33:15Z"
+            },
+            {
+              "name": "Record workflow timing",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:33:15Z",
+              "completed_at": "2026-09-24T17:33:15Z"
+            },
+            {
+              "name": "Summarize reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:33:15Z",
+              "completed_at": "2026-09-24T17:33:15Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:33:15Z",
+              "completed_at": "2026-09-24T17:33:17Z"
+            },
+            {
+              "name": "Remove session credentials",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:33:17Z",
+              "completed_at": "2026-09-24T17:33:17Z"
+            },
+            {
+              "name": "Post Run actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:33:17Z",
+              "completed_at": "2026-09-24T17:33:17Z"
+            },
+            {
+              "name": "Post Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:33:17Z",
+              "completed_at": "2026-09-24T17:33:18Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:33:18Z",
+              "completed_at": "2026-09-24T17:33:18Z"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T17:33:18Z",
+              "completed_at": "2026-09-24T17:33:18Z"
+            }
+          ]
+        },
+        {
+          "name": "plan",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T17:21:52Z",
+          "started_at": "2026-09-24T17:21:52Z",
+          "completed_at": "2026-09-24T17:21:51Z",
+          "duration_seconds": -1.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        }
+      ]
+    }
+  ],
+  "rollout_failures": [
+    {
+      "run_id": 36033749313,
+      "reason": "Main advanced after host convergence; publication revision guard rejected the stale apply",
+      "recovered_by_run": 36034781505
+    },
+    {
+      "run_id": 36037070630,
+      "reason": "Cached CLI destination was read-only; replacement now removes the destination first",
+      "recovered_by_run": 36037187653
+    },
+    {
+      "run_id": 36040113949,
+      "attempt": 1,
+      "reason": "The expected revision was not served within the unchanged 60-second deadline",
+      "recovery_attempt": 2
+    }
+  ],
+  "validation": [
+    "go test ./...",
+    "go test -race ./internal/platformops ./internal/reconcile ./internal/ci",
+    "All 19 Bazel test targets",
+    "actionlint",
+    "Ansible syntax checks for reconciliation and runner playbooks",
+    "Generated Flux artifact validation",
+    "Live single-project and combined llunde/parser/y read-only verification",
+    "Live runner admission acquire/release and occupied-slot contention fixture",
+    "Tailscale fresh/unchanged/corrupted/missing binary fixtures",
+    "Temporary transition RBAC removed after permanent list permissions converged"
+  ]
+}

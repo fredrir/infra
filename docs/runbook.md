@@ -164,3 +164,12 @@ Admission wait is reported separately in hook output and consumes the job timeou
 Install the pinned CLI release before enabling admission, and drain active jobs before changing runner service overrides.
 For rollback, disable admission and reconcile idle listeners before downgrading the CLI.
 Do not delete leases while their workers are running; corrupted lease state fails admission until an operator repairs it with listeners drained.
+
+The Rust reusable workflow accepts `build-output-cache: false` to skip target archive restore and publication while retaining compiler `sccache`.
+`nsql` uses this setting because the measured archive refresh cost exceeded the compilation saved; identical-output reruns benefited from archive reuse.
+Compare `rust-cache-restore`, `rust-preparation`, `rust-cache-save` and total job duration before changing this setting.
+The aggregate check budget remains ten seconds, and cache publication still requires a successful trusted build.
+
+Use the workflow performance artifact's attempt number and job queue timestamps when investigating latency, and retain failed attempts when joining build, deployment and reconciliation runs.
+A successful recovery rerun against an already-serving revision does not replace the original delivery duration or its failed serving deadline.
+Measured results and scope limits are recorded in [CI performance](ci-performance.md#execution-measurements).
