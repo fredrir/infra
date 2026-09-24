@@ -61,6 +61,22 @@ jobs:
           IMAGE_DIGEST: ${{ inputs.digest }}
           SOURCE_REVISION: ${{ inputs.source-revision }}
         run: infra ci measure --stage promotion --budget 30s --report-dir "$RUNNER_TEMP/performance" -- infra ci deploy "$GITHUB_WORKSPACE"
+      - name: Wait for production publication
+        if: inputs.image == 'ghcr.io/fredrir/llunde-frontend'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DESIRED_REVISION=$(git rev-parse HEAD)
+          export DESIRED_REVISION
+          infra ci measure --stage publication-wait --budget 8m --report-dir "$RUNNER_TEMP/performance" -- bash -euo pipefail -c '
+            while true; do
+              status=$(gh api "repos/fredrir/infra/compare/$DESIRED_REVISION...production" --jq .status)
+              case "$status" in
+                identical|ahead) exit 0 ;;
+                behind) sleep 2 ;;
+                *) echo "Production history diverged from the promoted revision" >&2; exit 1 ;;
+              esac
+            done'
       - name: Verify served frontend revision
         if: inputs.image == 'ghcr.io/fredrir/llunde-frontend'
         env:

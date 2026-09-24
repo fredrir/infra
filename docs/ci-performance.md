@@ -82,6 +82,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Rust target cache | Cache save identity includes source contents, lockfile and build arguments; dependency outputs remain reusable across source changes |
 | VM admission | A configurable host-wide limit bounds complete jobs across repository listeners; leases use worker PID and process start time and are reclaimed after worker exit |
 | Timing | A read-only completion observer retains job and step timestamps for successful and failed workflow attempts for 30 days |
+| Frontend deadlines | Publication queueing has a separate eight-minute measurement; the subsequent exact served-revision check retains its 60-second budget within the existing ten-minute job |
 
 VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; the default slot count is one for the 8 GiB build VM.
 The hourly verification does not replace the full OpenTofu and host drift repair cycle.

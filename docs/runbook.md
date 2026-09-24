@@ -175,4 +175,6 @@ The aggregate check budget remains ten seconds, and cache publication still requ
 
 Use the workflow performance artifact's attempt number and job queue timestamps when investigating latency, and retain failed attempts when joining build, deployment and reconciliation runs.
 A successful recovery rerun against an already-serving revision does not replace the original delivery duration or its failed serving deadline.
+Frontend deployment records `publication-wait` until `production` contains the promoted infrastructure commit, then starts the 60-second exact served-revision check.
+Publication has an eight-minute budget within the existing ten-minute deployment job; total delivery latency includes both stages, and divergent production history fails immediately.
 Measured results and scope limits are recorded in [CI performance](ci-performance.md#execution-measurements).
