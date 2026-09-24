@@ -154,7 +154,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 ## CI execution and runner admission
 
 Pushes and pull requests enter through `reconcile.yml`, which builds the CLI once and shares the verified artifact with reusable checks, image planning and reconciliation.
-Checks gate production application, and the parent workflow retains the existing Tailscale `workflow_ref` identity.
+Checks and reconciliation run alongside each other after the shared CLI is ready; apply retains declaration validation and live preflight, and the parent retains the existing Tailscale `workflow_ref` identity.
 `performance.yml` records completed attempt timings, including failures, without checking out or executing the observed revision.
 
 `build_runner_job_slots` limits simultaneous complete jobs across the build VM's repository listeners when `build_runner_admission_enabled` is true.

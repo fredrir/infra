@@ -72,7 +72,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Control | Behavior |
 | --- | --- |
 | Shared CLI | Push and pull-request checks, reconciliation and image planning consume one checksum-verified CLI artifact from the parent workflow |
-| Production gate | Required checks finish before reconciliation starts; production application is serialized and is not cancelled by a newer push |
+| Production validation | Apply validates declarations and live preflight before mutation; independent checks share the CLI and run alongside reconciliation; production application is serialized |
 | Scheduled work | Full recovery runs every six hours at minute 17; hourly verification at minute 47 reads live state without applying declarations |
 | Deployment selection | Explicit CI-only paths skip deployment; supported project changes select the union of their dependency chains; shared and unknown inputs retain full fallback |
 | Workload verification | Each verification poll lists workloads once per kind and namespace; expected ownership, images, readiness and generations remain required |
