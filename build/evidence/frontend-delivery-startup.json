@@ -1,0 +1,3311 @@
+{
+  "schema": 1,
+  "qualified_on": "2026-09-24",
+  "release": {
+    "tag": "infra-v0.2.8",
+    "revision": "d392e0a3f04ff8bccdb0ae938ba8eff29299d00e",
+    "linux_amd64_sha256": "29a69eed5062522f12087d35c279f3549561e0723483d6ef256f1e445e82a409",
+    "inputs_sha256": "c020aceda09e6eb4a7f55644e4a78da115ffbfb26c3d5e20981ca97446df614c",
+    "checksum_and_attestation_verified": true,
+    "attestation_source_ref": "refs/tags/infra-v0.2.8"
+  },
+  "comparison": {
+    "definition": "GitHub build workflow creation to the hosted reconciler completing exact artifact, ownership, generation, workload-readiness and served-revision verification",
+    "before_source_revision": "0d8239001ecd5ff5ffdb83380d64d7ac4e89fddc",
+    "after_source_revision": "78f2bfd936ebf80ec401ee2877553521b4e5b153",
+    "before_seconds": 187.665528,
+    "after_seconds": 137.368697,
+    "saved_seconds": 50.296831,
+    "reduction_percent": 26.80131590283326,
+    "reconciliation_workflow_before_seconds": 96.665528,
+    "reconciliation_workflow_after_seconds": 59.368697,
+    "reconciliation_reduction_percent": 38.583383106333415,
+    "baseline_evidence": "build/evidence/ci-execution-optimization.json",
+    "limitations": [
+      "One before/after qualification sample, not an ordinary-traffic percentile",
+      "Both canaries changed workflow metadata; application source changed independently between them",
+      "The endpoints use the same hosted reconciliation completion semantics; no historical observer clock offset is subtracted"
+    ]
+  },
+  "clock_accounting": {
+    "original_external_seconds": 195.332668,
+    "current_external_observation": {
+      "schema": 1,
+      "stage": "delivery-observation",
+      "revision": "78f2bfd936ebf80ec401ee2877553521b4e5b153",
+      "started": "2026-09-24T19:53:21.581906803Z",
+      "duration_seconds": 137.460414519,
+      "budget_seconds": 600,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.109947,
+      "peak_memory_bytes": 26091520
+    },
+    "current_clock_comparison": [
+      {
+        "local_start": "2026-09-24T19:56:56.391577+00:00",
+        "round_trip_seconds": 0.8166823387145996,
+        "server_date": "Thu, 24 Sep 2026 19:56:43 GMT",
+        "local_midpoint_minus_server_seconds": 13.79991865158081
+      },
+      {
+        "local_start": "2026-09-24T19:56:57.208392+00:00",
+        "round_trip_seconds": 0.19263863563537598,
+        "server_date": "Thu, 24 Sep 2026 19:56:43 GMT",
+        "local_midpoint_minus_server_seconds": 14.304710865020752
+      },
+      {
+        "local_start": "2026-09-24T19:56:57.401123+00:00",
+        "round_trip_seconds": 0.17472577095031738,
+        "server_date": "Thu, 24 Sep 2026 19:56:44 GMT",
+        "local_midpoint_minus_server_seconds": 13.48848581314087
+      }
+    ],
+    "policy": "Keep external observations as raw records; do not combine an uncalibrated local timestamp with GitHub creation time for an exact comparative percentage",
+    "http_date_precision": "One second, plus request latency; clock comparison occurred after the canary"
+  },
+  "delivery": {
+    "build_run": 36051159045,
+    "deploy_run": 36051255870,
+    "reconcile_run": 36051301670,
+    "attempt": 1,
+    "all_workflows_succeeded": true,
+    "workflow_creation_to_deploy_served_check_seconds": 133.647317,
+    "promotion_completion_to_deploy_served_check_seconds": 57.847204,
+    "promotion": {
+      "schema": 1,
+      "stage": "promotion",
+      "revision": "66f6df12f878c022ab02d6ffc4bacb3c51b70ff3",
+      "started": "2026-09-24T19:54:22.307300879Z",
+      "duration_seconds": 6.492813207,
+      "budget_seconds": 30,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.73,
+      "peak_memory_bytes": 132759552
+    },
+    "publication_wait": {
+      "schema": 1,
+      "stage": "publication-wait",
+      "revision": "66f6df12f878c022ab02d6ffc4bacb3c51b70ff3",
+      "started": "2026-09-24T19:54:28.904128079Z",
+      "duration_seconds": 37.304674022,
+      "budget_seconds": 480,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 2.19,
+      "peak_memory_bytes": 80334848
+    },
+    "served_revision": {
+      "schema": 1,
+      "stage": "served-revision",
+      "revision": "78f2bfd936ebf80ec401ee2877553521b4e5b153",
+      "started": "2026-09-24T19:55:06.278667769Z",
+      "duration_seconds": 20.368650255,
+      "budget_seconds": 65,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.14,
+      "peak_memory_bytes": 41611264
+    },
+    "reconciliation": {
+      "evaluated_revision": "333deba96023733f51c62e9766d718c44cd9d61c",
+      "artifacts_verified_revision": "333deba96023733f51c62e9766d718c44cd9d61c",
+      "selection": {
+        "tofu": false,
+        "kubernetes": true,
+        "ansible": false,
+        "monitor_only": false,
+        "projects": [
+          "llunde"
+        ],
+        "host_scope": "none",
+        "reasons": [
+          "deployment input: platform/projects/llunde/.deployments/llunde-frontend.json",
+          "deployment input: platform/projects/llunde/kustomization.yaml"
+        ]
+      },
+      "last_full_revision": "66f6df12f878c022ab02d6ffc4bacb3c51b70ff3",
+      "last_full_verified_at": "2026-09-24T19:52:26.510029558Z",
+      "desired_revision": "333deba96023733f51c62e9766d718c44cd9d61c",
+      "applied_revision": "333deba96023733f51c62e9766d718c44cd9d61c",
+      "stage": "complete",
+      "updated_at": "2026-09-24T19:55:30.368697479Z",
+      "stage_seconds": {
+        "kubernetes": 20.091413392,
+        "plan": 6.014528393,
+        "publish": 2.389905472,
+        "verify": 5.5837748640000004
+      }
+    },
+    "aggregate_checks": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 7.0955356080000005,
+      "remaining_seconds": 2.9044643919999995,
+      "success": true,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "frontend",
+          "revision": "78f2bfd936ebf80ec401ee2877553521b4e5b153",
+          "started": "2026-09-24T19:53:40.665626125Z",
+          "duration_seconds": 2.121902163,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 5.033087,
+          "peak_memory_bytes": 272105472
+        },
+        {
+          "schema": 1,
+          "stage": "provenance-verification",
+          "revision": "78f2bfd936ebf80ec401ee2877553521b4e5b153",
+          "started": "2026-09-24T19:53:56.937514069Z",
+          "duration_seconds": 3.034683746,
+          "budget_seconds": 5.939148138,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.311205,
+          "peak_memory_bytes": 70516736
+        },
+        {
+          "schema": 1,
+          "stage": "vulnerability-scan",
+          "revision": "78f2bfd936ebf80ec401ee2877553521b4e5b153",
+          "started": "2026-09-24T19:53:47.493061495Z",
+          "duration_seconds": 1.9389496990000001,
+          "budget_seconds": 7.878097837,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.421731,
+          "peak_memory_bytes": 122814464
+        }
+      ]
+    },
+    "scanner_preparation": {
+      "schema": 1,
+      "stage": "scanner-preparation",
+      "revision": "78f2bfd936ebf80ec401ee2877553521b4e5b153",
+      "started": "2026-09-24T19:53:36.484664794Z",
+      "duration_seconds": 0.013854396,
+      "budget_seconds": 300,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.017348,
+      "peak_memory_bytes": 13893632
+    },
+    "vm_resources": {
+      "scope": "Whole sampler interval around the canary, including pre-push and post-serving idle time; cgroups include background activity and page cache, and exclude hosted CI and Kubernetes node CPU",
+      "started": "2026-09-24T19:53:10.045722+00:00",
+      "completed": "2026-09-24T19:56:03.945824+00:00",
+      "duration_seconds": 173.900102,
+      "sample_count": 174,
+      "max_admitted_jobs": 1,
+      "runners": {
+        "peak_memory_bytes": 1796812800,
+        "cpu_seconds": 18.3635,
+        "memory_event_deltas": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        }
+      },
+      "engine": {
+        "peak_memory_bytes": 3455434752,
+        "cpu_seconds": 7.33741,
+        "memory_event_deltas": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        }
+      },
+      "samples": [
+        {
+          "at": "2026-09-24T19:53:10.045722+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644421120,
+          "runner_cpu_usec": 5570777987,
+          "engine_memory_bytes": 2996895744,
+          "engine_cpu_usec": 4618048015
+        },
+        {
+          "at": "2026-09-24T19:53:11.139000+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1645207552,
+          "runner_cpu_usec": 5570781128,
+          "engine_memory_bytes": 2996895744,
+          "engine_cpu_usec": 4618050270
+        },
+        {
+          "at": "2026-09-24T19:53:12.141661+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1645207552,
+          "runner_cpu_usec": 5570785835,
+          "engine_memory_bytes": 2996895744,
+          "engine_cpu_usec": 4618050382
+        },
+        {
+          "at": "2026-09-24T19:53:13.144503+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1645207552,
+          "runner_cpu_usec": 5570787725,
+          "engine_memory_bytes": 2996895744,
+          "engine_cpu_usec": 4618050455
+        },
+        {
+          "at": "2026-09-24T19:53:14.146290+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644945408,
+          "runner_cpu_usec": 5570789520,
+          "engine_memory_bytes": 2996895744,
+          "engine_cpu_usec": 4618050608
+        },
+        {
+          "at": "2026-09-24T19:53:15.149043+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644711936,
+          "runner_cpu_usec": 5570791912,
+          "engine_memory_bytes": 2996895744,
+          "engine_cpu_usec": 4618050695
+        },
+        {
+          "at": "2026-09-24T19:53:16.151651+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644711936,
+          "runner_cpu_usec": 5570794504,
+          "engine_memory_bytes": 2997161984,
+          "engine_cpu_usec": 4618442094
+        },
+        {
+          "at": "2026-09-24T19:53:17.153397+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644711936,
+          "runner_cpu_usec": 5570794874,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618443558
+        },
+        {
+          "at": "2026-09-24T19:53:18.156547+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644986368,
+          "runner_cpu_usec": 5570799172,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618443676
+        },
+        {
+          "at": "2026-09-24T19:53:19.158346+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644756992,
+          "runner_cpu_usec": 5570799475,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618443744
+        },
+        {
+          "at": "2026-09-24T19:53:20.161392+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644724224,
+          "runner_cpu_usec": 5570799906,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618443823
+        },
+        {
+          "at": "2026-09-24T19:53:21.163353+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644724224,
+          "runner_cpu_usec": 5570800125,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618444574
+        },
+        {
+          "at": "2026-09-24T19:53:22.166325+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644724224,
+          "runner_cpu_usec": 5570800354,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618444658
+        },
+        {
+          "at": "2026-09-24T19:53:23.169306+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1644732416,
+          "runner_cpu_usec": 5570810183,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618444755
+        },
+        {
+          "at": "2026-09-24T19:53:24.171255+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1645629440,
+          "runner_cpu_usec": 5571061009,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618444827
+        },
+        {
+          "at": "2026-09-24T19:53:25.172909+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648324608,
+          "runner_cpu_usec": 5571233693,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618444915
+        },
+        {
+          "at": "2026-09-24T19:53:26.174464+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1646350336,
+          "runner_cpu_usec": 5572294226,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618445425
+        },
+        {
+          "at": "2026-09-24T19:53:27.177845+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1653035008,
+          "runner_cpu_usec": 5572875821,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618445483
+        },
+        {
+          "at": "2026-09-24T19:53:28.179991+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1671737344,
+          "runner_cpu_usec": 5573646822,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618445563
+        },
+        {
+          "at": "2026-09-24T19:53:29.183658+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1697234944,
+          "runner_cpu_usec": 5574395334,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618445647
+        },
+        {
+          "at": "2026-09-24T19:53:30.186330+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1710055424,
+          "runner_cpu_usec": 5575015632,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618445773
+        },
+        {
+          "at": "2026-09-24T19:53:31.188108+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1741578240,
+          "runner_cpu_usec": 5576282672,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618446016
+        },
+        {
+          "at": "2026-09-24T19:53:32.189725+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1739436032,
+          "runner_cpu_usec": 5576863608,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618446082
+        },
+        {
+          "at": "2026-09-24T19:53:33.191262+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1719517184,
+          "runner_cpu_usec": 5577579186,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618446202
+        },
+        {
+          "at": "2026-09-24T19:53:34.193183+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1735389184,
+          "runner_cpu_usec": 5578409496,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618446260
+        },
+        {
+          "at": "2026-09-24T19:53:35.194910+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1724948480,
+          "runner_cpu_usec": 5579214563,
+          "engine_memory_bytes": 2996899840,
+          "engine_cpu_usec": 4618446311
+        },
+        {
+          "at": "2026-09-24T19:53:36.196536+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1728794624,
+          "runner_cpu_usec": 5580207346,
+          "engine_memory_bytes": 3001700352,
+          "engine_cpu_usec": 4618583243
+        },
+        {
+          "at": "2026-09-24T19:53:37.198600+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1794101248,
+          "runner_cpu_usec": 5581562931,
+          "engine_memory_bytes": 3019284480,
+          "engine_cpu_usec": 4619090304
+        },
+        {
+          "at": "2026-09-24T19:53:38.201453+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1796812800,
+          "runner_cpu_usec": 5582004871,
+          "engine_memory_bytes": 3100119040,
+          "engine_cpu_usec": 4620225175
+        },
+        {
+          "at": "2026-09-24T19:53:39.203270+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1791979520,
+          "runner_cpu_usec": 5582256584,
+          "engine_memory_bytes": 3310018560,
+          "engine_cpu_usec": 4621338823
+        },
+        {
+          "at": "2026-09-24T19:53:40.204713+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1792757760,
+          "runner_cpu_usec": 5582407684,
+          "engine_memory_bytes": 3346182144,
+          "engine_cpu_usec": 4622404404
+        },
+        {
+          "at": "2026-09-24T19:53:41.206474+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1794469888,
+          "runner_cpu_usec": 5582500703,
+          "engine_memory_bytes": 3371724800,
+          "engine_cpu_usec": 4622763146
+        },
+        {
+          "at": "2026-09-24T19:53:42.208108+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1792401408,
+          "runner_cpu_usec": 5582560617,
+          "engine_memory_bytes": 3336105984,
+          "engine_cpu_usec": 4622785898
+        },
+        {
+          "at": "2026-09-24T19:53:43.210522+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1790791680,
+          "runner_cpu_usec": 5582668432,
+          "engine_memory_bytes": 3380936704,
+          "engine_cpu_usec": 4623315725
+        },
+        {
+          "at": "2026-09-24T19:53:44.212135+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1790726144,
+          "runner_cpu_usec": 5582767924,
+          "engine_memory_bytes": 3449987072,
+          "engine_cpu_usec": 4624135495
+        },
+        {
+          "at": "2026-09-24T19:53:45.214358+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1792507904,
+          "runner_cpu_usec": 5582886382,
+          "engine_memory_bytes": 3452456960,
+          "engine_cpu_usec": 4624297669
+        },
+        {
+          "at": "2026-09-24T19:53:46.216454+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1789784064,
+          "runner_cpu_usec": 5583007678,
+          "engine_memory_bytes": 3454488576,
+          "engine_cpu_usec": 4624420773
+        },
+        {
+          "at": "2026-09-24T19:53:47.218393+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1789759488,
+          "runner_cpu_usec": 5583088578,
+          "engine_memory_bytes": 3455434752,
+          "engine_cpu_usec": 4624502921
+        },
+        {
+          "at": "2026-09-24T19:53:48.220732+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1757282304,
+          "runner_cpu_usec": 5583529283,
+          "engine_memory_bytes": 3444211712,
+          "engine_cpu_usec": 4624571980
+        },
+        {
+          "at": "2026-09-24T19:53:49.222687+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1758851072,
+          "runner_cpu_usec": 5583639141,
+          "engine_memory_bytes": 3444211712,
+          "engine_cpu_usec": 4624572655
+        },
+        {
+          "at": "2026-09-24T19:53:50.224898+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1739616256,
+          "runner_cpu_usec": 5584128587,
+          "engine_memory_bytes": 3444211712,
+          "engine_cpu_usec": 4624572799
+        },
+        {
+          "at": "2026-09-24T19:53:51.227400+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1739534336,
+          "runner_cpu_usec": 5584187239,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624641187
+        },
+        {
+          "at": "2026-09-24T19:53:52.230705+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1739902976,
+          "runner_cpu_usec": 5584260343,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624641279
+        },
+        {
+          "at": "2026-09-24T19:53:53.232906+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1740029952,
+          "runner_cpu_usec": 5584353995,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624644658
+        },
+        {
+          "at": "2026-09-24T19:53:54.236585+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1739763712,
+          "runner_cpu_usec": 5584397359,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624644721
+        },
+        {
+          "at": "2026-09-24T19:53:55.238647+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1739755520,
+          "runner_cpu_usec": 5584412563,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624644806
+        },
+        {
+          "at": "2026-09-24T19:53:56.240603+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1740025856,
+          "runner_cpu_usec": 5584432388,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624645797
+        },
+        {
+          "at": "2026-09-24T19:53:57.242600+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1741479936,
+          "runner_cpu_usec": 5584718918,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624645866
+        },
+        {
+          "at": "2026-09-24T19:53:58.245035+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1741332480,
+          "runner_cpu_usec": 5584738912,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624645966
+        },
+        {
+          "at": "2026-09-24T19:53:59.249063+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1743011840,
+          "runner_cpu_usec": 5584838511,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624646074
+        },
+        {
+          "at": "2026-09-24T19:54:00.253156+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1742774272,
+          "runner_cpu_usec": 5585149258,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624646151
+        },
+        {
+          "at": "2026-09-24T19:54:01.255527+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1743912960,
+          "runner_cpu_usec": 5585268347,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624648907
+        },
+        {
+          "at": "2026-09-24T19:54:02.257434+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1743814656,
+          "runner_cpu_usec": 5585278575,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624648981
+        },
+        {
+          "at": "2026-09-24T19:54:03.260397+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1743822848,
+          "runner_cpu_usec": 5585291266,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624649043
+        },
+        {
+          "at": "2026-09-24T19:54:04.263370+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1743818752,
+          "runner_cpu_usec": 5585302824,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624649154
+        },
+        {
+          "at": "2026-09-24T19:54:05.265420+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1743499264,
+          "runner_cpu_usec": 5585672640,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624649239
+        },
+        {
+          "at": "2026-09-24T19:54:06.267380+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1743458304,
+          "runner_cpu_usec": 5585721743,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624650707
+        },
+        {
+          "at": "2026-09-24T19:54:07.270965+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1773432832,
+          "runner_cpu_usec": 5586259217,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624650724
+        },
+        {
+          "at": "2026-09-24T19:54:08.274577+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1778204672,
+          "runner_cpu_usec": 5586554282,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624650781
+        },
+        {
+          "at": "2026-09-24T19:54:09.278246+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1744240640,
+          "runner_cpu_usec": 5586827284,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624650832
+        },
+        {
+          "at": "2026-09-24T19:54:10.280387+00:00",
+          "admitted_jobs": 1,
+          "runner_memory_bytes": 1756491776,
+          "runner_cpu_usec": 5588058937,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624650874
+        },
+        {
+          "at": "2026-09-24T19:54:11.284630+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1729060864,
+          "runner_cpu_usec": 5588379667,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624651323
+        },
+        {
+          "at": "2026-09-24T19:54:12.287085+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1729552384,
+          "runner_cpu_usec": 5588420276,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624651386
+        },
+        {
+          "at": "2026-09-24T19:54:13.295448+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1729331200,
+          "runner_cpu_usec": 5588480742,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624651733
+        },
+        {
+          "at": "2026-09-24T19:54:14.297996+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649025024,
+          "runner_cpu_usec": 5588884850,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624652209
+        },
+        {
+          "at": "2026-09-24T19:54:15.301838+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648766976,
+          "runner_cpu_usec": 5588906122,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624652282
+        },
+        {
+          "at": "2026-09-24T19:54:16.304946+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648766976,
+          "runner_cpu_usec": 5588908886,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624652991
+        },
+        {
+          "at": "2026-09-24T19:54:17.338036+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648508928,
+          "runner_cpu_usec": 5588910241,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624653087
+        },
+        {
+          "at": "2026-09-24T19:54:18.340360+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649033216,
+          "runner_cpu_usec": 5588913199,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624653184
+        },
+        {
+          "at": "2026-09-24T19:54:19.342690+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648513024,
+          "runner_cpu_usec": 5588914091,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624653304
+        },
+        {
+          "at": "2026-09-24T19:54:20.345204+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648488448,
+          "runner_cpu_usec": 5588915100,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624653423
+        },
+        {
+          "at": "2026-09-24T19:54:21.349601+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648488448,
+          "runner_cpu_usec": 5588915259,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624654589
+        },
+        {
+          "at": "2026-09-24T19:54:22.353992+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648488448,
+          "runner_cpu_usec": 5588915350,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624654802
+        },
+        {
+          "at": "2026-09-24T19:54:23.358079+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648488448,
+          "runner_cpu_usec": 5588915350,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624654900
+        },
+        {
+          "at": "2026-09-24T19:54:24.363047+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648488448,
+          "runner_cpu_usec": 5588917519,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624654995
+        },
+        {
+          "at": "2026-09-24T19:54:25.367087+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648488448,
+          "runner_cpu_usec": 5588920847,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624655188
+        },
+        {
+          "at": "2026-09-24T19:54:26.370957+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648488448,
+          "runner_cpu_usec": 5588923121,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624655999
+        },
+        {
+          "at": "2026-09-24T19:54:27.373154+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648488448,
+          "runner_cpu_usec": 5588924533,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624656058
+        },
+        {
+          "at": "2026-09-24T19:54:28.375448+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648488448,
+          "runner_cpu_usec": 5588926486,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624656152
+        },
+        {
+          "at": "2026-09-24T19:54:29.377736+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648996352,
+          "runner_cpu_usec": 5588933808,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624656361
+        },
+        {
+          "at": "2026-09-24T19:54:30.379810+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648988160,
+          "runner_cpu_usec": 5588939077,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624656465
+        },
+        {
+          "at": "2026-09-24T19:54:31.381988+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648951296,
+          "runner_cpu_usec": 5588942566,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624657017
+        },
+        {
+          "at": "2026-09-24T19:54:32.386462+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648951296,
+          "runner_cpu_usec": 5588943736,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624657078
+        },
+        {
+          "at": "2026-09-24T19:54:33.439491+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648951296,
+          "runner_cpu_usec": 5588944093,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624657172
+        },
+        {
+          "at": "2026-09-24T19:54:34.441850+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648902144,
+          "runner_cpu_usec": 5588944565,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624657235
+        },
+        {
+          "at": "2026-09-24T19:54:35.444267+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648848896,
+          "runner_cpu_usec": 5588944818,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624657296
+        },
+        {
+          "at": "2026-09-24T19:54:36.447041+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648848896,
+          "runner_cpu_usec": 5588944818,
+          "engine_memory_bytes": 3444310016,
+          "engine_cpu_usec": 4624657886
+        },
+        {
+          "at": "2026-09-24T19:54:37.451114+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648308224,
+          "runner_cpu_usec": 5588945030,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624826177
+        },
+        {
+          "at": "2026-09-24T19:54:38.455174+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648308224,
+          "runner_cpu_usec": 5588945131,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624826272
+        },
+        {
+          "at": "2026-09-24T19:54:39.465640+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649070080,
+          "runner_cpu_usec": 5588956390,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624826375
+        },
+        {
+          "at": "2026-09-24T19:54:40.469957+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649070080,
+          "runner_cpu_usec": 5588962548,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624826397
+        },
+        {
+          "at": "2026-09-24T19:54:41.474040+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649070080,
+          "runner_cpu_usec": 5588965935,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624827177
+        },
+        {
+          "at": "2026-09-24T19:54:42.479632+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649070080,
+          "runner_cpu_usec": 5588968392,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624827274
+        },
+        {
+          "at": "2026-09-24T19:54:43.484484+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649070080,
+          "runner_cpu_usec": 5588971302,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624827398
+        },
+        {
+          "at": "2026-09-24T19:54:44.489164+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648787456,
+          "runner_cpu_usec": 5588973150,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624827495
+        },
+        {
+          "at": "2026-09-24T19:54:45.495344+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648590848,
+          "runner_cpu_usec": 5588980813,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624827593
+        },
+        {
+          "at": "2026-09-24T19:54:46.500008+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648590848,
+          "runner_cpu_usec": 5588983315,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624828349
+        },
+        {
+          "at": "2026-09-24T19:54:47.503095+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648922624,
+          "runner_cpu_usec": 5588987912,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624828439
+        },
+        {
+          "at": "2026-09-24T19:54:48.507987+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648922624,
+          "runner_cpu_usec": 5588988427,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624828501
+        },
+        {
+          "at": "2026-09-24T19:54:49.512589+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648410624,
+          "runner_cpu_usec": 5588989031,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624828598
+        },
+        {
+          "at": "2026-09-24T19:54:50.515484+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5588990207,
+          "engine_memory_bytes": 3454902272,
+          "engine_cpu_usec": 4624828660
+        },
+        {
+          "at": "2026-09-24T19:54:51.520191+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5588991292,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625005112
+        },
+        {
+          "at": "2026-09-24T19:54:52.525975+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5588991590,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625005206
+        },
+        {
+          "at": "2026-09-24T19:54:53.530656+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5588991819,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625005324
+        },
+        {
+          "at": "2026-09-24T19:54:54.533374+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5588993823,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625005441
+        },
+        {
+          "at": "2026-09-24T19:54:55.536393+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5588994723,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625005572
+        },
+        {
+          "at": "2026-09-24T19:54:56.539317+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5588996748,
+          "engine_memory_bytes": 3455266816,
+          "engine_cpu_usec": 4625006452
+        },
+        {
+          "at": "2026-09-24T19:54:57.545108+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5589000276,
+          "engine_memory_bytes": 3455266816,
+          "engine_cpu_usec": 4625006575
+        },
+        {
+          "at": "2026-09-24T19:54:58.550038+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5589003476,
+          "engine_memory_bytes": 3455266816,
+          "engine_cpu_usec": 4625006675
+        },
+        {
+          "at": "2026-09-24T19:54:59.554431+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648336896,
+          "runner_cpu_usec": 5589006730,
+          "engine_memory_bytes": 3455266816,
+          "engine_cpu_usec": 4625006758
+        },
+        {
+          "at": "2026-09-24T19:55:00.556863+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648562176,
+          "runner_cpu_usec": 5589012410,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625006825
+        },
+        {
+          "at": "2026-09-24T19:55:01.560008+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648308224,
+          "runner_cpu_usec": 5589014886,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625007449
+        },
+        {
+          "at": "2026-09-24T19:55:02.564498+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648308224,
+          "runner_cpu_usec": 5589016183,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625007537
+        },
+        {
+          "at": "2026-09-24T19:55:03.569301+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648308224,
+          "runner_cpu_usec": 5589016908,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625007587
+        },
+        {
+          "at": "2026-09-24T19:55:04.577610+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648308224,
+          "runner_cpu_usec": 5589017068,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625007765
+        },
+        {
+          "at": "2026-09-24T19:55:05.580992+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648308224,
+          "runner_cpu_usec": 5589017068,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625007866
+        },
+        {
+          "at": "2026-09-24T19:55:06.585726+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648259072,
+          "runner_cpu_usec": 5589017527,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625010279
+        },
+        {
+          "at": "2026-09-24T19:55:07.588363+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648259072,
+          "runner_cpu_usec": 5589017527,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625010348
+        },
+        {
+          "at": "2026-09-24T19:55:08.593457+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648259072,
+          "runner_cpu_usec": 5589017821,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625010616
+        },
+        {
+          "at": "2026-09-24T19:55:09.598435+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648259072,
+          "runner_cpu_usec": 5589019841,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625010714
+        },
+        {
+          "at": "2026-09-24T19:55:10.601846+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648812032,
+          "runner_cpu_usec": 5589028251,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625010841
+        },
+        {
+          "at": "2026-09-24T19:55:11.607108+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648812032,
+          "runner_cpu_usec": 5589032199,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625013202
+        },
+        {
+          "at": "2026-09-24T19:55:12.611837+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648812032,
+          "runner_cpu_usec": 5589034747,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625013295
+        },
+        {
+          "at": "2026-09-24T19:55:13.615035+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648812032,
+          "runner_cpu_usec": 5589036377,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625013364
+        },
+        {
+          "at": "2026-09-24T19:55:14.619645+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648545792,
+          "runner_cpu_usec": 5589044493,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625013453
+        },
+        {
+          "at": "2026-09-24T19:55:15.623590+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648316416,
+          "runner_cpu_usec": 5589047597,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625013536
+        },
+        {
+          "at": "2026-09-24T19:55:16.628507+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648316416,
+          "runner_cpu_usec": 5589048989,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625014447
+        },
+        {
+          "at": "2026-09-24T19:55:17.632312+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649111040,
+          "runner_cpu_usec": 5589054279,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625014585
+        },
+        {
+          "at": "2026-09-24T19:55:18.635683+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649111040,
+          "runner_cpu_usec": 5589054793,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625014716
+        },
+        {
+          "at": "2026-09-24T19:55:19.640968+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648357376,
+          "runner_cpu_usec": 5589055129,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625014835
+        },
+        {
+          "at": "2026-09-24T19:55:20.644657+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648357376,
+          "runner_cpu_usec": 5589055480,
+          "engine_memory_bytes": 3455004672,
+          "engine_cpu_usec": 4625014909
+        },
+        {
+          "at": "2026-09-24T19:55:21.647661+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648357376,
+          "runner_cpu_usec": 5589055847,
+          "engine_memory_bytes": 3455299584,
+          "engine_cpu_usec": 4625283373
+        },
+        {
+          "at": "2026-09-24T19:55:22.733315+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648324608,
+          "runner_cpu_usec": 5589055993,
+          "engine_memory_bytes": 3455299584,
+          "engine_cpu_usec": 4625283440
+        },
+        {
+          "at": "2026-09-24T19:55:23.736647+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648324608,
+          "runner_cpu_usec": 5589055993,
+          "engine_memory_bytes": 3455299584,
+          "engine_cpu_usec": 4625283527
+        },
+        {
+          "at": "2026-09-24T19:55:24.739706+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648324608,
+          "runner_cpu_usec": 5589055993,
+          "engine_memory_bytes": 3455299584,
+          "engine_cpu_usec": 4625283633
+        },
+        {
+          "at": "2026-09-24T19:55:25.743144+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648324608,
+          "runner_cpu_usec": 5589056096,
+          "engine_memory_bytes": 3455299584,
+          "engine_cpu_usec": 4625283841
+        },
+        {
+          "at": "2026-09-24T19:55:26.747998+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648324608,
+          "runner_cpu_usec": 5589058078,
+          "engine_memory_bytes": 3437735936,
+          "engine_cpu_usec": 4625315676
+        },
+        {
+          "at": "2026-09-24T19:55:27.751433+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648324608,
+          "runner_cpu_usec": 5589061427,
+          "engine_memory_bytes": 3437735936,
+          "engine_cpu_usec": 4625315741
+        },
+        {
+          "at": "2026-09-24T19:55:28.754628+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648324608,
+          "runner_cpu_usec": 5589063806,
+          "engine_memory_bytes": 3437735936,
+          "engine_cpu_usec": 4625316198
+        },
+        {
+          "at": "2026-09-24T19:55:29.758146+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1649143808,
+          "runner_cpu_usec": 5589069165,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625316331
+        },
+        {
+          "at": "2026-09-24T19:55:30.763460+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648881664,
+          "runner_cpu_usec": 5589079077,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625316395
+        },
+        {
+          "at": "2026-09-24T19:55:31.768861+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648852992,
+          "runner_cpu_usec": 5589080523,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625317170
+        },
+        {
+          "at": "2026-09-24T19:55:32.772061+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648852992,
+          "runner_cpu_usec": 5589082530,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625317400
+        },
+        {
+          "at": "2026-09-24T19:55:33.777705+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648852992,
+          "runner_cpu_usec": 5589083296,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625317506
+        },
+        {
+          "at": "2026-09-24T19:55:34.783006+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648398336,
+          "runner_cpu_usec": 5589084089,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625317578
+        },
+        {
+          "at": "2026-09-24T19:55:35.788171+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648398336,
+          "runner_cpu_usec": 5589084089,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625318497
+        },
+        {
+          "at": "2026-09-24T19:55:36.793279+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648398336,
+          "runner_cpu_usec": 5589084089,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625318643
+        },
+        {
+          "at": "2026-09-24T19:55:37.796232+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648185344,
+          "runner_cpu_usec": 5589084385,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625319208
+        },
+        {
+          "at": "2026-09-24T19:55:38.802628+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648185344,
+          "runner_cpu_usec": 5589084564,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625319280
+        },
+        {
+          "at": "2026-09-24T19:55:39.805875+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648185344,
+          "runner_cpu_usec": 5589084886,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625319353
+        },
+        {
+          "at": "2026-09-24T19:55:40.809850+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648185344,
+          "runner_cpu_usec": 5589085216,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625320383
+        },
+        {
+          "at": "2026-09-24T19:55:41.815306+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648185344,
+          "runner_cpu_usec": 5589086150,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625320462
+        },
+        {
+          "at": "2026-09-24T19:55:42.820737+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648185344,
+          "runner_cpu_usec": 5589089881,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625320556
+        },
+        {
+          "at": "2026-09-24T19:55:43.828710+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648185344,
+          "runner_cpu_usec": 5589091703,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625320673
+        },
+        {
+          "at": "2026-09-24T19:55:44.831970+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648152576,
+          "runner_cpu_usec": 5589093107,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625320742
+        },
+        {
+          "at": "2026-09-24T19:55:45.852338+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648152576,
+          "runner_cpu_usec": 5589096791,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625321495
+        },
+        {
+          "at": "2026-09-24T19:55:46.858832+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648615424,
+          "runner_cpu_usec": 5589101059,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625321716
+        },
+        {
+          "at": "2026-09-24T19:55:47.864608+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648615424,
+          "runner_cpu_usec": 5589103159,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625321834
+        },
+        {
+          "at": "2026-09-24T19:55:48.867972+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648615424,
+          "runner_cpu_usec": 5589103333,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625321939
+        },
+        {
+          "at": "2026-09-24T19:55:49.871677+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648353280,
+          "runner_cpu_usec": 5589104331,
+          "engine_memory_bytes": 3437477888,
+          "engine_cpu_usec": 4625322093
+        },
+        {
+          "at": "2026-09-24T19:55:50.875882+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648058368,
+          "runner_cpu_usec": 5589104545,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625379473
+        },
+        {
+          "at": "2026-09-24T19:55:51.879068+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648058368,
+          "runner_cpu_usec": 5589105644,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625379552
+        },
+        {
+          "at": "2026-09-24T19:55:52.882627+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648058368,
+          "runner_cpu_usec": 5589105834,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625379632
+        },
+        {
+          "at": "2026-09-24T19:55:53.886173+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648058368,
+          "runner_cpu_usec": 5589106012,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625379709
+        },
+        {
+          "at": "2026-09-24T19:55:54.888953+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648058368,
+          "runner_cpu_usec": 5589106901,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625379779
+        },
+        {
+          "at": "2026-09-24T19:55:55.891872+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648058368,
+          "runner_cpu_usec": 5589107132,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625382497
+        },
+        {
+          "at": "2026-09-24T19:55:56.895477+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648357376,
+          "runner_cpu_usec": 5589111509,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625382610
+        },
+        {
+          "at": "2026-09-24T19:55:57.900592+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648095232,
+          "runner_cpu_usec": 5589114471,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625382722
+        },
+        {
+          "at": "2026-09-24T19:55:58.908538+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648095232,
+          "runner_cpu_usec": 5589117013,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625382821
+        },
+        {
+          "at": "2026-09-24T19:55:59.918845+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648095232,
+          "runner_cpu_usec": 5589118683,
+          "engine_memory_bytes": 3437744128,
+          "engine_cpu_usec": 4625382908
+        },
+        {
+          "at": "2026-09-24T19:56:00.923041+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648918528,
+          "runner_cpu_usec": 5589139296,
+          "engine_memory_bytes": 3437481984,
+          "engine_cpu_usec": 4625385084
+        },
+        {
+          "at": "2026-09-24T19:56:01.939103+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648918528,
+          "runner_cpu_usec": 5589140054,
+          "engine_memory_bytes": 3437481984,
+          "engine_cpu_usec": 4625385209
+        },
+        {
+          "at": "2026-09-24T19:56:02.942810+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648918528,
+          "runner_cpu_usec": 5589141361,
+          "engine_memory_bytes": 3437481984,
+          "engine_cpu_usec": 4625385339
+        },
+        {
+          "at": "2026-09-24T19:56:03.945824+00:00",
+          "admitted_jobs": 0,
+          "runner_memory_bytes": 1648312320,
+          "runner_cpu_usec": 5589141487,
+          "engine_memory_bytes": 3437481984,
+          "engine_cpu_usec": 4625385425
+        }
+      ]
+    }
+  },
+  "state_reads": {
+    "scope": "Three alternating read-only local invocations per binary against the same production status; excludes in-process connection reuse and state writes",
+    "samples": [
+      {
+        "mode": "old",
+        "seconds": 0.472349709001719,
+        "cpu_seconds": 0.30375399999999997,
+        "applied": "fede0599c3a4abb2f32692748c795fe0f26014bb"
+      },
+      {
+        "mode": "native",
+        "seconds": 0.20789440400039894,
+        "cpu_seconds": 0.02011800000000003,
+        "applied": "fede0599c3a4abb2f32692748c795fe0f26014bb"
+      },
+      {
+        "mode": "old",
+        "seconds": 0.4023490019972087,
+        "cpu_seconds": 0.281133,
+        "applied": "fede0599c3a4abb2f32692748c795fe0f26014bb"
+      },
+      {
+        "mode": "native",
+        "seconds": 0.44434344800174586,
+        "cpu_seconds": 0.02024499999999997,
+        "applied": "fede0599c3a4abb2f32692748c795fe0f26014bb"
+      },
+      {
+        "mode": "old",
+        "seconds": 0.5230393259989796,
+        "cpu_seconds": 0.3051529999999999,
+        "applied": "fede0599c3a4abb2f32692748c795fe0f26014bb"
+      },
+      {
+        "mode": "native",
+        "seconds": 0.3521913330005191,
+        "cpu_seconds": 0.020642000000000105,
+        "applied": "fede0599c3a4abb2f32692748c795fe0f26014bb"
+      }
+    ],
+    "medians": {
+      "old": {
+        "median_seconds": 0.472349709001719,
+        "median_cpu_seconds": 0.30375399999999997
+      },
+      "native": {
+        "median_seconds": 0.3521913330005191,
+        "median_cpu_seconds": 0.02024499999999997
+      }
+    }
+  },
+  "controls": {
+    "application_cli": "Matching input digest installs the verified release directly; changed CLI sources consume the one shared build with checksum and input verification",
+    "setup": "Durable applied state selects tools; application-only changes omit host tooling, SSH and runner-registration setup; incomplete or failed reconciliation prepares full tooling",
+    "state": "Signed S3 requests reuse connections and retain conditional lease ownership, AES256 encryption and durable status updates; AWS CLI credential resolution remains as a fallback",
+    "preflight": "At most four workload permission checks run concurrently before mutation",
+    "publication": "Separate measured wait for production to contain the promoted commit; divergent history fails closed",
+    "budgets_seconds": {
+      "aggregate_checks": 10,
+      "publication_wait": 480,
+      "served_revision_wait": 60,
+      "deploy_job": 600
+    },
+    "frontend_configuration": "Both public build settings are fetched in one Doppler request and checked for empty or multiline values"
+  },
+  "validation": [
+    "go test ./...",
+    "go test -race ./internal/reconcile ./internal/objectstore",
+    "All 19 Bazel test targets plus generated-file validation through pipeline check-fast",
+    "Actionlint with ShellCheck v0.11.0",
+    "Native S3 lease creation, expiry takeover, occupied lease rejection, conditional release and fail-closed error tests",
+    "Live read-only single-project and union-of-projects verification",
+    "Publication gate fixtures for behind, identical, ahead and divergent histories",
+    "Release checksum and attestation verified against the exact source digest and tag",
+    "Production activation and first-attempt frontend delivery",
+    "All Flux Kustomizations ready; exact frontend revision served; admission leases empty; transient sampler removed"
+  ],
+  "rollout_attempts": [
+    {
+      "run_id": 36045897630,
+      "outcome": "Application succeeded; independent check failed on generated Bazel dependency ordering"
+    },
+    {
+      "run_id": 36046049871,
+      "outcome": "Linux release check failed on generated Bazel ordering; remaining release work cancelled; tag never published as a release"
+    },
+    {
+      "run_id": 36047187492,
+      "outcome": "Corrected v0.2.8 release succeeded on all four platforms"
+    },
+    {
+      "run_id": 36047409509,
+      "attempt": 1,
+      "outcome": "Concurrent frontend change arrived during full infrastructure convergence and failed its old 60-second wait"
+    },
+    {
+      "run_id": 36047409509,
+      "attempt": 2,
+      "outcome": "Recovery succeeded after the expected revision was serving; excluded from latency comparisons"
+    },
+    {
+      "run_id": 36048755389,
+      "outcome": "Activation stopped before mutation on ShellCheck SC2016; polling was rewritten in Python and checked with ShellCheck"
+    },
+    {
+      "run_id": 36049420175,
+      "outcome": "Final activation succeeded"
+    }
+  ],
+  "runs": [
+    {
+      "repository": "fredrir/llunde-frontend",
+      "run_id": 36051159045,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/llunde-frontend/actions/runs/36051159045/attempts/1",
+      "revision": "78f2bfd936ebf80ec401ee2877553521b4e5b153",
+      "created_at": "2026-09-24T19:53:13Z",
+      "run_started_at": "2026-09-24T19:53:13Z",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "config",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:53:14Z",
+          "started_at": "2026-09-24T19:53:16Z",
+          "completed_at": "2026-09-24T19:53:21Z",
+          "duration_seconds": 5.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:17Z",
+              "completed_at": "2026-09-24T19:53:18Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:18Z",
+              "completed_at": "2026-09-24T19:53:19Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run set -euo pipefail",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:19Z",
+              "completed_at": "2026-09-24T19:53:19Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:19Z",
+              "completed_at": "2026-09-24T19:53:19Z",
+              "duration_seconds": 0.0
+            }
+          ]
+        },
+        {
+          "name": "frontend / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:53:22Z",
+          "started_at": "2026-09-24T19:53:24Z",
+          "completed_at": "2026-09-24T19:54:14Z",
+          "duration_seconds": 50.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:26Z",
+              "completed_at": "2026-09-24T19:53:30Z",
+              "duration_seconds": 4.0
+            },
+            {
+              "name": "Set up runner",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:30Z",
+              "completed_at": "2026-09-24T19:53:30Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:30Z",
+              "completed_at": "2026-09-24T19:53:32Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Fetch immutable public infrastructure recipe",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:32Z",
+              "completed_at": "2026-09-24T19:53:33Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run ./.infra-build-recipe/.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:33Z",
+              "completed_at": "2026-09-24T19:53:34Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Select affected image",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:34Z",
+              "completed_at": "2026-09-24T19:53:34Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:34Z",
+              "completed_at": "2026-09-24T19:53:35Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Verify dedicated engine",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:35Z",
+              "completed_at": "2026-09-24T19:53:36Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Validate Dagger cache policy",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:36Z",
+              "completed_at": "2026-09-24T19:53:36Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Check inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:36Z",
+              "completed_at": "2026-09-24T19:53:36Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Install verification tools",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:36Z",
+              "completed_at": "2026-09-24T19:53:36Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Select isolated scanner cache",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:36Z",
+              "completed_at": "2026-09-24T19:53:36Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Report scanner cache state",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:36Z",
+              "completed_at": "2026-09-24T19:53:36Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Prepare verification data",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:36Z",
+              "completed_at": "2026-09-24T19:53:36Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Build and publish",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:36Z",
+              "completed_at": "2026-09-24T19:53:47Z",
+              "duration_seconds": 11.0
+            },
+            {
+              "name": "Scan published image",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:47Z",
+              "completed_at": "2026-09-24T19:53:49Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Sign and verify private image provenance",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:49Z",
+              "completed_at": "2026-09-24T19:53:59Z",
+              "duration_seconds": 10.0
+            },
+            {
+              "name": "Enforce aggregate check budget",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:53:59Z",
+              "completed_at": "2026-09-24T19:54:00Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:00Z",
+              "completed_at": "2026-09-24T19:54:04Z",
+              "duration_seconds": 4.0
+            },
+            {
+              "name": "Request deployment",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:04Z",
+              "completed_at": "2026-09-24T19:54:06Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Release scanner database lease",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:06Z",
+              "completed_at": "2026-09-24T19:54:06Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:06Z",
+              "completed_at": "2026-09-24T19:54:08Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:09Z",
+              "completed_at": "2026-09-24T19:54:09Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Post Run docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:09Z",
+              "completed_at": "2026-09-24T19:54:09Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:09Z",
+              "completed_at": "2026-09-24T19:54:10Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Complete runner",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:10Z",
+              "completed_at": "2026-09-24T19:54:10Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:10Z",
+              "completed_at": "2026-09-24T19:54:10Z",
+              "duration_seconds": 0.0
+            }
+          ]
+        },
+        {
+          "name": "frontend / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:53:22Z",
+          "started_at": "2026-09-24T19:53:22Z",
+          "completed_at": "2026-09-24T19:53:22Z",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36051255870,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36051255870/attempts/1",
+      "revision": "66f6df12f878c022ab02d6ffc4bacb3c51b70ff3",
+      "created_at": "2026-09-24T19:54:06Z",
+      "run_started_at": "2026-09-24T19:54:06Z",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "deploy",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:54:08Z",
+          "started_at": "2026-09-24T19:54:10Z",
+          "completed_at": "2026-09-24T19:55:35Z",
+          "duration_seconds": 85.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:13Z",
+              "completed_at": "2026-09-24T19:54:15Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Fetch current deployment configuration",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:15Z",
+              "completed_at": "2026-09-24T19:54:17Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Run ./.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:17Z",
+              "completed_at": "2026-09-24T19:54:19Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Install tools",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:19Z",
+              "completed_at": "2026-09-24T19:54:20Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:20Z",
+              "completed_at": "2026-09-24T19:54:22Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Verify and deploy",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:22Z",
+              "completed_at": "2026-09-24T19:54:28Z",
+              "duration_seconds": 6.0
+            },
+            {
+              "name": "Wait for production publication",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:28Z",
+              "completed_at": "2026-09-24T19:55:06Z",
+              "duration_seconds": 38.0
+            },
+            {
+              "name": "Verify served frontend revision",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:06Z",
+              "completed_at": "2026-09-24T19:55:26Z",
+              "duration_seconds": 20.0
+            },
+            {
+              "name": "Report desired revision",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:26Z",
+              "completed_at": "2026-09-24T19:55:26Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:26Z",
+              "completed_at": "2026-09-24T19:55:29Z",
+              "duration_seconds": 3.0
+            },
+            {
+              "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:29Z",
+              "completed_at": "2026-09-24T19:55:30Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:30Z",
+              "completed_at": "2026-09-24T19:55:30Z",
+              "duration_seconds": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36051301670,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36051301670/attempts/1",
+      "revision": "333deba96023733f51c62e9766d718c44cd9d61c",
+      "created_at": "2026-09-24T19:54:31Z",
+      "run_started_at": "2026-09-24T19:54:31Z",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "cli / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:54:32Z",
+          "started_at": "2026-09-24T19:54:34Z",
+          "completed_at": "2026-09-24T19:54:46Z",
+          "duration_seconds": 12.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:35Z",
+              "completed_at": "2026-09-24T19:54:36Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:36Z",
+              "completed_at": "2026-09-24T19:54:37Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run ./.github/actions/cli-inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:37Z",
+              "completed_at": "2026-09-24T19:54:37Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:37Z",
+              "completed_at": "2026-09-24T19:54:39Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Run ./.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:39Z",
+              "completed_at": "2026-09-24T19:54:40Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Reuse released CLI for matching source inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:40Z",
+              "completed_at": "2026-09-24T19:54:40Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Reuse verified native CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:40Z",
+              "completed_at": "2026-09-24T19:54:40Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Verify binary identity",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:40Z",
+              "completed_at": "2026-09-24T19:54:40Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:40Z",
+              "completed_at": "2026-09-24T19:54:42Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Post Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:42Z",
+              "completed_at": "2026-09-24T19:54:42Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:42Z",
+              "completed_at": "2026-09-24T19:54:42Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:42Z",
+              "completed_at": "2026-09-24T19:54:42Z",
+              "duration_seconds": 0.0
+            }
+          ]
+        },
+        {
+          "name": "reconcile / apply",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:54:32Z",
+          "started_at": "2026-09-24T19:54:36Z",
+          "completed_at": "2026-09-24T19:55:34Z",
+          "duration_seconds": 58.0,
+          "queue_seconds": 4.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:37Z",
+              "completed_at": "2026-09-24T19:54:38Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:38Z",
+              "completed_at": "2026-09-24T19:54:39Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run ./.github/actions/setup-reconciliation-cli",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:39Z",
+              "completed_at": "2026-09-24T19:54:40Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:40Z",
+              "completed_at": "2026-09-24T19:54:41Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:41Z",
+              "completed_at": "2026-09-24T19:54:51Z",
+              "duration_seconds": 10.0
+            },
+            {
+              "name": "Validate affected declarations",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:51Z",
+              "completed_at": "2026-09-24T19:54:54Z",
+              "duration_seconds": 3.0
+            },
+            {
+              "name": "Reconcile merged revision",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:54Z",
+              "completed_at": "2026-09-24T19:55:30Z",
+              "duration_seconds": 36.0
+            },
+            {
+              "name": "Record workflow timing",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:30Z",
+              "completed_at": "2026-09-24T19:55:31Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Summarize reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:31Z",
+              "completed_at": "2026-09-24T19:55:31Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:31Z",
+              "completed_at": "2026-09-24T19:55:32Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Remove session credentials",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:32Z",
+              "completed_at": "2026-09-24T19:55:32Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Post Run ./.github/actions/setup-reconciliation",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:32Z",
+              "completed_at": "2026-09-24T19:55:32Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Post Run ./.github/actions/setup-reconciliation-cli",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:32Z",
+              "completed_at": "2026-09-24T19:55:32Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:32Z",
+              "completed_at": "2026-09-24T19:55:32Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:32Z",
+              "completed_at": "2026-09-24T19:55:33Z",
+              "duration_seconds": 1.0
+            }
+          ]
+        },
+        {
+          "name": "reconcile / plan",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:54:32Z",
+          "started_at": "2026-09-24T19:54:32Z",
+          "completed_at": "2026-09-24T19:54:32Z",
+          "steps": []
+        },
+        {
+          "name": "images / plan",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:54:46Z",
+          "started_at": "2026-09-24T19:54:48Z",
+          "completed_at": "2026-09-24T19:54:57Z",
+          "duration_seconds": 9.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:49Z",
+              "completed_at": "2026-09-24T19:54:50Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:50Z",
+              "completed_at": "2026-09-24T19:54:51Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:51Z",
+              "completed_at": "2026-09-24T19:54:53Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Plan",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:53Z",
+              "completed_at": "2026-09-24T19:54:54Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:54Z",
+              "completed_at": "2026-09-24T19:54:55Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:55Z",
+              "completed_at": "2026-09-24T19:54:55Z",
+              "duration_seconds": 0.0
+            }
+          ]
+        },
+        {
+          "name": "check / check",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:54:46Z",
+          "started_at": "2026-09-24T19:54:48Z",
+          "completed_at": "2026-09-24T19:56:48Z",
+          "duration_seconds": 120.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:49Z",
+              "completed_at": "2026-09-24T19:54:51Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:51Z",
+              "completed_at": "2026-09-24T19:54:52Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:52Z",
+              "completed_at": "2026-09-24T19:54:54Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Verify CLI",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:54Z",
+              "completed_at": "2026-09-24T19:54:54Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Select affected inputs",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:54Z",
+              "completed_at": "2026-09-24T19:54:54Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:54:54Z",
+              "completed_at": "2026-09-24T19:55:12Z",
+              "duration_seconds": 18.0
+            },
+            {
+              "name": "Install checksum-pinned native Bazel",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:12Z",
+              "completed_at": "2026-09-24T19:55:13Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Prepare affected check artifacts",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:55:13Z",
+              "completed_at": "2026-09-24T19:56:34Z",
+              "duration_seconds": 81.0
+            },
+            {
+              "name": "Check affected targets within aggregate budget",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:56:34Z",
+              "completed_at": "2026-09-24T19:56:36Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:56:36Z",
+              "completed_at": "2026-09-24T19:56:45Z",
+              "duration_seconds": 9.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:56:45Z",
+              "completed_at": "2026-09-24T19:56:46Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:56:46Z",
+              "completed_at": "2026-09-24T19:56:46Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:56:46Z",
+              "completed_at": "2026-09-24T19:56:46Z",
+              "duration_seconds": 0.0
+            }
+          ]
+        },
+        {
+          "name": "images / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:54:46Z",
+          "started_at": "2026-09-24T19:54:46Z",
+          "completed_at": "2026-09-24T19:54:46Z",
+          "steps": []
+        },
+        {
+          "name": "check / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:54:46Z",
+          "started_at": "2026-09-24T19:54:46Z",
+          "completed_at": "2026-09-24T19:54:46Z",
+          "steps": []
+        },
+        {
+          "name": "images / image",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:54:57Z",
+          "started_at": "2026-09-24T19:54:57Z",
+          "completed_at": "2026-09-24T19:54:57Z",
+          "steps": []
+        },
+        {
+          "name": "check / validate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:56:49Z",
+          "started_at": "2026-09-24T19:56:49Z",
+          "completed_at": "2026-09-24T19:56:49Z",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36049420175,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36049420175/attempts/1",
+      "revision": "66f6df12f878c022ab02d6ffc4bacb3c51b70ff3",
+      "created_at": "2026-09-24T19:37:36Z",
+      "run_started_at": "2026-09-24T19:37:36Z",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "cli / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:37:37Z",
+          "started_at": "2026-09-24T19:37:39Z",
+          "completed_at": "2026-09-24T19:37:46Z",
+          "duration_seconds": 7.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        },
+        {
+          "name": "reconcile / apply",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:37:37Z",
+          "started_at": "2026-09-24T19:37:42Z",
+          "completed_at": "2026-09-24T19:52:35Z",
+          "duration_seconds": 893.0,
+          "queue_seconds": 5.0,
+          "steps": []
+        },
+        {
+          "name": "reconcile / plan",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:37:37Z",
+          "started_at": "2026-09-24T19:37:37Z",
+          "completed_at": "2026-09-24T19:37:37Z",
+          "steps": []
+        },
+        {
+          "name": "images / plan",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:37:46Z",
+          "started_at": "2026-09-24T19:37:49Z",
+          "completed_at": "2026-09-24T19:37:59Z",
+          "duration_seconds": 10.0,
+          "queue_seconds": 3.0,
+          "steps": []
+        },
+        {
+          "name": "check / check",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:37:47Z",
+          "started_at": "2026-09-24T19:37:49Z",
+          "completed_at": "2026-09-24T19:39:19Z",
+          "duration_seconds": 90.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        },
+        {
+          "name": "images / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:37:47Z",
+          "started_at": "2026-09-24T19:37:47Z",
+          "completed_at": "2026-09-24T19:37:46Z",
+          "steps": []
+        },
+        {
+          "name": "check / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:37:47Z",
+          "started_at": "2026-09-24T19:37:47Z",
+          "completed_at": "2026-09-24T19:37:46Z",
+          "steps": []
+        },
+        {
+          "name": "images / image",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:37:59Z",
+          "started_at": "2026-09-24T19:37:59Z",
+          "completed_at": "2026-09-24T19:37:59Z",
+          "steps": []
+        },
+        {
+          "name": "check / validate",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:39:19Z",
+          "started_at": "2026-09-24T19:39:21Z",
+          "completed_at": "2026-09-24T19:39:45Z",
+          "duration_seconds": 24.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36047409509,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36047409509/attempts/1",
+      "revision": "d392e0a3f04ff8bccdb0ae938ba8eff29299d00e",
+      "created_at": "2026-09-24T19:19:54Z",
+      "run_started_at": "2026-09-24T19:19:54Z",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "name": "deploy",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-24T19:19:57Z",
+          "started_at": "2026-09-24T19:19:59Z",
+          "completed_at": "2026-09-24T19:21:24Z",
+          "duration_seconds": 85.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:20:02Z",
+              "completed_at": "2026-09-24T19:20:05Z",
+              "duration_seconds": 3.0
+            },
+            {
+              "name": "Fetch current deployment configuration",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:20:05Z",
+              "completed_at": "2026-09-24T19:20:07Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Run ./.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:20:07Z",
+              "completed_at": "2026-09-24T19:20:09Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Install tools",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:20:09Z",
+              "completed_at": "2026-09-24T19:20:10Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:20:10Z",
+              "completed_at": "2026-09-24T19:20:12Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Verify and deploy",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:20:12Z",
+              "completed_at": "2026-09-24T19:20:18Z",
+              "duration_seconds": 6.0
+            },
+            {
+              "name": "Verify served frontend revision",
+              "conclusion": "failure",
+              "started_at": "2026-09-24T19:20:18Z",
+              "completed_at": "2026-09-24T19:21:18Z",
+              "duration_seconds": 60.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:21:18Z",
+              "completed_at": "2026-09-24T19:21:20Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:21:20Z",
+              "completed_at": "2026-09-24T19:21:21Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:21:21Z",
+              "completed_at": "2026-09-24T19:21:21Z",
+              "duration_seconds": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36047409509,
+      "attempt": 2,
+      "url": "https://github.com/fredrir/infra/actions/runs/36047409509/attempts/2",
+      "revision": "d392e0a3f04ff8bccdb0ae938ba8eff29299d00e",
+      "created_at": "2026-09-24T19:33:01Z",
+      "run_started_at": "2026-09-24T19:33:00Z",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "deploy",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:33:02Z",
+          "started_at": "2026-09-24T19:33:04Z",
+          "completed_at": "2026-09-24T19:33:31Z",
+          "duration_seconds": 27.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:07Z",
+              "completed_at": "2026-09-24T19:33:10Z",
+              "duration_seconds": 3.0
+            },
+            {
+              "name": "Fetch current deployment configuration",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:10Z",
+              "completed_at": "2026-09-24T19:33:12Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Run ./.github/actions/setup-infra",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:12Z",
+              "completed_at": "2026-09-24T19:33:15Z",
+              "duration_seconds": 3.0
+            },
+            {
+              "name": "Install tools",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:15Z",
+              "completed_at": "2026-09-24T19:33:15Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:15Z",
+              "completed_at": "2026-09-24T19:33:20Z",
+              "duration_seconds": 5.0
+            },
+            {
+              "name": "Verify and deploy",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:20Z",
+              "completed_at": "2026-09-24T19:33:24Z",
+              "duration_seconds": 4.0
+            },
+            {
+              "name": "Verify served frontend revision",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:24Z",
+              "completed_at": "2026-09-24T19:33:25Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Report desired revision",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:25Z",
+              "completed_at": "2026-09-24T19:33:25Z",
+              "duration_seconds": 0.0
+            },
+            {
+              "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:25Z",
+              "completed_at": "2026-09-24T19:33:27Z",
+              "duration_seconds": 2.0
+            },
+            {
+              "name": "Post Run octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:27Z",
+              "completed_at": "2026-09-24T19:33:28Z",
+              "duration_seconds": 1.0
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success",
+              "started_at": "2026-09-24T19:33:28Z",
+              "completed_at": "2026-09-24T19:33:28Z",
+              "duration_seconds": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36045897630,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36045897630/attempts/1",
+      "revision": "9184350e1ad544af7af791d2e425ead6795082bb",
+      "created_at": "2026-09-24T19:06:43Z",
+      "run_started_at": "2026-09-24T19:06:43Z",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "name": "cli / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:06:44Z",
+          "started_at": "2026-09-24T19:06:47Z",
+          "completed_at": "2026-09-24T19:08:06Z",
+          "duration_seconds": 79.0,
+          "queue_seconds": 3.0,
+          "steps": []
+        },
+        {
+          "name": "reconcile / apply",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:06:44Z",
+          "started_at": "2026-09-24T19:06:47Z",
+          "completed_at": "2026-09-24T19:21:07Z",
+          "duration_seconds": 860.0,
+          "queue_seconds": 3.0,
+          "steps": []
+        },
+        {
+          "name": "reconcile / plan",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:06:44Z",
+          "started_at": "2026-09-24T19:06:44Z",
+          "completed_at": "2026-09-24T19:06:44Z",
+          "steps": []
+        },
+        {
+          "name": "images / plan",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:08:07Z",
+          "started_at": "2026-09-24T19:08:09Z",
+          "completed_at": "2026-09-24T19:08:18Z",
+          "duration_seconds": 9.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        },
+        {
+          "name": "check / check",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-24T19:08:07Z",
+          "started_at": "2026-09-24T19:08:09Z",
+          "completed_at": "2026-09-24T19:09:57Z",
+          "duration_seconds": 108.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Check affected targets within aggregate budget",
+              "conclusion": "failure",
+              "started_at": "2026-09-24T19:09:50Z",
+              "completed_at": "2026-09-24T19:09:55Z",
+              "duration_seconds": 5.0
+            }
+          ]
+        },
+        {
+          "name": "images / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:08:07Z",
+          "started_at": "2026-09-24T19:08:07Z",
+          "completed_at": "2026-09-24T19:08:07Z",
+          "steps": []
+        },
+        {
+          "name": "check / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:08:07Z",
+          "started_at": "2026-09-24T19:08:07Z",
+          "completed_at": "2026-09-24T19:08:07Z",
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/platform-backup-tools, platform/components/backups/tools.Dockerfile, resti... / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:09:06Z",
+          "completed_at": "2026-09-24T19:09:57Z",
+          "duration_seconds": 51.0,
+          "queue_seconds": 48.0,
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/platform-caddy, images/caddy/Containerfile, caddy version | grep -E '^v2\\.... / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:08:21Z",
+          "completed_at": "2026-09-24T19:09:04Z",
+          "duration_seconds": 43.0,
+          "queue_seconds": 3.0,
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/infra-runner-check, images/runner-check/Containerfile, /home/runner/run.sh... / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:10:00Z",
+          "completed_at": "2026-09-24T19:13:19Z",
+          "duration_seconds": 199.0,
+          "queue_seconds": 102.0,
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/infra-runner-rust, images/runner-rust/Containerfile, /home/runner/run.sh -... / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:13:22Z",
+          "completed_at": "2026-09-24T19:15:23Z",
+          "duration_seconds": 121.0,
+          "queue_seconds": 304.0,
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/infra-runner-dagger, images/runner-dagger/Containerfile, /home/runner/run.... / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:15:25Z",
+          "completed_at": "2026-09-24T19:16:32Z",
+          "duration_seconds": 67.0,
+          "queue_seconds": 427.0,
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/infra-runner-check, images/runner-check/Containerfile, /home/runner/run.sh... / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:08:18Z",
+          "completed_at": "2026-09-24T19:08:18Z",
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/platform-caddy, images/caddy/Containerfile, caddy version | grep -E '^v2\\.... / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:08:18Z",
+          "completed_at": "2026-09-24T19:08:18Z",
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/infra-runner-dagger, images/runner-dagger/Containerfile, /home/runner/run.... / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:08:18Z",
+          "completed_at": "2026-09-24T19:08:18Z",
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/infra-runner-rust, images/runner-rust/Containerfile, /home/runner/run.sh -... / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:08:18Z",
+          "completed_at": "2026-09-24T19:08:18Z",
+          "steps": []
+        },
+        {
+          "name": "images / image (ghcr.io/fredrir/platform-backup-tools, platform/components/backups/tools.Dockerfile, resti... / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:08:18Z",
+          "started_at": "2026-09-24T19:08:18Z",
+          "completed_at": "2026-09-24T19:08:18Z",
+          "steps": []
+        },
+        {
+          "name": "check / validate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:10:05Z",
+          "started_at": "2026-09-24T19:10:05Z",
+          "completed_at": "2026-09-24T19:10:05Z",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36046049871,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36046049871/attempts/1",
+      "revision": "9184350e1ad544af7af791d2e425ead6795082bb",
+      "created_at": "2026-09-24T19:08:04Z",
+      "run_started_at": "2026-09-24T19:08:04Z",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "jobs": [
+        {
+          "name": "build (linux_amd64)",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-24T19:08:05Z",
+          "started_at": "2026-09-24T19:08:07Z",
+          "completed_at": "2026-09-24T19:10:15Z",
+          "duration_seconds": 128.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Check native targets within aggregate budget",
+              "conclusion": "failure",
+              "started_at": "2026-09-24T19:10:10Z",
+              "completed_at": "2026-09-24T19:10:13Z",
+              "duration_seconds": 3.0
+            }
+          ]
+        },
+        {
+          "name": "build (darwin_amd64)",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:08:05Z",
+          "started_at": "2026-09-24T19:08:07Z",
+          "completed_at": "2026-09-24T19:10:37Z",
+          "duration_seconds": 150.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        },
+        {
+          "name": "build (linux_arm64)",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:08:05Z",
+          "started_at": "2026-09-24T19:08:08Z",
+          "completed_at": "2026-09-24T19:10:50Z",
+          "duration_seconds": 162.0,
+          "queue_seconds": 3.0,
+          "steps": []
+        },
+        {
+          "name": "build (darwin_arm64)",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "created_at": "2026-09-24T19:08:05Z",
+          "started_at": "2026-09-24T19:08:07Z",
+          "completed_at": "2026-09-24T19:11:21Z",
+          "duration_seconds": 194.0,
+          "queue_seconds": 2.0,
+          "steps": [
+            {
+              "name": "Build platform binary",
+              "conclusion": "cancelled",
+              "started_at": "2026-09-24T19:08:10Z",
+              "completed_at": "2026-09-24T19:11:19Z",
+              "duration_seconds": 189.0
+            }
+          ]
+        },
+        {
+          "name": "publish",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "created_at": "2026-09-24T19:11:22Z",
+          "started_at": "2026-09-24T19:11:22Z",
+          "completed_at": "2026-09-24T19:11:21Z",
+          "duration_seconds": -1.0,
+          "queue_seconds": 0.0,
+          "steps": []
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36047187492,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36047187492/attempts/1",
+      "revision": "d392e0a3f04ff8bccdb0ae938ba8eff29299d00e",
+      "created_at": "2026-09-24T19:17:56Z",
+      "run_started_at": "2026-09-24T19:17:56Z",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "build (darwin_arm64)",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:17:57Z",
+          "started_at": "2026-09-24T19:17:58Z",
+          "completed_at": "2026-09-24T19:21:22Z",
+          "duration_seconds": 204.0,
+          "queue_seconds": 1.0,
+          "steps": []
+        },
+        {
+          "name": "build (darwin_amd64)",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:17:57Z",
+          "started_at": "2026-09-24T19:17:59Z",
+          "completed_at": "2026-09-24T19:21:09Z",
+          "duration_seconds": 190.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        },
+        {
+          "name": "build (linux_arm64)",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:17:57Z",
+          "started_at": "2026-09-24T19:17:59Z",
+          "completed_at": "2026-09-24T19:20:45Z",
+          "duration_seconds": 166.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        },
+        {
+          "name": "build (linux_amd64)",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:17:57Z",
+          "started_at": "2026-09-24T19:17:59Z",
+          "completed_at": "2026-09-24T19:19:36Z",
+          "duration_seconds": 97.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        },
+        {
+          "name": "publish",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:21:22Z",
+          "started_at": "2026-09-24T19:21:24Z",
+          "completed_at": "2026-09-24T19:21:40Z",
+          "duration_seconds": 16.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        }
+      ]
+    },
+    {
+      "repository": "fredrir/infra",
+      "run_id": 36048755389,
+      "attempt": 1,
+      "url": "https://github.com/fredrir/infra/actions/runs/36048755389/attempts/1",
+      "revision": "2fd29eb6bbb24d5f27834862f22cb668fe6e364e",
+      "created_at": "2026-09-24T19:31:43Z",
+      "run_started_at": "2026-09-24T19:31:43Z",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "name": "cli / build",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:31:44Z",
+          "started_at": "2026-09-24T19:31:46Z",
+          "completed_at": "2026-09-24T19:31:56Z",
+          "duration_seconds": 10.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        },
+        {
+          "name": "reconcile / apply",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-24T19:31:44Z",
+          "started_at": "2026-09-24T19:33:04Z",
+          "completed_at": "2026-09-24T19:33:32Z",
+          "duration_seconds": 28.0,
+          "queue_seconds": 80.0,
+          "steps": [
+            {
+              "name": "Validate affected declarations",
+              "conclusion": "failure",
+              "started_at": "2026-09-24T19:33:26Z",
+              "completed_at": "2026-09-24T19:33:27Z",
+              "duration_seconds": 1.0
+            }
+          ]
+        },
+        {
+          "name": "reconcile / plan",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:31:44Z",
+          "started_at": "2026-09-24T19:31:44Z",
+          "completed_at": "2026-09-24T19:33:01Z",
+          "steps": []
+        },
+        {
+          "name": "images / plan",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:31:57Z",
+          "started_at": "2026-09-24T19:31:59Z",
+          "completed_at": "2026-09-24T19:32:07Z",
+          "duration_seconds": 8.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        },
+        {
+          "name": "images / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:31:57Z",
+          "started_at": "2026-09-24T19:31:57Z",
+          "completed_at": "2026-09-24T19:31:57Z",
+          "steps": []
+        },
+        {
+          "name": "check / check",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:31:57Z",
+          "started_at": "2026-09-24T19:32:00Z",
+          "completed_at": "2026-09-24T19:33:33Z",
+          "duration_seconds": 93.0,
+          "queue_seconds": 3.0,
+          "steps": []
+        },
+        {
+          "name": "check / cli",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:31:57Z",
+          "started_at": "2026-09-24T19:31:57Z",
+          "completed_at": "2026-09-24T19:31:57Z",
+          "steps": []
+        },
+        {
+          "name": "images / image",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-09-24T19:32:08Z",
+          "started_at": "2026-09-24T19:32:08Z",
+          "completed_at": "2026-09-24T19:32:08Z",
+          "steps": []
+        },
+        {
+          "name": "check / validate",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-24T19:33:34Z",
+          "started_at": "2026-09-24T19:33:36Z",
+          "completed_at": "2026-09-24T19:34:04Z",
+          "duration_seconds": 28.0,
+          "queue_seconds": 2.0,
+          "steps": []
+        }
+      ]
+    }
+  ]
+}

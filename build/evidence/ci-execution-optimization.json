@@ -295,7 +295,8 @@
       "Metadata-only frontend canary; no ordinary-traffic percentile",
       "The first 60-second deployment serving wait failed; the recovery rerun checked an already-serving revision",
       "The 15-second end-to-end target remains unqualified",
-      "External observation includes polling delay; cgroup resource samples do not cover every delivery machine"
+      "External observation includes polling delay; cgroup resource samples do not cover every delivery machine",
+      "External observer and GitHub clocks were not calibrated; use the hosted comparison in build/evidence/frontend-delivery-startup.json for before/after percentages"
     ]
   },
   "read_only_drift": {

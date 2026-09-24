@@ -52,9 +52,9 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | CLI release caches | [Cache scope](../build/evidence/cli-release-cache-scope.json): sibling release tags cannot restore each other's caches, and no matching cache is produced on the default branch | Qualify a trusted default-branch cache producer or persistent release cache without adding speculative compilation to ordinary commits |
 | Signed package build | [Production canary](../build/evidence/package-production-canary.json): build step 97 seconds; installation checks 7.487 seconds | Profile catalog downloads and repeated attestation verification; preserve the ten-second installation gate and separate publish credentials |
 | Runner queueing | Whole-job admission limits the build VM to one expensive job; short canaries do not establish queue percentiles | Compare admission wait, GitHub queue time and memory pressure before increasing slots or moving workloads |
-| Application delivery handoff | [Frontend sample](../build/evidence/ci-execution-optimization.json): 195.3 seconds from workflow creation to observed served revision, including a failed 60-second serving wait; project-scoped Kubernetes reconciliation and verification took 26.1 seconds | Profile workflow startup, CLI setup and promotion-to-reconciliation handoff separately from rollout readiness |
+| Application delivery handoff | [Frontend sample](../build/evidence/frontend-delivery-startup.json): 137.4 seconds from workflow creation to hosted verification; publication wait 37.3 seconds and Kubernetes reconciliation 20.1 seconds | Profile remaining workflow startup, protected environment setup and rollout readiness separately |
 | Full host reconciliation | [Task spans](../build/evidence/reconciliation-host-overhead.json): 435 task starts and 637.174 seconds total in one historical run; smart gathering already caches facts within a run | Profile remaining role work and preserve drift detection and registration checks |
-| Production revision publication | Frontend canary promotion reached `main`, then waited for a full infrastructure reconciliation before Flux could consume `production`; the 60-second serving check failed | Qualify publication after infrastructure convergence; reuse completed host work only with a valid checkpoint, unchanged host inputs and a live no-change expansion plan |
+| Production revision publication | Full infrastructure convergence still serializes application publication; a concurrent frontend change exceeded its original serving deadline during qualification | Keep publication queueing visible and bounded; isolate application delivery further only with an equivalent infrastructure and artifact baseline |
 
 | Scanner rollout constraint | Requirement |
 | --- | --- |
@@ -100,7 +100,7 @@ Failed attempts remain part of the evidence, including the frontend serving dead
 | Read-only drift verification | 36.76 seconds; 5.26 client CPU seconds; no Ansible changes | Local tailnet execution of the hourly command |
 | Whole-job admission | One active lease; a second worker timed out without displacing the owner | Installed production CLI; live acquire and release hooks verified |
 | Active build memory | Runner slice 1.81 GiB peak; engine 3.62 GiB peak; no OOM event increase | Twenty-second sample at four samples/second; includes page cache |
-| Frontend delivery | 195.33 seconds from workflow creation to observed expected revision | Metadata-only canary; initial 60-second serving wait failed; the 15-second target remains unqualified |
+| External frontend observation, raw | 195.33 seconds from workflow creation to local observation | Clocks were not calibrated; use the hosted comparison below for percentages; the initial 60-second serving wait failed |
 | Frontend scoped apply | Plan 10.89 seconds; publish 1.96; Kubernetes 18.63; verify 7.42 | Only `llunde` selected; no host or OpenTofu application |
 | Frontend VM resource use | Runner CPU 26.00 seconds and engine CPU 9.38 seconds; peaks 1.83/3.36 GiB; no OOM event increase | Cgroup samples across delivery; includes background activity and excludes hosted CI and cluster node CPU |
 
@@ -119,3 +119,31 @@ The no-archive checks took 4.29 seconds under the unchanged ten-second ceiling.
 
 Admission remains at one slot with the existing 2 GiB runner and 4 GiB engine limits because these short samples do not justify higher concurrency.
 Workflow completion reports retain attempt identity and queue timestamps for 30 days; compare total delivery latency, failures and resource use alongside the check metric.
+
+## Frontend delivery startup
+
+[Delivery evidence](../build/evidence/frontend-delivery-startup.json) records CLI v0.2.8 activation and the first-attempt production canary for source `78f2bfd936ebf80ec401ee2877553521b4e5b153`.
+The build, deployment and reconciliation workflows succeeded, and the expected source revision was served over HTTPS.
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| Build workflow creation → hosted reconciliation verification complete | 187.67 s | 137.37 s, 26.8% lower |
+| Reconciliation workflow creation → verification complete | 96.67 s | 59.37 s, 38.6% lower |
+| Reconciliation plan | 10.89 s | 6.01 s |
+| Reconciliation setup step | 16 s | 10 s |
+| State-read client CPU, local median | 0.304 s | 0.020 s |
+
+The hosted comparison uses the same completion signal in both reconciliation reports, including exact artifact, ownership, generation, workload-readiness and served-revision verification.
+The original 195.33-second figure mixed a local observer timestamp with GitHub workflow creation; a later clock comparison found the local clock approximately 14 seconds ahead of GitHub.
+That raw observation is retained, and no retrospective clock offset is subtracted from it.
+
+The deployment's own successful serving check completed 133.65 seconds after build workflow creation and 57.85 seconds after promotion finished.
+Publication wait took 37.30 seconds and the subsequent serving check took 20.37 seconds, within its unchanged 60-second budget.
+Aggregate checks took 7.10 seconds under the unchanged ten-second ceiling.
+
+Across the 173.90-second VM sampling window around the canary, runner CPU was 18.36 seconds and engine CPU was 7.34 seconds, with memory peaks of 1.67 GiB and 3.22 GiB and no OOM event increase.
+The sample includes idle time around delivery, background activity and page cache; it excludes hosted CI and Kubernetes node CPU, and admission remained at one job.
+
+These are qualification samples rather than an ordinary-traffic percentile, and application source changed independently between the two workflow-metadata canaries.
+Full infrastructure changes can still delay publication beyond the queue budget; failed rollout and deployment attempts are retained in the evidence.
+The 15-second delivery target remains unqualified.
