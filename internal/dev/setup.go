@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
 
 	"github.com/fredrir/infra/internal/ci"
 	"golang.org/x/sync/errgroup"
@@ -28,7 +27,7 @@ func (opts SetupOptions) defaults() SetupOptions {
 		opts.Runner.Dir = opts.State.Root
 	}
 	if opts.Client == nil {
-		opts.Client = &http.Client{Timeout: 2 * time.Minute}
+		opts.Client = ci.NewToolClient()
 	}
 	if opts.Platform == "" {
 		opts.Platform = runtime.GOOS + "/" + runtime.GOARCH

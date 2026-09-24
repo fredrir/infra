@@ -18,7 +18,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const toolDownloadTimeout = 15 * time.Minute
+
 type ToolAsset struct{ URL, Digest, Member string }
+
+func NewToolClient() *http.Client { return &http.Client{Timeout: toolDownloadTimeout} }
 
 var ToolAssets = map[string]ToolAsset{
 	"goreleaser": {"https://github.com/goreleaser/goreleaser/releases/download/v2.18.2/goreleaser_Linux_x86_64.tar.gz", "0a96edc9d9bc594e4a41cc4d59467c182062910ab24d9d1f6dd7b667d32606d3", "goreleaser"},
@@ -50,7 +54,7 @@ func InstallTools(ctx context.Context, temporary, pathOutput string, names []str
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return err
 	}
-	client := &http.Client{Timeout: 2 * time.Minute}
+	client := NewToolClient()
 	group, installContext := errgroup.WithContext(ctx)
 	group.SetLimit(4)
 	for _, name := range names {
