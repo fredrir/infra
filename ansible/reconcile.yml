@@ -1,3 +1,7 @@
+- name: Gather host facts in parallel
+  hosts: ubuntu
+  become: true
+  gather_facts: true
 - import_playbook: transport.yml
 - import_playbook: site.yml
 - import_playbook: ci-runtimes.yml
