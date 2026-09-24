@@ -72,10 +72,10 @@ metadata:
 rules:
 - apiGroups: [apps]
   resources: [deployments, statefulsets, daemonsets]
-  verbs: [get]
+  verbs: [get, list]
 - apiGroups: [batch]
   resources: [jobs]
-  verbs: [get]
+  verbs: [get, list]
 - apiGroups: [source.toolkit.fluxcd.io]
   resources: [gitrepositories]
   resourceNames: [flux-system]
