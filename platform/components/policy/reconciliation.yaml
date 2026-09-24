@@ -70,6 +70,12 @@ kind: ClusterRole
 metadata:
   name: infrastructure-apply
 rules:
+- apiGroups: [apps]
+  resources: [deployments, statefulsets, daemonsets]
+  verbs: [get]
+- apiGroups: [batch]
+  resources: [jobs]
+  verbs: [get]
 - apiGroups: [source.toolkit.fluxcd.io]
   resources: [gitrepositories]
   resourceNames: [flux-system]
@@ -86,6 +92,34 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: infrastructure-apply
+subjects:
+- kind: ServiceAccount
+  name: infrastructure-apply
+  namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: infrastructure-artifacts
+  namespace: flux-system
+rules:
+- apiGroups: [source.toolkit.fluxcd.io]
+  resources: [externalartifacts]
+  verbs: [get, list, watch]
+- apiGroups: [source.extensions.fluxcd.io]
+  resources: [artifactgenerators]
+  resourceNames: [platform-artifacts]
+  verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: infrastructure-artifacts
+  namespace: flux-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: infrastructure-artifacts
 subjects:
 - kind: ServiceAccount
   name: infrastructure-apply
