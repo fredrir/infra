@@ -3,10 +3,13 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/reconcile"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +26,7 @@ func newReconcileCommand() *cobra.Command {
 	command.PersistentFlags().BoolVar(&scopeHosts, "scope-hosts", false, "Limit host convergence to affected playbooks")
 	command.PersistentFlags().BoolVar(&scopeProjects, "scope-projects", false, "Limit project deployment to affected owners")
 	command.PersistentFlags().BoolVar(&verifyArtifacts, "verify-artifacts", false, "Verify artifact provenance and workload readiness")
-	for _, action := range []string{"plan", "apply", "verify", "status"} {
+	for _, action := range []string{"plan", "apply", "verify", "status", "requirements"} {
 		child := &cobra.Command{Use: action, Args: cobra.NoArgs}
 		if action == "plan" {
 			child.Flags().StringVar(&base, "base", "", "Comparison revision")
@@ -35,12 +38,32 @@ func newReconcileCommand() *cobra.Command {
 			}
 			runner := ci.Runner{Dir: absolute, Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}
 			store := reconcile.S3Store{Runner: runner, Bucket: bucket, Prefix: prefix}
+			region := os.Getenv("AWS_REGION")
+			if region == "" {
+				region = os.Getenv("AWS_DEFAULT_REGION")
+			}
+			if region != "" && os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "" {
+				store.Client = &objectstore.Client{Endpoint: "https://s3." + region + ".amazonaws.com", Region: region, AccessKey: os.Getenv("AWS_ACCESS_KEY_ID"), SecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY"), SessionToken: os.Getenv("AWS_SESSION_TOKEN"), HTTP: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+			}
 			if action == "status" {
 				status, err := store.Read(cmd.Context())
 				if err != nil {
 					return err
 				}
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(status)
+			}
+			if action == "requirements" {
+				status, err := store.Read(cmd.Context())
+				if err != nil {
+					return err
+				}
+				recovery := status.Desired != status.Applied || status.Failure != "" || (status.Stage != "" && status.Stage != "complete" && status.Stage != "evaluated")
+				ops := &reconcile.Commands{Runner: runner}
+				selected, err := ops.Select(cmd.Context(), status.Applied, full || recovery)
+				if err != nil {
+					return err
+				}
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(selected)
 			}
 			host, err := reconcile.Host(absolute)
 			if err != nil {

@@ -11,9 +11,11 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"go.yaml.in/yaml/v3"
+	"golang.org/x/sync/errgroup"
 )
 
 const productionOverlay = "build/rollout/flux-artifacts/cutover"
@@ -160,13 +162,26 @@ func (c *Commands) Preflight(ctx context.Context, plan Plan) (Plan, error) {
 			return plan, fmt.Errorf("artifact preflight: %w", err)
 		}
 	}
+	permissions, permissionContext := errgroup.WithContext(ctx)
+	permissions.SetLimit(4)
+	var output sync.Mutex
+	permissionRunner := c.Runner
+	if permissionRunner.Stderr != nil {
+		permissionRunner.Stderr = &lockedWriter{mu: &output, writer: permissionRunner.Stderr}
+	}
 	for _, kind := range []string{"deployments.apps", "statefulsets.apps", "daemonsets.apps", "jobs.batch"} {
 		for _, verb := range []string{"get", "list"} {
-			answer, err := c.Runner.Output(ctx, "kubectl", "auth", "can-i", verb, kind, "--all-namespaces")
-			if err != nil || strings.TrimSpace(string(answer)) != "yes" {
-				return plan, fmt.Errorf("workload preflight requires %s %s: %v", verb, kind, err)
-			}
+			permissions.Go(func() error {
+				answer, err := permissionRunner.Output(permissionContext, "kubectl", "auth", "can-i", verb, kind, "--all-namespaces", "--request-timeout=30s")
+				if err != nil || strings.TrimSpace(string(answer)) != "yes" {
+					return fmt.Errorf("workload preflight requires %s %s: %v", verb, kind, err)
+				}
+				return nil
+			})
 		}
+	}
+	if err := permissions.Wait(); err != nil {
+		return plan, err
 	}
 	if len(plan.Affected.Projects) > 0 {
 		current, err := c.resources(ctx, "kustomizations.kustomize.toolkit.fluxcd.io")
@@ -197,6 +212,17 @@ func (c *Commands) Preflight(ctx context.Context, plan Plan) (Plan, error) {
 		}
 	}
 	return plan, nil
+}
+
+type lockedWriter struct {
+	mu     *sync.Mutex
+	writer io.Writer
+}
+
+func (w *lockedWriter) Write(data []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.writer.Write(data)
 }
 
 func (c *Commands) RenderKubernetes(ctx context.Context, plan Plan) error {

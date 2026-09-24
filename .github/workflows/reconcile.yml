@@ -31,8 +31,6 @@ jobs:
       cli-artifact: ${{ needs.cli.outputs.artifact }}
       cli-sha256: ${{ needs.cli.outputs.sha256 }}
   reconcile:
-    if: ${{ !cancelled() && needs.cli.result == 'success' }}
-    needs: cli
     permissions:
       contents: write
       id-token: write
@@ -41,8 +39,6 @@ jobs:
     secrets: inherit
     with:
       full: ${{ inputs.full || false }}
-      cli-artifact: ${{ needs.cli.outputs.artifact }}
-      cli-sha256: ${{ needs.cli.outputs.sha256 }}
   images:
     needs: cli
     if: github.event_name == 'push' && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected

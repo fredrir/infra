@@ -10,19 +10,43 @@ inputs:
   tailscale-client-id:
     description: Federated network identity.
     required: false
+  full:
+    description: Prepare full infrastructure tooling.
+    default: 'true'
+outputs:
+  hosts:
+    value: ${{ steps.requirements.outputs.hosts }}
 runs:
   using: composite
   steps:
+  - id: requirements
+    shell: bash
+    env:
+      NETWORK: ${{ inputs.network }}
+      IDENTITY: ${{ inputs.identity }}
+      FULL: ${{ inputs.full }}
+    run: |
+      if [ "$NETWORK" = true ] && [ "$IDENTITY" = apply ] && [ "$FULL" = false ]; then
+        selection=$(infra reconcile requirements)
+        printf 'full=%s\nhosts=%s\n' "$(jq -r '.tofu or .ansible' <<< "$selection")" "$(jq -r '.ansible' <<< "$selection")" >> "$GITHUB_OUTPUT"
+      else
+        printf 'full=true\nhosts=true\n' >> "$GITHUB_OUTPUT"
+      fi
   - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+    if: steps.requirements.outputs.full == 'true'
     with:
       path: |
         ${{ runner.temp }}/tofu-providers
         ~/.cache/uv
       key: reconciliation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tofu/.terraform.lock.hcl', 'uv.lock') }}
   - shell: bash
+    env:
+      FULL: ${{ steps.requirements.outputs.full }}
     run: |
-      infra ci install-tools tofu flux kubectl helm actionlint sops uv
+      infra ci install-tools flux kubectl helm actionlint
+      if [ "$FULL" = true ]; then infra ci install-tools tofu sops uv; fi
   - shell: bash
+    if: steps.requirements.outputs.full == 'true'
     run: |
       uv sync --frozen --group ci --no-install-project
       printf '%s\n' "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"

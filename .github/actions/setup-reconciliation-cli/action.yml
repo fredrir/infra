@@ -1,0 +1,54 @@
+name: Install reconciliation CLI
+description: Use the matching release or the shared workflow build.
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/cli-inputs
+      id: inputs
+    - uses: ./.github/actions/setup-infra
+      if: steps.inputs.outputs.released == 'true'
+      with:
+        root: .
+    - name: Await shared CLI build
+      if: steps.inputs.outputs.released != 'true'
+      id: artifact
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        python3 - <<'PYTHON'
+        import json, os, subprocess, time
+        endpoint = f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+        prefix = f"infra-cli-{os.environ['GITHUB_SHA']}-"
+        deadline = time.monotonic() + 1500
+        while time.monotonic() < deadline:
+            pages = json.loads(subprocess.check_output(['gh', 'api', '--paginate', '--slurp', endpoint + '/artifacts?per_page=100']))
+            matches = [a for page in pages for a in page['artifacts'] if a['name'].startswith(prefix) and not a['expired']]
+            if matches:
+                artifact = max(matches, key=lambda a: a['id'])
+                with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                    output.write(f"name={artifact['name']}\n")
+                break
+            jobs = json.loads(subprocess.check_output(['gh', 'api', endpoint + '/jobs?per_page=100']))
+            if any(j['name'] == 'cli / build' and j['conclusion'] in ['failure', 'cancelled', 'timed_out'] for j in jobs['jobs']):
+                raise SystemExit('Shared CLI build did not succeed')
+            time.sleep(2)
+        else:
+            raise SystemExit('Timed out waiting for the shared CLI build')
+        PYTHON
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      if: steps.inputs.outputs.released != 'true'
+      with:
+        name: ${{ steps.artifact.outputs.name }}
+        path: ${{ runner.temp }}/infra-cli
+    - name: Verify shared CLI inputs and checksum
+      if: steps.inputs.outputs.released != 'true'
+      shell: bash
+      env:
+        INPUT_DIGEST: ${{ steps.inputs.outputs.digest }}
+      run: |
+        bundle="$RUNNER_TEMP/infra-cli"
+        test "$(cat "$bundle/inputs")" = "$INPUT_DIGEST"
+        printf '%s  %s\n' "$(cat "$bundle/sha256")" "$bundle/infra" | sha256sum --check --strict
+        chmod 755 "$bundle/infra"
+        printf '%s\n' "$bundle" >> "$GITHUB_PATH"

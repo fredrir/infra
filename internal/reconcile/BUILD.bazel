@@ -20,8 +20,10 @@ go_library(
     deps = [
         "//internal/ci",
         "//internal/fluxartifacts",
+        "//internal/objectstore",
         "//internal/process",
         "@in_yaml_go_yaml_v3//:yaml",
+        "@org_golang_x_sync//errgroup",
     ],
 )
 
@@ -36,11 +38,13 @@ go_test(
         "published_test.go",
         "reconcile_test.go",
         "run_scope_test.go",
+        "store_http_test.go",
         "workloads_test.go",
     ],
     embed = [":reconcile"],
     deps = [
         "//internal/ci",
+        "//internal/objectstore",
         "//internal/process",
         "@in_yaml_go_yaml_v3//:yaml",
     ],

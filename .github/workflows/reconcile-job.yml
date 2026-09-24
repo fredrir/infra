@@ -2,12 +2,6 @@ name: Apply infrastructure
 on:
   workflow_call:
     inputs:
-      cli-artifact:
-        type: string
-        required: true
-      cli-sha256:
-        type: string
-        required: true
       full:
         type: boolean
         default: false
@@ -33,6 +27,7 @@ jobs:
     environment: infrastructure-plan
     permissions:
       contents: read
+      actions: read
       id-token: write
     timeout-minutes: 30
     steps:
@@ -41,17 +36,7 @@ jobs:
         ref: ${{ github.sha }}
         fetch-depth: 0
         persist-credentials: false
-    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-      with:
-        name: ${{ inputs.cli-artifact }}
-        path: ${{ runner.temp }}/infra-cli
-    - name: Verify CLI
-      env:
-        CLI_SHA256: ${{ inputs.cli-sha256 }}
-      run: |
-        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
-        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
-        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+    - uses: ./.github/actions/setup-reconciliation-cli
     - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
       if: github.event.pull_request.head.repo.full_name == github.repository
       id: doppler
@@ -119,25 +104,17 @@ jobs:
       with:
         ref: ${{ github.sha }}
         fetch-depth: 0
-    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-      with:
-        name: ${{ inputs.cli-artifact }}
-        path: ${{ runner.temp }}/infra-cli
-    - name: Verify CLI
-      env:
-        CLI_SHA256: ${{ inputs.cli-sha256 }}
-      run: |
-        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
-        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
-        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+    - uses: ./.github/actions/setup-reconciliation-cli
     - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
       id: doppler
       with:
         doppler-token: ${{ secrets.DOPPLER_TOKEN }}
     - uses: ./.github/actions/setup-reconciliation
+      id: setup
       with:
         network: 'true'
         identity: apply
+        full: ${{ github.event_name == 'schedule' || inputs.full }}
         tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
       env:
         AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
@@ -147,6 +124,7 @@ jobs:
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
         KUBE_CONFIG: ${{ steps.doppler.outputs.KUBE_CONFIG }}
     - name: Configure host identity
+      if: steps.setup.outputs.hosts == 'true'
       env:
         SSH_PRIVATE_KEY: ${{ steps.doppler.outputs.SSH_PRIVATE_KEY }}
         SSH_KNOWN_HOSTS: ${{ steps.doppler.outputs.SSH_KNOWN_HOSTS }}
@@ -164,6 +142,7 @@ jobs:
         infra ci prepare-validation
         infra ci validate
     - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+      if: steps.setup.outputs.hosts == 'true'
       id: runner-token
       with:
         app-id: ${{ steps.doppler.outputs.RUNNER_APP_ID }}

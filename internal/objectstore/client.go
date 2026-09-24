@@ -19,10 +19,15 @@ import (
 
 type Client struct {
 	Endpoint, Region, AccessKey, SecretKey string
+	SessionToken                           string
 	HTTP                                   *http.Client
 }
 
 func (client Client) Request(ctx context.Context, method, bucket, key string, body io.ReadSeeker) (*http.Response, error) {
+	return client.RequestHeaders(ctx, method, bucket, key, body, nil)
+}
+
+func (client Client) RequestHeaders(ctx context.Context, method, bucket, key string, body io.ReadSeeker, headers http.Header) (*http.Response, error) {
 	base, err := url.Parse(client.Endpoint)
 	if err != nil || base.Host == "" || (base.Scheme != "http" && base.Scheme != "https") || base.User != nil || base.RawQuery != "" || base.Fragment != "" || client.Region == "" || client.AccessKey == "" || client.SecretKey == "" {
 		return nil, fmt.Errorf("invalid object store configuration")
@@ -52,9 +57,12 @@ func (client Client) Request(ctx context.Context, method, bucket, key string, bo
 		return nil, err
 	}
 	request.ContentLength = size
+	for name, values := range headers {
+		request.Header[name] = append([]string(nil), values...)
+	}
 	payloadHash := hex.EncodeToString(digest.Sum(nil))
 	request.Header.Set("X-Amz-Content-Sha256", payloadHash)
-	if err := v4.NewSigner().SignHTTP(ctx, aws.Credentials{AccessKeyID: client.AccessKey, SecretAccessKey: client.SecretKey}, request, payloadHash, "s3", client.Region, time.Now().UTC()); err != nil {
+	if err := v4.NewSigner().SignHTTP(ctx, aws.Credentials{AccessKeyID: client.AccessKey, SecretAccessKey: client.SecretKey, SessionToken: client.SessionToken}, request, payloadHash, "s3", client.Region, time.Now().UTC()); err != nil {
 		return nil, fmt.Errorf("sign object store request: %w", err)
 	}
 	httpClient := client.HTTP

@@ -1,18 +1,22 @@
 package reconcile
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/objectstore"
 )
 
 type Status struct {
@@ -40,6 +44,7 @@ type Store interface {
 type S3Store struct {
 	Runner         ci.Runner
 	Bucket, Prefix string
+	Client         *objectstore.Client
 }
 
 type lease struct {
@@ -48,6 +53,26 @@ type lease struct {
 }
 
 func (s S3Store) object(ctx context.Context, key string) ([]byte, string, error) {
+	if s.Client != nil {
+		response, err := s.Client.Request(ctx, http.MethodGet, s.Bucket, s.Prefix+"/"+key, nil)
+		if err != nil {
+			var status *objectstore.StatusError
+			if errors.As(err, &status) && status.Code == http.StatusNotFound {
+				return nil, "", nil
+			}
+			return nil, "", err
+		}
+		defer response.Body.Close()
+		etag := response.Header.Get("ETag")
+		if etag == "" {
+			return nil, "", fmt.Errorf("state object has no ETag")
+		}
+		body, err := io.ReadAll(io.LimitReader(response.Body, (1<<20)+1))
+		if len(body) > 1<<20 {
+			return nil, "", fmt.Errorf("state object exceeds size limit")
+		}
+		return body, etag, err
+	}
 	dir, err := os.MkdirTemp("", "infra-state-")
 	if err != nil {
 		return nil, "", err
@@ -83,6 +108,31 @@ func (s S3Store) object(ctx context.Context, key string) ([]byte, string, error)
 }
 
 func (s S3Store) put(ctx context.Context, key string, value any, match string) (string, error) {
+	if s.Client != nil {
+		body, err := json.Marshal(value)
+		if err != nil {
+			return "", err
+		}
+		headers := http.Header{"X-Amz-Server-Side-Encryption": {"AES256"}, "Content-Type": {"application/json"}}
+		if match == "*" {
+			headers.Set("If-None-Match", "*")
+		} else if match != "" {
+			headers.Set("If-Match", match)
+		}
+		response, err := s.Client.RequestHeaders(ctx, http.MethodPut, s.Bucket, s.Prefix+"/"+key, bytes.NewReader(body), headers)
+		if err != nil {
+			return "", err
+		}
+		defer response.Body.Close()
+		if _, err := io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20)); err != nil {
+			return "", err
+		}
+		etag := response.Header.Get("ETag")
+		if etag == "" {
+			return "", fmt.Errorf("state write has no ETag")
+		}
+		return etag, nil
+	}
 	dir, err := os.MkdirTemp("", "infra-state-")
 	if err != nil {
 		return "", err
@@ -161,6 +211,15 @@ func (s S3Store) Lock(ctx context.Context) (func() error, error) {
 	return func() error {
 		release, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+		if s.Client != nil {
+			response, err := s.Client.RequestHeaders(release, http.MethodDelete, s.Bucket, s.Prefix+"/lock.json", nil, http.Header{"If-Match": {token}})
+			if err != nil {
+				return err
+			}
+			defer response.Body.Close()
+			_, err = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+			return err
+		}
 		_, err := s.Runner.Output(release, "aws", "s3api", "delete-object", "--bucket", s.Bucket, "--key", s.Prefix+"/lock.json", "--if-match", token)
 		return err
 	}, nil

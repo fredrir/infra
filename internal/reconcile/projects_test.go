@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/fredrir/infra/internal/ci"
@@ -137,10 +138,13 @@ func TestReadOnlyProductionScopedVerification(t *testing.T) {
 }
 
 func TestPreflightFallsBackBeforeWritesForUnknownProject(t *testing.T) {
+	var mu sync.Mutex
 	var calls []string
 	commands := &Commands{VerifyArtifacts: true, ScopeProjects: true, kubernetes: &kubernetesState{}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		command := options.Name + " " + strings.Join(options.Args, " ")
+		mu.Lock()
 		calls = append(calls, command)
+		mu.Unlock()
 		if strings.Contains(command, "auth can-i") {
 			return process.Result{Stdout: []byte("yes\n")}, nil
 		}
