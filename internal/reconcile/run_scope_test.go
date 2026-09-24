@@ -28,6 +28,82 @@ func TestIndependentChangePreservesDeployedBaseline(t *testing.T) {
 	}
 }
 
+func TestToolingChangeVerifiesDeployedRevisionWithoutMutation(t *testing.T) {
+	verified := time.Now().Add(-time.Hour).UTC()
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "old", LastFullVerified: verified}}
+	ops := &fakeOps{selection: Affected([]string{".github/workflows/deploy.yml", "internal/reconcile/run.go"})}
+	err := (Reconciler{Store: store, Ops: ops, Host: "logs.fredrir.com", SkipUnchanged: true}).Apply(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(ops.calls, []string{"drift-verification"}) {
+		t.Fatalf("tooling change mutated production: %v", ops.calls)
+	}
+	if len(ops.drift) != 1 || ops.drift[0].Revision != "old" || !sameSelection(ops.drift[0].Affected, All()) || ops.drift[0].Host != "logs.fredrir.com" {
+		t.Fatalf("verification did not cover the deployed revision: %+v", ops.drift)
+	}
+	if store.status.Desired != "old" || store.status.Applied != "old" || store.status.Evaluated != "new" || store.status.Stage != "evaluated" {
+		t.Fatalf("tooling change affected deployment: %+v", store.status)
+	}
+	if store.status.LastFullRevision != "old" || !store.status.LastFullVerified.Equal(verified) {
+		t.Fatal("drift verification replaced full verification evidence")
+	}
+}
+
+func TestToolingVerificationFailureForcesFullRecovery(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
+	ops := &fakeOps{selection: Affected([]string{"internal/reconcile/run.go"}), fail: "drift-verification"}
+	if err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true}).Apply(context.Background(), false); err == nil {
+		t.Fatal("drift verification failure lost")
+	}
+	if store.status.Failure == "" || store.status.Applied != "old" {
+		t.Fatalf("failure not recorded: %+v", store.status)
+	}
+	store = &memoryStore{status: store.status}
+	retry := &fakeOps{selection: Affected([]string{"internal/reconcile/run.go"})}
+	if err := (Reconciler{Store: store, Ops: retry, SkipUnchanged: true}).Apply(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(retry.calls, []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}) {
+		t.Fatalf("recovery skipped full convergence: %v", retry.calls)
+	}
+}
+
+func TestToolingChangeKeepsSelectedProjectScope(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete", ArtifactsVerified: "old"}}
+	ops := &checkpointOps{revision: "new", delta: Affected([]string{"internal/reconcile/run.go", "platform/projects/llunde/kustomization.yaml"})}
+	if err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true, VerifyArtifacts: true}).Apply(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(ops.calls, []string{"plan", "publish", "kubernetes", "verify"}) {
+		t.Fatalf("tooling change widened application delivery: %v", ops.calls)
+	}
+	if len(ops.plans) != 1 || !reflect.DeepEqual(ops.plans[0].Affected.Projects, []string{"llunde"}) {
+		t.Fatalf("project scope lost: %+v", ops.plans)
+	}
+}
+
+func TestToolingChangeWithoutHostScopingConvergesEverything(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
+	ops := &fakeOps{selection: Affected([]string{"internal/reconcile/run.go"})}
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(ops.calls, []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}) {
+		t.Fatalf("disabled host scoping skipped full convergence: %v", ops.calls)
+	}
+}
+
+func TestDriftVerificationChecksGeneratedConfigurationFirst(t *testing.T) {
+	commands := &Commands{RequireMain: true, Runner: ci.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
+		t.Fatal("invalid generated inputs reached external commands")
+		return process.Result{}, nil
+	}}}
+	if err := commands.VerifyDrift(context.Background(), Plan{Affected: All()}); err == nil {
+		t.Fatal("drift verification accepted missing generated configuration")
+	}
+}
+
 func TestFullAndRecoveryCannotSkipIndependentChange(t *testing.T) {
 	for _, scenario := range []string{"explicit", "recovery", "initial", "failed-same-revision", "interrupted-same-revision"} {
 		t.Run(scenario, func(t *testing.T) {

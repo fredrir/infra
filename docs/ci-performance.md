@@ -76,7 +76,8 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | State operations | Signed S3 requests reuse HTTP connections with conditional lease ownership, encryption and durable status updates |
 | Permission preflight | Up to four read-only workload permission checks run concurrently before mutation |
 | Scheduled work | Full recovery runs every six hours at minute 17; hourly verification at minute 47 reads live state without applying declarations |
-| Deployment selection | Explicit CI-only paths skip deployment; supported project changes select the union of their dependency chains; shared and unknown inputs retain full fallback |
+| Deployment selection | Explicit CI-only paths skip deployment; supported project changes select the union of their dependency chains; tooling inputs never widen scope; shared and unknown inputs retain full fallback |
+| Tooling changes | `cmd/`, `internal/`, `.github/`, Go and Bazel modules and listed `build/` inputs run read-only drift verification of the applied revision: generated artifacts, `tofu plan -detailed-exitcode`, workloads and hosts; failure forces full recovery; `INFRA_SCOPE_HOSTS=false` restores full convergence |
 | Workload verification | Each verification poll lists workloads once per kind and namespace; expected ownership, images, readiness and generations remain required |
 | Transport installation | Pinned archive content is compared with extracted and installed binaries before extraction or copy; missing or corrupted files are repaired |
 | Rust target cache | Cache save identity includes source contents, lockfile and build arguments; dependency outputs remain reusable across source changes |

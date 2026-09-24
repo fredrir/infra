@@ -289,6 +289,30 @@ func (c *Commands) Verify(ctx context.Context, plan Plan) error {
 	return ci.WaitRevision(wait, client, "https://llunde.no/.well-known/revision", frontend.Revision, 2*time.Second)
 }
 
+func (c *Commands) VerifyDrift(ctx context.Context, plan Plan) error {
+	if err := c.checkGenerated(ctx); err != nil {
+		return err
+	}
+	if err := c.tofuInit(ctx); err != nil {
+		return err
+	}
+	if err := c.verifyTofu(ctx); err != nil {
+		return err
+	}
+	return c.VerifyLive(ctx, plan)
+}
+
+func (c *Commands) VerifyLive(ctx context.Context, plan Plan) error {
+	plan, err := c.Preflight(ctx, plan)
+	if err != nil {
+		return err
+	}
+	if err := c.RenderKubernetes(ctx, plan); err != nil {
+		return err
+	}
+	return c.Verify(ctx, plan)
+}
+
 func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
 	if c.kubernetes == nil || len(c.kubernetes.workloads) == 0 {
 		return fmt.Errorf("desired Kubernetes workloads have not been rendered")

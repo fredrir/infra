@@ -78,14 +78,12 @@ func (c *Commands) Select(ctx context.Context, base string, full bool) (Selectio
 
 func (c *Commands) Plan(ctx context.Context, plan Plan) error {
 	if c.RequireMain {
-		if err := fluxartifacts.Check(c.Runner.Dir, func(path string) ([]byte, error) {
-			return c.Runner.Output(ctx, "kubectl", "kustomize", path)
-		}); err != nil {
+		if err := c.checkGenerated(ctx); err != nil {
 			return err
 		}
 	}
 	if plan.Affected.Tofu {
-		if err := c.Runner.Run(ctx, "tofu", "-chdir=tofu", "init", "-input=false", "-lockfile=readonly"); err != nil {
+		if err := c.tofuInit(ctx); err != nil {
 			return err
 		}
 		if err := c.Runner.Run(ctx, "tofu", "-chdir=tofu", "validate"); err != nil {
@@ -120,6 +118,16 @@ func (c *Commands) Plan(ctx context.Context, plan Plan) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Commands) checkGenerated(ctx context.Context) error {
+	return fluxartifacts.Check(c.Runner.Dir, func(path string) ([]byte, error) {
+		return c.Runner.Output(ctx, "kubectl", "kustomize", path)
+	})
+}
+
+func (c *Commands) tofuInit(ctx context.Context) error {
+	return c.Runner.Run(ctx, "tofu", "-chdir=tofu", "init", "-input=false", "-lockfile=readonly")
 }
 
 func retainedHosts(state []byte) ([]string, error) {

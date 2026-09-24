@@ -156,7 +156,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 Pushes and pull requests enter through `reconcile.yml`, which shares one verified CLI build with reusable checks and image planning.
 Reconciliation starts independently and installs the pinned release when the checkout's CLI input digest matches; changed CLI inputs wait for the shared build and verify its input digest and binary checksum.
 Apply retains declaration validation and live preflight, and the parent retains the existing Tailscale `workflow_ref` identity.
-`infra reconcile requirements` compares the durable applied revision with the checkout before setup; application-only changes skip OpenTofu, Ansible, SSH and runner-registration setup, while incomplete or failed reconciliation requires full tooling.
+`infra reconcile requirements` compares the durable applied revision with the checkout before setup; application-only changes skip OpenTofu, Ansible, SSH and runner-registration setup, while tooling-only changes and incomplete or failed reconciliation require full tooling.
 Native signed S3 state requests retain conditional lease creation, takeover and release, server-side encryption and durable status updates; AWS CLI credential resolution remains available when environment credentials are absent.
 `performance.yml` records completed attempt timings, including failures, without checking out or executing the observed revision.
 

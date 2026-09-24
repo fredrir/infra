@@ -26,6 +26,7 @@ type Operations interface {
 	Kubernetes(context.Context, Plan) error
 	Monitor(context.Context, Plan) error
 	Verify(context.Context, Plan) error
+	VerifyDrift(context.Context, Plan) error
 	Retire(context.Context, Plan) error
 }
 
@@ -68,7 +69,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	if err != nil {
 		return err
 	}
-	if full || status.Applied == "" || recovery {
+	if full || status.Applied == "" || recovery || (selected.Tooling && !r.SkipUnchanged) {
 		selected = All()
 	}
 	if len(selected.Projects) > 0 && (!r.VerifyArtifacts || status.ArtifactsVerified != status.Applied) {
@@ -118,6 +119,12 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		return nil
 	}
 	if skip {
+		if selected.Tooling {
+			deployed := Plan{Revision: status.Applied, Base: status.Applied, Affected: All(), Host: r.Host}
+			if err = stage("drift-verification", func() error { return r.Ops.VerifyDrift(ctx, deployed) }); err != nil {
+				return err
+			}
+		}
 		status.Stage = "evaluated"
 		return save(ctx)
 	}

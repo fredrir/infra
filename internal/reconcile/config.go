@@ -16,6 +16,7 @@ type Selection struct {
 	Kubernetes  bool     `json:"kubernetes"`
 	Ansible     bool     `json:"ansible"`
 	MonitorOnly bool     `json:"monitor_only"`
+	Tooling     bool     `json:"tooling"`
 	Projects    []string `json:"projects,omitempty"`
 	HostScope   string   `json:"host_scope"`
 	Reasons     []string `json:"reasons,omitempty"`
@@ -42,6 +43,11 @@ func Affected(paths []string) Selection {
 			selected.Reasons = append(selected.Reasons, "deployment-independent input: "+path)
 			continue
 		}
+		if toolingInput(path) {
+			selected.Tooling = true
+			selected.Reasons = append(selected.Reasons, "tooling input: "+path)
+			continue
+		}
 		deploymentPaths = append(deploymentPaths, path)
 		selected.Reasons = append(selected.Reasons, "deployment input: "+path)
 		switch {
@@ -50,7 +56,7 @@ func Affected(paths []string) Selection {
 			selectHosts(&selected, HostScopeMonitor)
 		case strings.HasPrefix(path, "ansible/roles/gatus/"):
 			selectHosts(&selected, HostScopeMonitor)
-		case path == "build/cli-release.json", path == "ansible/build-runners.yml", path == "ansible/verify-runners.yml", strings.HasPrefix(path, "ansible/roles/build_runner/"), strings.HasPrefix(path, "ansible/roles/build_engine/"):
+		case path == "build/cli-release.json", path == "build/toolchain.json", path == "ansible/build-runners.yml", path == "ansible/verify-runners.yml", strings.HasPrefix(path, "ansible/roles/build_runner/"), strings.HasPrefix(path, "ansible/roles/build_engine/"):
 			selectHosts(&selected, HostScopeRunners)
 		case strings.HasPrefix(path, "tofu/"):
 			selected.Tofu = true
@@ -79,21 +85,45 @@ func Affected(paths []string) Selection {
 }
 
 func sharedDeploymentInput(path string) bool {
-	for _, prefix := range []string{"cmd/", "internal/", "build/", ".github/", "tailscale/", ".vscode/", "platform/components/policy/", "platform/clusters/production/flux-system/"} {
+	for _, prefix := range []string{"tailscale/", "build/rollout/flux-artifacts/", "platform/components/policy/", "platform/clusters/production/flux-system/"} {
 		if strings.HasPrefix(path, prefix) {
 			return true
 		}
 	}
 	switch path {
-	case "platform/clusters/production/root.yaml", "go.mod", "go.sum", "BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelrc", ".bazelversion", ".sops.yaml", ".dockerignore", ".editorconfig", ".envrc", ".gitignore", ".gitleaks.toml", ".gitleaksignore", ".taplo.toml", ".yamllint.yaml", "biome.json", "pyproject.toml", "renovate.json", "ruff.toml", "uv.lock":
+	case "platform/clusters/production/root.yaml", ".sops.yaml", "pyproject.toml", "uv.lock":
 		return true
 	default:
 		return false
 	}
 }
 
+func toolingInput(path string) bool {
+	if !canonicalPath(path) {
+		return false
+	}
+	for _, prefix := range []string{"cmd/", "internal/", ".github/", "build/tools/", "build/release/"} {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	if filepath.Dir(path) == "build/rollout" {
+		return true
+	}
+	switch path {
+	case "build/BUILD.bazel", "build/consumers.json", "build/dagger-embed.patch", "go.mod", "go.sum", "BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelrc", ".bazelversion", ".dockerignore", ".envrc", ".gitignore":
+		return true
+	default:
+		return false
+	}
+}
+
+func canonicalPath(path string) bool {
+	return !strings.HasPrefix(path, "/") && !strings.Contains(path, "\\") && filepath.ToSlash(filepath.Clean(path)) == path
+}
+
 func deploymentIndependent(path string) bool {
-	if strings.HasPrefix(path, "/") || strings.Contains(path, "\\") || filepath.ToSlash(filepath.Clean(path)) != path {
+	if !canonicalPath(path) {
 		return false
 	}
 	switch path {

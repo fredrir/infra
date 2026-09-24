@@ -118,14 +118,7 @@ func newReconcileCommand() *cobra.Command {
 			}
 			plan := reconcile.Plan{Revision: revision, Base: base, Affected: selected, Host: host}
 			if action == "verify" {
-				plan, err = ops.Preflight(cmd.Context(), plan)
-				if err != nil {
-					return err
-				}
-				if err := ops.RenderKubernetes(cmd.Context(), plan); err != nil {
-					return err
-				}
-				return ops.Verify(cmd.Context(), plan)
+				return ops.VerifyLive(cmd.Context(), plan)
 			}
 			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(plan); err != nil {
 				return err

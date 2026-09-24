@@ -28,7 +28,7 @@ runs:
     run: |
       if [ "$NETWORK" = true ] && [ "$IDENTITY" = apply ] && [ "$FULL" = false ]; then
         selection=$(infra reconcile requirements)
-        printf 'full=%s\nhosts=%s\n' "$(jq -r '.tofu or .ansible' <<< "$selection")" "$(jq -r '.ansible' <<< "$selection")" >> "$GITHUB_OUTPUT"
+        printf 'full=%s\nhosts=%s\n' "$(jq -r '.tofu or .ansible or .tooling' <<< "$selection")" "$(jq -r '.ansible or .tooling' <<< "$selection")" >> "$GITHUB_OUTPUT"
       else
         printf 'full=true\nhosts=true\n' >> "$GITHUB_OUTPUT"
       fi

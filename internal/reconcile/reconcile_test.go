@@ -45,6 +45,7 @@ type fakeOps struct {
 	fail, base string
 	full       bool
 	selection  Selection
+	drift      []Plan
 }
 
 func (o *fakeOps) call(name string) error {
@@ -70,6 +71,10 @@ func (o *fakeOps) Kubernetes(context.Context, Plan) error               { return
 func (o *fakeOps) Monitor(context.Context, Plan) error                  { return o.call("monitor") }
 func (o *fakeOps) Verify(context.Context, Plan) error                   { return o.call("verify") }
 func (o *fakeOps) Retire(context.Context, Plan) error                   { return o.call("retire") }
+func (o *fakeOps) VerifyDrift(_ context.Context, plan Plan) error {
+	o.drift = append(o.drift, plan)
+	return o.call("drift-verification")
+}
 
 func TestTransitionRetiresOnlyAfterVerification(t *testing.T) {
 	want := []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}
@@ -159,6 +164,16 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 		{"ansible/roles/gatus/tasks/main.yml", Selection{Ansible: true, MonitorOnly: true}},
 		{"platform/projects/y/application.yaml", Selection{Kubernetes: true, Projects: []string{"y"}}},
 		{"build/cli-release.json", Selection{Ansible: true, HostScope: HostScopeRunners}},
+		{"build/toolchain.json", Selection{Ansible: true, HostScope: HostScopeRunners}},
+		{"internal/reconcile/run.go", Selection{Tooling: true}},
+		{"cmd/infra/main.go", Selection{Tooling: true}},
+		{".github/workflows/deploy.yml", Selection{Tooling: true}},
+		{".github/actions/setup-reconciliation/action.yml", Selection{Tooling: true}},
+		{"MODULE.bazel.lock", Selection{Tooling: true}},
+		{"uv.lock", All()},
+		{".sops.yaml", All()},
+		{"platform/components/policy/kustomization.yaml", All()},
+		{"internal/../tofu/main.tf", All()},
 		{"README.md", Selection{}},
 	} {
 		if got := Affected([]string{test.path}); !sameSelection(got, test.want) {
@@ -192,8 +207,8 @@ func TestAffectedNarrowsKubernetesScopeToSelectedProjects(t *testing.T) {
 	if got := Affected([]string{"platform/projects/y/kustomization.yaml", "platform/projects/llunde/kustomization.yaml", "platform/projects/y/application.yaml"}); !sameSelection(got, Selection{Kubernetes: true, Projects: []string{"llunde", "y"}}) {
 		t.Fatalf("multiple projects did not retain their scoped union: %+v", got)
 	}
-	if got := Affected([]string{"platform/projects/llunde/kustomization.yaml", "internal/reconcile/config.go"}); !sameSelection(got, All()) {
-		t.Errorf("tooling change must keep the full scope: %+v", got)
+	if got := Affected([]string{"platform/projects/llunde/kustomization.yaml", "internal/reconcile/config.go"}); !sameSelection(got, Selection{Kubernetes: true, Tooling: true, Projects: []string{"llunde"}}) {
+		t.Errorf("tooling change widened the project scope: %+v", got)
 	}
 }
 
