@@ -95,6 +95,11 @@ spec:
   dependsOn:
     - name: platform-policy
       readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-eb209448b67b991cbbf76ee0cc12ec80c792d417' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: postgres
+      namespace: llunde-pyparser
   interval: 10m
   path: ./platform/projects/llunde-pyparser
   postBuild:

@@ -12,4 +12,5 @@ go_test(
     name = "fluxartifacts_test",
     srcs = ["generate_test.go"],
     embed = [":fluxartifacts"],
+    deps = ["@in_yaml_go_yaml_v3//:yaml"],
 )

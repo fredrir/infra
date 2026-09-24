@@ -30,11 +30,12 @@ type Operations interface {
 }
 
 type Reconciler struct {
-	Store         Store
-	Ops           Operations
-	Host          string
-	Report        func(Status) error
-	SkipUnchanged bool
+	Store           Store
+	Ops             Operations
+	Host            string
+	Report          func(Status) error
+	SkipUnchanged   bool
+	VerifyArtifacts bool
 }
 
 func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
@@ -69,6 +70,10 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	}
 	if full || status.Applied == "" || recovery {
 		selected = All()
+	}
+	if len(selected.Projects) > 0 && (!r.VerifyArtifacts || status.ArtifactsVerified != status.Applied) {
+		selected.Projects = nil
+		selected.Reasons = append(selected.Reasons, "full artifact verification baseline required")
 	}
 	plan := Plan{Revision: revision, Base: status.Applied, Affected: selected, Host: r.Host}
 	skip := r.SkipUnchanged && !full && !recovery && status.Applied != "" && !selected.Tofu && !selected.Ansible && !selected.Kubernetes
@@ -177,12 +182,18 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		}
 	}
 	previous, previousFull, previousFullTime := status.Applied, status.LastFullRevision, status.LastFullVerified
+	previousArtifacts := status.ArtifactsVerified
+	status.ArtifactsVerified = ""
+	if r.VerifyArtifacts {
+		status.ArtifactsVerified = revision
+	}
 	if selected.Tofu && selected.Kubernetes && effectiveHostScope(selected) == HostScopeFull && len(selected.Projects) == 0 {
 		status.LastFullRevision, status.LastFullVerified = revision, time.Now().UTC()
 	}
 	status.Applied, status.Stage = revision, "complete"
 	if err = save(ctx); err != nil {
 		status.Applied, status.LastFullRevision, status.LastFullVerified = previous, previousFull, previousFullTime
+		status.ArtifactsVerified = previousArtifacts
 		return err
 	}
 	return nil

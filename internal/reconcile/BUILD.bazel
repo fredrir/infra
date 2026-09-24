@@ -9,6 +9,7 @@ go_library(
         "config.go",
         "host_scope.go",
         "projects.go",
+        "published.go",
         "run.go",
         "store.go",
         "verify.go",
@@ -18,6 +19,7 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/ci",
+        "//internal/fluxartifacts",
         "//internal/process",
         "@in_yaml_go_yaml_v3//:yaml",
     ],
@@ -31,6 +33,7 @@ go_test(
         "checkpoint_test.go",
         "host_scope_test.go",
         "projects_test.go",
+        "published_test.go",
         "reconcile_test.go",
         "run_scope_test.go",
         "workloads_test.go",

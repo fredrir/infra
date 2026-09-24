@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/fluxartifacts"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -76,6 +77,13 @@ func (c *Commands) Select(ctx context.Context, base string, full bool) (Selectio
 }
 
 func (c *Commands) Plan(ctx context.Context, plan Plan) error {
+	if c.RequireMain {
+		if err := fluxartifacts.Check(c.Runner.Dir, func(path string) ([]byte, error) {
+			return c.Runner.Output(ctx, "kubectl", "kustomize", path)
+		}); err != nil {
+			return err
+		}
+	}
 	if plan.Affected.Tofu {
 		if err := c.Runner.Run(ctx, "tofu", "-chdir=tofu", "init", "-input=false", "-lockfile=readonly"); err != nil {
 			return err

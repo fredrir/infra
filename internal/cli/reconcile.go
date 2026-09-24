@@ -53,7 +53,7 @@ func newReconcileCommand() *cobra.Command {
 			defer os.RemoveAll(work)
 			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ScopeHosts: scopeHosts, ScopeProjects: scopeProjects, VerifyArtifacts: verifyArtifacts}
 			if action == "apply" {
-				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, SkipUnchanged: scopeHosts, Report: func(status reconcile.Status) error {
+				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, SkipUnchanged: scopeHosts, VerifyArtifacts: verifyArtifacts, Report: func(status reconcile.Status) error {
 					data, err := json.MarshalIndent(status, "", "  ")
 					if err != nil {
 						return err
@@ -72,6 +72,22 @@ func newReconcileCommand() *cobra.Command {
 			revision, err := ops.Revision(cmd.Context())
 			if err != nil {
 				return err
+			}
+			if action == "verify" {
+				published, err := ops.PublishedRevision(cmd.Context())
+				if err != nil {
+					return err
+				}
+				if published != revision {
+					pending, err := ops.Select(cmd.Context(), published, false)
+					if err != nil {
+						return err
+					}
+					if pending.Tofu || pending.Kubernetes || pending.Ansible {
+						return fmt.Errorf("checkout contains unpublished infrastructure changes")
+					}
+					revision = published
+				}
 			}
 			selected, err := ops.Select(cmd.Context(), base, full)
 			if err != nil {

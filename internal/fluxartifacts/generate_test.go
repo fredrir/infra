@@ -1,11 +1,15 @@
 package fluxartifacts
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 func TestPolicyChangesRequireRegeneratedBarrier(t *testing.T) {
@@ -25,6 +29,49 @@ func TestPolicyChangesRequireRegeneratedBarrier(t *testing.T) {
 	write("platform/clusters/production/root.yaml", "apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: platform-projects\nspec:\n  dependsOn:\n  - name: platform-policy\n")
 	if err := generate(root, false); err != nil {
 		t.Fatal(err)
+	}
+	projects, err := os.ReadFile(filepath.Join(root, directory, "cutover/projects.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoder := yaml.NewDecoder(bytes.NewReader(projects))
+	parserChecked := false
+	for {
+		var project struct {
+			Metadata struct{ Name string }
+			Spec     struct {
+				Wait         bool
+				HealthChecks []struct {
+					APIVersion            string `yaml:"apiVersion"`
+					Kind, Name, Namespace string
+				} `yaml:"healthChecks"`
+			}
+		}
+		if err := decoder.Decode(&project); errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		if project.Spec.Wait {
+			t.Fatalf("%s waits for unrelated workloads", project.Metadata.Name)
+		}
+		if project.Metadata.Name != "project-llunde-pyparser" {
+			if len(project.Spec.HealthChecks) != 0 {
+				t.Fatalf("%s inherited parser health checks", project.Metadata.Name)
+			}
+			continue
+		}
+		parserChecked = true
+		if len(project.Spec.HealthChecks) != 1 {
+			t.Fatalf("parser root must check its database before migration: %+v", project.Spec.HealthChecks)
+		}
+		check := project.Spec.HealthChecks[0]
+		if check.APIVersion != "apps/v1" || check.Kind != "StatefulSet" || check.Namespace != "llunde-pyparser" || check.Name != "postgres" {
+			t.Fatalf("parser database health check: %+v", check)
+		}
+	}
+	if !parserChecked {
+		t.Fatal("parser owner missing")
 	}
 	if err := generate(root, true); err != nil {
 		t.Fatal(err)

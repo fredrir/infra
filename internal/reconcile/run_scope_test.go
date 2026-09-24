@@ -131,3 +131,54 @@ func TestScopeControlsApplyToSelection(t *testing.T) {
 		}
 	}
 }
+
+func TestProjectScopeRequiresVerifiedArtifactBaseline(t *testing.T) {
+	for _, scenario := range []struct {
+		name, proof     string
+		enabled, scoped bool
+	}{
+		{"legacy state", "", true, false},
+		{"outdated proof", "older", true, false},
+		{"current proof", "old", true, true},
+		{"verification disabled", "old", false, false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete", ArtifactsVerified: scenario.proof}}
+			ops := &checkpointOps{revision: "new", delta: Selection{Kubernetes: true, Projects: []string{"portfolio"}}}
+			if err := (Reconciler{Store: store, Ops: ops, VerifyArtifacts: scenario.enabled}).Apply(context.Background(), false); err != nil {
+				t.Fatal(err)
+			}
+			if len(ops.plans) != 1 || (len(ops.plans[0].Affected.Projects) == 1) != scenario.scoped {
+				t.Fatalf("artifact baseline gate failed: %+v", ops.plans)
+			}
+			want := ""
+			if scenario.enabled {
+				want = "new"
+			}
+			if store.status.ArtifactsVerified != want {
+				t.Fatalf("incorrect proof: %+v", store.status)
+			}
+		})
+	}
+}
+
+func TestArtifactVerificationFailurePreservesProof(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old", ArtifactsVerified: "old"}}
+	ops := &fakeOps{selection: All(), fail: "verify"}
+	if err := (Reconciler{Store: store, Ops: ops, VerifyArtifacts: true}).Apply(context.Background(), false); err == nil {
+		t.Fatal("verification failure lost")
+	}
+	if store.status.ArtifactsVerified != "old" || store.status.Applied != "old" {
+		t.Fatalf("failed verification advanced proof: %+v", store.status)
+	}
+}
+
+func TestApplyChecksGeneratedConfigurationWithoutKubernetesSelection(t *testing.T) {
+	commands := &Commands{RequireMain: true, Runner: ci.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
+		t.Fatal("invalid generated inputs reached external commands")
+		return process.Result{}, nil
+	}}}
+	if err := commands.Plan(context.Background(), Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners}}); err == nil {
+		t.Fatal("apply accepted missing generated configuration")
+	}
+}
