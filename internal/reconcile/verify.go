@@ -160,7 +160,7 @@ func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
 		})
 	}
 	token := time.Now().UTC().Format(time.RFC3339Nano)
-	if err := c.Runner.Run(ctx, "kubectl", "annotate", "kustomizations.kustomize.toolkit.fluxcd.io", "--all", "--all-namespaces", "--overwrite", "--field-manager=flux-client-side-apply", "reconcile.fluxcd.io/requestedAt="+token, "--request-timeout=30s"); err != nil {
+	if err := c.requestReconcile(ctx, "kustomizations.kustomize.toolkit.fluxcd.io,helmreleases.helm.toolkit.fluxcd.io", token); err != nil {
 		return err
 	}
 	wait, cancel := context.WithTimeout(ctx, 20*time.Minute)
@@ -168,7 +168,8 @@ func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
 	if err := poll(wait, func() error { return c.verifyKubernetes(wait, revision, token) }); err != nil {
 		return err
 	}
-	if err := c.Runner.Run(ctx, "kubectl", "annotate", "helmreleases.helm.toolkit.fluxcd.io", "--all", "--all-namespaces", "--overwrite", "--field-manager=flux-client-side-apply", "reconcile.fluxcd.io/requestedAt="+token, "--request-timeout=30s"); err != nil {
+	// Requests HelmReleases that Kustomizations created while applying the revision.
+	if err := c.requestReconcile(ctx, "helmreleases.helm.toolkit.fluxcd.io", token); err != nil {
 		return err
 	}
 	if err := poll(wait, func() error { return c.verifyHelm(wait, token, "") }); err != nil {
@@ -178,6 +179,10 @@ func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
 		return poll(wait, func() error { return c.verifyDeployment(wait, plan) })
 	}
 	return nil
+}
+
+func (c *Commands) requestReconcile(ctx context.Context, kinds, token string) error {
+	return c.Runner.Run(ctx, "kubectl", "annotate", kinds, "--all", "--all-namespaces", "--overwrite", "--field-manager=flux-client-side-apply", "reconcile.fluxcd.io/requestedAt="+token, "--request-timeout=30s")
 }
 
 func (c *Commands) bootstrapProduction(ctx context.Context, plan Plan) error {

@@ -44,10 +44,7 @@ func (c *Commands) Hosts(ctx context.Context, plan Plan) error {
 func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
-		if err := c.ansible(ctx, "verify.yml"); err != nil {
-			return err
-		}
-		return c.ansible(ctx, "verify-runners.yml")
+		return c.ansible(ctx, "verify.yml", "verify-runners.yml")
 	case HostScopeRunners:
 		return c.ansible(ctx, "verify-runners.yml")
 	case HostScopeMonitor:

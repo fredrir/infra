@@ -424,6 +424,42 @@ func TestS3LockCreationUsesCreateOnlyCondition(t *testing.T) {
 	}
 }
 
+func TestHelmReleasesReconcileAlongsideKustomizations(t *testing.T) {
+	var calls []string
+	token, lateToken, created := "", "", false
+	item := func(name, namespace, handled string) string {
+		return fmt.Sprintf(`{"metadata":{"name":%q,"namespace":%q,"generation":1},"spec":{"sourceRef":{"kind":"GitRepository","name":"flux-system"}},"status":{"observedGeneration":1,"lastAppliedRevision":"production@sha1:revision","lastHandledReconcileAt":%q,"conditions":[{"type":"Ready","status":"True","observedGeneration":1}]}}`, name, namespace, handled)
+	}
+	c := Commands{Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+		args := strings.Join(o.Args, " ")
+		switch {
+		case o.Name == "kubectl" && strings.HasPrefix(args, "annotate "):
+			calls = append(calls, o.Args[1])
+			token = strings.TrimPrefix(o.Args[len(o.Args)-2], "reconcile.fluxcd.io/requestedAt=")
+			if created {
+				lateToken = token
+			}
+		case strings.HasPrefix(args, "get gitrepository "):
+			return process.Result{Stdout: []byte(`{"spec":{"ref":{"branch":"production"}},"status":{"artifact":{"revision":"production@sha1:revision"}}}`)}, nil
+		case strings.HasPrefix(args, "get kustomizations."):
+			calls, created = append(calls, "kustomizations ready"), true
+			return process.Result{Stdout: []byte(`{"items":[` + item("flux-system", "flux-system", token) + `]}`)}, nil
+		case strings.HasPrefix(args, "get helmreleases."):
+			return process.Result{Stdout: []byte(`{"items":[` + item("monitoring", "observability", token) + "," + item("created", "observability", lateToken) + `]}`)}, nil
+		}
+		return process.Result{}, nil
+	}}}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := c.Kubernetes(ctx, Plan{Revision: "revision", Affected: All()}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"kustomizations.kustomize.toolkit.fluxcd.io,helmreleases.helm.toolkit.fluxcd.io", "kustomizations ready", "helmreleases.helm.toolkit.fluxcd.io"}
+	if !reflect.DeepEqual(calls, want) {
+		t.Fatalf("HelmRelease reconciliation order: %v", calls)
+	}
+}
+
 func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
 	for _, initial := range []string{"main", "production"} {
 		t.Run(initial, func(t *testing.T) {

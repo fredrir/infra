@@ -62,7 +62,7 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 		scope string
 		want  []string
 	}{
-		{HostScopeFull, []string{"reconcile.yml", "external.yml", "verify.yml", "verify-runners.yml"}},
+		{HostScopeFull, []string{"reconcile.yml", "external.yml", "verify.yml verify-runners.yml"}},
 		{HostScopeRunners, []string{"build-runners.yml", "verify-runners.yml"}},
 		{HostScopeMonitor, []string{"external.yml --tags=gatus", "verify.yml --limit=external"}},
 		{HostScopeNone, nil},
