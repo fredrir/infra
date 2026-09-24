@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -142,7 +143,7 @@ func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
 	if source.Spec.Ref.Branch == "main" {
 		return c.bootstrapProduction(ctx, plan)
 	}
-	if c.VerifyArtifacts && len(plan.Affected.Projects) == 1 {
+	if c.VerifyArtifacts && len(plan.Affected.Projects) > 0 {
 		wait, cancel := context.WithTimeout(ctx, 20*time.Minute)
 		defer cancel()
 		started := time.Now()
@@ -274,7 +275,7 @@ func (c *Commands) Verify(ctx context.Context, plan Plan) error {
 			return err
 		}
 	}
-	if len(plan.Affected.Projects) > 0 && plan.Affected.Projects[0] != "llunde" {
+	if len(plan.Affected.Projects) > 0 && !slices.Contains(plan.Affected.Projects, "llunde") {
 		return nil
 	}
 	data, err := os.ReadFile(filepath.Join(c.Runner.Dir, "platform/projects/llunde/.deployments/llunde-frontend.json"))
@@ -308,12 +309,13 @@ func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
 			return fmt.Errorf("desired workloads for %s have not been rendered", name)
 		}
 	}
-	if len(plan.Affected.Projects) == 1 {
+	if len(plan.Affected.Projects) > 0 {
 		names = append(names, "platform-policy", "flux-system")
 	}
+	snapshot := resourceSnapshot{}
 	owners := make([]resource, 0, len(names))
 	for _, name := range names {
-		item, err := c.getResource(ctx, "kustomizations.kustomize.toolkit.fluxcd.io", "flux-system", name)
+		item, err := c.snapshotResource(ctx, snapshot, "kustomizations.kustomize.toolkit.fluxcd.io", "flux-system", name)
 		if err != nil {
 			return err
 		}
@@ -339,7 +341,7 @@ func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
 		return err
 	}
 	for _, owner := range owners {
-		if err = c.verifyOwnedWorkloads(ctx, owner); err != nil {
+		if err = c.verifyOwnedWorkloads(ctx, owner, snapshot); err != nil {
 			return err
 		}
 	}

@@ -68,7 +68,7 @@ func workloadReady(expected, actual resource) error {
 	return nil
 }
 
-func (c *Commands) verifyOwnedWorkloads(ctx context.Context, owner resource) error {
+func (c *Commands) verifyOwnedWorkloads(ctx context.Context, owner resource, snapshot resourceSnapshot) error {
 	var inventory struct{ Entries []struct{ ID string } }
 	if err := json.Unmarshal(owner.Status.Inventory, &inventory); err != nil {
 		return fmt.Errorf("%s inventory: %w", owner.Metadata.Name, err)
@@ -98,7 +98,7 @@ func (c *Commands) verifyOwnedWorkloads(ctx context.Context, owner resource) err
 		if !owned[id] {
 			return fmt.Errorf("%s is missing owned workload %s", owner.Metadata.Name, id)
 		}
-		actual, err := c.getResource(ctx, kind, expected.Metadata.Namespace, expected.Metadata.Name)
+		actual, err := c.snapshotResource(ctx, snapshot, kind, expected.Metadata.Namespace, expected.Metadata.Name)
 		if err != nil {
 			return err
 		}

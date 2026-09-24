@@ -21,6 +21,33 @@ func artifactFixture(t *testing.T, body string) resource {
 	return item
 }
 
+func TestWorkloadSnapshotBatchesReadsWithoutReusingStalePolls(t *testing.T) {
+	calls := 0
+	commands := &Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		calls++
+		if strings.Join(options.Args, " ") != "get deployments.apps -n=llunde -o=json --request-timeout=30s" {
+			t.Fatalf("unexpected resource scope: %v", options.Args)
+		}
+		return process.Result{Stdout: []byte(fmt.Sprintf(`{"items":[{"metadata":{"name":"web","namespace":"llunde","generation":%d}},{"metadata":{"name":"api","namespace":"llunde"}}]}`, calls))}, nil
+	}}}
+	snapshot := resourceSnapshot{}
+	for _, name := range []string{"web", "api"} {
+		if _, err := commands.snapshotResource(context.Background(), snapshot, "deployments.apps", "llunde", name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("same namespace read %d times", calls)
+	}
+	if _, err := commands.snapshotResource(context.Background(), snapshot, "deployments.apps", "llunde", "missing"); err == nil {
+		t.Fatal("missing workload accepted")
+	}
+	item, err := commands.snapshotResource(context.Background(), resourceSnapshot{}, "deployments.apps", "llunde", "web")
+	if err != nil || item.Metadata.Generation != 2 || calls != 2 {
+		t.Fatalf("new poll reused stale state: %+v, %v", item, err)
+	}
+}
+
 func TestArtifactOriginRequiresCurrentSourceEvenWhenContentIsUnchanged(t *testing.T) {
 	generator := artifactFixture(t, `{"spec":{"sources":[{"alias":"repo","kind":"GitRepository","name":"flux-system"}],"artifacts":[{"name":"project-y","originRevision":"@repo","copy":[{"from":"@repo/platform/projects/y/**","to":"@artifact/platform/projects/y/"},{"from":"@repo/platform/components/backup-job/**","to":"@artifact/platform/components/backup-job/"},{"from":"@repo/platform/clusters/production/settings.yaml","to":"@artifact/platform/clusters/production/settings.yaml"}]}]}}`)
 	old := strings.Repeat("a", 40)
@@ -73,7 +100,11 @@ func TestVerifyArtifactsRejectsStaleAndUnownedContent(t *testing.T) {
 		name      string
 		mutate    func(*resource, *resource, *resource)
 		wantError bool
+		baseline  map[string]string
+		projects  []string
 	}{
+		{name: "scoped selected changes", projects: []string{"llunde", "y"}, baseline: map[string]string{"project-y": "old"}, mutate: func(*resource, *resource, *resource) {}},
+		{name: "scoped unselected artifact missing", projects: []string{"llunde", "y"}, baseline: map[string]string{"project-portfolio": digest}, wantError: true, mutate: func(*resource, *resource, *resource) {}},
 		{name: "current", mutate: func(*resource, *resource, *resource) {}},
 		{name: "stale consumer", wantError: true, mutate: func(_, _ *resource, owner *resource) { owner.Status.LastAppliedRevision = "latest@sha256:old" }},
 		{name: "unowned artifact", wantError: true, mutate: func(_ *resource, artifact, _ *resource) {
@@ -93,7 +124,7 @@ func TestVerifyArtifactsRejectsStaleAndUnownedContent(t *testing.T) {
 			art := artifactFixture(t, artifact)
 			owner := artifactFixture(t, fmt.Sprintf(`{"metadata":{"name":"project-y"},"spec":{"sourceRef":{"kind":"ExternalArtifact","name":"project-y"}},"status":{"lastAppliedRevision":%q}}`, "latest@"+digest))
 			test.mutate(&gen, &art, &owner)
-			commands := &Commands{kubernetes: &kubernetesState{generator: gen}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := &Commands{kubernetes: &kubernetesState{generator: gen, baseline: test.baseline}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				var value any = gen
 				if strings.Contains(strings.Join(options.Args, " "), "externalartifacts") {
 					value = struct{ Items []resource }{[]resource{art}}
@@ -101,7 +132,7 @@ func TestVerifyArtifactsRejectsStaleAndUnownedContent(t *testing.T) {
 				output, err := json.Marshal(value)
 				return process.Result{Stdout: output}, err
 			}}}
-			err := commands.verifyArtifacts(context.Background(), Plan{Revision: revision}, []resource{owner})
+			err := commands.verifyArtifacts(context.Background(), Plan{Revision: revision, Affected: Selection{Projects: test.projects}}, []resource{owner})
 			if (err != nil) != test.wantError {
 				t.Fatalf("error %v, want error %v", err, test.wantError)
 			}

@@ -1,0 +1,66 @@
+name: Workflow performance
+on:
+  workflow_run:
+    workflows: [Check, Reconcile infrastructure, Infrastructure images, Deploy]
+    types: [completed]
+permissions:
+  actions: read
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+jobs:
+  report:
+    if: github.repository_id == '1328085692' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Record completed workflow timing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          python3 - <<'PY'
+          import datetime, json, os, pathlib, subprocess
+          run_id, attempt = int(os.environ['RUN_ID']), int(os.environ['RUN_ATTEMPT'])
+          endpoint = f"repos/{os.environ['GH_REPO']}/actions/runs/{run_id}/attempts/{attempt}"
+          def api(path):
+              return json.loads(subprocess.check_output(['gh', 'api', path]))
+          def timestamp(value):
+              return datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+          run = api(endpoint)
+          jobs = []
+          page = 1
+          while True:
+              batch = api(f'{endpoint}/jobs?per_page=100&page={page}')
+              jobs.extend(batch['jobs'])
+              if len(jobs) >= batch['total_count']:
+                  break
+              if not batch['jobs']:
+                  raise RuntimeError('Incomplete job timeline')
+              page += 1
+          started = timestamp(run['run_started_at'])
+          completed = max([timestamp(job['completed_at']) for job in jobs if job.get('completed_at')] or [started])
+          report = {'schema': 1, 'run_id': run_id, 'attempt': attempt, 'revision': run['head_sha'], 'conclusion': run['conclusion'], 'attempt_seconds': (completed - started).total_seconds(), 'jobs': jobs}
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'workflow-performance.json'
+          path.write_text(json.dumps(report, indent=2) + '\n')
+          rows = []
+          for job in jobs:
+              for step in job.get('steps', []):
+                  if step.get('started_at') and step.get('completed_at') and step['conclusion'] != 'skipped':
+                      seconds = (timestamp(step['completed_at']) - timestamp(step['started_at'])).total_seconds()
+                      rows.append((seconds, job['name'], step['name']))
+          def cell(value):
+              return value.replace('|', '\\|').replace('\n', ' ')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(f"[{run['name']}]({run['html_url']}) attempt {attempt}: **{report['attempt_seconds']:.0f}s**, {run['conclusion']}.\n\n")
+              summary.write('| Job | Step | Seconds |\n| --- | --- | ---: |\n')
+              for seconds, job, step in sorted(rows, reverse=True)[:15]:
+                  summary.write(f'| {cell(job)} | {cell(step)} | {seconds:.0f} |\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: workflow-performance-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: ${{ runner.temp }}/workflow-performance.json
+          retention-days: 30
+          if-no-files-found: error

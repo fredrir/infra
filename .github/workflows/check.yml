@@ -1,24 +1,27 @@
 name: Check
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "*.md"
-      - "docs/**/*.md"
-      - "build/evidence/*.json"
-  pull_request:
+  workflow_call:
+    inputs:
+      cli-artifact:
+        type: string
+        required: true
+      cli-sha256:
+        type: string
+        required: true
   workflow_dispatch:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
   contents: read
 concurrency:
-  group: infra-check-${{ github.ref }}
-  cancel-in-progress: true
+  group: infra-check-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   cli:
+    if: inputs.cli-artifact == ''
     uses: ./.github/workflows/infra-cli.yml
   check:
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') }}
     needs: cli
     outputs:
       base: ${{ steps.affected.outputs.base }}
@@ -32,11 +35,11 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: ${{ needs.cli.outputs.artifact }}
+          name: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
           path: ${{ runner.temp }}/infra-cli
       - name: Verify CLI
         env:
-          CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+          CLI_SHA256: ${{ inputs.cli-sha256 || needs.cli.outputs.sha256 }}
         run: |
           printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
           chmod 755 "$RUNNER_TEMP/infra-cli/infra"
@@ -107,7 +110,7 @@ jobs:
           retention-days: 14
   validate:
     needs: [cli, check]
-    if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]'
+    if: ${{ !cancelled() && needs.check.result == 'success' && github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]' }}
     runs-on: check-amd64
     timeout-minutes: 20
     steps:
@@ -118,7 +121,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: ${{ needs.cli.outputs.artifact }}
+          name: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
           path: ${{ runner.temp }}/infra-cli
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -126,7 +129,7 @@ jobs:
           path: ${{ runner.temp }}/build-reports
       - name: Prepare declaration dependencies
         env:
-          CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
+          CLI_SHA256: ${{ inputs.cli-sha256 || needs.cli.outputs.sha256 }}
           BEFORE: ${{ needs.check.outputs.base }}
         run: |
           printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict

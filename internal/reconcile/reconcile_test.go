@@ -167,7 +167,7 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 	}
 }
 
-func TestAffectedNarrowsKubernetesScopeToASingleProject(t *testing.T) {
+func TestAffectedNarrowsKubernetesScopeToSelectedProjects(t *testing.T) {
 	narrowed := Selection{Kubernetes: true, Projects: []string{"llunde"}}
 	for name, paths := range map[string][]string{
 		"one project":         {"platform/projects/llunde/kustomization.yaml"},
@@ -178,7 +178,6 @@ func TestAffectedNarrowsKubernetesScopeToASingleProject(t *testing.T) {
 		}
 	}
 	for name, paths := range map[string][]string{
-		"two projects":     {"platform/projects/llunde/kustomization.yaml", "platform/projects/y/kustomization.yaml"},
 		"cluster manifest": {"platform/clusters/production/root.yaml"},
 		"shared component": {"platform/projects/llunde/kustomization.yaml", "platform/components/cache/kustomization.yaml"},
 		"charts directory": {"charts/llunde/values.yaml"},
@@ -189,6 +188,9 @@ func TestAffectedNarrowsKubernetesScopeToASingleProject(t *testing.T) {
 		if got := Affected(paths); len(got.Projects) != 0 {
 			t.Errorf("%s: narrowed %+v", name, got)
 		}
+	}
+	if got := Affected([]string{"platform/projects/y/kustomization.yaml", "platform/projects/llunde/kustomization.yaml", "platform/projects/y/application.yaml"}); !sameSelection(got, Selection{Kubernetes: true, Projects: []string{"llunde", "y"}}) {
+		t.Fatalf("multiple projects did not retain their scoped union: %+v", got)
 	}
 	if got := Affected([]string{"platform/projects/llunde/kustomization.yaml", "internal/reconcile/config.go"}); !sameSelection(got, All()) {
 		t.Errorf("tooling change must keep the full scope: %+v", got)

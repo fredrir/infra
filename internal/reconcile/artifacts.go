@@ -9,6 +9,36 @@ import (
 	"strings"
 )
 
+type resourceSnapshot map[string]map[string]resource
+
+func (c *Commands) snapshotResource(ctx context.Context, snapshot resourceSnapshot, kind, namespace, name string) (resource, error) {
+	key := kind + "/" + namespace
+	items, ok := snapshot[key]
+	if !ok {
+		data, err := c.Runner.Output(ctx, "kubectl", "get", kind, "-n="+namespace, "-o=json", "--request-timeout=30s")
+		if err != nil {
+			return resource{}, err
+		}
+		var result struct{ Items []resource }
+		if err = json.Unmarshal(data, &result); err != nil {
+			return resource{}, err
+		}
+		items = map[string]resource{}
+		for _, item := range result.Items {
+			if item.Metadata.Namespace != namespace {
+				return resource{}, fmt.Errorf("%s returned an unexpected namespace", kind)
+			}
+			items[item.Metadata.Name] = item
+		}
+		snapshot[key] = items
+	}
+	item, ok := items[name]
+	if !ok {
+		return resource{}, fmt.Errorf("missing %s %s/%s", kind, namespace, name)
+	}
+	return item, nil
+}
+
 func (c *Commands) getResource(ctx context.Context, kind, namespace, name string) (resource, error) {
 	data, err := c.Runner.Output(ctx, "kubectl", "get", kind, name, "-n="+namespace, "-o=json", "--request-timeout=30s")
 	if err != nil {
@@ -148,10 +178,9 @@ func (c *Commands) verifyArtifacts(ctx context.Context, plan Plan, owners []reso
 			return err
 		}
 	}
-	if len(plan.Affected.Projects) == 1 {
-		selected := "project-" + plan.Affected.Projects[0]
+	if len(plan.Affected.Projects) > 0 {
 		for name, digest := range c.kubernetes.baseline {
-			if name == selected {
+			if slices.Contains(plan.Affected.Projects, strings.TrimPrefix(name, "project-")) {
 				continue
 			}
 			artifact, ok := artifacts[name]

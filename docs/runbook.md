@@ -35,7 +35,8 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | --- | --- | --- |
 | Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu expansion and final-state plans, Flux rendering, Ansible task lists |
 | Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout; apply against the last successful revision |
-| Scheduled recovery | `infra reconcile apply --full` | All systems reconciled at minutes 17 and 47 every hour |
+| Scheduled recovery | `infra reconcile apply --full` | All systems reconciled at minute 17 every six hours (UTC) |
+| Scheduled verification | `infra reconcile verify` | Read-only readiness, revision and service verification at minute 47 every hour |
 | Verification | `infra reconcile verify` | Exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision |
 | Status | `infra reconcile status` | Desired revision, successfully applied revision, failing stage and stage durations |
 
@@ -149,3 +150,17 @@ gh workflow run reconcile.yml --ref main
 | Image publication succeeds | Check the separate reconciliation workflow for production readiness |
 
 Do not remove an active reconciliation or OpenTofu lock while its writer is running.
+
+## CI execution and runner admission
+
+Pushes and pull requests enter through `reconcile.yml`, which builds the CLI once and shares the verified artifact with reusable checks, image planning and reconciliation.
+Checks gate production application, and the parent workflow retains the existing Tailscale `workflow_ref` identity.
+`performance.yml` records completed attempt timings, including failures, without checking out or executing the observed revision.
+
+`build_runner_job_slots` limits simultaneous complete jobs across the build VM's repository listeners when `build_runner_admission_enabled` is true.
+The start hook waits for a lease owned by its `Runner.Worker` PID and process start time; the completion hook releases it, and a later attempt reclaims leases from exited workers.
+Admission wait is reported separately in hook output and consumes the job timeout.
+
+Install the pinned CLI release before enabling admission, and drain active jobs before changing runner service overrides.
+For rollback, disable admission and reconcile idle listeners before downgrading the CLI.
+Do not delete leases while their workers are running; corrupted lease state fails admission until an operator repairs it with listeners drained.

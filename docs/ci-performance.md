@@ -3,7 +3,7 @@
 | Measurement | Result | Evidence |
 | --- | --- | --- |
 | CLI compression, Linux amd64, level 6 → 1 | Median 0.706 → 0.245 seconds; 6,458,416 → 7,097,014 bytes; seven samples per level | [Compression samples](../build/evidence/cli-artifact-compression.json) |
-| Documentation and evidence push | Check and reconciliation workflows exclude root Markdown, Markdown under `docs`, and JSON under `build/evidence` | [Check](../.github/workflows/check.yml), [reconciliation](../.github/workflows/reconcile.yml) |
+| Documentation and evidence push | The shared reconciliation workflow excludes root Markdown, Markdown under `docs`, and JSON under `build/evidence` | [Workflow](../.github/workflows/reconcile.yml) |
 | Frontend source COPY filtering, Linux amd64 | Static export median 13.643 → 11.885 seconds; engine CPU 35.460 → 29.090 seconds; two application samples per variant | [Source filter qualification](../build/evidence/frontend-source-filter-linux-amd64.json) |
 | Image assembly experiment | Concurrent check/runtime evaluation reverted after no measured application benefit | [Rejected experiments](../build/evidence/frontend-source-filter-linux-amd64.json) |
 | Isolated deployment integration tests, Linux | Median 4.976 → 2.051 seconds with four concurrent fixtures; CPU 5.680 → 5.648 seconds; three samples each | [Fixture samples](../build/evidence/ci-fixture-parallelism.json) |
@@ -54,7 +54,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Application-only planning | [Frontend plan](../build/evidence/reconcile-targeted-plan-opportunity.json): 45.489 seconds rendering the full cluster for a frontend image pin and receipt | Qualify a project-only render with equivalent live substitutions and full-render fallback for shared or unknown changes |
 | Runner queueing | Observed 2026-09-22: runner-image rebuilds triggered by `internal/**` and workflow pushes held every other build for tens of minutes on one build runner | Split the pool or stop rebuilding runner images when the change does not affect them |
 | Cluster-wide apply stage | [Application-only sample](../build/evidence/reconcile-scoped-plan-production.json): 45.948 seconds re-reconciling and verifying the whole cluster graph after the plan stage was scoped to 5.285 seconds | Verify the live Kustomization topology, then reconcile only the affected project Kustomizations |
-| Full host reconciliation | [Task spans](../build/evidence/reconciliation-host-overhead.json): 435 task starts; 17 fact-gathering passes; 637.174 seconds total in one run | Reuse valid host facts within a reconciliation and narrow role execution to affected hosts; preserve drift detection and registration checks |
+| Full host reconciliation | [Task spans](../build/evidence/reconciliation-host-overhead.json): 435 task starts and 637.174 seconds total in one historical run; smart gathering already caches facts within a run | Profile remaining role work and preserve drift detection and registration checks |
 | Production revision publication | Frontend canary promotion reached `main`, then waited for a full infrastructure reconciliation before Flux could consume `production`; the 60-second serving check failed | Qualify publication after infrastructure convergence; reuse completed host work only with a valid checkpoint, unchanged host inputs and a live no-change expansion plan |
 
 | Scanner rollout constraint | Requirement |
@@ -66,3 +66,21 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Analysis warm-up | `scanner-analysis` preparation stage, 5 m budget, exact `vulnerability-scan` arguments; the 10 s check then reads a warm analysis cache |
 | Legacy cache | Database copies removed after draining listeners; analysis caches retained and seeded into the new namespace |
 | Rollback | Previous CLI/workflow pins can reuse retained analysis and download current databases; remove the new prune command before downgrading the installed CLI |
+
+## Execution controls
+
+| Control | Behavior |
+| --- | --- |
+| Shared CLI | Push and pull-request checks, reconciliation and image planning consume one checksum-verified CLI artifact from the parent workflow |
+| Production gate | Required checks finish before reconciliation starts; production application is serialized and is not cancelled by a newer push |
+| Scheduled work | Full recovery runs every six hours at minute 17; hourly verification at minute 47 reads live state without applying declarations |
+| Deployment selection | Explicit CI-only paths skip deployment; supported project changes select the union of their dependency chains; shared and unknown inputs retain full fallback |
+| Workload verification | Each verification poll lists workloads once per kind and namespace; expected ownership, images, readiness and generations remain required |
+| Transport installation | Pinned archive content is compared with extracted and installed binaries before extraction or copy; missing or corrupted files are repaired |
+| Rust target cache | Cache save identity includes source contents, lockfile and build arguments; dependency outputs remain reusable across source changes |
+| VM admission | A configurable host-wide limit bounds complete jobs across repository listeners; leases use worker PID and process start time and are reclaimed after worker exit |
+| Timing | A read-only completion observer retains job and step timestamps for successful and failed workflow attempts for 30 days |
+
+VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; the default slot count is one for the 8 GiB build VM.
+The hourly verification does not replace the full OpenTofu and host drift repair cycle.
+These controls do not establish an ordinary-traffic latency percentile; compare the completion observer's post-rollout samples with equivalent workloads.

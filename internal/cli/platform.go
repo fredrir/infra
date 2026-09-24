@@ -28,7 +28,7 @@ func newPlatformCommand() *cobra.Command {
 	}}
 	slots.Flags().DurationVar(&interval, "interval", 30*time.Second, "Reconciliation interval")
 	slots.Flags().BoolVar(&once, "once", false, "Reconcile once")
-	root.AddCommand(newPrefetchCommand(), newToolsPromotionCommand(), slots, &cobra.Command{Use: "runner-hook", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	root.AddCommand(newRunnerAdmissionCommand(), newPrefetchCommand(), newToolsPromotionCommand(), slots, &cobra.Command{Use: "runner-hook", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		var event *os.File
 		if path := os.Getenv("GITHUB_EVENT_PATH"); path != "" {
 			var err error
@@ -50,6 +50,30 @@ func newPlatformCommand() *cobra.Command {
 		return nil
 	}})
 	return root
+}
+
+func newRunnerAdmissionCommand() *cobra.Command {
+	var directory string
+	var capacity int
+	var timeout time.Duration
+	command := &cobra.Command{Use: "runner-admission acquire|release", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		if args[0] != "acquire" && args[0] != "release" {
+			return fmt.Errorf("runner admission requires acquire or release")
+		}
+		if timeout <= 0 {
+			return fmt.Errorf("runner admission timeout must be positive")
+		}
+		ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
+		defer cancel()
+		started := time.Now()
+		err := platformops.RunnerAdmission(ctx, directory, capacity, args[0] == "release")
+		fmt.Fprintf(cmd.OutOrStdout(), "Runner admission %s took %.3fs\n", args[0], time.Since(started).Seconds())
+		return err
+	}}
+	command.Flags().StringVar(&directory, "directory", "/run/infra-runner-admission", "Host admission directory")
+	command.Flags().IntVar(&capacity, "capacity", 1, "Concurrent jobs on the build host")
+	command.Flags().DurationVar(&timeout, "timeout", 30*time.Minute, "Admission wait limit")
+	return command
 }
 
 func newToolsPromotionCommand() *cobra.Command {

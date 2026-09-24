@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -95,7 +96,12 @@ func deploymentIndependent(path string) bool {
 	if strings.HasPrefix(path, "/") || strings.Contains(path, "\\") || filepath.ToSlash(filepath.Clean(path)) != path {
 		return false
 	}
+	switch path {
+	case ".github/workflows/performance.yml", ".github/workflows/check.yml", ".github/workflows/infra-cli.yml", ".github/workflows/images.yml", ".github/workflows/build-image.yml", ".github/workflows/test-image.yml", ".github/workflows/cli-release.yml", ".github/workflows/rust-ci.yml", ".github/workflows/rust-release.yml", ".github/workflows/rust-auto-tag.yml", ".github/workflows/packages-publish.yml", ".github/actionlint.yaml", ".github/CODEOWNERS", ".editorconfig", ".gitleaks.toml", ".gitleaksignore", ".taplo.toml", ".yamllint.yaml", "biome.json", "renovate.json", "ruff.toml":
+		return true
+	}
 	return strings.HasPrefix(path, "docs/") || strings.HasPrefix(path, "build/evidence/") ||
+		strings.HasPrefix(path, ".vscode/") || strings.HasPrefix(path, "internal/dev/") ||
 		strings.HasPrefix(path, "images/") || strings.HasPrefix(path, "dev/") ||
 		strings.HasPrefix(path, "tests/") || path == "README.md" || path == "AGENTS.md" || path == "CLAUDE.md" ||
 		((strings.HasPrefix(path, "internal/") || strings.HasPrefix(path, "cmd/")) && strings.HasSuffix(path, "_test.go"))
@@ -127,24 +133,16 @@ func effectiveHostScope(selected Selection) string {
 }
 
 func projectScope(paths []string) []string {
-	var project string
+	var projects []string
 	for _, path := range paths {
 		parts := strings.Split(path, "/")
 		if len(parts) < 3 || parts[0] != "platform" || parts[1] != "projects" || !projectNamePattern.MatchString(parts[2]) {
 			return nil
 		}
-		if project == "" {
-			project = parts[2]
-			continue
-		}
-		if project != parts[2] {
-			return nil
-		}
+		projects = append(projects, parts[2])
 	}
-	if project == "" || len(paths) == 0 {
-		return nil
-	}
-	return []string{project}
+	slices.Sort(projects)
+	return slices.Compact(projects)
 }
 
 func Host(root string) (string, error) {

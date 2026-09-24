@@ -75,14 +75,14 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
   contents: read
-concurrency:
-  group: image-${{ github.repository }}-${{ inputs.image }}
-  cancel-in-progress: true
 jobs:
   cli:
     if: inputs.cli-artifact == '' && github.repository == 'fredrir/infra' && !inputs.release-cli
     uses: ./.github/workflows/infra-cli.yml
   build:
+    concurrency:
+      group: image-${{ github.repository }}-${{ inputs.image }}
+      cancel-in-progress: ${{ github.workflow != 'Reconcile infrastructure' }}
     needs: cli
     if: ${{ !cancelled() && (needs.cli.result == 'success' || (needs.cli.result == 'skipped' && ((github.repository == 'fredrir/infra' && inputs.cli-artifact != '') || (github.repository != 'fredrir/infra' && inputs.cli-artifact == '') || (github.repository == 'fredrir/infra' && inputs.release-cli)))) && (!inputs.release-cli || (github.repository == 'fredrir/infra' && contains(fromJSON('["ghcr.io/fredrir/infra-runner-deploy","ghcr.io/fredrir/infra-source-watcher"]'), inputs.image) && inputs.cli-artifact == '')) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected }}
     runs-on: ${{ !inputs.hosted && contains(fromJSON('["fredrir/infra","fredrir/Y","fredrir/portfolio","fredrir/llunde-frontend","fredrir/llunde-backend","fredrir/llunde-pyparser"]'), github.repository) && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}

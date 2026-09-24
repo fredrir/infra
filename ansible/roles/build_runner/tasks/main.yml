@@ -13,6 +13,8 @@
     - build_runner_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
     - build_runner_sha256 is match('^[a-f0-9]{64}$')
     - build_runner_memory is match('^[1-9][0-9]*G$')
+    - build_runner_job_slots | int >= 1
+    - build_runner_job_slots | int <= 8
     - build_runner_cpus_percent | int >= 1
     - build_runner_cpus_percent | int <= 400
     - build_runner_bazel_idle_seconds | int >= 60
@@ -132,7 +134,37 @@
     mode: '0555'
     content: |
       #!/bin/sh
-      CI_POOL=main exec /usr/local/bin/infra platform runner-hook
+      set -eu
+      CI_POOL=main /usr/local/bin/infra platform runner-hook
+      {% if build_runner_admission_enabled | bool %}
+      exec /usr/local/bin/infra platform runner-admission acquire --capacity={{ build_runner_job_slots | int }}
+      {% endif %}
+
+- name: Install runner admission runtime directory
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/infra-runner-admission.conf
+    content: "d /run/infra-runner-admission 0700 runner runner -\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Create runner admission runtime directory
+  ansible.builtin.file:
+    path: /run/infra-runner-admission
+    state: directory
+    owner: runner
+    group: runner
+    mode: '0700'
+
+- name: Install job completion hook
+  ansible.builtin.copy:
+    dest: /usr/local/libexec/infra-runner-completed.sh
+    owner: root
+    group: root
+    mode: '0555'
+    content: |
+      #!/bin/sh
+      exec /usr/local/bin/infra platform runner-admission release --timeout=30s
 
 - name: Download verified runner archive
   ansible.builtin.get_url:

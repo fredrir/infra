@@ -69,7 +69,7 @@ func (c *Commands) Select(ctx context.Context, base string, full bool) (Selectio
 		selection.HostScope = HostScopeFull
 		selection.Reasons = append(selection.Reasons, "host scoping disabled")
 	}
-	if len(selection.Projects) > 0 && (!c.ScopeProjects || !c.VerifyArtifacts || len(projectOwners(selection.Projects[0])) == 0) {
+	if len(selection.Projects) > 0 && (!c.ScopeProjects || !c.VerifyArtifacts || !supportedProjects(selection.Projects)) {
 		selection.Projects = nil
 		selection.Reasons = append(selection.Reasons, "full Kubernetes verification required")
 	}

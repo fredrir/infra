@@ -3,6 +3,8 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "platformops",
     srcs = [
+        "admission_darwin.go",
+        "admission_linux.go",
         "backup.go",
         "cache.go",
         "client.go",
@@ -24,6 +26,7 @@ go_library(
 go_test(
     name = "platformops_test",
     srcs = [
+        "admission_linux_test.go",
         "backup_contract_test.go",
         "backup_test.go",
         "cache_test.go",

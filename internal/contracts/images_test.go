@@ -48,10 +48,14 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 		t.Fatal(err)
 	}
 	var workflow struct {
-		On struct{ Push struct{ Paths []string } }
+		On struct{ Push struct{ PathsIgnore []string `yaml:"paths-ignore"` } }
+		Jobs map[string]struct{ Uses string }
 	}
-	if err := yaml.Unmarshal(read(t, filepath.Join(repository, ".github/workflows/images.yml")), &workflow); err != nil {
+	if err := yaml.Unmarshal(read(t, filepath.Join(repository, ".github/workflows/reconcile.yml")), &workflow); err != nil {
 		t.Fatal(err)
+	}
+	if workflow.Jobs["images"].Uses != "./.github/workflows/images.yml" {
+		t.Fatal("CI does not invoke the image planner")
 	}
 	seen := map[string]bool{}
 	for _, image := range catalog {
@@ -67,7 +71,7 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 				t.Error("development tooling changes rebuild image")
 			}
 			for _, receipt := range []string{"build/evidence/production-rollout.json", "build/rollout/manifest.json", "build/consumers.json"} {
-				if covered(receipt) || triggered(workflow.On.Push.Paths, receipt) {
+				if covered(receipt) {
 					t.Errorf("rollout record %s unnecessarily rebuilds image", receipt)
 				}
 			}
@@ -88,7 +92,7 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 						candidate += "/probe"
 					}
 				}
-				if !triggered(workflow.On.Push.Paths, candidate) {
+				if triggered(workflow.On.Push.PathsIgnore, candidate) {
 					t.Errorf("changes to %s do not trigger image workflow", input)
 				}
 			}

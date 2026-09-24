@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -77,6 +78,12 @@ func TestRustCacheRestoresFreshCheckoutAndBoundsWrites(t *testing.T) {
 	}
 	workspace := func(content bool) string {
 		directory := t.TempDir()
+		if data, err := exec.Command("git", "-C", directory, "init", "--quiet").CombinedOutput(); err != nil {
+			t.Fatalf("git init: %s: %v", data, err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "main.rs"), []byte("fn main() {}"), 0600); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(directory, "Cargo.lock"), []byte("version = 4\n"), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -119,11 +126,25 @@ func TestRustCacheRestoresFreshCheckoutAndBoundsWrites(t *testing.T) {
 	if err != nil || string(restored) != "compiled" {
 		t.Fatalf("fresh checkout restore = %q, %v", restored, err)
 	}
-	if err := os.WriteFile(filepath.Join(first, "Cargo.lock"), []byte("version = 5\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(first, "main.rs"), []byte("fn main() { println!(\"updated\"); }"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(first, "target/debug/artifact"), []byte("updated"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	run(first, "save")
 	if writes != 4 {
+		t.Fatal("source-only change did not refresh build outputs")
+	}
+	run(fresh, "restore")
+	if restored, err := os.ReadFile(filepath.Join(fresh, "target/debug/artifact")); err != nil || string(restored) != "updated" {
+		t.Fatalf("source-only outputs were not restored: %q, %v", restored, err)
+	}
+	if err := os.WriteFile(filepath.Join(first, "Cargo.lock"), []byte("version = 5\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	run(first, "save")
+	if writes != 6 {
 		t.Fatal("changed dependencies were not uploaded")
 	}
 	if err := os.WriteFile(filepath.Join(first, "target/debug/artifact"), make([]byte, 2048), 0600); err != nil {

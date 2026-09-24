@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -18,6 +19,18 @@ func TestProjectDependencyChain(t *testing.T) {
 	}
 	if got := projectOwners("unknown"); got != nil {
 		t.Fatalf("unknown project selected: %v", got)
+	}
+}
+
+func TestSelectedProjectsIncludeEveryMigrationDependency(t *testing.T) {
+	commands := &Commands{}
+	plan := Plan{Affected: Selection{Projects: []string{"llunde", "llunde-pyparser", "y"}}}
+	want := []string{"project-llunde", "project-llunde-pyparser", "llunde-pyparser-migration", "llunde-pyparser-application", "project-y"}
+	if got := commands.selectedOwners(plan); !reflect.DeepEqual(got, want) {
+		t.Fatalf("selected dependencies = %v, want %v", got, want)
+	}
+	if supportedProjects([]string{"llunde", "unknown"}) {
+		t.Fatal("mixed known and unknown projects accepted")
 	}
 }
 
@@ -60,7 +73,7 @@ func TestReadOnlyProductionWorkloadContracts(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		if err = commands.verifyOwnedWorkloads(context.Background(), owner); err != nil {
+		if err = commands.verifyOwnedWorkloads(context.Background(), owner, resourceSnapshot{}); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -97,20 +110,20 @@ func TestReadOnlyProductionScopedVerification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, project := range []string{"portfolio", "llunde", "llunde-pyparser"} {
-		t.Run(project, func(t *testing.T) {
+	for _, projects := range [][]string{{"portfolio"}, {"llunde"}, {"llunde-pyparser"}, {"llunde", "llunde-pyparser", "y"}} {
+		t.Run(strings.Join(projects, "+"), func(t *testing.T) {
 			commands := &Commands{Runner: ci.Runner{Dir: root}, Work: t.TempDir(), VerifyArtifacts: true, ScopeProjects: true}
 			source, err := commands.getResource(context.Background(), "gitrepositories.source.toolkit.fluxcd.io", "flux-system", "flux-system")
 			if err != nil {
 				t.Fatal(err)
 			}
 			revision := strings.TrimPrefix(source.Status.Artifact.Revision, "production@sha1:")
-			plan := Plan{Revision: revision, Affected: Selection{Kubernetes: true, Projects: []string{project}}}
+			plan := Plan{Revision: revision, Affected: Selection{Kubernetes: true, Projects: projects}}
 			plan, err = commands.Preflight(context.Background(), plan)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(plan.Affected.Projects) != 1 {
+			if !reflect.DeepEqual(plan.Affected.Projects, projects) {
 				t.Fatalf("project unexpectedly widened: %v", plan.Affected)
 			}
 			if err = commands.RenderKubernetes(context.Background(), plan); err != nil {

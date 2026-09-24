@@ -32,8 +32,12 @@ func TestHostScopeSelection(t *testing.T) {
 		{"active overlay", []string{"build/rollout/flux-artifacts/cutover/projects.yaml"}, HostScopeFull, true, true},
 		{"unknown", []string{"new-input"}, HostScopeFull, true, true},
 		{"shared source", []string{"internal/ci/tools.go"}, HostScopeFull, true, true},
-		{"dev source", []string{"internal/dev/setup.go"}, HostScopeFull, true, true},
+		{"dev source", []string{"internal/dev/setup.go"}, HostScopeNone, false, false},
 		{"test source", []string{"internal/reconcile/host_scope_test.go"}, HostScopeNone, false, false},
+		{"CLI workflow", []string{".github/workflows/infra-cli.yml"}, HostScopeNone, false, false},
+		{"editor settings", []string{".vscode/settings.json"}, HostScopeNone, false, false},
+		{"reconciliation workflow", []string{".github/workflows/reconcile.yml"}, HostScopeFull, true, true},
+		{"unknown workflow", []string{".github/workflows/unknown.yml"}, HostScopeFull, true, true},
 		{"docs", []string{"docs/plans/infra-reconcile/TODO.md"}, HostScopeNone, false, false},
 		{"unsafe path", []string{"docs/../secrets/a"}, HostScopeFull, true, true},
 	} {

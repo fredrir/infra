@@ -145,6 +145,9 @@
       [Service]
       Slice=infra-runners.slice
       Environment=ACTIONS_RUNNER_HOOK_JOB_STARTED=/usr/local/libexec/infra-runner-hook.sh
+      {% if build_runner_admission_enabled | bool %}
+      Environment=ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/usr/local/libexec/infra-runner-completed.sh
+      {% endif %}
       Environment=CI_POOL=main
       Environment=BAZEL_REMOTE_CACHE=http://127.0.0.1:9092
       Environment=_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger

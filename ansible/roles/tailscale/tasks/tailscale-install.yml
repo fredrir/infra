@@ -6,12 +6,41 @@
     mode: "0600"
   register: platform_tailscale_archive
 
+- name: Compare installed transport binaries with verified archive
+  ansible.builtin.command:
+    argv:
+    - /usr/bin/python3
+    - -c
+    - |
+      import hashlib, json, pathlib, stat, sys, tarfile
+      root = pathlib.Path("/var/lib/platform")
+      result = {"extract": False, "install": False}
+      with tarfile.open(root / "tailscale.tgz") as archive:
+          for name in ("tailscale", "tailscaled"):
+              member = sys.argv[1] + "/" + name
+              with archive.extractfile(member) as source:
+                  expected = hashlib.file_digest(source, "sha256").digest()
+              for stage, path in (("extract", root / member), ("install", pathlib.Path("/usr/local/bin") / name)):
+                  try:
+                      with path.open("rb") as current:
+                          result[stage] |= hashlib.file_digest(current, "sha256").digest() != expected
+                      result[stage] |= stat.S_IMODE(path.stat().st_mode) != 0o755
+                  except FileNotFoundError:
+                      result[stage] = True
+      print(json.dumps(result))
+    - 'tailscale_{{ platform_tailscale_version }}_{{ platform_architecture }}'
+  register: platform_tailscale_compare
+  changed_when: false
+  when: not ansible_check_mode
+
 - name: Extract Tailscale binaries
   ansible.builtin.unarchive:
     src: /var/lib/platform/tailscale.tgz
     dest: /var/lib/platform
     remote_src: true
-  when: not ansible_check_mode
+  when:
+  - not ansible_check_mode
+  - (platform_tailscale_compare.stdout | from_json).extract
 
 - name: Install Tailscale binaries
   ansible.builtin.copy:
@@ -20,5 +49,7 @@
     dest: "/usr/local/bin/{{ item }}"
     mode: "0755"
   loop: [tailscale, tailscaled]
-  when: not ansible_check_mode
+  when:
+  - not ansible_check_mode
+  - (platform_tailscale_compare.stdout | from_json).install
   notify: "{{ platform_tailscale_restart_handler | default('Restart bootstrap Tailscale') }}"

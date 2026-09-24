@@ -102,9 +102,22 @@ func projectOwners(project string) []string {
 	}
 }
 
+func supportedProjects(projects []string) bool {
+	for _, project := range projects {
+		if len(projectOwners(project)) == 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *Commands) selectedOwners(plan Plan) []string {
-	if len(plan.Affected.Projects) == 1 {
-		return projectOwners(plan.Affected.Projects[0])
+	if len(plan.Affected.Projects) > 0 {
+		var names []string
+		for _, project := range plan.Affected.Projects {
+			names = append(names, projectOwners(project)...)
+		}
+		return names
 	}
 	var names []string
 	for name, owner := range c.kubernetes.owners {
@@ -128,11 +141,14 @@ func (c *Commands) Preflight(ctx context.Context, plan Plan) (Plan, error) {
 		plan.Affected.Projects = nil
 	}
 	if len(plan.Affected.Projects) > 0 {
-		names := projectOwners(plan.Affected.Projects[0])
-		valid := len(plan.Affected.Projects) == 1 && len(names) > 0
-		for _, name := range names {
-			owner, ok := c.kubernetes.owners[name]
-			valid = valid && ok && !owner.Spec.Suspend && owner.Spec.SourceRef.Kind == "ExternalArtifact" && owner.Spec.SourceRef.Name == "project-"+plan.Affected.Projects[0]
+		valid := true
+		for _, project := range plan.Affected.Projects {
+			names := projectOwners(project)
+			valid = valid && len(names) > 0
+			for _, name := range names {
+				owner, ok := c.kubernetes.owners[name]
+				valid = valid && ok && !owner.Spec.Suspend && owner.Spec.SourceRef.Kind == "ExternalArtifact" && owner.Spec.SourceRef.Name == "project-"+project
+			}
 		}
 		if !valid {
 			plan.Affected.Reasons = append(plan.Affected.Reasons, "full Kubernetes: unsupported project topology")
@@ -145,12 +161,14 @@ func (c *Commands) Preflight(ctx context.Context, plan Plan) (Plan, error) {
 		}
 	}
 	for _, kind := range []string{"deployments.apps", "statefulsets.apps", "daemonsets.apps", "jobs.batch"} {
-		answer, err := c.Runner.Output(ctx, "kubectl", "auth", "can-i", "get", kind, "--all-namespaces")
-		if err != nil || strings.TrimSpace(string(answer)) != "yes" {
-			return plan, fmt.Errorf("workload preflight requires get %s: %v", kind, err)
+		for _, verb := range []string{"get", "list"} {
+			answer, err := c.Runner.Output(ctx, "kubectl", "auth", "can-i", verb, kind, "--all-namespaces")
+			if err != nil || strings.TrimSpace(string(answer)) != "yes" {
+				return plan, fmt.Errorf("workload preflight requires %s %s: %v", verb, kind, err)
+			}
 		}
 	}
-	if len(plan.Affected.Projects) == 1 {
+	if len(plan.Affected.Projects) > 0 {
 		current, err := c.resources(ctx, "kustomizations.kustomize.toolkit.fluxcd.io")
 		if err != nil {
 			return plan, err
@@ -182,8 +200,10 @@ func (c *Commands) Preflight(ctx context.Context, plan Plan) (Plan, error) {
 }
 
 func (c *Commands) RenderKubernetes(ctx context.Context, plan Plan) error {
-	if len(plan.Affected.Projects) > 0 && (len(plan.Affected.Projects) != 1 || len(projectOwners(plan.Affected.Projects[0])) == 0) {
-		return fmt.Errorf("unsupported selected project")
+	for _, project := range plan.Affected.Projects {
+		if len(projectOwners(project)) == 0 {
+			return fmt.Errorf("unsupported selected project %s", project)
+		}
 	}
 	if err := c.loadKubernetes(ctx); err != nil {
 		return err

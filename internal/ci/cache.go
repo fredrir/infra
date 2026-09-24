@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -98,12 +99,35 @@ func RustCache(ctx context.Context, runner Runner, temporary, action string) err
 		return err
 	}
 	fingerprint := sha256.New()
+	files, err := runner.Output(ctx, "git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	if err != nil {
+		return fmt.Errorf("identify Rust source inputs: %w", err)
+	}
+	paths := strings.Split(strings.TrimSuffix(string(files), "\x00"), "\x00")
+	slices.Sort(paths)
+	for _, path := range slices.Compact(paths) {
+		if path == "" || path == "target" || strings.HasPrefix(path, "target/") || strings.HasPrefix(path, ".infra-build-recipe/") {
+			continue
+		}
+		if !filepath.IsLocal(path) {
+			return fmt.Errorf("invalid Rust source path")
+		}
+		data, err := os.ReadFile(filepath.Join(runner.Dir, path))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		digest := sha256.Sum256(data)
+		fmt.Fprintf(fingerprint, "%s\x00%x\x00", path, digest)
+	}
 	for _, path := range []string{filepath.Join(runner.Dir, "Cargo.lock"), filepath.Join(temporary, "rust-args.json")} {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		fingerprint.Write(data)
+		fmt.Fprintf(fingerprint, "%x\x00", sha256.Sum256(data))
 	}
 	identity := hex.EncodeToString(fingerprint.Sum(nil))
 	var previous bytes.Buffer

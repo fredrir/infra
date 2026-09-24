@@ -8,214 +8,51 @@ on:
       - "build/evidence/*.json"
   pull_request:
   schedule:
-  - cron: '17,47 * * * *'
+    - cron: '17 */6 * * *'
+    - cron: '47 * * * *'
   workflow_dispatch:
     inputs:
       full:
         type: boolean
         default: true
-        description: Reconcile all systems
 permissions:
   contents: read
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-  AWS_REGION: eu-north-1
-  AWS_DEFAULT_REGION: eu-north-1
-  AWS_PAGER: ''
-  TF_IN_AUTOMATION: 'true'
-  INFRA_RECONCILE_TAILNET: 'true'
-  SCOPE_HOSTS: ${{ vars.INFRA_SCOPE_HOSTS == 'true' }}
-  SCOPE_PROJECTS: ${{ vars.INFRA_SCOPE_PROJECTS == 'true' }}
-  VERIFY_ARTIFACTS: ${{ vars.INFRA_VERIFY_ARTIFACTS == 'true' }}
 concurrency:
-  group: infrastructure-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'production' }}
-  cancel-in-progress: false
+  group: infra-ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   cli:
     uses: ./.github/workflows/infra-cli.yml
-  plan:
-    if: github.event_name == 'pull_request'
+  check:
+    if: github.event_name != 'schedule'
     needs: cli
-    runs-on: ubuntu-24.04
-    environment: infrastructure-plan
-    permissions:
-      contents: read
-      id-token: write
-    timeout-minutes: 30
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        ref: ${{ github.sha }}
-        fetch-depth: 0
-        persist-credentials: false
-    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-      with:
-        name: ${{ needs.cli.outputs.artifact }}
-        path: ${{ runner.temp }}/infra-cli
-    - name: Verify CLI
-      env:
-        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
-      run: |
-        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
-        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
-        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
-    - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
-      if: github.event.pull_request.head.repo.full_name == github.repository
-      id: doppler
-      with:
-        doppler-token: ${{ secrets.DOPPLER_TOKEN }}
-    - uses: ./.github/actions/setup-reconciliation
-      with:
-        network: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-        tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
-      env:
-        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
-        KUBE_CONFIG: ${{ steps.doppler.outputs.KUBE_CONFIG }}
-    - name: Validate affected declarations
-      env:
-        BEFORE: ${{ github.event.pull_request.base.sha }}
-      run: |
-        infra ci prepare-validation
-        infra ci validate
-    - name: Plan affected infrastructure
-      if: github.event.pull_request.head.repo.full_name == github.repository
-      env:
-        BASE: ${{ github.event.pull_request.base.sha }}
-        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
-      run: |
-        set -o pipefail
-        infra reconcile plan --base "$BASE" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
-    - name: Require a trusted branch for the live plan
-      if: github.event.pull_request.head.repo.full_name != github.repository
-      run: |
-        echo 'Live planning requires a branch in fredrir/infra; fork code receives no infrastructure credentials.' >> "$GITHUB_STEP_SUMMARY"
-        exit 1
-    - name: Summarize plan
-      if: always()
-      run: |
-        if [ -f "$RUNNER_TEMP/infrastructure-plan.txt" ]; then
-          {
-            printf '```text\n'
-            tail -c 900000 "$RUNNER_TEMP/infrastructure-plan.txt"
-            printf '\n```\n'
-          } >> "$GITHUB_STEP_SUMMARY"
-        fi
-    - name: Remove session credentials
-      if: always()
-      run: |
-        rm -f "$RUNNER_TEMP/reconcile-kubeconfig"
-  apply:
-    if: github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name != 'pull_request'
-    needs: cli
-    runs-on: ubuntu-24.04
-    environment: infrastructure-apply
-    timeout-minutes: 100
+    uses: ./.github/workflows/check.yml
+    with:
+      cli-artifact: ${{ needs.cli.outputs.artifact }}
+      cli-sha256: ${{ needs.cli.outputs.sha256 }}
+  reconcile:
+    if: ${{ !cancelled() && needs.cli.result == 'success' && (needs.check.result == 'success' || github.event_name == 'schedule') }}
+    needs: [cli, check]
     permissions:
       contents: write
       id-token: write
       actions: read
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        ref: ${{ github.sha }}
-        fetch-depth: 0
-    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-      with:
-        name: ${{ needs.cli.outputs.artifact }}
-        path: ${{ runner.temp }}/infra-cli
-    - name: Verify CLI
-      env:
-        CLI_SHA256: ${{ needs.cli.outputs.sha256 }}
-      run: |
-        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
-        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
-        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
-    - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
-      id: doppler
-      with:
-        doppler-token: ${{ secrets.DOPPLER_TOKEN }}
-    - uses: ./.github/actions/setup-reconciliation
-      with:
-        network: 'true'
-        identity: apply
-        tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
-      env:
-        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
-        KUBE_CONFIG: ${{ steps.doppler.outputs.KUBE_CONFIG }}
-    - name: Configure host identity
-      env:
-        SSH_PRIVATE_KEY: ${{ steps.doppler.outputs.SSH_PRIVATE_KEY }}
-        SSH_KNOWN_HOSTS: ${{ steps.doppler.outputs.SSH_KNOWN_HOSTS }}
-      run: |
-        test -n "$SSH_PRIVATE_KEY" && test -n "$SSH_KNOWN_HOSTS"
-        umask 077
-        mkdir -p "$HOME/.ssh"
-        printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
-        printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-        ssh-keygen -y -f "$HOME/.ssh/id_ed25519" > "$HOME/.ssh/id_ed25519.pub"
-    - name: Validate affected declarations
-      env:
-        BEFORE: ${{ github.event.before }}
-      run: |
-        infra ci prepare-validation
-        infra ci validate
-    - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
-      id: runner-token
-      with:
-        app-id: ${{ steps.doppler.outputs.RUNNER_APP_ID }}
-        private-key: ${{ steps.doppler.outputs.RUNNER_APP_PRIVATE_KEY }}
-        owner: fredrir
-        repositories: infra,Y,llunde-frontend,llunde-backend,llunde-pyparser,packages,nsql,portfolio
-        permission-administration: write
-    - name: Reconcile merged revision
-      env:
-        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
-        SOPS_AGE_KEY: ${{ steps.doppler.outputs.SOPS_AGE_KEY }}
-        GH_TOKEN: ${{ steps.runner-token.outputs.token }}
-        FULL: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full) }}
-      run: infra reconcile apply --full="$FULL" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/status.json"
-    - name: Record workflow timing
-      if: always()
-      env:
-        GH_TOKEN: ${{ github.token }}
-        GH_REPO: ${{ github.repository }}
-      run: |
-        mkdir -p "$RUNNER_TEMP/reconciliation"
-        gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID" --jq '{created_at, run_started_at, start_delay_seconds: ((.run_started_at | fromdateiso8601) - (.created_at | fromdateiso8601))}' > "$RUNNER_TEMP/reconciliation/workflow-timing.json"
-    - name: Summarize reconciliation
-      if: always()
-      run: |
-        if [ -f "$RUNNER_TEMP/reconciliation/status.json" ]; then
-          {
-            printf '```json\n'
-            cat "$RUNNER_TEMP/reconciliation/status.json"
-            printf '\n```\n'
-          } >> "$GITHUB_STEP_SUMMARY"
-        fi
-    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      if: always()
-      with:
-        name: reconciliation-${{ github.run_id }}-${{ github.run_attempt }}
-        path: ${{ runner.temp }}/reconciliation/*.json
-        if-no-files-found: warn
-        retention-days: 30
-    - name: Remove session credentials
-      if: always()
-      run: |
-        rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"
+    uses: ./.github/workflows/reconcile-job.yml
+    secrets: inherit
+    with:
+      full: ${{ inputs.full || false }}
+      cli-artifact: ${{ needs.cli.outputs.artifact }}
+      cli-sha256: ${{ needs.cli.outputs.sha256 }}
+  images:
+    needs: cli
+    if: github.event_name == 'push' && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/images.yml
+    with:
+      cli-artifact: ${{ needs.cli.outputs.artifact }}
+      cli-sha256: ${{ needs.cli.outputs.sha256 }}
+      cli-revision: ${{ needs.cli.outputs.revision }}
