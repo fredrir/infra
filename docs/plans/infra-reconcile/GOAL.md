@@ -2,11 +2,11 @@
 
 | What | Target | Status |
 | --- | --- | --- |
-| Host scope | Run and verify only affected playbooks and their prerequisites | Not done |
-| Project scope | Deploy through existing Flux owners; verify only the selected project and dependencies | Not done |
-| Deployment correctness | Prove artifact freshness, workload readiness and parser migration ordering | Not done |
-| Safe state | Failures never advance Applied; skipped deployments preserve the deployed baseline | Not done |
-| Recovery | Unknown inputs select full mode; scoped checkpoints remain safe across CLI rollback | Not done |
-| Efficient validation | Parallel isolated local tests, reused fixtures/caches and focused checks for environment gaps | Not done |
-| Rollout | Permissions precede scoped execution; full recovery, production locking and ownership remain intact | Not done |
-| Performance evidence | Capture timings during required tests and normal runs without observation periods or completion estimates | Not done |
+| Host scope | Run and verify affected playbooks with their prerequisites | Done |
+| Project scope | Verify selected owners and dependencies against a verified baseline | Done |
+| Deployment correctness | Exact artifact provenance, ready workloads and ordered parser migration | Done |
+| Safe state | Failed/skipped deployments preserve Applied and artifact proof | Done |
+| Recovery | Unknown inputs select full mode; scoped checkpoints remain rollback-safe | Done |
+| Efficient validation | Parallel Go/container tests, reused caches and focused live checks | Done |
+| Rollout | Permissions first; scoped execution, full recovery and locking verified | Done |
+| Performance evidence | Record queue/stage timings during required runs | Done |

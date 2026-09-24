@@ -1,0 +1,270 @@
+{
+  "schema": 1,
+  "implementation_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+  "local_flux": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "pinned-controllers-ready",
+        "passed": true
+      },
+      {
+        "name": "initial-origin-and-owner",
+        "passed": true
+      },
+      {
+        "name": "unchanged-content-provenance",
+        "passed": true
+      },
+      {
+        "name": "ready-owner-stale-artifact-during-generator-lag",
+        "passed": true
+      },
+      {
+        "name": "changed-content-converges",
+        "passed": true
+      },
+      {
+        "name": "explicit-request-token",
+        "passed": true
+      },
+      {
+        "name": "ready-owner-unavailable-workload",
+        "passed": true
+      },
+      {
+        "name": "selected-recovery-with-unrelated-failure",
+        "passed": true
+      },
+      {
+        "name": "parser-application-blocked-by-migration",
+        "passed": true
+      },
+      {
+        "name": "parser-migration-before-application",
+        "passed": true
+      },
+      {
+        "name": "least-read-rbac-and-annotation-only-admission",
+        "passed": true
+      }
+    ]
+  },
+  "local_validation": {
+    "bazel_test_targets": 19,
+    "bazel_passed": true,
+    "race_tests_passed": true,
+    "ansible_container_passed": true,
+    "new_python_files": false,
+    "commands": [
+      "bazel test //... --jobs=6 --test_output=errors",
+      "go test -race ./internal/reconcile ./internal/ci ./internal/fluxartifacts",
+      "go run ./tests/infra/fluxscope",
+      "INFRA_ANSIBLE_TEST_IMAGE=<local-image> go test ./internal/reconcile -run '^TestAnsibleScopeWithLocalContainers$' -count=1 -v"
+    ],
+    "actionlint_passed": true,
+    "generated_artifacts_check_passed": true,
+    "controller_evidence_replayed_through_production_helpers": true,
+    "ansible_checks": [
+      "task graph equivalence",
+      "idempotence",
+      "interrupted archive extraction recovery",
+      "wrong CLI checksum, service, version, image and cache health"
+    ],
+    "ansible_environment_gap": "Real service and Docker verification completed during the full production reconciliation."
+  },
+  "review": {
+    "tool": "claude -p",
+    "addressed": [
+      "same-revision recovery",
+      "verified artifact baseline",
+      "exact origin with unchanged content",
+      "generated validation on every apply",
+      "parser database readiness",
+      "verification after deployment skip"
+    ]
+  },
+  "production": {
+    "permissions": {
+      "run": "https://github.com/fredrir/infra/actions/runs/36025173553",
+      "passed": true
+    },
+    "full_reconciliation": {
+      "run": "https://github.com/fredrir/infra/actions/runs/36027342376",
+      "passed": true,
+      "status": {
+        "evaluated_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "artifacts_verified_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "selection": {
+          "tofu": true,
+          "kubernetes": true,
+          "ansible": true,
+          "monitor_only": false,
+          "host_scope": "full",
+          "reasons": [
+            "shared deployment input: .github/workflows/infra-cli.yml"
+          ]
+        },
+        "host_scope": "full",
+        "last_full_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "last_full_verified_at": "2026-09-24T16:40:35.521710396Z",
+        "desired_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "applied_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "stage": "complete",
+        "updated_at": "2026-09-24T16:40:35.521710616Z",
+        "stage_seconds": {
+          "expand": 4.684625772,
+          "hosts": 495.325680692,
+          "kubernetes": 81.817574937,
+          "monitor": 52.870745016,
+          "plan": 28.833836347,
+          "publish": 1.331345388,
+          "retire": 7.500222208,
+          "verify": 78.758861352
+        }
+      },
+      "workflow_timing": {
+        "created_at": "2026-09-24T16:26:10Z",
+        "run_started_at": "2026-09-24T16:26:10Z",
+        "start_delay_seconds": 0
+      }
+    },
+    "hosted_checks": {
+      "run": "https://github.com/fredrir/infra/actions/runs/36027342601",
+      "passed": true
+    },
+    "image_builds": {
+      "run": "https://github.com/fredrir/infra/actions/runs/36027343013",
+      "passed": true
+    },
+    "host_scope_no_change": {
+      "run": "https://github.com/fredrir/infra/actions/runs/36029246495",
+      "passed": true,
+      "stage": "evaluated",
+      "deployed_baseline_preserved": true,
+      "status": {
+        "evaluated_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "artifacts_verified_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "selection": {
+          "tofu": false,
+          "kubernetes": false,
+          "ansible": false,
+          "monitor_only": false,
+          "host_scope": "none"
+        },
+        "last_full_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "last_full_verified_at": "2026-09-24T16:40:35.521710396Z",
+        "desired_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "applied_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "stage": "evaluated",
+        "updated_at": "2026-09-24T16:43:55.809138332Z"
+      },
+      "workflow_timing": {
+        "created_at": "2026-09-24T16:42:36Z",
+        "run_started_at": "2026-09-24T16:42:36Z",
+        "start_delay_seconds": 0
+      }
+    },
+    "both_scopes_no_change": {
+      "run": "https://github.com/fredrir/infra/actions/runs/36029800032",
+      "passed": true,
+      "stage": "evaluated",
+      "deployed_baseline_preserved": true,
+      "status": {
+        "evaluated_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "artifacts_verified_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "selection": {
+          "tofu": false,
+          "kubernetes": false,
+          "ansible": false,
+          "monitor_only": false,
+          "host_scope": "none"
+        },
+        "last_full_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "last_full_verified_at": "2026-09-24T16:40:35.521710396Z",
+        "desired_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "applied_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "stage": "evaluated",
+        "updated_at": "2026-09-24T16:48:17.18255177Z"
+      },
+      "workflow_timing": {
+        "created_at": "2026-09-24T16:47:26Z",
+        "run_started_at": "2026-09-24T16:47:26Z",
+        "start_delay_seconds": 0
+      }
+    },
+    "scoped_read_only_checks": {
+      "passed": true,
+      "projects": [
+        "portfolio",
+        "llunde",
+        "llunde-pyparser"
+      ],
+      "operations": [
+        "preflight",
+        "render",
+        "verify"
+      ],
+      "includes": [
+        "workload images and readiness",
+        "Helm dependencies",
+        "served revision",
+        "parser migration and application"
+      ]
+    },
+    "fallback": {
+      "run": "https://github.com/fredrir/infra/actions/runs/36029967131",
+      "passed": true,
+      "status": {
+        "evaluated_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "artifacts_verified_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "selection": {
+          "tofu": false,
+          "kubernetes": false,
+          "ansible": false,
+          "monitor_only": false,
+          "host_scope": "none"
+        },
+        "last_full_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "last_full_verified_at": "2026-09-24T16:40:35.521710396Z",
+        "desired_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "applied_revision": "981269de3b6970407e7e2d7ca9ab274da76aff9d",
+        "stage": "complete",
+        "updated_at": "2026-09-24T16:51:46.778005658Z",
+        "stage_seconds": {
+          "kubernetes": 77.497449676,
+          "plan": 4.300265725,
+          "publish": 0.515552517,
+          "verify": 37.669871506
+        }
+      },
+      "workflow_timing": {
+        "created_at": "2026-09-24T16:48:54Z",
+        "run_started_at": "2026-09-24T16:48:54Z",
+        "start_delay_seconds": 0
+      },
+      "scope_hosts": false,
+      "scope_projects": false,
+      "verify_artifacts": true,
+      "executed": [
+        "plan",
+        "publish",
+        "kubernetes",
+        "verify"
+      ],
+      "host_changes_required": false
+    },
+    "active_flux_owners": 16,
+    "active_flux_owners_ready": true,
+    "final_controls": {
+      "INFRA_SCOPE_HOSTS": true,
+      "INFRA_SCOPE_PROJECTS": true,
+      "INFRA_VERIFY_ARTIFACTS": true
+    },
+    "checked_at": "2026-09-24"
+  },
+  "limitations": [
+    "Scoped project production checks used live reads without changing application images; mutation and failure cases ran with local pinned Flux controllers.",
+    "Stage timings describe required runs and are not a comparative performance benchmark."
+  ]
+}
