@@ -16,6 +16,6 @@ images:
     - digest: sha256:c0ea02ff826aff6d1ffb99d97929c46ba2e0f077d0bfd04f4500838bc40da8a7
       name: ghcr.io/fredrir/llunde-backend
       newName: ghcr.io/fredrir/llunde-backend
-    - digest: sha256:39d8ea7815d215f37896956c6337d0b65d2f43d20a90260b9020a36cb6c5891f
+    - digest: sha256:a35ecc4a57316fe0e5ccb6005aca42e1922a3f2dbd1b261c221135433def3c03
       name: ghcr.io/fredrir/llunde-frontend
       newName: ghcr.io/fredrir/llunde-frontend
