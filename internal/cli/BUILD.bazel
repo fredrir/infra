@@ -26,11 +26,11 @@ go_library(
     deps = [
         "//internal/artifact",
         "//internal/ci",
-        "//internal/objectstore",
         "//internal/dev",
         "//internal/enrollment",
         "//internal/images",
         "//internal/kata",
+        "//internal/objectstore",
         "//internal/operations",
         "//internal/packages",
         "//internal/pipeline",
