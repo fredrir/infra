@@ -26,6 +26,37 @@
     "controller_only_task_seconds": 0.04,
     "fact_gatherings": 7
   },
+  "production_mitogen": {
+    "hosts_run": "https://github.com/fredrir/infra/actions/runs/36067211590/attempts/2",
+    "monitor_verify_run": "https://github.com/fredrir/infra/actions/runs/36068380854",
+    "stage_seconds": [
+      {"stage": "hosts", "linear": 469.3, "mitogen_linear": 211.1},
+      {"stage": "monitor", "linear": 49.3, "mitogen_linear": 21.8},
+      {"stage": "verify", "linear": 62.9, "mitogen_linear": 48.8}
+    ],
+    "play_seconds": {
+      "Reconcile enrolled cluster transport": 65.6,
+      "Register trusted dedicated build runners": 54.3,
+      "Configure K3s servers in bootstrap order": 23.1,
+      "Configure K3s workers": 18.0,
+      "Configure host network access": 9.8,
+      "Configure Ubuntu hosts": 9.6,
+      "Configure isolated build runtimes": 9.2,
+      "Maintain reconciliation host access": 8.1,
+      "Provision capacity-reserved build VMs": 6.0,
+      "Configure control-plane recovery backups": 5.1,
+      "Install verified infrastructure binary": 1.0
+    },
+    "remote_no_op_task_seconds": "0.2-0.3",
+    "serial_transport_fact_gathering_seconds": 34.6
+  },
+  "parallel_fact_gathering": {
+    "run": "https://github.com/fredrir/infra/actions/runs/36069091673",
+    "hosts_stage_seconds": {"before": 211.1, "after": 176.6},
+    "transport_play_seconds": {"before": 65.6, "after": 34.4},
+    "gather_play_seconds": 7.5,
+    "excluded": "build_engines guest, provisioned later in the run"
+  },
   "latency_benchmark": {
     "target": "Ubuntu 26.04 container over SSH with 120 ms netem egress delay",
     "play": "facts plus 8 repositories x 8 file, stat, command, copy and slurp tasks with become",
@@ -50,7 +81,7 @@
   },
   "rollback": "Set repository variable INFRA_ANSIBLE_STRATEGY=linear; reconciliation exports it as ANSIBLE_STRATEGY",
   "limitations": [
-    "Production hosts-stage duration with Mitogen is not yet measured",
+    "One production sample per stage; not an ordinary-traffic percentile",
     "ansible-core 2.21 deprecates third-party strategy plugins without a planned alternative",
     "Serial transport and K3s plays are unchanged"
   ]
