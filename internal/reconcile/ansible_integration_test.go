@@ -250,6 +250,7 @@ case "$*" in
 *registration-token*) if [ -e /fixture/state/token-failure ]; then exit 1; fi; echo fixture-token ;;
 *"--method DELETE"*) if [ -e /fixture/state/withdrawal-failure ]; then exit 1; fi ;;
 *"--method PUT"*) cat >> /fixture/state/gh ;;
+*"--jq .busy"*) if [ -e /fixture/state/github-busy ]; then echo true; else echo false; fi ;;
 *) echo 7 ;;
 esac
 `, true)
@@ -470,12 +471,16 @@ esac
 	withdrawal := "api --method DELETE --silent repos/" + fleet.Owner + "/infra/actions/runners/7/labels\n"
 	restoration := "api --method PUT --silent repos/" + fleet.Owner + "/infra/actions/runners/7/labels --input -\n" + fmt.Sprintf(`{"labels": ["%s"]}`, strings.Join(fleet.Labels, `", "`)) + "\n"
 	github := func(since string) string { return strings.TrimPrefix(record("gh"), since) }
+	returned := func(calls string) bool {
+		withdrawn := strings.LastIndex(calls, withdrawal)
+		return withdrawn >= 0 && strings.HasSuffix(calls, restoration) && strings.LastIndex(calls, restoration) > withdrawn
+	}
 	untouched := func(scenario, since string) {
 		t.Helper()
 		if _, err := os.Stat(filepath.Join(fixture, "runners/infra/.infra-runner-pending")); record("stopped") != "" || !os.IsNotExist(err) {
 			t.Fatalf("%s interrupted the runner: stopped %q, pending marker %v", scenario, record("stopped"), err)
 		}
-		if calls := github(since); !strings.HasSuffix(calls, withdrawal+restoration) {
+		if calls := github(since); !returned(calls) {
 			t.Fatalf("%s did not return the runner to its jobs:\n%s", scenario, calls)
 		}
 	}
@@ -485,6 +490,12 @@ esac
 	untouched("failed withdrawal", calls)
 	remove("state/withdrawal-failure")
 	t.Log("a runner that cannot be withdrawn from new jobs is not replaced")
+	write("state/github-busy", "", false)
+	calls = record("gh")
+	run("/fixture/converge.yml", false, "--extra-vars", `{"build_runner_drain_minutes":0,"build_runner_drain_interval":1}`)
+	untouched("job accepted before withdrawal", calls)
+	remove("state/github-busy")
+	t.Log("a job GitHub already assigned keeps its runner before its worker starts")
 	write("runners/infra/bin/Runner.Worker", "#!/bin/sh\nwhile [ -e /fixture/state/job-infra ]; do sleep 0.1; done\n", true)
 	write("state/job-infra", "", false)
 	command("docker", "exec", "-d", name, "/home/runner/infra/bin/Runner.Worker", "spawnclient", "1", "2")
@@ -510,7 +521,7 @@ esac
 	if record("stopped") != "" {
 		t.Fatalf("upgrade stopped the runner during its job:\n%s", upgradeOutput.String())
 	}
-	if withdrawn := github(calls); !strings.HasSuffix(withdrawn, withdrawal) {
+	if withdrawn := github(calls); !strings.Contains(withdrawn, withdrawal) || strings.Contains(withdrawn[strings.LastIndex(withdrawn, withdrawal):], "--method PUT") {
 		t.Fatalf("draining runner still takes new jobs:\n%s", withdrawn)
 	}
 	remove("state/job-infra")
@@ -525,7 +536,7 @@ esac
 	if busy := record("stopped-mid-job"); busy != "" {
 		t.Fatalf("upgrade stopped %q while a job was running", busy)
 	}
-	if replaced := github(calls); !strings.HasSuffix(replaced, withdrawal+restoration) {
+	if replaced := github(calls); !returned(replaced) {
 		t.Fatalf("upgraded runner did not return to new jobs:\n%s", replaced)
 	}
 	t.Log("runner upgrade takes the runner out of new jobs, waits for its running job and returns it after the replacement")
@@ -545,7 +556,7 @@ esac
 	if _, err := os.Stat(pending); err != nil {
 		t.Fatal("partial replacement lost its recovery marker", err)
 	}
-	if failed := github(calls); !strings.HasSuffix(failed, withdrawal+restoration) {
+	if failed := github(calls); !returned(failed) {
 		t.Fatalf("failed replacement did not return the runner to new jobs:\n%s", failed)
 	}
 	archive()
