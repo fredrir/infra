@@ -47,6 +47,19 @@
         "/home/runner/.cache/bazel"
       ],
       "runners_after": "8 online, idle"
+    },
+    {
+      "change": "Verify the runner play by comparing its own declarations; restart stale units; skip the verified runner play on scheduled full runs",
+      "run": "https://github.com/fredrir/infra/actions/runs/36119801027",
+      "scope": "runners",
+      "stage_seconds": {
+        "hosts-runners": 40.3,
+        "verify": 37.3
+      },
+      "drain": "INFRA_VM_POOL_QUALIFIED false in 7 routed repositories 09:40-09:52 UTC",
+      "restarts": "none; stale runner, stale engine and slice reload tasks skipped",
+      "verification": "check-mode declarations, probe and GitHub fleet check passed",
+      "pending": "first scheduled full run exercising the runner play skip"
     }
   ]
 }
