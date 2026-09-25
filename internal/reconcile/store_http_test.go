@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -117,6 +118,58 @@ func TestNativeStateReadFailsClosed(t *testing.T) {
 			store := S3Store{Bucket: "bucket", Prefix: "production", Client: &objectstore.Client{Endpoint: server.URL, Region: "eu-north-1", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}}
 			if _, err := store.Read(context.Background()); err == nil || strings.Contains(err.Error(), "private-response") {
 				t.Fatalf("unsafe read result: %v", err)
+			}
+		})
+	}
+}
+
+func TestVerificationDefersToHeldReconciliationLock(t *testing.T) {
+	status, _ := json.Marshal(Status{Desired: "c", Applied: "b", Stage: "hosts"})
+	recovery := []Difference{{System: "reconciliation", Item: "applied b, desired c, stage hosts"}}
+	for _, test := range []struct {
+		name         string
+		lease        *lease
+		wantCompared []string
+		want         Verification
+	}{
+		{name: "held", lease: &lease{Owner: "local", Expires: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)}, want: Verification{Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"comparisons skipped: reconciliation locked by local until 2099-01-01 00:00:00 +0000 UTC"}}},
+		{name: "expired", lease: &lease{Owner: "orphaned", Expires: time.Now().Add(-time.Minute)}, wantCompared: []string{"deep c"}, want: Verification{Revision: "c", Outcome: OutcomeDiffers, Differences: recovery, Errors: []string{}}},
+		{name: "absent", wantCompared: []string{"deep c"}, want: Verification{Revision: "c", Outcome: OutcomeDiffers, Differences: recovery, Errors: []string{}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("verification sent %s %s", r.Method, r.URL.Path)
+					w.WriteHeader(405)
+					return
+				}
+				switch r.URL.Path {
+				case "/bucket/production/status.json":
+					w.Header().Set("ETag", `"status"`)
+					w.Write(status)
+				case "/bucket/production/lock.json":
+					if test.lease == nil {
+						w.WriteHeader(404)
+						return
+					}
+					w.Header().Set("ETag", `"lease"`)
+					json.NewEncoder(w).Encode(test.lease)
+				default:
+					t.Errorf("unexpected path: %s", r.URL.Path)
+					w.WriteHeader(404)
+				}
+			}))
+			defer server.Close()
+			store := S3Store{Bucket: "bucket", Prefix: "production", Client: &objectstore.Client{Endpoint: server.URL, Region: "eu-north-1", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}}
+			ops := &verificationOps{revision: "c", published: "c"}
+			verified, err := Verifier{Store: store, Ops: ops, Host: "logs.fredrir.com", Deep: true}.Verify(context.Background())
+			if !reflect.DeepEqual(ops.compared, test.wantCompared) {
+				t.Errorf("compared %q, want %q", ops.compared, test.wantCompared)
+			}
+			want := test.want
+			want.Deep = true
+			if got := VerificationOutcome(verified, true, err); !reflect.DeepEqual(got, want) {
+				t.Fatalf("outcome %+v, want %+v", got, want)
 			}
 		})
 	}

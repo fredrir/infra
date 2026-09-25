@@ -85,14 +85,22 @@ type VerificationOperations interface {
 	VerifyDeep(context.Context, Plan) error
 }
 
+type VerificationStore interface {
+	Read(context.Context) (Status, error)
+	Unlocked(context.Context) error
+}
+
 type Verifier struct {
-	Store Store
+	Store VerificationStore
 	Ops   VerificationOperations
 	Host  string
 	Deep  bool
 }
 
 func (v Verifier) Verify(ctx context.Context) (string, error) {
+	if err := v.Store.Unlocked(ctx); err != nil {
+		return "", fmt.Errorf("comparisons skipped: %w", err)
+	}
 	recorded := v.recordedReconciliation(ctx)
 	revision, err := v.Ops.Revision(ctx)
 	if err != nil {
