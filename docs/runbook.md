@@ -37,15 +37,17 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout; apply against the last successful revision |
 | Scheduled verification | `infra reconcile verify --deep --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and each host playbook at minute 47 every hour (UTC); a report listing differences dispatches one full reconciliation of `main` |
 | On-demand verification | `gh workflow run reconcile.yml --ref main -f verify=true` | The scheduled verification on demand; differences are reported without dispatching a reconciliation |
-| Verification | `infra reconcile verify` | Reconciliation lock and recorded status, exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision; every part runs when another fails |
+| Verification | `infra reconcile verify` | Reconciliation lock and recorded status, exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision; every comparison runs when another fails |
 | Status | `infra reconcile status` | Desired revision, successfully applied revision, failing stage and stage durations |
 
 | Verification report | Value |
 | --- | --- |
 | Differences | OpenTofu plan changes, host tasks changed in check mode, runner drift, Flux objects that differ from or have not applied the published revision, unpublished deploying changes, an incomplete or failed recorded reconciliation |
 | Errors | Unreachable hosts, failed host tasks, playbooks that could not be compared, API failures, readiness, timeouts |
-| Held reconciliation lock | Error; comparisons skipped until release or expiry |
-| Repair not dispatched | Push reconciliation of the same commit not completed; latest bot dispatch for the commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled |
+| Held or unreadable reconciliation lock | Error; comparisons skipped, or discarded when the lock is taken during them |
+| No state bucket access | Error; comparisons skipped |
+| Unpublished deploying changes | Difference; comparisons skipped |
+| Repair not dispatched | Push reconciliation on `main` with an incomplete `reconcile / apply` job; latest bot dispatch for the commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled |
 | Repair cap reset | New commit on `main` |
 
 | Owner | Managed state |

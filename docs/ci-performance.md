@@ -87,7 +87,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Frontend deadlines | Publication queueing has a separate eight-minute measurement; the subsequent exact served-revision check retains its 60-second budget within the existing ten-minute job |
 
 VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; the default slot count is one for the 8 GiB build VM.
-An hourly verification report that lists differences dispatches one full reconciliation of `main` unless a push reconciliation of the same commit has not completed or the latest bot dispatch for the same commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled; a new commit on `main` lifts the cap; `verify=true` never dispatches.
+An hourly verification report that lists differences dispatches one full reconciliation of `main` unless a push reconciliation on `main` has not completed its apply or the latest bot dispatch for the same commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled; a new commit on `main` lifts the cap; `verify=true` never dispatches.
 These controls do not establish an ordinary-traffic latency percentile; compare the completion observer's post-rollout samples with equivalent workloads.
 
 ## Execution measurements
