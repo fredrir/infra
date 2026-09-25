@@ -185,7 +185,7 @@ jobs:
           infra ci measure --stage drift-verification --budget 10m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --deep --report="$RUNNER_TEMP/reconciliation/verification.json"
         else
           code=0
-          infra reconcile apply --full="$FULL" --report="$RUNNER_TEMP/reconciliation/status.json" || code=$?
+          infra reconcile apply --wait=11m --full="$FULL" --report="$RUNNER_TEMP/reconciliation/status.json" || code=$?
           if [ "$code" -eq 75 ]; then
             echo 'retry=true' >> "$GITHUB_OUTPUT"
             exit 0
@@ -198,12 +198,16 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         GH_REPO: ${{ github.repository }}
       run: |
-        newer=$(gh run list --workflow reconcile.yml --event push --branch main --json databaseId,status --jq 'map(select(.databaseId > ($ENV.GITHUB_RUN_ID | tonumber) and .status != "completed") | .databaseId | tostring) | join(",")')
-        if [ -z "$newer" ]; then
-          echo "::error::Reconciliation must be retried and no newer push reconciliation of main is pending"
-          exit 1
-        fi
-        echo "::notice::Reconciliation deferred to run $newer"
+        newer=$(gh run list --workflow reconcile.yml --event push --branch main --json databaseId,status --jq '.[] | select(.databaseId > ($ENV.GITHUB_RUN_ID | tonumber) and .status != "completed") | .databaseId')
+        for run in $newer; do
+          applied=$(gh api --paginate "repos/$GH_REPO/actions/runs/$run/jobs" --jq '.jobs[] | select(.name == "reconcile / apply" and .status == "completed") | .status')
+          if [ -z "$applied" ]; then
+            echo "::notice::Reconciliation deferred to run $run"
+            exit 0
+          fi
+        done
+        echo "::error::Reconciliation must be retried and no newer push reconciliation of main has a pending apply"
+        exit 1
     - name: Read declared differences
       id: verification
       if: always() && inputs.verify && inputs.repair

@@ -135,7 +135,7 @@ func deploymentIndependent(path string) bool {
 	return strings.HasPrefix(path, "docs/") || strings.HasPrefix(path, "build/evidence/") ||
 		strings.HasPrefix(path, ".vscode/") || strings.HasPrefix(path, "internal/dev/") ||
 		strings.HasPrefix(path, "images/") || strings.HasPrefix(path, "dev/") ||
-		strings.HasPrefix(path, "tests/") || path == "README.md" || path == "AGENTS.md" || path == "CLAUDE.md" ||
+		strings.HasPrefix(path, "tests/") || pushIgnored(path) ||
 		((strings.HasPrefix(path, "internal/") || strings.HasPrefix(path, "cmd/")) && strings.HasSuffix(path, "_test.go"))
 }
 

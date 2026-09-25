@@ -15,6 +15,7 @@ import (
 
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/objectstore"
+	"github.com/fredrir/infra/internal/process"
 )
 
 type Status struct {
@@ -54,11 +55,15 @@ type lease struct {
 }
 
 const (
-	leaseTTL     = 10 * time.Minute
-	leaseRenewal = 3 * time.Minute
+	leaseTTL       = 10 * time.Minute
+	leaseRenewal   = 3 * time.Minute
+	renewalTimeout = 30 * time.Second
 )
 
-var errLeaseLost = errors.New("reconciliation lease lost")
+var (
+	errLeaseLost          = errors.New("reconciliation lease lost")
+	errPreconditionFailed = errors.New("lease changed by another writer")
+)
 
 type ErrLocked struct {
 	Owner   string
@@ -169,12 +174,19 @@ func (s S3Store) put(ctx context.Context, key string, value any, match string) (
 	} else if match != "" {
 		args = append(args, "--if-match", match)
 	}
-	data, err := s.Runner.Output(ctx, "aws", args...)
+	execute := s.Runner.Execute
+	if execute == nil {
+		execute = process.Run
+	}
+	result, err := execute(ctx, process.Options{Name: "aws", Args: args, Dir: s.Runner.Dir, Env: append(os.Environ(), s.Runner.Env...), Stderr: s.Runner.Stderr})
 	if err != nil {
+		if bytes.Contains(result.Stderr, []byte("(PreconditionFailed)")) {
+			return "", fmt.Errorf("%w: %w", errPreconditionFailed, err)
+		}
 		return "", err
 	}
 	var metadata struct{ ETag string }
-	if err := json.Unmarshal(data, &metadata); err != nil {
+	if err := json.Unmarshal(result.Stdout, &metadata); err != nil {
 		return "", err
 	}
 	if metadata.ETag == "" {
@@ -268,17 +280,22 @@ func (l *heldLease) renew(ctx context.Context, lose context.CancelCauseFunc, sto
 			return
 		case <-ticker.C:
 		}
-		expires := time.Now().Add(leaseTTL)
-		token, err := l.store.put(ctx, "lock.json", lease{l.owner, expires}, l.token)
-		if err == nil {
-			l.token, l.expires = token, expires
-			continue
-		}
-		if leaseTaken(err) || time.Until(l.expires) < leaseRenewal {
+		if err := l.extend(ctx); err != nil && (leaseTaken(err) || time.Until(l.expires) < leaseRenewal) {
 			lose(fmt.Errorf("%w: %w", errLeaseLost, err))
 			return
 		}
 	}
+}
+
+func (l *heldLease) extend(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, min(renewalTimeout, time.Until(l.expires)-renewalTimeout))
+	defer cancel()
+	expires := time.Now().Add(leaseTTL)
+	token, err := l.store.put(ctx, "lock.json", lease{l.owner, expires}, l.token)
+	if err == nil {
+		l.token, l.expires = token, expires
+	}
+	return err
 }
 
 func (l *heldLease) release() error {
@@ -300,7 +317,7 @@ func (l *heldLease) release() error {
 
 func leaseTaken(err error) bool {
 	var status *objectstore.StatusError
-	return errors.As(err, &status) && status.Code == http.StatusPreconditionFailed
+	return errors.Is(err, errPreconditionFailed) || (errors.As(err, &status) && status.Code == http.StatusPreconditionFailed)
 }
 
 func leaseOwner() string {

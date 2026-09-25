@@ -15,7 +15,9 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/objectstore"
+	"github.com/fredrir/infra/internal/process"
 )
 
 type leaseServer struct {
@@ -27,9 +29,18 @@ type leaseServer struct {
 	writes   int
 	deletes  int
 	failPuts int
+	hang     chan struct{}
 }
 
 func (s *leaseServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	hang := s.hang
+	s.mu.Unlock()
+	if hang != nil && r.Method == http.MethodPut {
+		<-hang
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if r.URL.Path != "/bucket/production/lock.json" {
@@ -107,6 +118,21 @@ func (s *leaseServer) failWrites(code int) {
 	s.failPuts = code
 }
 
+func (s *leaseServer) hangWrites() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.hang = make(chan struct{})
+}
+
+func (s *leaseServer) resume() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.hang != nil {
+		close(s.hang)
+		s.hang = nil
+	}
+}
+
 func (s *leaseServer) counts() (int, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -117,8 +143,17 @@ type handlerTransport struct{ http.Handler }
 
 func (h handlerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	recorder := httptest.NewRecorder()
-	h.ServeHTTP(recorder, r)
-	return recorder.Result(), nil
+	served := make(chan struct{})
+	go func() {
+		defer close(served)
+		h.ServeHTTP(recorder, r)
+	}()
+	select {
+	case <-served:
+		return recorder.Result(), nil
+	case <-r.Context().Done():
+		return nil, r.Context().Err()
+	}
 }
 
 func leaseStore(server *leaseServer) S3Store {
@@ -226,6 +261,7 @@ func TestLostLeaseCancelsTheRun(t *testing.T) {
 		{name: "taken over", lose: func(s *leaseServer) { s.set(lease{Owner: "thief", Expires: time.Now().Add(time.Hour)}) }, deadline: leaseRenewal},
 		{name: "renewals fail", lose: func(s *leaseServer) { s.failWrites(http.StatusServiceUnavailable) }, deadline: leaseTTL},
 		{name: "renewals denied", lose: func(s *leaseServer) { s.failWrites(http.StatusForbidden) }, deadline: leaseTTL},
+		{name: "renewals hang", lose: func(s *leaseServer) { s.hangWrites() }, deadline: leaseTTL},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
@@ -250,9 +286,60 @@ func TestLostLeaseCancelsTheRun(t *testing.T) {
 				if owner := server.lease().Owner; test.name == "taken over" && (released == nil || owner != "thief") {
 					t.Errorf("release of a taken-over lease returned %v and left owner %q", released, owner)
 				}
+				server.resume()
 			})
 		})
 	}
+}
+
+func TestReleaseOutwaitsOnlyOneBoundedRenewal(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		server := &leaseServer{t: t}
+		_, unlock, err := leaseStore(server).Lock(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		server.hangWrites()
+		time.Sleep(leaseRenewal + time.Second)
+		started := time.Now()
+		if err := unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if waited := time.Since(started); waited >= renewalTimeout {
+			t.Errorf("release waited %s for a hung renewal", waited)
+		}
+		server.resume()
+	})
+}
+
+func TestCLILeaseRenewalDetectsTakeover(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		puts := 0
+		runner := ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+			switch o.Args[1] {
+			case "get-object":
+				return process.Result{ExitCode: 254}, errors.New("missing")
+			case "list-objects-v2":
+				return process.Result{Stdout: []byte(`{"Contents":[]}`)}, nil
+			case "put-object":
+				if puts++; puts > 1 {
+					return process.Result{ExitCode: 254, Stderr: []byte("\nAn error occurred (PreconditionFailed) when calling the PutObject operation: At least one of the pre-conditions you specified did not hold\n")}, errors.New("aws failed: exit status 254")
+				}
+				return process.Result{Stdout: []byte(`{"ETag":"owner"}`)}, nil
+			}
+			return process.Result{}, nil
+		}}
+		held, unlock, err := (S3Store{Runner: runner, Bucket: "bucket", Prefix: "production"}).Lock(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		acquired := time.Now()
+		<-held.Done()
+		if lost := time.Since(acquired); lost != leaseRenewal || !errors.Is(context.Cause(held), errLeaseLost) {
+			t.Errorf("taken-over lease lost after %s: %v", lost, context.Cause(held))
+		}
+		unlock()
+	})
 }
 
 func TestTransientRenewalFailureKeepsTheLease(t *testing.T) {

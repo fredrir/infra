@@ -191,26 +191,29 @@ func repairQuery(t *testing.T, listing string) *gojq.Code {
 	return jobQuery(t, "repair", listing)
 }
 
-func jobQuery(t *testing.T, job, listing string, options ...gojq.CompilerOption) *gojq.Code {
+func jobQueryText(t *testing.T, job, listing string) string {
 	t.Helper()
 	script := readWorkflow(t, "reconcile-job.yml").Jobs[job].script()
 	for _, line := range strings.Split(script, "\n") {
-		match := regexp.MustCompile(`--jq '([^']+)'`).FindStringSubmatch(line)
-		if match == nil || !strings.Contains(line, listing) {
-			continue
+		if match := regexp.MustCompile(`--jq '([^']+)'`).FindStringSubmatch(line); match != nil && strings.Contains(line, listing) {
+			return match[1]
 		}
-		query, err := gojq.Parse(match[1])
-		if err != nil {
-			t.Fatal(err)
-		}
-		program, err := gojq.Compile(query, options...)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return program
 	}
 	t.Fatalf("%s job has no query over %s runs:\n%s", job, listing, script)
-	return nil
+	return ""
+}
+
+func jobQuery(t *testing.T, job, listing string, options ...gojq.CompilerOption) *gojq.Code {
+	t.Helper()
+	query, err := gojq.Parse(jobQueryText(t, job, listing))
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := gojq.Compile(query, options...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return program
 }
 
 func queryResults(t *testing.T, program *gojq.Code, input any) []any {
@@ -296,9 +299,17 @@ func TestRepairWaitsForPendingPushApplies(t *testing.T) {
 
 func TestApplyJobOutlivesTheApplyDeadline(t *testing.T) {
 	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
+	flag := regexp.MustCompile(`infra reconcile apply --wait=(\S+) `).FindStringSubmatch(apply.step(t, func(step workflowStep) bool { return step.ID == "reconcile" }).Run)
+	if flag == nil {
+		t.Fatal("apply does not wait for an abandoned lease")
+	}
+	wait, err := time.ParseDuration(flag[1])
+	if err != nil || wait <= leaseTTL {
+		t.Fatalf("apply waits %s for a lease that expires after %s", flag[1], leaseTTL)
+	}
 	minutes, ok := apply.TimeoutMinutes.(int)
-	if margin := time.Duration(minutes)*time.Minute - applyDeadline; !ok || margin < 30*time.Minute {
-		t.Fatalf("apply job timeout of %v minutes leaves %s beyond the apply deadline for setup and reporting", apply.TimeoutMinutes, margin)
+	if margin := time.Duration(minutes)*time.Minute - wait - applyDeadline; !ok || margin < 15*time.Minute {
+		t.Fatalf("apply job timeout of %v minutes leaves %s beyond the lease wait and apply deadline for setup and reporting", apply.TimeoutMinutes, margin)
 	}
 }
 
@@ -434,14 +445,17 @@ func TestSupersessionIgnoresExactlyThePushIgnoredPaths(t *testing.T) {
 			t.Errorf("invalid pattern %q", pattern)
 		}
 	}
-	for path, ignored := range map[string]bool{"README.md": true, "docs/runbook.md": true, "docs/a/b.md": true, "build/evidence/run.json": true, "docs/diagram.svg": false, "platform/README.md": false, "build/evidence/a/run.json": false, "tofu/main.tf": false} {
+	for path, ignored := range map[string]bool{"README.md": true, "SECURITY.md": true, "docs/runbook.md": true, "docs/a/b.md": true, "build/evidence/run.json": true, "docs/diagram.svg": false, "platform/README.md": false, "build/evidence/a/run.json": false, "tofu/main.tf": false} {
 		if pushIgnored(path) != ignored {
 			t.Errorf("%s ignored=%t", path, !ignored)
+		}
+		if selected := Affected([]string{path}); ignored && (selected.Tofu || selected.Kubernetes || selected.Ansible || selected.Tooling) {
+			t.Errorf("push-ignored %s selects %+v", path, selected)
 		}
 	}
 }
 
-func TestRetriedApplyRequiresANewerPushReconciliation(t *testing.T) {
+func TestRetriedApplyRequiresANewerPendingPushApply(t *testing.T) {
 	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
 	reconcile := apply.step(t, func(step workflowStep) bool { return step.ID == "reconcile" })
 	for _, mapping := range []string{`if [ "$code" -eq 75 ]; then`, `echo 'retry=true' >> "$GITHUB_OUTPUT"`, `exit "$code"`} {
@@ -450,28 +464,34 @@ func TestRetriedApplyRequiresANewerPushReconciliation(t *testing.T) {
 		}
 	}
 	successor := apply.step(t, func(step workflowStep) bool { return strings.Contains(step.Run, "gh run list") })
-	for _, guard := range []string{"--workflow reconcile.yml --event push --branch main", "--json databaseId,status", `if [ -z "$newer" ]; then`} {
+	for _, guard := range []string{"--workflow reconcile.yml --event push --branch main", "--json databaseId,status", `for run in $newer; do`, `gh api --paginate "repos/$GH_REPO/actions/runs/$run/jobs"`, `if [ -z "$applied" ]; then`} {
 		if !strings.Contains(successor.Run, guard) {
 			t.Errorf("successor check lacks %s:\n%s", guard, successor.Run)
 		}
 	}
+	if successor.If != "steps.reconcile.outputs.retry == 'true'" || strings.Index(successor.Run, "exit 0") > strings.Index(successor.Run, "exit 1") {
+		t.Errorf("successor check does not fail without a pending apply:\n%s", successor.Run)
+	}
+	if applied, repaired := jobQueryText(t, "apply", "/jobs"), jobQueryText(t, "repair", "/jobs"); applied != repaired {
+		t.Errorf("successor check reads apply jobs with %q, repair with %q", applied, repaired)
+	}
 	newer := jobQuery(t, "apply", "gh run list", gojq.WithEnvironLoader(func() []string { return []string{"GITHUB_RUN_ID=100"} }))
 	for _, test := range []struct {
 		runs map[int]string
-		want string
+		want []any
 	}{
-		{want: ""},
-		{runs: map[int]string{100: "in_progress", 99: "queued"}, want: ""},
-		{runs: map[int]string{101: "completed"}, want: ""},
-		{runs: map[int]string{101: "queued"}, want: "101"},
-		{runs: map[int]string{101: "in_progress", 100: "in_progress"}, want: "101"},
+		{},
+		{runs: map[int]string{100: "in_progress", 99: "queued"}},
+		{runs: map[int]string{101: "completed"}},
+		{runs: map[int]string{101: "queued"}, want: []any{101}},
+		{runs: map[int]string{101: "in_progress", 100: "in_progress"}, want: []any{101}},
 	} {
 		runs := []any{}
 		for id, status := range test.runs {
 			runs = append(runs, map[string]any{"databaseId": id, "status": status})
 		}
-		if got := queryResults(t, newer, runs); !reflect.DeepEqual(got, []any{test.want}) {
-			t.Errorf("runs %v deferred to %v, want %q", test.runs, got, test.want)
+		if got := queryResults(t, newer, runs); !reflect.DeepEqual(got, test.want) {
+			t.Errorf("runs %v deferred to %v, want %v", test.runs, got, test.want)
 		}
 	}
 }

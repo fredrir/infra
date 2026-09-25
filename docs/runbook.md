@@ -44,7 +44,7 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | --- | --- |
 | Differences | OpenTofu plan changes, host tasks changed in check mode, runner drift, Flux objects that differ from or have not applied the published revision, unpublished deploying changes, an incomplete or failed recorded reconciliation |
 | Errors | Unreachable hosts, failed host tasks, playbooks that could not be compared, API failures, readiness, timeouts, suspended Flux objects, replica counts a manifest does not declare |
-| Held or unreadable reconciliation lock | Error; comparisons skipped, or discarded when the lock is taken during them |
+| Held or unreadable reconciliation lock | Error; comparisons skipped, or discarded when the lock is taken during them; a held lock exits 75 |
 | No state bucket access | Error; comparisons skipped |
 | Ten-minute budget exceeded | Error; comparisons discarded; report and log written |
 | Unpublished deploying changes | Difference; comparisons skipped |
@@ -109,11 +109,11 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 | Hostname-only deployment | Skip unrelated host configuration; run the Gatus role |
 | State | `s3://llunde-pyparser-bucket/reconciliation/production/status.json` |
 | Cross-client lease | Conditional S3 writes to `reconciliation/production/lock.json` |
-| Lease TTL / renewal | 10 minutes / every 3 minutes; a lost or unrenewable lease cancels the run before its next mutation and records no status |
-| Lease wait | `infra reconcile apply --wait DURATION`; default fails fast |
+| Lease TTL / renewal | 10 minutes / every 3 minutes, each attempt bounded to 30 seconds; a taken-over or unrenewable lease cancels the run, interrupting its current step, and records no further status |
+| Lease wait | `infra reconcile apply --wait DURATION`; default fails fast; CI waits 11 minutes to outlast an abandoned lease |
 | Run deadline / apply job timeout | 90 minutes / 120 minutes |
-| Exit codes | 0 success; 75 retry (lease held, or `main` advanced beyond root Markdown, `docs/**/*.md` and `build/evidence/*.json`); 1 failure |
-| Retry in CI | Succeeds only while a newer push reconciliation of `main` is pending |
+| Exit codes | 0 success; 75 retry: lease held (`apply`, `verify`), or `main` advanced beyond root Markdown, `docs/**/*.md` and `build/evidence/*.json`; 1 failure |
+| Retry in CI | Succeeds only while a newer push reconciliation of `main` has not completed its apply job |
 | Provenance gate | Before planning, each commit after the applied revision is SSH-signed by a key in `keys/admin_keys` at the applied revision, reproduces the `infra ci deploy` rewrite of its parent byte for byte, or is named by a later owner-signed `Provenance-Acknowledged: SHA` trailer |
 | Provenance base | Applied revision; none or not an ancestor refuses; `infra reconcile apply --provenance-base SHA` overrides |
 | OpenTofu locking | S3 lockfile retained; acquisition timeout 5 minutes |
@@ -203,7 +203,7 @@ gh workflow run reconcile.yml --ref main
 | Failure | Recovery |
 | --- | --- |
 | Missing credentials or private connectivity | Repair the environment identity, host enrollment or Tailnet policy; rerun the workflow |
-| Newer merge supersedes a queued run | Reconcile current `main`; runs superseded by reconciled changes cannot publish; a retry without a newer pending push run fails |
+| Newer merge supersedes a queued run | Reconcile current `main`; runs superseded by reconciled changes cannot publish; a retry fails unless a newer push run has yet to complete its apply |
 | On-demand or hourly verification supersedes a run queued in the `infrastructure-production` concurrency group | When the superseded run carried deploying changes, the superseding hourly verification, or the next hourly one after an on-demand verification, reports the unapplied revision and dispatches a full reconciliation; dispatch `verify=true` when no apply is queued |
 | Failed apply or verification | Rerun the workflow or run `infra reconcile apply --full` from a clean current `main` checkout |
 | Unverified commits | Revert unwanted changes; push an owner-signed commit with one `Provenance-Acknowledged: SHA` trailer per listed commit |
