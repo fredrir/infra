@@ -245,7 +245,7 @@ jobs:
     steps:
     - uses: %s
       with:
-        fetch-depth: 2
+        fetch-depth: 3
     - run: |
         set -o pipefail
         if git push origin HEAD~1:refs/heads/%s 2>&1 | tee "$RUNNER_TEMP/push.log"; then
