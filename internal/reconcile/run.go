@@ -33,11 +33,10 @@ type Operations interface {
 const applyDeadline = 90 * time.Minute
 
 type Reconciler struct {
-	Store         Store
-	Ops           Operations
-	Host          string
-	Report        func(Status) error
-	SkipUnchanged bool
+	Store  Store
+	Ops    Operations
+	Host   string
+	Report func(Status) error
 }
 
 func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
@@ -70,11 +69,11 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	if err != nil {
 		return err
 	}
-	if full || status.Applied == "" || recovery || (selected.Tooling && !r.SkipUnchanged) {
+	if full || status.Applied == "" || recovery {
 		selected = All()
 	}
 	plan := Plan{Revision: revision, Base: status.Applied, Affected: selected, Host: r.Host}
-	skip := r.SkipUnchanged && !full && !recovery && status.Applied != "" && !selected.Tofu && !selected.Ansible && !selected.Kubernetes
+	skip := !full && !recovery && status.Applied != "" && !selected.Tofu && !selected.Ansible && !selected.Kubernetes
 	status.Evaluated, status.Selection = revision, selected
 	status.Failure, status.HostsReusedFrom, status.HostScope = "", "", ""
 	status.Durations = map[string]float64{}

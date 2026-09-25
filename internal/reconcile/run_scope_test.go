@@ -16,7 +16,7 @@ func TestIndependentChangePreservesDeployedBaseline(t *testing.T) {
 	verified := time.Now().Add(-time.Hour).UTC()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "old", LastFullVerified: verified}}
 	ops := &fakeOps{selection: Affected([]string{"docs/example.md"})}
-	err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true}).Apply(context.Background(), false)
+	err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestToolingChangeVerifiesDeployedRevisionWithoutMutation(t *testing.T) {
 	verified := time.Now().Add(-time.Hour).UTC()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "old", LastFullVerified: verified}}
 	ops := &fakeOps{selection: Affected([]string{".github/workflows/deploy.yml", "internal/reconcile/run.go"})}
-	err := (Reconciler{Store: store, Ops: ops, Host: "logs.fredrir.com", SkipUnchanged: true}).Apply(context.Background(), false)
+	err := (Reconciler{Store: store, Ops: ops, Host: "logs.fredrir.com"}).Apply(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestToolingChangeVerifiesDeployedRevisionWithoutMutation(t *testing.T) {
 func TestToolingVerificationFailureForcesFullRecovery(t *testing.T) {
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
 	ops := &fakeOps{selection: Affected([]string{"internal/reconcile/run.go"}), fail: "drift-verification"}
-	if err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true}).Apply(context.Background(), false); err == nil {
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
 		t.Fatal("drift verification failure lost")
 	}
 	if store.status.Failure == "" || store.status.Applied != "old" {
@@ -61,7 +61,7 @@ func TestToolingVerificationFailureForcesFullRecovery(t *testing.T) {
 	}
 	store = &memoryStore{status: store.status}
 	retry := &fakeOps{selection: Affected([]string{"internal/reconcile/run.go"})}
-	if err := (Reconciler{Store: store, Ops: retry, SkipUnchanged: true}).Apply(context.Background(), false); err != nil {
+	if err := (Reconciler{Store: store, Ops: retry}).Apply(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(retry.calls, []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}) {
@@ -72,7 +72,7 @@ func TestToolingVerificationFailureForcesFullRecovery(t *testing.T) {
 func TestToolingChangeKeepsSelectedProjectScope(t *testing.T) {
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}
 	ops := &checkpointOps{revision: "new", delta: Affected([]string{"internal/reconcile/run.go", "platform/projects/llunde/kustomization.yaml"})}
-	if err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true}).Apply(context.Background(), false); err != nil {
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(ops.calls, []string{"plan", "publish", "kubernetes", "verify"}) {
@@ -80,17 +80,6 @@ func TestToolingChangeKeepsSelectedProjectScope(t *testing.T) {
 	}
 	if len(ops.plans) != 1 || !reflect.DeepEqual(ops.plans[0].Affected.Projects, []string{"llunde"}) {
 		t.Fatalf("project scope lost: %+v", ops.plans)
-	}
-}
-
-func TestToolingChangeWithoutHostScopingConvergesEverything(t *testing.T) {
-	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
-	ops := &fakeOps{selection: Affected([]string{"internal/reconcile/run.go"})}
-	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(ops.calls, []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}) {
-		t.Fatalf("disabled host scoping skipped full convergence: %v", ops.calls)
 	}
 }
 
@@ -122,7 +111,7 @@ func TestFullAndRecoveryCannotSkipIndependentChange(t *testing.T) {
 				store.status.Stage = "verify"
 			}
 			ops := &fakeOps{selection: Selection{}}
-			if err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true}).Apply(context.Background(), scenario == "explicit"); err != nil {
+			if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), scenario == "explicit"); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(ops.calls, []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}) {
@@ -185,25 +174,23 @@ func TestPreflightFailurePreventsMutations(t *testing.T) {
 	}
 }
 
-func TestScopeControlsApplyToSelection(t *testing.T) {
-	for _, enabled := range []bool{false, true} {
-		for _, path := range []string{"build/cli-release.json", "platform/projects/portfolio/kustomization.yaml"} {
-			commands := &Commands{ScopeHosts: enabled, ScopeProjects: enabled, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
-				if options.Args[0] == "diff" {
-					return process.Result{Stdout: []byte(path + "\n")}, nil
-				}
-				return process.Result{}, nil
-			}}}
-			selected, err := commands.Select(context.Background(), strings.Repeat("a", 40), false)
-			if err != nil {
-				t.Fatal(err)
+func TestSelectionScopesRunnersAndProjects(t *testing.T) {
+	for _, path := range []string{"build/cli-release.json", "platform/projects/portfolio/kustomization.yaml"} {
+		commands := &Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			if options.Args[0] == "diff" {
+				return process.Result{Stdout: []byte(path + "\n")}, nil
 			}
-			if selected.Ansible && (effectiveHostScope(selected) == HostScopeRunners) != enabled {
-				t.Fatalf("host control ignored: %+v", selected)
-			}
-			if selected.Kubernetes && (len(selected.Projects) == 1) != enabled {
-				t.Fatalf("project control ignored: %+v", selected)
-			}
+			return process.Result{}, nil
+		}}}
+		selected, err := commands.Select(context.Background(), strings.Repeat("a", 40), false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if selected.Ansible && effectiveHostScope(selected) != HostScopeRunners {
+			t.Fatalf("runner change widened host convergence: %+v", selected)
+		}
+		if selected.Kubernetes && !reflect.DeepEqual(selected.Projects, []string{"portfolio"}) {
+			t.Fatalf("project change widened Kubernetes delivery: %+v", selected)
 		}
 	}
 }

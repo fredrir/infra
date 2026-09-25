@@ -113,7 +113,7 @@ func TestReadOnlyProductionScopedVerification(t *testing.T) {
 	}
 	for _, projects := range [][]string{{"portfolio"}, {"llunde"}, {"llunde-pyparser"}, {"llunde", "llunde-pyparser", "y"}} {
 		t.Run(strings.Join(projects, "+"), func(t *testing.T) {
-			commands := &Commands{Runner: ci.Runner{Dir: root}, Work: t.TempDir(), ScopeProjects: true}
+			commands := &Commands{Runner: ci.Runner{Dir: root}, Work: t.TempDir()}
 			source, err := commands.getResource(context.Background(), "gitrepositories.source.toolkit.fluxcd.io", "flux-system", "flux-system")
 			if err != nil {
 				t.Fatal(err)
@@ -140,7 +140,7 @@ func TestReadOnlyProductionScopedVerification(t *testing.T) {
 func TestPreflightFallsBackBeforeWritesForUnknownProject(t *testing.T) {
 	var mu sync.Mutex
 	var calls []string
-	commands := &Commands{ScopeProjects: true, kubernetes: &kubernetesState{}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	commands := &Commands{kubernetes: &kubernetesState{}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		command := options.Name + " " + strings.Join(options.Args, " ")
 		mu.Lock()
 		calls = append(calls, command)

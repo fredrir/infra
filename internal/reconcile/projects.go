@@ -135,9 +135,6 @@ func (c *Commands) Preflight(ctx context.Context, plan Plan) (Plan, error) {
 	if err := c.loadKubernetes(ctx); err != nil {
 		return plan, err
 	}
-	if !c.ScopeProjects {
-		plan.Affected.Projects = nil
-	}
 	if len(plan.Affected.Projects) > 0 {
 		valid := true
 		for _, project := range plan.Affected.Projects {

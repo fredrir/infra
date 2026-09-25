@@ -16,13 +16,11 @@ import (
 )
 
 type Commands struct {
-	Runner        ci.Runner
-	Work          string
-	Retained      []string
-	RequireMain   bool
-	ScopeHosts    bool
-	ScopeProjects bool
-	kubernetes    *kubernetesState
+	Runner      ci.Runner
+	Work        string
+	Retained    []string
+	RequireMain bool
+	kubernetes  *kubernetesState
 }
 
 func (c *Commands) Revision(ctx context.Context) (string, error) {
@@ -64,11 +62,7 @@ func (c *Commands) Select(ctx context.Context, base string, full bool) (Selectio
 		return Selection{}, err
 	}
 	selection := Affected(strings.Fields(string(data)))
-	if !c.ScopeHosts && effectiveHostScope(selection) == HostScopeRunners {
-		selection.HostScope = HostScopeFull
-		selection.Reasons = append(selection.Reasons, "host scoping disabled")
-	}
-	if len(selection.Projects) > 0 && (!c.ScopeProjects || !supportedProjects(selection.Projects)) {
+	if len(selection.Projects) > 0 && !supportedProjects(selection.Projects) {
 		selection.Projects = nil
 		selection.Reasons = append(selection.Reasons, "full Kubernetes verification required")
 	}
