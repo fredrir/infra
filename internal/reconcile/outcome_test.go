@@ -25,6 +25,8 @@ func (s *recordedStatus) Unlocked(context.Context) error {
 
 type verificationOps struct {
 	revision, published string
+	offMain             bool
+	ancestry, rulesets  error
 	pending             Selection
 	result              error
 	compared            []string
@@ -34,6 +36,13 @@ func (o *verificationOps) Revision(context.Context) (string, error) { return o.r
 func (o *verificationOps) PublishedRevision(context.Context) (string, error) {
 	return o.published, nil
 }
+func (o *verificationOps) OnMain(_ context.Context, revision string) (bool, error) {
+	if revision != o.published {
+		return false, errors.New("ancestry checked for the wrong revision")
+	}
+	return !o.offMain, o.ancestry
+}
+func (o *verificationOps) VerifyRulesets(context.Context) error { return o.rulesets }
 func (o *verificationOps) Select(_ context.Context, base string, full bool) (Selection, error) {
 	if base != o.published || full {
 		return Selection{}, errors.New("pending changes selected from the wrong base")
@@ -58,6 +67,8 @@ func TestVerificationReportsIncompleteReconciliationAsDifference(t *testing.T) {
 		readErr             error
 		locked, lockedAfter error
 		revision, published string
+		offMain             bool
+		ancestry, rulesets  error
 		pending             Selection
 		result              error
 		deep                bool
@@ -79,12 +90,16 @@ func TestVerificationReportsIncompleteReconciliationAsDifference(t *testing.T) {
 		{name: "status unreadable", readErr: errors.New("access denied"), revision: "a", published: "a", deep: true, wantCompared: []string{"deep a"}, wantRevision: "a", wantErrors: []string{"read reconciliation status: access denied"}},
 		{name: "never reconciled", revision: "a", published: "a", deep: true, wantCompared: []string{"deep a"}, wantRevision: "a"},
 		{name: "tooling-only change evaluated", status: Status{Desired: "a", Applied: "a", Stage: "evaluated", Evaluated: "b"}, revision: "b", published: "a", pending: Selection{Tooling: true}, deep: true, wantCompared: []string{"deep a"}, wantRevision: "a"},
+		{name: "production not on main", status: complete("a"), revision: "a", published: "f", offMain: true, deep: true, wantDifferences: []Difference{{System: "revision", Item: "production at f is not on main"}}},
+		{name: "production ancestry unreadable", status: complete("a"), revision: "a", published: "a", ancestry: errors.New("fetch failed"), deep: true, wantErrors: []string{"production ancestry: fetch failed"}},
+		{name: "ruleset drift", status: complete("a"), revision: "a", published: "a", rulesets: Differences{{System: "rulesets", Item: "production differs in rules"}}, deep: true, wantCompared: []string{"deep a"}, wantRevision: "a", wantDifferences: []Difference{{System: "rulesets", Item: "production differs in rules"}}},
+		{name: "rulesets unreadable", status: complete("a"), revision: "a", published: "a", rulesets: errors.New("list rulesets: 503"), deep: true, wantCompared: []string{"deep a"}, wantRevision: "a", wantErrors: []string{"list rulesets: 503"}},
 		{name: "reconciliation lock held", status: Status{Desired: "c", Applied: "b", Stage: "hosts"}, locked: errors.New("reconciliation locked by abc until 2026-09-25 18:00:00 +0000 UTC"), revision: "c", published: "b", pending: Selection{Ansible: true}, deep: true, wantErrors: []string{"comparisons skipped: reconciliation locked by abc until 2026-09-25 18:00:00 +0000 UTC"}},
 		{name: "reconciliation lock unreadable", status: complete("a"), locked: errors.New("read reconciliation lock: access denied"), revision: "a", published: "a", deep: true, wantErrors: []string{"comparisons skipped: read reconciliation lock: access denied"}},
 		{name: "reconciliation locked during comparison", status: complete("a"), lockedAfter: errors.New("reconciliation locked by local until 2026-09-25 18:00:00 +0000 UTC"), revision: "a", published: "a", result: Differences{{System: "hosts", Host: "fredrir-04", Item: "edited file"}}, deep: true, wantCompared: []string{"deep a"}, wantErrors: []string{"comparisons discarded: reconciliation locked by local until 2026-09-25 18:00:00 +0000 UTC"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			ops := &verificationOps{revision: test.revision, published: test.published, pending: test.pending, result: test.result}
+			ops := &verificationOps{revision: test.revision, published: test.published, offMain: test.offMain, ancestry: test.ancestry, rulesets: test.rulesets, pending: test.pending, result: test.result}
 			store := &recordedStatus{status: test.status, err: test.readErr, locked: test.locked, lockedAfter: test.lockedAfter}
 			verified, err := Verifier{Store: store, Ops: ops, Host: "logs.fredrir.com", Deep: test.deep}.Verify(context.Background())
 			if !reflect.DeepEqual(ops.compared, test.wantCompared) {

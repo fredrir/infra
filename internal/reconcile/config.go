@@ -113,7 +113,7 @@ func toolingInput(path string) bool {
 		return true
 	}
 	switch path {
-	case "build/BUILD.bazel", "build/consumers.json", "build/dagger-embed.patch", "go.mod", "go.sum", "BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelrc", ".bazelversion", ".dockerignore", ".envrc", ".gitignore":
+	case "build/BUILD.bazel", "build/consumers.json", "build/dagger-embed.patch", "build/publisher.json", "go.mod", "go.sum", "BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelrc", ".bazelversion", ".dockerignore", ".envrc", ".gitignore":
 		return true
 	default:
 		return false

@@ -1,6 +1,7 @@
 exports_files([
     "BUILD.bazel",
     "dagger-embed.patch",
+    "publisher.json",
     "runners.json",
     "toolchain.json",
 ])

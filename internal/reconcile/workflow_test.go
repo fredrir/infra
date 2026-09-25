@@ -375,8 +375,8 @@ func TestRepairCapFollowsLatestDispatchedReconciliation(t *testing.T) {
 func TestVerificationRunsWithReadOnlyCredentials(t *testing.T) {
 	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
 	checkout := apply.step(t, func(step workflowStep) bool { return strings.HasPrefix(step.Uses, "actions/checkout@") })
-	if persisted := checkout.With["persist-credentials"]; persisted != "${{ env.VERIFICATION != 'true' }}" {
-		t.Errorf("verification checkout persists credentials with %q", persisted)
+	if persisted := checkout.With["persist-credentials"]; persisted != "false" {
+		t.Errorf("checkout persists credentials with %q", persisted)
 	}
 	token := apply.step(t, func(step workflowStep) bool { return strings.HasPrefix(step.Uses, "actions/create-github-app-token@") })
 	if administration := token.With["permission-administration"]; administration != "${{ env.VERIFICATION == 'true' && 'read' || 'write' }}" {
@@ -605,5 +605,82 @@ func TestProvenanceGateRunsBeforeAnyCheckoutCode(t *testing.T) {
 	}
 	if summary := apply.step(t, func(step workflowStep) bool { return step.Name == "Summarize reconciliation" }); !strings.Contains(summary.Run, "for report in provenance ") {
 		t.Errorf("provenance report is not summarized:\n%s", summary.Run)
+	}
+}
+
+const publisherKey = "PUBLISHER_APP_PRIVATE_KEY"
+
+func TestPublisherKeyReachesOnlyThePublishingEngine(t *testing.T) {
+	workflow := readWorkflow(t, "reconcile-job.yml")
+	if _, ok := workflow.Env[publisherKey]; ok {
+		t.Error("every job receives the publisher key")
+	}
+	for name, job := range workflow.Jobs {
+		if _, ok := job.Env[publisherKey]; ok {
+			t.Errorf("job %s passes the publisher key to every step", name)
+		}
+		if contents := job.Permissions["contents"]; contents == "write" {
+			t.Errorf("job %s can push with its workflow token", name)
+		}
+		for _, step := range job.Steps {
+			key, ok := step.Env[publisherKey]
+			if publisher := name == "apply" && step.ID == "reconcile"; ok != publisher || (publisher && key != "${{ env.VERIFICATION != 'true' && steps.doppler.outputs.PUBLISHER_APP_PRIVATE_KEY || '' }}") {
+				t.Errorf("job %s step %q receives publisher key %q", name, cmp.Or(step.ID, step.Name, step.Uses), key)
+			}
+			if strings.Contains(step.Run, publisherKey) || slices.ContainsFunc(slices.Collect(maps.Values(step.With)), func(value string) bool { return strings.Contains(value, publisherKey) }) {
+				t.Errorf("job %s step %q reads the publisher key outside the engine", name, cmp.Or(step.ID, step.Name, step.Uses))
+			}
+		}
+	}
+	apply := workflow.Jobs["apply"]
+	if !reflect.DeepEqual(apply.Permissions, map[string]string{"contents": "read", "id-token": "write", "actions": "read", "packages": "read"}) {
+		t.Errorf("apply permissions %v", apply.Permissions)
+	}
+	gate := apply.step(t, func(step workflowStep) bool { return step.Name == provenanceGateStep })
+	reconcile := apply.step(t, func(step workflowStep) bool { return step.ID == "reconcile" })
+	if _, ok := gate.Env[publisherKey]; ok || !strings.Contains(reconcile.Run, `if [ "$VERIFICATION" = true ]; then`) || !strings.Contains(reconcile.Run, "infra reconcile verify") || !strings.Contains(reconcile.Run, "infra reconcile apply") {
+		t.Errorf("publisher key reaches the gate or the reconcile step no longer separates verification:\n%s", reconcile.Run)
+	}
+	for _, name := range []string{"reconcile.yml", "reconcile-job.yml"} {
+		for job, definition := range readWorkflow(t, name).Jobs {
+			if definition.Permissions["contents"] == "write" {
+				t.Errorf("%s job %s grants contents: write", name, job)
+			}
+		}
+	}
+}
+
+func TestRulesetDifferencesDoNotDispatchRepair(t *testing.T) {
+	step := readWorkflow(t, "reconcile-job.yml").Jobs["apply"].step(t, func(step workflowStep) bool { return step.ID == "verification" })
+	match := regexp.MustCompile(`jq -e '([^']+)' "\$report"`).FindStringSubmatch(step.Run)
+	if match == nil {
+		t.Fatalf("difference selection not found:\n%s", step.Run)
+	}
+	query, err := gojq.Parse(match[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := gojq.Compile(query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		systems []string
+		repair  bool
+	}{
+		{},
+		{systems: []string{"rulesets"}},
+		{systems: []string{"rulesets", "rulesets"}},
+		{systems: []string{"revision"}, repair: true},
+		{systems: []string{"rulesets", "hosts"}, repair: true},
+	} {
+		differences := []any{}
+		for _, system := range test.systems {
+			differences = append(differences, map[string]any{"system": system, "item": "x"})
+		}
+		results := queryResults(t, program, map[string]any{"differences": differences})
+		if len(results) != 1 || results[0] != test.repair {
+			t.Errorf("differences in %v select repair %v, want %t", test.systems, results, test.repair)
+		}
 	}
 }

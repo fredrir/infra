@@ -17,6 +17,7 @@ import (
 	"github.com/fredrir/infra/internal/fluxartifacts"
 	"github.com/fredrir/infra/internal/kustomize"
 	"github.com/fredrir/infra/internal/process"
+	"github.com/google/go-github/v88/github"
 )
 
 type Commands struct {
@@ -25,6 +26,8 @@ type Commands struct {
 	Retained      []string
 	RequireMain   bool
 	ProvenanceEnv []string
+	Publisher     *Publisher
+	GitHub        *github.Client
 	kubernetes    *kubernetesState
 }
 
@@ -221,15 +224,27 @@ var ErrSuperseded = errors.New("main advanced; retry reconciliation at its curre
 
 var pushIgnoredPaths = []string{"*.md", "docs/**/*.md", "build/evidence/*.json"}
 
-func (c *Commands) currentMain(ctx context.Context, revision string) error {
+func (c *Commands) fetchMain(ctx context.Context) (string, error) {
 	if err := c.Runner.Run(ctx, "git", "fetch", "--quiet", "--no-tags", "origin", "refs/heads/main"); err != nil {
-		return err
+		return "", err
 	}
 	data, err := c.Runner.Output(ctx, "git", "rev-parse", "FETCH_HEAD")
+	return strings.TrimSpace(string(data)), err
+}
+
+func (c *Commands) OnMain(ctx context.Context, revision string) (bool, error) {
+	head, err := c.fetchMain(ctx)
+	if err != nil {
+		return false, err
+	}
+	return c.contains(ctx, head, revision)
+}
+
+func (c *Commands) currentMain(ctx context.Context, revision string) error {
+	head, err := c.fetchMain(ctx)
 	if err != nil {
 		return err
 	}
-	head := strings.TrimSpace(string(data))
 	if head == revision {
 		return nil
 	}
@@ -265,7 +280,7 @@ func (c *Commands) Publish(ctx context.Context, revision string) error {
 			return err
 		}
 	}
-	return c.Runner.Run(ctx, "git", "push", "origin", revision+":refs/heads/production")
+	return c.push(ctx, revision)
 }
 
 func (c *Commands) allowed(ctx context.Context, codes []int, name string, args ...string) error {

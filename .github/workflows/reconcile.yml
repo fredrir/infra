@@ -37,7 +37,7 @@ jobs:
   reconcile:
     if: (inputs.verify || github.triggering_actor != 'fredrir-infra-verification[bot]')
     permissions:
-      contents: write
+      contents: read
       id-token: write
       actions: write
       packages: read

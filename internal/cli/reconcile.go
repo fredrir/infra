@@ -46,6 +46,13 @@ func newReconcileCommand() *cobra.Command {
 			child.Flags().BoolVar(&deep, "deep", false, "Also compare OpenTofu and every host play with production in check mode")
 		}
 		child.RunE = func(cmd *cobra.Command, _ []string) (err error) {
+			publisherKey := os.Getenv("PUBLISHER_APP_PRIVATE_KEY")
+			if err := os.Unsetenv("PUBLISHER_APP_PRIVATE_KEY"); err != nil {
+				return err
+			}
+			if action == "apply" && publisherKey == "" {
+				return errors.New("PUBLISHER_APP_PRIVATE_KEY required")
+			}
 			var verified string
 			if action == "verify" && report != "" {
 				defer func() {
@@ -72,7 +79,7 @@ func newReconcileCommand() *cobra.Command {
 				}
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(status)
 			}
-			attestations, removeCredentials, err := provenanceCredentials()
+			token, attestations, removeCredentials, err := githubCredentials()
 			if err != nil {
 				return err
 			}
@@ -102,7 +109,16 @@ func newReconcileCommand() *cobra.Command {
 			}
 			defer os.RemoveAll(work)
 			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ProvenanceEnv: attestations}
+			if ops.GitHub, err = reconcile.GitHubClient(reconcile.GitHubAPI, token); err != nil {
+				return err
+			}
 			if action == "apply" {
+				publisher, err := reconcile.ReadPublisher(absolute)
+				if err != nil {
+					return err
+				}
+				publisher.PrivateKey = []byte(publisherKey)
+				ops.Publisher = &publisher
 				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, LockWait: wait, Log: cmd.ErrOrStderr(), ProvenanceBase: provenanceBase, Report: func(status reconcile.Status) error {
 					fmt.Fprintf(cmd.OutOrStdout(), "%s desired=%s applied=%s\n", status.Stage, status.Desired, status.Applied)
 					if report == "" {
@@ -135,16 +151,16 @@ func newReconcileCommand() *cobra.Command {
 	return command
 }
 
-func provenanceCredentials() ([]string, func(), error) {
+func githubCredentials() (string, []string, func(), error) {
 	token := os.Getenv("PROVENANCE_TOKEN")
 	if err := os.Unsetenv("PROVENANCE_TOKEN"); err != nil || token == "" {
-		return nil, func() {}, err
+		return "", nil, func() {}, err
 	}
 	directory, err := ci.RegistryConfig(cmp.Or(os.Getenv("GITHUB_ACTOR"), "provenance"), token)
 	if err != nil {
-		return nil, nil, err
+		return "", nil, nil, err
 	}
-	return []string{"GH_TOKEN=" + token, "DOCKER_CONFIG=" + directory}, func() { os.RemoveAll(directory) }, nil
+	return token, []string{"GH_TOKEN=" + token, "DOCKER_CONFIG=" + directory}, func() { os.RemoveAll(directory) }, nil
 }
 
 func verifyProvenance(cmd *cobra.Command, store reconcile.S3Store, ops *reconcile.Commands, override, report string) (err error) {

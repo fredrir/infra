@@ -27,6 +27,7 @@ var Suites = []Suite{
 	{Name: "onboarding", Package: "./internal/projects", Test: "^TestNativeOnboardingQualification$", Tools: []string{"age-keygen", "sops", "helm", "kustomize"}, Env: []string{"INFRA_ONBOARD_INTEGRATION=1"}, RootVariable: "INFRA_TEST_SOURCE_ROOT"},
 	{Name: "image", Package: "./internal/pipeline", Test: "^TestDaggerImageBuildSelectsStageAndPreservesLiteralBuildArguments$", RootVariable: "INFRA_DAGGER_IMAGE_TEST_ROOT", Engine: "build"},
 	{Name: "reconcile-plan", Package: "./internal/reconcile", Test: "^TestSavedExpansionProofWithLocalTofu$", Tools: []string{"tofu"}, Env: []string{"INFRA_RECONCILE_PLAN_QUALIFY=1"}},
+	{Name: "publishing", Package: "./internal/reconcile", Test: "^TestPublishingQualification$", Env: []string{"INFRA_PUBLISHING_QUALIFY=1"}, RootVariable: "INFRA_TEST_SOURCE_ROOT"},
 	{Name: "kustomize", Package: "./internal/kustomize", Test: "^TestBuildMatchesKubectlOnRepositoryOverlays$", Tools: []string{"kubectl"}, Env: []string{"INFRA_KUSTOMIZE_QUALIFY=1"}, RootVariable: "INFRA_TEST_SOURCE_ROOT"},
 	{Name: "packages", Package: "./internal/packages", Test: "Qualification$", Tools: []string{"nfpm", "gpg", "openssl", "go"}, Env: []string{"INFRA_PACKAGE_QUALIFY=1"}, BinaryVariable: "INFRA_QUALIFICATION_BINARY", Engine: "build"},
 	{Name: "kata", Package: "./internal/kata", Test: "^TestDaggerExecutesBoundedWorker$", Env: []string{"INFRA_KATA_ENGINE_TEST=1"}, BinaryVariable: "INFRA_KATA_BINARY", Engine: "kata"},

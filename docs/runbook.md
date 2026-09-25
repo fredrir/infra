@@ -42,13 +42,13 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 
 | Verification report | Value |
 | --- | --- |
-| Differences | OpenTofu plan changes, host tasks changed in check mode, runner drift, Flux objects that differ from or have not applied the published revision, unpublished deploying changes, an incomplete or failed recorded reconciliation |
+| Differences | OpenTofu plan changes, host tasks changed in check mode, runner drift, Flux objects that differ from or have not applied the published revision, unpublished deploying changes, an incomplete or failed recorded reconciliation, a published revision not on `main`, live rulesets that differ from `.github/*-ruleset.json` |
 | Errors | Unreachable hosts, failed host tasks, playbooks that could not be compared, API failures, readiness, timeouts, suspended Flux objects, replica counts a manifest does not declare |
 | Held or unreadable reconciliation lock | Error; comparisons skipped, or discarded when the lock is taken during them; a held lock exits 75 |
 | No state bucket access | Error; comparisons skipped |
 | Ten-minute budget exceeded | Error; comparisons discarded; report and log written |
 | Unpublished deploying changes | Difference; comparisons skipped |
-| Repair not dispatched | `repair=false`; push reconciliation on `main` with an incomplete `reconcile / apply` job; latest `github-actions[bot]` dispatch for the commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled |
+| Repair not dispatched | `repair=false`; only `rulesets` differences; push reconciliation on `main` with an incomplete `reconcile / apply` job; latest `github-actions[bot]` dispatch for the commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled |
 | Repair cap reset | New commit on `main` |
 
 | Verification trigger | Value |
@@ -117,7 +117,7 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 | Provenance gate | Before any checkout tooling runs, including drift verification, each commit after the applied revision is SSH-signed by a key in `keys/admin_keys` at the applied revision, is a deployment, or is named by a later owner-signed `Provenance-Acknowledged: SHA` trailer |
 | Deployment commit | Reproduces the `infra ci deploy` rewrite of its parent byte for byte, and its image digest is attested for the receipt's revision, run and attempt by the mapped repository's approved `build-image.yml` revision |
 | Attestation tools | `gh attestation verify` for public repositories, `cosign verify` for private ones; both on `PATH` |
-| Attestation credentials | `PROVENANCE_TOKEN`, a GitHub token with `packages: read`; unset uses the ambient `gh` login and Docker configuration; removed from the environment before any child process |
+| Attestation credentials | `PROVENANCE_TOKEN`, a GitHub token with `packages: read`; unset uses the ambient `gh` login and Docker configuration; removed from the environment before any child process; also reads rulesets during verification, anonymously when unset |
 | Owner-signed | Authenticates the owner's workstation key: any process on that workstation can sign; the gate blocks remote writers (Octo STS, stolen deploy tokens, other machines), not a compromised workstation |
 | Provenance base | Applied revision; none or not an ancestor refuses; `--provenance-base SHA` overrides and must precede `HEAD`; base, revision and override are recorded in `status.json` |
 | Standalone gate | `infra reconcile provenance [--provenance-base SHA] [--report PATH]`; reads the applied revision without the lease |
@@ -135,10 +135,42 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 infra reconcile provenance
 go build -o .infra/bin/infra ./cmd/infra
 .infra/bin/infra reconcile plan --base BASE_SHA
-.infra/bin/infra reconcile apply --report .infra/reconciliation/status.json
+doppler run --project infra --config prd_reconciliation_apply --only-secrets PUBLISHER_APP_PRIVATE_KEY -- .infra/bin/infra reconcile apply --report .infra/reconciliation/status.json
 .infra/bin/infra reconcile status
 .infra/bin/infra reconcile verify
-.infra/bin/infra reconcile apply --full
+doppler run --project infra --config prd_reconciliation_apply --only-secrets PUBLISHER_APP_PRIVATE_KEY -- .infra/bin/infra reconcile apply --full
+```
+
+### Publishing
+
+| Publishing | Value |
+| --- | --- |
+| Identity | GitHub App `fredrir-infra-publisher`: `contents: write`, `metadata: read`; `fredrir/infra` only; no webhook; App and installation IDs in `build/publisher.json` |
+| Private key | `PUBLISHER_APP_PRIVATE_KEY`, Doppler `prd_reconciliation_apply`; CI passes it only to the apply path of the `reconcile` step, never to the gate or verification; removed from the environment before any child process; `apply` fails without it |
+| Token | Minted after the `main` checks; repository `infra`, `contents: write`; revoked after the push |
+| Push | `git push --no-verify https://github.com/fredrir/infra.git REVISION:refs/heads/production`; never forced; token only in the push child's environment through an inline credential helper; never argv, `.git/config` or logs; global, system and other helper configuration ignored |
+| Apply job token | `contents: read`; checkout persists no credentials |
+| [`production`](../.github/production-ruleset.json) ruleset | Creation and update of `refs/heads/production`; bypass: publisher App only |
+| [`production-history`](../.github/production-history-ruleset.json) ruleset | Deletion and non-fast-forward of `refs/heads/production`; no bypass |
+| Two rulesets | A bypass actor skips every rule of the ruleset listing it; the history ruleset holds the publisher to fast-forwards |
+| Administrators | Not bypass actors; their pushes to `production` are rejected |
+| Drift | Hourly verification: a published revision not on `main` is a `revision` difference; live rulesets that differ from their declaration are `rulesets` differences and dispatch no repair |
+| Ruleset read | `metadata: read` (`github.token`); bypass actors are returned only with write access to the ruleset (repository administration), so verification compares them only in administrator runs and the qualification |
+| Break-glass | An administrator publishes as the App with the Doppler key; fallback: disable `production`, push, re-enable |
+| Rollback | Disable both rulesets |
+
+| `infra dev qualify publishing` | Value |
+| --- | --- |
+| Requires | `GH_TOKEN` of a repository administrator with the `workflow` scope; `PUBLISHER_APP_PRIVATE_KEY` |
+| Applies | Both declared rulesets, then adds `refs/heads/production-canary` to them |
+| Rejected | Administrator fast-forward; `GITHUB_TOKEN` fast-forward with `contents: write` from a throwaway push workflow on `production-canary-probe`; publisher force-push; publisher deletion |
+| Accepted | Publisher fast-forward |
+| Cleanup | Declared rulesets without the canary; `production-canary` and `production-canary-probe` deleted; also on start, so reruns are safe |
+| Result | Live rulesets equal their declarations, bypass actors included |
+
+```sh
+gh auth refresh --scopes workflow
+GH_TOKEN="$(gh auth token)" doppler run --project infra --config prd_reconciliation_apply --only-secrets PUBLISHER_APP_PRIVATE_KEY -- go run ./cmd/infra dev qualify publishing -- -timeout=30m
 ```
 
 ### Initial activation
@@ -173,6 +205,7 @@ These activation steps provision external credentials once; merge, verification 
 | `SSH_KNOWN_HOSTS` | Unset | Verified Tailnet host keys, `fredrir-06` and `infra-build-09` aliases |
 | `SOPS_AGE_KEY` | Unset | Decrypt host monitoring, verification trigger and backup credentials |
 | `RUNNER_APP_ID`, `RUNNER_APP_PRIVATE_KEY` | Unset | Existing runner GitHub App; mint a short-lived installation token with repository administration permission |
+| `PUBLISHER_APP_PRIVATE_KEY` | Unset | [Publisher App](#publishing) private key |
 
 | OIDC setting | `infrastructure-plan` | `infrastructure-apply` |
 | --- | --- | --- |
@@ -216,6 +249,8 @@ gh workflow run reconcile.yml --ref main
 | On-demand or hourly verification supersedes a run queued in the `infrastructure-production` concurrency group | When the superseded run carried deploying changes, the superseding hourly verification, or the next hourly one after an on-demand verification, reports the unapplied revision and dispatches a full reconciliation; dispatch `verify=true` when no apply is queued |
 | Failed apply or verification | Rerun the workflow or run `infra reconcile apply --full` from a clean current `main` checkout |
 | Unverified commits | Revert unwanted changes; push an owner-signed commit with one `Provenance-Acknowledged: SHA` trailer per listed commit |
+| Published revision not on `main` | Publisher key compromised: rotate it in the App settings and Doppler; disable both rulesets; `git push --force origin APPLIED_SHA:refs/heads/production`; rerun `infra dev qualify publishing`; `infra reconcile apply --full` |
+| Ruleset differences | Rerun `infra dev qualify publishing`; it restores the declared rulesets |
 | Process terminated without lock cleanup | Hourly verification reports the held lock until its recorded expiry, then the incomplete reconciliation as a difference |
 | Remaining OpenTofu drift | Inspect the final plan; nonzero drift keeps the run failed |
 | Image publication succeeds | Check the separate reconciliation workflow for production readiness |

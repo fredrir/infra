@@ -80,6 +80,8 @@ func VerificationOutcome(revision string, deep bool, err error) Verification {
 type VerificationOperations interface {
 	Revision(context.Context) (string, error)
 	PublishedRevision(context.Context) (string, error)
+	OnMain(context.Context, string) (bool, error)
+	VerifyRulesets(context.Context) error
 	Select(context.Context, string, bool) (Selection, error)
 	VerifyLive(context.Context, Plan) error
 	VerifyDeep(context.Context, Plan) error
@@ -109,22 +111,29 @@ func (v Verifier) Verify(ctx context.Context) (string, error) {
 }
 
 func (v Verifier) compare(ctx context.Context) (string, error) {
-	recorded := v.recordedReconciliation(ctx)
+	standing := errors.Join(v.recordedReconciliation(ctx), v.Ops.VerifyRulesets(ctx))
 	revision, err := v.Ops.Revision(ctx)
 	if err != nil {
-		return "", errors.Join(recorded, err)
+		return "", errors.Join(standing, err)
 	}
 	published, err := v.Ops.PublishedRevision(ctx)
 	if err != nil {
-		return "", errors.Join(recorded, err)
+		return "", errors.Join(standing, err)
+	}
+	onMain, err := v.Ops.OnMain(ctx, published)
+	if err != nil {
+		return "", errors.Join(standing, fmt.Errorf("production ancestry: %w", err))
+	}
+	if !onMain {
+		return "", errors.Join(standing, Differences{{System: "revision", Item: "production at " + published + " is not on main"}})
 	}
 	if published != revision {
 		pending, err := v.Ops.Select(ctx, published, false)
 		if err != nil {
-			return "", errors.Join(recorded, err)
+			return "", errors.Join(standing, err)
 		}
 		if pending.Tofu || pending.Kubernetes || pending.Ansible {
-			return "", errors.Join(recorded, Differences{{System: "revision", Item: "production at " + published + ", checkout at " + revision}})
+			return "", errors.Join(standing, Differences{{System: "revision", Item: "production at " + published + ", checkout at " + revision}})
 		}
 		revision = published
 	}
@@ -133,7 +142,7 @@ func (v Verifier) compare(ctx context.Context) (string, error) {
 	if v.Deep {
 		verify = v.Ops.VerifyDeep
 	}
-	return revision, errors.Join(recorded, verify(ctx, plan))
+	return revision, errors.Join(standing, verify(ctx, plan))
 }
 
 func (v Verifier) recordedReconciliation(ctx context.Context) error {

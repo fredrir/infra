@@ -81,7 +81,7 @@ func TestQualifyRunsGatedSuitesWithTheirPrerequisites(t *testing.T) {
 	if err := Qualify(context.Background(), QualifyOptions{State: state, Runner: capturing, Suite: "packages"}); err == nil || !strings.Contains(err.Error(), "nfpm") {
 		t.Fatalf("missing tools not reported: %v", err)
 	}
-	if err := Qualify(context.Background(), QualifyOptions{State: state, Runner: capturing, Suite: "unknown"}); err == nil || !strings.Contains(err.Error(), "onboarding, image, reconcile-plan, kustomize, packages, kata") {
+	if err := Qualify(context.Background(), QualifyOptions{State: state, Runner: capturing, Suite: "unknown"}); err == nil || !strings.Contains(err.Error(), "onboarding, image, reconcile-plan, publishing, kustomize, packages, kata") {
 		t.Fatalf("unknown suite not listed: %v", err)
 	}
 	if len(tests) != 2 {

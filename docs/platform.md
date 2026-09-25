@@ -175,6 +175,7 @@ Container onboarding uses the qualified VM when enabled and hosted Dagger jobs o
 | `infra` setting  | Value                                                                                   |
 | ---------------- | --------------------------------------------------------------------------------------- |
 | `main` ruleset   | [`main-ruleset.json`](../.github/main-ruleset.json); bypass: repository admin, Octo STS |
+| `production` rulesets | [`production-ruleset.json`](../.github/production-ruleset.json), bypass: publisher App; [`production-history-ruleset.json`](../.github/production-history-ruleset.json), no bypass; [publishing](runbook.md#publishing) |
 | Private packages | Package settings → Manage Actions access: `fredrir/infra`, read                         |
 
 The shared [project chart](../charts/project) supports web services, workers and scheduled jobs. Databases and durable files require explicit storage, backup and recovery configuration.

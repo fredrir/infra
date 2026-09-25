@@ -74,6 +74,12 @@ filegroup(
 )
 
 filegroup(
+    name = "publishing_data",
+    srcs = glob([".github/*-ruleset.json"]) + ["//build:publisher.json"],
+    visibility = ["//internal/reconcile:__pkg__"],
+)
+
+filegroup(
     name = "host_play_data",
     srcs = glob([
         "ansible/*.yml",

@@ -127,6 +127,24 @@ func TestProvenanceReportsItsFailureAndDropsItsToken(t *testing.T) {
 	}
 }
 
+func TestApplyRequiresThePublisherKeyAndEveryActionDropsIt(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	t.Setenv("PUBLISHER_APP_PRIVATE_KEY", "")
+	var output bytes.Buffer
+	if err := cli.Run(context.Background(), []string{"reconcile", "apply", "--root", t.TempDir()}, &output, &output); err == nil || err.Error() != "PUBLISHER_APP_PRIVATE_KEY required" {
+		t.Fatalf("apply without the publisher key returned %v", err)
+	}
+	for _, action := range []string{"plan", "apply", "verify", "status", "requirements", "provenance"} {
+		t.Setenv("PUBLISHER_APP_PRIVATE_KEY", "publisher-secret")
+		output.Reset()
+		cli.Run(context.Background(), []string{"reconcile", action, "--root", t.TempDir()}, &output, &output)
+		if key := os.Getenv("PUBLISHER_APP_PRIVATE_KEY"); key != "" || strings.Contains(output.String(), "publisher-secret") {
+			t.Errorf("%s left the publisher key in the environment of child processes or its output", action)
+		}
+	}
+}
+
 func TestVerificationWritesItsOutcomeReport(t *testing.T) {
 	report := filepath.Join(t.TempDir(), "reports", "verification.json")
 	var output bytes.Buffer

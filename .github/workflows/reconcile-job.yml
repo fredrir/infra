@@ -99,7 +99,7 @@ jobs:
     environment: infrastructure-apply
     timeout-minutes: 130
     permissions:
-      contents: write
+      contents: read
       id-token: write
       actions: read
       packages: read
@@ -113,7 +113,7 @@ jobs:
       with:
         ref: ${{ github.sha }}
         fetch-depth: 0
-        persist-credentials: ${{ env.VERIFICATION != 'true' }}
+        persist-credentials: false
     - name: Install provenance gate
       env:
         GATE_RELEASE: infra-v0.2.11
@@ -197,6 +197,7 @@ jobs:
         SOPS_AGE_KEY: ${{ steps.doppler.outputs.SOPS_AGE_KEY }}
         GH_TOKEN: ${{ steps.runner-token.outputs.token }}
         PROVENANCE_TOKEN: ${{ github.token }}
+        PUBLISHER_APP_PRIVATE_KEY: ${{ env.VERIFICATION != 'true' && steps.doppler.outputs.PUBLISHER_APP_PRIVATE_KEY || '' }}
         FULL: ${{ inputs.full }}
         STRATEGY_OVERRIDE: ${{ vars.INFRA_ANSIBLE_STRATEGY }}
       run: |
@@ -235,7 +236,7 @@ jobs:
       run: |
         report="$RUNNER_TEMP/reconciliation/verification.json"
         differences=false
-        if [ -f "$report" ] && jq -e '.differences | length > 0' "$report" >/dev/null; then
+        if [ -f "$report" ] && jq -e 'any(.differences[]; .system != "rulesets")' "$report" >/dev/null; then
           differences=true
         fi
         printf 'differences=%s\n' "$differences" >> "$GITHUB_OUTPUT"
