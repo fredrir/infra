@@ -3,11 +3,8 @@ data "aws_caller_identity" "reconciliation" {}
 locals {
   reconciliation_identities = toset(["plan", "apply"])
   reconciliation_iam        = "arn:aws:iam::${data.aws_caller_identity.reconciliation.account_id}"
-  reconciliation_users = concat(
-    [for user in ["leploy", "restic-llunde-01", "restic-llunde-parser"] : "${local.reconciliation_iam}:user/${user}"],
-    ["${local.reconciliation_iam}:user/platform/*"],
-  )
-  reconciliation_policies = [for policy in ["platform/*", "pyparser-dataset-*", "restic-*"] : "${local.reconciliation_iam}:policy/${policy}"]
+  reconciliation_users      = ["${local.reconciliation_iam}:user/platform/*"]
+  reconciliation_policies   = [for policy in ["platform/*", "pyparser-dataset-*"] : "${local.reconciliation_iam}:policy/${policy}"]
   iam_policy_writes = [
     "iam:CreatePolicy", "iam:DeletePolicy", "iam:CreatePolicyVersion", "iam:DeletePolicyVersion",
     "iam:SetDefaultPolicyVersion", "iam:TagPolicy", "iam:UntagPolicy",

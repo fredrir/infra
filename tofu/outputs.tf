@@ -16,6 +16,6 @@ output "dataset_bucket" {
 }
 
 output "dataset_access_policy_arn" {
-  description = "IAM policy granting read/write to the dataset bucket (attached to the leploy user)."
+  description = "IAM policy granting read/write to the dataset bucket."
   value       = aws_iam_policy.dataset_access.arn
 }

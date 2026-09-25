@@ -43,7 +43,7 @@ run "workload_boundary" {
   command = plan
 
   plan_options {
-    target = [aws_iam_policy.reconciliation, aws_iam_user.platform_backup, aws_iam_user_policy_attachment.platform_backup, aws_iam_user.restic_host, aws_iam_user.leploy, aws_iam_user.dataset, module.platform_mail, aws_s3_bucket_lifecycle_configuration.dataset]
+    target = [aws_iam_policy.reconciliation, aws_iam_user.platform_backup, aws_iam_user_policy_attachment.platform_backup, aws_iam_user.dataset, module.platform_mail, aws_s3_bucket_lifecycle_configuration.dataset]
   }
 
   assert {
@@ -65,7 +65,7 @@ run "workload_boundary" {
   assert {
     condition = (
       alltrue([
-        for user in concat(values(aws_iam_user.platform_backup), values(aws_iam_user.restic_host), [aws_iam_user.leploy, aws_iam_user.dataset]) :
+        for user in concat(values(aws_iam_user.platform_backup), [aws_iam_user.dataset]) :
         user.permissions_boundary == aws_iam_policy.workload_boundary.arn
       ]) &&
       output.platform_mail.iam_user_boundary == aws_iam_policy.workload_boundary.arn &&
