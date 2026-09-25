@@ -66,6 +66,23 @@
     fail_msg: Volatile workers join with their own k3s token create --ttl token
   when: inventory_hostname in groups.get('volatile', [])
 
+- name: Search volatile state for the shared join token
+  ansible.builtin.shell: |
+    set -eu
+    find /var/lib/rancher -type f -print0 | while IFS= read -r -d '' file; do
+      if [ "$(sha256sum < "$file" | cut -d' ' -f1)" = "{{ k3s_shared_token.stat.checksum }}" ]; then echo "$file"; fi
+    done
+  when: inventory_hostname in groups.get('volatile', [])
+  register: k3s_shared_token_leak
+  changed_when: k3s_shared_token_leak.stdout_lines | length > 0
+  check_mode: false
+
+- name: Require no shared join token on volatile workers
+  ansible.builtin.assert:
+    that: k3s_shared_token_leak.stdout_lines | length == 0
+    fail_msg: "Shared join token found on the volatile worker: {{ k3s_shared_token_leak.stdout_lines | join(', ') }}"
+  when: inventory_hostname in groups.get('volatile', [])
+
 - name: Install kernel module configuration
   ansible.builtin.copy:
     dest: /etc/modules-load.d/k3s.conf

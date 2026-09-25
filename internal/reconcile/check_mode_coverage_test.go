@@ -114,6 +114,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"roles/k3s/tasks/main.yml: Find unloaded kernel modules",
 		"roles/k3s/tasks/main.yml: Compare the upstream service with its declared command",
 		"roles/k3s/tasks/main.yml: Read declared worker taints through the administrator API",
+		"roles/k3s/tasks/main.yml: Search volatile state for the shared join token",
 		"roles/data_volume/tasks/main.yml: Probe the data volume partition table",
 		"roles/data_volume/tasks/main.yml: Probe the data volume filesystem",
 		"roles/no_container_engines/tasks/main.yml: Find root Podman containers",
