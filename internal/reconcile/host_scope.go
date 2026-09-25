@@ -42,13 +42,7 @@ func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 func (c *Commands) Hosts(ctx context.Context, plan Plan) error {
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
-		if !plan.RunnersUnchanged {
-			return c.convergeRunners(ctx, plan, "reconcile.yml")
-		}
-		if err := c.ansible(ctx, "reconcile.yml", "--skip-tags=runners"); err != nil {
-			return err
-		}
-		return c.convergeRunners(ctx, plan, "build-runners.yml")
+		return c.convergeRunners(ctx, plan, "reconcile.yml")
 	case HostScopeRunners:
 		return c.convergeRunners(ctx, plan, "build-runners.yml")
 	default:
@@ -59,14 +53,8 @@ func (c *Commands) Hosts(ctx context.Context, plan Plan) error {
 func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
-		if c.runnersVerified {
-			return c.ansible(ctx, "verify.yml")
-		}
 		return c.verifyRunnerHosts(ctx, "verify.yml", "verify-runners.yml")
 	case HostScopeRunners:
-		if c.runnersVerified {
-			return nil
-		}
 		return c.verifyRunnerHosts(ctx, "verify-runners.yml")
 	case HostScopeMonitor:
 		return c.ansible(ctx, "verify.yml", "--limit=external")

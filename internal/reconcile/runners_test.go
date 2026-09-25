@@ -63,20 +63,19 @@ func queriedRepository(opts process.Options) string {
 }
 
 type fleetHarness struct {
-	t              *testing.T
-	fleet          RunnerFleet
-	mu             sync.Mutex
-	calls          []string
-	queries        int
-	unreadable     func(query int) bool
-	rejectLabels   bool
-	failing        []string
-	change         func(*registeredRunner)
-	stdout, stderr bytes.Buffer
+	t            *testing.T
+	fleet        RunnerFleet
+	mu           sync.Mutex
+	calls        []string
+	queries      int
+	unreadable   func(query int) bool
+	rejectLabels bool
+	change       func(*registeredRunner)
+	stderr       bytes.Buffer
 }
 
 func (h *fleetHarness) commands() *Commands {
-	return &Commands{Runner: ci.Runner{Dir: writeRunnerFleet(h.t, h.fleet), Execute: h.execute, Stdout: &h.stdout, Stderr: &h.stderr}}
+	return &Commands{Runner: ci.Runner{Dir: writeRunnerFleet(h.t, h.fleet), Execute: h.execute, Stderr: &h.stderr}}
 }
 
 func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process.Result, error) {
@@ -84,11 +83,7 @@ func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process
 	defer h.mu.Unlock()
 	switch {
 	case opts.Name == "ansible-playbook":
-		call := strings.Join(opts.Args[2:], " ")
-		h.calls = append(h.calls, call)
-		if slices.Contains(h.failing, call) {
-			return process.Result{ExitCode: 2}, errors.New(call + " failed")
-		}
+		h.calls = append(h.calls, strings.Join(opts.Args[2:], " "))
 		return process.Result{}, nil
 	case opts.Name == "gh" && slices.Contains(opts.Args, "PUT"):
 		h.calls = append(h.calls, "gh "+strings.Join(opts.Args, " "))
@@ -427,7 +422,6 @@ func TestUnreadableRunnerFleetDoesNotGateConvergence(t *testing.T) {
 	}{
 		{"CLI release", Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: []string{"build/cli-release.json"}}}, []string{"build-runners.yml"}},
 		{"full", Plan{Affected: All()}, []string{"reconcile.yml"}},
-		{"unchanged runners", Plan{Affected: All(), RunnersUnchanged: true}, []string{"reconcile.yml --skip-tags=runners", "build-runners.yml"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: func(int) bool { return true }}
@@ -435,8 +429,8 @@ func TestUnreadableRunnerFleetDoesNotGateConvergence(t *testing.T) {
 			if err := commands.Hosts(context.Background(), test.plan); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(harness.calls, test.want) || commands.runnersVerified {
-				t.Fatalf("unreadable fleet changed host convergence: %q, verified %t", harness.calls, commands.runnersVerified)
+			if !reflect.DeepEqual(harness.calls, test.want) {
+				t.Fatalf("unreadable fleet changed host convergence: %q", harness.calls)
 			}
 			if !strings.Contains(harness.stderr.String(), "warning: runner fleet state unavailable") {
 				t.Fatalf("unreadable fleet not reported: %q", harness.stderr.String())
@@ -467,6 +461,7 @@ func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
 	var workflow struct {
 		Jobs map[string]struct {
 			If          string            `yaml:"if"`
+			Env         map[string]string `yaml:"env"`
 			Permissions map[string]string `yaml:"permissions"`
 			Steps       []struct {
 				Run string `yaml:"run"`
@@ -489,7 +484,7 @@ func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
 	for _, step := range repair.Steps {
 		script.WriteString(step.Run)
 	}
-	for _, guard := range []string{"--workflow reconcile.yml", "--event workflow_dispatch", "--user 'github-actions[bot]'", `--commit "$GITHUB_SHA"`, "failure|timed_out|startup_failure)"} {
+	for _, guard := range []string{"--workflow reconcile.yml", "--event workflow_dispatch", "--user 'github-actions[bot]'", `--commit "$GITHUB_SHA"`, "--json conclusion,createdAt", `IN("failure", "timed_out", "startup_failure")`, "now - (.createdAt | fromdateiso8601) < 21600"} {
 		if !strings.Contains(script.String(), guard) {
 			t.Errorf("repair dispatch lacks guard %s:\n%s", guard, script.String())
 		}
@@ -498,6 +493,31 @@ func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
 		if name != "repair" && job.Permissions["actions"] == "write" {
 			t.Errorf("job %s can dispatch workflows", name)
 		}
+	}
+	if verification := workflow.Jobs["apply"].Env["VERIFICATION"]; verification != "${{ github.event.schedule == '47 * * * *' || inputs.verify }}" {
+		t.Errorf("hourly and dispatched verification select %q", verification)
+	}
+	data, err = os.ReadFile(filepath.Join("..", "..", ".github/workflows/reconcile.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var trigger struct {
+		On struct {
+			Schedule []struct {
+				Cron string `yaml:"cron"`
+			} `yaml:"schedule"`
+			Dispatch struct {
+				Inputs map[string]struct {
+					Type string `yaml:"type"`
+				} `yaml:"inputs"`
+			} `yaml:"workflow_dispatch"`
+		} `yaml:"on"`
+	}
+	if err := yaml.Unmarshal(data, &trigger); err != nil {
+		t.Fatal(err)
+	}
+	if len(trigger.On.Schedule) != 1 || trigger.On.Schedule[0].Cron != "47 * * * *" || trigger.On.Dispatch.Inputs["verify"].Type != "boolean" {
+		t.Errorf("reconciliation is scheduled beyond hourly verification or lacks on-demand verification: %+v", trigger.On)
 	}
 }
 

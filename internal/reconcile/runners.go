@@ -273,21 +273,6 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 		c.warn("runner fleet state unavailable; converging runners without GitHub repairs: %v", err)
 		return c.ansible(ctx, playbook)
 	}
-	drift := runnerDrift(fleet, states)
-	if plan.RunnersUnchanged {
-		switch {
-		case len(drift) > 0:
-			c.note("GitHub reported runner drift; converging runners")
-		case c.ansible(ctx, "verify-runners.yml") == nil:
-			c.runnersVerified = true
-			c.note("runner fleet matches its declaration; skipping the runner play")
-			return nil
-		case ctx.Err() != nil:
-			return ctx.Err()
-		default:
-			c.note("runner verification reported drift; converging runners")
-		}
-	}
 	c.convergeRunnerLabels(ctx, fleet, states)
 	repairs := map[string][]string{}
 	if restart := offlineRunners(fleet, states); len(restart) > 0 {
@@ -304,16 +289,10 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 		}
 		args = append(args, "--extra-vars", string(variables))
 	}
-	if len(drift) == 0 && effectiveHostScope(plan.Affected) == HostScopeRunners && slices.Equal(plan.Affected.RunnerInputs, []string{"build/cli-release.json"}) {
+	if len(runnerDrift(fleet, states)) == 0 && effectiveHostScope(plan.Affected) == HostScopeRunners && slices.Equal(plan.Affected.RunnerInputs, []string{"build/cli-release.json"}) {
 		args = append(args, "--tags=infra_binary")
 	}
 	return c.ansible(ctx, playbook, args...)
-}
-
-func (c *Commands) note(format string, args ...any) {
-	if c.Runner.Stdout != nil {
-		fmt.Fprintf(c.Runner.Stdout, format+"\n", args...)
-	}
 }
 
 func (c *Commands) warn(format string, args ...any) {

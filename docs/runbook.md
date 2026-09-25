@@ -35,8 +35,8 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | --- | --- | --- |
 | Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu expansion and final-state plans, Flux rendering, Ansible task lists |
 | Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout; apply against the last successful revision |
-| Scheduled recovery | `infra reconcile apply --full --scheduled` | All systems reconciled at minute 17 every six hours (UTC); the runner play is skipped when no runner input changed since the applied revision and runner verification passes |
-| Scheduled verification | `infra reconcile verify` | Read-only readiness, revision, service and runner verification at minute 47 every hour; a failure dispatches one full reconciliation of `main` |
+| Scheduled verification | `infra reconcile verify --deep --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and host plays at minute 47 every hour (UTC); a report listing differences dispatches one full reconciliation of `main` unless one dispatched for the same revision started within six hours or failed |
+| On-demand verification | `gh workflow run reconcile.yml --ref main -f verify=true` | The scheduled verification on demand; differences are reported without dispatching a reconciliation |
 | Verification | `infra reconcile verify` | Exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision |
 | Status | `infra reconcile status` | Desired revision, successfully applied revision, failing stage and stage durations |
 
@@ -86,7 +86,7 @@ go build -o .infra/bin/infra ./cmd/infra
 | 8 | Apply `tailscale/policy.hujson`; create the environment-bound OIDC identities below |
 | 9 | Run the workflow manually and confirm `desired_revision == applied_revision` with `stage == complete` |
 
-These activation steps provision external credentials once; merge and scheduled reconciliation fetch credentials from Doppler.
+These activation steps provision external credentials once; merge, verification and dispatched reconciliation runs fetch credentials from Doppler.
 
 | GitHub environment | Doppler project / config | GitHub secret |
 | --- | --- | --- |
@@ -145,7 +145,7 @@ gh workflow run reconcile.yml --ref main
 | Missing credentials or private connectivity | Repair the environment identity, host enrollment or Tailnet policy; rerun the workflow |
 | Newer merge supersedes a queued run | Reconcile current `main`; stale runs cannot publish or report success |
 | Failed apply or verification | Rerun the workflow or run `infra reconcile apply --full` from a clean current `main` checkout |
-| Process terminated without lock cleanup | Wait for the recorded lock expiry; scheduled reconciliation retries automatically |
+| Process terminated without lock cleanup | Wait for the recorded lock expiry; rerun the workflow |
 | Remaining OpenTofu drift | Inspect the final plan; nonzero drift keeps the run failed |
 | Image publication succeeds | Check the separate reconciliation workflow for production readiness |
 
