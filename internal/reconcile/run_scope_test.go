@@ -70,9 +70,9 @@ func TestToolingVerificationFailureForcesFullRecovery(t *testing.T) {
 }
 
 func TestToolingChangeKeepsSelectedProjectScope(t *testing.T) {
-	store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete", ArtifactsVerified: "old"}}
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}
 	ops := &checkpointOps{revision: "new", delta: Affected([]string{"internal/reconcile/run.go", "platform/projects/llunde/kustomization.yaml"})}
-	if err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true, VerifyArtifacts: true}).Apply(context.Background(), false); err != nil {
+	if err := (Reconciler{Store: store, Ops: ops, SkipUnchanged: true}).Apply(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(ops.calls, []string{"plan", "publish", "kubernetes", "verify"}) {
@@ -188,7 +188,7 @@ func TestPreflightFailurePreventsMutations(t *testing.T) {
 func TestScopeControlsApplyToSelection(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
 		for _, path := range []string{"build/cli-release.json", "platform/projects/portfolio/kustomization.yaml"} {
-			commands := &Commands{ScopeHosts: enabled, ScopeProjects: enabled, VerifyArtifacts: enabled, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := &Commands{ScopeHosts: enabled, ScopeProjects: enabled, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				if options.Args[0] == "diff" {
 					return process.Result{Stdout: []byte(path + "\n")}, nil
 				}
@@ -205,47 +205,6 @@ func TestScopeControlsApplyToSelection(t *testing.T) {
 				t.Fatalf("project control ignored: %+v", selected)
 			}
 		}
-	}
-}
-
-func TestProjectScopeRequiresVerifiedArtifactBaseline(t *testing.T) {
-	for _, scenario := range []struct {
-		name, proof     string
-		enabled, scoped bool
-	}{
-		{"legacy state", "", true, false},
-		{"outdated proof", "older", true, false},
-		{"current proof", "old", true, true},
-		{"verification disabled", "old", false, false},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete", ArtifactsVerified: scenario.proof}}
-			ops := &checkpointOps{revision: "new", delta: Selection{Kubernetes: true, Projects: []string{"portfolio"}}}
-			if err := (Reconciler{Store: store, Ops: ops, VerifyArtifacts: scenario.enabled}).Apply(context.Background(), false); err != nil {
-				t.Fatal(err)
-			}
-			if len(ops.plans) != 1 || (len(ops.plans[0].Affected.Projects) == 1) != scenario.scoped {
-				t.Fatalf("artifact baseline gate failed: %+v", ops.plans)
-			}
-			want := ""
-			if scenario.enabled {
-				want = "new"
-			}
-			if store.status.ArtifactsVerified != want {
-				t.Fatalf("incorrect proof: %+v", store.status)
-			}
-		})
-	}
-}
-
-func TestArtifactVerificationFailurePreservesProof(t *testing.T) {
-	store := &memoryStore{status: Status{Desired: "old", Applied: "old", ArtifactsVerified: "old"}}
-	ops := &fakeOps{selection: All(), fail: "verify"}
-	if err := (Reconciler{Store: store, Ops: ops, VerifyArtifacts: true}).Apply(context.Background(), false); err == nil {
-		t.Fatal("verification failure lost")
-	}
-	if store.status.ArtifactsVerified != "old" || store.status.Applied != "old" {
-		t.Fatalf("failed verification advanced proof: %+v", store.status)
 	}
 }
 

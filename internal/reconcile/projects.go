@@ -132,10 +132,6 @@ func (c *Commands) selectedOwners(plan Plan) []string {
 }
 
 func (c *Commands) Preflight(ctx context.Context, plan Plan) (Plan, error) {
-	if !c.VerifyArtifacts {
-		plan.Affected.Projects = nil
-		return plan, nil
-	}
 	if err := c.loadKubernetes(ctx); err != nil {
 		return plan, err
 	}

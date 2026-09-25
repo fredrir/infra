@@ -430,10 +430,13 @@ func TestHelmReleasesReconcileAlongsideKustomizations(t *testing.T) {
 	var calls []string
 	token, lateToken, created := "", "", false
 	item := func(name, namespace, handled string) string {
-		return fmt.Sprintf(`{"metadata":{"name":%q,"namespace":%q,"generation":1},"spec":{"sourceRef":{"kind":"GitRepository","name":"flux-system"}},"status":{"observedGeneration":1,"lastAppliedRevision":"production@sha1:revision","lastHandledReconcileAt":%q,"conditions":[{"type":"Ready","status":"True","observedGeneration":1}]}}`, name, namespace, handled)
+		return fmt.Sprintf(`{"metadata":{"name":%q,"namespace":%q,"generation":1},"spec":{"sourceRef":{"kind":"GitRepository","name":"flux-system"}},"status":{"observedGeneration":1,"lastAppliedRevision":"production@sha1:revision","lastHandledReconcileAt":%q,"inventory":{"entries":[]},"conditions":[{"type":"Ready","status":"True","observedGeneration":1}]}}`, name, namespace, handled)
 	}
-	c := Commands{Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+	c := Commands{kubernetes: declaredRoot(t), Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
 		args := strings.Join(o.Args, " ")
+		if result, ok := deployedArtifacts(t, "revision", args); ok {
+			return result, nil
+		}
 		switch {
 		case o.Name == "kubectl" && strings.HasPrefix(args, "annotate "):
 			calls = append(calls, o.Args[1])
@@ -443,8 +446,10 @@ func TestHelmReleasesReconcileAlongsideKustomizations(t *testing.T) {
 			}
 		case strings.HasPrefix(args, "get gitrepository "):
 			return process.Result{Stdout: []byte(`{"spec":{"ref":{"branch":"production"}},"status":{"artifact":{"revision":"production@sha1:revision"}}}`)}, nil
-		case strings.HasPrefix(args, "get kustomizations."):
+		case strings.HasPrefix(args, "get kustomizations.") && strings.Contains(args, "--all-namespaces"):
 			calls, created = append(calls, "kustomizations ready"), true
+			return process.Result{Stdout: []byte(`{"items":[` + item("flux-system", "flux-system", token) + `]}`)}, nil
+		case strings.HasPrefix(args, "get kustomizations."):
 			return process.Result{Stdout: []byte(`{"items":[` + item("flux-system", "flux-system", token) + `]}`)}, nil
 		case strings.HasPrefix(args, "get helmreleases."):
 			return process.Result{Stdout: []byte(`{"items":[` + item("monitoring", "observability", token) + "," + item("created", "observability", lateToken) + `]}`)}, nil
@@ -467,8 +472,11 @@ func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
 		t.Run(initial, func(t *testing.T) {
 			branch, token := initial, ""
 			var rootReconciles int
-			c := Commands{Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+			c := Commands{kubernetes: declaredRoot(t), Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
 				args := strings.Join(o.Args, " ")
+				if result, ok := deployedArtifacts(t, "revision", args); ok {
+					return result, nil
+				}
 				if o.Name == "flux" && strings.HasPrefix(args, "reconcile kustomization flux-system") {
 					branch = "production"
 					rootReconciles++
@@ -494,7 +502,7 @@ func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
 					if strings.HasPrefix(args, "get helmreleases.") {
 						name, namespace = "monitoring", "observability"
 					}
-					body := fmt.Sprintf(`{"items":[{"metadata":{"name":%q,"namespace":%q,"generation":1},"spec":{"sourceRef":{"kind":"GitRepository","name":"flux-system"}},"status":{"observedGeneration":1,"lastAppliedRevision":"production@sha1:revision","lastHandledReconcileAt":%q,"conditions":[{"type":"Ready","status":"True","observedGeneration":1}]}}]}`, name, namespace, token)
+					body := fmt.Sprintf(`{"items":[{"metadata":{"name":%q,"namespace":%q,"generation":1},"spec":{"sourceRef":{"kind":"GitRepository","name":"flux-system"}},"status":{"observedGeneration":1,"lastAppliedRevision":"production@sha1:revision","lastHandledReconcileAt":%q,"inventory":{"entries":[]},"conditions":[{"type":"Ready","status":"True","observedGeneration":1}]}}]}`, name, namespace, token)
 					return process.Result{Stdout: []byte(body)}, nil
 				}
 				return process.Result{}, nil

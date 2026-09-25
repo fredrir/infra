@@ -19,11 +19,51 @@ func readyResource(t *testing.T, kind, namespace, name string) resource {
 	return artifactFixture(t, fmt.Sprintf(`{"kind":%q,"metadata":{"name":%q,"namespace":%q,"generation":1},"status":{"observedGeneration":1,"conditions":[{"type":"Ready","status":"True","observedGeneration":1}]}}`, kind, name, namespace))
 }
 
+func declaredRoot(t *testing.T) *kubernetesState {
+	root := readyResource(t, "Kustomization", "flux-system", "flux-system")
+	root.Spec.SourceRef.Kind, root.Spec.SourceRef.Name = "GitRepository", "flux-system"
+	return &kubernetesState{owners: map[string]resource{"flux-system": root}, generator: readyGenerator(t), workloads: map[string][]resource{"flux-system": nil}}
+}
+
+func readyGenerator(t *testing.T) resource {
+	return artifactFixture(t, `{"kind":"ArtifactGenerator","metadata":{"name":"platform-artifacts","namespace":"flux-system","uid":"generator-id","generation":1},"status":{"observedGeneration":1,"conditions":[{"type":"Ready","status":"True","observedGeneration":1}],"inventory":[]}}`)
+}
+
+func deployedArtifacts(t *testing.T, revision, args string) (process.Result, bool) {
+	var value any
+	switch {
+	case strings.HasPrefix(args, "get gitrepositories.source.toolkit.fluxcd.io flux-system "):
+		source := readyResource(t, "GitRepository", "flux-system", "flux-system")
+		source.Spec.Ref.Branch, source.Status.Artifact.Revision = "production", "production@sha1:"+revision
+		value = source
+	case strings.HasPrefix(args, "get artifactgenerators.source.extensions.fluxcd.io platform-artifacts "):
+		value = readyGenerator(t)
+	case strings.HasPrefix(args, "get externalartifacts.source.toolkit.fluxcd.io "):
+		value = items()
+	default:
+		return process.Result{}, false
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return process.Result{Stdout: data}, true
+}
+
 func notReady(item *resource) {
 	item.Status.Conditions[0].Status = "False"
 }
 
 type kubernetesFake map[string]any
+
+func (f kubernetesFake) handles(command string) bool {
+	for prefix := range f {
+		if strings.HasPrefix(command, prefix) {
+			return true
+		}
+	}
+	return false
+}
 
 func (f kubernetesFake) execute(t *testing.T, options process.Options) (process.Result, error) {
 	t.Helper()
@@ -43,14 +83,7 @@ func (f kubernetesFake) execute(t *testing.T, options process.Options) (process.
 
 func items(resources ...resource) any { return struct{ Items []resource }{resources} }
 
-func TestKubernetesDeclarationMismatchesAreDifferences(t *testing.T) {
-	revision := strings.Repeat("a", 40)
-	root := func(t *testing.T) resource {
-		item := readyResource(t, "Kustomization", "flux-system", "flux-system")
-		item.Spec.SourceRef.Kind, item.Spec.SourceRef.Name = "GitRepository", "flux-system"
-		item.Status.LastAppliedRevision = "production@sha1:" + revision
-		return item
-	}
+func TestHelmReleaseMismatchesAreDifferences(t *testing.T) {
 	monitoring := func(t *testing.T) resource {
 		item := readyResource(t, "HelmRelease", "observability", "monitoring")
 		item.Spec.Values.Grafana.INI.Server.RootURL = "https://logs.fredrir.com"
@@ -58,51 +91,36 @@ func TestKubernetesDeclarationMismatchesAreDifferences(t *testing.T) {
 	}
 	for _, test := range []struct {
 		name        string
-		mutate      func(kustomizations, releases *[]resource)
+		mutate      func(releases *[]resource)
 		differences []Difference
 		errors      []string
 	}{
 		{name: "matching"},
-		{name: "unapplied revision", mutate: func(kustomizations, _ *[]resource) {
-			(*kustomizations)[0].Status.LastAppliedRevision = "production@sha1:old"
-		}, differences: []Difference{{System: "kubernetes", Item: "Kustomization flux-system/flux-system has not applied " + revision}}},
-		{name: "suspended root", mutate: func(kustomizations, _ *[]resource) { (*kustomizations)[0].Spec.Suspend = true }, errors: []string{"Kustomization flux-system/flux-system is suspended"}},
-		{name: "suspended child is declared elsewhere", mutate: func(kustomizations, _ *[]resource) {
-			child := readyResource(t, "Kustomization", "flux-system", "platform-projects")
-			child.Spec.Suspend = true
-			*kustomizations = append(*kustomizations, child)
-		}},
-		{name: "unready and unapplied", mutate: func(kustomizations, _ *[]resource) {
-			child := readyResource(t, "Kustomization", "flux-system", "platform-cache")
-			child.Spec.SourceRef.Kind, child.Spec.SourceRef.Name = "GitRepository", "flux-system"
-			notReady(&child)
-			*kustomizations = append(*kustomizations, child)
-		}, differences: []Difference{{System: "kubernetes", Item: "Kustomization flux-system/platform-cache has not applied " + revision}}, errors: []string{"flux-system/platform-cache is not ready"}},
-		{name: "Grafana root_url", mutate: func(_, releases *[]resource) {
+		{name: "Grafana root_url", mutate: func(releases *[]resource) {
 			(*releases)[0].Spec.Values.Grafana.INI.Server.RootURL = "https://grafana.fredrir.com"
 		}, differences: []Difference{{System: "kubernetes", Item: `HelmRelease observability/monitoring serves Grafana at "https://grafana.fredrir.com", want "https://logs.fredrir.com"`}}},
-		{name: "suspended Grafana", mutate: func(_, releases *[]resource) { (*releases)[0].Spec.Suspend = true }, errors: []string{"HelmRelease observability/monitoring is suspended"}},
-		{name: "missing Grafana", mutate: func(_, releases *[]resource) {
+		{name: "suspended Grafana", mutate: func(releases *[]resource) { (*releases)[0].Spec.Suspend = true }, errors: []string{"HelmRelease observability/monitoring is suspended"}},
+		{name: "missing Grafana", mutate: func(releases *[]resource) {
 			*releases = []resource{readyResource(t, "HelmRelease", "cache", "valkey")}
 		}, differences: []Difference{{System: "kubernetes", Item: "HelmRelease observability/monitoring is missing"}}},
-		{name: "unready release", mutate: func(_, releases *[]resource) {
+		{name: "unready release", mutate: func(releases *[]resource) {
 			release := readyResource(t, "HelmRelease", "cache", "valkey")
 			notReady(&release)
 			*releases = append(*releases, release)
 		}, errors: []string{"cache/valkey is not ready"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			kustomizations, releases := []resource{root(t)}, []resource{monitoring(t)}
+			releases := []resource{monitoring(t)}
 			if test.mutate != nil {
-				test.mutate(&kustomizations, &releases)
+				test.mutate(&releases)
 			}
-			fake := kubernetesFake{"get kustomizations.kustomize.toolkit.fluxcd.io": items(kustomizations...), "get helmreleases.helm.toolkit.fluxcd.io": items(releases...)}
+			fake := kubernetesFake{"get helmreleases.helm.toolkit.fluxcd.io": items(releases...)}
 			commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				return fake.execute(t, options)
 			}}}
-			outcome := VerificationOutcome("", false, commands.verifyCluster(context.Background(), Plan{Revision: revision, Host: "logs.fredrir.com"}))
+			outcome := VerificationOutcome("", false, commands.verifyHelm(context.Background(), "", "logs.fredrir.com"))
 			if !reflect.DeepEqual(outcome.Differences, append([]Difference{}, test.differences...)) || !reflect.DeepEqual(outcome.Errors, append([]string{}, test.errors...)) {
-				t.Fatalf("cluster verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
+				t.Fatalf("release verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
 			}
 		})
 	}
@@ -197,12 +215,12 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 				"get helmreleases.helm.toolkit.fluxcd.io --all-namespaces":              items(current.monitoring),
 			}
 			var mu sync.Mutex
-			commands := Commands{VerifyArtifacts: true, kubernetes: &kubernetesState{owners: declared, generator: generator, workloads: map[string][]resource{"flux-system": nil, "project-y": {expected}}}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{kubernetes: &kubernetesState{owners: declared, generator: generator, workloads: map[string][]resource{"flux-system": nil, "project-y": {expected}}}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				mu.Lock()
 				defer mu.Unlock()
 				return fake.execute(t, options)
 			}}}
-			outcome := VerificationOutcome("", false, commands.verifyCluster(context.Background(), Plan{Revision: revision, Affected: All(), Host: "logs.fredrir.com"}))
+			outcome := VerificationOutcome("", false, commands.verifyDeployment(context.Background(), Plan{Revision: revision, Affected: All(), Host: "logs.fredrir.com"}))
 			if !reflect.DeepEqual(outcome.Differences, append([]Difference{}, test.differences...)) || !reflect.DeepEqual(outcome.Errors, append([]string{}, test.errors...)) {
 				t.Fatalf("deployment verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
 			}
@@ -213,12 +231,23 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 func TestVerificationCollectsEveryPart(t *testing.T) {
 	fleet := testRunnerFleet()
 	revision := strings.Repeat("a", 40)
-	root := readyResource(t, "Kustomization", "flux-system", "flux-system")
-	root.Spec.SourceRef.Kind, root.Spec.SourceRef.Name = "GitRepository", "flux-system"
-	root.Status.LastAppliedRevision = "production@sha1:old"
-	unready := readyResource(t, "HelmRelease", "observability", "monitoring")
-	notReady(&unready)
+	declared := declaredRoot(t)
+	for _, name := range []string{"platform-policy", "project-portfolio"} {
+		owner := readyResource(t, "Kustomization", "flux-system", name)
+		owner.Spec.SourceRef.Kind, owner.Spec.SourceRef.Name = "GitRepository", "flux-system"
+		declared.owners[name], declared.workloads[name] = owner, nil
+	}
+	deployed := func(name, applied string, ready bool) resource {
+		item := readyResource(t, "Kustomization", "flux-system", name)
+		item.Spec.SourceRef = declared.owners[name].Spec.SourceRef
+		item.Status.LastAppliedRevision, item.Status.Inventory = "production@sha1:"+applied, json.RawMessage(`{"entries":[]}`)
+		if !ready {
+			notReady(&item)
+		}
+		return item
+	}
 	drift := junitCase("[infra-build-09] Verify dedicated build runners: Reject declared runner state drift", "verify-runners.yml:92", `<failure message="The build VM differs from its declared runner state"/>`)
+	runnerDrift := Difference{System: "runners", Host: "infra-build-09", Item: "Verify dedicated build runners: Reject declared runner state drift"}
 	for _, test := range []struct {
 		name        string
 		kubernetes  kubernetesFake
@@ -226,16 +255,12 @@ func TestVerificationCollectsEveryPart(t *testing.T) {
 		differences []Difference
 		errors      []string
 	}{
-		{name: "cluster mismatch", kubernetes: kubernetesFake{"get kustomizations.kustomize.toolkit.fluxcd.io": items(root), "get helmreleases.helm.toolkit.fluxcd.io": items(unready)}, differences: []Difference{
+		{name: "cluster mismatch", kubernetes: kubernetesFake{"get kustomizations.kustomize.toolkit.fluxcd.io -n=flux-system": items(deployed("flux-system", "old", true), deployed("platform-policy", revision, true), deployed("project-portfolio", revision, false))}, differences: []Difference{
 			{System: "kubernetes", Item: "Kustomization flux-system/flux-system has not applied " + revision},
-			{System: "runners", Host: "infra-build-09", Item: "Verify dedicated build runners: Reject declared runner state drift"},
-		}, errors: []string{"observability/monitoring is not ready"}},
-		{name: "cluster unreachable", kubernetes: kubernetesFake{"get kustomizations.kustomize.toolkit.fluxcd.io": errors.New("kubectl failed: connection refused"), "get helmreleases.helm.toolkit.fluxcd.io": errors.New("kubectl failed: connection refused")}, differences: []Difference{
-			{System: "runners", Host: "infra-build-09", Item: "Verify dedicated build runners: Reject declared runner state drift"},
-		}, errors: []string{"kubectl failed: connection refused"}},
-		{name: "desired state unrendered", kubernetes: kubernetesFake{"kustomize": errors.New("kubectl failed: kustomize build failed")}, live: true, differences: []Difference{
-			{System: "runners", Host: "infra-build-09", Item: "Verify dedicated build runners: Reject declared runner state drift"},
-		}, errors: []string{"kubectl failed: kustomize build failed"}},
+			runnerDrift,
+		}, errors: []string{"flux-system/project-portfolio is not ready"}},
+		{name: "cluster unreachable", kubernetes: kubernetesFake{"get gitrepositories.source.toolkit.fluxcd.io": errors.New("kubectl failed: connection refused")}, differences: []Difference{runnerDrift}, errors: []string{"kubectl failed: connection refused"}},
+		{name: "desired state unrendered", kubernetes: kubernetesFake{"kustomize": errors.New("kubectl failed: kustomize build failed")}, live: true, differences: []Difference{runnerDrift}, errors: []string{"kubectl failed: kustomize build failed"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var mu sync.Mutex
@@ -244,6 +269,11 @@ func TestVerificationCollectsEveryPart(t *testing.T) {
 				case "kubectl":
 					mu.Lock()
 					defer mu.Unlock()
+					if args := strings.Join(options.Args, " "); !test.kubernetes.handles(args) {
+						if result, ok := deployedArtifacts(t, revision, args); ok {
+							return result, nil
+						}
+					}
 					return test.kubernetes.execute(t, options)
 				case "ansible-playbook":
 					return fakePlaybooks{reports: []string{junitReport("verify-runners", drift)}, exit: 2}.execute(t, options)
@@ -257,6 +287,8 @@ func TestVerificationCollectsEveryPart(t *testing.T) {
 			verify := commands.Verify
 			if test.live {
 				verify = commands.VerifyLive
+			} else {
+				commands.kubernetes = declared
 			}
 			outcome := VerificationOutcome("", false, verify(context.Background(), plan))
 			if !reflect.DeepEqual(outcome.Differences, test.differences) || !reflect.DeepEqual(outcome.Errors, test.errors) {

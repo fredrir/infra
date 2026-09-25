@@ -19,7 +19,6 @@ env:
   INFRA_RECONCILE_TAILNET: 'true'
   SCOPE_HOSTS: ${{ vars.INFRA_SCOPE_HOSTS == 'true' }}
   SCOPE_PROJECTS: ${{ vars.INFRA_SCOPE_PROJECTS == 'true' }}
-  VERIFY_ARTIFACTS: ${{ vars.INFRA_VERIFY_ARTIFACTS == 'true' }}
 concurrency:
   group: infrastructure-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'production' }}
   cancel-in-progress: false
@@ -73,7 +72,7 @@ jobs:
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
       run: |
         set -o pipefail
-        infra reconcile plan --base "$BASE" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
+        infra reconcile plan --base "$BASE" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
     - name: Require a trusted branch for the live plan
       if: github.event.pull_request.head.repo.full_name != github.repository
       run: |
@@ -182,9 +181,9 @@ jobs:
       run: |
         if [ -n "$STRATEGY_OVERRIDE" ]; then export ANSIBLE_STRATEGY="$STRATEGY_OVERRIDE"; fi
         if [ "$VERIFICATION" = true ]; then
-          infra ci measure --stage drift-verification --budget 10m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --deep --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/verification.json"
+          infra ci measure --stage drift-verification --budget 10m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --deep --report="$RUNNER_TEMP/reconciliation/verification.json"
         else
-          infra reconcile apply --full="$FULL" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/status.json"
+          infra reconcile apply --full="$FULL" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --report="$RUNNER_TEMP/reconciliation/status.json"
         fi
     - name: Read declared differences
       id: verification

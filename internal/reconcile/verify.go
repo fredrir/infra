@@ -116,14 +116,12 @@ func (c *Commands) resources(ctx context.Context, kind string) ([]resource, erro
 
 func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
 	revision := plan.Revision
-	if c.VerifyArtifacts {
-		if err := c.loadKubernetes(ctx); err != nil {
+	if err := c.loadKubernetes(ctx); err != nil {
+		return err
+	}
+	if len(c.kubernetes.workloads) == 0 {
+		if err := c.RenderKubernetes(ctx, plan); err != nil {
 			return err
-		}
-		if len(c.kubernetes.workloads) == 0 {
-			if err := c.RenderKubernetes(ctx, plan); err != nil {
-				return err
-			}
 		}
 	}
 	if err := c.Runner.Run(ctx, "flux", "reconcile", "source", "git", "flux-system", "--timeout=5m"); err != nil {
@@ -149,7 +147,7 @@ func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
 	if source.Spec.Ref.Branch == "main" {
 		return c.bootstrapProduction(ctx, plan)
 	}
-	if c.VerifyArtifacts && len(plan.Affected.Projects) > 0 {
+	if len(plan.Affected.Projects) > 0 {
 		wait, cancel := context.WithTimeout(ctx, 20*time.Minute)
 		defer cancel()
 		started := time.Now()
@@ -181,10 +179,7 @@ func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
 	if err := poll(wait, func() error { return c.verifyHelm(wait, token, "") }); err != nil {
 		return err
 	}
-	if c.VerifyArtifacts {
-		return poll(wait, func() error { return c.verifyDeployment(wait, plan) })
-	}
-	return nil
+	return poll(wait, func() error { return c.verifyDeployment(wait, plan) })
 }
 
 func (c *Commands) requestReconcile(ctx context.Context, kinds, token string) error {
@@ -228,7 +223,7 @@ func (c *Commands) verifyKubernetes(ctx context.Context, revision, token string)
 		}
 		if item.Spec.SourceRef.Kind == "GitRepository" && item.Spec.SourceRef.Name == "flux-system" {
 			if !strings.HasSuffix(item.Status.LastAppliedRevision, ":"+revision) {
-				problems = append(problems, kubernetesDifference("Kustomization %s has not applied %s", name, revision))
+				problems = append(problems, fmt.Errorf("Kustomization %s has not applied %s", name, revision))
 			}
 			root = root || name == "flux-system/flux-system"
 		}
@@ -271,14 +266,7 @@ func (c *Commands) verifyHelm(ctx context.Context, token, host string) error {
 }
 
 func (c *Commands) Verify(ctx context.Context, plan Plan) error {
-	return c.verifyParts(ctx, plan, c.verifyCluster(ctx, plan))
-}
-
-func (c *Commands) verifyCluster(ctx context.Context, plan Plan) error {
-	if c.VerifyArtifacts {
-		return c.verifyDeployment(ctx, plan)
-	}
-	return errors.Join(c.verifyKubernetes(ctx, plan.Revision, ""), c.verifyHelm(ctx, "", plan.Host))
+	return c.verifyParts(ctx, plan, c.verifyDeployment(ctx, plan))
 }
 
 func (c *Commands) verifyParts(ctx context.Context, plan Plan, cluster error) error {
@@ -435,7 +423,7 @@ func (c *Commands) verifyRenderedCluster(ctx context.Context, plan Plan) error {
 	if err := c.RenderKubernetes(ctx, plan); err != nil {
 		return err
 	}
-	return c.verifyCluster(ctx, plan)
+	return c.verifyDeployment(ctx, plan)
 }
 
 func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
