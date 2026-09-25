@@ -35,8 +35,8 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | --- | --- | --- |
 | Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu expansion and final-state plans, Flux rendering, Ansible task lists |
 | Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout; apply against the last successful revision |
-| Scheduled recovery | `infra reconcile apply --full` | All systems reconciled at minute 17 every six hours (UTC) |
-| Scheduled verification | `infra reconcile verify` | Read-only readiness, revision and service verification at minute 47 every hour |
+| Scheduled recovery | `infra reconcile apply --full --scheduled` | All systems reconciled at minute 17 every six hours (UTC); the runner play is skipped when no runner input changed since the applied revision and runner verification passes |
+| Scheduled verification | `infra reconcile verify` | Read-only readiness, revision, service and runner verification at minute 47 every hour; a failure dispatches one full reconciliation of `main` |
 | Verification | `infra reconcile verify` | Exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision |
 | Status | `infra reconcile status` | Desired revision, successfully applied revision, failing stage and stage durations |
 

@@ -76,7 +76,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Application setup | Durable applied state selects tools; application-only changes skip host tooling, SSH and runner-registration credentials; recovery retains full setup |
 | State operations | Signed S3 requests reuse HTTP connections with conditional lease ownership, encryption and durable status updates |
 | Permission preflight | Up to four read-only workload permission checks run concurrently before mutation |
-| Scheduled work | Full recovery runs every six hours at minute 17; hourly verification at minute 47 reads live state without applying declarations |
+| Scheduled work | Full recovery runs every six hours at minute 17 and skips the verified runner play when runner inputs are unchanged; hourly verification at minute 47 reads live state and dispatches one full reconciliation when it fails |
 | Deployment selection | Explicit CI-only paths skip deployment; supported project changes select the union of their dependency chains; tooling inputs never widen scope; shared and unknown inputs retain full fallback |
 | Tooling changes | `cmd/`, `internal/`, `.github/`, Go and Bazel modules and listed `build/` inputs run read-only drift verification of the applied revision: generated artifacts, `tofu plan -detailed-exitcode`, workloads and hosts; failure forces full recovery; `INFRA_SCOPE_HOSTS=false` restores full convergence |
 | Workload verification | Each verification poll lists workloads once per kind and namespace; expected ownership, images, readiness and generations remain required |
@@ -87,7 +87,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Frontend deadlines | Publication queueing has a separate eight-minute measurement; the subsequent exact served-revision check retains its 60-second budget within the existing ten-minute job |
 
 VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; the default slot count is one for the 8 GiB build VM.
-The hourly verification does not replace the full OpenTofu and host drift repair cycle.
+A failed hourly verification dispatches a full reconciliation; a failed dispatched reconciliation of the same revision is not dispatched again.
 These controls do not establish an ordinary-traffic latency percentile; compare the completion observer's post-rollout samples with equivalent workloads.
 
 ## Execution measurements
