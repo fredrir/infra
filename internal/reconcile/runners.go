@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -57,6 +58,9 @@ func LoadRunnerFleet(root string) (RunnerFleet, error) {
 	var fleet RunnerFleet
 	if err := decoder.Decode(&fleet); err != nil {
 		return RunnerFleet{}, fmt.Errorf("runner fleet: %w", err)
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		return RunnerFleet{}, fmt.Errorf("runner fleet: trailing data after declaration")
 	}
 	switch {
 	case fleet.Schema != 1:

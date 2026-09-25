@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -88,12 +89,22 @@ func TestLoadRunnerFleetValidatesDeclaration(t *testing.T) {
 			}
 		})
 	}
-	root := writeRunnerFleet(t, testRunnerFleet())
-	if err := os.WriteFile(filepath.Join(root, "build/runners.json"), []byte(`{"schema":1,"repository":"infra"}`), 0644); err != nil {
+	valid, err := json.Marshal(testRunnerFleet())
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadRunnerFleet(root); err == nil {
-		t.Fatal("unknown runner fleet field accepted")
+	for name, data := range map[string]string{
+		"unknown field":      `{"schema":1,"repository":"infra"}`,
+		"trailing object":    string(valid) + "\n{}",
+		"trailing delimiter": string(valid) + "}",
+	} {
+		root := writeRunnerFleet(t, testRunnerFleet())
+		if err := os.WriteFile(filepath.Join(root, "build/runners.json"), []byte(data), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadRunnerFleet(root); err == nil {
+			t.Errorf("runner fleet with %s accepted", name)
+		}
 	}
 }
 
@@ -187,42 +198,57 @@ func TestRunnerFleetVerificationFailsWhenDriftPersists(t *testing.T) {
 	}
 }
 
-func TestDaggerRoutedRepositoriesHaveDeclaredRunners(t *testing.T) {
+func TestFleetRoutedRepositoriesHaveDeclaredRunners(t *testing.T) {
 	root := filepath.Join("..", "..")
 	fleet, err := LoadRunnerFleet(root)
 	if err != nil {
 		t.Fatal(err)
 	}
+	workflows, err := filepath.Glob(filepath.Join(root, ".github/workflows/*.yml"))
+	if err != nil || len(workflows) == 0 {
+		t.Fatalf("workflows unavailable: %v", err)
+	}
+	var labels []string
+	for _, label := range fleet.Labels {
+		labels = append(labels, regexp.QuoteMeta(label))
+	}
+	label := regexp.MustCompile(`(^|[^A-Za-z0-9_-])(` + strings.Join(labels, "|") + `)($|[^A-Za-z0-9_-])`)
 	repository := regexp.MustCompile(regexp.QuoteMeta(fleet.Owner) + `/([A-Za-z0-9_.-]+)`)
 	var routed []string
-	for _, path := range []string{".github/workflows/build-image.yml", ".github/workflows/packages-publish.yml"} {
-		data, err := os.ReadFile(filepath.Join(root, path))
+	for _, path := range workflows {
+		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var workflow struct {
 			Jobs map[string]struct {
-				RunsOn string `yaml:"runs-on"`
+				RunsOn any `yaml:"runs-on"`
 			} `yaml:"jobs"`
 		}
 		if err := yaml.Unmarshal(data, &workflow); err != nil {
 			t.Fatalf("%s: %v", path, err)
 		}
-		for _, job := range workflow.Jobs {
-			if strings.Contains(job.RunsOn, "'dagger-amd64'") {
-				for _, match := range repository.FindAllStringSubmatch(job.RunsOn, -1) {
-					routed = append(routed, match[1])
-				}
+		for name, job := range workflow.Jobs {
+			runsOn := fmt.Sprint(job.RunsOn)
+			if !label.MatchString(runsOn) {
+				continue
+			}
+			matches := repository.FindAllStringSubmatch(runsOn, -1)
+			if len(matches) == 0 {
+				t.Errorf("%s job %s routes to the runner fleet without naming its repositories", filepath.Base(path), name)
+			}
+			for _, match := range matches {
+				routed = append(routed, match[1])
 			}
 		}
 	}
 	if len(routed) == 0 {
-		t.Fatal("no repository routes to dagger-amd64")
+		t.Fatal("no repository routes to the runner fleet")
 	}
 	slices.Sort(routed)
 	for _, name := range slices.Compact(routed) {
 		if !slices.Contains(fleet.Repositories, name) {
-			t.Errorf("%s/%s routes to dagger-amd64 without a declared runner", fleet.Owner, name)
+			t.Errorf("%s/%s routes to the runner fleet without a declared runner", fleet.Owner, name)
 		}
 	}
 }

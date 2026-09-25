@@ -141,20 +141,21 @@ jobs:
       run: |
         infra ci prepare-validation
         infra ci validate
-    - name: Read declared runner repositories
+    - name: Read declared runner fleet
       if: steps.setup.outputs.hosts == 'true'
       id: runner-fleet
       run: |
+        owner=$(jq -r '.owner' build/runners.json)
         repositories=$(jq -r '.repositories | join(",")' build/runners.json)
-        test -n "$repositories"
-        printf 'repositories=%s\n' "$repositories" >> "$GITHUB_OUTPUT"
+        test -n "$owner" && test "$owner" != null && test -n "$repositories"
+        printf 'owner=%s\nrepositories=%s\n' "$owner" "$repositories" >> "$GITHUB_OUTPUT"
     - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
       if: steps.setup.outputs.hosts == 'true'
       id: runner-token
       with:
         app-id: ${{ steps.doppler.outputs.RUNNER_APP_ID }}
         private-key: ${{ steps.doppler.outputs.RUNNER_APP_PRIVATE_KEY }}
-        owner: fredrir
+        owner: ${{ steps.runner-fleet.outputs.owner }}
         repositories: ${{ steps.runner-fleet.outputs.repositories }}
         permission-administration: ${{ github.event.schedule == '47 * * * *' && 'read' || 'write' }}
     - name: Reconcile merged revision

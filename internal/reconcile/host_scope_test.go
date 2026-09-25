@@ -91,8 +91,10 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 				return process.Result{}, errors.New("unexpected command")
 			}}}
 			plan := Plan{Affected: Selection{Ansible: test.scope != HostScopeNone, HostScope: test.scope}}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
 			for _, operation := range []func(context.Context, Plan) error{commands.Hosts, commands.Monitor, commands.VerifyHosts} {
-				if err := operation(context.Background(), plan); err != nil {
+				if err := operation(ctx, plan); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -111,16 +113,21 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 }
 
 func TestHostScopeStopsOnVerificationFailure(t *testing.T) {
+	fleet := testRunnerFleet()
 	failure := errors.New("verification failed")
 	calls := 0
-	commands := Commands{Runner: ci.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	commands := Commands{Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(context.Context, process.Options) (process.Result, error) {
 		calls++
 		return process.Result{}, failure
 	}}}
 	if err := commands.VerifyHosts(context.Background(), Plan{Affected: All()}); !errors.Is(err, failure) || calls != 1 {
 		t.Fatalf("verification failure lost: calls=%d, error=%v", calls, err)
 	}
-	fleet := testRunnerFleet()
+	calls = 0
+	commands.Runner.Dir = t.TempDir()
+	if err := commands.VerifyHosts(context.Background(), Plan{Affected: All()}); err == nil || calls != 0 {
+		t.Fatalf("missing runner fleet reached host verification: calls=%d, error=%v", calls, err)
+	}
 	commands = Commands{Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
 		if opts.Name != "gh" {
 			return process.Result{}, nil

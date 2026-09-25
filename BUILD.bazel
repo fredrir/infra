@@ -12,11 +12,14 @@ exports_files([
 ])
 
 filegroup(
+    name = "workflows",
+    srcs = glob([".github/workflows/*.yml"]),
+)
+
+filegroup(
     name = "image_contract_data",
-    srcs = glob([
-        "images/**",
-        ".github/workflows/*.yml",
-    ]) + [
+    srcs = glob(["images/**"]) + [
+        ":workflows",
         ".bazelrc",
         ".bazelversion",
         "BUILD.bazel",
@@ -37,8 +40,7 @@ filegroup(
 filegroup(
     name = "runner_routing_data",
     srcs = [
-        ".github/workflows/build-image.yml",
-        ".github/workflows/packages-publish.yml",
+        ":workflows",
         "//build:runners.json",
     ],
     visibility = ["//internal/reconcile:__pkg__"],

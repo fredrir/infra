@@ -8,6 +8,7 @@
     - ansible_facts.virtualization_role == 'guest'
     - inventory_hostname not in groups.get('k3s_cluster', [])
     - inventory_hostname == build_runner_fleet.host
+    - build_runner_repositories | difference(build_runner_fleet.repositories) | length == 0
     - build_runner_memory is match('^[1-9][0-9]*G$')
     - build_runner_job_slots | int >= 1
     - build_runner_job_slots | int <= 8

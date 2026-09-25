@@ -6,16 +6,17 @@ func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 	var playbooks []string
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
-		playbooks = []string{"reconcile.yml", "external.yml", "verify.yml", "verify-runners.yml"}
-	case HostScopeRunners:
-		playbooks = []string{"build-runners.yml", "verify-runners.yml"}
-	case HostScopeMonitor:
-		playbooks = []string{"external.yml", "verify.yml"}
-	}
-	if scope := effectiveHostScope(plan.Affected); scope == HostScopeFull || scope == HostScopeRunners {
 		if _, err := LoadRunnerFleet(c.Runner.Dir); err != nil {
 			return err
 		}
+		playbooks = []string{"reconcile.yml", "external.yml", "verify.yml", "verify-runners.yml"}
+	case HostScopeRunners:
+		if _, err := LoadRunnerFleet(c.Runner.Dir); err != nil {
+			return err
+		}
+		playbooks = []string{"build-runners.yml", "verify-runners.yml"}
+	case HostScopeMonitor:
+		playbooks = []string{"external.yml", "verify.yml"}
 	}
 	for _, playbook := range playbooks {
 		for _, check := range []string{"--syntax-check", "--list-tasks"} {
@@ -47,22 +48,24 @@ func (c *Commands) Hosts(ctx context.Context, plan Plan) error {
 }
 
 func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
-	var err error
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
-		err = c.ansible(ctx, "verify.yml", "verify-runners.yml")
+		return c.verifyRunnerHosts(ctx, "verify.yml", "verify-runners.yml")
 	case HostScopeRunners:
-		err = c.ansible(ctx, "verify-runners.yml")
+		return c.verifyRunnerHosts(ctx, "verify-runners.yml")
 	case HostScopeMonitor:
 		return c.ansible(ctx, "verify.yml", "--limit=external")
 	default:
 		return nil
 	}
+}
+
+func (c *Commands) verifyRunnerHosts(ctx context.Context, playbook string, extra ...string) error {
+	fleet, err := LoadRunnerFleet(c.Runner.Dir)
 	if err != nil {
 		return err
 	}
-	fleet, err := LoadRunnerFleet(c.Runner.Dir)
-	if err != nil {
+	if err := c.ansible(ctx, playbook, extra...); err != nil {
 		return err
 	}
 	return c.verifyRunnerFleet(ctx, fleet)
