@@ -58,8 +58,12 @@
 
 - name: Find unloaded kernel modules
   ansible.builtin.shell: |
+    set -eu
     for module in overlay br_netfilter vxlan; do
-      if modprobe --dry-run --first-time "$module" 2>/dev/null; then echo "$module"; fi
+      if [ ! -d "/sys/module/$module" ]; then
+        modprobe --dry-run "$module"
+        if modprobe --dry-run --first-time "$module" 2>/dev/null; then echo "$module"; fi
+      fi
     done
   register: k3s_unloaded_modules
   changed_when: k3s_unloaded_modules.stdout_lines | length > 0
