@@ -48,7 +48,11 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 		t.Fatal(err)
 	}
 	var workflow struct {
-		On struct{ Push struct{ PathsIgnore []string `yaml:"paths-ignore"` } }
+		On struct {
+			Push struct {
+				PathsIgnore []string `yaml:"paths-ignore"`
+			}
+		}
 		Jobs map[string]struct{ Uses string }
 	}
 	if err := yaml.Unmarshal(read(t, filepath.Join(repository, ".github/workflows/reconcile.yml")), &workflow); err != nil {
