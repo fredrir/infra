@@ -14,16 +14,21 @@ RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
         /usr/local/lib/docker \
         /home/runner/externals/node20/lib/node_modules/npm /home/runner/externals/node20/bin/npm /home/runner/externals/node20/bin/npx \
         /home/runner/externals/node24/lib/node_modules/npm /home/runner/externals/node24/bin/npm /home/runner/externals/node24/bin/npx
-# renovate: datasource=github-releases depName=rust-cross/cargo-zigbuild extractVersion=^v(?<version>.+)$
+# renovate: datasource=custom.cargo-zigbuild depName=rust-cross/cargo-zigbuild
 ARG CARGO_ZIGBUILD_VERSION=0.23.4
-# renovate: datasource=github-releases depName=mozilla/sccache extractVersion=^v(?<version>.+)$
+ARG CARGO_ZIGBUILD_SHA256=9e3cf73485edbd45905c8aadbc0fdf869c7ddc3848f0c898229f2680db52e44b
+# renovate: datasource=custom.sccache depName=mozilla/sccache
 ARG SCCACHE_VERSION=0.18.0
-# renovate: datasource=github-releases depName=nextest-rs/nextest extractVersion=^cargo-nextest-(?<version>.+)$
+ARG SCCACHE_SHA256=45f1447fbe231e3037bde351ef70677dd212216c8d62ae7ca409fecc4d6acc89
+# renovate: datasource=custom.cargo-nextest depName=nextest-rs/nextest
 ARG NEXTEST_VERSION=0.9.145
-# renovate: datasource=github-releases depName=rustsec/rustsec extractVersion=^cargo-audit/v(?<version>.+)$
+ARG NEXTEST_SHA256=cd3c85194e8b28ad26676d287f41f0d6b4d456cef5bd94700def5dea8e328883
+# renovate: datasource=custom.cargo-audit depName=rustsec/rustsec
 ARG CARGO_AUDIT_VERSION=0.22.2
-# renovate: datasource=pypi depName=ziglang
+ARG CARGO_AUDIT_SHA256=7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428
+# renovate: datasource=custom.ziglang depName=ziglang versioning=pep440
 ARG ZIG_VERSION=0.16.0
+ARG ZIG_SHA256=9fcda73f62b851dd72a54b710ad40a209896db14cfb13649e62191243556342b
 RUN cd /tmp \
     && curl --fail --silent --show-error --location --max-time 120 --output zig.whl "https://files.pythonhosted.org/packages/py3/z/ziglang/ziglang-${ZIG_VERSION}-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl" \
     && curl --fail --silent --show-error --location --max-time 120 --output zigbuild.tar.xz "https://github.com/rust-cross/cargo-zigbuild/releases/download/v${CARGO_ZIGBUILD_VERSION}/cargo-zigbuild-x86_64-unknown-linux-musl.tar.xz" \
@@ -31,11 +36,11 @@ RUN cd /tmp \
     && curl --fail --silent --show-error --location --max-time 120 --output nextest.tar.gz "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
     && curl --fail --silent --show-error --location --max-time 120 --output audit.tgz "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-musl-v${CARGO_AUDIT_VERSION}.tgz" \
     && printf '%s  %s\n' \
-        9fcda73f62b851dd72a54b710ad40a209896db14cfb13649e62191243556342b zig.whl \
-        9e3cf73485edbd45905c8aadbc0fdf869c7ddc3848f0c898229f2680db52e44b zigbuild.tar.xz \
-        45f1447fbe231e3037bde351ef70677dd212216c8d62ae7ca409fecc4d6acc89 sccache.tar.gz \
-        cd3c85194e8b28ad26676d287f41f0d6b4d456cef5bd94700def5dea8e328883 nextest.tar.gz \
-        7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428 audit.tgz \
+        "$ZIG_SHA256" zig.whl \
+        "$CARGO_ZIGBUILD_SHA256" zigbuild.tar.xz \
+        "$SCCACHE_SHA256" sccache.tar.gz \
+        "$NEXTEST_SHA256" nextest.tar.gz \
+        "$CARGO_AUDIT_SHA256" audit.tgz \
         | sha256sum --check --strict \
     && unzip -q zig.whl 'ziglang/*' -d /tmp/zig \
     && mv /tmp/zig/ziglang "/opt/zig-${ZIG_VERSION}" \

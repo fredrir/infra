@@ -15,10 +15,57 @@
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)Containerfile$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( extractVersion=(?<extractVersion>\\S+))?\\nARG \\S+_VERSION=(?<currentValue>\\S+)"
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( versioning=(?<versioning>\\S+))?\\nARG \\S+_VERSION=(?<currentValue>\\S+)\\nARG \\S+_SHA256=(?<currentDigest>[a-f0-9]{64})\\n"
       ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^build/runners\\.json$/"],
+      "matchStrings": [
+        "\"version\": \"(?<currentValue>[^\"]+)\",\\n\\s*\"sha256\": \"(?<currentDigest>[a-f0-9]{64})\""
+      ],
+      "depNameTemplate": "actions/runner",
+      "datasourceTemplate": "custom.actions-runner"
     }
   ],
+  "customDatasources": {
+    "actions-runner": {
+      "defaultRegistryUrlTemplate": "https://api.github.com/repos/actions/runner/releases",
+      "transformTemplates": [
+        "{'releases': [$[prerelease = false].($version := $substringAfter(tag_name, 'v'); {'version': $version, 'releaseTimestamp': published_at, 'digest': $substringAfter(assets[name = 'actions-runner-linux-x64-' & $version & '.tar.gz' and digest].digest, 'sha256:')})], 'sourceUrl': 'https://github.com/actions/runner'}"
+      ]
+    },
+    "cargo-zigbuild": {
+      "defaultRegistryUrlTemplate": "https://api.github.com/repos/rust-cross/cargo-zigbuild/releases",
+      "transformTemplates": [
+        "{'releases': [$[prerelease = false].($version := $substringAfter(tag_name, 'v'); {'version': $version, 'releaseTimestamp': published_at, 'digest': $substringAfter(assets[name = 'cargo-zigbuild-x86_64-unknown-linux-musl.tar.xz' and digest].digest, 'sha256:')})], 'sourceUrl': 'https://github.com/rust-cross/cargo-zigbuild'}"
+      ]
+    },
+    "sccache": {
+      "defaultRegistryUrlTemplate": "https://api.github.com/repos/mozilla/sccache/releases",
+      "transformTemplates": [
+        "{'releases': [$[prerelease = false].($version := $substringAfter(tag_name, 'v'); {'version': $version, 'releaseTimestamp': published_at, 'digest': $substringAfter(assets[name = 'sccache-v' & $version & '-x86_64-unknown-linux-musl.tar.gz' and digest].digest, 'sha256:')})], 'sourceUrl': 'https://github.com/mozilla/sccache'}"
+      ]
+    },
+    "cargo-nextest": {
+      "defaultRegistryUrlTemplate": "https://api.github.com/repos/nextest-rs/nextest/releases?per_page=100",
+      "transformTemplates": [
+        "{'releases': [$[prerelease = false and $contains(tag_name, /^cargo-nextest-[0-9]/)].($version := $substringAfter(tag_name, 'cargo-nextest-'); {'version': $version, 'releaseTimestamp': published_at, 'digest': $substringAfter(assets[name = 'cargo-nextest-' & $version & '-x86_64-unknown-linux-musl.tar.gz' and digest].digest, 'sha256:')})], 'sourceUrl': 'https://github.com/nextest-rs/nextest'}"
+      ]
+    },
+    "cargo-audit": {
+      "defaultRegistryUrlTemplate": "https://api.github.com/repos/rustsec/rustsec/releases?per_page=100",
+      "transformTemplates": [
+        "{'releases': [$[prerelease = false and $substringBefore(tag_name, '/v') = 'cargo-audit'].($version := $substringAfter(tag_name, 'cargo-audit/v'); {'version': $version, 'releaseTimestamp': published_at, 'digest': $substringAfter(assets[name = 'cargo-audit-x86_64-unknown-linux-musl-v' & $version & '.tgz' and digest].digest, 'sha256:')})], 'sourceUrl': 'https://github.com/rustsec/rustsec'}"
+      ]
+    },
+    "ziglang": {
+      "defaultRegistryUrlTemplate": "https://pypi.org/pypi/ziglang/json",
+      "transformTemplates": [
+        "{'releases': [$each(releases, function($files, $version) { {'version': $version, 'releaseTimestamp': $files[0].upload_time_iso_8601, 'digest': $files[filename = 'ziglang-' & $version & '-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl'].digests.sha256} })], 'sourceUrl': 'https://github.com/ziglang/zig-pypi'}"
+      ]
+    }
+  },
   "automerge": false,
   "dependencyDashboard": true,
   "prConcurrentLimit": 3,
@@ -52,8 +99,8 @@
     },
     {
       "matchManagers": ["custom.regex"],
-      "groupName": "runner tools",
-      "prBodyNotes": ["Update the matching sha256 in the Containerfile before merging."]
+      "matchFileNames": ["images/**/Containerfile"],
+      "groupName": "runner tools"
     }
   ],
   "nix": {

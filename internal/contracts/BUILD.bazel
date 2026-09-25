@@ -5,8 +5,12 @@ go_test(
     srcs = [
         "cancellation_test.go",
         "images_test.go",
+        "renovate_test.go",
     ],
-    data = ["//:image_contract_data"],
+    data = [
+        "//:image_contract_data",
+        "//:renovate_pin_data",
+    ],
     deps = [
         "//internal/images",
         "@dev_cel_cel_go//cel",
