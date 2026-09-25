@@ -20,7 +20,7 @@
           - "{{ platform_tailscale_cli }}"
           - up
           - "--auth-key=file:{{ platform_tailscale_auth_key_file }}"
-          - "--accept-routes={{ 'true' if platform_tailscale_bootstrap_tags == ['tag:platform-worker'] else 'false' }}"
+          - "--accept-routes={{ platform_tailscale_accept_routes | string | lower }}"
           - --ssh=false
           - --advertise-routes=
           - --advertise-exit-node=false
@@ -66,14 +66,14 @@
     argv:
       - "{{ platform_tailscale_cli }}"
       - set
-      - "--accept-routes={{ 'true' if platform_tailscale_bootstrap_tags == ['tag:platform-worker'] else 'false' }}"
+      - "--accept-routes={{ platform_tailscale_accept_routes | string | lower }}"
       - --ssh=false
       - --advertise-routes=
       - --advertise-exit-node=false
       - "--hostname={{ platform_node_name }}"
   when: >-
     (platform_bootstrap_preferences.stdout | from_json)['ssh'] != false or
-    (platform_bootstrap_preferences.stdout | from_json)['accept-routes'] != (platform_tailscale_bootstrap_tags == ['tag:platform-worker']) or
+    (platform_bootstrap_preferences.stdout | from_json)['accept-routes'] != platform_tailscale_accept_routes or
     (platform_bootstrap_preferences.stdout | from_json)['advertise-routes'] != '' or
     (platform_bootstrap_preferences.stdout | from_json)['advertise-exit-node'] != false or
     (platform_bootstrap_preferences.stdout | from_json)['hostname'] != platform_node_name

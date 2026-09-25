@@ -1,0 +1,76 @@
+- name: Configure volatile workers
+  hosts: volatile
+  become: true
+  gather_facts: false
+  ignore_unreachable: true
+  vars:
+    k3s_role: agent
+    platform_architecture: "{{ architecture }}"
+  pre_tasks:
+  - name: Skip volatile workers without an enrolled address
+    ansible.builtin.meta: end_host
+    when: tailscale_ip is none
+  - name: Gather volatile worker facts
+    ansible.builtin.setup:
+    register: volatile_facts
+  - name: Skip unreachable volatile workers
+    ansible.builtin.meta: end_host
+    when: volatile_facts is unreachable
+  - name: Require an enrolled identity
+    ansible.builtin.stat:
+      path: /var/lib/tailscale/tailscaled.state
+      get_checksum: false
+    register: volatile_transport_state
+    no_log: true
+  - name: Preserve enrolled transport
+    ansible.builtin.assert:
+      that:
+      - volatile_transport_state.stat.isreg | default(false)
+      - volatile_transport_state.stat.size > 0
+  - name: Configure Tailscale
+    ansible.builtin.import_role:
+      name: tailscale
+      tasks_from: install.yml
+  - name: Refresh changed transport facts
+    ansible.builtin.setup:
+      gather_subset: ['!all', '!min', network]
+    when: platform_tailscale_start.changed or (platform_tailscale_restart.changed | default(false))
+  - name: Read SSH account
+    ansible.builtin.getent:
+      database: passwd
+      key: '{{ ansible_user }}'
+  - name: Create SSH directory
+    ansible.builtin.file:
+      path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh'
+      state: directory
+      owner: '{{ ansible_user }}'
+      mode: '0700'
+  - name: Install reconciliation identity
+    ansible.builtin.lineinfile:
+      path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh/authorized_keys'
+      line: '{{ lookup("ansible.builtin.file", "files/reconciliation.pub") }}'
+      create: true
+      owner: '{{ ansible_user }}'
+      mode: '0600'
+  - name: Find unmanaged root containers
+    ansible.builtin.shell: |
+      set -eu
+      if command -v podman > /dev/null; then podman ps --all --format '{{ "{{.Names}}" }}'; fi
+    register: volatile_unmanaged_containers
+    changed_when: volatile_unmanaged_containers.stdout_lines | length > 0
+    check_mode: false
+  - name: Remove unmanaged root containers
+    ansible.builtin.command:
+      argv: "{{ ['podman', 'rm', '--force', '--volumes'] + volatile_unmanaged_containers.stdout_lines }}"
+    when: volatile_unmanaged_containers.changed
+  - name: Remove unmanaged root container images
+    ansible.builtin.command:
+      argv: [podman, image, prune, --all, --force]
+    when: volatile_unmanaged_containers.changed
+  roles:
+  - ubuntu
+  - firewall
+  - data_volume
+  - k3s
+  - ci_runtime
+

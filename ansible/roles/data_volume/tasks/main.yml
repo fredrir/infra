@@ -1,0 +1,145 @@
+- name: Require a declared data volume
+  ansible.builtin.assert:
+    that:
+      - data_volume_device is string
+      - data_volume_device is match('^/dev/disk/by-id/[A-Za-z0-9_.:-]+$')
+      - data_volume_filesystem == 'ext4'
+      - data_volume_mount is match('^(/[a-z0-9][a-z0-9-]*)+$')
+      - data_volume_binds | reject('match', '^(/[a-z0-9][a-z0-9-]*)+$') | list == []
+      - data_volume_binds | map('basename') | unique | length == data_volume_binds | length
+      - data_volume_consumers | reject('match', '^[a-z0-9][a-z0-9_.@-]*[.]service$') | list == []
+    fail_msg: A stable by-id device, absolute layout paths and service consumers are required
+
+- name: Install volume tools
+  ansible.builtin.import_role:
+    name: host_packages
+  vars:
+    host_packages_required: "{{ data_volume_packages }}"
+
+- name: Inspect the data volume device
+  ansible.builtin.stat:
+    path: "{{ data_volume_device }}"
+    follow: true
+    get_checksum: false
+  register: data_volume_attached
+
+- name: Require the attached data volume
+  ansible.builtin.assert:
+    that: data_volume_attached.stat.isblk | default(false)
+    fail_msg: "{{ data_volume_device }} is not attached"
+
+- name: Probe the data volume partition table
+  ansible.builtin.command:
+    argv: [wipefs, --no-act, --noheadings, --parsable, --output=TYPE, "{{ data_volume_device }}"]
+  register: data_volume_table
+  changed_when: data_volume_table.stdout_lines | length == 0
+  check_mode: false
+
+- name: Require an empty or GPT-partitioned data volume
+  ansible.builtin.assert:
+    that: data_volume_table.stdout_lines | difference(data_volume_table_signatures) | length == 0
+    fail_msg: "{{ data_volume_device }} holds {{ data_volume_table.stdout_lines | join(', ') }}"
+
+- name: Partition the empty data volume
+  ansible.builtin.command:
+    argv: [parted, --script, --align=optimal, "{{ data_volume_device }}", mklabel, gpt, mkpart, data, "{{ data_volume_filesystem }}", 1MiB, 100%]
+  when: data_volume_table.changed
+
+- name: Wait for the data volume partition
+  ansible.builtin.wait_for:
+    path: "{{ data_volume_partition }}"
+    timeout: 30
+  when: data_volume_table.changed
+
+- name: Inspect the data volume partition
+  ansible.builtin.stat:
+    path: "{{ data_volume_partition }}"
+    follow: true
+    get_checksum: false
+  register: data_volume_partitioned
+
+- name: Probe the data volume filesystem
+  ansible.builtin.command:
+    argv: [wipefs, --no-act, --noheadings, --parsable, --output=TYPE, "{{ data_volume_partition }}"]
+  register: data_volume_signatures
+  changed_when: data_volume_signatures.stdout_lines | length == 0
+  check_mode: false
+  when: data_volume_partitioned.stat.isblk | default(false)
+
+- name: Require the declared data volume filesystem
+  ansible.builtin.assert:
+    that: data_volume_signatures.stdout_lines | default([]) in [[], [data_volume_filesystem]]
+    fail_msg: "{{ data_volume_partition }} holds {{ data_volume_signatures.stdout_lines | join(', ') }}"
+
+- name: Create the data volume filesystem
+  ansible.builtin.command:
+    argv: ["mkfs.{{ data_volume_filesystem }}", -L, "{{ data_volume_label }}", "{{ data_volume_partition }}"]
+  when: data_volume_signatures.changed
+
+- name: Read data volume consumer states
+  ansible.builtin.command:
+    argv: "{{ ['systemctl', 'is-active'] + data_volume_consumers }}"
+  register: data_volume_consumer_states
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Declare the data volume mount
+  ansible.builtin.template:
+    src: data-volume.mount.j2
+    dest: "/etc/systemd/system/{{ data_volume_mount_unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Mount the data volume
+  ansible.builtin.systemd_service:
+    name: "{{ data_volume_mount_unit }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  notify: Restart data volume consumers
+
+- name: Create the data volume layout
+  ansible.builtin.file:
+    path: "{{ data_volume_mount }}/{{ item | basename }}"
+    state: directory
+  loop: "{{ data_volume_binds }}"
+
+- name: Declare the data volume layout mounts
+  ansible.builtin.template:
+    src: data-volume-bind.mount.j2
+    dest: "/etc/systemd/system/{{ item.1 }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ data_volume_binds | zip(data_volume_bind_units) | list }}"
+
+- name: Create consumer dependency directories
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ data_volume_consumers }}"
+
+- name: Require the data volume for its consumers
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item }}.d/data-volume.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      RequiresMountsFor={{ (data_volume_binds or [data_volume_mount]) | join(' ') }}
+  loop: "{{ data_volume_consumers }}"
+
+- name: Mount the data volume layout
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  loop: "{{ data_volume_bind_units }}"
+  notify: Restart data volume consumers

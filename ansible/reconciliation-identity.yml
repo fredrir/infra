@@ -1,5 +1,5 @@
 - name: Maintain reconciliation host access
-  hosts: ubuntu:build_engines
+  hosts: ubuntu:build_engines:!volatile
   become: true
   gather_facts: false
   tasks:

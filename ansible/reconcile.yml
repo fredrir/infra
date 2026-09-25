@@ -1,5 +1,5 @@
 - name: Gather host facts in parallel
-  hosts: ubuntu
+  hosts: ubuntu:!volatile
   become: true
   gather_facts: true
 - import_playbook: transport.yml
@@ -10,3 +10,4 @@
 - import_playbook: control-backup.yml
 - import_playbook: infra-cli.yml
 - import_playbook: build-runners.yml
+- import_playbook: volatile.yml

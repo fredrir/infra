@@ -1,0 +1,6 @@
+- name: Restart data volume consumers
+  ansible.builtin.systemd_service:
+    name: "{{ item.0 }}"
+    state: restarted
+  loop: "{{ data_volume_consumers | zip(data_volume_consumer_states.stdout_lines) | list }}"
+  when: item.1 == 'active'

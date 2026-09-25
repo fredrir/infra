@@ -11,7 +11,7 @@
     - k3s
 
 - name: Configure K3s workers
-  hosts: agent
+  hosts: agent:!volatile
   serial: "{{ '100%' if ansible_check_mode else 1 }}"
   any_errors_fatal: true
   become: true

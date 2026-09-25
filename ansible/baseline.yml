@@ -1,5 +1,5 @@
 - name: Configure Ubuntu hosts
-  hosts: ubuntu
+  hosts: ubuntu:!volatile
   become: true
   gather_facts: true
   roles:

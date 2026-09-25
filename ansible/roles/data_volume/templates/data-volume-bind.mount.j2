@@ -1,0 +1,11 @@
+[Unit]
+RequiresMountsFor={{ data_volume_mount }}
+
+[Mount]
+What={{ data_volume_mount }}/{{ item.0 | basename }}
+Where={{ item.0 }}
+Type=none
+Options=bind,nofail
+
+[Install]
+WantedBy=local-fs.target

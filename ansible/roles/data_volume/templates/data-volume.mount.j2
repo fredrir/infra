@@ -1,0 +1,8 @@
+[Mount]
+What={{ data_volume_partition }}
+Where={{ data_volume_mount }}
+Type={{ data_volume_filesystem }}
+Options=nofail
+
+[Install]
+WantedBy=local-fs.target

@@ -1,5 +1,5 @@
 - name: Configure host network access
-  hosts: ubuntu
+  hosts: ubuntu:!volatile
   become: true
   gather_facts: false
   roles:

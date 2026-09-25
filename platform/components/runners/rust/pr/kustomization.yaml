@@ -3,6 +3,8 @@ kind: Kustomization
 nameSuffix: -pr
 resources:
 - ../pool
+components:
+- ../volatile
 patches:
 - target:
     kind: HelmRelease

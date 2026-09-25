@@ -7,5 +7,5 @@ spec:
     pods: '5'
     requests.cpu: 10500m
     requests.memory: 31Gi
-    limits.cpu: 30500m
-    limits.memory: 51Gi
+    limits.cpu: 38500m
+    limits.memory: 75Gi

@@ -3,6 +3,7 @@ platform_node_name: ""
 platform_tailscale_auth_key_file: ""
 platform_tailscale_bootstrap_approved: false
 platform_tailscale_bootstrap_tags: []
+platform_tailscale_accept_routes: "{{ platform_tailscale_bootstrap_tags in [['tag:platform-worker'], ['tag:platform-volatile']] }}"
 platform_tailscale_cli: /usr/local/bin/tailscale
 platform_tailscale_sha256:
   amd64: 50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9

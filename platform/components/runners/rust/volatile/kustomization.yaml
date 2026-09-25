@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+- target:
+    kind: HelmRelease
+    name: rust
+  patch: |
+    - op: add
+      path: /spec/values/template/spec/tolerations
+      value:
+      - key: node-restriction.kubernetes.io/volatile
+        operator: Equal
+        value: 'true'
+        effect: NoSchedule
+      - key: node.kubernetes.io/not-ready
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 30
+      - key: node.kubernetes.io/unreachable
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 30
+    - op: add
+      path: /spec/values/template/spec/affinity
+      value:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-restriction.kubernetes.io/volatile
+                operator: In
+                values:
+                - 'true'
+    - op: replace
+      path: /spec/values/template/spec/containers/0/resources/limits/cpu
+      value: '8'
+    - op: replace
+      path: /spec/values/template/spec/containers/0/resources/limits/memory
+      value: 16Gi

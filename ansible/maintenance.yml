@@ -23,7 +23,7 @@
 
     - name: Require all cluster nodes ready before maintenance
       ansible.builtin.command:
-        argv: [/usr/local/bin/k3s, kubectl, wait, --for=condition=Ready, node, --all, --timeout=60s]
+        argv: [/usr/local/bin/k3s, kubectl, wait, --for=condition=Ready, node, --selector=!node-restriction.kubernetes.io/volatile, --timeout=60s]
       delegate_to: "{{ maintenance_control }}"
       changed_when: false
   tasks:

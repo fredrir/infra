@@ -12,19 +12,21 @@ import (
 )
 
 type ansiblePlay struct {
-	Name           string           `yaml:"name"`
-	ImportPlaybook string           `yaml:"import_playbook"`
-	Tags           any              `yaml:"tags"`
-	Serial         any              `yaml:"serial"`
-	CheckMode      *bool            `yaml:"check_mode"`
-	Vars           map[string]any   `yaml:"vars"`
-	PreTasks       []map[string]any `yaml:"pre_tasks"`
-	Roles          []ansibleRole    `yaml:"roles"`
-	Tasks          []map[string]any `yaml:"tasks"`
-	Handlers       []map[string]any `yaml:"handlers"`
+	Name              string           `yaml:"name"`
+	Hosts             string           `yaml:"hosts"`
+	IgnoreUnreachable bool             `yaml:"ignore_unreachable"`
+	ImportPlaybook    string           `yaml:"import_playbook"`
+	Tags              any              `yaml:"tags"`
+	Serial            any              `yaml:"serial"`
+	CheckMode         *bool            `yaml:"check_mode"`
+	Vars              map[string]any   `yaml:"vars"`
+	PreTasks          []map[string]any `yaml:"pre_tasks"`
+	Roles             []ansibleRole    `yaml:"roles"`
+	Tasks             []map[string]any `yaml:"tasks"`
+	Handlers          []map[string]any `yaml:"handlers"`
 }
 
-var playKeywords = []string{"any_errors_fatal", "become", "check_mode", "gather_facts", "handlers", "hosts", "import_playbook", "name", "order", "pre_tasks", "roles", "serial", "tags", "tasks", "vars"}
+var playKeywords = []string{"any_errors_fatal", "become", "check_mode", "gather_facts", "handlers", "hosts", "ignore_unreachable", "import_playbook", "name", "order", "pre_tasks", "roles", "serial", "tags", "tasks", "vars"}
 
 func (p *ansiblePlay) UnmarshalYAML(node *yaml.Node) error {
 	if err := classifiedKeywords(node, "play", playKeywords); err != nil {

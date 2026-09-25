@@ -202,18 +202,7 @@
 
 - name: Assign worker capabilities through the administrator API
   ansible.builtin.command:
-    argv:
-      - /usr/local/bin/k3s
-      - kubectl
-      - label
-      - node
-      - "{{ inventory_hostname }}"
-      - node-restriction.kubernetes.io/critical=true
-      - node-restriction.kubernetes.io/stateful=true
-      - "infra.fredrir.com/ci-slots={{ k3s_ci_slots }}"
-      - --overwrite
-      - --request-timeout=10s
-      - "--dry-run={{ 'server' if ansible_check_mode else 'none' }}"
+    argv: "{{ ['/usr/local/bin/k3s', 'kubectl', 'label', 'node', inventory_hostname] + k3s_node_labels + ['infra.fredrir.com/ci-slots=' ~ k3s_ci_slots, '--overwrite', '--request-timeout=10s', '--dry-run=' ~ ('server' if ansible_check_mode else 'none')] }}"
   delegate_to: "{{ k3s_registration_server }}"
   check_mode: false
   retries: 1
@@ -221,6 +210,32 @@
   when: k3s_role == 'agent'
   register: k3s_labels
   changed_when: "'not labeled' not in k3s_labels.stdout"
+  tags: [worker-labels]
+
+- name: Read declared worker taints through the administrator API
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - get
+      - node
+      - "{{ inventory_hostname }}"
+      - '-o=jsonpath={range .spec.taints[*]}{.key}={.value}:{.effect}{"\n"}{end}'
+      - --request-timeout=10s
+  delegate_to: "{{ k3s_registration_server }}"
+  check_mode: false
+  retries: 1
+  delay: 5
+  when: k3s_role == 'agent' and k3s_node_taints | length > 0
+  register: k3s_taints
+  changed_when: k3s_node_taints | difference(k3s_taints.stdout_lines) | length > 0
+  tags: [worker-labels]
+
+- name: Taint the worker through the administrator API
+  ansible.builtin.command:
+    argv: "{{ ['/usr/local/bin/k3s', 'kubectl', 'taint', 'node', inventory_hostname] + k3s_node_taints + ['--overwrite', '--request-timeout=10s'] }}"
+  delegate_to: "{{ k3s_registration_server }}"
+  when: k3s_taints.changed
   tags: [worker-labels]
 
 - name: Advertise CI job slots through the administrator API

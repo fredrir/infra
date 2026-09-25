@@ -1,5 +1,5 @@
 - name: Verify cluster services
-  hosts: k3s_cluster
+  hosts: k3s_cluster:!volatile
   become: true
   gather_facts: false
   tasks:
@@ -9,9 +9,23 @@
     changed_when: false
   - name: Verify node registration
     ansible.builtin.command:
-      argv: [/usr/local/bin/k3s, kubectl, wait, node, --all, --for=condition=Ready, --timeout=120s]
+      argv: [/usr/local/bin/k3s, kubectl, wait, node, --selector=!node-restriction.kubernetes.io/volatile, --for=condition=Ready, --timeout=120s]
     changed_when: false
     when: inventory_hostname == groups['server'][0]
+
+- name: Verify volatile workers
+  hosts: volatile
+  become: true
+  gather_facts: false
+  ignore_unreachable: true
+  tasks:
+  - name: Skip volatile workers without an enrolled address
+    ansible.builtin.meta: end_host
+    when: tailscale_ip is none
+  - name: Read volatile Kubernetes service status
+    ansible.builtin.command:
+      argv: [systemctl, is-active, k3s-agent.service]
+    changed_when: false
 
 - name: Verify independent monitoring configuration
   hosts: external

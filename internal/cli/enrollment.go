@@ -93,7 +93,7 @@ func newRuntimeKeyCommand() *cobra.Command {
 
 func enrollmentFlags(command *cobra.Command, target *enrollment.Target) {
 	command.Flags().StringVar(&target.Node, "node", "", "Concrete fleet node")
-	command.Flags().StringVar(&target.Role, "role", "", "control or worker")
+	command.Flags().StringVar(&target.Role, "role", "", "control, worker or volatile")
 	command.Flags().StringVar(&target.Host, "host", "", "Verified SSH host alias")
 	command.Flags().StringVar(&target.KeyFile, "key-file", enrollment.KeyFile, "Private runtime key path")
 	command.Flags().StringVar(&target.KeyID, "key-id", "", "Key identity for revocation")

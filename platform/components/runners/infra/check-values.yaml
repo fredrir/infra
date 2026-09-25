@@ -87,9 +87,29 @@ spec:
               memory: 4Gi
               ephemeral-storage: 10Gi
               infra.fredrir.com/ci-slot: '1'
+        tolerations:
+        - key: node-restriction.kubernetes.io/volatile
+          operator: Equal
+          value: 'true'
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
         affinity:
           nodeAffinity:
             preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                - key: node-restriction.kubernetes.io/volatile
+                  operator: In
+                  values:
+                  - 'true'
             - weight: 100
               preference:
                 matchExpressions:

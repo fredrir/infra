@@ -11,6 +11,7 @@
 | 7   | fredrir-07 | hetzner-three | Ubuntu 26.04.1 LTS | Hetzner | CX33              | x86, 4 vCPU, 8 GB RAM, 80 GB disk                                                                                                                | hel1          |                 | Yes  |
 | 8   | fredrir-08 | hetzner-four  | Ubuntu 26.04.1 LTS | Hetzner | CX33              | x86, 4 vCPU, 8 GB RAM, 80 GB disk                                                                                                                | hel1          |                 | Yes  |
 | 9   | fredrir-09 | one-cloud-one | Ubuntu 26.04 LTS   | one.com | Cloud server XXL  | x86, 16 vCPU, 32 GB RAM, 800 GB disk                                                                                                             |               |                 | Yes  |
+| 10  | fredrir-10 | ntnu-one      | Ubuntu 26.04 LTS   | NTNU    | sx3.16c64r        | x86 Haswell, 16 vCPU, 62 GiB RAM, 40 GB root, up to 512 GB OpenStack volume; no outbound UDP                                                   | Trondheim     | Free until 2027-07 |      |
 
 ## Roles
 
@@ -25,13 +26,14 @@
 | `fredrir-07`          | K3s control plane and etcd                           | 24/7                            |
 | `fredrir-08`          | K3s control plane and etcd                           | 24/7                            |
 | `fredrir-09`          | Shared production and CI worker; retained local data | 24/7                            |
-| `fredrir-10`          | Reserved fourth home computer                        | Hardware and purchase undecided |
+| `fredrir-10`          | Volatile CI worker (tainted K3s agent)               | Volatile; third-party NTNU host, no SLA; fleet runs without it |
 
 | Capacity         | Value                                                                                         |
 | ---------------- | --------------------------------------------------------------------------------------------- |
 | Provisioned VPSs | Six                                                                                           |
 | Control plane    | Three servers in `hel1`, private etcd network and spread placement group                      |
 | Shared workers   | CCX23 and one.com XXL; Kubernetes capability-based placement                                  |
+| Volatile worker  | `fredrir-10`; CI only; see [volatile workers](runbook.md#volatile-workers)                    |
 | Additional ARM   | HidenCloud SAR-Torrent, unpurchased; provider clarification and runtime qualification pending |
 | ARM node number  | Unassigned                                                                                    |
 | Inventory        | [Ansible production inventory](../ansible/inventory/production.yml)                           |

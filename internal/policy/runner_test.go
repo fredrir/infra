@@ -189,3 +189,74 @@ func TestLegacyBuildkitCacheCredentialsStayWithinPool(t *testing.T) {
 		}
 	}
 }
+
+func TestOnlyUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
+	const volatile = "node-restriction.kubernetes.io/volatile"
+	tolerating := map[string]bool{"check-amd64": true, "rust-amd64": true, "rust-pr-amd64": true}
+	seen := map[string]bool{}
+	for _, overlay := range at(load(t, "platform/components/runners/kustomization.yaml"), "resources").([]any) {
+		for _, resource := range rendered(t, "platform/components/runners/"+overlay.(string)) {
+			if resource["kind"] != "HelmRelease" {
+				continue
+			}
+			values := at(resource, "spec", "values").(object)
+			name := values["runnerScaleSetName"].(string)
+			spec := at(values, "template", "spec").(object)
+			evictions := map[string]any{}
+			tolerates := false
+			tolerations, _ := spec["tolerations"].([]any)
+			for _, item := range tolerations {
+				toleration := item.(object)
+				switch toleration["key"] {
+				case volatile:
+					tolerates = toleration["operator"] == "Equal" && toleration["value"] == "true" && toleration["effect"] == "NoSchedule"
+				case "node.kubernetes.io/not-ready", "node.kubernetes.io/unreachable":
+					if toleration["effect"] == "NoExecute" {
+						evictions[toleration["key"].(string)] = toleration["tolerationSeconds"]
+					}
+				case nil:
+					t.Errorf("%s tolerates every taint", name)
+				}
+			}
+			if tolerates != tolerating[name] {
+				t.Errorf("%s tolerates volatile workers: %t", name, tolerates)
+			}
+			if !tolerating[name] {
+				continue
+			}
+			seen[name] = true
+			for _, key := range []string{"node.kubernetes.io/not-ready", "node.kubernetes.io/unreachable"} {
+				if fmt.Sprint(evictions[key]) != "30" {
+					t.Errorf("%s keeps pods on a lost worker for %v seconds after %s", name, evictions[key], key)
+				}
+			}
+			affinity, _ := spec["affinity"].(object)
+			nodeAffinity, _ := affinity["nodeAffinity"].(object)
+			if _, required := nodeAffinity["requiredDuringSchedulingIgnoredDuringExecution"]; required {
+				t.Errorf("%s requires a node selection instead of preferring volatile workers", name)
+			}
+			preferred := false
+			preferences, _ := nodeAffinity["preferredDuringSchedulingIgnoredDuringExecution"].([]any)
+			for _, item := range preferences {
+				for _, expression := range at(item, "preference", "matchExpressions").([]any) {
+					if at(expression, "key") == volatile && at(expression, "operator") == "In" && fmt.Sprint(at(expression, "values")) == "[true]" {
+						preferred = true
+					}
+				}
+			}
+			if !preferred {
+				t.Errorf("%s does not prefer volatile workers", name)
+			}
+			for _, container := range spec["containers"].([]any) {
+				if _, ok := at(container, "resources", "requests").(object)["ephemeral-storage"]; !ok {
+					t.Errorf("%s requests no ephemeral storage", name)
+				}
+			}
+		}
+	}
+	for name := range tolerating {
+		if !seen[name] {
+			t.Errorf("volatile pool %s not rendered", name)
+		}
+	}
+}

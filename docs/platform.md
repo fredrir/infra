@@ -188,6 +188,7 @@ export SOPS_AGE_KEY_FILE="$HOME/.config/age/keys.txt"
 uv run --frozen --group ci ansible-playbook ansible/site.yml --limit fredrir-NN
 uv run --frozen --group ci ansible-playbook ansible/k3s.yml --limit fredrir-NN -e k3s_registration_server=fredrir-08
 uv run --frozen --group ci ansible-playbook ansible/ci-runtimes.yml --limit fredrir-NN
+uv run --frozen --group ci ansible-playbook ansible/volatile.yml --limit fredrir-10
 uv run --frozen --group ci ansible-playbook ansible/maintenance.yml
 uv run --frozen --group ci ansible-playbook ansible/external.yml --limit fredrir-06
 ```

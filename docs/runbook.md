@@ -277,6 +277,56 @@ PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" .infra/bin/infra reconcile app
 
 Do not remove an active reconciliation or OpenTofu lock while its writer is running.
 
+## Volatile workers
+
+| Setting | Value |
+| --- | --- |
+| Hosts | Inventory group `volatile`, also in `agent`: `fredrir-10` |
+| Reconciliation | `ansible/volatile.yml`, last in `reconcile.yml`; fleet plays target `…:!volatile` |
+| Unreachable host | Ends for the play (`ignore_unreachable`); the run succeeds without it |
+| Unenrolled host | `tailscale_ip: null`; skipped |
+| Failed task | Fails the run |
+| Verification | `verify.yml` play `Verify volatile workers`; fleet readiness waits exclude `node-restriction.kubernetes.io/volatile` |
+| Scheduling | Taint `node-restriction.kubernetes.io/volatile=true:NoSchedule`; labels `gvisor`, `volatile`, `infra.fredrir.com/ci-slots=3`; no `critical` or `stateful` |
+| CI pools | `check-amd64`, `rust-amd64` and `rust-pr-amd64` tolerate and prefer it and leave 30 s after not-ready or unreachable; `rust-release-amd64` never runs there |
+| Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100 and 10250; SSH from Macie, Archie and `tag:infra-apply` |
+| Transport | DERP over TCP 443; NTNU blocks outbound UDP |
+| Inbound access | Tailnet; NTNU VPN (`~/ntnu-proxy`, `10.50.0.0/16`) is owner-only break-glass SSH, never used by the fleet |
+| Trust | NTNU controls hypervisor and network; no ProxyJump, `ForwardAgent=no`, no delegated secrets; holds the K3s agent token and the credentials of its CI pools |
+| Removal | Delete from `agent` and `volatile`; `kubectl delete node fredrir-10`; rotate the K3s agent token |
+
+| Data volume | Value |
+| --- | --- |
+| Device | `data_volume_device` under `/dev/disk/by-id/`; partition `-part1`; ext4 label `infra-data` |
+| Formatting | Only when `wipefs` finds no signature; foreign or whole-disk signatures fail closed |
+| Mount | `srv-data.mount` at `/srv/data`; `Options=nofail`; `WantedBy=local-fs.target` |
+| Layout | `data_volume_binds`: `/srv/data/<name>` bound onto `/var/lib/rancher`, `/var/lib/kubelet`, `/var/lib/containerd`, `/var/lib/docker`, `/var/lib/infra-build-vm` |
+| Consumers | `data_volume_consumers` get `RequiresMountsFor=` on the layout; running consumers restart once when a mount activates |
+| Missing volume | Consumers stay stopped; nothing writes the 40 GB root |
+| Unmanaged containers | Root Podman containers and their images are removed |
+
+### fredrir-10 activation
+
+| Order | Owner action | Value |
+| --- | --- | --- |
+| 1 | Attach the OpenStack volume | Up to 512 GB; highest IOPS class offered; note `ls -l /dev/disk/by-id` |
+| 2 | Apply `tailscale/policy.hujson` | Adds `tag:platform-volatile` |
+| 3 | Install the verified `infra` release at `/usr/local/bin/infra` over `ssh ntnu` | Release SHA-256 from the trusted build |
+| 4 | Deliver the enrollment key | `infra operations enrollment create-deliver --node fredrir-10 --role volatile --host ntnu --sudo` |
+| 5 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
+| 6 | Copy the K3s agent token | `/etc/rancher/k3s/agent-token`, root `0600` |
+| 7 | Set inventory values | `tailscale_ip`, `data_volume_device` |
+| 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in Doppler `SSH_KNOWN_HOSTS` and the admin `known_hosts` |
+| 9 | First converge from Macie or Archie | `ansible-playbook ansible/volatile.yml --limit fredrir-10`; installs the reconciliation key and sets the hostname |
+| 10 | Merge | Reconciliation keeps it converged |
+
+```sh
+inventory=$(mktemp)
+printf 'tailscale_bootstrap:\n  hosts:\n    fredrir-10:\n      ansible_host: ntnu\n      ansible_user: ubuntu\n' > "$inventory"
+ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
+  -e '{"platform_tailscale_bootstrap_approved": true, "platform_tailscale_bootstrap_tags": ["tag:platform-volatile"], "platform_tailscale_auth_key_file": "/run/secrets/tailscale-auth-key", "platform_architecture": "amd64"}'
+```
+
 ## CI execution and runner admission
 
 Pushes and pull requests enter through `reconcile.yml`, which shares one verified CLI build with reusable checks and image planning.

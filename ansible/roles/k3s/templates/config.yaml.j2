@@ -15,6 +15,9 @@ kubelet-arg:
   - pod-max-pids=1024
   - container-log-max-size=10Mi
   - container-log-max-files=3
+{% if k3s_role == 'agent' and k3s_node_taints | length > 0 %}
+node-taint: {{ k3s_node_taints | to_json }}
+{% endif %}
 {% if k3s_role == 'server' %}
 agent-token-file: {{ k3s_agent_token_file | to_json }}
 advertise-address: {{ private_ip | to_json }}

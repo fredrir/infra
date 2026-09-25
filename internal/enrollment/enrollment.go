@@ -16,7 +16,7 @@ import (
 
 const KeyFile = "/run/secrets/tailscale-auth-key"
 
-var roles = map[string]string{"control": "tag:platform-control", "worker": "tag:platform-worker"}
+var roles = map[string]string{"control": "tag:platform-control", "worker": "tag:platform-worker", "volatile": "tag:platform-volatile"}
 var keyIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{4,128}$`)
 var authKeyPattern = regexp.MustCompile(`^tskey-auth-[A-Za-z0-9_-]{20,250}$`)
 
