@@ -39,3 +39,83 @@ spec:
   policyName: node-registration
   validationActions:
   - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: node-flannel-writer
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - UPDATE
+      resources:
+      - nodes
+      - nodes/status
+  matchConditions:
+  - name: shared-flannel-identity
+    expression: "request.userInfo.username == 'system:k3s-controller'"
+  variables:
+  - name: labels
+    expression: "has(object.metadata.labels) ? object.metadata.labels : {}"
+  - name: oldLabels
+    expression: "has(oldObject.metadata.labels) ? oldObject.metadata.labels : {}"
+  - name: annotations
+    expression: "has(object.metadata.annotations) ? object.metadata.annotations : {}"
+  - name: oldAnnotations
+    expression: "has(oldObject.metadata.annotations) ? oldObject.metadata.annotations : {}"
+  validations:
+  - expression: variables.labels == variables.oldLabels
+    message: The shared flannel identity may not change node labels
+  - expression: object.spec == oldObject.spec
+    message: The shared flannel identity may not change the node spec
+  - expression: >-
+      variables.annotations.all(k, k.startsWith('flannel.alpha.coreos.com/') || (k in variables.oldAnnotations && variables.annotations[k] == variables.oldAnnotations[k]))
+      && variables.oldAnnotations.all(k, k in variables.annotations || k.startsWith('flannel.alpha.coreos.com/'))
+    message: The shared flannel identity may change only flannel annotations
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: node-flannel-writer
+spec:
+  policyName: node-flannel-writer
+  validationActions:
+  - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: node-no-static-pods
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      resources:
+      - pods
+  matchConditions:
+  - name: kubelet
+    expression: "'system:nodes' in request.userInfo.groups"
+  validations:
+  - expression: 'false'
+    message: Nodes may not create mirror or static pods
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: node-no-static-pods
+spec:
+  policyName: node-no-static-pods
+  validationActions:
+  - Deny
