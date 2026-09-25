@@ -31,7 +31,8 @@
   ansible.builtin.stat:
     path: "{{ item }}"
     follow: false
-    get_checksum: false
+    get_checksum: "{{ inventory_hostname in groups.get('volatile', []) }}"
+    checksum_algorithm: sha256
     get_mime: false
   loop: "{{ [k3s_server_token_file, k3s_agent_token_file] if k3s_role == 'server' else [k3s_agent_token_file] }}"
   register: k3s_credentials
@@ -49,6 +50,21 @@
   loop: "{{ k3s_credentials.results }}"
   loop_control:
     label: "{{ item.item }}"
+
+- name: Inspect the shared join token
+  ansible.builtin.stat:
+    path: "{{ k3s_agent_token_file }}"
+    checksum_algorithm: sha256
+    get_mime: false
+  delegate_to: "{{ k3s_registration_server }}"
+  when: inventory_hostname in groups.get('volatile', [])
+  register: k3s_shared_token
+
+- name: Require a per-node join token on volatile workers
+  ansible.builtin.assert:
+    that: k3s_shared_token.stat.checksum != (k3s_credentials.results | last).stat.checksum
+    fail_msg: Volatile workers join with their own k3s token create --ttl token
+  when: inventory_hostname in groups.get('volatile', [])
 
 - name: Install kernel module configuration
   ansible.builtin.copy:
