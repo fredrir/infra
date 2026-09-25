@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "steps": [
+    {
+      "change": "Remove dead runner work and retire the build prewarming timer",
+      "run": "https://github.com/fredrir/infra/actions/runs/36080161729",
+      "baseline_run": "https://github.com/fredrir/infra/actions/runs/36079574526",
+      "runner_play_seconds": {"before": 56.0, "after": 42.7},
+      "hosts_stage_seconds": {"before": 172.3, "after": 160.0},
+      "prewarm_retirement": "timer stopped and disabled; units, /var/lib/infra/build and the legacy source-cli cache removed once",
+      "pin_pruning": "skipped; no new runner archive or CLI revision",
+      "limitations": ["One sample per stage"]
+    }
+  ]
+}
