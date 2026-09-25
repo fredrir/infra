@@ -108,8 +108,12 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 | Merge selection | Diff against the last successfully applied revision; incomplete attempts force all systems |
 | Hostname-only deployment | Skip unrelated host configuration; run the Gatus role |
 | State | `s3://llunde-pyparser-bucket/reconciliation/production/status.json` |
-| Cross-client lock | Conditional S3 writes to `reconciliation/production/lock.json` |
-| Run deadline / apply job timeout / abandoned lock expiry | 90 minutes / 120 minutes / 2 hours |
+| Cross-client lease | Conditional S3 writes to `reconciliation/production/lock.json` |
+| Lease TTL / renewal | 10 minutes / every 3 minutes; a lost or unrenewable lease cancels the run before its next mutation and records no status |
+| Lease wait | `infra reconcile apply --wait DURATION`; default fails fast |
+| Run deadline / apply job timeout | 90 minutes / 120 minutes |
+| Exit codes | 0 success; 75 retry (lease held, or `main` advanced beyond root Markdown, `docs/**/*.md` and `build/evidence/*.json`); 1 failure |
+| Retry in CI | Succeeds only while a newer push reconciliation of `main` is pending |
 | OpenTofu locking | S3 lockfile retained; acquisition timeout 5 minutes |
 | Failed verification | Old routes retained; applied revision unchanged |
 | Failed retirement | Applied revision unchanged; the next attempt reads actual OpenTofu state |
@@ -197,7 +201,7 @@ gh workflow run reconcile.yml --ref main
 | Failure | Recovery |
 | --- | --- |
 | Missing credentials or private connectivity | Repair the environment identity, host enrollment or Tailnet policy; rerun the workflow |
-| Newer merge supersedes a queued run | Reconcile current `main`; stale runs cannot publish or report success |
+| Newer merge supersedes a queued run | Reconcile current `main`; runs superseded by reconciled changes cannot publish; a retry without a newer pending push run fails |
 | On-demand or hourly verification supersedes a run queued in the `infrastructure-production` concurrency group | When the superseded run carried deploying changes, the superseding hourly verification, or the next hourly one after an on-demand verification, reports the unapplied revision and dispatches a full reconciliation; dispatch `verify=true` when no apply is queued |
 | Failed apply or verification | Rerun the workflow or run `infra reconcile apply --full` from a clean current `main` checkout |
 | Process terminated without lock cleanup | Hourly verification reports the held lock until its recorded expiry, then the incomplete reconciliation as a difference |

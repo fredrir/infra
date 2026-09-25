@@ -15,6 +15,7 @@ import (
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/images"
 	"github.com/fredrir/infra/internal/kata"
+	"github.com/fredrir/infra/internal/reconcile"
 	"github.com/spf13/cobra"
 )
 
@@ -100,4 +101,17 @@ func envDefault(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+const exitRetry = 75
+
+func ExitCode(err error) int {
+	switch {
+	case err == nil:
+		return 0
+	case reconcile.Retryable(err):
+		return exitRetry
+	default:
+		return 1
+	}
 }

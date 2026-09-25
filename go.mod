@@ -6,6 +6,7 @@ require (
 	cel.dev/cel-go v0.32.0
 	dagger.io/dagger v0.21.9
 	github.com/aws/aws-sdk-go-v2 v1.47.0
+	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-github/v88 v88.0.0

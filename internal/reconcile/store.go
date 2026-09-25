@@ -3,8 +3,6 @@ package reconcile
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,7 +39,7 @@ func (s Status) NeedsRecovery() bool {
 type Store interface {
 	Read(context.Context) (Status, error)
 	Write(context.Context, Status) error
-	Lock(context.Context) (func() error, error)
+	Lock(context.Context) (context.Context, func() error, error)
 }
 
 type S3Store struct {
@@ -53,6 +51,22 @@ type S3Store struct {
 type lease struct {
 	Owner   string    `json:"owner"`
 	Expires time.Time `json:"expires"`
+}
+
+const (
+	leaseTTL     = 10 * time.Minute
+	leaseRenewal = 3 * time.Minute
+)
+
+var errLeaseLost = errors.New("reconciliation lease lost")
+
+type ErrLocked struct {
+	Owner   string
+	Expires time.Time
+}
+
+func (e ErrLocked) Error() string {
+	return fmt.Sprintf("reconciliation locked by %s until %s", e.Owner, e.Expires)
 }
 
 func (s S3Store) object(ctx context.Context, key string) ([]byte, string, error) {
@@ -205,37 +219,94 @@ func (s S3Store) replaceableLease(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("read reconciliation lock: %w", err)
 	}
 	if existing.Expires.IsZero() || time.Now().Before(existing.Expires) {
-		return "", fmt.Errorf("reconciliation locked by %s until %s", existing.Owner, existing.Expires)
+		return "", ErrLocked(existing)
 	}
 	return etag, nil
 }
 
-func (s S3Store) Lock(ctx context.Context) (func() error, error) {
+func (s S3Store) Lock(ctx context.Context) (context.Context, func() error, error) {
 	etag, err := s.replaceableLease(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var owner [16]byte
-	if _, err := rand.Read(owner[:]); err != nil {
-		return nil, err
-	}
-	token, err := s.put(ctx, "lock.json", lease{hex.EncodeToString(owner[:]), time.Now().Add(2 * time.Hour)}, etag)
+	current := &heldLease{store: s, owner: leaseOwner(), expires: time.Now().Add(leaseTTL)}
+	current.token, err = s.put(ctx, "lock.json", lease{current.owner, current.expires}, etag)
 	if err != nil {
-		return nil, fmt.Errorf("acquire reconciliation lock: %w", err)
+		if _, occupied := s.replaceableLease(ctx); errors.As(occupied, new(ErrLocked)) {
+			return nil, nil, occupied
+		}
+		return nil, nil, fmt.Errorf("acquire reconciliation lock: %w", err)
 	}
-	return func() error {
-		release, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		if s.Client != nil {
-			response, err := s.Client.RequestHeaders(release, http.MethodDelete, s.Bucket, s.Prefix+"/lock.json", nil, http.Header{"If-Match": {token}})
-			if err != nil {
-				return err
-			}
-			defer response.Body.Close()
-			_, err = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+	held, lose := context.WithCancelCause(ctx)
+	stop, stopped := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(stopped)
+		current.renew(held, lose, stop)
+	}()
+	return held, func() error {
+		close(stop)
+		<-stopped
+		lose(nil)
+		return current.release()
+	}, nil
+}
+
+type heldLease struct {
+	store        S3Store
+	owner, token string
+	expires      time.Time
+}
+
+func (l *heldLease) renew(ctx context.Context, lose context.CancelCauseFunc, stop <-chan struct{}) {
+	ticker := time.NewTicker(leaseRenewal)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		expires := time.Now().Add(leaseTTL)
+		token, err := l.store.put(ctx, "lock.json", lease{l.owner, expires}, l.token)
+		if err == nil {
+			l.token, l.expires = token, expires
+			continue
+		}
+		if leaseTaken(err) || time.Until(l.expires) < leaseRenewal {
+			lose(fmt.Errorf("%w: %w", errLeaseLost, err))
+			return
+		}
+	}
+}
+
+func (l *heldLease) release() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	s := l.store
+	if s.Client != nil {
+		response, err := s.Client.RequestHeaders(ctx, http.MethodDelete, s.Bucket, s.Prefix+"/lock.json", nil, http.Header{"If-Match": {l.token}})
+		if err != nil {
 			return err
 		}
-		_, err := s.Runner.Output(release, "aws", "s3api", "delete-object", "--bucket", s.Bucket, "--key", s.Prefix+"/lock.json", "--if-match", token)
+		defer response.Body.Close()
+		_, err = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
 		return err
-	}, nil
+	}
+	_, err := s.Runner.Output(ctx, "aws", "s3api", "delete-object", "--bucket", s.Bucket, "--key", s.Prefix+"/lock.json", "--if-match", l.token)
+	return err
+}
+
+func leaseTaken(err error) bool {
+	var status *objectstore.StatusError
+	return errors.As(err, &status) && status.Code == http.StatusPreconditionFailed
+}
+
+func leaseOwner() string {
+	host, err := os.Hostname()
+	if err != nil {
+		host = "unknown host"
+	}
+	return fmt.Sprintf("%s pid %d", host, os.Getpid())
 }

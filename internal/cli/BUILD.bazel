@@ -46,5 +46,8 @@ go_library(
 go_test(
     name = "cli_test",
     srcs = ["cli_test.go"],
-    deps = [":cli"],
+    deps = [
+        ":cli",
+        "//internal/reconcile",
+    ],
 )

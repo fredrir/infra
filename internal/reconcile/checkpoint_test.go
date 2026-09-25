@@ -76,12 +76,12 @@ func (s *checkpointStore) Read(context.Context) (Status, error) {
 	err = json.Unmarshal(data, &status)
 	return status, err
 }
-func (s *checkpointStore) Lock(ctx context.Context) (func() error, error) {
-	unlock, err := s.memoryStore.Lock(ctx)
+func (s *checkpointStore) Lock(ctx context.Context) (context.Context, func() error, error) {
+	held, unlock, err := s.memoryStore.Lock(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return func() error { s.locked = false; return unlock() }, nil
+	return held, func() error { s.locked = false; return unlock() }, nil
 }
 
 func hostCheckpoint() Status {

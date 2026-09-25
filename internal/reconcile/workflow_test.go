@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/itchyny/gojq"
 	"go.yaml.in/yaml/v3"
 )
@@ -187,7 +188,12 @@ func TestDriftRepairDispatchRequiresRequestedRepairOfVerification(t *testing.T) 
 
 func repairQuery(t *testing.T, listing string) *gojq.Code {
 	t.Helper()
-	script := readWorkflow(t, "reconcile-job.yml").Jobs["repair"].script()
+	return jobQuery(t, "repair", listing)
+}
+
+func jobQuery(t *testing.T, job, listing string, options ...gojq.CompilerOption) *gojq.Code {
+	t.Helper()
+	script := readWorkflow(t, "reconcile-job.yml").Jobs[job].script()
 	for _, line := range strings.Split(script, "\n") {
 		match := regexp.MustCompile(`--jq '([^']+)'`).FindStringSubmatch(line)
 		if match == nil || !strings.Contains(line, listing) {
@@ -197,13 +203,13 @@ func repairQuery(t *testing.T, listing string) *gojq.Code {
 		if err != nil {
 			t.Fatal(err)
 		}
-		program, err := gojq.Compile(query)
+		program, err := gojq.Compile(query, options...)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return program
 	}
-	t.Fatalf("repair dispatch has no query over %s runs:\n%s", listing, script)
+	t.Fatalf("%s job has no query over %s runs:\n%s", job, listing, script)
 	return nil
 }
 
@@ -408,6 +414,64 @@ func TestVerificationAppStartsOnlyVerification(t *testing.T) {
 	for _, job := range []string{"cli", "reconcile"} {
 		if !slices.Contains(topLevel(t, reconcile.Jobs[job].If, "&&"), verificationBotCheck) {
 			t.Errorf("reconcile.yml job %s refuses requested verification: %q", job, reconcile.Jobs[job].If)
+		}
+	}
+}
+
+func TestSupersessionIgnoresExactlyThePushIgnoredPaths(t *testing.T) {
+	var push struct {
+		PathsIgnore []string `yaml:"paths-ignore"`
+	}
+	trigger := readWorkflow(t, "reconcile.yml").On["push"]
+	if err := trigger.Decode(&push); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(pushIgnoredPaths, push.PathsIgnore) {
+		t.Fatalf("supersession ignores %q, reconciliation pushes ignore %q", pushIgnoredPaths, push.PathsIgnore)
+	}
+	for _, pattern := range pushIgnoredPaths {
+		if !doublestar.ValidatePattern(pattern) {
+			t.Errorf("invalid pattern %q", pattern)
+		}
+	}
+	for path, ignored := range map[string]bool{"README.md": true, "docs/runbook.md": true, "docs/a/b.md": true, "build/evidence/run.json": true, "docs/diagram.svg": false, "platform/README.md": false, "build/evidence/a/run.json": false, "tofu/main.tf": false} {
+		if pushIgnored(path) != ignored {
+			t.Errorf("%s ignored=%t", path, !ignored)
+		}
+	}
+}
+
+func TestRetriedApplyRequiresANewerPushReconciliation(t *testing.T) {
+	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
+	reconcile := apply.step(t, func(step workflowStep) bool { return step.ID == "reconcile" })
+	for _, mapping := range []string{`if [ "$code" -eq 75 ]; then`, `echo 'retry=true' >> "$GITHUB_OUTPUT"`, `exit "$code"`} {
+		if !strings.Contains(reconcile.Run, mapping) {
+			t.Errorf("apply step lacks %s:\n%s", mapping, reconcile.Run)
+		}
+	}
+	successor := apply.step(t, func(step workflowStep) bool { return strings.Contains(step.Run, "gh run list") })
+	for _, guard := range []string{"--workflow reconcile.yml --event push --branch main", "--json databaseId,status", `if [ -z "$newer" ]; then`} {
+		if !strings.Contains(successor.Run, guard) {
+			t.Errorf("successor check lacks %s:\n%s", guard, successor.Run)
+		}
+	}
+	newer := jobQuery(t, "apply", "gh run list", gojq.WithEnvironLoader(func() []string { return []string{"GITHUB_RUN_ID=100"} }))
+	for _, test := range []struct {
+		runs map[int]string
+		want string
+	}{
+		{want: ""},
+		{runs: map[int]string{100: "in_progress", 99: "queued"}, want: ""},
+		{runs: map[int]string{101: "completed"}, want: ""},
+		{runs: map[int]string{101: "queued"}, want: "101"},
+		{runs: map[int]string{101: "in_progress", 100: "in_progress"}, want: "101"},
+	} {
+		runs := []any{}
+		for id, status := range test.runs {
+			runs = append(runs, map[string]any{"databaseId": id, "status": status})
+		}
+		if got := queryResults(t, newer, runs); !reflect.DeepEqual(got, []any{test.want}) {
+			t.Errorf("runs %v deferred to %v, want %q", test.runs, got, test.want)
 		}
 	}
 }

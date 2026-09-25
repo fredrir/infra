@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -32,17 +34,18 @@ func (s *memoryStore) Write(_ context.Context, status Status) error {
 	s.status = status
 	return nil
 }
-func (s *memoryStore) Lock(context.Context) (func() error, error) {
+func (s *memoryStore) Lock(ctx context.Context) (context.Context, func() error, error) {
 	if s.locked {
-		return nil, errors.New("locked")
+		return nil, nil, ErrLocked{Owner: "another run", Expires: time.Now().Add(time.Minute)}
 	}
 	s.locked = true
-	return func() error { s.released = true; return nil }, nil
+	return ctx, func() error { s.released = true; return nil }, nil
 }
 
 type fakeOps struct {
 	calls      []string
 	fail, base string
+	failure    error
 	full       bool
 	selection  Selection
 	drift      []Plan
@@ -51,7 +54,7 @@ type fakeOps struct {
 func (o *fakeOps) call(name string) error {
 	o.calls = append(o.calls, name)
 	if name == o.fail {
-		return errors.New("failed")
+		return cmp.Or(o.failure, errors.New("failed"))
 	}
 	return nil
 }
@@ -145,6 +148,138 @@ func TestConcurrentApplyDoesNotExecute(t *testing.T) {
 	}
 	if len(ops.calls) != 0 {
 		t.Fatal("concurrent apply executed")
+	}
+}
+
+type losingStore struct {
+	memoryStore
+	lose context.CancelCauseFunc
+}
+
+func (s *losingStore) Lock(ctx context.Context) (context.Context, func() error, error) {
+	held, lose := context.WithCancelCause(ctx)
+	s.lose = lose
+	return held, func() error { lose(nil); s.released = true; return nil }, nil
+}
+
+type leaseLosingOps struct {
+	fakeOps
+	store *losingStore
+}
+
+func (o *leaseLosingOps) Hosts(ctx context.Context, _ Plan) error {
+	o.calls = append(o.calls, "hosts")
+	o.store.lose(fmt.Errorf("%w: taken over", errLeaseLost))
+	return ctx.Err()
+}
+
+func TestLostLeaseStopsTheRunWithoutRecordingState(t *testing.T) {
+	store := &losingStore{memoryStore: memoryStore{status: Status{Desired: "old", Applied: "old"}}}
+	ops := &leaseLosingOps{fakeOps: fakeOps{selection: All()}, store: store}
+	err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false)
+	if !errors.Is(err, errLeaseLost) || !strings.HasPrefix(err.Error(), "hosts: reconciliation lease lost") {
+		t.Fatalf("lost lease reported as %v", err)
+	}
+	if !reflect.DeepEqual(ops.calls, []string{"plan", "expand", "hosts"}) {
+		t.Fatalf("run continued after losing its lease: %v", ops.calls)
+	}
+	if store.status.Stage != "hosts" || store.status.Failure != "" || !store.released {
+		t.Fatalf("status written after losing the lease: %+v", store.status)
+	}
+	if Retryable(err) {
+		t.Fatal("lost lease classified as retryable")
+	}
+}
+
+type supersededOps struct{ fakeOps }
+
+func (o *supersededOps) Revision(context.Context) (string, error) { return "", ErrSuperseded }
+
+type unrecordedFailureStore struct{ memoryStore }
+
+func (s *unrecordedFailureStore) Write(ctx context.Context, status Status) error {
+	if status.Failure != "" {
+		return errors.New("state unavailable")
+	}
+	return s.memoryStore.Write(ctx, status)
+}
+
+func TestApplyClassifiesRetryableOutcomes(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		store     Store
+		ops       Operations
+		retryable bool
+	}{
+		{name: "locked", store: &memoryStore{locked: true}, ops: &fakeOps{}, retryable: true},
+		{name: "superseded at start", store: &memoryStore{}, ops: &supersededOps{}, retryable: true},
+		{name: "superseded at publish", store: &memoryStore{status: Status{Desired: "old", Applied: "old"}}, ops: &fakeOps{selection: All(), fail: "publish", failure: ErrSuperseded}, retryable: true},
+		{name: "superseded without recorded failure", store: &unrecordedFailureStore{memoryStore{status: Status{Desired: "old", Applied: "old"}}}, ops: &fakeOps{selection: All(), fail: "publish", failure: ErrSuperseded}},
+		{name: "failed", store: &memoryStore{status: Status{Desired: "old", Applied: "old"}}, ops: &fakeOps{selection: All(), fail: "hosts"}},
+		{name: "complete", store: &memoryStore{status: Status{Desired: "old", Applied: "old"}}, ops: &fakeOps{selection: All()}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := (Reconciler{Store: test.store, Ops: test.ops}).Apply(context.Background(), false)
+			if Retryable(err) != test.retryable {
+				t.Fatalf("%v classified retryable=%t", err, Retryable(err))
+			}
+		})
+	}
+}
+
+func TestMainAdvanceSupersedesOnlyReconciledChanges(t *testing.T) {
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	area := t.TempDir()
+	git := func(dir string, args ...string) string {
+		t.Helper()
+		command := exec.Command("git", append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid"}, args...)...)
+		command.Dir = dir
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, output)
+		}
+		return strings.TrimSpace(string(output))
+	}
+	origin, pusher, checkout := filepath.Join(area, "origin.git"), filepath.Join(area, "pusher"), filepath.Join(area, "checkout")
+	git(area, "init", "--quiet", "--bare", "--initial-branch=main", origin)
+	git(area, "init", "--quiet", "--initial-branch=main", pusher)
+	commit := func(path string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Join(pusher, filepath.Dir(path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(pusher, path), []byte(path+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		git(pusher, "add", "--", path)
+		git(pusher, "commit", "--quiet", "--message", path)
+		git(pusher, "push", "--quiet", "--force", origin, "HEAD:main")
+	}
+	commit("tofu/main.tf")
+	git(area, "clone", "--quiet", origin, checkout)
+	revision := git(checkout, "rev-parse", "HEAD")
+	ops := &Commands{Runner: ci.Runner{Dir: checkout}, RequireMain: true}
+	for _, test := range []struct {
+		name       string
+		advance    func()
+		superseded bool
+	}{
+		{name: "current", advance: func() {}},
+		{name: "root documentation", advance: func() { commit("README.md") }},
+		{name: "nested documentation", advance: func() { commit("docs/runbooks/apply.md"); commit("build/evidence/run.json") }},
+		{name: "documentation asset", advance: func() { commit("docs/diagram.svg") }, superseded: true},
+		{name: "declaration", advance: func() { commit("README.md"); commit("platform/projects/y/kustomization.yaml") }, superseded: true},
+		{name: "rewritten", advance: func() { git(pusher, "checkout", "--quiet", "--orphan", "rewritten"); commit("README.md") }, superseded: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			git(pusher, "reset", "--quiet", "--hard", revision)
+			test.advance()
+			got, err := ops.Revision(context.Background())
+			if test.superseded != errors.Is(err, ErrSuperseded) || (!test.superseded && (err != nil || got != revision)) {
+				t.Fatalf("revision %q, error %v; want superseded=%t", got, err, test.superseded)
+			}
+		})
 	}
 }
 
@@ -313,7 +448,7 @@ func TestS3LockUsesConditionalTakeoverAndRelease(t *testing.T) {
 				}
 				return process.Result{}, nil
 			}}
-			unlock, err := (S3Store{Runner: runner, Bucket: "bucket", Prefix: "production"}).Lock(context.Background())
+			_, unlock, err := (S3Store{Runner: runner, Bucket: "bucket", Prefix: "production"}).Lock(context.Background())
 			if expired {
 				if err != nil {
 					t.Fatal(err)
@@ -414,7 +549,7 @@ func TestS3LockCreationUsesCreateOnlyCondition(t *testing.T) {
 		}
 		return process.Result{}, nil
 	}}
-	unlock, err := (S3Store{Runner: runner, Bucket: "bucket", Prefix: "production"}).Lock(context.Background())
+	_, unlock, err := (S3Store{Runner: runner, Bucket: "bucket", Prefix: "production"}).Lock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

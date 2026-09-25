@@ -4,13 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fredrir/infra/internal/cli"
+	"github.com/fredrir/infra/internal/reconcile"
 )
 
 func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
@@ -66,16 +70,37 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 }
 
 func TestCommandValidation(t *testing.T) {
-	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}} {
+	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "verify", "--wait=1m"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err == nil {
 			t.Errorf("accepted invalid command %q", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--deep", "--help"}, {"reconcile", "request-verification", "--help"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--deep", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "request-verification", "--help"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
 			t.Errorf("command %q: %v, output=%q", args, err, &output)
+		}
+	}
+}
+
+func TestExitCodeSeparatesRetryFromFailure(t *testing.T) {
+	locked := reconcile.ErrLocked{Owner: "laptop", Expires: time.Now().Add(time.Minute)}
+	superseded := fmt.Errorf("publish: %w", reconcile.ErrSuperseded)
+	for _, test := range []struct {
+		err  error
+		want int
+	}{
+		{err: nil, want: 0},
+		{err: locked, want: 75},
+		{err: fmt.Errorf("comparisons skipped: %w", locked), want: 75},
+		{err: superseded, want: 75},
+		{err: errors.Join(superseded, locked), want: 75},
+		{err: errors.Join(superseded, errors.New("state unavailable")), want: 1},
+		{err: errors.New("reconciliation lease lost"), want: 1},
+	} {
+		if got := cli.ExitCode(test.err); got != test.want {
+			t.Errorf("%v exits %d, want %d", test.err, got, test.want)
 		}
 	}
 }

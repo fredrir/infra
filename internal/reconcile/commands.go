@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/fluxartifacts"
 	"github.com/fredrir/infra/internal/kustomize"
@@ -213,18 +215,43 @@ func (c *Commands) ansible(ctx context.Context, playbook string, extra ...string
 	return runner.Run(ctx, "ansible-playbook", args...)
 }
 
+var ErrSuperseded = errors.New("main advanced; retry reconciliation at its current revision")
+
+var pushIgnoredPaths = []string{"*.md", "docs/**/*.md", "build/evidence/*.json"}
+
 func (c *Commands) currentMain(ctx context.Context, revision string) error {
 	if err := c.Runner.Run(ctx, "git", "fetch", "--quiet", "origin", "refs/heads/main"); err != nil {
 		return err
 	}
-	head, err := c.Runner.Output(ctx, "git", "rev-parse", "FETCH_HEAD")
+	data, err := c.Runner.Output(ctx, "git", "rev-parse", "FETCH_HEAD")
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(string(head)) != revision {
-		return fmt.Errorf("main advanced; retry reconciliation at its current revision")
+	head := strings.TrimSpace(string(data))
+	if head == revision {
+		return nil
+	}
+	unmerged, err := c.Runner.Output(ctx, "git", "rev-list", "--max-count=1", revision, "^"+head)
+	if err != nil {
+		return err
+	}
+	if len(unmerged) != 0 {
+		return ErrSuperseded
+	}
+	changed, err := c.Runner.Output(ctx, "git", "diff", "--name-only", "--no-renames", "-z", revision, head)
+	if err != nil {
+		return err
+	}
+	for path := range strings.SplitSeq(string(changed), "\x00") {
+		if path != "" && !pushIgnored(path) {
+			return ErrSuperseded
+		}
 	}
 	return nil
+}
+
+func pushIgnored(path string) bool {
+	return slices.ContainsFunc(pushIgnoredPaths, func(pattern string) bool { return doublestar.MatchUnvalidated(pattern, path) })
 }
 
 func (c *Commands) Publish(ctx context.Context, revision string) error {

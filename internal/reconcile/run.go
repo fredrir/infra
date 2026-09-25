@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"slices"
 	"time"
 )
 
@@ -30,23 +32,28 @@ type Operations interface {
 	Retire(context.Context, Plan) error
 }
 
-const applyDeadline = 90 * time.Minute
+const (
+	applyDeadline = 90 * time.Minute
+	lockPoll      = 15 * time.Second
+)
 
 type Reconciler struct {
-	Store  Store
-	Ops    Operations
-	Host   string
-	Report func(Status) error
+	Store    Store
+	Ops      Operations
+	Host     string
+	Report   func(Status) error
+	LockWait time.Duration
+	Log      io.Writer
 }
 
 func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
-	ctx, cancel := context.WithTimeout(ctx, applyDeadline)
-	defer cancel()
-	unlock, err := r.Store.Lock(ctx)
+	held, unlock, err := r.lock(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, unlock()) }()
+	ctx, cancel := context.WithTimeout(held, applyDeadline)
+	defer cancel()
 	status, err := r.Store.Read(ctx)
 	if err != nil {
 		return err
@@ -91,7 +98,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		return nil
 	}
 	defer func() {
-		if err != nil {
+		if err != nil && !errors.Is(context.Cause(held), errLeaseLost) {
 			status.Failure = err.Error()
 			failureContext, failureCancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer failureCancel()
@@ -99,8 +106,8 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		}
 	}()
 	stage := func(name string, action func() error) error {
-		if err := ctx.Err(); err != nil {
-			return err
+		if ctx.Err() != nil {
+			return context.Cause(ctx)
 		}
 		status.Stage = name
 		if err := save(ctx); err != nil {
@@ -109,6 +116,9 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		started := time.Now()
 		err := action()
 		status.Durations[name] = time.Since(started).Seconds()
+		if err != nil && ctx.Err() != nil {
+			err = context.Cause(ctx)
+		}
 		if err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
@@ -194,4 +204,44 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		return err
 	}
 	return nil
+}
+
+func (r Reconciler) lock(ctx context.Context) (context.Context, func() error, error) {
+	deadline := time.Now().Add(r.LockWait)
+	var holder string
+	for {
+		held, unlock, err := r.Store.Lock(ctx)
+		var locked ErrLocked
+		if !errors.As(err, &locked) || !time.Now().Before(deadline) {
+			return held, unlock, err
+		}
+		if r.Log != nil && locked.Owner != holder {
+			fmt.Fprintf(r.Log, "Waiting until %s: %s\n", deadline.Format(time.RFC3339), locked)
+		}
+		holder = locked.Owner
+		wait := min(lockPoll, time.Until(deadline))
+		if expiry := time.Until(locked.Expires); expiry > 0 {
+			wait = min(wait, expiry)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, nil, context.Cause(ctx)
+		case <-time.After(wait):
+		}
+	}
+}
+
+func Retryable(err error) bool {
+	switch err := err.(type) {
+	case nil:
+		return false
+	case ErrLocked:
+		return true
+	case interface{ Unwrap() []error }:
+		return !slices.ContainsFunc(err.Unwrap(), func(inner error) bool { return !Retryable(inner) })
+	case interface{ Unwrap() error }:
+		return Retryable(err.Unwrap())
+	default:
+		return err == ErrSuperseded
+	}
 }
