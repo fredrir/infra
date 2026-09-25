@@ -113,6 +113,36 @@
       "limitations": [
         "One sample; the hourly verification has not yet run on this revision"
       ]
+    },
+    {
+      "change": "Trigger hourly deep verification from fredrir-06 through a dedicated GitHub App and report each outcome to Gatus; remove the GitHub schedule",
+      "rollout": {
+        "runs": [
+          "https://github.com/fredrir/infra/actions/runs/36184579253",
+          "https://github.com/fredrir/infra/actions/runs/36185411393"
+        ],
+        "first_run": "failure: build VM restarted for its new metrics forward and the SSH readiness wait accepted QEMU's forwarded port before the guest booted",
+        "fix": "wait for the guest SSH banner (a6cccdc); recovery run applied every stage"
+      },
+      "schedule_delivery_before": "GitHub cron 47 * * * * fired 4-6 times per day",
+      "first_dispatch": {
+        "run": "https://github.com/fredrir/infra/actions/runs/36189505951",
+        "actor": "fredrir-infra-verification[bot]",
+        "created": "2026-09-25T21:04:35Z",
+        "timer": "OnCalendar=hourly, RandomizedDelaySec=5min",
+        "deep_verification_seconds": 63.2,
+        "outcome": "success",
+        "repair": "skipped",
+        "gatus_heartbeat": {
+          "endpoint": "reconciliation_verification",
+          "success": true,
+          "timestamp": "2026-09-25T21:06:37Z"
+        }
+      },
+      "cross_checks": {
+        "prometheus_job_independent_monitor_up": 1,
+        "prometheus_job_build_vm_up": 1
+      }
     }
   ]
 }
