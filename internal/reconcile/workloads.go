@@ -13,7 +13,7 @@ func workloadReady(expected, actual resource) error {
 	name := actual.Metadata.Namespace + "/" + actual.Metadata.Name
 	if expected.Kind == "HelmRelease" {
 		if actual.Spec.Suspend {
-			return kubernetesDifference("HelmRelease %s is suspended", name)
+			return fmt.Errorf("HelmRelease %s is suspended", name)
 		}
 		return ready(actual)
 	}
@@ -48,6 +48,9 @@ func workloadReady(expected, actual resource) error {
 		count = *expected.Spec.Replicas
 	}
 	if actual.Spec.Replicas != nil && *actual.Spec.Replicas != count {
+		if expected.Spec.Replicas == nil {
+			return fmt.Errorf("%s %s runs %d replicas, want the default %d", expected.Kind, name, *actual.Spec.Replicas, count)
+		}
 		return kubernetesDifference("%s %s runs %d replicas, want %d", expected.Kind, name, *actual.Spec.Replicas, count)
 	}
 	switch expected.Kind {

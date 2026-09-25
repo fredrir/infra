@@ -66,7 +66,7 @@ func (c *Commands) getResource(ctx context.Context, kind, namespace, name string
 
 func conditionReady(item resource) error {
 	if item.Spec.Suspend {
-		return kubernetesDifference("%s %s/%s is suspended", item.Kind, item.Metadata.Namespace, item.Metadata.Name)
+		return fmt.Errorf("%s %s/%s is suspended", item.Kind, item.Metadata.Namespace, item.Metadata.Name)
 	}
 	for _, condition := range item.Status.Conditions {
 		if (condition.Type == "Reconciling" || condition.Type == "Stalled") && condition.Status == "True" {

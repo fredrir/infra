@@ -218,7 +218,7 @@ func (c *Commands) verifyKubernetes(ctx context.Context, revision, token string)
 		if item.Spec.Suspend {
 			if name == "flux-system/flux-system" {
 				root = true
-				problems = append(problems, kubernetesDifference("Kustomization %s is suspended", name))
+				problems = append(problems, fmt.Errorf("Kustomization %s is suspended", name))
 			}
 			continue
 		}
@@ -252,7 +252,7 @@ func (c *Commands) verifyHelm(ctx context.Context, token, host string) error {
 		grafana = grafana || monitoring
 		if item.Spec.Suspend {
 			if monitoring {
-				problems = append(problems, kubernetesDifference("HelmRelease %s is suspended", name))
+				problems = append(problems, fmt.Errorf("HelmRelease %s is suspended", name))
 			}
 			continue
 		}
@@ -329,11 +329,18 @@ func (c *Commands) VerifyDrift(ctx context.Context, plan Plan) error {
 }
 
 func (c *Commands) VerifyDeep(ctx context.Context, plan Plan) error {
+	var output bytes.Buffer
+	log := &lockedWriter{mu: &sync.Mutex{}, writer: &output}
+	compare := *c
+	compare.Runner.Stdout, compare.Runner.Stderr = log, log
+	compared := make(chan error, 1)
+	go func() { compared <- compare.compareDeclarations(ctx) }()
 	live := c.VerifyLive(ctx, plan)
-	if err := ctx.Err(); err != nil {
-		return errors.Join(live, err)
+	declarations := <-compared
+	if c.Runner.Stdout != nil {
+		_, _ = c.Runner.Stdout.Write(output.Bytes())
 	}
-	return errors.Join(live, c.compareDeclarations(ctx))
+	return errors.Join(live, declarations)
 }
 
 func (c *Commands) compareDeclarations(ctx context.Context) error {
@@ -464,7 +471,7 @@ func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
 			continue
 		}
 		if item.Spec.Suspend {
-			problems = append(problems, kubernetesDifference("Kustomization flux-system/%s is suspended", name))
+			problems = append(problems, fmt.Errorf("Kustomization flux-system/%s is suspended", name))
 			continue
 		}
 		problems = append(problems, c.verifyOwner(item, plan))

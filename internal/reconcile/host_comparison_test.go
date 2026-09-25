@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
@@ -351,5 +352,46 @@ echo 'fredrir-04 : ok=1 changed=0 unreachable=0 failed=0 skipped=0'
 		if !strings.Contains(stdout.String(), line+"\n") {
 			t.Errorf("combined output lost %q:\n%s", line, &stdout)
 		}
+	}
+}
+
+func TestDeepVerificationComparesDeclarationsDuringLiveChecks(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	fleet := testRunnerFleet()
+	planning := make(chan struct{})
+	var once sync.Once
+	var stdout bytes.Buffer
+	commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Stdout: &stdout, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
+		switch options.Name {
+		case "kubectl":
+			select {
+			case <-planning:
+				return process.Result{ExitCode: 1}, errors.New("kubectl failed: connection refused")
+			case <-ctx.Done():
+				return process.Result{ExitCode: 1}, ctx.Err()
+			}
+		case "tofu":
+			if slices.Contains(options.Args, "plan") {
+				once.Do(func() { close(planning) })
+			}
+			return process.Result{Stdout: []byte(`{"@level":"info","@message":"No changes.","type":"change_summary"}` + "\n")}, nil
+		case "ansible-playbook":
+			playbook := strings.TrimSuffix(playbookArgument(options), ".yml")
+			return fakePlaybooks{reports: []string{junitReport(playbook, junitCase("[fredrir-04] Configure Ubuntu hosts: ubuntu : Harden SSH authentication", "roles/ubuntu/tasks/main.yml:22", junitResult(false)))}}.execute(t, options)
+		case "gh":
+			return runnerResponse(t, healthyRunner(fleet, queriedRepository(options))), nil
+		}
+		t.Errorf("unexpected command %s", options.Name)
+		return process.Result{}, errors.New("unexpected command")
+	}}}
+	plan := Plan{Revision: strings.Repeat("a", 40), Affected: Selection{Kubernetes: true, Ansible: true, HostScope: HostScopeRunners, Projects: []string{"portfolio"}}}
+	got := VerificationOutcome("", true, commands.VerifyDeep(ctx, plan))
+	want := Verification{Deep: true, Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"kubectl failed: connection refused"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("deep verification reported %+v, want %+v", got, want)
+	}
+	if !strings.Contains(stdout.String(), "No changes.\n") {
+		t.Fatalf("declaration comparison output lost:\n%s", &stdout)
 	}
 }

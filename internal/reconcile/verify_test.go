@@ -66,7 +66,7 @@ func TestKubernetesDeclarationMismatchesAreDifferences(t *testing.T) {
 		{name: "unapplied revision", mutate: func(kustomizations, _ *[]resource) {
 			(*kustomizations)[0].Status.LastAppliedRevision = "production@sha1:old"
 		}, differences: []Difference{{System: "kubernetes", Item: "Kustomization flux-system/flux-system has not applied " + revision}}},
-		{name: "suspended root", mutate: func(kustomizations, _ *[]resource) { (*kustomizations)[0].Spec.Suspend = true }, differences: []Difference{{System: "kubernetes", Item: "Kustomization flux-system/flux-system is suspended"}}},
+		{name: "suspended root", mutate: func(kustomizations, _ *[]resource) { (*kustomizations)[0].Spec.Suspend = true }, errors: []string{"Kustomization flux-system/flux-system is suspended"}},
 		{name: "suspended child is declared elsewhere", mutate: func(kustomizations, _ *[]resource) {
 			child := readyResource(t, "Kustomization", "flux-system", "platform-projects")
 			child.Spec.Suspend = true
@@ -81,7 +81,7 @@ func TestKubernetesDeclarationMismatchesAreDifferences(t *testing.T) {
 		{name: "Grafana root_url", mutate: func(_, releases *[]resource) {
 			(*releases)[0].Spec.Values.Grafana.INI.Server.RootURL = "https://grafana.fredrir.com"
 		}, differences: []Difference{{System: "kubernetes", Item: `HelmRelease observability/monitoring serves Grafana at "https://grafana.fredrir.com", want "https://logs.fredrir.com"`}}},
-		{name: "suspended Grafana", mutate: func(_, releases *[]resource) { (*releases)[0].Spec.Suspend = true }, differences: []Difference{{System: "kubernetes", Item: "HelmRelease observability/monitoring is suspended"}}},
+		{name: "suspended Grafana", mutate: func(_, releases *[]resource) { (*releases)[0].Spec.Suspend = true }, errors: []string{"HelmRelease observability/monitoring is suspended"}},
 		{name: "missing Grafana", mutate: func(_, releases *[]resource) {
 			*releases = []resource{readyResource(t, "HelmRelease", "cache", "valkey")}
 		}, differences: []Difference{{System: "kubernetes", Item: "HelmRelease observability/monitoring is missing"}}},
@@ -145,7 +145,7 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 			owner := s.owners["project-y"]
 			owner.Spec.Suspend = true
 			s.owners["project-y"] = owner
-		}, differences: []Difference{{System: "kubernetes", Item: "Kustomization flux-system/project-y is suspended"}}},
+		}, errors: []string{"Kustomization flux-system/project-y is suspended"}},
 		{name: "topology", mutate: func(s *state) {
 			owner := s.owners["project-y"]
 			owner.Spec.Path = "./elsewhere"
@@ -159,6 +159,10 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 		{name: "image", mutate: func(s *state) { s.deployment.Spec.Template.Spec.Containers[0].Image = "example@sha256:old" }, differences: []Difference{image}},
 		{name: "missing workload", mutate: func(s *state) { s.deployment.Metadata.Name = "renamed" }, differences: []Difference{{System: "kubernetes", Item: "deployments.apps y/api is missing"}}},
 		{name: "rollout incomplete", mutate: func(s *state) { s.deployment.Status.AvailableReplicas = 0 }, errors: []string{"y/api deployment rollout is incomplete"}},
+		{name: "scaled", mutate: func(s *state) {
+			scaled := int64(3)
+			s.deployment.Spec.Replicas = &scaled
+		}, differences: []Difference{{System: "kubernetes", Item: "Deployment y/api runs 3 replicas, want 1"}}},
 		{name: "image and unready Grafana", mutate: func(s *state) {
 			s.deployment.Spec.Template.Spec.Containers[0].Image = "example@sha256:old"
 			notReady(&s.monitoring)

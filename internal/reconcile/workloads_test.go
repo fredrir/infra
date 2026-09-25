@@ -3,6 +3,7 @@ package reconcile
 import (
 	"encoding/json"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -25,6 +26,23 @@ func TestWorkloadRejectsWrongImageAndIncompleteRollout(t *testing.T) {
 	actual.Status.ObservedGeneration = 2
 	if err := workloadReady(expected, actual); err == nil {
 		t.Fatal("stale rollout accepted")
+	}
+}
+
+func TestReplicaCountDiffersOnlyWhenDeclared(t *testing.T) {
+	actual := artifactFixture(t, `{"kind":"Deployment","metadata":{"name":"api","namespace":"y","generation":2},"spec":{"replicas":3,"template":{"spec":{"containers":[{"name":"api","image":"example@sha256:desired"}]}}},"status":{"observedGeneration":2,"replicas":3,"updatedReplicas":3,"availableReplicas":3}}`)
+	for _, test := range []struct {
+		name, expected string
+		want           Verification
+	}{
+		{name: "declared", expected: `{"kind":"Deployment","spec":{"replicas":1,"template":{"spec":{"containers":[{"name":"api","image":"example@sha256:desired"}]}}}}`, want: Verification{Outcome: OutcomeDiffers, Differences: []Difference{{System: "kubernetes", Item: "Deployment y/api runs 3 replicas, want 1"}}, Errors: []string{}}},
+		{name: "undeclared", expected: `{"kind":"Deployment","spec":{"template":{"spec":{"containers":[{"name":"api","image":"example@sha256:desired"}]}}}}`, want: Verification{Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"Deployment y/api runs 3 replicas, want the default 1"}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := VerificationOutcome("", false, workloadReady(artifactFixture(t, test.expected), actual)); !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("scaled workload reported %+v, want %+v", got, test.want)
+			}
+		})
 	}
 }
 
