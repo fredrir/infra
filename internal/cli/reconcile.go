@@ -1,17 +1,18 @@
 package cli
 
 import (
-	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/objectstore"
+	"github.com/fredrir/infra/internal/platformops"
 	"github.com/fredrir/infra/internal/reconcile"
 	"github.com/spf13/cobra"
 )
@@ -117,30 +118,34 @@ func newReconcileCommand() *cobra.Command {
 }
 
 func newRequestVerificationCommand() *cobra.Command {
-	request := reconcile.VerificationRequest{API: "https://api.github.com"}
-	var key string
-	command := &cobra.Command{Use: "request-verification", Short: "Dispatch deep verification with drift repair as a GitHub App", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		if key == "" {
-			return errors.New("--private-key is required outside a systemd credential directory")
+	request := reconcile.VerificationRequest{API: "https://api.github.com", Poll: 30 * time.Second, Deadline: 150 * time.Minute}
+	var key, token string
+	command := &cobra.Command{Use: "request-verification", Short: "Dispatch deep verification with drift repair and report its conclusion to Gatus", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		if key == "" || token == "" {
+			return errors.New("--private-key and --heartbeat-token are required outside a systemd credential directory")
 		}
 		var err error
 		if request.PrivateKey, err = os.ReadFile(key); err != nil {
 			return err
 		}
-		run, err := reconcile.RequestVerification(cmd.Context(), request)
+		heartbeat, err := os.ReadFile(token)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintln(cmd.OutOrStdout(), "Requested verification:", cmp.Or(run, request.Repository+" "+request.Workflow+"@"+request.Ref))
-		return err
+		request.HeartbeatToken, request.Log = strings.TrimSpace(string(heartbeat)), cmd.OutOrStdout()
+		return reconcile.RequestVerification(cmd.Context(), request)
 	}}
-	var credentials string
-	if directory := os.Getenv("CREDENTIALS_DIRECTORY"); directory != "" {
-		credentials = filepath.Join(directory, "github-app-key")
+	credential := func(name string) string {
+		if directory := os.Getenv("CREDENTIALS_DIRECTORY"); directory != "" {
+			return filepath.Join(directory, name)
+		}
+		return ""
 	}
 	command.Flags().Int64Var(&request.AppID, "app-id", 0, "GitHub App ID")
 	command.Flags().Int64Var(&request.InstallationID, "installation-id", 0, "GitHub App installation ID")
-	command.Flags().StringVar(&key, "private-key", credentials, "GitHub App private key file")
+	command.Flags().StringVar(&key, "private-key", credential("github-app-key"), "GitHub App private key file")
+	command.Flags().StringVar(&token, "heartbeat-token", credential("gatus-token"), "Gatus external endpoint token file")
+	command.Flags().StringVar(&request.Gatus, "gatus", platformops.GatusURL, "Gatus URL")
 	command.Flags().StringVar(&request.Repository, "repository", "fredrir/infra", "Repository as OWNER/NAME")
 	command.Flags().StringVar(&request.Workflow, "workflow", "reconcile.yml", "Workflow file name")
 	command.Flags().StringVar(&request.Ref, "ref", "main", "Workflow revision")
