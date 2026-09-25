@@ -58,8 +58,28 @@
       },
       "drain": "INFRA_VM_POOL_QUALIFIED false in 7 routed repositories 09:40-09:52 UTC",
       "restarts": "none; stale runner, stale engine and slice reload tasks skipped",
-      "verification": "check-mode declarations, probe and GitHub fleet check passed",
-      "pending": "first scheduled full run exercising the runner play skip"
+      "verification": "check-mode declarations, probe and GitHub fleet check passed"
+    },
+    {
+      "change": "Scheduled full reconciliation skips the verified runner play",
+      "run": "https://github.com/fredrir/infra/actions/runs/36132158963",
+      "result": "runner fleet matches its declaration; skipping the runner play",
+      "stage_seconds": {
+        "plan": 27.7,
+        "expand": 4.8,
+        "hosts": 115.0,
+        "publish": 1.3,
+        "kubernetes": 55.0,
+        "monitor": 17.2,
+        "verify": 27.0,
+        "retire": 7.3
+      },
+      "hosts_stage_seconds_with_runner_play": "160-177",
+      "hourly_verification": {
+        "run": "https://github.com/fredrir/infra/actions/runs/36124798333",
+        "seconds": 68.0,
+        "success": true
+      }
     }
   ]
 }
