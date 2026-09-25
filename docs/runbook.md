@@ -35,9 +35,9 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | --- | --- | --- |
 | Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu expansion and final-state plans, Flux rendering, Ansible task lists |
 | Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout; apply against the last successful revision |
-| Scheduled verification | `infra reconcile verify --deep --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and host plays at minute 47 every hour (UTC); a report listing differences dispatches one full reconciliation of `main` unless one dispatched for the same revision started within six hours or failed |
+| Scheduled verification | `infra reconcile verify --deep --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and host plays at minute 47 every hour (UTC); unpublished deploying changes and an incomplete or failed recorded reconciliation are differences; a report listing differences dispatches one full reconciliation of `main` unless the latest bot dispatch for the same commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled; a new commit on `main` lifts the cap |
 | On-demand verification | `gh workflow run reconcile.yml --ref main -f verify=true` | The scheduled verification on demand; differences are reported without dispatching a reconciliation |
-| Verification | `infra reconcile verify` | Exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision |
+| Verification | `infra reconcile verify` | Recorded reconciliation status, exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision |
 | Status | `infra reconcile status` | Desired revision, successfully applied revision, failing stage and stage durations |
 
 | Owner | Managed state |
@@ -144,6 +144,7 @@ gh workflow run reconcile.yml --ref main
 | --- | --- |
 | Missing credentials or private connectivity | Repair the environment identity, host enrollment or Tailnet policy; rerun the workflow |
 | Newer merge supersedes a queued run | Reconcile current `main`; stale runs cannot publish or report success |
+| On-demand or hourly verification supersedes a run queued in the `infrastructure-production` concurrency group | The next hourly verification reports the unapplied revision and dispatches a full reconciliation; dispatch `verify=true` when no apply is queued |
 | Failed apply or verification | Rerun the workflow or run `infra reconcile apply --full` from a clean current `main` checkout |
 | Process terminated without lock cleanup | Wait for the recorded lock expiry; rerun the workflow |
 | Remaining OpenTofu drift | Inspect the final plan; nonzero drift keeps the run failed |

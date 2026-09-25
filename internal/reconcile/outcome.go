@@ -1,6 +1,12 @@
 package reconcile
 
-import "strings"
+import (
+	"cmp"
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+)
 
 type Difference struct {
 	System string `json:"system"`
@@ -62,4 +68,62 @@ func VerificationOutcome(revision string, deep bool, err error) Verification {
 		verification.Outcome = OutcomeMatches
 	}
 	return verification
+}
+
+type VerificationOperations interface {
+	Revision(context.Context) (string, error)
+	PublishedRevision(context.Context) (string, error)
+	Select(context.Context, string, bool) (Selection, error)
+	VerifyLive(context.Context, Plan) error
+	VerifyDeep(context.Context, Plan) error
+}
+
+type Verifier struct {
+	Store Store
+	Ops   VerificationOperations
+	Host  string
+	Deep  bool
+}
+
+func (v Verifier) Verify(ctx context.Context) (string, error) {
+	recorded := v.recordedReconciliation(ctx)
+	revision, err := v.Ops.Revision(ctx)
+	if err != nil {
+		return "", errors.Join(recorded, err)
+	}
+	published, err := v.Ops.PublishedRevision(ctx)
+	if err != nil {
+		return "", errors.Join(recorded, err)
+	}
+	if published != revision {
+		pending, err := v.Ops.Select(ctx, published, false)
+		if err != nil {
+			return "", errors.Join(recorded, err)
+		}
+		if pending.Tofu || pending.Kubernetes || pending.Ansible {
+			return "", errors.Join(recorded, Differences{{System: "revision", Item: "production at " + published + ", checkout at " + revision}})
+		}
+		revision = published
+	}
+	plan := Plan{Revision: revision, Affected: All(), Host: v.Host}
+	compare := v.Ops.VerifyLive
+	if v.Deep {
+		compare = v.Ops.VerifyDeep
+	}
+	return revision, errors.Join(recorded, compare(ctx, plan))
+}
+
+func (v Verifier) recordedReconciliation(ctx context.Context) error {
+	status, err := v.Store.Read(ctx)
+	if err != nil {
+		return fmt.Errorf("read reconciliation status: %w", err)
+	}
+	if !status.NeedsRecovery() {
+		return nil
+	}
+	item := fmt.Sprintf("applied %s, desired %s, stage %s", cmp.Or(status.Applied, "none"), status.Desired, status.Stage)
+	if status.Failure != "" {
+		item += " failed"
+	}
+	return Differences{{System: "reconciliation", Item: item}}
 }

@@ -35,6 +35,10 @@ type Status struct {
 	Durations         map[string]float64 `json:"stage_seconds,omitempty"`
 }
 
+func (s Status) NeedsRecovery() bool {
+	return s.Desired != s.Applied || s.Failure != "" || (s.Stage != "" && s.Stage != "complete" && s.Stage != "evaluated")
+}
+
 type Store interface {
 	Read(context.Context) (Status, error)
 	Write(context.Context, Status) error

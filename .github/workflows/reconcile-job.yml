@@ -112,6 +112,7 @@ jobs:
       with:
         ref: ${{ github.sha }}
         fetch-depth: 0
+        persist-credentials: ${{ env.VERIFICATION != 'true' }}
     - uses: ./.github/actions/setup-reconciliation-cli
     - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
       id: doppler
@@ -239,7 +240,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         GH_REPO: ${{ github.repository }}
       run: |
-        previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --user 'github-actions[bot]' --commit "$GITHUB_SHA" --limit 1 --json conclusion,createdAt --jq '.[] | if (.conclusion | IN("failure", "timed_out", "startup_failure")) then "ended in \(.conclusion)" elif now - (.createdAt | fromdateiso8601) < 21600 then "started within six hours" else empty end')
+        previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --user 'github-actions[bot]' --commit "$GITHUB_SHA" --limit 1 --json conclusion,createdAt --jq '.[] | if (.conclusion | IN("failure", "timed_out", "startup_failure")) then "ended in \(.conclusion)" elif .conclusion != "cancelled" and now - (.createdAt | fromdateiso8601) < 21600 then "started within six hours" else empty end')
         if [ -n "$previous" ]; then
           echo "::warning::The dispatched full reconciliation of $GITHUB_SHA $previous; not dispatching another"
           exit 0

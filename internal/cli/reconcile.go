@@ -67,9 +67,8 @@ func newReconcileCommand() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				recovery := status.Desired != status.Applied || status.Failure != "" || (status.Stage != "" && status.Stage != "complete" && status.Stage != "evaluated")
 				ops := &reconcile.Commands{Runner: runner}
-				selected, err := ops.Select(cmd.Context(), status.Applied, full || recovery)
+				selected, err := ops.Select(cmd.Context(), status.Applied, full || status.NeedsRecovery())
 				if err != nil {
 					return err
 				}
@@ -95,38 +94,19 @@ func newReconcileCommand() *cobra.Command {
 				}}
 				return engine.Apply(cmd.Context(), full)
 			}
+			if action == "verify" {
+				verified, err = reconcile.Verifier{Store: store, Ops: ops, Host: host, Deep: deep}.Verify(cmd.Context())
+				return err
+			}
 			revision, err := ops.Revision(cmd.Context())
 			if err != nil {
 				return err
-			}
-			if action == "verify" {
-				published, err := ops.PublishedRevision(cmd.Context())
-				if err != nil {
-					return err
-				}
-				if published != revision {
-					pending, err := ops.Select(cmd.Context(), published, false)
-					if err != nil {
-						return err
-					}
-					if pending.Tofu || pending.Kubernetes || pending.Ansible {
-						return fmt.Errorf("checkout contains unpublished infrastructure changes")
-					}
-					revision = published
-				}
 			}
 			selected, err := ops.Select(cmd.Context(), base, full)
 			if err != nil {
 				return err
 			}
 			plan := reconcile.Plan{Revision: revision, Base: base, Affected: selected, Host: host}
-			if action == "verify" {
-				verified = revision
-				if deep {
-					return ops.VerifyDeep(cmd.Context(), plan)
-				}
-				return ops.VerifyLive(cmd.Context(), plan)
-			}
 			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(plan); err != nil {
 				return err
 			}

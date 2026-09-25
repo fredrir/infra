@@ -56,7 +56,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		return err
 	}
 	reuseHosts := false
-	recovery := status.Desired != status.Applied || status.Failure != "" || (status.Stage != "" && status.Stage != "complete" && status.Stage != "evaluated")
+	recovery := status.NeedsRecovery()
 	previousDesired := status.Desired
 	if !full && reusableHosts(status, time.Now()) {
 		changed, err := r.Ops.Select(ctx, status.Desired, false)

@@ -39,6 +39,7 @@ go_test(
         "checkpoint_test.go",
         "host_comparison_test.go",
         "host_scope_test.go",
+        "outcome_test.go",
         "projects_test.go",
         "published_test.go",
         "reconcile_test.go",
@@ -46,6 +47,7 @@ go_test(
         "runner_coverage_test.go",
         "runners_test.go",
         "store_http_test.go",
+        "workflow_test.go",
         "workloads_test.go",
     ],
     data = [
@@ -57,6 +59,7 @@ go_test(
         "//internal/ci",
         "//internal/objectstore",
         "//internal/process",
+        "@com_github_itchyny_gojq//:gojq",
         "@in_yaml_go_yaml_v3//:yaml",
     ],
 )
