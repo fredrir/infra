@@ -15,7 +15,6 @@
     "llunde-backend",
     "llunde-pyparser",
     "packages",
-    "nsql",
     "portfolio"
   ]
 }

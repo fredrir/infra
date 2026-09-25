@@ -5,11 +5,48 @@
       "change": "Remove dead runner work and retire the build prewarming timer",
       "run": "https://github.com/fredrir/infra/actions/runs/36080161729",
       "baseline_run": "https://github.com/fredrir/infra/actions/runs/36079574526",
-      "runner_play_seconds": {"before": 56.0, "after": 42.7},
-      "hosts_stage_seconds": {"before": 172.3, "after": 160.0},
+      "runner_play_seconds": {
+        "before": 56.0,
+        "after": 42.7
+      },
+      "hosts_stage_seconds": {
+        "before": 172.3,
+        "after": 160.0
+      },
       "prewarm_retirement": "timer stopped and disabled; units, /var/lib/infra/build and the legacy source-cli cache removed once",
       "pin_pruning": "skipped; no new runner archive or CLI revision",
-      "limitations": ["One sample per stage"]
+      "limitations": [
+        "One sample per stage"
+      ]
+    },
+    {
+      "change": "Declare the runner fleet once and verify it at GitHub",
+      "run": "https://github.com/fredrir/infra/actions/runs/36082265224",
+      "token_scope": "owner and repositories read from build/runners.json; administration write on apply, read on hourly drift",
+      "verify_stage_seconds": {
+        "before": 54.2,
+        "after": 54.5
+      },
+      "github_verification": "8 declared runners online at 2.337.0 with custom labels dagger-amd64 and infra-trusted",
+      "limitations": [
+        "GitHub API calls are not echoed in the log; a failure fails the verify stage"
+      ]
+    },
+    {
+      "change": "Retire the Bazel remote cache and native Bazel from the build VM",
+      "run": "https://github.com/fredrir/infra/actions/runs/36083474010",
+      "drain": "INFRA_VM_POOL_QUALIFIED false in 7 routed repositories 01:46-01:52 UTC; no queued or busy VM jobs",
+      "runner_restarts": "8, one per runner, from the removed BAZEL_REMOTE_CACHE drop-in line",
+      "retired": [
+        "infra-bazel-cache unit",
+        "infra-bazel-cache volume",
+        "untagged bazel-remote image found with --all",
+        "/usr/local/bin/bazel",
+        "/etc/bazel.bazelrc",
+        "/var/cache/infra/bazel-repo",
+        "/home/runner/.cache/bazel"
+      ],
+      "runners_after": "8 online, idle"
     }
   ]
 }

@@ -198,7 +198,7 @@ func TestRunnerFleetVerificationFailsWhenDriftPersists(t *testing.T) {
 	}
 }
 
-func TestFleetRoutedRepositoriesHaveDeclaredRunners(t *testing.T) {
+func TestFleetRoutingMatchesDeclaredRunners(t *testing.T) {
 	root := filepath.Join("..", "..")
 	fleet, err := LoadRunnerFleet(root)
 	if err != nil {
@@ -242,13 +242,16 @@ func TestFleetRoutedRepositoriesHaveDeclaredRunners(t *testing.T) {
 			}
 		}
 	}
-	if len(routed) == 0 {
-		t.Fatal("no repository routes to the runner fleet")
-	}
 	slices.Sort(routed)
-	for _, name := range slices.Compact(routed) {
+	routed = slices.Compact(routed)
+	for _, name := range routed {
 		if !slices.Contains(fleet.Repositories, name) {
 			t.Errorf("%s/%s routes to the runner fleet without a declared runner", fleet.Owner, name)
+		}
+	}
+	for _, name := range fleet.Repositories {
+		if !slices.Contains(routed, name) {
+			t.Errorf("%s/%s declares a runner that no workflow routes to the runner fleet", fleet.Owner, name)
 		}
 	}
 }

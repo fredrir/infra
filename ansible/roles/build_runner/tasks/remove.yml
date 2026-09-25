@@ -1,0 +1,47 @@
+- name: Read retired runner service registration
+  ansible.builtin.stat:
+    path: '/home/runner/{{ build_runner_retired }}/.service'
+  register: build_runner_retired_registration
+
+- name: Remove retired runner service
+  when: build_runner_retired_registration.stat.exists
+  vars:
+    build_runner_retired_unit: '{{ build_runner_retired_service.content | b64decode | trim }}'
+  block:
+    - name: Read retired runner service
+      ansible.builtin.slurp:
+        src: '/home/runner/{{ build_runner_retired }}/.service'
+      register: build_runner_retired_service
+
+    - name: Require the retired runner's own service
+      ansible.builtin.assert:
+        that: build_runner_retired_unit is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]' ~ ((inventory_hostname ~ '-' ~ build_runner_retired) | regex_escape) ~ '[.]service$')
+
+    - name: Read retired runner unit
+      ansible.builtin.stat:
+        path: '/etc/systemd/system/{{ build_runner_retired_unit }}'
+      register: build_runner_retired_unit_file
+
+    - name: Stop retired runner service
+      ansible.builtin.systemd_service:
+        name: '{{ build_runner_retired_unit }}'
+        state: stopped
+        enabled: false
+      when: build_runner_retired_unit_file.stat.exists
+
+    - name: Remove retired runner unit and resource override
+      ansible.builtin.file:
+        path: '/etc/systemd/system/{{ item }}'
+        state: absent
+      loop:
+        - '{{ build_runner_retired_unit }}'
+        - '{{ build_runner_retired_unit }}.d'
+
+    - name: Reload systemd without retired runner
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+- name: Remove retired runner
+  ansible.builtin.file:
+    path: '/home/runner/{{ build_runner_retired }}'
+    state: absent

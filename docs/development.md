@@ -149,7 +149,7 @@ git diff -- platform
 | Guest                           | Four CPUs / 8 GiB RAM / 80 GiB sparse persistent disk                                                                                       |
 | Host boundary                   | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding                                                                         |
 | Activation gates                | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true`                                                       |
-| Runner registration             | Eight repository registrations share one VM; each accepts protected main pushes or manual runs only                                         |
+| Runner registration             | Seven repository registrations share one VM; each accepts protected main pushes or manual runs only                                         |
 | Runner slice                    | Four CPUs / 2 GiB aggregate for runner services and native child processes                                                                   |
 | Production Dagger ceiling       | Four CPUs / 4 GiB RAM / 1,024 processes / one parallel operation                                                                           |
 | Standalone engine defaults      | Four CPUs / 8 GiB RAM / one parallel operation; configurable within host capacity                                                         |
