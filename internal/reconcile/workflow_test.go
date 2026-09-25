@@ -300,6 +300,18 @@ func TestRepairWaitsForPendingPushApplies(t *testing.T) {
 	}
 }
 
+func TestCalledReconciliationJobsRequestOnlyGrantedPermissions(t *testing.T) {
+	levels := map[string]int{"none": 0, "read": 1, "write": 2}
+	caller := readWorkflow(t, "reconcile.yml").Jobs["reconcile"]
+	for name, job := range readWorkflow(t, "reconcile-job.yml").Jobs {
+		for scope, level := range job.Permissions {
+			if levels[level] > levels[caller.Permissions[scope]] {
+				t.Errorf("job %s requests %s: %s beyond the caller's %q", name, scope, level, caller.Permissions[scope])
+			}
+		}
+	}
+}
+
 func TestApplyJobOutlivesTheApplyDeadline(t *testing.T) {
 	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
 	flag := regexp.MustCompile(`infra reconcile apply --wait=(\S+) `).FindStringSubmatch(apply.step(t, func(step workflowStep) bool { return step.ID == "reconcile" }).Run)
