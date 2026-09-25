@@ -337,12 +337,18 @@ func (c *Commands) compareDeclarations(ctx context.Context) error {
 	log := &lockedWriter{mu: &sync.Mutex{}, writer: &output}
 	planned := make(chan error, 1)
 	go func() { planned <- c.compareTofu(ctx, log) }()
+	var volatileOutput bytes.Buffer
+	volatile := *c
+	volatile.Runner.Stdout, volatile.Runner.Stderr = &volatileOutput, &volatileOutput
+	degraded := make(chan error, 1)
+	go func() { degraded <- volatile.compareVolatile(ctx) }()
 	hosts := c.compareHosts(ctx)
-	infrastructure := <-planned
+	infrastructure, volatileHosts := <-planned, <-degraded
 	if c.Runner.Stdout != nil {
+		_, _ = c.Runner.Stdout.Write(volatileOutput.Bytes())
 		_, _ = c.Runner.Stdout.Write(output.Bytes())
 	}
-	return errors.Join(hosts, infrastructure)
+	return errors.Join(hosts, infrastructure, volatileHosts)
 }
 
 func (c *Commands) compareTofu(ctx context.Context, log io.Writer) error {

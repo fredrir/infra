@@ -22,7 +22,7 @@ func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 		if _, err := LoadRunnerFleet(c.Runner.Dir); err != nil {
 			return err
 		}
-		playbooks = [][]string{{"reconcile.yml"}, {"external.yml"}, {"verify.yml"}, {"verify-runners.yml"}}
+		playbooks = [][]string{{"reconcile.yml"}, {"external.yml"}, {"verify.yml"}, {"verify-runners.yml"}, {volatilePlaybook}}
 	case HostScopeRunners:
 		if _, err := LoadRunnerFleet(c.Runner.Dir); err != nil {
 			return err

@@ -75,11 +75,11 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 		planned []string
 		runners bool
 	}{
-		{name: HostScopeFull, scope: HostScopeFull, want: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, planned: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, runners: true},
+		{name: HostScopeFull, scope: HostScopeFull, want: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml", "volatile.yml"}, planned: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml", "volatile.yml"}, runners: true},
 		{name: HostScopeRunners, scope: HostScopeRunners, want: []string{"build-runners.yml", "verify-runners.yml"}, planned: []string{"build-runners.yml", "verify-runners.yml"}, runners: true},
 		{name: "CLI release", scope: HostScopeRunners, inputs: cli, want: []string{"build-runners.yml --tags=infra_binary", "external.yml --tags=infra_binary", "verify-runners.yml"}, planned: []string{"build-runners.yml", "external.yml --tags=infra_binary", "verify-runners.yml"}, runners: true},
 		{name: HostScopeMonitor, scope: HostScopeMonitor, want: []string{"external.yml --tags=gatus,verification_trigger", "verify.yml --limit=external"}, planned: []string{"external.yml --tags=gatus,verification_trigger", "verify.yml --limit=external"}},
-		{name: "CLI release in full scope", scope: HostScopeFull, inputs: cli, want: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, planned: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, runners: true},
+		{name: "CLI release in full scope", scope: HostScopeFull, inputs: cli, want: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml", "volatile.yml"}, planned: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml", "volatile.yml"}, runners: true},
 		{name: HostScopeNone, scope: HostScopeNone},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 				t.Fatalf("plan checked %v", calls)
 			}
 			calls = nil
-			for _, operation := range []func(context.Context, Plan) error{commands.Hosts, commands.Monitor, commands.VerifyHosts} {
+			for _, operation := range []func(context.Context, Plan) error{commands.Hosts, commands.Monitor, commands.VerifyHosts, commands.Volatile} {
 				if err := operation(ctx, plan); err != nil {
 					t.Fatal(err)
 				}

@@ -13,20 +13,6 @@
     changed_when: false
     when: inventory_hostname == groups['server'][0]
 
-- name: Verify volatile workers
-  hosts: volatile
-  become: true
-  gather_facts: false
-  ignore_unreachable: true
-  tasks:
-  - name: Skip volatile workers without an enrolled address
-    ansible.builtin.meta: end_host
-    when: tailscale_ip is none
-  - name: Read volatile Kubernetes service status
-    ansible.builtin.command:
-      argv: [systemctl, is-active, k3s-agent.service]
-    changed_when: false
-
 - name: Verify independent monitoring configuration
   hosts: external
   become: true

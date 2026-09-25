@@ -60,9 +60,10 @@ func newReconcileCommand() *cobra.Command {
 				return errors.New("PUBLISHER_APP_PRIVATE_KEY_FILE required")
 			}
 			var verified string
+			var compared error
 			if action == "verify" && report != "" {
 				defer func() {
-					err = errors.Join(err, writeReport(report, reconcile.VerificationOutcome(verified, deep, err)))
+					err = errors.Join(err, writeReport(report, reconcile.VerificationOutcome(verified, deep, errors.Join(compared, err))))
 				}()
 			}
 			absolute, err := filepath.Abs(root)
@@ -135,8 +136,8 @@ func newReconcileCommand() *cobra.Command {
 				return engine.Apply(cmd.Context(), full)
 			}
 			if action == "verify" {
-				verified, err = reconcile.Verifier{Store: store, Ops: ops, Host: host, Deep: deep}.Verify(cmd.Context())
-				return err
+				verified, compared = reconcile.Verifier{Store: store, Ops: ops, Host: host, Deep: deep}.Verify(cmd.Context())
+				return reconcile.WithoutDegraded(compared)
 			}
 			revision, err := ops.Revision(cmd.Context())
 			if err != nil {

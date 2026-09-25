@@ -41,14 +41,33 @@ type Verification struct {
 	Outcome     string       `json:"outcome"`
 	Differences []Difference `json:"differences"`
 	Errors      []string     `json:"errors"`
+	Degraded    []string     `json:"degraded,omitempty"`
 }
 
 func VerificationOutcome(revision string, deep bool, err error) Verification {
 	verification := Verification{Revision: revision, Deep: deep, Differences: []Difference{}, Errors: []string{}}
+	var degrade func(error)
+	degrade = func(err error) {
+		switch err := err.(type) {
+		case nil:
+		case Differences:
+			for _, difference := range err {
+				verification.Degraded = append(verification.Degraded, Differences{difference}.Error())
+			}
+		case interface{ Unwrap() []error }:
+			for _, inner := range err.Unwrap() {
+				degrade(inner)
+			}
+		default:
+			verification.Degraded = append(verification.Degraded, err.Error())
+		}
+	}
 	var visit func(error)
 	visit = func(err error) {
 		switch err := err.(type) {
 		case nil:
+		case Degraded:
+			degrade(err.Err)
 		case Differences:
 			for _, difference := range err {
 				if !slices.Contains(verification.Differences, difference) {

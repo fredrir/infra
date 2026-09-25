@@ -10,4 +10,3 @@
 - import_playbook: control-backup.yml
 - import_playbook: infra-cli.yml
 - import_playbook: build-runners.yml
-- import_playbook: volatile.yml

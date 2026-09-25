@@ -101,35 +101,35 @@ func TestVolatileHostsStayUntrusted(t *testing.T) {
 	}
 }
 
-func TestSharedPlaysExcludeVolatileHosts(t *testing.T) {
+func TestVolatileHostsConvergeInTheirOwnLinearInvocation(t *testing.T) {
 	root := filepath.Join("..", "..", "ansible")
 	fleet := loadInventory(t, root)
 	volatile := fleet.groups["volatile"]
-	walked := 0
-	var walk func(string)
-	walk = func(file string) {
+	var walk func(string, func(string, ansiblePlay))
+	walk = func(file string, visit func(string, ansiblePlay)) {
 		for _, play := range loadAnsible[[]ansiblePlay](t, root, file) {
 			if play.ImportPlaybook != "" {
-				walk(play.ImportPlaybook)
+				walk(play.ImportPlaybook, visit)
 				continue
 			}
-			walked++
-			hosts := fleet.resolve(play.Hosts)
-			shared := slices.ContainsFunc(hosts, func(host string) bool { return !slices.Contains(volatile, host) })
-			reachesVolatile := slices.ContainsFunc(hosts, func(host string) bool { return slices.Contains(volatile, host) })
-			switch {
-			case shared && reachesVolatile:
-				t.Errorf("%s: play %q runs volatile hosts beside the fleet", file, play.Name)
-			case shared && play.IgnoreUnreachable:
-				t.Errorf("%s: play %q hides unreachable fleet hosts", file, play.Name)
-			case play.Hosts == "volatile" && !play.IgnoreUnreachable:
-				t.Errorf("%s: play %q fails the run when a volatile host is lost", file, play.Name)
-			}
+			visit(file, play)
 		}
 	}
+	walked := 0
 	for _, playbook := range []string{"reconcile.yml", "external.yml", "verify.yml", "build-runners.yml", "verify-runners.yml"} {
-		walk(playbook)
+		walk(playbook, func(file string, play ansiblePlay) {
+			walked++
+			if file == volatilePlaybook || slices.ContainsFunc(fleet.resolve(play.Hosts), func(host string) bool { return slices.Contains(volatile, host) }) {
+				t.Errorf("%s: fleet play %q reaches volatile hosts", file, play.Name)
+			}
+		})
 	}
+	walk(volatilePlaybook, func(file string, play ansiblePlay) {
+		walked++
+		if play.Hosts != "volatile" || play.Strategy != "linear" {
+			t.Errorf("%s: play %q targets %q with strategy %q instead of volatile hosts without Mitogen", file, play.Name, play.Hosts, play.Strategy)
+		}
+	})
 	if walked == 0 {
 		t.Fatal("no plays walked")
 	}

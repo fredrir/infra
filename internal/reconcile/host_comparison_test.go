@@ -300,7 +300,7 @@ func TestDeclarationComparisonCombinesOpenTofuAndHosts(t *testing.T) {
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("declaration comparison reported %+v, want %+v", got, want)
 			}
-			if len(commandsRun) != 4 {
+			if len(commandsRun) != 5 {
 				t.Fatalf("declaration comparison ran %q", commandsRun)
 			}
 			var first struct {

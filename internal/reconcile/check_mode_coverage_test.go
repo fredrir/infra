@@ -133,7 +133,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 	gatingResults := map[string]bool{}
 	skippedResults := map[string]string{}
 	var definitions []ansibleTask
-	for _, playbook := range comparedPlaybooks {
+	for _, playbook := range append(slices.Clone(comparedPlaybooks), volatilePlaybook) {
 		walkComparedPlays(t, root, playbook, func(play ansiblePlay) {
 			if problem := playCheckModeProblem(play); problem != "" {
 				t.Errorf("%s: play %q %s", playbook, play.Name, problem)

@@ -31,6 +31,7 @@ type Operations interface {
 	Verify(context.Context, Plan) error
 	VerifyDrift(context.Context, Plan) error
 	Retire(context.Context, Plan) error
+	Volatile(context.Context, Plan) error
 }
 
 const (
@@ -84,7 +85,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	plan := Plan{Revision: revision, Base: status.Applied, Affected: selected, Host: r.Host}
 	skip := !full && !recovery && status.Applied != "" && !selected.Tofu && !selected.Ansible && !selected.Kubernetes
 	status.Evaluated, status.Selection = revision, selected
-	status.Failure, status.HostsReusedFrom, status.HostScope, status.Provenance = "", "", "", nil
+	status.Failure, status.HostsReusedFrom, status.HostScope, status.Provenance, status.VolatileFailure = "", "", "", nil, ""
 	status.Durations = map[string]float64{}
 	if !skip {
 		status.Desired = revision
@@ -175,7 +176,8 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	} else {
 		reuseHosts = false
 	}
-	if selected.Ansible && !selected.MonitorOnly && !reuseHosts {
+	convergedHosts := selected.Ansible && !selected.MonitorOnly && !reuseHosts
+	if convergedHosts {
 		name := "hosts"
 		if effectiveHostScope(selected) == HostScopeRunners {
 			name = "hosts-runners"
@@ -205,6 +207,20 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		if err = stage("retire", func() error { return r.Ops.Retire(ctx, plan) }); err != nil {
 			return err
 		}
+	}
+	if convergedHosts && effectiveHostScope(selected) == HostScopeFull {
+		status.Stage = "volatile"
+		if err = save(ctx); err != nil {
+			return err
+		}
+		started := time.Now()
+		if failure := r.Ops.Volatile(ctx, plan); failure != nil {
+			if err = ctx.Err(); err != nil {
+				return err
+			}
+			status.VolatileFailure = failure.Error()
+		}
+		status.Durations["volatile"] = time.Since(started).Seconds()
 	}
 	previous, previousFull, previousFullTime := status.Applied, status.LastFullRevision, status.LastFullVerified
 	if selected.Tofu && selected.Kubernetes && effectiveHostScope(selected) == HostScopeFull && len(selected.Projects) == 0 {

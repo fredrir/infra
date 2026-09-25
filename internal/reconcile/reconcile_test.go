@@ -44,13 +44,15 @@ func (s *memoryStore) Lock(ctx context.Context) (context.Context, func() error, 
 }
 
 type fakeOps struct {
-	calls      []string
-	fail, base string
-	failure    error
-	full       bool
-	selection  Selection
-	drift      []Plan
-	provenance []ProvenanceRange
+	calls           []string
+	fail, base      string
+	failure         error
+	full            bool
+	selection       Selection
+	drift           []Plan
+	provenance      []ProvenanceRange
+	volatile        int
+	volatileFailure error
 }
 
 func (o *fakeOps) call(name string) error {
@@ -83,6 +85,10 @@ func (o *fakeOps) Kubernetes(context.Context, Plan) error               { return
 func (o *fakeOps) Monitor(context.Context, Plan) error                  { return o.call("monitor") }
 func (o *fakeOps) Verify(context.Context, Plan) error                   { return o.call("verify") }
 func (o *fakeOps) Retire(context.Context, Plan) error                   { return o.call("retire") }
+func (o *fakeOps) Volatile(context.Context, Plan) error {
+	o.volatile++
+	return o.volatileFailure
+}
 func (o *fakeOps) VerifyDrift(_ context.Context, plan Plan) error {
 	o.drift = append(o.drift, plan)
 	return o.call("drift-verification")

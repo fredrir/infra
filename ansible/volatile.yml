@@ -2,7 +2,7 @@
   hosts: volatile
   become: true
   gather_facts: false
-  ignore_unreachable: true
+  strategy: linear
   vars:
     k3s_role: agent
     platform_architecture: "{{ architecture }}"
@@ -12,10 +12,6 @@
     when: tailscale_ip is none
   - name: Gather volatile worker facts
     ansible.builtin.setup:
-    register: volatile_facts
-  - name: Skip unreachable volatile workers
-    ansible.builtin.meta: end_host
-    when: volatile_facts is unreachable
   - name: Require an enrolled identity
     ansible.builtin.stat:
       path: /var/lib/tailscale/tailscaled.state
