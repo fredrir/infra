@@ -282,44 +282,53 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Setting | Value |
 | --- | --- |
 | Hosts | Inventory group `volatile`, also in `agent`: `fredrir-10` |
-| Reconciliation | `ansible/volatile.yml`, last in `reconcile.yml`; fleet plays target `…:!volatile` |
-| Unreachable host | Ends for the play (`ignore_unreachable`); the run succeeds without it |
+| Reconciliation | `ansible/volatile.yml`, linear strategy, run separately after the fleet is verified; fleet plays target `…:!volatile` |
+| Failing or unreachable host | Recorded as `volatile_failure` in the reconciliation status; the run completes and requests no recovery |
+| Deep verification | `volatile.yml --check` beside the fleet; results under `degraded`; outcome and exit status unchanged |
 | Unenrolled host | `tailscale_ip: null`; skipped |
-| Failed task | Fails the run |
-| Verification | `verify.yml` play `Verify volatile workers`; fleet readiness waits exclude `node-restriction.kubernetes.io/volatile` |
-| Scheduling | Taint `node-restriction.kubernetes.io/volatile=true:NoSchedule`; labels `gvisor`, `volatile`, `infra.fredrir.com/ci-slots=3`; no `critical` or `stateful` |
-| CI pools | `check-amd64`, `rust-amd64` and `rust-pr-amd64` tolerate and prefer it and leave 30 s after not-ready or unreachable; `rust-release-amd64` never runs there |
-| Monitoring | node-exporter and Alloy tolerate the taint; Alloy reads only pods, pod logs and namespaces; OTLP stays on the sending node (`internalTrafficPolicy: Local`) |
+| Node admission | `node-registration` policy: kubelets register only inventory nodes; volatile nodes must carry the taint; nodes cannot remove taints |
+| Join credential | Per-node `k3s token create --ttl`; the k3s role refuses the shared agent token; joined agents restart after it expires |
+| Scheduling | Taint `node-restriction.kubernetes.io/volatile=true:NoSchedule`, applied before labels `gvisor`, `volatile`, `infra.fredrir.com/ci-slots=3`; no `critical` or `stateful` |
+| Critical controllers | Flux, ARC controller and listeners, ci-slots: required `node-restriction.kubernetes.io/critical=true` |
+| CI pools | `check-amd64`, `rust-amd64` and `rust-pr-amd64` tolerate and prefer it and leave 30 s after not-ready or unreachable; `rust-release-amd64` and `rust-tag-amd64` never run there |
+| Monitoring | node-exporter only; Alloy stays off because pod-log reads cannot be scoped to one node |
+| Readiness waits | `verify.yml` and `maintenance.yml` exclude `node-restriction.kubernetes.io/volatile` |
 | Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100 and 10250; SSH from Macie, Archie and `tag:infra-apply` |
-| Transport | DERP over TCP 443; NTNU blocks outbound UDP |
-| Inbound access | Tailnet; NTNU VPN (`~/ntnu-proxy`, `10.50.0.0/16`) is owner-only break-glass SSH, never used by the fleet |
-| Trust | NTNU controls hypervisor and network; no ProxyJump, `ForwardAgent=no`, no delegated secrets; holds the K3s agent token, the credentials of its CI pools and the Alloy token (cluster-wide pod and log reads) |
-| Removal | Delete from `agent` and `volatile`; `kubectl delete node fredrir-10`; rotate the K3s agent token |
+| Inbound access | Tailnet; NTNU VPN (`~/ntnu-proxy`, `10.50.0.0/16`) is owner-only break-glass SSH with keys only, never used by the fleet |
+| Container engines | Docker, containerd.io, Podman and Buildah removed at takeover; only the k3s agent runs |
+| Trust | NTNU controls hypervisor and network; no ProxyJump, `ForwardAgent=no`, no delegated secrets; holds its node credentials and the job credentials of its CI pools |
+| Removal | Delete from `agent`, `volatile` and `node-registration`; `kubectl delete node fredrir-10`; delete `fredrir-10.node-password.k3s` |
 
 | Data volume | Value |
 | --- | --- |
 | Device | `data_volume_device` under `/dev/disk/by-id/`; partition `-part1`; ext4 label `infra-data` |
 | Formatting | Only when `wipefs` finds no signature; foreign or whole-disk signatures fail closed |
 | Mount | `srv-data.mount` at `/srv/data`; `Options=nofail`; `WantedBy=local-fs.target` |
-| Layout | `data_volume_binds`: `/srv/data/<name>` bound onto `/var/lib/rancher`, `/var/lib/kubelet`, `/var/lib/containerd`, `/var/lib/docker`, `/var/lib/infra-build-vm` |
+| Layout | `data_volume_binds`: `/srv/data/<name>` bound onto `/var/lib/rancher`, `/var/lib/kubelet`, `/var/lib/infra-build-vm` |
 | Consumers | `data_volume_consumers` get `RequiresMountsFor=` on the layout; running consumers restart once when a mount activates |
 | Missing volume | Consumers stay stopped; nothing writes the 40 GB root |
-| Unmanaged containers | Root Podman containers and their images are removed |
+
+| Transport | Value |
+| --- | --- |
+| Path | DERP over TCP 443; NTNU blocks outbound UDP, so no direct WireGuard path |
+| Measure | On fredrir-10: `tailscale netcheck`; `tailscale ping --c 20 fredrir-07`; `iperf3` to fredrir-09 over the Tailnet; Rust job `rust-cache-restore` timings |
+| Add a relay | When DERP throughput or latency limits CI: self-hosted `derper` in hel1 with `--verify-clients`, a custom `derpMap` region and 443/tcp |
 
 ### fredrir-10 activation
 
 | Order | Owner action | Value |
 | --- | --- | --- |
-| 1 | Attach the OpenStack volume | Up to 512 GB; highest IOPS class offered; note `ls -l /dev/disk/by-id` |
-| 2 | Apply `tailscale/policy.hujson` | Adds `tag:platform-volatile` |
-| 3 | Install the verified `infra` release at `/usr/local/bin/infra` over `ssh ntnu` | Release SHA-256 from the trusted build |
-| 4 | Deliver the enrollment key | `infra operations enrollment create-deliver --node fredrir-10 --role volatile --host ntnu --sudo` |
-| 5 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
-| 6 | Copy the K3s agent token | `/etc/rancher/k3s/agent-token`, root `0600` |
+| 1 | Roll out nsql | Pin an infra revision whose `rust-auto-tag.yml` runs on `rust-tag-amd64`; allow it in `auto-tag.sts.yaml` |
+| 2 | Attach the OpenStack volume | Up to 512 GB; highest IOPS class offered; note `ls -l /dev/disk/by-id` |
+| 3 | Apply `tailscale/policy.hujson` | Adds `tag:platform-volatile` |
+| 4 | Install the verified `infra` release at `/usr/local/bin/infra` over `ssh ntnu` | Release SHA-256 from the trusted build |
+| 5 | Deliver the enrollment key | `infra operations enrollment create-deliver --node fredrir-10 --role volatile --host ntnu --sudo` |
+| 6 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
 | 7 | Set inventory values | `tailscale_ip`, `data_volume_device` |
 | 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in Doppler `SSH_KNOWN_HOSTS` and the admin `known_hosts` |
-| 9 | First converge from Macie or Archie | `ansible-playbook ansible/volatile.yml --limit fredrir-10`; installs the reconciliation key and sets the hostname |
-| 10 | Merge | Reconciliation keeps it converged |
+| 9 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 11 |
+| 10 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 2h --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
+| 11 | First converge from Macie or Archie within the token lifetime | `ansible-playbook ansible/volatile.yml --limit fredrir-10`; installs the reconciliation key and sets the hostname |
 
 ```sh
 inventory=$(mktemp)

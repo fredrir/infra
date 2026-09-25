@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"fmt"
 	"io/fs"
 	"maps"
 	"os"
@@ -128,6 +129,18 @@ func TestVolatileHostsConvergeInTheirOwnLinearInvocation(t *testing.T) {
 		walked++
 		if play.Hosts != "volatile" || play.Strategy != "linear" {
 			t.Errorf("%s: play %q targets %q with strategy %q instead of volatile hosts without Mitogen", file, play.Name, play.Hosts, play.Strategy)
+		}
+		if !slices.ContainsFunc(play.Roles, func(role ansibleRole) bool { return role.Name == "ubuntu" }) {
+			t.Errorf("%s: play %q leaves SSH authentication undeclared", file, play.Name)
+		}
+	})
+	walkAnsibleFile(t, root, "roles/ubuntu/tasks/main.yml", ansibleTask{}, func(task ansibleTask) {
+		if task.Key == "roles/ubuntu/tasks/main.yml: Harden SSH authentication" {
+			walked++
+			content := fmt.Sprint(task.Definition[task.Module])
+			if !strings.Contains(content, "PasswordAuthentication no") || !strings.Contains(content, "KbdInteractiveAuthentication no") {
+				t.Errorf("SSH password and keyboard-interactive authentication stay enabled: %s", content)
+			}
 		}
 	})
 	if walked == 0 {
