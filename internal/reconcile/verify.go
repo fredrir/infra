@@ -338,8 +338,9 @@ func (c *Commands) compareDeclarations(ctx context.Context) error {
 	planned := make(chan error, 1)
 	go func() { planned <- c.compareTofu(ctx, log) }()
 	var volatileOutput bytes.Buffer
+	volatileLog := &lockedWriter{mu: &sync.Mutex{}, writer: &volatileOutput}
 	volatile := *c
-	volatile.Runner.Stdout, volatile.Runner.Stderr = &volatileOutput, &volatileOutput
+	volatile.Runner.Stdout, volatile.Runner.Stderr = volatileLog, volatileLog
 	degraded := make(chan error, 1)
 	go func() { degraded <- volatile.compareVolatile(ctx) }()
 	hosts := c.compareHosts(ctx)
