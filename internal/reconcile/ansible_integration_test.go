@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -81,7 +82,10 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 	write("infra", cli, true)
 	write("vars.json", fmt.Sprintf(`{"build_runner_cli":{"sha256":"%x"}}`, sha256.Sum256([]byte(cli))), false)
 	write("inventory.yml", "all:\n  children:\n    build_engines:\n      hosts:\n        localhost:\n          ansible_connection: local\n          ansible_user: root\n          ansible_python_interpreter: /usr/bin/python3\n          build_runner_repositories: [infra, Y]\n", false)
+	svc := "#!/bin/sh\necho \"$1 $(pwd)\" >> /fixture/state/svc\n"
 	for _, repository := range []string{"infra", "Y"} {
+		write("runners/"+repository+"/.runner", "{}", false)
+		write("runners/"+repository+"/svc.sh", svc, true)
 		write("runners/"+repository+"/.service", "actions.runner.fixture."+repository+".service", false)
 		write("runners/"+repository+"/bin/Runner.Listener", "#!/bin/sh\ncat /fixture/state/version-"+repository+"\n", true)
 		write("state/version-"+repository, version, false)
@@ -222,6 +226,51 @@ cat "/fixture/state/$2.json"
 		t.Fatal("successful recovery left its pending marker", err)
 	}
 	t.Log("partial extraction failure retains recovery proof and retries successfully")
+	var roleTasks []map[string]any
+	if err := yaml.Unmarshal(read(filepath.Join(root, "ansible/roles/build_runner/tasks/main.yml")), &roleTasks); err != nil {
+		t.Fatal(err)
+	}
+	configure := slices.IndexFunc(roleTasks, func(task map[string]any) bool { return task["name"] == "Configure repository runners" })
+	if configure < 0 {
+		t.Fatal("repository runner loop not found")
+	}
+	removalTasks := roleTasks[configure+1:]
+	for _, task := range removalTasks {
+		if path, ok := task["ansible.builtin.include_tasks"].(string); ok {
+			task["ansible.builtin.include_tasks"] = "/source/ansible/roles/build_runner/tasks/" + path
+		}
+	}
+	removal, err := yaml.Marshal([]any{map[string]any{"hosts": "build_engines", "gather_facts": false, "tasks": removalTasks}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	write("removal.yml", string(removal), false)
+	write("runners/retired/.runner", "{}", false)
+	write("runners/retired/svc.sh", svc, true)
+	write("runners/retired/.service", "actions.runner.fixture.retired.service", false)
+	write("runners/unregistered/config.sh", "", true)
+	override := "/etc/systemd/system/actions.runner.fixture.retired.service.d"
+	command("docker", "exec", name, "mkdir", "-p", override)
+	command("docker", "exec", name, "touch", override+"/resources.conf")
+	run("/fixture/removal.yml", true)
+	if uninstalled := string(read(filepath.Join(fixture, "state/svc"))); uninstalled != "uninstall /home/runner/retired\n" {
+		t.Fatalf("wrong runners uninstalled: %q", uninstalled)
+	}
+	if _, err := os.Stat(filepath.Join(fixture, "runners/retired")); !os.IsNotExist(err) {
+		t.Fatal("retired runner root remains", err)
+	}
+	if output, err := exec.CommandContext(ctx, "docker", "exec", name, "test", "-e", override).CombinedOutput(); err == nil {
+		t.Fatalf("retired runner resource override remains:\n%s", output)
+	}
+	for _, path := range []string{"runners/infra/.runner", "runners/Y/.runner", "runners/unregistered/config.sh"} {
+		if _, err := os.Stat(filepath.Join(fixture, path)); err != nil {
+			t.Fatal("runner removal touched a kept root", err)
+		}
+	}
+	if output := run("/fixture/removal.yml", true); !strings.Contains(output, "changed=0") {
+		t.Fatalf("runner removal is not idempotent:\n%s", output)
+	}
+	t.Log("undeclared registered runner is uninstalled and removed while declared roots remain")
 	write("packages.yml", "- hosts: build_engines\n  gather_facts: false\n  module_defaults:\n    ansible.builtin.apt:\n      update_cache_retries: 1\n  roles:\n  - role: host_packages\n    vars:\n      host_packages_required: '{{ packages }}'\n", false)
 	installed := `{"packages":["dpkg","tar"]}`
 	if output := run("/fixture/packages.yml", true, "--extra-vars", installed); !strings.Contains(output, "changed=0") {

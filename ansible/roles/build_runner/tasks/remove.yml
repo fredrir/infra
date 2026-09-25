@@ -1,0 +1,39 @@
+- name: Read retired runner service registration
+  ansible.builtin.stat:
+    path: '/home/runner/{{ build_runner_retired }}/.service'
+  register: build_runner_retired_registration
+
+- name: Read retired runner service
+  ansible.builtin.slurp:
+    src: '/home/runner/{{ build_runner_retired }}/.service'
+  register: build_runner_retired_service
+  when: build_runner_retired_registration.stat.exists
+
+- name: Require a valid retired runner service
+  ansible.builtin.assert:
+    that: (build_runner_retired_service.content | b64decode | trim) is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]service$')
+  when: build_runner_retired_registration.stat.exists
+
+- name: Remove retired runner resource override
+  ansible.builtin.file:
+    path: '/etc/systemd/system/{{ build_runner_retired_service.content | b64decode | trim }}.d'
+    state: absent
+  register: build_runner_retired_override
+  when: build_runner_retired_registration.stat.exists
+
+- name: Uninstall retired runner service
+  ansible.builtin.command:
+    argv: ['/home/runner/{{ build_runner_retired }}/svc.sh', uninstall]
+    chdir: '/home/runner/{{ build_runner_retired }}'
+  register: build_runner_retired_uninstall
+  when: build_runner_retired_registration.stat.exists
+
+- name: Remove retired runner
+  ansible.builtin.file:
+    path: '/home/runner/{{ build_runner_retired }}'
+    state: absent
+
+- name: Reload systemd without retired runner
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: build_runner_retired_override is changed or build_runner_retired_uninstall is changed
