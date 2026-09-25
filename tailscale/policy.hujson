@@ -108,6 +108,20 @@
     {
       "action": "accept",
       "src": [
+        "tag:platform-control",
+        "tag:platform-worker",
+        "tag:platform-volatile"
+      ],
+      "proto": "udp",
+      "dst": [
+        "tag:platform-control:51820",
+        "tag:platform-worker:51820",
+        "tag:platform-volatile:51820"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
         "100.115.121.9",
         "100.66.14.60",
         "100.87.168.66"
@@ -199,7 +213,10 @@
       "deny": [
         "tag:platform-control:8472",
         "tag:platform-worker:8472",
-        "tag:platform-volatile:8472"
+        "tag:platform-volatile:8472",
+        "tag:platform-control:51820",
+        "tag:platform-worker:51820",
+        "tag:platform-volatile:51820"
       ]
     },
     {
@@ -310,7 +327,10 @@
       "accept": [
         "tag:platform-control:8472",
         "tag:platform-worker:8472",
-        "tag:platform-volatile:8472"
+        "tag:platform-volatile:8472",
+        "tag:platform-control:51820",
+        "tag:platform-worker:51820",
+        "tag:platform-volatile:51820"
       ],
       "deny": [
         "tag:platform-control:6443",
@@ -377,7 +397,10 @@
       "accept": [
         "tag:platform-control:8472",
         "tag:platform-worker:8472",
-        "tag:platform-volatile:8472"
+        "tag:platform-volatile:8472",
+        "tag:platform-control:51820",
+        "tag:platform-worker:51820",
+        "tag:platform-volatile:51820"
       ],
       "deny": [
         "tag:platform-control:6443",
@@ -439,7 +462,10 @@
       "accept": [
         "tag:platform-control:8472",
         "tag:platform-worker:8472",
-        "tag:platform-volatile:8472"
+        "tag:platform-volatile:8472",
+        "tag:platform-control:51820",
+        "tag:platform-worker:51820",
+        "tag:platform-volatile:51820"
       ],
       "deny": [
         "tag:platform-control:6443",
@@ -494,7 +520,10 @@
       "deny": [
         "tag:platform-control:8472",
         "tag:platform-worker:8472",
-        "tag:platform-volatile:8472"
+        "tag:platform-volatile:8472",
+        "tag:platform-control:51820",
+        "tag:platform-worker:51820",
+        "tag:platform-volatile:51820"
       ]
     },
     {
@@ -543,7 +572,10 @@
       "deny": [
         "tag:platform-control:8472",
         "tag:platform-worker:8472",
-        "tag:platform-volatile:8472"
+        "tag:platform-volatile:8472",
+        "tag:platform-control:51820",
+        "tag:platform-worker:51820",
+        "tag:platform-volatile:51820"
       ]
     },
     {
@@ -591,7 +623,10 @@
       "deny": [
         "tag:platform-control:8472",
         "tag:platform-worker:8472",
-        "tag:platform-volatile:8472"
+        "tag:platform-volatile:8472",
+        "tag:platform-control:51820",
+        "tag:platform-worker:51820",
+        "tag:platform-volatile:51820"
       ]
     },
     {
@@ -639,7 +674,10 @@
       "deny": [
         "tag:platform-control:8472",
         "tag:platform-worker:8472",
-        "tag:platform-volatile:8472"
+        "tag:platform-volatile:8472",
+        "tag:platform-control:51820",
+        "tag:platform-worker:51820",
+        "tag:platform-volatile:51820"
       ]
     },
     {

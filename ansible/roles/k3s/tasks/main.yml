@@ -87,12 +87,12 @@
   ansible.builtin.copy:
     dest: /etc/modules-load.d/k3s.conf
     mode: "0644"
-    content: "overlay\nbr_netfilter\nvxlan\n"
+    content: "overlay\nbr_netfilter\nvxlan\nwireguard\n"
 
 - name: Find unloaded kernel modules
   ansible.builtin.shell: |
     set -eu
-    for module in overlay br_netfilter vxlan; do
+    for module in overlay br_netfilter vxlan wireguard; do
       if [ ! -d "/sys/module/$module" ]; then
         modprobe --dry-run "$module"
         if modprobe --dry-run --first-time "$module" 2>/dev/null; then echo "$module"; fi
@@ -232,6 +232,48 @@
   retries: 36
   delay: 5
   tags: [worker-labels, capacity]
+
+- name: Read the flannel backend of the node through the administrator API
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - get
+      - node
+      - "{{ inventory_hostname }}"
+      - -o=jsonpath={.metadata.annotations.flannel\.alpha\.coreos\.com/backend-type}
+      - --request-timeout=10s
+  delegate_to: "{{ k3s_registration_server }}"
+  check_mode: false
+  retries: 1
+  delay: 5
+  register: k3s_flannel_state
+  changed_when: k3s_flannel_state.stdout != k3s_flannel_backend_types[k3s_flannel_backend]
+
+- name: Restart the node onto the cluster flannel backend
+  ansible.builtin.systemd_service:
+    name: "{{ k3s_service }}"
+    state: restarted
+  when: k3s_flannel_state.changed and not k3s_configuration.changed
+
+- name: Wait for the node to publish the cluster flannel backend
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - get
+      - node
+      - "{{ inventory_hostname }}"
+      - -o=jsonpath={.metadata.annotations.flannel\.alpha\.coreos\.com/backend-type}
+      - --request-timeout=10s
+  delegate_to: "{{ k3s_registration_server }}"
+  changed_when: false
+  check_mode: false
+  register: k3s_flannel_published
+  until: k3s_flannel_published.stdout == k3s_flannel_backend_types[k3s_flannel_backend]
+  retries: 36
+  delay: 5
+  when: k3s_flannel_state.changed
 
 - name: Read declared worker taints through the administrator API
   ansible.builtin.command:

@@ -1,0 +1,15 @@
+- name: Find devices of other flannel backends
+  ansible.builtin.shell: |
+    set -eu
+    for device in {{ k3s_flannel_devices | dict2items | rejectattr('key', 'equalto', k3s_flannel_backend) | map(attribute='value') | join(' ') }}; do
+      if ip link show "$device" > /dev/null 2>&1; then echo "$device"; fi
+    done
+  register: k3s_stale_flannel
+  changed_when: k3s_stale_flannel.stdout_lines | length > 0
+  check_mode: false
+
+- name: Remove devices of other flannel backends
+  ansible.builtin.command:
+    argv: [ip, link, delete, "{{ item }}"]
+  loop: "{{ k3s_stale_flannel.stdout_lines }}"
+  when: k3s_stale_flannel.changed

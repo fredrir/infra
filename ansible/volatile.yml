@@ -55,4 +55,8 @@
   - data_volume
   - k3s
   - ci_runtime
-
+  tasks:
+  - name: Remove devices of other flannel backends
+    ansible.builtin.import_role:
+      name: k3s
+      tasks_from: flannel-cleanup.yml
