@@ -38,6 +38,15 @@ filegroup(
 )
 
 filegroup(
+    name = "renovate_pin_data",
+    srcs = glob(["images/*/Containerfile"]) + [
+        "renovate.json",
+        "//build:runners.json",
+    ],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "runner_routing_data",
     srcs = [
         ":workflows",

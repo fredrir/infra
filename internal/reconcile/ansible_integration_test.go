@@ -2,11 +2,13 @@ package reconcile
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -109,7 +111,7 @@ show)
 is-enabled) if listed disabled-units "$2"; then echo disabled; exit 1; fi; echo enabled ;;
 start) started "$2" ;;
 restart) echo "$2" >> "$state/restarted"; started "$2"; if [ "$2" = infra-dagger ]; then cp "$state/engine-pinned" "$state/engine"; fi ;;
-stop) echo "$2" >> "$state/stopped" ;;
+stop) echo "$2" >> "$state/stopped"; if pgrep --full '/bin/Runner[.]Worker' > /dev/null; then echo "$2" >> "$state/stopped-mid-job"; fi ;;
 disable) echo "$2" >> "$state/disabled" ;;
 daemon-reload) if rm "$state/reload-failure" 2>/dev/null; then exit 1; fi; rm -f "$state/reload-units"; echo reload >> "$state/reloaded" ;;
 esac
@@ -146,11 +148,12 @@ esac
 	command("docker", "exec", name, "groupadd", "docker")
 	command("docker", "exec", name, "mkdir", "-p", "/etc/tmpfiles.d")
 	command("docker", "exec", name, "ln", "-s", "/fixture/infra", "/usr/local/bin/infra")
+	playbookArgs := func(playbook string, extra ...string) []string {
+		return append([]string{"exec", "-e", "PYTHONUNBUFFERED=1", name, "python3", "-m", "ansible.cli.playbook", "-i", "/fixture/inventory.yml", playbook, "--extra-vars", "@/fixture/vars.json"}, extra...)
+	}
 	run := func(playbook string, success bool, extra ...string) string {
 		t.Helper()
-		args := []string{"exec", name, "python3", "-m", "ansible.cli.playbook", "-i", "/fixture/inventory.yml", playbook, "--extra-vars", "@/fixture/vars.json"}
-		args = append(args, extra...)
-		output, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+		output, err := exec.CommandContext(ctx, "docker", playbookArgs(playbook, extra...)...).CombinedOutput()
 		if (err == nil) != success {
 			t.Fatalf("Ansible success=%t: %v\n%s", success, err, output)
 		}
@@ -241,7 +244,16 @@ esac
 	t.Log("runners reported offline restart without restarting the rest of the fleet")
 	identity := []string{".runner", ".credentials", ".credentials_rsaparams"}
 	reregisterY := `{"build_runner_reregister":["Y"]}`
-	write("bin/gh", "#!/bin/sh\nif [ -e /fixture/state/token-failure ]; then exit 1; fi\necho fixture-token\n", true)
+	write("bin/gh", `#!/bin/sh
+echo "$*" >> /fixture/state/gh
+case "$*" in
+*registration-token*) if [ -e /fixture/state/token-failure ]; then exit 1; fi; echo fixture-token ;;
+*"--method DELETE"*) if [ -e /fixture/state/withdrawal-failure ]; then exit 1; fi ;;
+*"--method PUT"*) cat >> /fixture/state/gh ;;
+*"--jq .busy"*) if [ -e /fixture/state/github-busy ]; then echo true; else echo false; fi ;;
+*) echo 7 ;;
+esac
+`, true)
 	write("runners/Y/config.sh", "#!/bin/sh\nset -eu\necho \"$*\" >> /fixture/state/registered\nfor file in .runner .credentials .credentials_rsaparams; do echo registered > \"$file\"; done\n", true)
 	for _, file := range identity {
 		write("runners/Y/"+file, "stale\n", false)
@@ -456,11 +468,78 @@ esac
 	archive()
 	command("docker", "exec", name, "ln", "-s", "/fixture/runner.tar.gz", "/var/cache/actions-runner-"+version+".tar.gz")
 	write("state/version-infra", "0.0.0", false)
-	converge()
+	withdrawal := "api --method DELETE --silent repos/" + fleet.Owner + "/infra/actions/runners/7/labels\n"
+	restoration := "api --method PUT --silent repos/" + fleet.Owner + "/infra/actions/runners/7/labels --input -\n" + fmt.Sprintf(`{"labels": ["%s"]}`, strings.Join(fleet.Labels, `", "`)) + "\n"
+	github := func(since string) string { return strings.TrimPrefix(record("gh"), since) }
+	returned := func(calls string) bool {
+		withdrawn := strings.LastIndex(calls, withdrawal)
+		return withdrawn >= 0 && strings.HasSuffix(calls, restoration) && strings.LastIndex(calls, restoration) > withdrawn
+	}
+	untouched := func(scenario, since string) {
+		t.Helper()
+		if _, err := os.Stat(filepath.Join(fixture, "runners/infra/.infra-runner-pending")); record("stopped") != "" || !os.IsNotExist(err) {
+			t.Fatalf("%s interrupted the runner: stopped %q, pending marker %v", scenario, record("stopped"), err)
+		}
+		if calls := github(since); !returned(calls) {
+			t.Fatalf("%s did not return the runner to its jobs:\n%s", scenario, calls)
+		}
+	}
+	calls := record("gh")
+	write("state/withdrawal-failure", "", false)
+	run("/fixture/converge.yml", false)
+	untouched("failed withdrawal", calls)
+	remove("state/withdrawal-failure")
+	t.Log("a runner that cannot be withdrawn from new jobs is not replaced")
+	write("state/github-busy", "", false)
+	calls = record("gh")
+	run("/fixture/converge.yml", false, "--extra-vars", `{"build_runner_drain_minutes":0,"build_runner_drain_interval":1}`)
+	untouched("job accepted before withdrawal", calls)
+	remove("state/github-busy")
+	t.Log("a job GitHub already assigned keeps its runner before its worker starts")
+	write("runners/infra/bin/Runner.Worker", "#!/bin/sh\nwhile [ -e /fixture/state/job-infra ]; do sleep 0.1; done\n", true)
+	write("state/job-infra", "", false)
+	command("docker", "exec", "-d", name, "/home/runner/infra/bin/Runner.Worker", "spawnclient", "1", "2")
+	calls = record("gh")
+	run("/fixture/converge.yml", false, "--extra-vars", `{"build_runner_drain_minutes":0,"build_runner_drain_interval":1}`)
+	untouched("drain deadline", calls)
+	t.Log("a runner still busy at the drain deadline keeps its job and its binaries and returns to new jobs")
+	calls = record("gh")
+	upgrade := exec.CommandContext(ctx, "docker", playbookArgs("/fixture/converge.yml", "--extra-vars", `{"build_runner_drain_interval":1}`)...)
+	progress, err := upgrade.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	upgrade.Stderr = upgrade.Stdout
+	if err := upgrade.Start(); err != nil {
+		t.Fatal(err)
+	}
+	var upgradeOutput strings.Builder
+	lines := bufio.NewScanner(progress)
+	for lines.Scan() && !(strings.HasPrefix(lines.Text(), "FAILED - RETRYING: ") && strings.Contains(lines.Text(), "Wait for the runner to finish its job")) {
+		upgradeOutput.WriteString(lines.Text() + "\n")
+	}
+	if record("stopped") != "" {
+		t.Fatalf("upgrade stopped the runner during its job:\n%s", upgradeOutput.String())
+	}
+	if withdrawn := github(calls); !strings.Contains(withdrawn, withdrawal) || strings.Contains(withdrawn[strings.LastIndex(withdrawn, withdrawal):], "--method PUT") {
+		t.Fatalf("draining runner still takes new jobs:\n%s", withdrawn)
+	}
+	remove("state/job-infra")
+	rest, _ := io.ReadAll(progress)
+	if err := upgrade.Wait(); err != nil {
+		t.Fatalf("upgrade after the job finished: %v\n%s%s", err, upgradeOutput.String(), rest)
+	}
 	stopped := string(read(filepath.Join(fixture, "state/stopped")))
 	if stopped != runnerUnit("infra")+"\n" {
 		t.Fatalf("wrong service stopped: %q", stopped)
 	}
+	if busy := record("stopped-mid-job"); busy != "" {
+		t.Fatalf("upgrade stopped %q while a job was running", busy)
+	}
+	if replaced := github(calls); !returned(replaced) {
+		t.Fatalf("upgraded runner did not return to new jobs:\n%s", replaced)
+	}
+	t.Log("runner upgrade takes the runner out of new jobs, waits for its running job and returns it after the replacement")
 	if output := run("/source/ansible/verify-runners.yml", true); !strings.Contains(output, "changed=0") {
 		t.Fatalf("verification after runner upgrade reports drift:\n%s", output)
 	}
@@ -471,10 +550,14 @@ esac
 	t.Log("runner upgrade stops only its own service and converges idempotently")
 	write("runners/infra/bin/Runner.Listener", "#!/bin/sh\necho 0.0.0\n", true)
 	write("runner.tar.gz", "invalid archive", false)
+	calls = record("gh")
 	run("/fixture/converge.yml", false)
 	pending := filepath.Join(fixture, "runners/infra/.infra-runner-pending")
 	if _, err := os.Stat(pending); err != nil {
 		t.Fatal("partial replacement lost its recovery marker", err)
+	}
+	if failed := github(calls); !returned(failed) {
+		t.Fatalf("failed replacement did not return the runner to new jobs:\n%s", failed)
 	}
 	archive()
 	converge()
