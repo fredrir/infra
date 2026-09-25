@@ -8,6 +8,7 @@ go_test(
         "project_test.go",
         "quota_test.go",
         "runner_test.go",
+        "volatile_test.go",
     ],
     data = ["//platform:policy_testdata"],
     deps = [

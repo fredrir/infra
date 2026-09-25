@@ -245,6 +245,9 @@ spec:
       enabled: true
     prometheus-node-exporter:
       namespaceOverride: node-exporter
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
       extraArgs:
       - --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
       extraHostVolumeMounts:

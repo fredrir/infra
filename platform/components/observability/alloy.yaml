@@ -75,6 +75,26 @@ spec:
         - name: alloy-state
           emptyDir:
             sizeLimit: 512Mi
+    rbac:
+      rules:
+      - apiGroups:
+        - ''
+        resources:
+        - pods
+        - namespaces
+        verbs:
+        - get
+        - list
+        - watch
+      clusterRules:
+      - apiGroups:
+        - ''
+        resources:
+        - pods/log
+        verbs:
+        - get
+        - list
+        - watch
     serviceMonitor:
       enabled: true
       additionalLabels:

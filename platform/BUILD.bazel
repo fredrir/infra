@@ -1,8 +1,8 @@
 filegroup(
     name = "policy_testdata",
     srcs = glob([
-        "components/policy/*.yaml",
-        "components/runners/**/*.yaml",
+        "components/**/*.yaml",
+        "projects/**/*.yaml",
     ]),
     visibility = ["//internal/policy:__pkg__"],
 )

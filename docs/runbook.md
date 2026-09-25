@@ -289,10 +289,11 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Verification | `verify.yml` play `Verify volatile workers`; fleet readiness waits exclude `node-restriction.kubernetes.io/volatile` |
 | Scheduling | Taint `node-restriction.kubernetes.io/volatile=true:NoSchedule`; labels `gvisor`, `volatile`, `infra.fredrir.com/ci-slots=3`; no `critical` or `stateful` |
 | CI pools | `check-amd64`, `rust-amd64` and `rust-pr-amd64` tolerate and prefer it and leave 30 s after not-ready or unreachable; `rust-release-amd64` never runs there |
+| Monitoring | node-exporter and Alloy tolerate the taint; Alloy reads only pods, pod logs and namespaces; OTLP stays on the sending node (`internalTrafficPolicy: Local`) |
 | Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100 and 10250; SSH from Macie, Archie and `tag:infra-apply` |
 | Transport | DERP over TCP 443; NTNU blocks outbound UDP |
 | Inbound access | Tailnet; NTNU VPN (`~/ntnu-proxy`, `10.50.0.0/16`) is owner-only break-glass SSH, never used by the fleet |
-| Trust | NTNU controls hypervisor and network; no ProxyJump, `ForwardAgent=no`, no delegated secrets; holds the K3s agent token and the credentials of its CI pools |
+| Trust | NTNU controls hypervisor and network; no ProxyJump, `ForwardAgent=no`, no delegated secrets; holds the K3s agent token, the credentials of its CI pools and the Alloy token (cluster-wide pod and log reads) |
 | Removal | Delete from `agent` and `volatile`; `kubectl delete node fredrir-10`; rotate the K3s agent token |
 
 | Data volume | Value |
