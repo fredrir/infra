@@ -25,15 +25,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   cli:
+    if: (inputs.verify || github.triggering_actor != 'fredrir-infra-verification[bot]')
     uses: ./.github/workflows/infra-cli.yml
   check:
-    if: ${{ !inputs.verify }}
+    if: ${{ !inputs.verify && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
     needs: cli
     uses: ./.github/workflows/check.yml
     with:
       cli-artifact: ${{ needs.cli.outputs.artifact }}
       cli-sha256: ${{ needs.cli.outputs.sha256 }}
   reconcile:
+    if: (inputs.verify || github.triggering_actor != 'fredrir-infra-verification[bot]')
     permissions:
       contents: write
       id-token: write
@@ -46,7 +48,7 @@ jobs:
       repair: ${{ inputs.repair || false }}
   images:
     needs: cli
-    if: github.event_name == 'push' && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected
+    if: github.event_name == 'push' && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && (inputs.verify || github.triggering_actor != 'fredrir-infra-verification[bot]')
     permissions:
       contents: read
       packages: write

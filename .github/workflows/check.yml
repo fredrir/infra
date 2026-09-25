@@ -18,10 +18,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   cli:
-    if: inputs.cli-artifact == ''
+    if: inputs.cli-artifact == '' && github.triggering_actor != 'fredrir-infra-verification[bot]'
     uses: ./.github/workflows/infra-cli.yml
   check:
-    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') }}
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
     needs: cli
     outputs:
       base: ${{ steps.affected.outputs.base }}
@@ -110,7 +110,7 @@ jobs:
           retention-days: 14
   validate:
     needs: [cli, check]
-    if: ${{ !cancelled() && needs.check.result == 'success' && github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]' }}
+    if: ${{ !cancelled() && needs.check.result == 'success' && github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]' && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
     runs-on: check-amd64
     timeout-minutes: 20
     steps:

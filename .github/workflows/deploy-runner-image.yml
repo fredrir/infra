@@ -14,7 +14,7 @@ permissions:
   contents: read
 jobs:
   image:
-    if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref == 'refs/heads/main' && github.ref_protected
+    if: github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref == 'refs/heads/main' && github.ref_protected && github.triggering_actor != 'fredrir-infra-verification[bot]'
     permissions:
       contents: read
       packages: write

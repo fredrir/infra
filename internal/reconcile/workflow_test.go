@@ -29,7 +29,7 @@ type workflowJob struct {
 	Uses           string            `yaml:"uses"`
 	With           map[string]string `yaml:"with"`
 	If             string            `yaml:"if"`
-	TimeoutMinutes int               `yaml:"timeout-minutes"`
+	TimeoutMinutes any               `yaml:"timeout-minutes"`
 	Env            map[string]string `yaml:"env"`
 	Permissions    map[string]string `yaml:"permissions"`
 	Steps          []workflowStep    `yaml:"steps"`
@@ -290,8 +290,9 @@ func TestRepairWaitsForPendingPushApplies(t *testing.T) {
 
 func TestApplyJobOutlivesTheApplyDeadline(t *testing.T) {
 	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
-	if margin := time.Duration(apply.TimeoutMinutes)*time.Minute - applyDeadline; margin < 30*time.Minute {
-		t.Fatalf("apply job timeout of %d minutes leaves %s beyond the apply deadline for setup and reporting", apply.TimeoutMinutes, margin)
+	minutes, ok := apply.TimeoutMinutes.(int)
+	if margin := time.Duration(minutes)*time.Minute - applyDeadline; !ok || margin < 30*time.Minute {
+		t.Fatalf("apply job timeout of %v minutes leaves %s beyond the apply deadline for setup and reporting", apply.TimeoutMinutes, margin)
 	}
 }
 
@@ -340,7 +341,73 @@ func TestVerificationRunsWithReadOnlyCredentials(t *testing.T) {
 	if full := setup.With["full"]; full != "${{ env.VERIFICATION == 'true' || inputs.full }}" {
 		t.Errorf("verification prepares tooling with full=%q", full)
 	}
-	if check := readWorkflow(t, "reconcile.yml").Jobs["check"].If; check != "${{ !inputs.verify }}" {
+	if check := readWorkflow(t, "reconcile.yml").Jobs["check"].If; !slices.Contains(topLevel(t, check, "&&"), "!inputs.verify") {
 		t.Errorf("verification runs repository checks with condition %q", check)
+	}
+}
+
+const (
+	verificationBot      = "github.triggering_actor != 'fredrir-infra-verification[bot]'"
+	verificationBotCheck = "(inputs.verify || " + verificationBot + ")"
+)
+
+func topLevel(t *testing.T, condition, operator string) []string {
+	t.Helper()
+	expression := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(condition), "${{"), "}}"))
+	var parts []string
+	depth, quoted, start := 0, false, 0
+	for index := 0; index < len(expression); index++ {
+		switch character := expression[index]; {
+		case character == '\'':
+			quoted = !quoted
+		case quoted:
+		case character == '(':
+			depth++
+		case character == ')':
+			depth--
+		case depth == 0 && strings.HasPrefix(expression[index:], operator):
+			parts = append(parts, strings.TrimSpace(expression[start:index]))
+			start = index + len(operator)
+		}
+	}
+	if depth != 0 || quoted {
+		t.Fatalf("unbalanced condition %q", condition)
+	}
+	return append(parts, strings.TrimSpace(expression[start:]))
+}
+
+func TestVerificationAppStartsOnlyVerification(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join("..", "..", ".github/workflows", "*.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dispatchable []string
+	for _, path := range paths {
+		name := filepath.Base(path)
+		workflow := readWorkflow(t, name)
+		if _, ok := workflow.On["workflow_dispatch"]; !ok {
+			continue
+		}
+		dispatchable = append(dispatchable, name)
+		for job, definition := range workflow.Jobs {
+			if len(topLevel(t, definition.If, "||")) != 1 {
+				t.Errorf("%s job %s condition %q has a top-level alternative", name, job, definition.If)
+			}
+			conjuncts := topLevel(t, definition.If, "&&")
+			if !slices.Contains(conjuncts, verificationBot) && (name != "reconcile.yml" || !slices.Contains(conjuncts, verificationBotCheck)) {
+				t.Errorf("%s job %s runs for the verification App: %q", name, job, definition.If)
+			}
+		}
+	}
+	for _, name := range []string{"check.yml", "cosign-release.yml", "deploy-runner-image.yml", "deploy.yml", "images.yml", "reconcile.yml", "source-watcher-image.yml", "tag-image.yml"} {
+		if !slices.Contains(dispatchable, name) {
+			t.Errorf("%s is not found as a dispatchable workflow", name)
+		}
+	}
+	reconcile := readWorkflow(t, "reconcile.yml")
+	for _, job := range []string{"cli", "reconcile"} {
+		if !slices.Contains(topLevel(t, reconcile.Jobs[job].If, "&&"), verificationBotCheck) {
+			t.Errorf("reconcile.yml job %s refuses requested verification: %q", job, reconcile.Jobs[job].If)
+		}
 	}
 }

@@ -9,6 +9,7 @@ resources:
 - alloy.yaml
 - network.yaml
 - node-exporter.yaml
+- independent-monitor.yaml
 - alertmanager.secret.sops.yaml
 - grafana.secret.sops.yaml
 - tunnel.yaml

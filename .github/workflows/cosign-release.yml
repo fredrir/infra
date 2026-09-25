@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected
+    if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.triggering_actor != 'fredrir-infra-verification[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:

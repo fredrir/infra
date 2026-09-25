@@ -1,0 +1,56 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: independent-monitor-scrape
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 100.86.241.75/32
+    ports:
+    - protocol: TCP
+      port: 8080
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: independent-monitor
+  namespace: observability
+  labels:
+    release: monitoring
+spec:
+  jobName: independent-monitor
+  scheme: HTTP
+  metricsPath: /metrics
+  scrapeInterval: 1m
+  scrapeTimeout: 10s
+  staticConfigs:
+  - targets:
+    - 100.86.241.75:8080
+    labels:
+      node: fredrir-06
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: independent-monitor
+  namespace: observability
+spec:
+  groups:
+  - name: independent-monitor
+    rules:
+    - alert: IndependentMonitorDown
+      expr: |
+        up{job="independent-monitor"} == 0
+        or absent(up{job="independent-monitor"})
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: Gatus on fredrir-06 is unreachable; independent checks, heartbeats and hourly verification requests are unobserved

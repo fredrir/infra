@@ -23,9 +23,10 @@ permissions:
   contents: read
 jobs:
   cli:
-    if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected
+    if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.triggering_actor != 'fredrir-infra-verification[bot]'
     uses: ./.github/workflows/infra-cli.yml
   tag:
+    if: github.triggering_actor != 'fredrir-infra-verification[bot]'
     needs: cli
     runs-on: ubuntu-24.04
     timeout-minutes: 10

@@ -13,6 +13,7 @@
 | Native configuration | Root `0600` `/etc/gatus/config.yaml`, delivered through systemd `LoadCredential`                  |
 | Runtime              | `DynamicUser`, SQLite `/var/lib/gatus/gatus.db`, `MemoryMax=256M`                                 |
 | Listener             | Tailnet-only `100.86.241.75:8080`                                                                 |
+| Cross-check          | Cluster Prometheus scrapes `/metrics` each minute; `IndependentMonitorDown` after 10 minutes down |
 | HTTP checks          | Exact status codes; portfolio follows redirects; authentication boundaries checked separately     |
 | Response handling    | Status-only checks do not read response bodies; Y API checks its small GraphQL readiness response |
 

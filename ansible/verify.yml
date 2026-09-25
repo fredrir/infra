@@ -38,6 +38,13 @@
       use_proxy: false
     retries: 1
     delay: 5
+  - name: Verify monitor metrics for the cluster cross-check
+    ansible.builtin.uri:
+      url: "http://{{ tailscale_ip }}:8080/metrics"
+      status_code: 200
+      use_proxy: false
+    retries: 1
+    delay: 5
   - name: Verify scheduled verification requests
     ansible.builtin.command:
       argv: [systemctl, is-active, infra-verification-request.timer]

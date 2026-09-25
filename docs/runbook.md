@@ -67,7 +67,8 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | Owner notification | Value |
 | --- | --- |
 | Failed, timed out or unfinished verification run | Email `reconciliation/verification: Alert triggered` on the report; Gatus result error names the run URL and conclusion |
-| No report for 3 hours | Same email; dispatch failures, a stopped timer or an unreachable host |
+| No report for 3 hours | Same email; dispatch failures or a stopped timer |
+| `fredrir-06` or Gatus unreachable for 10 minutes | Alertmanager email `IndependentMonitorDown` from the cluster's scrape of `100.86.241.75:8080/metrics`; Gatus cannot report its own host |
 | Next successful run | Email `reconciliation/verification: Alert resolved` |
 | Superseded run | No email |
 | Deployment scope | Role and Gatus changes run `external.yml --tags=gatus,verification_trigger` |
