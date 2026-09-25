@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "change": "Package indexes refresh only when a declared package is missing; unattended patching declared",
+  "baseline_run": "https://github.com/fredrir/infra/actions/runs/36069091673",
+  "rollout_run": "https://github.com/fredrir/infra/actions/runs/36079574526",
+  "hosts_stage_seconds": {"before": 176.6, "after": 172.3},
+  "apt_task_seconds_hosts_stage": {"before": 26.8, "after": 2.5},
+  "transport_play_seconds": {"before": 34.4, "after": 23.8},
+  "patching_role_seconds_first_rollout": 4.2,
+  "install_missing_declared_packages": "skipped on all 7 hosts",
+  "patching_files_changed_once": ["52infra-unattended-upgrades", "needrestart conf.d/infra.conf"],
+  "unchanged_ubuntu_default": "20auto-upgrades",
+  "kubernetes_stage_seconds_full_path": {"before": 66.9, "after": 54.6, "change": "HelmRelease and Kustomization requests overlap"},
+  "limitations": [
+    "One rollout sample; other plays varied by up to 5 seconds between runs",
+    "Patching role cost includes first-rollout writes"
+  ]
+}
