@@ -44,13 +44,12 @@ type Report struct {
 	TraceURL        string    `json:"trace_url,omitempty"`
 }
 
+const diskCachePath = "/root/.cache/infra-bazel-actions"
+
 func Run(ctx context.Context, opts Options) (report Report, err error) {
 	report = Report{Schema: 1, Operation: opts.Operation, Targets: opts.Targets, Started: time.Now().UTC(), TraceURL: os.Getenv("DAGGER_TRACE_URL")}
-	if opts.Operation != "test" && opts.Operation != "build" && opts.Operation != "generate-check" && opts.Operation != "cache-gc" && opts.Operation != "prepare-check" {
-		return report, errors.New("operation must be build, test, generate-check, prepare-check or cache-gc")
-	}
-	if opts.Operation == "cache-gc" && (opts.Local || len(opts.Targets) != 0 || opts.Base != "") {
-		return report, errors.New("cache maintenance requires Dagger and no targets or base")
+	if opts.Operation != "test" && opts.Operation != "build" && opts.Operation != "generate-check" && opts.Operation != "prepare-check" {
+		return report, errors.New("operation must be build, test, generate-check or prepare-check")
 	}
 	if opts.Operation == "generate-check" && len(opts.Targets) != 0 {
 		return report, errors.New("generated BUILD checks do not accept targets")
@@ -218,9 +217,6 @@ func runDagger(ctx context.Context, opts Options, config Toolchain, expression s
 		WithMountedCache("/root/.cache/bazel-repo", client.CacheVolume("infra-bazel-repository-v1")).
 		WithMountedCache(diskCachePath, client.CacheVolume("infra-bazel-actions-v1"), dagger.ContainerWithMountedCacheOpts{Sharing: dagger.CacheSharingModeShared}).
 		WithExec([]string{"mkdir", "-p", "/reports"})
-	if opts.Operation == "cache-gc" {
-		return pruneDiskCache(ctx, container)
-	}
 	if opts.ForwardLocalCache {
 		endpoint, host, port, err := localCache(opts.RemoteCache)
 		if err != nil {

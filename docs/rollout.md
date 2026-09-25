@@ -7,7 +7,7 @@
 | Binary trust     | Release attestation, source revision and manifest SHA-256 agree            | Install the exact platform artifact; retain the previous binary                     |
 | Images           | Published digest, scan and provenance; compiled CLI included               | Promote tools and runner image pins                                                 |
 | External callers | Exact reviewed workflow SHA; matching OctoSTS policy; native test commands | Apply each repository patch from `build/rollout` after its expected blobs match     |
-| VM engines       | Dedicated trusted VM, native qualification and registered runner           | Apply `ansible/build-engines.yml`; enable the qualified pool explicitly             |
+| VM engines       | Dedicated trusted VM, native qualification and registered runner           | Apply `ansible/build-runners.yml`; enable the qualified pool explicitly             |
 | Retirement       | All callers moved; old jobs drained; rollback data retained                | Remove legacy runner and Attic service resources                                    |
 
 ## Applied cutover

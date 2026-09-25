@@ -96,6 +96,7 @@
     argv:
     - '/home/runner/{{ build_runner_repository }}/config.sh'
     - --unattended
+    - --replace
     - --disableupdate
     - --url
     - 'https://github.com/{{ build_runner_owner }}/{{ build_runner_repository }}'
@@ -159,7 +160,3 @@
     enabled: true
     daemon_reload: '{{ build_runner_resource_slice.changed or build_runner_service_install.changed or build_runner_service_override.changed }}'
     state: '{{ "restarted" if build_runner_service_override.changed else "started" }}'
-
-- name: Select engine runner service
-  ansible.builtin.set_fact:
-    build_engine_runner_service: '{{ build_runner_service_name }}'

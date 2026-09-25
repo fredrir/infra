@@ -2,10 +2,9 @@
   hosts: build_engines
   become: true
   gather_facts: true
-  pre_tasks:
-  - name: Read verified CLI identity
-    ansible.builtin.set_fact:
-      build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
+  vars:
+    build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
+    build_runner_toolchain: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json }}"
   roles:
   - infra_binary
   - build_runner

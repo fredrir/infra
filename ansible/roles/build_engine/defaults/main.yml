@@ -1,7 +1,6 @@
 build_engine_dedicated: false
 build_engine_qualified: false
 build_engine_trust: trusted
-build_engine_runner_service: ''
 build_engine_cpus: 4
 build_engine_memory: 8g
 build_engine_pids: 1024
@@ -13,12 +12,6 @@ build_engine_gc_emergency_free_gib: 4
 build_engine_parallelism: 4
 build_engine_cache_cpus: 1
 build_engine_cache_memory: 1g
-build_engine_prewarm_commands: []
-build_engine_prewarm_workdir: /var/lib/infra/build
-build_engine_prewarm_interval: 6h
-build_engine_prewarm_timeout: 10min
-build_engine_prewarm_cpu_percent: 100
-build_engine_prewarm_memory: 2G
 build_engine_cache_port: 9092
 build_engine_dagger_name: infra-dagger
 build_engine_bazel_image: buchgr/bazel-remote-cache:v2.6.2@sha256:8109f1f39eb17d898cf51e08b41e4eabaaaeb1f584c2f22c1be45b7568fcc512

@@ -50,34 +50,6 @@
     shell: /bin/bash
     create_home: true
 
-- name: Read pinned build toolchain
-  ansible.builtin.set_fact:
-    build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
-    build_runner_toolchain: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json }}"
-
-- name: Create runner-owned CLI and tool caches
-  ansible.builtin.file:
-    path: '{{ item }}'
-    state: directory
-    owner: runner
-    group: runner
-    mode: '0700'
-  loop:
-  - /home/runner/.cache
-  - /home/runner/.cache/infra
-  - /home/runner/.cache/infra/bin
-  - /home/runner/.cache/infra/tools
-  - '/home/runner/.cache/infra/bin/{{ build_runner_cli.sha256 }}'
-
-- name: Seed verified CLI fast-path cache
-  ansible.builtin.copy:
-    src: /usr/local/bin/infra
-    dest: '/home/runner/.cache/infra/bin/{{ build_runner_cli.sha256 }}/infra'
-    remote_src: true
-    owner: runner
-    group: runner
-    mode: '0555'
-
 - name: Install verified native Bazel
   ansible.builtin.get_url:
     url: 'https://github.com/bazelbuild/bazel/releases/download/{{ build_runner_toolchain.bazel }}/bazel-{{ build_runner_toolchain.bazel }}-linux-x86_64'
@@ -178,25 +150,26 @@
     group: root
     mode: '0644'
     timeout: 30
+  register: build_runner_archive
+
+- name: Find superseded runner archives
+  ansible.builtin.find:
+    paths: /var/cache
+    patterns: 'actions-runner-*.tar.gz'
+  register: build_runner_archives
+  when: build_runner_archive.changed
+
+- name: Remove superseded runner archives
+  ansible.builtin.file:
+    path: '{{ item.path }}'
+    state: absent
+  loop: "{{ build_runner_archives.files | default([]) | rejectattr('path', 'equalto', build_runner_archive.dest) | list }}"
+  loop_control:
+    label: '{{ item.path }}'
+  when: build_runner_archive.changed
 
 - name: Configure repository runners
   ansible.builtin.include_tasks: repository.yml
   loop: '{{ build_runner_repositories }}'
   loop_control:
     loop_var: build_runner_repository
-
-- name: Create prewarming source directory
-  ansible.builtin.file:
-    path: /var/lib/infra/build
-    state: directory
-    owner: runner
-    group: runner
-    mode: '0755'
-
-- name: Checkout verified CLI source for prewarming
-  become_user: runner
-  ansible.builtin.git:
-    repo: https://github.com/fredrir/infra.git
-    dest: /var/lib/infra/build
-    version: '{{ build_runner_cli.revision }}'
-    force: false

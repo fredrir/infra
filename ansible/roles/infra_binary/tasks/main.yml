@@ -31,11 +31,13 @@
     group: root
     mode: '0555'
     timeout: 30
+  register: infra_binary_download
 
 - name: Check executable compatibility
   ansible.builtin.command:
     argv: ['{{ infra_binary_cache }}/infra', version]
   changed_when: false
+  when: infra_binary_download.changed
 
 - name: Activate verified binary
   ansible.builtin.file:
@@ -45,3 +47,21 @@
     owner: root
     group: root
     force: true
+
+- name: Find superseded binary revisions
+  ansible.builtin.find:
+    paths: /var/cache/infra
+    file_type: directory
+    patterns: '^[a-f0-9]{40}$'
+    use_regex: true
+  register: infra_binary_revisions
+  when: infra_binary_download.changed
+
+- name: Remove superseded binary revisions
+  ansible.builtin.file:
+    path: '{{ item.path }}'
+    state: absent
+  loop: "{{ infra_binary_revisions.files | default([]) | rejectattr('path', 'equalto', '/var/cache/infra/' ~ infra_binary_revision) | list }}"
+  loop_control:
+    label: '{{ item.path }}'
+  when: infra_binary_download.changed

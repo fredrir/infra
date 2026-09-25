@@ -143,10 +143,8 @@ git diff -- platform
 | Dedicated VM setting            | Value                                                                                                                                       |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Host provisioning               | `ansible/build-vms.yml`; inventory group `build_vm_hosts`                                                                                   |
-| Runner provisioning             | `ansible/build-runners.yml`; inventory group `build_engines`                                                                                |
-| Engine provisioning             | `ansible/build-engines.yml`; inventory group `build_engines`                                                                                |
+| Runner and engine provisioning  | `ansible/build-runners.yml`; inventory group `build_engines`                                                                                |
 | Production placement            | `ansible/inventory/production.yml`; `infra-build-09` on `fredrir-09`                                                                        |
-| Reviewable provisioning example | `ansible/examples/build-vm-fredrir-09.yml`                                                                                                  |
 | Host reservation                | 4.25 CPUs / 10 GiB reserved; resulting allocatable 11.5 CPUs / 21,585,868 KiB                                                               |
 | Guest                           | Four CPUs / 8 GiB RAM / 80 GiB sparse persistent disk                                                                                       |
 | Host boundary                   | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding                                                                         |
@@ -162,8 +160,6 @@ git diff -- platform
 | Runner cache environment        | `BAZEL_REMOTE_CACHE=http://127.0.0.1:9092`; `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger`                              |
 | Runner enforcement              | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected                                            |
 | Cache collection                | Dagger ordinary layers first; named caches preferred for 48 h; 20 GiB target / 4 GiB emergency free space; Bazel remote 20 GiB target / 21 GiB admission ceiling                                                      |
-| Background preparation          | Six-hour systemd timer; low-priority client; ten-minute timeout; configured argv only                                                       |
-| Background maintenance            | `infra artifact prune-source`; `infra pipeline cache-gc`                                                                           |
 | Verified tooling                | CLI release checksum and revision; pinned native Bazel; pinned GitHub runner archive                                                        |
 | Warm ARC capacity               | One deploy runner and one declaration-check runner                                                                                          |
 | Pool isolation                  | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines                                                           |
@@ -177,7 +173,7 @@ ansible-playbook -i ansible/inventory/production.yml \
 
 | Activation order      | Required result                                                                                                           |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Publish tooling       | `build/cli-release.json` identifies a verified release supporting preparation and cache collection                        |
+| Publish tooling       | `build/cli-release.json` identifies the verified release installed on the guest                                           |
 | Reserve host capacity | Apply reviewed K3s reservation; verify worker readiness and allocatable resources                                         |
 | Provision guest       | Apply VM playbook with `build_vm_enabled=true`; verify guest SSH host identity before adding it to known hosts            |
 | Qualify guest         | Native Linux builds, persistent cache reuse, resource ceilings and trust isolation pass                                   |
@@ -186,9 +182,9 @@ ansible-playbook -i ansible/inventory/production.yml \
 | Verify latency        | Measure queue, setup, checks, publication and revision readiness independently                                            |
 | Roll back routing     | Disable qualification variables before stopping services; retain guest disk and cache volumes                             |
 
-The reservation and dedicated guest are provisioned and natively qualified; workflow routing remains separately gated by release identity and qualified-pool variables. The guest shares physical CPUs with Kubernetes; reservations constrain schedulable capacity rather than guaranteeing latency. Runner registrations share one capped engine, so concurrent repositories may queue. Background preparation limits its client process; expensive Dagger work remains bounded by the engine's shared limits. Cache thresholds are retention targets rather than filesystem quotas, except for Bazel remote's write-admission ceiling and the guest disk's virtual capacity.
+The reservation and dedicated guest are provisioned and natively qualified; workflow routing remains separately gated by release identity and qualified-pool variables. The guest shares physical CPUs with Kubernetes; reservations constrain schedulable capacity rather than guaranteeing latency. Runner registrations share one capped engine, so concurrent repositories may queue. Cache thresholds are retention targets rather than filesystem quotas, except for Bazel remote's write-admission ceiling and the guest disk's virtual capacity.
 
-The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary. Only trusted repositories and protected branches may use this VM. Prewarming starts only when supported commands and their working directory exist; first population may exceed the normal CI budget.
+The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary. Only trusted repositories and protected branches may use this VM.
 
 ## Consumer cutover
 
@@ -230,7 +226,6 @@ The inventory records GitHub reads on its `checked` date; refresh it before reti
 | Complete infrastructure checks          | `infra pipeline check-deep --local`                                                                                     |
 | Prepare infrastructure test executables | `infra pipeline prepare-check --local`                                                                                  |
 | Fast checks                             | `infra pipeline check-fast --local --base HEAD~1`                                                                       |
-| Maintain Dagger action cache            | `infra pipeline cache-gc`                                                                                               |
 | Rust full validation                    | `infra ci rust prepare && infra ci rust check deep`                                                                     |
 | Rust cross-toolchain qualification      | `infra ci rust check toolchain` inside the verified Rust runner image                                                   |
 | Full package installation matrix        | `infra packages smoke --root . SITE CHANNELS full`                                                                      |

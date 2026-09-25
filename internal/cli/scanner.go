@@ -11,7 +11,7 @@ import (
 )
 
 func newScannerCommand() *cobra.Command {
-	var cache, shared, leaseID, pruneRoot string
+	var cache, shared, leaseID string
 	var leaseDuration time.Duration
 	var java bool
 	command := &cobra.Command{Use: "scanner", Short: "Reuse isolated scanner analysis and shared databases"}
@@ -34,13 +34,9 @@ func newScannerCommand() *cobra.Command {
 		return ci.ReleaseScanner(cmd.Context(), cache, leaseID)
 	}}
 	release.Flags().StringVar(&leaseID, "lease-id", "", "Workflow attempt lease")
-	prune := &cobra.Command{Use: "prune", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		return ci.PruneScanner(cmd.Context(), pruneRoot, time.Now())
-	}}
-	prune.Flags().StringVar(&pruneRoot, "root", filepath.Join(os.Getenv("HOME"), ".cache/infra/trivy-v3"), "Leased scanner family root")
 	scan := &cobra.Command{Use: "scan -- ARGS", Args: cobra.MinimumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return ci.RunScanner(cmd.Context(), ci.Runner{Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}, cache, args)
 	}}
-	command.AddCommand(prepare, scan, release, prune)
+	command.AddCommand(prepare, scan, release)
 	return command
 }

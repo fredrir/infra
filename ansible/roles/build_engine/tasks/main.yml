@@ -4,7 +4,6 @@
     - build_engine_dedicated | bool
     - build_engine_qualified | bool
     - build_engine_trust == 'trusted'
-    - build_engine_runner_service is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]service$')
     - ansible_facts.system == 'Linux'
     - ansible_facts.architecture == 'x86_64'
     - inventory_hostname not in groups.get('k3s_cluster', [])
@@ -19,44 +18,16 @@
     - build_engine_cache_cpus | int >= 1
     - build_engine_cache_cpus | int <= build_engine_cpus | int
     - build_engine_cache_memory is match('^[1-9][0-9]*g$')
-    - build_engine_prewarm_interval is match('^[1-9][0-9]*h$')
-    - build_engine_prewarm_timeout is match('^[1-9][0-9]*min$')
-    - build_engine_prewarm_cpu_percent | int >= 1
-    - build_engine_prewarm_cpu_percent | int <= 100
-    - build_engine_prewarm_memory is match('^[1-9][0-9]*[MG]$')
     - build_engine_cache_gib | int >= 4
     - build_engine_dagger_cache_gib | int >= 4
     - build_engine_named_cache_hours | int >= 1
     - build_engine_named_cache_hours | int <= 168
     - build_engine_gc_emergency_free_gib | int >= 1
     - build_engine_gc_free_gib | int > build_engine_gc_emergency_free_gib | int
-    - build_engine_prewarm_workdir is match('^/[-a-zA-Z0-9_/.]+$')
     - build_engine_cache_port | int > 1024
     - build_engine_cache_port | int < 65536
     - build_engine_cache_port | int == 9092
     - build_engine_dagger_name == 'infra-dagger'
-
-- name: Read runner services
-  ansible.builtin.service_facts:
-
-- name: Require an installed active GitHub runner
-  ansible.builtin.assert:
-    that:
-    - build_engine_runner_service in ansible_facts.services
-    - ansible_facts.services[build_engine_runner_service].state == 'running'
-
-- name: Read the registered runner account
-  ansible.builtin.command:
-    argv: [systemctl, show, '--property=User', --value, '{{ build_engine_runner_service }}']
-  register: build_engine_runner_account
-  changed_when: false
-
-- name: Verify runner access to its dedicated Docker engine
-  ansible.builtin.command:
-    argv: [runuser, --user, '{{ build_engine_runner_account.stdout | default("root", true) }}', --, docker, info, --format, '{{ "{{.OSType}}" }}']
-  register: build_engine_runner_docker
-  changed_when: false
-  failed_when: build_engine_runner_docker.rc != 0 or build_engine_runner_docker.stdout != 'linux'
 
 - name: Read engine pin
   ansible.builtin.set_fact:
@@ -67,13 +38,6 @@
     that:
     - build_engine_image is match('^registry.dagger.io/engine:v[0-9.]+@sha256:[a-f0-9]{64}$')
     - build_engine_bazel_image is match('^buchgr/bazel-remote-cache:v[0-9.]+@sha256:[a-f0-9]{64}$')
-
-- name: Check Docker availability
-  ansible.builtin.command:
-    argv: [docker, info, --format, '{{ "{{.OSType}}" }}']
-  register: build_engine_docker
-  changed_when: false
-  failed_when: build_engine_docker.rc != 0 or build_engine_docker.stdout != 'linux'
 
 - name: Inspect pinned engine images
   ansible.builtin.command:
@@ -112,6 +76,7 @@
     owner: root
     group: root
     mode: '0644'
+  register: build_engine_dagger_unit
   notify: Restart infra-dagger
 
 - name: Install Bazel cache unit
@@ -121,44 +86,43 @@
     owner: root
     group: root
     mode: '0644'
+  register: build_engine_cache_unit
   notify: Restart infra-bazel-cache
 
 - name: Start build engines
   ansible.builtin.systemd_service:
     name: '{{ item }}'
-    daemon_reload: true
+    daemon_reload: '{{ build_engine_dagger_unit.changed or build_engine_cache_unit.changed }}'
     enabled: true
     state: started
   loop:
   - infra-dagger
   - infra-bazel-cache
 
-- name: Validate prewarming commands
-  ansible.builtin.assert:
-    that:
-    - item is sequence
-    - item is not string
-    - item | length > 0
-    - item | select('string') | list | length == item | length
-    - item[0] is match('^/[-a-zA-Z0-9_/.]+$')
-    - item | select('search', '[\n\r%$]') | list | length == 0
-  loop: '{{ build_engine_prewarm_commands }}'
+- name: Read retired prewarming timer
+  ansible.builtin.stat:
+    path: /etc/systemd/system/infra-build-prewarm.timer
+  register: build_engine_prewarm_timer
 
-- name: Install background prewarming units
-  ansible.builtin.template:
-    src: '{{ item }}.j2'
-    dest: '/etc/systemd/system/{{ item }}'
-    owner: root
-    group: root
-    mode: '0644'
-  loop:
-  - infra-build-prewarm.service
-  - infra-build-prewarm.timer
-  notify: Restart build prewarming
-
-- name: Configure background prewarming
+- name: Stop retired prewarming timer
   ansible.builtin.systemd_service:
     name: infra-build-prewarm.timer
+    state: stopped
+    enabled: false
+  when: build_engine_prewarm_timer.stat.exists
+
+- name: Remove retired prewarming state
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+  - /etc/systemd/system/infra-build-prewarm.timer
+  - /etc/systemd/system/infra-build-prewarm.service
+  - /var/lib/infra/build
+  - /home/runner/.cache/infra/source-cli
+  register: build_engine_prewarm_removed
+
+- name: Reload units without retired prewarming
+  ansible.builtin.systemd_service:
     daemon_reload: true
-    enabled: '{{ build_engine_prewarm_commands | length > 0 }}'
-    state: '{{ "started" if build_engine_prewarm_commands | length > 0 else "stopped" }}'
+  when: build_engine_prewarm_removed.changed
