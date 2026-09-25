@@ -691,17 +691,30 @@ esac
 		t.Fatalf("unattended upgrade policy not applied:\n%s", output)
 	}
 	t.Log("declared patching configuration validates and converges idempotently")
-	write("bin/sops", "#!/bin/sh\nprintf 'private_key: declared-key\\n'\n", true)
+	write("bin/sops", "#!/bin/sh\nprintf 'private_key: declared-key\\ntoken: declared-token\\n'\n", true)
 	write("app-key.sops.yaml", "", false)
-	write("trigger.yml", "- hosts: build_engines\n  gather_facts: false\n  vars:\n    verification_trigger_app_id: 1\n    verification_trigger_installation_id: 2\n    verification_trigger_key_sops_file: /fixture/app-key.sops.yaml\n  roles:\n  - verification_trigger\n", false)
+	write("heartbeat.sops.yaml", "", false)
+	write("trigger.yml", `- hosts: build_engines
+  gather_facts: false
+  vars:
+    verification_trigger_app_id: 1
+    verification_trigger_installation_id: 2
+    verification_trigger_credentials:
+    - {source: /fixture/app-key.sops.yaml, field: private_key, dest: /etc/infra-verification/github-app.pem}
+    - {source: /fixture/heartbeat.sops.yaml, field: token, dest: /etc/infra-verification/gatus-token}
+  roles:
+  - verification_trigger
+`, false)
 	trigger := func(success bool, extra ...string) string {
 		return run("/fixture/trigger.yml", success, append([]string{"--skip-tags=infra_binary"}, extra...)...)
 	}
-	if output := trigger(true, "--diff"); strings.Contains(output, "declared-key") {
-		t.Fatalf("verification trigger printed its private key:\n%s", output)
+	if output := trigger(true, "--diff"); strings.Contains(output, "declared-key") || strings.Contains(output, "declared-token") {
+		t.Fatalf("verification trigger printed a credential:\n%s", output)
 	}
-	if key := command("docker", "exec", name, "stat", "-c", "%a %U %s", "/etc/infra-verification/github-app.pem"); string(key) != "600 root 12\n" {
-		t.Fatalf("GitHub App key installed as %q", key)
+	for credential, size := range map[string]int{"github-app.pem": 12, "gatus-token": 14} {
+		if installed := command("docker", "exec", name, "stat", "-c", "%a %U %s", "/etc/infra-verification/"+credential); string(installed) != fmt.Sprintf("600 root %d\n", size) {
+			t.Fatalf("%s installed as %q", credential, installed)
+		}
 	}
 	for _, mode := range [][]string{nil, {"--check"}} {
 		if output := trigger(true, mode...); !strings.Contains(output, "changed=0") {
@@ -717,11 +730,11 @@ esac
 	if got := strings.TrimPrefix(restarted(), before); got != "infra-verification-request.timer\n" {
 		t.Fatalf("timer repair restarted %q", got)
 	}
-	command("docker", "exec", name, "rm", "/fixture/app-key.sops.yaml")
-	if output := trigger(false, "--check"); !strings.Contains(output, "Missing SOPS-encrypted GitHub App key /fixture/app-key.sops.yaml") {
-		t.Fatalf("missing encrypted key did not fail clearly:\n%s", output)
+	command("docker", "exec", name, "rm", "/fixture/heartbeat.sops.yaml")
+	if output := trigger(false, "--check"); !strings.Contains(output, "Missing SOPS-encrypted credential /fixture/heartbeat.sops.yaml") {
+		t.Fatalf("missing encrypted credential did not fail clearly:\n%s", output)
 	}
-	t.Log("verification trigger installs its key privately, converges idempotently, restarts an edited timer and requires its encrypted key")
+	t.Log("verification trigger installs its credentials privately, converges idempotently, restarts an edited timer and requires its encrypted credentials")
 }
 
 func TestHostComparisonWithLocalContainer(t *testing.T) {

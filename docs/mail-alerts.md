@@ -24,6 +24,10 @@
 | `backups_portfolio` | 2 hours     |
 | `backups_attic`     | 2 hours     |
 
+| Verification heartbeat        | Value                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `reconciliation_verification` | Maximum age 3 hours; failed run reported immediately with its URL; [runbook](runbook.md#reconciliation) |
+
 Successful backup producers POST to `/api/v1/endpoints/backups_<name>/external?success=true` with separate Bearer tokens from their encrypted repository credentials. Producers keep tokens in private curl configuration files. Tailnet policy permits the control and worker producers to reach the monitor; Kubernetes network policies restrict backup pods to this destination.
 
 ```sh

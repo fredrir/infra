@@ -55,13 +55,22 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | --- | --- |
 | Host / role | `fredrir-06` (`external`) / `ansible/roles/verification_trigger` |
 | Timer | `infra-verification-request.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |
-| Service | `infra-verification-request.service`: oneshot `infra reconcile request-verification`, `DynamicUser=yes`, IPv4/IPv6 sockets only, read-only system |
+| Service | `infra-verification-request.service`: oneshot `infra reconcile request-verification`, `DynamicUser=yes`, IPv4/IPv6 sockets only, read-only system, `TimeoutStartSec=160min`; runs never overlap, and an hour that elapses during a run starts one run after it completes |
 | Binary | `/usr/local/bin/infra` from `build/cli-release.json`; a CLI release also runs `external.yml --tags=infra_binary` |
-| Credential | Root `0600` `/etc/infra-verification/github-app.pem`, delivered through `LoadCredential=github-app-key` |
+| Credentials | Root `0600` `/etc/infra-verification/github-app.pem` and `gatus-token`, delivered through `LoadCredential=github-app-key` and `gatus-token` |
 | Token | Installation token restricted to `infra` with `actions: write` |
 | Dispatch | `reconcile.yml` at `main`, `verify=true`, `repair=true`, actor `fredrir-infra-verification[bot]` |
-| Failed dispatch | Unit `failed`; journal `infra: dispatch reconcile.yml in fredrir/infra at main: ERROR`; no new dispatched run; the next hour retries |
-| Deployment scope | Role changes run `external.yml --tags=gatus,verification_trigger` |
+| Wait | Polls the dispatched run every 30 s with ETag revalidation; honors `Retry-After` and `X-RateLimit-Reset`; deadline 150 minutes |
+| Heartbeat | Gatus `reconciliation_verification`: `success=true` for `success`; `success=false` with the run URL and conclusion for `failure`, `timed_out`, `startup_failure` or the deadline; none for `cancelled` or a stopped unit |
+| Failed dispatch | Unit `failed`; journal `infra: dispatch reconcile.yml in fredrir/infra at main: ERROR`; no run and no heartbeat; the next hour retries |
+
+| Owner notification | Value |
+| --- | --- |
+| Failed, timed out or unfinished verification run | Email `reconciliation/verification: Alert triggered` on the report; Gatus result error names the run URL and conclusion |
+| No report for 3 hours | Same email; dispatch failures, a stopped timer or an unreachable host |
+| Next successful run | Email `reconciliation/verification: Alert resolved` |
+| Superseded run | No email |
+| Deployment scope | Role and Gatus changes run `external.yml --tags=gatus,verification_trigger` |
 
 ```sh
 ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl list-timers infra-verification-request.timer --no-pager
@@ -78,6 +87,7 @@ ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl start infra-verifica
 | App / installation ID | `5077572` / `164918469`; `fredrir-06` in `ansible/inventory/production.yml` |
 | Private key | `ansible/roles/verification_trigger/files/github-app.sops.yaml`, field `private_key`; recipients in [Secrets](Secrets.md) |
 | Rotation | Generate a key in the App settings; replace `private_key`; reconcile; delete the previous key |
+| Heartbeat token | `ansible/roles/verification_trigger/files/heartbeat.sops.yaml`, field `token`; equal to the `reconciliation/verification` token in `ansible/roles/gatus/files/config.sops.yaml` |
 
 ```sh
 sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["private_key"]' "$(jq -Rs . < NEW_KEY.pem)"

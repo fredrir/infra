@@ -5,9 +5,10 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/infra reconcile request-verification --app-id={{ verification_trigger_app_id }} --installation-id={{ verification_trigger_installation_id }}
-LoadCredential=github-app-key:{{ verification_trigger_key }}
+LoadCredential=github-app-key:/etc/infra-verification/github-app.pem
+LoadCredential=gatus-token:/etc/infra-verification/gatus-token
 DynamicUser=yes
-TimeoutStartSec=2min
+TimeoutStartSec=160min
 MemoryMax=128M
 TasksMax=32
 UMask=0077

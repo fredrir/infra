@@ -208,6 +208,17 @@ external-endpoints:
           failure-threshold: 1
           success-threshold: 1
           send-on-resolved: true
+    - name: verification
+      group: reconciliation
+      token: ENC[AES256_GCM,data:CLlXgpWbDC77uyqarC+NVTWenJA4lCcUXngQ8TqsmjaKBOneZPCj3KKimA==,iv:woRj3jb1bCZvr+Ay8j9I+ZmLcCNLX/SNn0O2dpz7HFs=,tag:N7wpXqXTZEWiI9/5uLIhZw==,type:str]
+      heartbeat:
+        interval: 3h
+      alerts:
+        - type: email
+          failure-threshold: 1
+          success-threshold: 1
+          send-on-resolved: true
+          description: Hourly infrastructure verification failed or stopped reporting; the Gatus result names the run
 sops:
     age:
         - enc: |
@@ -247,6 +258,6 @@ sops:
             -----END AGE ENCRYPTED FILE-----
           recipient: age1mxszcn7gs8gnvhpq8ku748szqe8u6raferefg986slu83r3zkcmswe29zs
     encrypted_regex: ^(username|password|token)$
-    lastmodified: "2026-09-23T16:14:33Z"
-    mac: ENC[AES256_GCM,data:t2pl1V+AWMRK6N2MmSlHpz3BHbPEo+XqtdmKgdIaz37z1kyxfphT1GT6e0mZyzJbRTOMS6RdFQM1+gIqSoWLFMmR26k6SP+fGte0UErV/ytTumzdDqUlR1N7VDswwiC9Kic6U7p1B50Jh5XaQm02S+jnwyFC8EzuHwD6XnztMEQ=,iv:ZArV0jNJ+i6T/2rSr+yloW+kLtLE7shwmmumAVTpvIE=,tag:ei/Vukx5or/9Q2EawXnhmA==,type:str]
+    lastmodified: "2026-09-25T19:06:34Z"
+    mac: ENC[AES256_GCM,data:pMxVDWp9sVT78+4mSFNwytbDxxIquswv7KROqSMP41A9x5nZPKOyIlkw3KgUT13/QIjSIW/iZp1ylzfOZLMw4LYRg/59gV6GoZZiLfLoNntRu6Ss4hTLx6UNFP11PjEt+7Fw0CjD9nVf7eDhHAuNG94oIJRDceFUnFOcjhyVFB0=,iv:Cgg4VB8hi3fDxYyaJoy6EusOpaQMw8UuOTWP/TG+01Q=,tag:Mg+TV2tJK2h/UNc1CaCqYg==,type:str]
     version: 3.13.3

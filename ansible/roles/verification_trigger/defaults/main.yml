@@ -1,3 +1,8 @@
 verification_trigger_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
-verification_trigger_key_sops_file: "{{ role_path }}/files/github-app.sops.yaml"
-verification_trigger_key: /etc/infra-verification/github-app.pem
+verification_trigger_credentials:
+  - source: "{{ role_path }}/files/github-app.sops.yaml"
+    field: private_key
+    dest: /etc/infra-verification/github-app.pem
+  - source: "{{ role_path }}/files/heartbeat.sops.yaml"
+    field: token
+    dest: /etc/infra-verification/gatus-token
