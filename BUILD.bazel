@@ -19,7 +19,6 @@ filegroup(
 filegroup(
     name = "image_contract_data",
     srcs = glob(["images/**"]) + [
-        ":workflows",
         ".bazelrc",
         ".bazelversion",
         "BUILD.bazel",
@@ -29,6 +28,7 @@ filegroup(
         "go.sum",
         "pyproject.toml",
         "uv.lock",
+        ":workflows",
         "//build:BUILD.bazel",
         "//build:dagger-embed.patch",
         "//build:toolchain.json",
