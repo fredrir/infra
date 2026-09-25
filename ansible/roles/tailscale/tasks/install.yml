@@ -22,7 +22,6 @@
   ansible.builtin.command:
     argv: [modprobe, tun]
   changed_when: false
-  when: not ansible_check_mode
 
 - name: Inspect tunnel device
   ansible.builtin.stat:
@@ -31,12 +30,10 @@
     get_mime: false
     get_attributes: false
   register: platform_bootstrap_tun
-  when: not ansible_check_mode
 
 - name: Require kernel tunnel support
   ansible.builtin.assert:
     that: platform_bootstrap_tun.stat.ischr | default(false)
-  when: not ansible_check_mode
 
 - name: Apply transport service changes
   ansible.builtin.meta: flush_handlers
@@ -48,4 +45,3 @@
     state: started
     daemon_reload: true
   register: platform_tailscale_start
-  when: not ansible_check_mode

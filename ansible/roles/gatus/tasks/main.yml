@@ -18,6 +18,7 @@
     url: https://auth.docker.io/token?service=registry.docker.io&scope=repository:twinproduction/gatus:pull
     return_content: true
   register: gatus_registry
+  check_mode: false
   no_log: true
 
 - name: Download the pinned upstream binary layer
@@ -99,6 +100,7 @@
     host: "{{ gatus_address }}"
     port: "{{ gatus_port }}"
     timeout: 45
+  check_mode: false
 
 - name: Verify monitor readiness
   ansible.builtin.uri:
@@ -106,6 +108,7 @@
     status_code: 200
     use_proxy: false
   register: gatus_ready
+  check_mode: false
   until: gatus_ready.status == 200
   retries: 6
   delay: 2
