@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "kustomize",
+    srcs = ["build.go"],
+    importpath = "github.com/fredrir/infra/internal/kustomize",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@io_k8s_sigs_kustomize_api//krusty",
+        "@io_k8s_sigs_kustomize_kyaml//filesys",
+    ],
+)
+
+go_test(
+    name = "kustomize_test",
+    srcs = ["build_test.go"],
+    embed = [":kustomize"],
+)

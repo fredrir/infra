@@ -79,7 +79,7 @@ ENV UV_PYTHON_DOWNLOADS=never
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 ENV UV_LINK_MODE=copy
 COPY pyproject.toml uv.lock /tmp/pins/
-RUN cd /tmp/pins && uv sync --frozen --group ci --no-install-project \
+RUN cd /tmp/pins && uv sync --frozen --group ci --no-install-project --compile-bytecode \
     && chmod -R a+rX /opt/venv \
     && rm -rf /tmp/pins /root/.cache
 ENV RUNNER_ALLOW_RUNASROOT=1

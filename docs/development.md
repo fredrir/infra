@@ -56,7 +56,7 @@ git diff --exit-code -- '*BUILD.bazel'
 | `infra dev bench run [--baseline FILE] [SCENARIO...]` | hyperfine samples of `dev/bench/scenarios.yaml` with the freshly built binary; median, p95, CPU, peak memory and budget per scenario in `.cache/dev/bench/<timestamp>/summary.json` and `latest.json`; non-zero exit on failures, budget breaches or regressions beyond `--threshold` |
 | `infra dev bench compare BASE CANDIDATE` | Median deltas between two summaries |
 | `infra dev bench go [PACKAGE...]` | `go test -bench` with repetitions; benchstat against `.cache/dev/bench/go-baseline.txt` when present |
-| `infra dev qualify SUITE [-- go test flags]` | Gated suites `onboarding`, `image`, `reconcile-plan`, `packages`, `kata`; builds `.cache/dev/bin/infra` and starts the engine when the suite needs them |
+| `infra dev qualify SUITE [-- go test flags]` | Gated suites `onboarding`, `image`, `reconcile-plan`, `kustomize`, `packages`, `kata`; builds `.cache/dev/bin/infra` and starts the engine when the suite needs them |
 
 | Setting | Value |
 | --- | --- |

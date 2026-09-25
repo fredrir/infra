@@ -1,96 +1,138 @@
 package ci
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
-	"github.com/fredrir/infra/internal/fluxartifacts"
 	"github.com/fredrir/infra/internal/process"
 )
 
-func TestValidateBuildsAggregateAndChildKustomizations(t *testing.T) {
-	for _, changed := range []string{"platform/projects/kustomization.yaml", "platform/projects/example/deployment.yaml"} {
-		t.Run(changed, func(t *testing.T) {
-			root := t.TempDir()
-			for _, path := range []string{
-				"platform/clusters/production/kustomization.yaml",
-				"platform/components/common/kustomization.yaml",
-				"platform/components/policy.yaml",
-				"platform/projects/kustomization.yaml",
-				"platform/projects/example/kustomization.yaml",
-				"platform/projects/llunde-pyparser/migration/kustomization.yaml",
-				"platform/projects/llunde-pyparser/application/kustomization.yaml",
-				"build/rollout/flux-artifacts/cutover/kustomization.yaml",
-				"platform/projects/settings.yaml",
-			} {
-				filename := filepath.Join(root, path)
-				if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(filename, []byte("resources: []\n"), 0644); err != nil {
-					t.Fatal(err)
-				}
+func writeDeclarations(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for path, content := range files {
+		filename := filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func changedFiles(t *testing.T, changed string) func(context.Context, process.Options) (process.Result, error) {
+	return func(_ context.Context, options process.Options) (process.Result, error) {
+		if options.Name != "git" || !reflect.DeepEqual(options.Args, []string{"ls-files"}) {
+			t.Errorf("unexpected validation command: %s %v", options.Name, options.Args)
+		}
+		return process.Result{Stdout: []byte(changed + "\n")}, nil
+	}
+}
+
+func TestKustomizationsCoverAggregatesAndChildren(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{"platform/components/policy.yaml": "", "platform/projects/settings.yaml": ""}
+	for _, directory := range []string{
+		"platform/clusters/production",
+		"platform/components/common",
+		"platform/projects",
+		"platform/projects/example",
+		"platform/projects/llunde-pyparser/migration",
+		"platform/projects/llunde-pyparser/application",
+		"build/rollout/flux-artifacts/cutover",
+	} {
+		files[directory+"/kustomization.yaml"] = "resources: []\n"
+	}
+	writeDeclarations(t, root, files)
+	for _, directory := range []string{"platform/components/policy", "platform/projects/llunde", "platform/projects/y"} {
+		if err := os.MkdirAll(filepath.Join(root, directory), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	directories, err := kustomizations(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"platform/clusters/production", "platform/projects", "build/rollout/flux-artifacts/cutover", "platform/components/common", "platform/projects/example", "platform/projects/llunde-pyparser/application", "platform/projects/llunde-pyparser/migration"}
+	if !reflect.DeepEqual(directories, want) {
+		t.Fatalf("kustomizations %v, want %v", directories, want)
+	}
+}
+
+func TestValidateRendersEveryChangedKustomizationInProcess(t *testing.T) {
+	root := t.TempDir()
+	configMap := "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: settings\n"
+	writeDeclarations(t, root, map[string]string{
+		"platform/components/kustomization.yaml":         "resources:\n- common\n",
+		"platform/components/common/kustomization.yaml":  "resources:\n- settings.yaml\n",
+		"platform/components/common/settings.yaml":       configMap,
+		"platform/components/runners/kustomization.yaml": "resources:\n- settings.yaml\n",
+		"platform/components/runners/settings.yaml":      configMap,
+	})
+	runner := Runner{Dir: root, Execute: changedFiles(t, "platform/components/common/settings.yaml")}
+	if err := Validate(context.Background(), runner, ""); err != nil {
+		t.Fatal(err)
+	}
+	writeDeclarations(t, root, map[string]string{
+		"platform/components/common/kustomization.yaml":  "resources:\n- missing.yaml\n",
+		"platform/components/runners/kustomization.yaml": "resources:\n- ../../outside.yaml\n",
+	})
+	err := Validate(context.Background(), runner, "")
+	if err == nil {
+		t.Fatal("broken kustomizations accepted")
+	}
+	failed := func(directory string) int {
+		return strings.Index(err.Error(), "kustomize "+filepath.Join(root, directory)+":")
+	}
+	aggregate, common, runners := failed("platform/components"), failed("platform/components/common"), failed("platform/components/runners")
+	if aggregate < 0 || common <= aggregate || runners <= common {
+		t.Fatalf("rendering failures missing or out of directory order: %v", err)
+	}
+}
+
+func TestDeclarationChecksReportOutputAndErrorsInDeclarationOrder(t *testing.T) {
+	var output bytes.Buffer
+	runner := Runner{Stdout: &output, Stderr: &output}
+	laterFinished := make(chan struct{})
+	first, second := errors.New("first failure"), errors.New("second failure")
+	checks := []declarationCheck{
+		func(_ context.Context, runner Runner) error {
+			select {
+			case <-laterFinished:
+			case <-time.After(5 * time.Second):
 			}
-			for _, directory := range []string{"platform/components/policy", "platform/components/backup-job", "platform/components/repository-maintenance", "platform/projects/llunde", "platform/projects/portfolio", "platform/projects/y"} {
-				if err := os.MkdirAll(filepath.Join(root, directory), 0755); err != nil {
-					t.Fatal(err)
-				}
-			}
-			for name, value := range map[string]string{"settings.yaml": "settings: fixture\n", "root.yaml": "metadata:\n  name: platform-projects\nspec: {}\n"} {
-				if err := os.WriteFile(filepath.Join(root, "platform/clusters/production", name), []byte(value), 0644); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err := fluxartifacts.Run(root, false); err != nil {
-				t.Fatal(err)
-			}
-			var rendered []string
-			broken := errors.New("invalid project resource")
-			var failure error
-			runner := Runner{Dir: root, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
-				switch options.Name {
-				case "git":
-					if !reflect.DeepEqual(options.Args, []string{"ls-files"}) {
-						t.Fatalf("unexpected git command: %v", options.Args)
-					}
-					return process.Result{Stdout: []byte(changed + "\n")}, nil
-				case "kubectl":
-					if len(options.Args) != 2 || options.Args[0] != "kustomize" {
-						t.Fatalf("unexpected kubectl command: %v", options.Args)
-					}
-					if filepath.IsAbs(options.Args[1]) {
-						return process.Result{}, nil
-					}
-					rendered = append(rendered, options.Args[1])
-					if options.Args[1] == "platform/projects/example" {
-						return process.Result{}, failure
-					}
-					return process.Result{}, nil
-				default:
-					t.Fatalf("unexpected validation command: %s", options.Name)
-					return process.Result{}, nil
-				}
-			}}
-			if err := Validate(context.Background(), runner, ""); err != nil {
-				t.Fatal(err)
-			}
-			want := []string{"platform/clusters/production", "platform/projects", "build/rollout/flux-artifacts/cutover", "platform/components/common", "platform/projects/example", "platform/projects/llunde-pyparser/application", "platform/projects/llunde-pyparser/migration"}
-			if !reflect.DeepEqual(rendered, want) {
-				t.Fatalf("rendered %v, want %v", rendered, want)
-			}
-			failure = broken
-			if err := Validate(context.Background(), runner, ""); !errors.Is(err, broken) {
-				t.Fatalf("project rendering error was lost: %v", err)
-			}
-		})
+			runner.Stdout.Write([]byte("first stdout\n"))
+			runner.Stderr.Write([]byte("first stderr\n"))
+			runner.Stdout.Write([]byte("first stdout again\n"))
+			return first
+		},
+		func(_ context.Context, runner Runner) error {
+			defer close(laterFinished)
+			runner.Stderr.Write([]byte("second stderr\n"))
+			return second
+		},
+		func(context.Context, Runner) error { return nil },
+	}
+	err := runChecks(context.Background(), runner, checks)
+	if !errors.Is(err, first) || !errors.Is(err, second) || err.Error() != "first failure\nsecond failure" {
+		t.Fatalf("errors not reported in declaration order: %v", err)
+	}
+	if output.String() != "first stdout\nfirst stderr\nfirst stdout again\nsecond stderr\n" {
+		t.Fatalf("output not reported in declaration order:\n%s", output.String())
 	}
 }
 
 func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
+	var lock sync.Mutex
 	var calls [][]string
 	changed := "tofu/main.tf\n"
 	failure := errors.New("invalid tofu declaration")
@@ -100,13 +142,15 @@ func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
 		case "git":
 			return process.Result{Stdout: []byte(changed)}, nil
 		case "tofu":
+			lock.Lock()
+			defer lock.Unlock()
 			calls = append(calls, options.Args)
 			if options.Args[1] == "validate" {
 				return process.Result{}, validationFailure
 			}
 			return process.Result{}, nil
 		default:
-			t.Fatalf("unexpected validator: %s", options.Name)
+			t.Errorf("unexpected validator: %s", options.Name)
 			return process.Result{}, nil
 		}
 	}}
@@ -120,6 +164,7 @@ func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
 	if err := Validate(context.Background(), runner, ""); err != nil {
 		t.Fatal(err)
 	}
+	slices.SortFunc(calls, func(a, b []string) int { return strings.Compare(strings.Join(a, " "), strings.Join(b, " ")) })
 	want := [][]string{{"-chdir=tofu", "fmt", "-check", "-recursive"}, {"-chdir=tofu", "validate"}}
 	if !reflect.DeepEqual(calls, want) {
 		t.Fatalf("validation commands: %v, want %v", calls, want)
@@ -147,12 +192,7 @@ func TestGeneratedOverlaysValidateOnEveryGeneratorInput(t *testing.T) {
 		"internal/ci/validate.go",
 	} {
 		t.Run(path, func(t *testing.T) {
-			runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
-				if options.Name != "git" {
-					t.Fatalf("unexpected command: %s", options.Name)
-				}
-				return process.Result{Stdout: []byte(path + "\n")}, nil
-			}}
+			runner := Runner{Dir: t.TempDir(), Execute: changedFiles(t, path)}
 			if err := Validate(context.Background(), runner, ""); err == nil {
 				t.Fatal("missing generator inputs accepted")
 			}
