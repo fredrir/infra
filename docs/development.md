@@ -157,7 +157,7 @@ git diff -- platform
 | Persistent caches               | `infra-dagger-cache` Docker volume; engine-local Bazel action cache                                                                         |
 | Runner environment              | `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger`                                                                          |
 | Runner enforcement              | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected                                            |
-| Cache collection                | Dagger ordinary layers first; named caches preferred for 48 h; 20 GiB target / 4 GiB emergency free space                                   |
+| Cache collection                | Dagger ordinary layers first; named caches preferred for 48 h; 25 GiB target / 32 GiB ceiling; 8 GiB / 4 GiB emergency free space           |
 | Verified tooling                | CLI release checksum and revision; pinned GitHub runner archive                                                                             |
 | Warm ARC capacity               | One deploy runner and one declaration-check runner                                                                                          |
 | Pool isolation                  | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines                                                           |

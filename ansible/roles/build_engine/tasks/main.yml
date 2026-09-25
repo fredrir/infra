@@ -131,7 +131,7 @@
 
 - name: Find retired Bazel cache images
   ansible.builtin.command:
-    argv: [docker, image, ls, --quiet, --filter, reference=buchgr/bazel-remote-cache]
+    argv: [docker, image, ls, --all, --quiet, --filter, reference=buchgr/bazel-remote-cache]
   register: build_engine_bazel_cache_images
   changed_when: false
   check_mode: false
@@ -150,6 +150,8 @@
   - /usr/local/bin/bazel
   - /etc/bazel.bazelrc
   - /var/cache/infra/bazel-repo
+  - /home/runner/.cache/bazel
+  - /home/runner/prewarm-reports
   register: build_engine_bazel_removed
 
 - name: Reload units without retired Bazel cache
