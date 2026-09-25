@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -82,7 +84,7 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 		return err
 	}
 	verified := false
-	var order deploymentOrder
+	var order DeploymentOrder
 	for _, workflowRevision := range revisions {
 		name, arguments, err := ProvenanceCommand(mapping.Visibility, mapping.Repository, workflowRevision, options.Revision, options.Image+"@"+options.Digest)
 		if err != nil {
@@ -106,79 +108,28 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 	if !verified {
 		return fmt.Errorf("image provenance did not match an approved workflow revision")
 	}
-	receipt := deploymentReceiptPath(project, options.Image)
-	if err := checkLocalDeploymentOrder(receipt, order); err != nil {
-		return err
-	}
-	relativeReceipt, err := filepath.Rel(root, receipt)
+	files, err := DeploymentFiles(os.DirFS(root), target, order)
 	if err != nil {
 		return err
 	}
-	relativeReceipt = filepath.ToSlash(relativeReceipt)
-	allowed := map[string]bool{relativeReceipt: true}
-	switch target.Mode {
-	case "kustomize":
-		var pins []string
-		err := filepath.WalkDir(project, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if entry.Type()&os.ModeSymlink != 0 {
-				return fmt.Errorf("deployment project contains symlink %s", path)
-			}
-			if entry.IsDir() || entry.Name() != "kustomization.yaml" {
-				return nil
-			}
-			var resource struct{ Images []struct{ Name string } }
-			if err := readYAML(path, &resource); err != nil {
-				return err
-			}
-			for _, image := range resource.Images {
-				if image.Name == options.Image {
-					pins = append(pins, path)
-					break
-				}
-			}
-			return nil
-		})
-		if err != nil {
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 			return err
 		}
-		if len(pins) == 0 {
-			return fmt.Errorf("project has no matching image pin")
+		if err := os.WriteFile(path, files[name], 0644); err != nil {
+			return err
 		}
-		slices.Sort(pins)
-		for _, path := range pins {
-			if err := updateImagePin(path, options.Image, options.Digest); err != nil {
-				return err
-			}
+		if filepath.Base(path) == "kustomization.yaml" {
 			if err := renderDeployment(filepath.Dir(path)); err != nil {
 				return err
 			}
-			relative, err := filepath.Rel(root, path)
-			if err != nil {
-				return err
-			}
-			allowed[filepath.ToSlash(relative)] = true
 		}
-	case "helmrelease":
-		if !workloadPattern.MatchString(target.Workload) {
-			return fmt.Errorf("invalid deployment workload")
-		}
-		path := filepath.Join(project, "release.yaml")
-		if err := UpdateWorkload(path, target.Workload, options.Image+"@"+options.Digest, options.Revision); err != nil {
-			return err
-		}
-		allowed[target.Path+"/release.yaml"] = true
-	default:
-		return fmt.Errorf("unsupported deployment mode %q", target.Mode)
 	}
 	if err := renderDeployment(project); err != nil {
 		return err
 	}
-	if err := writeDeploymentOrder(receipt, order); err != nil {
-		return err
-	}
+	relativeReceipt := deploymentReceiptPath(target.Path, options.Image)
 	if err := runner.Run(ctx, "git", "add", "--intent-to-add", "--", relativeReceipt); err != nil {
 		return err
 	}
@@ -194,7 +145,7 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 		return err
 	}
 	for _, path := range strings.Split(strings.TrimSpace(string(changed)), "\n") {
-		if !allowed[path] {
+		if _, allowed := files[path]; !allowed {
 			return fmt.Errorf("unexpected deployment change %q", path)
 		}
 	}
@@ -241,43 +192,101 @@ func ProvenanceCommand(visibility, repository, workflowRevision, revision, image
 	}
 }
 
-func UpdateWorkload(path, workload, image, revision string) error {
-	info, err := os.Lstat(path)
+func DeploymentFiles(root fs.FS, target DeploymentTarget, order DeploymentOrder) (map[string][]byte, error) {
+	if !projectPattern.MatchString(target.Path) {
+		return nil, fmt.Errorf("image has no valid deployment mapping")
+	}
+	receipt := deploymentReceiptPath(target.Path, order.Image)
+	if err := checkLocalDeploymentOrder(root, receipt, order); err != nil {
+		return nil, err
+	}
+	encoded, err := encodeDeploymentOrder(order)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if !info.Mode().IsRegular() {
-		return fmt.Errorf("HelmRelease must be a regular file")
+	files := map[string][]byte{receipt: encoded}
+	switch target.Mode {
+	case "kustomize":
+		err := fs.WalkDir(root, target.Path, func(name string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.Type()&fs.ModeSymlink != 0 {
+				return fmt.Errorf("deployment project contains symlink %s", name)
+			}
+			if entry.IsDir() || entry.Name() != "kustomization.yaml" {
+				return nil
+			}
+			data, err := fs.ReadFile(root, name)
+			if err != nil {
+				return err
+			}
+			pinned, err := pinImage(data, order.Image, order.Digest)
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+			if pinned != nil {
+				files[name] = pinned
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(files) == 1 {
+			return nil, fmt.Errorf("project has no matching image pin")
+		}
+	case "helmrelease":
+		if !workloadPattern.MatchString(target.Workload) {
+			return nil, fmt.Errorf("invalid deployment workload")
+		}
+		name := path.Join(target.Path, "release.yaml")
+		info, err := fs.Lstat(root, name)
+		if err != nil {
+			return nil, err
+		}
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("HelmRelease must be a regular file")
+		}
+		data, err := fs.ReadFile(root, name)
+		if err != nil {
+			return nil, err
+		}
+		if files[name], err = pinWorkload(data, target.Workload, order.Image+"@"+order.Digest, order.Revision); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported deployment mode %q", target.Mode)
 	}
+	return files, nil
+}
+
+func pinWorkload(data []byte, workload, image, revision string) ([]byte, error) {
 	var document yaml.Node
-	if err := readYAML(path, &document); err != nil {
-		return err
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		return nil, fmt.Errorf("decode HelmRelease: %w", err)
 	}
 	if len(document.Content) != 1 {
-		return fmt.Errorf("expected one HelmRelease")
+		return nil, fmt.Errorf("expected one HelmRelease")
 	}
 	resource := document.Content[0]
 	kind := yamlValue(resource, "kind")
 	if kind == nil || kind.Value != "HelmRelease" {
-		return fmt.Errorf("expected HelmRelease")
+		return nil, fmt.Errorf("expected HelmRelease")
 	}
 	target := resource
 	for _, name := range []string{"spec", "values", "workloads", workload} {
 		target = yamlValue(target, name)
 		if target == nil {
-			return fmt.Errorf("HelmRelease has no workload %q", workload)
+			return nil, fmt.Errorf("HelmRelease has no workload %q", workload)
 		}
 	}
 	if target.Kind != yaml.MappingNode {
-		return fmt.Errorf("invalid workload mapping")
+		return nil, fmt.Errorf("invalid workload mapping")
 	}
 	setYAMLValue(target, "image", image)
 	setYAMLValue(target, "sourceRevision", revision)
-	data, err := yaml.Marshal(&document)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, info.Mode().Perm())
+	return yaml.Marshal(&document)
 }
 
 func yamlValue(node *yaml.Node, key string) *yaml.Node {
@@ -325,17 +334,20 @@ func renderDeployment(directory string) error {
 	_, err := kustomize.Build(directory)
 	return err
 }
-func updateImagePin(path, image, digest string) error {
+func pinImage(data []byte, image, digest string) ([]byte, error) {
 	var document yaml.Node
-	if err := readYAML(path, &document); err != nil {
-		return err
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		return nil, err
 	}
 	if len(document.Content) != 1 {
-		return fmt.Errorf("expected one Kustomization")
+		return nil, nil
 	}
 	images := yamlValue(document.Content[0], "images")
-	if images == nil || images.Kind != yaml.SequenceNode {
-		return fmt.Errorf("image pins missing")
+	if images == nil {
+		return nil, nil
+	}
+	if images.Kind != yaml.SequenceNode {
+		return nil, fmt.Errorf("image pins are not a list")
 	}
 	found := false
 	for _, entry := range images.Content {
@@ -354,18 +366,7 @@ func updateImagePin(path, image, digest string) error {
 		}
 	}
 	if !found {
-		return fmt.Errorf("image pin missing")
+		return nil, nil
 	}
-	data, err := yaml.Marshal(&document)
-	if err != nil {
-		return err
-	}
-	info, err := os.Lstat(path)
-	if err != nil {
-		return err
-	}
-	if !info.Mode().IsRegular() {
-		return fmt.Errorf("Kustomization must be regular")
-	}
-	return os.WriteFile(path, data, info.Mode().Perm())
+	return yaml.Marshal(&document)
 }

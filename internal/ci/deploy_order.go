@@ -3,14 +3,15 @@ package ci
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
+	"path"
 	"strconv"
 	"strings"
 )
 
-type deploymentOrder struct {
+type DeploymentOrder struct {
 	Schema   int    `json:"schema"`
 	Image    string `json:"image"`
 	Revision string `json:"revision"`
@@ -19,7 +20,7 @@ type deploymentOrder struct {
 	Attempt  uint64 `json:"attempt"`
 }
 
-func verifiedDeploymentOrder(data []byte, visibility, repository string, options DeployOptions) (deploymentOrder, error) {
+func verifiedDeploymentOrder(data []byte, visibility, repository string, options DeployOptions) (DeploymentOrder, error) {
 	var results []struct {
 		VerificationResult struct {
 			Signature struct {
@@ -31,9 +32,9 @@ func verifiedDeploymentOrder(data []byte, visibility, repository string, options
 		Optional map[string]any `json:"optional"`
 	}
 	if err := json.Unmarshal(data, &results); err != nil {
-		return deploymentOrder{}, fmt.Errorf("decode verified deployment provenance: %w", err)
+		return DeploymentOrder{}, fmt.Errorf("decode verified deployment provenance: %w", err)
 	}
-	order := deploymentOrder{Schema: 1, Image: options.Image, Revision: options.Revision, Digest: options.Digest}
+	order := DeploymentOrder{Schema: 1, Image: options.Image, Revision: options.Revision, Digest: options.Digest}
 	for _, result := range results {
 		var run, attempt string
 		switch visibility {
@@ -52,7 +53,7 @@ func verifiedDeploymentOrder(data []byte, visibility, repository string, options
 			run, _ = result.Optional["source-run-id"].(string)
 			attempt, _ = result.Optional["source-run-attempt"].(string)
 		default:
-			return deploymentOrder{}, fmt.Errorf("unsupported deployment visibility")
+			return DeploymentOrder{}, fmt.Errorf("unsupported deployment visibility")
 		}
 		id, e1 := strconv.ParseUint(run, 10, 64)
 		number, e2 := strconv.ParseUint(attempt, 10, 64)
@@ -64,23 +65,23 @@ func verifiedDeploymentOrder(data []byte, visibility, repository string, options
 		}
 	}
 	if order.RunID == 0 {
-		return deploymentOrder{}, fmt.Errorf("verified provenance has no deployment run identity")
+		return DeploymentOrder{}, fmt.Errorf("verified provenance has no deployment run identity")
 	}
 	return order, nil
 }
 
-func decodeDeploymentOrder(data []byte, image string) (deploymentOrder, error) {
-	var order deploymentOrder
+func DecodeDeploymentOrder(data []byte) (DeploymentOrder, error) {
+	var order DeploymentOrder
 	if err := json.Unmarshal(data, &order); err != nil {
 		return order, err
 	}
-	if order.Schema != 1 || order.Image != image || !revisionPattern.MatchString(order.Revision) || !imageReferencePattern.MatchString(order.Image+"@"+order.Digest) || order.RunID == 0 || order.Attempt == 0 {
+	if order.Schema != 1 || !revisionPattern.MatchString(order.Revision) || !imageReferencePattern.MatchString(order.Image+"@"+order.Digest) || order.RunID == 0 || order.Attempt == 0 {
 		return order, fmt.Errorf("invalid accepted deployment identity")
 	}
 	return order, nil
 }
 
-func checkDeploymentOrder(candidate, accepted deploymentOrder) error {
+func checkDeploymentOrder(candidate, accepted DeploymentOrder) error {
 	if candidate.Image != accepted.Image {
 		return fmt.Errorf("deployment receipt image mismatch")
 	}
@@ -97,48 +98,42 @@ func checkDeploymentOrder(candidate, accepted deploymentOrder) error {
 }
 
 func deploymentReceiptPath(project, image string) string {
-	return filepath.Join(project, ".deployments", image[strings.LastIndex(image, "/")+1:]+".json")
+	return path.Join(project, ".deployments", image[strings.LastIndex(image, "/")+1:]+".json")
 }
 
-func checkLocalDeploymentOrder(path string, candidate deploymentOrder) error {
-	for _, name := range []string{filepath.Dir(path), path} {
-		info, err := os.Lstat(name)
-		if os.IsNotExist(err) {
+func checkLocalDeploymentOrder(root fs.FS, receipt string, candidate DeploymentOrder) error {
+	for _, name := range []string{path.Dir(receipt), receipt} {
+		info, err := fs.Lstat(root, name)
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
-		if info.Mode()&os.ModeSymlink != 0 {
+		if info.Mode()&fs.ModeSymlink != 0 {
 			return fmt.Errorf("deployment receipt must not traverse symlinks")
 		}
 	}
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
+	data, err := fs.ReadFile(root, receipt)
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	accepted, err := decodeDeploymentOrder(data, candidate.Image)
+	accepted, err := DecodeDeploymentOrder(data)
 	if err != nil {
 		return err
 	}
 	return checkDeploymentOrder(candidate, accepted)
 }
 
-func writeDeploymentOrder(path string, order deploymentOrder) error {
+func encodeDeploymentOrder(order DeploymentOrder) ([]byte, error) {
 	data, err := json.MarshalIndent(order, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err = os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, append(data, '\n'), 0644)
+	return append(data, '\n'), err
 }
 
-func checkFetchedDeploymentOrder(ctx context.Context, runner Runner, path string, candidate deploymentOrder) error {
+func checkFetchedDeploymentOrder(ctx context.Context, runner Runner, path string, candidate DeploymentOrder) error {
 	listed, err := runner.Output(ctx, "git", "ls-tree", "--name-only", "FETCH_HEAD", "--", path)
 	if err != nil {
 		return err
@@ -150,7 +145,7 @@ func checkFetchedDeploymentOrder(ctx context.Context, runner Runner, path string
 	if err != nil {
 		return err
 	}
-	accepted, err := decodeDeploymentOrder(data, candidate.Image)
+	accepted, err := DecodeDeploymentOrder(data)
 	if err != nil {
 		return err
 	}

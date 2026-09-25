@@ -114,6 +114,8 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 | Run deadline / apply job timeout | 90 minutes / 120 minutes |
 | Exit codes | 0 success; 75 retry (lease held, or `main` advanced beyond root Markdown, `docs/**/*.md` and `build/evidence/*.json`); 1 failure |
 | Retry in CI | Succeeds only while a newer push reconciliation of `main` is pending |
+| Provenance gate | Before planning, each commit after the applied revision is SSH-signed by a key in `keys/admin_keys` at the applied revision, reproduces the `infra ci deploy` rewrite of its parent byte for byte, or is named by a later owner-signed `Provenance-Acknowledged: SHA` trailer |
+| Provenance base | Applied revision; none or not an ancestor refuses; `infra reconcile apply --provenance-base SHA` overrides |
 | OpenTofu locking | S3 lockfile retained; acquisition timeout 5 minutes |
 | Failed verification | Old routes retained; applied revision unchanged |
 | Failed retirement | Applied revision unchanged; the next attempt reads actual OpenTofu state |
@@ -204,6 +206,7 @@ gh workflow run reconcile.yml --ref main
 | Newer merge supersedes a queued run | Reconcile current `main`; runs superseded by reconciled changes cannot publish; a retry without a newer pending push run fails |
 | On-demand or hourly verification supersedes a run queued in the `infrastructure-production` concurrency group | When the superseded run carried deploying changes, the superseding hourly verification, or the next hourly one after an on-demand verification, reports the unapplied revision and dispatches a full reconciliation; dispatch `verify=true` when no apply is queued |
 | Failed apply or verification | Rerun the workflow or run `infra reconcile apply --full` from a clean current `main` checkout |
+| Unverified commits | Revert unwanted changes; push an owner-signed commit with one `Provenance-Acknowledged: SHA` trailer per listed commit |
 | Process terminated without lock cleanup | Hourly verification reports the held lock until its recorded expiry, then the incomplete reconciliation as a difference |
 | Remaining OpenTofu drift | Inspect the final plan; nonzero drift keeps the run failed |
 | Image publication succeeds | Check the separate reconciliation workflow for production readiness |

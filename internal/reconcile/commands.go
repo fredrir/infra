@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -231,12 +232,8 @@ func (c *Commands) currentMain(ctx context.Context, revision string) error {
 	if head == revision {
 		return nil
 	}
-	unmerged, err := c.Runner.Output(ctx, "git", "rev-list", "--max-count=1", revision, "^"+head)
-	if err != nil {
-		return err
-	}
-	if len(unmerged) != 0 {
-		return ErrSuperseded
+	if contained, err := c.contains(ctx, head, revision); err != nil || !contained {
+		return cmp.Or(err, ErrSuperseded)
 	}
 	changed, err := c.Runner.Output(ctx, "git", "diff", "--name-only", "--no-renames", "-z", revision, head)
 	if err != nil {

@@ -1,8 +1,6 @@
 package ci
 
 import (
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -33,19 +31,13 @@ func TestProvenanceRequiresExactSourceAndWorkflow(t *testing.T) {
 	}
 }
 
-func TestUpdateWorkloadPreservesScaleAndOtherWorkloads(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "release.yaml")
-	input := "kind: HelmRelease\nspec:\n  values:\n    workloads:\n      web:\n        image: old\n        replicas: 0\n      worker:\n        image: worker\n        replicas: 2\n"
-	if err := os.WriteFile(path, []byte(input), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := UpdateWorkload(path, "missing", "image", "revision"); err == nil {
+func TestPinWorkloadPreservesScaleAndOtherWorkloads(t *testing.T) {
+	input := []byte("kind: HelmRelease\nspec:\n  values:\n    workloads:\n      web:\n        image: old\n        replicas: 0\n      worker:\n        image: worker\n        replicas: 2\n")
+	if _, err := pinWorkload(input, "missing", "image", "revision"); err == nil {
 		t.Fatal("accepted missing workload")
 	}
-	if data, _ := os.ReadFile(path); string(data) != input {
-		t.Fatal("failed update changed file")
-	}
-	if err := UpdateWorkload(path, "web", "image", "revision"); err != nil {
+	data, err := pinWorkload(input, "web", "image", "revision")
+	if err != nil {
 		t.Fatal(err)
 	}
 	var resource struct {
@@ -59,10 +51,6 @@ func TestUpdateWorkloadPreservesScaleAndOtherWorkloads(t *testing.T) {
 			}
 		}
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err := yaml.Unmarshal(data, &resource); err != nil {
 		t.Fatal(err)
 	}
@@ -71,11 +59,29 @@ func TestUpdateWorkloadPreservesScaleAndOtherWorkloads(t *testing.T) {
 	if web.Image != "image" || web.Revision != "revision" || web.Replicas != 0 || worker.Image != "worker" || worker.Replicas != 2 {
 		t.Fatalf("unexpected workload mutation: %+v", resource)
 	}
-	before := string(data)
-	if err := UpdateWorkload(path, "web", "image", "revision"); err != nil {
-		t.Fatal(err)
+	if repeated, err := pinWorkload(data, "web", "image", "revision"); err != nil || string(repeated) != string(data) {
+		t.Fatalf("repeated update changed output: %v", err)
 	}
-	if data, _ := os.ReadFile(path); string(data) != before {
-		t.Fatal("repeated update changed output")
+}
+
+func TestPinImageUpdatesOnlyTheNamedPin(t *testing.T) {
+	image, digest := "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64)
+	for _, test := range []struct {
+		name, input, want string
+	}{
+		{name: "pinned", input: "resources:\n- application.yaml\nimages:\n- name: ghcr.io/fredrir/other\n  digest: sha256:old\n- name: ghcr.io/fredrir/example\n  newTag: latest\n", want: "resources:\n    - application.yaml\nimages:\n    - name: ghcr.io/fredrir/other\n      digest: sha256:old\n    - name: ghcr.io/fredrir/example\n      newName: ghcr.io/fredrir/example\n      digest: " + digest + "\n"},
+		{name: "other image", input: "images:\n- name: ghcr.io/fredrir/other\n"},
+		{name: "no images", input: "resources:\n- application.yaml\n"},
+		{name: "empty", input: ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			pinned, err := pinImage([]byte(test.input), image, digest)
+			if err != nil || string(pinned) != test.want {
+				t.Fatalf("pinned %q, %v; want %q", pinned, err, test.want)
+			}
+		})
+	}
+	if _, err := pinImage([]byte("images: ghcr.io/fredrir/example\n"), image, digest); err == nil {
+		t.Fatal("accepted image pins that are not a list")
 	}
 }

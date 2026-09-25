@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ type Plan struct {
 type Operations interface {
 	Revision(context.Context) (string, error)
 	Select(context.Context, string, bool) (Selection, error)
+	Provenance(context.Context, string, string) error
 	Preflight(context.Context, Plan) (Plan, error)
 	Plan(context.Context, Plan) error
 	Expand(context.Context, Plan) error
@@ -38,12 +40,13 @@ const (
 )
 
 type Reconciler struct {
-	Store    Store
-	Ops      Operations
-	Host     string
-	Report   func(Status) error
-	LockWait time.Duration
-	Log      io.Writer
+	Store          Store
+	Ops            Operations
+	Host           string
+	Report         func(Status) error
+	LockWait       time.Duration
+	Log            io.Writer
+	ProvenanceBase string
 }
 
 func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
@@ -133,6 +136,9 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		}
 		status.Stage = "evaluated"
 		return save(ctx)
+	}
+	if err = stage("provenance", func() error { return r.Ops.Provenance(ctx, cmp.Or(r.ProvenanceBase, status.Applied), revision) }); err != nil {
+		return err
 	}
 	if err = stage("plan", func() error {
 		var err error

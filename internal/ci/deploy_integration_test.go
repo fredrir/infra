@@ -103,6 +103,20 @@ func (f *deployFixture) write(path, text string) {
 		f.t.Fatal(err)
 	}
 }
+func (f *deployFixture) receipt(root string, order DeploymentOrder) {
+	f.t.Helper()
+	data, err := encodeDeploymentOrder(order)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	path := filepath.Join(root, deploymentReceiptPath("platform/projects/example", order.Image))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		f.t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		f.t.Fatal(err)
+	}
+}
 func (f *deployFixture) commit(message string) {
 	f.git("add", "-A")
 	f.git("commit", "--quiet", "-m", message)

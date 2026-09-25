@@ -18,7 +18,7 @@ func (c *Commands) PublishedRevision(ctx context.Context) (string, error) {
 		return "", err
 	}
 	revision := strings.TrimPrefix(source.Status.Artifact.Revision, "production@sha1:")
-	if revision == source.Status.Artifact.Revision || !checkpointRevision.MatchString(revision) {
+	if revision == source.Status.Artifact.Revision || !revisionPattern.MatchString(revision) {
 		return "", fmt.Errorf("Flux production source has an invalid revision")
 	}
 	return revision, nil

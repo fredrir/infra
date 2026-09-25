@@ -18,7 +18,7 @@ import (
 )
 
 func newReconcileCommand() *cobra.Command {
-	var root, bucket, prefix, base, report string
+	var root, bucket, prefix, base, report, provenanceBase string
 	var full, deep bool
 	var wait time.Duration
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
@@ -35,6 +35,7 @@ func newReconcileCommand() *cobra.Command {
 		}
 		if action == "apply" {
 			child.Flags().DurationVar(&wait, "wait", 0, "Wait up to this long for another reconciliation to release its lease")
+			child.Flags().StringVar(&provenanceBase, "provenance-base", "", "Verify commit provenance from this revision instead of the applied one")
 		}
 		if action == "verify" {
 			child.Flags().BoolVar(&deep, "deep", false, "Also compare OpenTofu and every host play with production in check mode")
@@ -89,7 +90,7 @@ func newReconcileCommand() *cobra.Command {
 			defer os.RemoveAll(work)
 			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply"}
 			if action == "apply" {
-				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, LockWait: wait, Log: cmd.ErrOrStderr(), Report: func(status reconcile.Status) error {
+				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, LockWait: wait, Log: cmd.ErrOrStderr(), ProvenanceBase: provenanceBase, Report: func(status reconcile.Status) error {
 					fmt.Fprintf(cmd.OutOrStdout(), "%s desired=%s applied=%s\n", status.Stage, status.Desired, status.Applied)
 					if report == "" {
 						return nil

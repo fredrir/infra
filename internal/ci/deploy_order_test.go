@@ -37,7 +37,7 @@ func TestVerifiedDeploymentOrder(t *testing.T) {
 }
 
 func TestDeploymentOrderRejectsRollbackAndConflictingIdentity(t *testing.T) {
-	accepted := deploymentOrder{Schema: 1, Image: "ghcr.io/fredrir/example", Revision: strings.Repeat("a", 40), Digest: "sha256:" + strings.Repeat("b", 64), RunID: 20, Attempt: 2}
+	accepted := DeploymentOrder{Schema: 1, Image: "ghcr.io/fredrir/example", Revision: strings.Repeat("a", 40), Digest: "sha256:" + strings.Repeat("b", 64), RunID: 20, Attempt: 2}
 	for _, scenario := range []string{"older-run", "older-attempt", "different-revision", "different-digest"} {
 		t.Run(scenario, func(t *testing.T) {
 			candidate := accepted
@@ -71,10 +71,7 @@ func TestDeploymentOrderRejectsRollbackAndConflictingIdentity(t *testing.T) {
 
 func TestDeployRejectsOlderQueuedRunWithoutMutation(t *testing.T) {
 	f := newDeployFixture(t, "kustomize", "private", false)
-	order := deploymentOrder{Schema: 1, Image: f.options.Image, Revision: f.options.Revision, Digest: f.options.Digest, RunID: 101, Attempt: 1}
-	if err := writeDeploymentOrder(deploymentReceiptPath(f.project, f.options.Image), order); err != nil {
-		t.Fatal(err)
-	}
+	f.receipt(f.root, DeploymentOrder{Schema: 1, Image: f.options.Image, Revision: f.options.Revision, Digest: f.options.Digest, RunID: 101, Attempt: 1})
 	f.commit("Accept newer run")
 	f.git("push", "--quiet", "origin", "HEAD:main")
 	before := f.deployed()
@@ -90,11 +87,7 @@ func TestDeployRejectsNewerRunDuringPushRace(t *testing.T) {
 	f := newDeployFixture(t, "kustomize", "public", false)
 	other := filepath.Join(t.TempDir(), "other")
 	f.git("clone", "--quiet", "--branch", "main", f.remote, other)
-	order := deploymentOrder{Schema: 1, Image: f.options.Image, Revision: f.options.Revision, Digest: f.options.Digest, RunID: 101, Attempt: 1}
-	path := deploymentReceiptPath(filepath.Join(other, "platform/projects/example"), f.options.Image)
-	if err := writeDeploymentOrder(path, order); err != nil {
-		t.Fatal(err)
-	}
+	f.receipt(other, DeploymentOrder{Schema: 1, Image: f.options.Image, Revision: f.options.Revision, Digest: f.options.Digest, RunID: 101, Attempt: 1})
 	for _, args := range [][]string{{"add", "."}, {"-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--quiet", "-m", "Accept newer deployment"}, {"push", "--quiet", "origin", "HEAD:main"}} {
 		f.git(append([]string{"-C", other}, args...)...)
 	}
@@ -108,12 +101,14 @@ func TestDeployRejectsNewerRunDuringPushRace(t *testing.T) {
 }
 
 func TestDeploymentReceiptRejectsSymlink(t *testing.T) {
-	project := t.TempDir()
-	outside := t.TempDir()
-	if err := os.Symlink(outside, filepath.Join(project, ".deployments")); err != nil {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "platform/projects/example"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := checkLocalDeploymentOrder(deploymentReceiptPath(project, "ghcr.io/fredrir/example"), deploymentOrder{}); err == nil {
+	if err := os.Symlink(t.TempDir(), filepath.Join(root, "platform/projects/example/.deployments")); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkLocalDeploymentOrder(os.DirFS(root), deploymentReceiptPath("platform/projects/example", "ghcr.io/fredrir/example"), DeploymentOrder{}); err == nil {
 		t.Fatal("symlink accepted")
 	}
 }
@@ -121,7 +116,7 @@ func TestDeploymentReceiptRejectsSymlink(t *testing.T) {
 func TestFetchedOrderAllowsUnrelatedRemoteChanges(t *testing.T) {
 	f := newDeployFixture(t, "kustomize", "public", false)
 	f.git("fetch", "--quiet", "origin", "main")
-	if err := checkFetchedDeploymentOrder(context.Background(), f.runner, "platform/projects/example/.deployments/example.json", deploymentOrder{}); err != nil {
+	if err := checkFetchedDeploymentOrder(context.Background(), f.runner, "platform/projects/example/.deployments/example.json", DeploymentOrder{}); err != nil {
 		t.Fatal(err)
 	}
 }
