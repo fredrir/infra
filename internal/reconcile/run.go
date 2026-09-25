@@ -8,11 +8,10 @@ import (
 )
 
 type Plan struct {
-	Revision         string    `json:"revision"`
-	Base             string    `json:"base_revision"`
-	Affected         Selection `json:"affected"`
-	Host             string    `json:"grafana_host"`
-	RunnersUnchanged bool      `json:"runners_unchanged,omitempty"`
+	Revision string    `json:"revision"`
+	Base     string    `json:"base_revision"`
+	Affected Selection `json:"affected"`
+	Host     string    `json:"grafana_host"`
 }
 
 type Operations interface {
@@ -31,6 +30,8 @@ type Operations interface {
 	Retire(context.Context, Plan) error
 }
 
+const applyDeadline = 90 * time.Minute
+
 type Reconciler struct {
 	Store           Store
 	Ops             Operations
@@ -38,11 +39,10 @@ type Reconciler struct {
 	Report          func(Status) error
 	SkipUnchanged   bool
 	VerifyArtifacts bool
-	Scheduled       bool
 }
 
 func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, applyDeadline)
 	defer cancel()
 	unlock, err := r.Store.Lock(ctx)
 	if err != nil {
@@ -58,7 +58,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		return err
 	}
 	reuseHosts := false
-	recovery := status.Desired != status.Applied || status.Failure != "" || (status.Stage != "" && status.Stage != "complete" && status.Stage != "evaluated")
+	recovery := status.NeedsRecovery()
 	previousDesired := status.Desired
 	if !full && reusableHosts(status, time.Now()) {
 		changed, err := r.Ops.Select(ctx, status.Desired, false)
@@ -71,15 +71,6 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	if err != nil {
 		return err
 	}
-	runnersUnchanged := false
-	if r.Scheduled && !recovery && status.Applied != "" {
-		changed, err := r.Ops.Select(ctx, status.Applied, false)
-		if err != nil {
-			return err
-		}
-		scope := effectiveHostScope(changed)
-		runnersUnchanged = scope == HostScopeNone || scope == HostScopeMonitor
-	}
 	if full || status.Applied == "" || recovery || (selected.Tooling && !r.SkipUnchanged) {
 		selected = All()
 	}
@@ -87,7 +78,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		selected.Projects = nil
 		selected.Reasons = append(selected.Reasons, "full artifact verification baseline required")
 	}
-	plan := Plan{Revision: revision, Base: status.Applied, Affected: selected, Host: r.Host, RunnersUnchanged: runnersUnchanged}
+	plan := Plan{Revision: revision, Base: status.Applied, Affected: selected, Host: r.Host}
 	skip := r.SkipUnchanged && !full && !recovery && status.Applied != "" && !selected.Tofu && !selected.Ansible && !selected.Kubernetes
 	status.Evaluated, status.Selection = revision, selected
 	status.Failure, status.HostsReusedFrom, status.HostScope = "", "", ""

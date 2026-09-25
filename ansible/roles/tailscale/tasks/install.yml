@@ -18,11 +18,21 @@
     mode: "0644"
   notify: Restart bootstrap Tailscale
 
+- name: Find unloaded tunnel support
+  ansible.builtin.shell: |
+    set -eu
+    if [ ! -e /sys/class/misc/tun ]; then
+      modprobe --dry-run tun
+      echo tun
+    fi
+  register: platform_tailscale_tun
+  changed_when: platform_tailscale_tun.stdout != ''
+  check_mode: false
+
 - name: Load tunnel support
   ansible.builtin.command:
     argv: [modprobe, tun]
-  changed_when: false
-  when: not ansible_check_mode
+  when: platform_tailscale_tun.changed
 
 - name: Inspect tunnel device
   ansible.builtin.stat:
@@ -31,12 +41,10 @@
     get_mime: false
     get_attributes: false
   register: platform_bootstrap_tun
-  when: not ansible_check_mode
 
 - name: Require kernel tunnel support
   ansible.builtin.assert:
     that: platform_bootstrap_tun.stat.ischr | default(false)
-  when: not ansible_check_mode
 
 - name: Apply transport service changes
   ansible.builtin.meta: flush_handlers
@@ -48,4 +56,3 @@
     state: started
     daemon_reload: true
   register: platform_tailscale_start
-  when: not ansible_check_mode

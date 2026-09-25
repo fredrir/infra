@@ -127,3 +127,4 @@
     host: 127.0.0.1
     port: '{{ build_vm_ssh_port }}'
     timeout: 60
+  check_mode: false

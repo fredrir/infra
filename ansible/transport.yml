@@ -1,6 +1,6 @@
 - name: Reconcile enrolled cluster transport
   hosts: k3s_cluster
-  serial: 1
+  serial: "{{ '100%' if ansible_check_mode else 1 }}"
   become: true
   gather_facts: true
   vars:
@@ -24,4 +24,4 @@
   - name: Refresh changed transport facts
     ansible.builtin.setup:
       gather_subset: ['!all', '!min', network]
-    when: not ansible_check_mode and (platform_tailscale_start.changed or (platform_tailscale_restart.changed | default(false)))
+    when: platform_tailscale_start.changed or (platform_tailscale_restart.changed | default(false))

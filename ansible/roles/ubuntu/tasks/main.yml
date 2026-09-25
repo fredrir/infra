@@ -35,10 +35,12 @@
 - name: Validate the complete SSH configuration
   ansible.builtin.command: /usr/sbin/sshd -t
   changed_when: false
+  check_mode: false
 
 - name: Inspect effective SSH authentication
   ansible.builtin.command: /usr/sbin/sshd -T
   changed_when: false
+  check_mode: false
   register: ubuntu_ssh_configuration
 
 - name: Require public key authentication

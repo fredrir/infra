@@ -1,6 +1,6 @@
 - name: Configure isolated build runtimes
   hosts: agent
-  serial: 1
+  serial: "{{ '100%' if ansible_check_mode else 1 }}"
   become: true
   gather_facts: true
   roles:

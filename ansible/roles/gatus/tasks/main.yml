@@ -13,11 +13,21 @@
     mode: "0700"
   loop: [/etc/gatus, /var/cache/gatus]
 
+- name: Inspect the cached upstream binary layer
+  ansible.builtin.stat:
+    path: /var/cache/gatus/binary.tar.gz
+    checksum_algorithm: sha256
+  register: gatus_layer
+
 - name: Read the public upstream artifact token
   ansible.builtin.uri:
     url: https://auth.docker.io/token?service=registry.docker.io&scope=repository:twinproduction/gatus:pull
     return_content: true
   register: gatus_registry
+  check_mode: false
+  retries: 1
+  delay: 5
+  when: gatus_layer.stat.checksum | default('') != gatus_archive_sha256
   no_log: true
 
 - name: Download the pinned upstream binary layer
@@ -26,7 +36,7 @@
     dest: /var/cache/gatus/binary.tar.gz
     checksum: "sha256:{{ gatus_archive_sha256 }}"
     headers:
-      Authorization: "Bearer {{ gatus_registry.json.token }}"
+      Authorization: "Bearer {{ gatus_registry.json.token | default('') }}"
     unredirected_headers: [Authorization]
     owner: root
     group: root
@@ -34,22 +44,33 @@
     timeout: 60
   no_log: true
 
+- name: Compare the extracted binary with the pinned executable
+  ansible.builtin.stat:
+    path: /var/cache/gatus/gatus
+    checksum_algorithm: sha256
+  register: gatus_extracted
+  changed_when: gatus_extracted.stat.checksum | default('') != gatus_binary_sha256
+
 - name: Extract the upstream binary
   ansible.builtin.unarchive:
     src: /var/cache/gatus/binary.tar.gz
     dest: /var/cache/gatus
     remote_src: true
     include: [gatus]
+  register: gatus_extraction
+  when: gatus_extracted.changed
 
 - name: Verify the upstream binary
   ansible.builtin.stat:
     path: /var/cache/gatus/gatus
     checksum_algorithm: sha256
   register: gatus_binary
+  when: gatus_extraction.changed
 
 - name: Require the pinned executable
   ansible.builtin.assert:
     that: gatus_binary.stat.checksum == gatus_binary_sha256
+  when: gatus_extraction.changed
 
 - name: Install Gatus
   ansible.builtin.copy:
@@ -99,6 +120,7 @@
     host: "{{ gatus_address }}"
     port: "{{ gatus_port }}"
     timeout: 45
+  check_mode: false
 
 - name: Verify monitor readiness
   ansible.builtin.uri:
@@ -106,6 +128,7 @@
     status_code: 200
     use_proxy: false
   register: gatus_ready
+  check_mode: false
   until: gatus_ready.status == 200
   retries: 6
   delay: 2

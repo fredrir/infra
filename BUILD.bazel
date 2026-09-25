@@ -56,10 +56,12 @@ filegroup(
 )
 
 filegroup(
-    name = "runner_play_data",
-    srcs = [
-        "ansible/build-runners.yml",
-        "ansible/verify-runners.yml",
-    ] + glob(["ansible/roles/*/tasks/*.yml"]),
+    name = "host_play_data",
+    srcs = glob([
+        "ansible/*.yml",
+        "ansible/roles/*/defaults/*.yml",
+        "ansible/roles/*/handlers/*.yml",
+        "ansible/roles/*/tasks/*.yml",
+    ]),
     visibility = ["//internal/reconcile:__pkg__"],
 )

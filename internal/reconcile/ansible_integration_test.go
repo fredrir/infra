@@ -12,11 +12,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -687,4 +691,106 @@ esac
 		t.Fatalf("unattended upgrade policy not applied:\n%s", output)
 	}
 	t.Log("declared patching configuration validates and converges idempotently")
+}
+
+func TestHostComparisonWithLocalContainer(t *testing.T) {
+	image := os.Getenv("INFRA_ANSIBLE_TEST_IMAGE")
+	if image == "" {
+		t.Skip("requires a local Linux container image with Python matching the Ansible environment")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	command := func(args ...string) string {
+		t.Helper()
+		output, err := exec.CommandContext(ctx, args[0], args[1:]...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s: %v\n%s", strings.Join(args, " "), err, output)
+		}
+		return string(output)
+	}
+	root := strings.TrimSpace(command("git", "rev-parse", "--show-toplevel"))
+	packages := os.Getenv("INFRA_ANSIBLE_SITE_PACKAGES")
+	if packages == "" {
+		matches, err := filepath.Glob(filepath.Join(root, ".venv/lib/python*/site-packages"))
+		if err != nil || len(matches) != 1 {
+			t.Fatal("set INFRA_ANSIBLE_SITE_PACKAGES to the local Ansible Python package directory")
+		}
+		packages = matches[0]
+	}
+	fixture := t.TempDir()
+	for path, data := range map[string]string{
+		"ansible/ansible.cfg":              "[defaults]\nroles_path = /source/ansible/roles\nstrategy_plugins = /source/ansible/plugins/strategy\nstrategy = mitogen_linear\nretry_files_enabled = False\n",
+		"ansible/inventory/production.yml": "all:\n  hosts:\n    localhost:\n      ansible_connection: local\n      ansible_user: root\n      ansible_python_interpreter: /usr/bin/python3\n",
+		"ansible/reconcile.yml":            "- name: Declare patching\n  hosts: all\n  gather_facts: false\n  roles: [host_patching]\n- name: Declare host enrollment\n  hosts: all\n  gather_facts: false\n  tasks:\n  - name: Inspect the enrolled host\n    ansible.builtin.stat:\n      path: /etc/infra-host.enrolled\n    register: host_enrollment\n  - name: Require the enrolled host\n    ansible.builtin.assert:\n      that: host_enrollment.stat.exists\n- name: Register runners\n  hosts: all\n  gather_facts: false\n  tags: [runners]\n  tasks:\n  - name: Reject runner comparison\n    ansible.builtin.fail:\n      msg: runner play compared\n",
+		"ansible/external.yml":             "- name: Declare monitor\n  hosts: all\n  gather_facts: false\n  tasks:\n  - name: Inspect the enrolled monitor\n    ansible.builtin.stat:\n      path: /etc/infra-monitor.enrolled\n    register: monitor_enrollment\n  - name: Require the enrolled monitor\n    ansible.builtin.assert:\n      that: monitor_enrollment.stat.exists\n  - name: Install monitor settings\n    ansible.builtin.copy:\n      dest: /etc/infra-monitor.conf\n      content: \"declared\\n\"\n",
+	} {
+		if err := os.MkdirAll(filepath.Join(fixture, filepath.Dir(path)), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(fixture, path), []byte(data), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	name := fmt.Sprintf("infra-host-comparison-%d", time.Now().UnixNano())
+	command("docker", "run", "-d", "--name", name, "--network=none", "-v", root+":/source:ro", "-v", fixture+":"+fixture, "-v", packages+":/opt/ansible:ro", "-e", "PYTHONPATH=/opt/ansible", image, "sleep", "infinity")
+	t.Cleanup(func() {
+		_ = exec.Command("docker", "exec", name, "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), fixture).Run()
+		_ = exec.Command("docker", "rm", "-f", name).Run()
+	})
+	var mu sync.Mutex
+	var output strings.Builder
+	commands := Commands{Work: fixture, Runner: ci.Runner{Dir: fixture, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
+		args := []string{"exec", "-w", options.Dir}
+		for _, entry := range options.Env {
+			if strings.HasPrefix(entry, "ANSIBLE_") || strings.HasPrefix(entry, "JUNIT_") {
+				args = append(args, "-e", entry)
+			}
+		}
+		result, err := exec.CommandContext(ctx, "docker", append(append(args, name, "python3", "-m", "ansible.cli.playbook"), options.Args...)...).CombinedOutput()
+		mu.Lock()
+		output.Write(result)
+		mu.Unlock()
+		if options.Stdout != nil {
+			_, _ = options.Stdout.Write(result)
+		}
+		return process.Result{Stdout: result}, err
+	}}}
+	converge := func() {
+		t.Helper()
+		command("docker", "exec", "-w", filepath.Join(fixture, "ansible"), "-e", "ANSIBLE_CONFIG="+filepath.Join(fixture, "ansible/ansible.cfg"), name, "python3", "-m", "ansible.cli.playbook", "-i", "inventory/production.yml", "reconcile.yml", "external.yml", "--skip-tags=runners")
+	}
+	compare := func(differences []Difference, errors []string) {
+		t.Helper()
+		outcome := VerificationOutcome("", true, commands.compareHosts(ctx))
+		if !reflect.DeepEqual(outcome.Differences, append([]Difference{}, differences...)) || !reflect.DeepEqual(outcome.Errors, append([]string{}, errors...)) {
+			t.Fatalf("comparison reported %+v, want differences %+v and errors %q\n%s", outcome, differences, errors, output.String())
+		}
+		output.Reset()
+	}
+	command("docker", "exec", name, "touch", "/etc/infra-monitor.enrolled", "/etc/infra-host.enrolled")
+	converge()
+	compare(nil, nil)
+	t.Log("converged host matches its declaration in check mode")
+	command("docker", "exec", name, "sh", "-c", `echo 'APT::Periodic::Unattended-Upgrade "0";' >> /etc/apt/apt.conf.d/20auto-upgrades && echo drift > /etc/infra-monitor.conf`)
+	compare([]Difference{
+		{System: "hosts", Host: "localhost", Item: "Declare patching: host_patching : Enable unattended security updates"},
+		{System: "hosts", Host: "localhost", Item: "Declare monitor: Install monitor settings"},
+	}, nil)
+	if monitor := command("docker", "exec", name, "cat", "/etc/infra-monitor.conf"); monitor != "drift\n" {
+		t.Fatalf("check mode repaired the monitor settings: %q", monitor)
+	}
+	t.Log("edited managed files are reported once as differences without being repaired")
+	command("docker", "exec", name, "rm", "/etc/infra-monitor.enrolled")
+	compare([]Difference{{System: "hosts", Host: "localhost", Item: "Declare patching: host_patching : Enable unattended security updates"}}, []string{"external.yml comparison incomplete: host tasks failed: [localhost] Declare monitor: Require the enrolled monitor"})
+	t.Log("failed requirements are reported as errors, not differences")
+	command("docker", "exec", name, "sh", "-c", "touch /etc/infra-monitor.enrolled && rm /etc/infra-host.enrolled")
+	compare([]Difference{
+		{System: "hosts", Host: "localhost", Item: "Declare patching: host_patching : Enable unattended security updates"},
+		{System: "hosts", Host: "localhost", Item: "Declare monitor: Install monitor settings"},
+	}, []string{"reconcile.yml comparison incomplete: host tasks failed: [localhost] Declare host enrollment: Require the enrolled host"})
+	t.Log("a failing reconcile.yml host leaves the monitor playbook compared")
+	command("docker", "exec", name, "touch", "/etc/infra-host.enrolled")
+	converge()
+	compare(nil, nil)
+	t.Log("repair converges the host back to a matching comparison")
 }

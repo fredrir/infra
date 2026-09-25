@@ -36,3 +36,5 @@
       url: "http://{{ tailscale_ip }}:8080/health"
       status_code: 200
       use_proxy: false
+    retries: 1
+    delay: 5

@@ -5,6 +5,9 @@ on:
       full:
         type: boolean
         default: false
+      verify:
+        type: boolean
+        default: false
 permissions:
   contents: read
 env:
@@ -94,18 +97,22 @@ jobs:
     if: ${{ !cancelled() && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     environment: infrastructure-apply
-    timeout-minutes: 100
+    timeout-minutes: 120
     permissions:
       contents: write
       id-token: write
       actions: read
+    env:
+      VERIFICATION: ${{ github.event.schedule == '47 * * * *' || inputs.verify }}
     outputs:
       reconciliation: ${{ steps.reconcile.outcome }}
+      differences: ${{ steps.verification.outputs.differences }}
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         ref: ${{ github.sha }}
         fetch-depth: 0
+        persist-credentials: ${{ env.VERIFICATION != 'true' }}
     - uses: ./.github/actions/setup-reconciliation-cli
     - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
       id: doppler
@@ -116,7 +123,7 @@ jobs:
       with:
         network: 'true'
         identity: apply
-        full: ${{ github.event_name == 'schedule' || inputs.full }}
+        full: ${{ env.VERIFICATION == 'true' || inputs.full }}
         tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
       env:
         AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
@@ -159,7 +166,7 @@ jobs:
         private-key: ${{ steps.doppler.outputs.RUNNER_APP_PRIVATE_KEY }}
         owner: ${{ steps.runner-fleet.outputs.owner }}
         repositories: ${{ steps.runner-fleet.outputs.repositories }}
-        permission-administration: ${{ github.event.schedule == '47 * * * *' && 'read' || 'write' }}
+        permission-administration: ${{ env.VERIFICATION == 'true' && 'read' || 'write' }}
     - name: Reconcile merged revision
       id: reconcile
       env:
@@ -170,17 +177,25 @@ jobs:
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
         SOPS_AGE_KEY: ${{ steps.doppler.outputs.SOPS_AGE_KEY }}
         GH_TOKEN: ${{ steps.runner-token.outputs.token }}
-        FULL: ${{ github.event.schedule == '17 */6 * * *' || (github.event_name == 'workflow_dispatch' && inputs.full) }}
-        SCHEDULED: ${{ github.event.schedule == '17 */6 * * *' }}
-        DRIFT_ONLY: ${{ github.event.schedule == '47 * * * *' }}
+        FULL: ${{ inputs.full }}
         STRATEGY_OVERRIDE: ${{ vars.INFRA_ANSIBLE_STRATEGY }}
       run: |
         if [ -n "$STRATEGY_OVERRIDE" ]; then export ANSIBLE_STRATEGY="$STRATEGY_OVERRIDE"; fi
-        if [ "$DRIFT_ONLY" = true ]; then
-          infra ci measure --stage drift-verification --budget 5m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --verify-artifacts="$VERIFY_ARTIFACTS"
+        if [ "$VERIFICATION" = true ]; then
+          infra ci measure --stage drift-verification --budget 10m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --deep --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/verification.json"
         else
-          infra reconcile apply --full="$FULL" --scheduled="$SCHEDULED" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/status.json"
+          infra reconcile apply --full="$FULL" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/status.json"
         fi
+    - name: Read declared differences
+      id: verification
+      if: always() && github.event.schedule == '47 * * * *'
+      run: |
+        report="$RUNNER_TEMP/reconciliation/verification.json"
+        differences=false
+        if [ -f "$report" ] && jq -e '.differences | length > 0' "$report" >/dev/null; then
+          differences=true
+        fi
+        printf 'differences=%s\n' "$differences" >> "$GITHUB_OUTPUT"
     - name: Record workflow timing
       if: always()
       env:
@@ -192,13 +207,15 @@ jobs:
     - name: Summarize reconciliation
       if: always()
       run: |
-        if [ -f "$RUNNER_TEMP/reconciliation/status.json" ]; then
-          {
-            printf '```json\n'
-            cat "$RUNNER_TEMP/reconciliation/status.json"
-            printf '\n```\n'
-          } >> "$GITHUB_STEP_SUMMARY"
-        fi
+        for report in status verification; do
+          if [ -f "$RUNNER_TEMP/reconciliation/$report.json" ]; then
+            {
+              printf '```json\n'
+              cat "$RUNNER_TEMP/reconciliation/$report.json"
+              printf '\n```\n'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+        done
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       if: always()
       with:
@@ -212,7 +229,7 @@ jobs:
         rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"
   repair:
     needs: apply
-    if: ${{ !cancelled() && needs.apply.result == 'failure' && github.event.schedule == '47 * * * *' && needs.apply.outputs.reconciliation == 'failure' }}
+    if: ${{ !cancelled() && needs.apply.result == 'failure' && github.event.schedule == '47 * * * *' && needs.apply.outputs.reconciliation == 'failure' && needs.apply.outputs.differences == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -223,11 +240,14 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         GH_REPO: ${{ github.repository }}
       run: |
-        previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --user 'github-actions[bot]' --commit "$GITHUB_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // ""')
-        case "$previous" in
-        failure|timed_out|startup_failure)
-          echo "::warning::The dispatched full reconciliation of $GITHUB_SHA ended in $previous; not dispatching another"
+        pushed=$(gh run list --workflow reconcile.yml --event push --commit "$GITHUB_SHA" --json status --jq '.[] | select(.status != "completed") | .status')
+        if [ -n "$pushed" ]; then
+          echo "::warning::The push reconciliation of $GITHUB_SHA has not completed; not dispatching a repair"
           exit 0
-          ;;
-        esac
+        fi
+        previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --user 'github-actions[bot]' --commit "$GITHUB_SHA" --limit 1 --json conclusion,createdAt --jq '.[] | if (.conclusion | IN("failure", "timed_out", "startup_failure")) then "ended in \(.conclusion)" elif .conclusion != "cancelled" and now - (.createdAt | fromdateiso8601) < 21600 then "started within six hours" else empty end')
+        if [ -n "$previous" ]; then
+          echo "::warning::The dispatched full reconciliation of $GITHUB_SHA $previous; not dispatching another"
+          exit 0
+        fi
         gh workflow run reconcile.yml --ref main -f full=true

@@ -27,6 +27,15 @@
     group: root
     mode: '0644'
 
+- name: Compare the extracted runtime and sidecar binaries
+  ansible.builtin.command:
+    argv: [sha256sum, --check, --status]
+    stdin: "{{ ci_gvisor_checksums }}"
+  register: ci_gvisor_extracted
+  changed_when: ci_gvisor_extracted.rc != 0
+  failed_when: false
+  check_mode: false
+
 - name: Extract the runtime and sidecar binaries
   ansible.builtin.unarchive:
     src: "{{ ci_gvisor_directory }}/gvisor.tar.bz2"
@@ -34,7 +43,16 @@
     remote_src: true
     owner: root
     group: root
-    creates: "{{ ci_gvisor_directory }}/runsc"
+  register: ci_gvisor_extraction
+  when: ci_gvisor_extracted.changed
+
+- name: Require the pinned runtime and sidecar binaries
+  ansible.builtin.command:
+    argv: [sha256sum, --check, --status]
+    stdin: "{{ ci_gvisor_checksums }}"
+  changed_when: false
+  check_mode: false
+  when: ci_gvisor_extraction.changed
 
 - name: Expose the containerd shim
   ansible.builtin.file:

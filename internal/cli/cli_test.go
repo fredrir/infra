@@ -66,16 +66,40 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 }
 
 func TestCommandValidation(t *testing.T) {
-	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}} {
+	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err == nil {
 			t.Errorf("accepted invalid command %q", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--deep", "--help"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
 			t.Errorf("command %q: %v, output=%q", args, err, &output)
 		}
+	}
+}
+
+func TestVerificationWritesItsOutcomeReport(t *testing.T) {
+	report := filepath.Join(t.TempDir(), "reports", "verification.json")
+	var output bytes.Buffer
+	if err := cli.Run(context.Background(), []string{"reconcile", "verify", "--deep", "--root", t.TempDir(), "--report", report}, &output, &output); err == nil {
+		t.Fatal("verification without declarations succeeded")
+	}
+	data, err := os.ReadFile(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var outcome struct {
+		Deep        bool
+		Outcome     string
+		Differences []any
+		Errors      []string
+	}
+	if err := json.Unmarshal(data, &outcome); err != nil {
+		t.Fatal(err)
+	}
+	if !outcome.Deep || outcome.Outcome != "failed" || outcome.Differences == nil || len(outcome.Differences) != 0 || len(outcome.Errors) != 1 || !strings.Contains(outcome.Errors[0], "settings.yaml") {
+		t.Fatalf("verification error reported as %s", data)
 	}
 }

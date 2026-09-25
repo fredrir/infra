@@ -1,7 +1,7 @@
 - name: Configure K3s servers in bootstrap order
   hosts: server
   order: inventory
-  serial: 1
+  serial: "{{ '100%' if ansible_check_mode else 1 }}"
   any_errors_fatal: true
   become: true
   gather_facts: true
@@ -12,7 +12,7 @@
 
 - name: Configure K3s workers
   hosts: agent
-  serial: 1
+  serial: "{{ '100%' if ansible_check_mode else 1 }}"
   any_errors_fatal: true
   become: true
   gather_facts: true

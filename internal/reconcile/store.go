@@ -35,6 +35,10 @@ type Status struct {
 	Durations         map[string]float64 `json:"stage_seconds,omitempty"`
 }
 
+func (s Status) NeedsRecovery() bool {
+	return s.Desired != s.Applied || s.Failure != "" || (s.Stage != "" && s.Stage != "complete" && s.Stage != "evaluated")
+}
+
 type Store interface {
 	Read(context.Context) (Status, error)
 	Write(context.Context, Status) error
@@ -181,24 +185,36 @@ func (s S3Store) Write(ctx context.Context, status Status) error {
 	return err
 }
 
-func (s S3Store) Lock(ctx context.Context) (func() error, error) {
+func (s S3Store) Unlocked(ctx context.Context) error {
+	_, err := s.replaceableLease(ctx)
+	return err
+}
+
+func (s S3Store) replaceableLease(ctx context.Context) (string, error) {
 	if s.Bucket == "" || s.Prefix == "" || strings.HasPrefix(s.Prefix, "/") {
-		return nil, fmt.Errorf("state bucket and prefix required")
+		return "", fmt.Errorf("state bucket and prefix required")
 	}
 	body, etag, err := s.object(ctx, "lock.json")
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("read reconciliation lock: %w", err)
 	}
-	if body != nil {
-		var existing lease
-		if err := json.Unmarshal(body, &existing); err != nil {
-			return nil, err
-		}
-		if existing.Expires.IsZero() || time.Now().Before(existing.Expires) {
-			return nil, fmt.Errorf("reconciliation locked by %s until %s", existing.Owner, existing.Expires)
-		}
-	} else {
-		etag = "*"
+	if body == nil {
+		return "*", nil
+	}
+	var existing lease
+	if err := json.Unmarshal(body, &existing); err != nil {
+		return "", fmt.Errorf("read reconciliation lock: %w", err)
+	}
+	if existing.Expires.IsZero() || time.Now().Before(existing.Expires) {
+		return "", fmt.Errorf("reconciliation locked by %s until %s", existing.Owner, existing.Expires)
+	}
+	return etag, nil
+}
+
+func (s S3Store) Lock(ctx context.Context) (func() error, error) {
+	etag, err := s.replaceableLease(ctx)
+	if err != nil {
+		return nil, err
 	}
 	var owner [16]byte
 	if _, err := rand.Read(owner[:]); err != nil {

@@ -1,6 +1,9 @@
 package reconcile
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 	var playbooks []string
@@ -39,13 +42,7 @@ func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 func (c *Commands) Hosts(ctx context.Context, plan Plan) error {
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
-		if !plan.RunnersUnchanged {
-			return c.convergeRunners(ctx, plan, "reconcile.yml")
-		}
-		if err := c.ansible(ctx, "reconcile.yml", "--skip-tags=runners"); err != nil {
-			return err
-		}
-		return c.convergeRunners(ctx, plan, "build-runners.yml")
+		return c.convergeRunners(ctx, plan, "reconcile.yml")
 	case HostScopeRunners:
 		return c.convergeRunners(ctx, plan, "build-runners.yml")
 	default:
@@ -56,14 +53,8 @@ func (c *Commands) Hosts(ctx context.Context, plan Plan) error {
 func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
-		if c.runnersVerified {
-			return c.ansible(ctx, "verify.yml")
-		}
 		return c.verifyRunnerHosts(ctx, "verify.yml", "verify-runners.yml")
 	case HostScopeRunners:
-		if c.runnersVerified {
-			return nil
-		}
 		return c.verifyRunnerHosts(ctx, "verify-runners.yml")
 	case HostScopeMonitor:
 		return c.ansible(ctx, "verify.yml", "--limit=external")
@@ -72,15 +63,51 @@ func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
 	}
 }
 
-func (c *Commands) verifyRunnerHosts(ctx context.Context, playbook string, extra ...string) error {
+var comparedPlaybooks = []string{"reconcile.yml", "external.yml"}
+
+func (c *Commands) compareHosts(ctx context.Context) error {
+	var problems []error
+	for _, run := range c.recordPlaybooks(ctx, comparedPlaybooks, "--check", "--skip-tags=runners") {
+		var differences Differences
+		var failed []string
+		for _, task := range run.Tasks {
+			if task.Failed {
+				failed = append(failed, "["+task.Host+"] "+task.Task)
+			} else {
+				differences = append(differences, Difference{System: "hosts", Host: task.Host, Item: task.Task})
+			}
+		}
+		problems = append(problems, run.outcome(differences, failed))
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return errors.Join(problems...)
+}
+
+func (c *Commands) verifyRunnerHosts(ctx context.Context, playbooks ...string) error {
 	fleet, err := LoadRunnerFleet(c.Runner.Dir)
 	if err != nil {
 		return err
 	}
-	if err := c.ansible(ctx, playbook, extra...); err != nil {
+	var problems []error
+	for _, run := range c.recordPlaybooks(ctx, playbooks) {
+		var differences Differences
+		var failed []string
+		for _, task := range run.Tasks {
+			switch {
+			case run.Playbook == "verify-runners.yml":
+				differences = append(differences, Difference{System: "runners", Host: task.Host, Item: task.Task})
+			case task.Failed:
+				failed = append(failed, "["+task.Host+"] "+task.Task)
+			}
+		}
+		problems = append(problems, run.outcome(differences, failed))
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return c.verifyRunnerFleet(ctx, fleet)
+	return errors.Join(append(problems, c.verifyRunnerFleet(ctx, fleet))...)
 }
 
 func (c *Commands) Monitor(ctx context.Context, plan Plan) error {

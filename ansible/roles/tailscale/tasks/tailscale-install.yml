@@ -30,17 +30,15 @@
       print(json.dumps(result))
     - 'tailscale_{{ platform_tailscale_version }}_{{ platform_architecture }}'
   register: platform_tailscale_compare
-  changed_when: false
-  when: not ansible_check_mode
+  changed_when: (platform_tailscale_compare.stdout | from_json).extract or (platform_tailscale_compare.stdout | from_json).install
+  check_mode: false
 
 - name: Extract Tailscale binaries
   ansible.builtin.unarchive:
     src: /var/lib/platform/tailscale.tgz
     dest: /var/lib/platform
     remote_src: true
-  when:
-  - not ansible_check_mode
-  - (platform_tailscale_compare.stdout | from_json).extract
+  when: (platform_tailscale_compare.stdout | from_json).extract
 
 - name: Install Tailscale binaries
   ansible.builtin.copy:
@@ -49,7 +47,5 @@
     dest: "/usr/local/bin/{{ item }}"
     mode: "0755"
   loop: [tailscale, tailscaled]
-  when:
-  - not ansible_check_mode
-  - (platform_tailscale_compare.stdout | from_json).install
+  when: (platform_tailscale_compare.stdout | from_json).install
   notify: "{{ platform_tailscale_restart_handler | default('Restart bootstrap Tailscale') }}"

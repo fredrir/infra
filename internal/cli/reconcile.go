@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,12 +17,12 @@ import (
 
 func newReconcileCommand() *cobra.Command {
 	var root, bucket, prefix, base, report string
-	var full, scheduled, scopeHosts, scopeProjects, verifyArtifacts bool
+	var full, deep, scopeHosts, scopeProjects, verifyArtifacts bool
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
 	command.PersistentFlags().StringVar(&root, "root", ".", "Source checkout")
 	command.PersistentFlags().StringVar(&bucket, "state-bucket", "llunde-pyparser-bucket", "Reconciliation state bucket")
 	command.PersistentFlags().StringVar(&prefix, "state-prefix", "reconciliation/production", "Reconciliation state prefix")
-	command.PersistentFlags().StringVar(&report, "report", "", "Status report path")
+	command.PersistentFlags().StringVar(&report, "report", "", "Status or verification outcome report path")
 	command.PersistentFlags().BoolVar(&full, "full", false, "Reconcile all systems, including external drift")
 	command.PersistentFlags().BoolVar(&scopeHosts, "scope-hosts", false, "Limit host convergence to affected playbooks")
 	command.PersistentFlags().BoolVar(&scopeProjects, "scope-projects", false, "Limit project deployment to affected owners")
@@ -31,10 +32,16 @@ func newReconcileCommand() *cobra.Command {
 		if action == "plan" {
 			child.Flags().StringVar(&base, "base", "", "Comparison revision")
 		}
-		if action == "apply" {
-			child.Flags().BoolVar(&scheduled, "scheduled", false, "Skip the runner play when verification proves the fleet unchanged")
+		if action == "verify" {
+			child.Flags().BoolVar(&deep, "deep", false, "Also compare OpenTofu and every host play with production in check mode")
 		}
-		child.RunE = func(cmd *cobra.Command, _ []string) error {
+		child.RunE = func(cmd *cobra.Command, _ []string) (err error) {
+			var verified string
+			if action == "verify" && report != "" {
+				defer func() {
+					err = errors.Join(err, writeReport(report, reconcile.VerificationOutcome(verified, deep, err)))
+				}()
+			}
 			absolute, err := filepath.Abs(root)
 			if err != nil {
 				return err
@@ -60,9 +67,8 @@ func newReconcileCommand() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				recovery := status.Desired != status.Applied || status.Failure != "" || (status.Stage != "" && status.Stage != "complete" && status.Stage != "evaluated")
 				ops := &reconcile.Commands{Runner: runner}
-				selected, err := ops.Select(cmd.Context(), status.Applied, full || recovery)
+				selected, err := ops.Select(cmd.Context(), status.Applied, full || status.NeedsRecovery())
 				if err != nil {
 					return err
 				}
@@ -79,50 +85,28 @@ func newReconcileCommand() *cobra.Command {
 			defer os.RemoveAll(work)
 			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ScopeHosts: scopeHosts, ScopeProjects: scopeProjects, VerifyArtifacts: verifyArtifacts}
 			if action == "apply" {
-				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, SkipUnchanged: scopeHosts, VerifyArtifacts: verifyArtifacts, Scheduled: scheduled, Report: func(status reconcile.Status) error {
-					data, err := json.MarshalIndent(status, "", "  ")
-					if err != nil {
-						return err
-					}
+				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, SkipUnchanged: scopeHosts, VerifyArtifacts: verifyArtifacts, Report: func(status reconcile.Status) error {
 					fmt.Fprintf(cmd.OutOrStdout(), "%s desired=%s applied=%s\n", status.Stage, status.Desired, status.Applied)
 					if report == "" {
 						return nil
 					}
-					if err := os.MkdirAll(filepath.Dir(report), 0700); err != nil {
-						return err
-					}
-					return os.WriteFile(report, append(data, '\n'), 0600)
+					return writeReport(report, status)
 				}}
 				return engine.Apply(cmd.Context(), full)
+			}
+			if action == "verify" {
+				verified, err = reconcile.Verifier{Store: store, Ops: ops, Host: host, Deep: deep}.Verify(cmd.Context())
+				return err
 			}
 			revision, err := ops.Revision(cmd.Context())
 			if err != nil {
 				return err
-			}
-			if action == "verify" {
-				published, err := ops.PublishedRevision(cmd.Context())
-				if err != nil {
-					return err
-				}
-				if published != revision {
-					pending, err := ops.Select(cmd.Context(), published, false)
-					if err != nil {
-						return err
-					}
-					if pending.Tofu || pending.Kubernetes || pending.Ansible {
-						return fmt.Errorf("checkout contains unpublished infrastructure changes")
-					}
-					revision = published
-				}
 			}
 			selected, err := ops.Select(cmd.Context(), base, full)
 			if err != nil {
 				return err
 			}
 			plan := reconcile.Plan{Revision: revision, Base: base, Affected: selected, Host: host}
-			if action == "verify" {
-				return ops.VerifyLive(cmd.Context(), plan)
-			}
 			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(plan); err != nil {
 				return err
 			}
@@ -131,4 +115,15 @@ func newReconcileCommand() *cobra.Command {
 		command.AddCommand(child)
 	}
 	return command
+}
+
+func writeReport(path string, value any) error {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0600)
 }

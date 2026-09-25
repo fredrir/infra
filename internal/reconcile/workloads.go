@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -12,12 +13,12 @@ func workloadReady(expected, actual resource) error {
 	name := actual.Metadata.Namespace + "/" + actual.Metadata.Name
 	if expected.Kind == "HelmRelease" {
 		if actual.Spec.Suspend {
-			return fmt.Errorf("%s is suspended", name)
+			return kubernetesDifference("HelmRelease %s is suspended", name)
 		}
 		return ready(actual)
 	}
 	if !reflect.DeepEqual(expected.Spec.Template.Spec, actual.Spec.Template.Spec) {
-		return fmt.Errorf("%s does not run the declared container images", name)
+		return kubernetesDifference("%s %s does not run the declared container images", expected.Kind, name)
 	}
 	if expected.Kind == "Job" {
 		completions := int64(1)
@@ -47,7 +48,7 @@ func workloadReady(expected, actual resource) error {
 		count = *expected.Spec.Replicas
 	}
 	if actual.Spec.Replicas != nil && *actual.Spec.Replicas != count {
-		return fmt.Errorf("%s has unexpected replicas", name)
+		return kubernetesDifference("%s %s runs %d replicas, want %d", expected.Kind, name, *actual.Spec.Replicas, count)
 	}
 	switch expected.Kind {
 	case "Deployment":
@@ -77,6 +78,7 @@ func (c *Commands) verifyOwnedWorkloads(ctx context.Context, owner resource, sna
 	for _, entry := range inventory.Entries {
 		owned[entry.ID] = true
 	}
+	var problems []error
 	for _, expected := range c.kubernetes.workloads[owner.Metadata.Name] {
 		group := "apps"
 		kind := ""
@@ -96,21 +98,23 @@ func (c *Commands) verifyOwnedWorkloads(ctx context.Context, owner resource, sna
 		}
 		id := strings.Join([]string{expected.Metadata.Namespace, expected.Metadata.Name, group, expected.Kind}, "_")
 		if !owned[id] {
-			return fmt.Errorf("%s is missing owned workload %s", owner.Metadata.Name, id)
+			problems = append(problems, kubernetesDifference("Kustomization %s/%s does not own %s", owner.Metadata.Namespace, owner.Metadata.Name, id))
+			continue
 		}
 		actual, err := c.snapshotResource(ctx, snapshot, kind, expected.Metadata.Namespace, expected.Metadata.Name)
 		if err != nil {
-			return err
+			problems = append(problems, err)
+			continue
 		}
 		if actual.Metadata.Labels["kustomize.toolkit.fluxcd.io/name"] != owner.Metadata.Name || actual.Metadata.Labels["kustomize.toolkit.fluxcd.io/namespace"] != owner.Metadata.Namespace {
-			return fmt.Errorf("%s workload ownership differs", id)
+			problems = append(problems, kubernetesDifference("%s is not labelled as owned by Kustomization %s/%s", id, owner.Metadata.Namespace, owner.Metadata.Name))
+			continue
 		}
 		if token := c.kubernetes.requested[kind+"/"+expected.Metadata.Namespace+"/"+expected.Metadata.Name]; token != "" && actual.Status.LastHandledReconcileAt != token {
-			return fmt.Errorf("%s has not handled its requested reconciliation", id)
+			problems = append(problems, fmt.Errorf("%s has not handled its requested reconciliation", id))
+			continue
 		}
-		if err = workloadReady(expected, actual); err != nil {
-			return err
-		}
+		problems = append(problems, workloadReady(expected, actual))
 	}
-	return nil
+	return errors.Join(problems...)
 }
