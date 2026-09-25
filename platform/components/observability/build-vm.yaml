@@ -1,0 +1,58 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: build-vm
+  namespace: observability
+  labels:
+    release: monitoring
+spec:
+  jobName: build-vm
+  kubernetesSDConfigs:
+  - role: Node
+    selectors:
+    - role: Node
+      field: metadata.name=fredrir-09
+  relabelings:
+  - sourceLabels:
+    - __meta_kubernetes_node_address_InternalIP
+    replacement: $1:9101
+    targetLabel: __address__
+  - replacement: infra-build-09
+    targetLabel: instance
+  - sourceLabels:
+    - __meta_kubernetes_node_name
+    targetLabel: node
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: build-vm
+  namespace: observability
+spec:
+  groups:
+  - name: build-vm
+    rules:
+    - alert: BuildVmMetricsMissing
+      expr: |
+        absent(node_textfile_mtime_seconds{job="build-vm"})
+        or time() - node_textfile_mtime_seconds{job="build-vm"} > 300
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Build VM guest or cgroup metrics are missing or stale
+    - alert: BuildVmCgroupOomKilled
+      expr: increase(infra_cgroup_memory_events_total{job="build-vm",event="oom_kill"}[30m]) > 0
+      labels:
+        severity: warning
+      annotations:
+        summary: Build VM cgroup {{ $labels.cgroup }} had a process OOM-killed
+    - alert: BuildVmCgroupMemoryNearLimit
+      expr: |
+        infra_cgroup_memory_working_set_bytes{job="build-vm"}
+        / infra_cgroup_memory_max_bytes{job="build-vm"} > 0.9
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Build VM cgroup {{ $labels.cgroup }} working set is above 90% of its memory limit

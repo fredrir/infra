@@ -10,6 +10,7 @@ resources:
 - network.yaml
 - node-exporter.yaml
 - independent-monitor.yaml
+- build-vm.yaml
 - alertmanager.secret.sops.yaml
 - grafana.secret.sops.yaml
 - tunnel.yaml

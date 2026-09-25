@@ -15,6 +15,9 @@ table inet platform_host {
     ip saddr {{ cidr }} tcp dport 22 accept
 {% endfor %}
     iifname { "cni0", "flannel.1" } ip saddr {{ firewall_pod_cidr }} tcp dport { 6443, 10250 } accept
+{% if build_vm_enabled | default(false) | bool %}
+    iifname "cni0" ip saddr {{ firewall_pod_cidr }} tcp dport {{ build_vm_metrics_port }} accept
+{% endif %}
 {% if inventory_hostname in groups['server'] %}
 {% for node in groups['server'] %}
     ip saddr {{ hostvars[node].private_ip | default(hostvars[node].tailscale_ip) }} tcp dport { 2379, 2380, 6443, 10250 } accept

@@ -14,6 +14,10 @@
     - build_vm_disk_gib | int == 80
     - build_vm_ssh_port | int > 1024
     - build_vm_ssh_port | int < 65536
+    - build_vm_metrics_port | int > 1024
+    - build_vm_metrics_port | int < 65536
+    - build_vm_metrics_port | int != build_vm_ssh_port | int
+    - tailscale_ip is match('^100[.]')
     - build_vm_ssh_public_key is match('^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$')
     - build_vm_image_url is match('^https://cloud-images[.]ubuntu[.]com/[-a-zA-Z0-9/_.]+$')
     - build_vm_image_sha256 is match('^[a-f0-9]{64}$')

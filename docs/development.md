@@ -147,7 +147,8 @@ git diff -- platform
 | Production placement            | `ansible/inventory/production.yml`; `infra-build-09` on `fredrir-09`                                                                        |
 | Host reservation                | 4.25 CPUs / 10 GiB reserved; resulting allocatable 11.5 CPUs / 21,585,868 KiB                                                               |
 | Guest                           | Four CPUs / 8 GiB RAM / 80 GiB sparse persistent disk                                                                                       |
-| Host boundary                   | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding                                                                         |
+| Host boundary                   | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding; guest metrics forwarded to the tailnet address, port 9101              |
+| Guest metrics                   | Node exporter `:9100`; `infra_cgroup_*` for `infra-engine.slice` and `infra-runners.slice`; Prometheus job `build-vm`                      |
 | Activation gates                | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true`                                                       |
 | Runner registration             | Seven repository registrations share one VM; each accepts protected main pushes or manual runs only                                         |
 | Runner slice                    | Four CPUs / 2 GiB aggregate for runner services and native child processes                                                                   |

@@ -1,0 +1,53 @@
+#!/bin/sh
+set -eu
+cd /sys/fs/cgroup
+textfile=/var/lib/node_exporter/textfile_collector/infra-cgroups.prom
+while :; do
+  set --
+  for slice in infra.slice/infra-engine.slice infra.slice/infra-runners.slice; do
+    if [ -d "$slice" ]; then
+      set -- "$@" "$slice/memory.current" "$slice/memory.peak" "$slice/memory.events" "$slice/memory.stat" "$slice/memory.max" "$slice/cpu.stat" "$slice/cpu.max"
+      for child in "$slice"/*/; do
+        if [ -d "$child" ]; then
+          set -- "$@" "${child}memory.max" "${child}cpu.max" "${child}cpu.stat"
+        fi
+      done
+    fi
+  done
+  awk '
+    {
+      depth = split(FILENAME, path, "/")
+      cgroup = path[2]
+      file = path[depth]
+    }
+    file == "memory.max" && $1 != "max" && (!(cgroup in memory_max) || $1 < memory_max[cgroup]) { memory_max[cgroup] = $1 }
+    file == "cpu.max" && $1 != "max" && (!(cgroup in cpu_max) || $1 / $2 < cpu_max[cgroup]) { cpu_max[cgroup] = $1 / $2 }
+    file == "cpu.stat" && $1 == "nr_periods" { periods[cgroup] += $2 }
+    file == "cpu.stat" && $1 == "nr_throttled" { throttled_periods[cgroup] += $2 }
+    file == "cpu.stat" && $1 == "throttled_usec" { throttled[cgroup] += $2 / 1000000 }
+    depth > 3 { next }
+    file == "cpu.stat" && $1 == "usage_usec" { usage[cgroup] = $2 / 1000000 }
+    file == "memory.current" { current[cgroup] = $1 }
+    file == "memory.peak" { peak[cgroup] = $1 }
+    file == "memory.stat" && $1 == "inactive_file" { inactive_file[cgroup] = $2 }
+    file == "memory.events" { events[cgroup "\",event=\"" $1] = $2 }
+    function emit(name, type, values, format,    key) {
+      printf "# TYPE infra_cgroup_%s %s\n", name, type
+      for (key in values) printf "infra_cgroup_%s{cgroup=\"%s\"} " format "\n", name, key, values[key]
+    }
+    END {
+      for (cgroup in current) working_set[cgroup] = current[cgroup] - inactive_file[cgroup]
+      emit("memory_current_bytes", "gauge", current, "%.0f")
+      emit("memory_peak_bytes", "gauge", peak, "%.0f")
+      emit("memory_working_set_bytes", "gauge", working_set, "%.0f")
+      emit("memory_max_bytes", "gauge", memory_max, "%.0f")
+      emit("memory_events_total", "counter", events, "%.0f")
+      emit("cpu_usage_seconds_total", "counter", usage, "%.6f")
+      emit("cpu_throttled_seconds_total", "counter", throttled, "%.6f")
+      emit("cpu_periods_total", "counter", periods, "%.0f")
+      emit("cpu_throttled_periods_total", "counter", throttled_periods, "%.0f")
+      emit("cpu_max_cores", "gauge", cpu_max, "%g")
+    }
+  ' "$@" > "$textfile.tmp" && mv "$textfile.tmp" "$textfile"
+  sleep 15
+done

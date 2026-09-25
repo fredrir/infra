@@ -93,3 +93,96 @@
     content: |
       #!/bin/sh
       exec /usr/local/bin/infra platform runner-admission release --timeout=30s
+
+- name: Create guest metric directory
+  ansible.builtin.file:
+    path: /var/lib/node_exporter/textfile_collector
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install cgroup metric writer
+  ansible.builtin.copy:
+    src: infra-cgroup-metrics
+    dest: /usr/local/libexec/infra-cgroup-metrics
+    owner: root
+    group: root
+    mode: '0555'
+
+- name: Install guest metric units
+  ansible.builtin.copy:
+    dest: '/etc/systemd/system/{{ item.name }}.service'
+    owner: root
+    group: root
+    mode: '0644'
+    content: '{{ item.content }}'
+  loop:
+  - name: infra-node-exporter
+    content: |
+      [Unit]
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/opt/{{ build_runner_node_exporter_release }}/node_exporter --web.listen-address=:9100 --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
+      DynamicUser=true
+      Restart=on-failure
+      RestartSec=5
+      MemoryMax=128M
+      CPUQuota=25%
+
+      [Install]
+      WantedBy=multi-user.target
+  - name: infra-cgroup-metrics
+    content: |
+      [Service]
+      ExecStart=/usr/local/libexec/infra-cgroup-metrics
+      Restart=always
+      RestartSec=5
+      CapabilityBoundingSet=
+      NoNewPrivileges=true
+      PrivateNetwork=true
+      PrivateTmp=true
+      ProtectSystem=strict
+      ProtectHome=true
+      ProtectControlGroups=true
+      ReadWritePaths=/var/lib/node_exporter/textfile_collector
+      UMask=0022
+      MemoryMax=32M
+      CPUQuota=10%
+
+      [Install]
+      WantedBy=multi-user.target
+  loop_control:
+    label: '{{ item.name }}'
+  register: build_runner_metric_units
+
+- name: Start guest metric services
+  ansible.builtin.systemd_service:
+    name: '{{ item }}'
+    enabled: true
+    daemon_reload: '{{ build_runner_metric_units.changed }}'
+    state: started
+  loop: [infra-node-exporter, infra-cgroup-metrics]
+
+- name: Find stale guest metric services
+  ansible.builtin.shell: |
+    set -eu
+    for unit in infra-node-exporter infra-cgroup-metrics; do
+      started=$(systemctl show --timestamp=us+utc --property=ActiveEnterTimestamp --value "$unit")
+      if [ -z "$started" ] || [ "$(systemctl show --property=NeedDaemonReload --value "$unit")" = yes ] ||
+        [ -n "$(find "/etc/systemd/system/$unit.service" "/usr/local/libexec/$unit" -newermt "$started" 2>/dev/null)" ]; then
+        echo "$unit"
+      fi
+    done
+  register: build_runner_stale_metric_services
+  changed_when: false
+  check_mode: false
+
+- name: Restart stale guest metric services
+  ansible.builtin.systemd_service:
+    name: '{{ item }}'
+    daemon_reload: true
+    state: restarted
+  loop: '{{ build_runner_stale_metric_services.stdout_lines }}'

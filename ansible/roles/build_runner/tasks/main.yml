@@ -14,12 +14,50 @@
     - build_runner_job_slots | int <= 8
     - build_runner_cpus_percent | int >= 1
     - build_runner_cpus_percent | int <= 400
+    - build_runner_node_exporter_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
+    - build_runner_node_exporter_sha256 is match('^[a-f0-9]{64}$')
 
 - name: Wait for cloud initialization
   ansible.builtin.command:
     argv: [cloud-init, status, --wait]
   changed_when: false
   timeout: 120
+
+- name: Download verified node exporter archive
+  ansible.builtin.get_url:
+    url: 'https://github.com/prometheus/node_exporter/releases/download/v{{ build_runner_node_exporter_version }}/{{ build_runner_node_exporter_release }}.tar.gz'
+    dest: '/var/cache/{{ build_runner_node_exporter_release }}.tar.gz'
+    checksum: 'sha256:{{ build_runner_node_exporter_sha256 }}'
+    owner: root
+    group: root
+    mode: '0644'
+    timeout: 30
+  register: build_runner_node_exporter_archive
+
+- name: Extract verified node exporter
+  ansible.builtin.unarchive:
+    src: '/var/cache/{{ build_runner_node_exporter_release }}.tar.gz'
+    dest: /opt
+    remote_src: true
+    include: ['{{ build_runner_node_exporter_release }}/node_exporter']
+    creates: '/opt/{{ build_runner_node_exporter_release }}/node_exporter'
+
+- name: Find superseded node exporter releases
+  ansible.builtin.find:
+    paths: [/var/cache, /opt]
+    patterns: 'node_exporter-*'
+    file_type: any
+  register: build_runner_node_exporter_releases
+  when: build_runner_node_exporter_archive.changed
+
+- name: Remove superseded node exporter releases
+  ansible.builtin.file:
+    path: '{{ item.path }}'
+    state: absent
+  loop: "{{ build_runner_node_exporter_releases.files | default([]) | rejectattr('path', 'search', build_runner_node_exporter_release | regex_escape) | list }}"
+  loop_control:
+    label: '{{ item.path }}'
+  when: build_runner_node_exporter_archive.changed
 
 - name: Declare runner host state
   ansible.builtin.import_tasks: state.yml

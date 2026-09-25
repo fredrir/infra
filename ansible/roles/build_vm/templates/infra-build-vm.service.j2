@@ -1,5 +1,5 @@
 [Unit]
-After=network-online.target
+After=network-online.target tailscaled.service
 Wants=network-online.target
 ConditionPathExists=/dev/kvm
 
@@ -7,7 +7,7 @@ ConditionPathExists=/dev/kvm
 User=infra-build-vm
 Group=infra-build-vm
 SupplementaryGroups=kvm
-ExecStart=/usr/bin/qemu-system-x86_64 -name {{ build_vm_name }} -machine q35,accel=kvm -cpu host -smp {{ build_vm_cpus }} -m {{ build_vm_memory_mib }} -display none -serial stdio -monitor none -drive file={{ build_vm_directory }}/disk.qcow2,if=virtio,format=qcow2,discard=unmap -drive file={{ build_vm_directory }}/seed.img,if=virtio,format=raw,readonly=on -netdev user,id=net0,hostfwd=tcp:127.0.0.1:{{ build_vm_ssh_port }}-:22 -device virtio-net-pci,netdev=net0 -device virtio-rng-pci
+ExecStart=/usr/bin/qemu-system-x86_64 -name {{ build_vm_name }} -machine q35,accel=kvm -cpu host -smp {{ build_vm_cpus }} -m {{ build_vm_memory_mib }} -display none -serial stdio -monitor none -drive file={{ build_vm_directory }}/disk.qcow2,if=virtio,format=qcow2,discard=unmap -drive file={{ build_vm_directory }}/seed.img,if=virtio,format=raw,readonly=on -netdev user,id=net0,hostfwd=tcp:127.0.0.1:{{ build_vm_ssh_port }}-:22,hostfwd=tcp:{{ tailscale_ip }}:{{ build_vm_metrics_port }}-:9100 -device virtio-net-pci,netdev=net0 -device virtio-rng-pci
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=60
