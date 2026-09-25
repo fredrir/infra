@@ -3,6 +3,13 @@
   vars:
     build_runner_state_repositories: ['{{ build_runner_repository }}']
 
+- name: Remove unregistered runner identity
+  ansible.builtin.file:
+    path: '/home/runner/{{ build_runner_repository }}/{{ item }}'
+    state: absent
+  loop: [.runner, .credentials, .credentials_rsaparams]
+  when: build_runner_repository in build_runner_reregister | default([])
+
 - name: Read runner registration
   ansible.builtin.stat:
     path: '/home/runner/{{ build_runner_repository }}/.runner'
@@ -130,4 +137,4 @@
   ansible.builtin.import_tasks: repository-services.yml
   vars:
     build_runner_state_services: ['{{ build_runner_service_name }}']
-    build_runner_state_restarts: "{{ [build_runner_service_name] if build_runner_repository in build_runner_restart | default([]) else [] }}"
+    build_runner_state_restarts: "{{ [build_runner_service_name] if build_runner_repository in (build_runner_restart | default([])) + (build_runner_reregister | default([])) else [] }}"

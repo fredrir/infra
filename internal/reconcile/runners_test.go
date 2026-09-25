@@ -1,10 +1,12 @@
 package reconcile
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -62,17 +64,20 @@ func queriedRepository(opts process.Options) string {
 }
 
 type fleetHarness struct {
-	t       *testing.T
-	fleet   RunnerFleet
-	mu      sync.Mutex
-	calls   []string
-	queries int
-	failing []string
-	change  func(*registeredRunner)
+	t              *testing.T
+	fleet          RunnerFleet
+	mu             sync.Mutex
+	calls          []string
+	queries        int
+	unreadable     int
+	rejectLabels   bool
+	failing        []string
+	change         func(*registeredRunner)
+	stdout, stderr bytes.Buffer
 }
 
 func (h *fleetHarness) commands() *Commands {
-	return &Commands{Runner: ci.Runner{Dir: writeRunnerFleet(h.t, h.fleet), Execute: h.execute}}
+	return &Commands{Runner: ci.Runner{Dir: writeRunnerFleet(h.t, h.fleet), Execute: h.execute, Stdout: &h.stdout, Stderr: &h.stderr}}
 }
 
 func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process.Result, error) {
@@ -88,9 +93,15 @@ func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process
 		return process.Result{}, nil
 	case opts.Name == "gh" && slices.Contains(opts.Args, "PUT"):
 		h.calls = append(h.calls, "gh "+strings.Join(opts.Args, " "))
+		if h.rejectLabels {
+			return process.Result{ExitCode: 1}, errors.New("HTTP 403")
+		}
 		return process.Result{}, nil
 	case opts.Name == "gh":
 		h.queries++
+		if h.queries <= h.unreadable {
+			return process.Result{ExitCode: 1}, errors.New("HTTP 502")
+		}
 		runner := healthyRunner(h.fleet, queriedRepository(opts))
 		if h.change != nil {
 			h.change(&runner)
@@ -104,6 +115,12 @@ func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process
 func offlineY(runner *registeredRunner) {
 	if runner.Name == "infra-build-09-Y" {
 		runner.Status = "offline"
+	}
+}
+
+func unregisteredY(runner *registeredRunner) {
+	if runner.Name == "infra-build-09-Y" {
+		runner.Name = "infra-build-08-Y"
 	}
 }
 
@@ -302,14 +319,14 @@ func TestFleetRoutingMatchesDeclaredRunners(t *testing.T) {
 	}
 }
 
-func TestOfflineRunnersSelectRestarts(t *testing.T) {
+func TestRunnerRepairsFollowGitHubState(t *testing.T) {
 	fleet := testRunnerFleet()
 	states := map[string][]registeredRunner{}
 	for _, repository := range fleet.Repositories {
 		states[repository] = []registeredRunner{healthyRunner(fleet, repository)}
 	}
-	if restart := offlineRunners(fleet, states); restart != nil {
-		t.Fatalf("healthy runners restarted: %q", restart)
+	if restart, missing := offlineRunners(fleet, states), missingRunners(fleet, states); restart != nil || missing != nil {
+		t.Fatalf("healthy runners repaired: restart %q, reregister %q", restart, missing)
 	}
 	states["Y"][0].Status = "offline"
 	foreign := healthyRunner(fleet, "infra")
@@ -317,6 +334,10 @@ func TestOfflineRunnersSelectRestarts(t *testing.T) {
 	states["infra"] = append(states["infra"], foreign)
 	if restart := offlineRunners(fleet, states); !reflect.DeepEqual(restart, []string{"Y"}) {
 		t.Fatalf("restart list does not match offline fleet runners: %q", restart)
+	}
+	states["infra"] = states["infra"][1:]
+	if missing := missingRunners(fleet, states); !reflect.DeepEqual(missing, []string{"infra"}) {
+		t.Fatalf("reregistration list does not match missing fleet runners: %q", missing)
 	}
 }
 
@@ -338,6 +359,13 @@ func TestRunnerConvergenceArguments(t *testing.T) {
 		{"CLI release in full scope", Plan{Affected: Selection{Ansible: true, HostScope: HostScopeFull, RunnerInputs: cli}}, nil, "reconcile.yml"},
 		{"full with offline runner", Plan{Affected: All()}, offlineY, `reconcile.yml --extra-vars {"build_runner_restart":["Y"]}`},
 		{"all offline", Plan{Affected: All()}, func(runner *registeredRunner) { runner.Status = "offline" }, `reconcile.yml --extra-vars {"build_runner_restart":["infra","Y"]}`},
+		{"missing registration", runners(cli...), unregisteredY, `build-runners.yml --extra-vars {"build_runner_reregister":["Y"]}`},
+		{"missing and offline", Plan{Affected: All()}, func(runner *registeredRunner) {
+			unregisteredY(runner)
+			if runner.Name == "infra-build-09-infra" {
+				runner.Status = "offline"
+			}
+		}, `reconcile.yml --extra-vars {"build_runner_reregister":["Y"],"build_runner_restart":["infra"]}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), change: test.change}
@@ -369,5 +397,88 @@ func TestRunnerLabelsConvergeOnlyMismatchedRunners(t *testing.T) {
 	}
 	if !reflect.DeepEqual(harness.calls, want) {
 		t.Fatalf("labels converged on the wrong runners: %q", harness.calls)
+	}
+}
+
+func TestRunnerConvergenceRetriesTransientReads(t *testing.T) {
+	harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: 1, change: offlineY}
+	if err := harness.commands().Hosts(context.Background(), Plan{Affected: All()}); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{`reconcile.yml --extra-vars {"build_runner_restart":["Y"]}`}; !reflect.DeepEqual(harness.calls, want) || harness.stderr.Len() != 0 {
+		t.Fatalf("transient read failure lost GitHub repairs: %q\n%s", harness.calls, harness.stderr.String())
+	}
+}
+
+func TestUnreadableRunnerFleetDoesNotGateConvergence(t *testing.T) {
+	window := runnerStateWindow
+	runnerStateWindow = 50 * time.Millisecond
+	t.Cleanup(func() { runnerStateWindow = window })
+	for _, test := range []struct {
+		name string
+		plan Plan
+		want []string
+	}{
+		{"CLI release", Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: []string{"build/cli-release.json"}}}, []string{"build-runners.yml"}},
+		{"full", Plan{Affected: All()}, []string{"reconcile.yml"}},
+		{"unchanged runners", Plan{Affected: All(), RunnersUnchanged: true}, []string{"reconcile.yml --skip-tags=runners", "build-runners.yml"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: math.MaxInt}
+			commands := harness.commands()
+			if err := commands.Hosts(context.Background(), test.plan); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(harness.calls, test.want) || commands.runnersVerified {
+				t.Fatalf("unreadable fleet changed host convergence: %q, verified %t", harness.calls, commands.runnersVerified)
+			}
+			if !strings.Contains(harness.stderr.String(), "warning: runner fleet state unavailable") {
+				t.Fatalf("unreadable fleet not reported: %q", harness.stderr.String())
+			}
+		})
+	}
+}
+
+func TestRejectedLabelUpdateOnlyWarns(t *testing.T) {
+	harness := &fleetHarness{t: t, fleet: testRunnerFleet(), rejectLabels: true, change: func(runner *registeredRunner) {
+		if runner.Name == "infra-build-09-Y" {
+			runner.Labels = runner.Labels[:3]
+		}
+	}}
+	if err := harness.commands().Hosts(context.Background(), Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(harness.calls) != 2 || harness.calls[1] != "build-runners.yml" || !strings.Contains(harness.stderr.String(), "warning: set labels of infra-build-09-Y") {
+		t.Fatalf("rejected label update stopped convergence or went unreported: %q\n%s", harness.calls, harness.stderr.String())
+	}
+}
+
+func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github/workflows/reconcile-job.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			If          string            `yaml:"if"`
+			Permissions map[string]string `yaml:"permissions"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	repair, ok := workflow.Jobs["repair"]
+	if !ok || !reflect.DeepEqual(repair.Permissions, map[string]string{"actions": "write"}) {
+		t.Fatalf("repair job permissions are not exactly actions: write: %+v", repair.Permissions)
+	}
+	for _, condition := range []string{"github.event.schedule == '47 * * * *'", "needs.apply.result == 'failure'", "!cancelled()"} {
+		if !strings.Contains(repair.If, condition) || strings.Contains(repair.If, "||") {
+			t.Errorf("repair job condition %q does not require %s", repair.If, condition)
+		}
+	}
+	for name, job := range workflow.Jobs {
+		if name != "repair" && job.Permissions["actions"] == "write" {
+			t.Errorf("job %s can dispatch workflows", name)
+		}
 	}
 }

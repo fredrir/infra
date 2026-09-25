@@ -212,7 +212,7 @@ jobs:
         rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"
   repair:
     needs: apply
-    if: ${{ failure() && github.event.schedule == '47 * * * *' && needs.apply.outputs.reconciliation == 'failure' }}
+    if: ${{ !cancelled() && needs.apply.result == 'failure' && github.event.schedule == '47 * * * *' && needs.apply.outputs.reconciliation == 'failure' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -222,4 +222,10 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
         GH_REPO: ${{ github.repository }}
-      run: gh workflow run reconcile.yml --ref main -f full=true
+      run: |
+        previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --commit "$GITHUB_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // ""')
+        if [ "$previous" = failure ]; then
+          echo "::warning::A dispatched full reconciliation of $GITHUB_SHA already failed; not dispatching another"
+          exit 0
+        fi
+        gh workflow run reconcile.yml --ref main -f full=true

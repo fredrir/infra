@@ -222,6 +222,7 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 	applyOnlyTasks := []string{
 		"roles/infra_binary/tasks/main.yml: Remove superseded binary revisions",
 		"roles/build_runner/tasks/main.yml: Remove superseded runner archives",
+		"roles/build_runner/tasks/repository.yml: Remove unregistered runner identity",
 		"roles/build_runner/tasks/repository.yml: Record incomplete runner replacement",
 		"roles/build_runner/tasks/repository.yml: Complete runner replacement",
 		"roles/build_runner/tasks/remove.yml: Stop retired runner service",

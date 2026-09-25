@@ -160,6 +160,47 @@ esac
 		t.Fatalf("runner-only path lost full-path prerequisites:\n%s", runners)
 	}
 	t.Log("full and runner-only paths resolve the same ordered runner tasks")
+	listed := func(output string) map[string][]string {
+		plays := map[string][]string{}
+		var play string
+		for line := range strings.SplitSeq(output, "\n") {
+			switch {
+			case strings.HasPrefix(line, "  play #"):
+				play = strings.TrimSpace(line)
+				plays[play] = []string{}
+			case strings.HasPrefix(line, "      ") && play != "":
+				plays[play] = append(plays[play], strings.TrimSpace(line))
+			}
+		}
+		return plays
+	}
+	everything, withoutRunners := listed(full), listed(run("/source/ansible/reconcile.yml", true, "--list-tasks", "--skip-tags=runners"))
+	runnerPlays := 0
+	for play, tasks := range everything {
+		skipped, ok := withoutRunners[play]
+		switch {
+		case !ok:
+			t.Fatalf("skipping runners lost play %s", play)
+		case strings.Contains(play, "Register trusted dedicated build runners"):
+			runnerPlays++
+			if len(tasks) == 0 || len(skipped) != 0 {
+				t.Fatalf("skipping runners kept runner play tasks %q of %q", skipped, tasks)
+			}
+		case !slices.Equal(skipped, tasks):
+			t.Fatalf("skipping runners changed %s: %q, want %q", play, skipped, tasks)
+		}
+	}
+	if runnerPlays != 1 || len(withoutRunners) != len(everything) {
+		t.Fatalf("skipping runners changed the plays: %d runner plays, %d of %d plays", runnerPlays, len(withoutRunners), len(everything))
+	}
+	var binary []string
+	for _, tasks := range listed(run("/source/ansible/build-runners.yml", true, "--list-tasks", "--tags=infra_binary")) {
+		binary = append(binary, tasks...)
+	}
+	if len(binary) < 2 || !strings.HasPrefix(binary[0], "Gather runner host facts\t") || slices.ContainsFunc(binary[1:], func(task string) bool { return !strings.HasPrefix(task, "infra_binary : ") }) {
+		t.Fatalf("binary-only runner convergence selects more than facts and the binary: %q", binary)
+	}
+	t.Log("skipping runners removes only the runner play and the binary tag selects only facts and the binary")
 	restarted := func() string {
 		data, err := os.ReadFile(filepath.Join(fixture, "state/restarted"))
 		if err != nil && !os.IsNotExist(err) {
@@ -187,6 +228,28 @@ esac
 		t.Fatalf("requested runner restart restarted %q, want only %s:\n%s", strings.TrimPrefix(restarted(), steady), runnerUnit("Y"), output)
 	}
 	t.Log("runners reported offline restart without restarting the rest of the fleet")
+	write("bin/gh", "#!/bin/sh\necho fixture-token\n", true)
+	write("runners/Y/config.sh", "#!/bin/sh\nset -eu\necho \"$*\" >> /fixture/state/registered\nfor file in .runner .credentials .credentials_rsaparams; do echo registered > \"$file\"; done\n", true)
+	write("runners/Y/.credentials", "stale\n", false)
+	write("runners/Y/.credentials_rsaparams", "stale\n", false)
+	before := restarted()
+	reregistered := run("/fixture/converge.yml", true, "--extra-vars", `{"build_runner_reregister":["Y"]}`)
+	registration := string(read(filepath.Join(fixture, "state/registered")))
+	if strings.Count(registration, "\n") != 1 || !strings.Contains(registration, "--replace") || !strings.Contains(registration, "--token fixture-token") || !strings.Contains(registration, "--name localhost-Y ") {
+		t.Fatalf("missing registration did not re-register only Y with --replace: %q\n%s", registration, reregistered)
+	}
+	for _, file := range []string{".runner", ".credentials", ".credentials_rsaparams"} {
+		if identity := string(read(filepath.Join(fixture, "runners/Y", file))); identity != "registered\n" {
+			t.Fatalf("re-registration kept stale %s %q", file, identity)
+		}
+	}
+	if got := strings.TrimPrefix(restarted(), before); got != runnerUnit("Y")+"\n" {
+		t.Fatalf("re-registration restarted %q, want only %s", got, runnerUnit("Y"))
+	}
+	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") {
+		t.Fatalf("re-registered runner does not converge idempotently:\n%s", output)
+	}
+	t.Log("missing registrations re-register with fresh credentials and restart only their runner")
 	outcome := func(output string) (changed, failed []string) {
 		var task string
 		for line := range strings.SplitSeq(output, "\n") {

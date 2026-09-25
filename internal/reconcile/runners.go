@@ -181,6 +181,20 @@ func runnerDrift(fleet RunnerFleet, states map[string][]registeredRunner) []stri
 	return problems
 }
 
+var runnerStateWindow = 10 * time.Second
+
+func (c *Commands) readRunnerStates(ctx context.Context, fleet RunnerFleet) (map[string][]registeredRunner, error) {
+	read, cancel := context.WithTimeout(ctx, runnerStateWindow)
+	defer cancel()
+	var states map[string][]registeredRunner
+	err := poll(read, func() error {
+		var err error
+		states, err = c.runnerStates(read, fleet)
+		return err
+	})
+	return states, err
+}
+
 func offlineRunners(fleet RunnerFleet, states map[string][]registeredRunner) []string {
 	var offline []string
 	for _, repository := range fleet.Repositories {
@@ -191,7 +205,17 @@ func offlineRunners(fleet RunnerFleet, states map[string][]registeredRunner) []s
 	return offline
 }
 
-func (c *Commands) convergeRunnerLabels(ctx context.Context, fleet RunnerFleet, states map[string][]registeredRunner) error {
+func missingRunners(fleet RunnerFleet, states map[string][]registeredRunner) []string {
+	var missing []string
+	for _, repository := range fleet.Repositories {
+		if len(namedRunners(fleet, states, repository)) == 0 {
+			missing = append(missing, repository)
+		}
+	}
+	return missing
+}
+
+func (c *Commands) convergeRunnerLabels(ctx context.Context, fleet RunnerFleet, states map[string][]registeredRunner) {
 	labels := slices.Sorted(slices.Values(fleet.Labels))
 	for _, repository := range fleet.Repositories {
 		matches := namedRunners(fleet, states, repository)
@@ -203,10 +227,9 @@ func (c *Commands) convergeRunnerLabels(ctx context.Context, fleet RunnerFleet, 
 			args = append(args, "-f", "labels[]="+label)
 		}
 		if err := c.Runner.Run(ctx, "gh", args...); err != nil {
-			return fmt.Errorf("set labels of %s: %w", matches[0].Name, err)
+			c.warn("set labels of %s: %v", matches[0].Name, err)
 		}
 	}
-	return nil
 }
 
 func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook string) error {
@@ -214,27 +237,37 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 	if err != nil {
 		return err
 	}
-	states, err := c.runnerStates(ctx, fleet)
+	states, err := c.readRunnerStates(ctx, fleet)
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if err != nil {
-		return err
+		c.warn("runner fleet state unavailable; converging runners without GitHub repairs: %v", err)
+		return c.ansible(ctx, playbook)
 	}
 	drift := runnerDrift(fleet, states)
-	if plan.RunnersUnchanged && len(drift) == 0 && c.ansible(ctx, "verify-runners.yml") == nil {
-		c.runnersVerified = true
-		if c.Runner.Stdout != nil {
-			fmt.Fprintln(c.Runner.Stdout, "Runner fleet matches its declaration; skipping the runner play")
+	if plan.RunnersUnchanged {
+		if len(drift) == 0 && c.ansible(ctx, "verify-runners.yml") == nil {
+			c.runnersVerified = true
+			c.note("runner fleet matches its declaration; skipping the runner play")
+			return nil
 		}
-		return nil
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		c.note("runner verification reported drift; converging runners")
 	}
-	if err := ctx.Err(); err != nil {
-		return err
+	c.convergeRunnerLabels(ctx, fleet, states)
+	repairs := map[string][]string{}
+	if restart := offlineRunners(fleet, states); len(restart) > 0 {
+		repairs["build_runner_restart"] = restart
 	}
-	if err := c.convergeRunnerLabels(ctx, fleet, states); err != nil {
-		return err
+	if missing := missingRunners(fleet, states); len(missing) > 0 {
+		repairs["build_runner_reregister"] = missing
 	}
 	var args []string
-	if restart := offlineRunners(fleet, states); len(restart) > 0 {
-		variables, err := json.Marshal(map[string][]string{"build_runner_restart": restart})
+	if len(repairs) > 0 {
+		variables, err := json.Marshal(repairs)
 		if err != nil {
 			return err
 		}
@@ -244,6 +277,18 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 		args = append(args, "--tags=infra_binary")
 	}
 	return c.ansible(ctx, playbook, args...)
+}
+
+func (c *Commands) note(format string, args ...any) {
+	if c.Runner.Stdout != nil {
+		fmt.Fprintf(c.Runner.Stdout, format+"\n", args...)
+	}
+}
+
+func (c *Commands) warn(format string, args ...any) {
+	if c.Runner.Stderr != nil {
+		fmt.Fprintf(c.Runner.Stderr, "warning: "+format+"\n", args...)
+	}
 }
 
 func (c *Commands) verifyRunnerFleet(ctx context.Context, fleet RunnerFleet) error {
