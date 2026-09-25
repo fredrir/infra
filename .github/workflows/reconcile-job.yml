@@ -101,6 +101,7 @@ jobs:
       actions: read
     outputs:
       reconciliation: ${{ steps.reconcile.outcome }}
+      differences: ${{ steps.verification.outputs.differences }}
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
@@ -177,10 +178,20 @@ jobs:
       run: |
         if [ -n "$STRATEGY_OVERRIDE" ]; then export ANSIBLE_STRATEGY="$STRATEGY_OVERRIDE"; fi
         if [ "$DRIFT_ONLY" = true ]; then
-          infra ci measure --stage drift-verification --budget 5m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --verify-artifacts="$VERIFY_ARTIFACTS"
+          infra ci measure --stage drift-verification --budget 10m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --deep --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/verification.json"
         else
           infra reconcile apply --full="$FULL" --scheduled="$SCHEDULED" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/status.json"
         fi
+    - name: Read declared differences
+      id: verification
+      if: always() && github.event.schedule == '47 * * * *'
+      run: |
+        report="$RUNNER_TEMP/reconciliation/verification.json"
+        differences=false
+        if [ -f "$report" ] && jq -e '.differences | length > 0' "$report" >/dev/null; then
+          differences=true
+        fi
+        printf 'differences=%s\n' "$differences" >> "$GITHUB_OUTPUT"
     - name: Record workflow timing
       if: always()
       env:
@@ -192,13 +203,15 @@ jobs:
     - name: Summarize reconciliation
       if: always()
       run: |
-        if [ -f "$RUNNER_TEMP/reconciliation/status.json" ]; then
-          {
-            printf '```json\n'
-            cat "$RUNNER_TEMP/reconciliation/status.json"
-            printf '\n```\n'
-          } >> "$GITHUB_STEP_SUMMARY"
-        fi
+        for report in status verification; do
+          if [ -f "$RUNNER_TEMP/reconciliation/$report.json" ]; then
+            {
+              printf '```json\n'
+              cat "$RUNNER_TEMP/reconciliation/$report.json"
+              printf '\n```\n'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+        done
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       if: always()
       with:
@@ -212,7 +225,7 @@ jobs:
         rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"
   repair:
     needs: apply
-    if: ${{ !cancelled() && needs.apply.result == 'failure' && github.event.schedule == '47 * * * *' && needs.apply.outputs.reconciliation == 'failure' }}
+    if: ${{ !cancelled() && needs.apply.result == 'failure' && github.event.schedule == '47 * * * *' && needs.apply.outputs.reconciliation == 'failure' && needs.apply.outputs.differences == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

@@ -325,14 +325,23 @@ func (c *Commands) warn(format string, args ...any) {
 func (c *Commands) verifyRunnerFleet(ctx context.Context, fleet RunnerFleet) error {
 	wait, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	return poll(wait, func() error {
+	var drift Differences
+	err := poll(wait, func() error {
 		states, err := c.runnerStates(wait, fleet)
 		if err != nil {
 			return err
 		}
-		if problems := runnerDrift(fleet, states); len(problems) > 0 {
-			return fmt.Errorf("runner fleet drift: %s", strings.Join(problems, "; "))
+		drift = nil
+		for _, problem := range runnerDrift(fleet, states) {
+			drift = append(drift, Difference{System: "runners", Item: problem})
+		}
+		if len(drift) > 0 {
+			return drift
 		}
 		return nil
 	})
+	if err != nil && len(drift) > 0 && ctx.Err() == nil {
+		return drift
+	}
+	return err
 }

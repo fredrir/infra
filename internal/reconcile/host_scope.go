@@ -2,13 +2,7 @@ package reconcile
 
 import (
 	"context"
-	"encoding/xml"
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"slices"
-	"strings"
 )
 
 func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
@@ -84,70 +78,45 @@ func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
 var comparedPlaybooks = []string{"reconcile.yml", "external.yml"}
 
 func (c *Commands) compareHosts(ctx context.Context) error {
-	reports, err := os.MkdirTemp(c.Work, "host-comparison-")
-	if err != nil {
-		return err
+	run, err := c.recordPlaybooks(ctx, comparedPlaybooks, "--check", "--skip-tags=runners")
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
 	}
-	compare := Commands{Runner: c.Runner}
-	compare.Runner.Env = append(slices.Clone(c.Runner.Env), "ANSIBLE_CALLBACKS_ENABLED=ansible.builtin.junit", "JUNIT_OUTPUT_DIR="+reports, "JUNIT_FAIL_ON_CHANGE=true", "JUNIT_HIDE_TASK_ARGUMENTS=true")
-	run := compare.ansible(ctx, comparedPlaybooks[0], append(slices.Clone(comparedPlaybooks[1:]), "--check", "--skip-tags=runners")...)
-	if err := ctx.Err(); err != nil {
-		return err
+	if err == nil && !run.Reported {
+		err = fmt.Errorf("host comparison recorded no task results")
 	}
-	differences, err := hostDifferences(reports)
-	if err != nil {
-		return errors.Join(run, err)
+	var differences Differences
+	var failed []string
+	for _, task := range run.Tasks {
+		if task.Failed {
+			failed = append(failed, "["+task.Host+"] "+task.Task)
+		} else {
+			differences = append(differences, Difference{System: "hosts", Host: task.Host, Item: task.Task})
+		}
 	}
-	if len(differences) > 0 {
-		return errors.Join(run, fmt.Errorf("hosts differ from their declarations: %s", strings.Join(differences, "; ")))
-	}
-	return run
+	return run.outcome(differences, failed, err)
 }
 
-func hostDifferences(reports string) ([]string, error) {
-	files, err := filepath.Glob(filepath.Join(reports, "*.xml"))
-	if err != nil {
-		return nil, err
-	}
-	if len(files) == 0 {
-		return nil, fmt.Errorf("host comparison recorded no task results")
-	}
-	var differences []string
-	for _, file := range files {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
-		var report struct {
-			Suites []struct {
-				Cases []struct {
-					Name     string     `xml:"name,attr"`
-					Failures []xml.Name `xml:"failure"`
-					Errors   []xml.Name `xml:"error"`
-				} `xml:"testcase"`
-			} `xml:"testsuite"`
-		}
-		if err := xml.Unmarshal(data, &report); err != nil {
-			return nil, fmt.Errorf("host comparison report %s: %w", filepath.Base(file), err)
-		}
-		for _, suite := range report.Suites {
-			for _, task := range suite.Cases {
-				if len(task.Failures) > 0 || len(task.Errors) > 0 {
-					differences = append(differences, task.Name)
-				}
-			}
-		}
-	}
-	slices.Sort(differences)
-	return slices.Compact(differences), nil
-}
-
-func (c *Commands) verifyRunnerHosts(ctx context.Context, playbook string, extra ...string) error {
+func (c *Commands) verifyRunnerHosts(ctx context.Context, playbooks ...string) error {
 	fleet, err := LoadRunnerFleet(c.Runner.Dir)
 	if err != nil {
 		return err
 	}
-	if err := c.ansible(ctx, playbook, extra...); err != nil {
+	run, err := c.recordPlaybooks(ctx, playbooks)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	var differences Differences
+	var failed []string
+	for _, task := range run.Tasks {
+		switch {
+		case task.Playbook == "verify-runners":
+			differences = append(differences, Difference{System: "runners", Host: task.Host, Item: task.Task})
+		case task.Failed:
+			failed = append(failed, "["+task.Host+"] "+task.Task)
+		}
+	}
+	if err := run.outcome(differences, failed, err); err != nil {
 		return err
 	}
 	return c.verifyRunnerFleet(ctx, fleet)

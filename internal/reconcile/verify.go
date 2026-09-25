@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/fredrir/infra/internal/ci"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,7 +15,11 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 )
 
 type resource struct {
@@ -310,33 +314,91 @@ func (c *Commands) VerifyDrift(ctx context.Context, plan Plan) error {
 }
 
 func (c *Commands) VerifyDeep(ctx context.Context, plan Plan) error {
-	if err := c.VerifyLive(ctx, plan); err != nil {
-		return err
+	live := c.VerifyLive(ctx, plan)
+	if err := ctx.Err(); err != nil {
+		return errors.Join(live, err)
 	}
-	return c.compareDeclarations(ctx)
+	return errors.Join(live, c.compareDeclarations(ctx))
 }
 
 func (c *Commands) compareDeclarations(ctx context.Context) error {
 	var output bytes.Buffer
-	tofu := Commands{Runner: c.Runner}
-	tofu.Runner.Stdout, tofu.Runner.Stderr = &output, &output
+	log := &lockedWriter{mu: &sync.Mutex{}, writer: &output}
 	planned := make(chan error, 1)
-	go func() {
-		err := tofu.tofuInit(ctx)
-		if err == nil {
-			err = tofu.verifyTofu(ctx)
-		}
-		planned <- err
-	}()
+	go func() { planned <- c.compareTofu(ctx, log) }()
 	hosts := c.compareHosts(ctx)
 	infrastructure := <-planned
 	if c.Runner.Stdout != nil {
 		_, _ = c.Runner.Stdout.Write(output.Bytes())
 	}
-	if infrastructure != nil {
-		infrastructure = fmt.Errorf("OpenTofu comparison: %w", infrastructure)
-	}
 	return errors.Join(hosts, infrastructure)
+}
+
+func (c *Commands) compareTofu(ctx context.Context, log io.Writer) error {
+	tofu := Commands{Runner: c.Runner}
+	tofu.Runner.Stdout, tofu.Runner.Stderr = log, log
+	if err := tofu.tofuInit(ctx); err != nil {
+		return fmt.Errorf("OpenTofu comparison: %w", err)
+	}
+	execute := c.Runner.Execute
+	if execute == nil {
+		execute = process.Run
+	}
+	result, err := execute(ctx, process.Options{Name: "tofu", Args: []string{"-chdir=tofu", "plan", "-input=false", "-lock=false", "-json", "-detailed-exitcode", "-var-file=production.tfvars.json"}, Dir: c.Runner.Dir, Env: append(os.Environ(), c.Runner.Env...), Stderr: log})
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	var differences Differences
+	var diagnostics []string
+	summary := "plan has changes"
+	for line := range strings.Lines(string(result.Stdout)) {
+		var event struct {
+			Type    string `json:"type"`
+			Level   string `json:"@level"`
+			Message string `json:"@message"`
+			Change  struct {
+				Resource struct{ Addr string }
+				Action   string
+			}
+			Outputs map[string]struct{ Action string }
+		}
+		if json.Unmarshal([]byte(line), &event) != nil {
+			fmt.Fprint(log, line)
+			continue
+		}
+		fmt.Fprintln(log, event.Message)
+		switch event.Type {
+		case "planned_change":
+			differences = append(differences, Difference{System: "opentofu", Item: event.Change.Resource.Addr + " " + event.Change.Action})
+		case "outputs":
+			for _, name := range slices.Sorted(maps.Keys(event.Outputs)) {
+				if action := event.Outputs[name].Action; action != "noop" {
+					differences = append(differences, Difference{System: "opentofu", Item: "output " + name + " " + action})
+				}
+			}
+		case "change_summary":
+			summary = event.Message
+		case "diagnostic":
+			if event.Level == "error" {
+				diagnostics = append(diagnostics, event.Message)
+			}
+		}
+	}
+	switch {
+	case err == nil && result.ExitCode == 0:
+		return nil
+	case result.ExitCode == 2:
+		if len(differences) == 0 {
+			differences = Differences{{System: "opentofu", Item: summary}}
+		}
+		return differences
+	case len(diagnostics) > 0:
+		return fmt.Errorf("OpenTofu comparison: %s", strings.Join(diagnostics, "; "))
+	case err != nil:
+		return fmt.Errorf("OpenTofu comparison: %w", err)
+	default:
+		return fmt.Errorf("OpenTofu comparison: tofu exited %d", result.ExitCode)
+	}
 }
 
 func (c *Commands) VerifyLive(ctx context.Context, plan Plan) error {

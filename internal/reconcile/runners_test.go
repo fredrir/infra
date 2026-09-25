@@ -480,7 +480,7 @@ func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
 	if !ok || !reflect.DeepEqual(repair.Permissions, map[string]string{"actions": "write"}) {
 		t.Fatalf("repair job permissions are not exactly actions: write: %+v", repair.Permissions)
 	}
-	for _, condition := range []string{"github.event.schedule == '47 * * * *'", "needs.apply.result == 'failure'", "!cancelled()"} {
+	for _, condition := range []string{"github.event.schedule == '47 * * * *'", "needs.apply.result == 'failure'", "!cancelled()", "needs.apply.outputs.differences == 'true'"} {
 		if !strings.Contains(repair.If, condition) || strings.Contains(repair.If, "||") {
 			t.Errorf("repair job condition %q does not require %s", repair.If, condition)
 		}

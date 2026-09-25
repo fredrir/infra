@@ -79,3 +79,27 @@ func TestCommandValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestVerificationWritesItsOutcomeReport(t *testing.T) {
+	report := filepath.Join(t.TempDir(), "reports", "verification.json")
+	var output bytes.Buffer
+	if err := cli.Run(context.Background(), []string{"reconcile", "verify", "--deep", "--root", t.TempDir(), "--report", report}, &output, &output); err == nil {
+		t.Fatal("verification without declarations succeeded")
+	}
+	data, err := os.ReadFile(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var outcome struct {
+		Deep        bool
+		Outcome     string
+		Differences []any
+		Errors      []string
+	}
+	if err := json.Unmarshal(data, &outcome); err != nil {
+		t.Fatal(err)
+	}
+	if !outcome.Deep || outcome.Outcome != "failed" || outcome.Differences == nil || len(outcome.Differences) != 0 || len(outcome.Errors) != 1 || !strings.Contains(outcome.Errors[0], "settings.yaml") {
+		t.Fatalf("verification error reported as %s", data)
+	}
+}

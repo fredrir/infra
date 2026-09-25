@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -21,7 +22,7 @@ func newReconcileCommand() *cobra.Command {
 	command.PersistentFlags().StringVar(&root, "root", ".", "Source checkout")
 	command.PersistentFlags().StringVar(&bucket, "state-bucket", "llunde-pyparser-bucket", "Reconciliation state bucket")
 	command.PersistentFlags().StringVar(&prefix, "state-prefix", "reconciliation/production", "Reconciliation state prefix")
-	command.PersistentFlags().StringVar(&report, "report", "", "Status report path")
+	command.PersistentFlags().StringVar(&report, "report", "", "Status or verification outcome report path")
 	command.PersistentFlags().BoolVar(&full, "full", false, "Reconcile all systems, including external drift")
 	command.PersistentFlags().BoolVar(&scopeHosts, "scope-hosts", false, "Limit host convergence to affected playbooks")
 	command.PersistentFlags().BoolVar(&scopeProjects, "scope-projects", false, "Limit project deployment to affected owners")
@@ -37,7 +38,13 @@ func newReconcileCommand() *cobra.Command {
 		if action == "verify" {
 			child.Flags().BoolVar(&deep, "deep", false, "Also compare OpenTofu and every host play with production in check mode")
 		}
-		child.RunE = func(cmd *cobra.Command, _ []string) error {
+		child.RunE = func(cmd *cobra.Command, _ []string) (err error) {
+			var verified string
+			if action == "verify" && report != "" {
+				defer func() {
+					err = errors.Join(err, writeReport(report, reconcile.VerificationOutcome(verified, deep, err)))
+				}()
+			}
 			absolute, err := filepath.Abs(root)
 			if err != nil {
 				return err
@@ -83,18 +90,11 @@ func newReconcileCommand() *cobra.Command {
 			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ScopeHosts: scopeHosts, ScopeProjects: scopeProjects, VerifyArtifacts: verifyArtifacts}
 			if action == "apply" {
 				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, SkipUnchanged: scopeHosts, VerifyArtifacts: verifyArtifacts, Scheduled: scheduled, Report: func(status reconcile.Status) error {
-					data, err := json.MarshalIndent(status, "", "  ")
-					if err != nil {
-						return err
-					}
 					fmt.Fprintf(cmd.OutOrStdout(), "%s desired=%s applied=%s\n", status.Stage, status.Desired, status.Applied)
 					if report == "" {
 						return nil
 					}
-					if err := os.MkdirAll(filepath.Dir(report), 0700); err != nil {
-						return err
-					}
-					return os.WriteFile(report, append(data, '\n'), 0600)
+					return writeReport(report, status)
 				}}
 				return engine.Apply(cmd.Context(), full)
 			}
@@ -123,10 +123,11 @@ func newReconcileCommand() *cobra.Command {
 				return err
 			}
 			plan := reconcile.Plan{Revision: revision, Base: base, Affected: selected, Host: host}
-			if action == "verify" && deep {
-				return ops.VerifyDeep(cmd.Context(), plan)
-			}
 			if action == "verify" {
+				verified = revision
+				if deep {
+					return ops.VerifyDeep(cmd.Context(), plan)
+				}
 				return ops.VerifyLive(cmd.Context(), plan)
 			}
 			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(plan); err != nil {
@@ -137,4 +138,15 @@ func newReconcileCommand() *cobra.Command {
 		command.AddCommand(child)
 	}
 	return command
+}
+
+func writeReport(path string, value any) error {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0600)
 }

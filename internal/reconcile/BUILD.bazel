@@ -8,6 +8,8 @@ go_library(
         "commands.go",
         "config.go",
         "host_scope.go",
+        "outcome.go",
+        "playbook_results.go",
         "projects.go",
         "published.go",
         "run.go",

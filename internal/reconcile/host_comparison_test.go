@@ -3,10 +3,12 @@ package reconcile
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -16,8 +18,16 @@ import (
 	"github.com/fredrir/infra/internal/process"
 )
 
-func junitReport(cases ...string) string {
-	return `<?xml version="1.0" ?><testsuites><testsuite name="external" tests="` + fmt.Sprint(len(cases)) + `">` + strings.Join(cases, "") + `</testsuite></testsuites>`
+func junitReport(playbook string, cases ...string) string {
+	return `<?xml version="1.0" ?><testsuites><testsuite name="` + playbook + `" tests="` + fmt.Sprint(len(cases)) + `">` + strings.Join(cases, "") + `</testsuite></testsuites>`
+}
+
+func junitCase(name, class, body string) string {
+	return `<testcase name="` + name + `" classname="` + class + `">` + body + `</testcase>`
+}
+
+func junitResult(changed bool) string {
+	return fmt.Sprintf(`<system-out>{&#10;"changed": %t,&#10;"msg": "ok"&#10;}</system-out>`, changed)
 }
 
 func environment(options process.Options, name string) string {
@@ -29,84 +39,180 @@ func environment(options process.Options, name string) string {
 	return ""
 }
 
-func TestHostComparisonRunsEveryHostPlayInCheckMode(t *testing.T) {
-	ok := `<testcase name="[fredrir-07] Configure Ubuntu hosts: ubuntu : Harden SSH authentication" classname="roles/ubuntu/tasks/main.yml:22"><system-out>{}</system-out></testcase>`
-	skipped := `<testcase name="[fredrir-06] Configure K3s workers: k3s : Assign worker capabilities"><skipped message="Conditional result was False"/></testcase>`
-	changed := `<testcase name="[fredrir-04] Configure host network access: firewall : Configure host input filtering"><failure message="rc=0"/></testcase>`
-	failed := `<testcase name="[fredrir-09] Configure K3s workers: k3s : Wait for the node to become ready"><failure message="non-zero return code"/></testcase>`
-	broken := `<testcase name="[fredrir-05] Configure Ubuntu hosts: ubuntu : Set the inventory hostname"><error message="Task failed"/></testcase>`
+type fakePlaybooks struct {
+	reports []string
+	recap   string
+	exit    int
+}
+
+func (f fakePlaybooks) execute(t *testing.T, options process.Options) (process.Result, error) {
+	t.Helper()
+	reports := environment(options, "JUNIT_OUTPUT_DIR")
+	if environment(options, "ANSIBLE_CALLBACKS_ENABLED") != "ansible.builtin.junit" || environment(options, "JUNIT_HIDE_TASK_ARGUMENTS") != "true" || reports == "" {
+		t.Errorf("Ansible results are not recorded: %q", options.Env)
+	}
+	for index, report := range f.reports {
+		if err := os.WriteFile(filepath.Join(reports, fmt.Sprintf("playbook-%d.%d.xml", 1790000000+index, index)), []byte(report), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if options.Stdout != nil {
+		fmt.Fprint(options.Stdout, "PLAY RECAP *****\n"+f.recap)
+	}
+	if f.exit != 0 {
+		return process.Result{ExitCode: f.exit}, fmt.Errorf("ansible-playbook failed: exit status %d", f.exit)
+	}
+	return process.Result{}, nil
+}
+
+func TestHostComparisonClassifiesCheckModeResults(t *testing.T) {
+	unchanged := junitCase("[fredrir-07] Configure Ubuntu hosts: ubuntu : Harden SSH authentication", "roles/ubuntu/tasks/main.yml:22", junitResult(false))
+	skipped := junitCase("[fredrir-06] Configure K3s workers: k3s : Assign worker capabilities", "roles/k3s/tasks/main.yml:180", `<skipped message="Conditional result was False"/>`)
+	changed := junitCase("[fredrir-04] Configure host network access: firewall : Configure host input filtering", "roles/firewall/tasks/main.yml:19", junitResult(true))
+	failed := junitCase("[fredrir-09] Configure K3s workers: k3s : Wait for the node to become ready", "roles/k3s/tasks/main.yml:160", `<failure message="non-zero return code"/>`)
+	broken := junitCase("[fredrir-05] Configure Ubuntu hosts: ubuntu : Set the inventory hostname", "roles/ubuntu/tasks/main.yml:8", `<error message="Task failed"/>`)
+	included := junitCase("[include] Configure K3s workers: tailscale : Install verified transport binaries", "roles/tailscale/tasks/install.yml:9", `<system-out>included</system-out>`)
+	filtering := Difference{System: "hosts", Host: "fredrir-04", Item: "Configure host network access: firewall : Configure host input filtering"}
 	for _, test := range []struct {
-		name      string
-		reports   []string
-		exit      int
-		want      []string
-		unwanted  []string
-		succeeded bool
+		name        string
+		playbooks   fakePlaybooks
+		differences []Difference
+		errors      []string
 	}{
-		{name: "matching", reports: []string{junitReport(ok, skipped)}, succeeded: true},
-		{name: "changed", reports: []string{junitReport(ok, changed)}, want: []string{"[fredrir-04] Configure host network access: firewall : Configure host input filtering"}, unwanted: []string{"Harden SSH"}},
-		{name: "failed", reports: []string{junitReport(changed, failed), junitReport(changed, failed, broken)}, exit: 2, want: []string{"Wait for the node to become ready", "Set the inventory hostname", "exited 2"}},
-		{name: "unreported", exit: 0, want: []string{"recorded no task results"}},
-		{name: "unreadable", reports: []string{"<testsuites"}, want: []string{"host comparison report"}},
+		{name: "matching", playbooks: fakePlaybooks{reports: []string{junitReport("reconcile", unchanged, skipped, included)}}},
+		{name: "changed", playbooks: fakePlaybooks{reports: []string{junitReport("reconcile", unchanged, changed), junitReport("external", unchanged, changed)}}, differences: []Difference{filtering}},
+		{name: "failed", playbooks: fakePlaybooks{reports: []string{junitReport("reconcile", changed, failed, broken)}, exit: 2}, differences: []Difference{filtering}, errors: []string{"host tasks failed: [fredrir-09] Configure K3s workers: k3s : Wait for the node to become ready; [fredrir-05] Configure Ubuntu hosts: ubuntu : Set the inventory hostname"}},
+		{name: "unreachable", playbooks: fakePlaybooks{reports: []string{junitReport("reconcile", unchanged)}, recap: "fredrir-07                 : ok=40   changed=0    unreachable=0    failed=0    skipped=9\n\x1b[0;31mfredrir-06\x1b[0m                 : \x1b[0;32mok=0\x1b[0m    changed=0    \x1b[1;31munreachable=1\x1b[0m    failed=0    skipped=0\n", exit: 4}, errors: []string{"unreachable hosts: fredrir-06"}},
+		{name: "unreported", errors: []string{"host comparison recorded no task results"}},
+		{name: "unreported failure", playbooks: fakePlaybooks{exit: 1}, errors: []string{"ansible-playbook failed: exit status 1"}},
+		{name: "unreadable", playbooks: fakePlaybooks{reports: []string{"<testsuites"}}, errors: []string{"Ansible result report playbook-1790000000.0.xml: XML syntax error on line 1: unexpected EOF"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var calls [][]string
 			work := t.TempDir()
 			commands := Commands{Work: work, Runner: ci.Runner{Dir: "/source", Env: []string{"JUNIT_OUTPUT_DIR=/elsewhere"}, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				calls = append(calls, options.Args)
-				for _, setting := range []string{"ANSIBLE_CALLBACKS_ENABLED=ansible.builtin.junit", "JUNIT_FAIL_ON_CHANGE=true", "JUNIT_HIDE_TASK_ARGUMENTS=true", "ANSIBLE_CONFIG=/source/ansible/ansible.cfg"} {
-					name, value, _ := strings.Cut(setting, "=")
-					if environment(options, name) != value {
-						t.Errorf("%s=%q, want %q", name, environment(options, name), value)
-					}
+				if environment(options, "ANSIBLE_CONFIG") != "/source/ansible/ansible.cfg" || filepath.Dir(environment(options, "JUNIT_OUTPUT_DIR")) != work {
+					t.Errorf("results recorded outside the private work directory: %q", options.Env)
 				}
-				reports := environment(options, "JUNIT_OUTPUT_DIR")
-				if filepath.Dir(reports) != work {
-					t.Errorf("reports written to %s outside the private work directory", reports)
-				}
-				for index, report := range test.reports {
-					if err := os.WriteFile(filepath.Join(reports, fmt.Sprintf("reconcile-%d.xml", index)), []byte(report), 0600); err != nil {
-						t.Fatal(err)
-					}
-				}
-				if test.exit != 0 {
-					return process.Result{ExitCode: test.exit}, fmt.Errorf("ansible-playbook exited %d", test.exit)
-				}
-				return process.Result{}, nil
+				return test.playbooks.execute(t, options)
 			}}}
-			err := commands.compareHosts(context.Background())
+			outcome := VerificationOutcome("", true, commands.compareHosts(context.Background()))
 			if want := [][]string{{"-i", "inventory/production.yml", "reconcile.yml", "external.yml", "--check", "--skip-tags=runners"}}; !slices.EqualFunc(calls, want, slices.Equal) {
 				t.Fatalf("host comparison ran %q, want %q", calls, want)
 			}
-			if (err == nil) != test.succeeded {
-				t.Fatalf("host comparison returned %v", err)
+			if !reflect.DeepEqual(outcome.Differences, append([]Difference{}, test.differences...)) || !reflect.DeepEqual(outcome.Errors, append([]string{}, test.errors...)) {
+				t.Fatalf("host comparison reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
 			}
-			for _, fragment := range test.want {
-				if strings.Count(fmt.Sprint(err), fragment) != 1 {
-					t.Errorf("error %q does not report %q exactly once", err, fragment)
-				}
-			}
-			for _, fragment := range test.unwanted {
-				if strings.Contains(fmt.Sprint(err), fragment) {
-					t.Errorf("error %q reports matching task %q", err, fragment)
-				}
+			if entries, _ := os.ReadDir(work); len(entries) != 0 {
+				t.Fatalf("recorded results left in the work directory: %v", entries)
 			}
 		})
 	}
 }
 
+func TestRunnerVerificationReportsRunnerPlayDifferences(t *testing.T) {
+	fleet := testRunnerFleet()
+	runner := junitCase("[infra-build-09] Verify dedicated build runners: build_runner : Install immutable trusted-job hook adapter", "roles/build_runner/tasks/state.yml:57", junitResult(true))
+	rejected := junitCase("[infra-build-09] Verify dedicated build runners: Reject declared runner state drift", "verify-runners.yml:92", `<failure message="The build VM differs from its declared runner state"/>`)
+	inactive := junitCase("[fredrir-04] Verify cluster services: Read Kubernetes service status", "verify.yml:6", `<failure message="non-zero return code"/>`)
+	for _, test := range []struct {
+		name        string
+		reports     []string
+		differences []Difference
+		errors      []string
+	}{
+		{name: "matching", reports: []string{junitReport("verify"), junitReport("verify-runners")}},
+		{name: "runner drift", reports: []string{junitReport("verify"), junitReport("verify-runners", runner, rejected)}, differences: []Difference{
+			{System: "runners", Host: "infra-build-09", Item: "Verify dedicated build runners: build_runner : Install immutable trusted-job hook adapter"},
+			{System: "runners", Host: "infra-build-09", Item: "Verify dedicated build runners: Reject declared runner state drift"},
+		}},
+		{name: "cluster service", reports: []string{junitReport("verify", inactive), junitReport("verify-runners", inactive)}, errors: []string{"host tasks failed: [fredrir-04] Verify cluster services: Read Kubernetes service status"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var mu sync.Mutex
+			queried := 0
+			commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				switch options.Name {
+				case "ansible-playbook":
+					exit := 0
+					if test.differences != nil || test.errors != nil {
+						exit = 2
+					}
+					return fakePlaybooks{reports: test.reports, exit: exit}.execute(t, options)
+				case "gh":
+					queried++
+					return runnerResponse(t, healthyRunner(fleet, queriedRepository(options))), nil
+				}
+				return process.Result{}, fmt.Errorf("unexpected command %s", options.Name)
+			}}}
+			outcome := VerificationOutcome("", false, commands.VerifyHosts(context.Background(), Plan{Affected: All()}))
+			if !reflect.DeepEqual(outcome.Differences, append([]Difference{}, test.differences...)) || !reflect.DeepEqual(outcome.Errors, append([]string{}, test.errors...)) {
+				t.Fatalf("runner verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
+			}
+			if want := map[bool]int{true: len(fleet.Repositories), false: 0}[outcome.Outcome == OutcomeMatches]; queried != want {
+				t.Fatalf("runner fleet queried %d times, want %d", queried, want)
+			}
+		})
+	}
+}
+
+func TestVerificationOutcomeSeparatesDifferencesFromErrors(t *testing.T) {
+	hosts := Differences{{System: "hosts", Host: "fredrir-04", Item: "Configure host network access: firewall : Enable host input filtering"}}
+	infrastructure := Differences{{System: "opentofu", Item: "cloudflare_dns_record.grafana update"}}
+	for _, test := range []struct {
+		name    string
+		err     error
+		outcome string
+		want    Verification
+	}{
+		{name: "matching", want: Verification{Outcome: OutcomeMatches}},
+		{name: "differences", err: errors.Join(errors.Join(nil, hosts), infrastructure), want: Verification{Outcome: OutcomeDiffers, Differences: slices.Concat(hosts, infrastructure)}},
+		{name: "errors", err: errors.Join(errors.New("unreachable hosts: fredrir-06"), fmt.Errorf("verification: %v: %w", "Grafana /login returned HTTP 502", context.DeadlineExceeded)), want: Verification{Outcome: OutcomeFailed, Errors: []string{"unreachable hosts: fredrir-06", "verification: Grafana /login returned HTTP 502: context deadline exceeded"}}},
+		{name: "both", err: errors.Join(errors.New("flux-system is not ready"), hosts), want: Verification{Outcome: OutcomeDiffers, Differences: hosts, Errors: []string{"flux-system is not ready"}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := VerificationOutcome("abc", true, test.err)
+			want := test.want
+			want.Revision, want.Deep = "abc", true
+			want.Differences = append([]Difference{}, want.Differences...)
+			want.Errors = append([]string{}, want.Errors...)
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("outcome %+v, want %+v", got, want)
+			}
+		})
+	}
+	if message := hosts.Error(); message != "production differs from its declaration: hosts: fredrir-04: Configure host network access: firewall : Enable host input filtering" {
+		t.Fatalf("difference message %q", message)
+	}
+}
+
 func TestDeclarationComparisonCombinesOpenTofuAndHosts(t *testing.T) {
+	changes := `{"@level":"info","@message":"OpenTofu 1.12.6","type":"version"}
+{"@level":"info","@message":"cloudflare_dns_record.grafana: Plan to update","change":{"resource":{"addr":"cloudflare_dns_record.grafana"},"action":"update"},"type":"planned_change"}
+{"@level":"info","@message":"Plan: 0 to add, 1 to change, 0 to destroy.","changes":{"add":0,"change":1,"remove":0,"operation":"plan"},"type":"change_summary"}
+{"@level":"info","@message":"Outputs: 2","outputs":{"grafana":{"sensitive":false,"action":"update"},"zone":{"sensitive":false,"action":"noop"}},"type":"outputs"}
+`
+	failure := `{"@level":"error","@message":"Error: Invalid provider configuration","diagnostic":{"severity":"error","summary":"Invalid provider configuration"},"type":"diagnostic"}
+`
 	for _, test := range []struct {
 		name      string
+		plan      string
 		tofuExit  int
 		hostDrift bool
-		want      []string
-		succeeded bool
+		want      Verification
 	}{
-		{name: "matching", succeeded: true},
-		{name: "OpenTofu drift", tofuExit: 2, want: []string{"OpenTofu comparison"}},
-		{name: "host drift", hostDrift: true, want: []string{"hosts differ", "Configure host input filtering"}},
-		{name: "both", tofuExit: 2, hostDrift: true, want: []string{"OpenTofu comparison", "hosts differ"}},
+		{name: "matching", plan: `{"@level":"info","@message":"No changes. Your infrastructure matches the configuration.","type":"change_summary"}` + "\n", want: Verification{Outcome: OutcomeMatches}},
+		{name: "OpenTofu drift", plan: changes, tofuExit: 2, want: Verification{Outcome: OutcomeDiffers, Differences: []Difference{{System: "opentofu", Item: "cloudflare_dns_record.grafana update"}, {System: "opentofu", Item: "output grafana update"}}}},
+		{name: "OpenTofu summary only", plan: `{"@level":"info","@message":"Plan: 0 to add, 0 to change, 1 to destroy.","type":"change_summary"}` + "\n", tofuExit: 2, want: Verification{Outcome: OutcomeDiffers, Differences: []Difference{{System: "opentofu", Item: "Plan: 0 to add, 0 to change, 1 to destroy."}}}},
+		{name: "OpenTofu failure", plan: failure, tofuExit: 1, want: Verification{Outcome: OutcomeFailed, Errors: []string{"OpenTofu comparison: Error: Invalid provider configuration"}}},
+		{name: "both", plan: changes, tofuExit: 2, hostDrift: true, want: Verification{Outcome: OutcomeDiffers, Differences: []Difference{
+			{System: "hosts", Host: "fredrir-04", Item: "Configure host network access: firewall : Configure host input filtering"},
+			{System: "opentofu", Item: "cloudflare_dns_record.grafana update"},
+			{System: "opentofu", Item: "output grafana update"},
+		}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var mu sync.Mutex
@@ -117,41 +223,82 @@ func TestDeclarationComparisonCombinesOpenTofuAndHosts(t *testing.T) {
 				defer mu.Unlock()
 				command := options.Name + " " + strings.Join(options.Args, " ")
 				commandsRun = append(commandsRun, command)
-				switch {
-				case command == "tofu -chdir=tofu init -input=false -lockfile=readonly":
+				switch command {
+				case "tofu -chdir=tofu init -input=false -lockfile=readonly":
 					return process.Result{}, nil
-				case strings.HasPrefix(command, "tofu -chdir=tofu plan ") && strings.Contains(command, " -detailed-exitcode "):
-					fmt.Fprintln(options.Stdout, "planned changes")
+				case "tofu -chdir=tofu plan -input=false -lock=false -json -detailed-exitcode -var-file=production.tfvars.json":
 					if test.tofuExit != 0 {
-						return process.Result{ExitCode: test.tofuExit}, errors.New("exit status 2")
+						return process.Result{Stdout: []byte(test.plan), ExitCode: test.tofuExit}, fmt.Errorf("tofu failed: exit status %d", test.tofuExit)
 					}
-					return process.Result{}, nil
-				case options.Name == "ansible-playbook":
+					return process.Result{Stdout: []byte(test.plan)}, nil
+				}
+				if options.Name == "ansible-playbook" {
 					fmt.Fprintln(options.Stdout, "PLAY RECAP")
-					report := junitReport()
-					if test.hostDrift {
-						report = junitReport(`<testcase name="[fredrir-04] Configure host network access: firewall : Configure host input filtering"><failure message="rc=0"/></testcase>`)
-					}
-					return process.Result{}, os.WriteFile(filepath.Join(environment(options, "JUNIT_OUTPUT_DIR"), "external.xml"), []byte(report), 0600)
+					result := junitResult(test.hostDrift)
+					return fakePlaybooks{reports: []string{junitReport("external", junitCase("[fredrir-04] Configure host network access: firewall : Configure host input filtering", "roles/firewall/tasks/main.yml:19", result))}}.execute(t, options)
 				}
 				t.Errorf("unexpected command %s", command)
 				return process.Result{}, errors.New("unexpected command")
 			}}}
-			err := commands.compareDeclarations(context.Background())
-			if (err == nil) != test.succeeded {
-				t.Fatalf("declaration comparison returned %v", err)
-			}
-			for _, fragment := range test.want {
-				if !strings.Contains(fmt.Sprint(err), fragment) {
-					t.Errorf("error %q does not report %q", err, fragment)
-				}
+			got := VerificationOutcome("", true, commands.compareDeclarations(context.Background()))
+			want := test.want
+			want.Deep = true
+			want.Differences = append([]Difference{}, want.Differences...)
+			want.Errors = append([]string{}, want.Errors...)
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("declaration comparison reported %+v, want %+v", got, want)
 			}
 			if len(commandsRun) != 3 {
 				t.Fatalf("declaration comparison ran %q", commandsRun)
 			}
-			if got := stdout.String(); got != "PLAY RECAP\nplanned changes\n" {
-				t.Fatalf("OpenTofu output interleaved with host output: %q", got)
+			var first struct {
+				Message string `json:"@message"`
+			}
+			if err := json.Unmarshal([]byte(strings.SplitN(test.plan, "\n", 2)[0]), &first); err != nil {
+				t.Fatal(err)
+			}
+			if output := stdout.String(); !strings.HasPrefix(output, "PLAY RECAP\n") || strings.Index(output, first.Message+"\n") < strings.LastIndex(output, "PLAY RECAP") {
+				t.Fatalf("OpenTofu output interleaved with host output: %q", output)
 			}
 		})
+	}
+}
+
+func TestDeclarationComparisonStreamsRealProcessOutput(t *testing.T) {
+	bin := t.TempDir()
+	for name, script := range map[string]string{
+		"tofu": `#!/bin/sh
+case "$2" in
+init)
+  for line in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do echo "stdout $line"; echo "stderr $line" >&2; done ;;
+plan)
+  for line in 1 2 3 4 5 6 7 8 9 10; do echo "warning $line" >&2; done
+  echo '{"@level":"info","@message":"No changes.","type":"change_summary"}' ;;
+esac
+`,
+		"ansible-playbook": `#!/bin/sh
+for line in 1 2 3 4 5 6 7 8 9 10; do echo "TASK $line"; echo "warning $line" >&2; done
+printf '<testsuites><testsuite name="reconcile"><testcase name="[fredrir-04] Configure Ubuntu hosts: ubuntu : Harden SSH authentication" classname="main.yml:1"><system-out>{"changed": false}</system-out></testcase></testsuite></testsuites>' > "$JUNIT_OUTPUT_DIR/reconcile-1.0.xml"
+echo 'fredrir-04 : ok=1 changed=0 unreachable=0 failed=0 skipped=0'
+`,
+	} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "ansible"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: root, Stdout: &stdout, Stderr: &stderr}}
+	if err := commands.compareDeclarations(context.Background()); err != nil {
+		t.Fatalf("matching declarations reported %v\nstdout:\n%s\nstderr:\n%s", err, &stdout, &stderr)
+	}
+	for _, line := range []string{"stdout 20", "stderr 20", "warning 10", "No changes.", "TASK 10"} {
+		if !strings.Contains(stdout.String(), line+"\n") {
+			t.Errorf("combined output lost %q:\n%s", line, &stdout)
+		}
 	}
 }
