@@ -28,6 +28,7 @@ type Status struct {
 	Desired          string             `json:"desired_revision"`
 	Applied          string             `json:"applied_revision"`
 	Stage            string             `json:"stage"`
+	Provenance       *ProvenanceRange   `json:"provenance,omitempty"`
 	Failure          string             `json:"failure,omitempty"`
 	Updated          time.Time          `json:"updated_at"`
 	Durations        map[string]float64 `json:"stage_seconds,omitempty"`

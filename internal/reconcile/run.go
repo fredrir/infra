@@ -1,7 +1,6 @@
 package reconcile
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -20,7 +19,7 @@ type Plan struct {
 type Operations interface {
 	Revision(context.Context) (string, error)
 	Select(context.Context, string, bool) (Selection, error)
-	Provenance(context.Context, string, string) error
+	Provenance(context.Context, ProvenanceRange) error
 	Preflight(context.Context, Plan) (Plan, error)
 	Plan(context.Context, Plan) error
 	Expand(context.Context, Plan) error
@@ -85,7 +84,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	plan := Plan{Revision: revision, Base: status.Applied, Affected: selected, Host: r.Host}
 	skip := !full && !recovery && status.Applied != "" && !selected.Tofu && !selected.Ansible && !selected.Kubernetes
 	status.Evaluated, status.Selection = revision, selected
-	status.Failure, status.HostsReusedFrom, status.HostScope = "", "", ""
+	status.Failure, status.HostsReusedFrom, status.HostScope, status.Provenance = "", "", "", nil
 	status.Durations = map[string]float64{}
 	if !skip {
 		status.Desired = revision
@@ -127,6 +126,16 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		}
 		return nil
 	}
+	if err = stage("provenance", func() error {
+		checked, err := NewProvenanceRange(status.Applied, r.ProvenanceBase, revision)
+		if err != nil {
+			return err
+		}
+		status.Provenance = &checked
+		return r.Ops.Provenance(ctx, checked)
+	}); err != nil {
+		return err
+	}
 	if skip {
 		if selected.Tooling {
 			deployed := Plan{Revision: status.Applied, Base: status.Applied, Affected: All(), Host: r.Host}
@@ -136,9 +145,6 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		}
 		status.Stage = "evaluated"
 		return save(ctx)
-	}
-	if err = stage("provenance", func() error { return r.Ops.Provenance(ctx, cmp.Or(r.ProvenanceBase, status.Applied), revision) }); err != nil {
-		return err
 	}
 	if err = stage("plan", func() error {
 		var err error

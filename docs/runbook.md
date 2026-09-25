@@ -114,8 +114,11 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 | Run deadline / apply job timeout | 90 minutes / 120 minutes |
 | Exit codes | 0 success; 75 retry: lease held (`apply`, `verify`), or `main` advanced beyond root Markdown, `docs/**/*.md` and `build/evidence/*.json`; 1 failure |
 | Retry in CI | Succeeds only while a newer push reconciliation of `main` has not completed its apply job |
-| Provenance gate | Before planning, each commit after the applied revision is SSH-signed by a key in `keys/admin_keys` at the applied revision, reproduces the `infra ci deploy` rewrite of its parent byte for byte, or is named by a later owner-signed `Provenance-Acknowledged: SHA` trailer |
-| Provenance base | Applied revision; none or not an ancestor refuses; `infra reconcile apply --provenance-base SHA` overrides |
+| Provenance gate | Before any checkout tooling runs, including drift verification, each commit after the applied revision is SSH-signed by a key in `keys/admin_keys` at the applied revision, reproduces the `infra ci deploy` rewrite of its parent byte for byte, or is named by a later owner-signed `Provenance-Acknowledged: SHA` trailer |
+| Owner-signed | Authenticates the owner's workstation key: any process on that workstation can sign; the gate blocks remote writers (Octo STS, stolen deploy tokens, other machines), not a compromised workstation |
+| Provenance base | Applied revision; none or not an ancestor refuses; `--provenance-base SHA` overrides and must precede `HEAD`; base, revision and override are recorded in `status.json` |
+| Standalone gate | `infra reconcile provenance [--provenance-base SHA] [--report PATH]`; reads the applied revision without the lease |
+| Workstation apply | Run `infra reconcile provenance` with an installed release CLI before building or running anything from the checkout; a CLI built from an unverified checkout can skip its own gate |
 | OpenTofu locking | S3 lockfile retained; acquisition timeout 5 minutes |
 | Failed verification | Old routes retained; applied revision unchanged |
 | Failed retirement | Applied revision unchanged; the next attempt reads actual OpenTofu state |
@@ -124,6 +127,7 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 | Fork pull requests | Declaration validation only; live-plan check fails until changes are on a trusted repository branch |
 
 ```sh
+infra reconcile provenance
 go build -o .infra/bin/infra ./cmd/infra
 .infra/bin/infra reconcile plan --base BASE_SHA
 .infra/bin/infra reconcile apply --report .infra/reconciliation/status.json

@@ -49,7 +49,7 @@ type fakeOps struct {
 	full       bool
 	selection  Selection
 	drift      []Plan
-	provenance []string
+	provenance []ProvenanceRange
 }
 
 func (o *fakeOps) call(name string) error {
@@ -65,8 +65,8 @@ func (o *fakeOps) Select(_ context.Context, base string, full bool) (Selection, 
 	o.full = full
 	return o.selection, nil
 }
-func (o *fakeOps) Provenance(_ context.Context, base, revision string) error {
-	o.provenance = append(o.provenance, base+".."+revision)
+func (o *fakeOps) Provenance(_ context.Context, checked ProvenanceRange) error {
+	o.provenance = append(o.provenance, checked)
 	if o.fail == "provenance" {
 		return cmp.Or(o.failure, errors.New("unverified commits"))
 	}

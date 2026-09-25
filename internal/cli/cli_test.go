@@ -70,13 +70,13 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 }
 
 func TestCommandValidation(t *testing.T) {
-	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "verify", "--wait=1m"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}} {
+	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "verify", "--wait=1m"}, {"reconcile", "provenance", "--full"}, {"reconcile", "provenance", "--wait=1m"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err == nil {
 			t.Errorf("accepted invalid command %q", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--deep", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "request-verification", "--help"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--deep", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "provenance", "--provenance-base=" + strings.Repeat("a", 40), "--help"}, {"reconcile", "request-verification", "--help"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
 			t.Errorf("command %q: %v, output=%q", args, err, &output)

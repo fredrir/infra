@@ -31,6 +31,22 @@ const (
 
 var ErrNoProvenanceBase = errors.New("no applied revision to verify commits from; apply once with --provenance-base")
 
+type ProvenanceRange struct {
+	Base     string `json:"base"`
+	Revision string `json:"revision"`
+	Override bool   `json:"override,omitempty"`
+}
+
+func NewProvenanceRange(applied, override, revision string) (ProvenanceRange, error) {
+	switch {
+	case override == "" && applied == "":
+		return ProvenanceRange{}, ErrNoProvenanceBase
+	case override == revision:
+		return ProvenanceRange{}, fmt.Errorf("--provenance-base must be an ancestor of %s, not the revision itself", revision)
+	}
+	return ProvenanceRange{Base: cmp.Or(override, applied), Revision: revision, Override: override != ""}, nil
+}
+
 type provenanceCommit struct {
 	hash, subject string
 	parents       []string
@@ -44,10 +60,9 @@ type provenanceGate struct {
 
 type provenanceRule func(context.Context, provenanceCommit) error
 
-func (c *Commands) Provenance(ctx context.Context, base, revision string) error {
+func (c *Commands) Provenance(ctx context.Context, checked ProvenanceRange) error {
+	base, revision := checked.Base, checked.Revision
 	switch {
-	case base == "":
-		return ErrNoProvenanceBase
 	case !revisionPattern.MatchString(base):
 		return fmt.Errorf("invalid provenance base %q", base)
 	case base == revision:

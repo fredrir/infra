@@ -111,7 +111,7 @@ func TestFullAndRecoveryCannotSkipIndependentChange(t *testing.T) {
 				store.status.Stage = "verify"
 			}
 			ops := &fakeOps{selection: Selection{}}
-			if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), scenario == "explicit"); err != nil {
+			if err := (Reconciler{Store: store, Ops: ops, ProvenanceBase: "admin"}).Apply(context.Background(), scenario == "explicit"); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(ops.calls, []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}) {

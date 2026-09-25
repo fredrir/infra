@@ -23,18 +23,22 @@ func newReconcileCommand() *cobra.Command {
 	var wait time.Duration
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
 	command.AddCommand(newRequestVerificationCommand())
-	for _, action := range []string{"plan", "apply", "verify", "status", "requirements"} {
+	for _, action := range []string{"plan", "apply", "verify", "status", "requirements", "provenance"} {
 		child := &cobra.Command{Use: action, Args: cobra.NoArgs}
 		child.Flags().StringVar(&root, "root", ".", "Source checkout")
 		child.Flags().StringVar(&bucket, "state-bucket", "llunde-pyparser-bucket", "Reconciliation state bucket")
 		child.Flags().StringVar(&prefix, "state-prefix", "reconciliation/production", "Reconciliation state prefix")
-		child.Flags().StringVar(&report, "report", "", "Status or verification outcome report path")
-		child.Flags().BoolVar(&full, "full", false, "Reconcile all systems, including external drift")
+		child.Flags().StringVar(&report, "report", "", "Status, verification or provenance outcome report path")
+		if action != "provenance" {
+			child.Flags().BoolVar(&full, "full", false, "Reconcile all systems, including external drift")
+		}
 		if action == "plan" {
 			child.Flags().StringVar(&base, "base", "", "Comparison revision")
 		}
 		if action == "apply" {
 			child.Flags().DurationVar(&wait, "wait", 0, "Wait up to this long for another reconciliation to release its lease")
+		}
+		if action == "apply" || action == "provenance" {
 			child.Flags().StringVar(&provenanceBase, "provenance-base", "", "Verify commit provenance from this revision instead of the applied one")
 		}
 		if action == "verify" {
@@ -66,6 +70,9 @@ func newReconcileCommand() *cobra.Command {
 					return err
 				}
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(status)
+			}
+			if action == "provenance" {
+				return verifyProvenance(cmd, store, &reconcile.Commands{Runner: runner}, provenanceBase, report)
 			}
 			if action == "requirements" {
 				status, err := store.Read(cmd.Context())
@@ -120,6 +127,34 @@ func newReconcileCommand() *cobra.Command {
 		command.AddCommand(child)
 	}
 	return command
+}
+
+func verifyProvenance(cmd *cobra.Command, store reconcile.S3Store, ops *reconcile.Commands, override, report string) (err error) {
+	var outcome struct {
+		reconcile.ProvenanceRange
+		Error string `json:"error,omitempty"`
+	}
+	defer func() {
+		if err != nil {
+			outcome.Error = err.Error()
+		}
+		err = errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(outcome))
+		if report != "" {
+			err = errors.Join(err, writeReport(report, outcome))
+		}
+	}()
+	status, err := store.Read(cmd.Context())
+	if err != nil {
+		return err
+	}
+	revision, err := ops.Revision(cmd.Context())
+	if err != nil {
+		return err
+	}
+	if outcome.ProvenanceRange, err = reconcile.NewProvenanceRange(status.Applied, override, revision); err != nil {
+		return err
+	}
+	return ops.Provenance(cmd.Context(), outcome.ProvenanceRange)
 }
 
 func newRequestVerificationCommand() *cobra.Command {

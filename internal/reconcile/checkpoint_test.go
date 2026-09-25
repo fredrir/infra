@@ -154,7 +154,7 @@ func TestHostReuseFallsBackForUncertainCheckpointOrChangedInputs(t *testing.T) {
 				ops.proofError = errors.New("plan unavailable")
 			}
 			store := &checkpointStore{memoryStore{status: status}}
-			if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), full); err != nil {
+			if err := (Reconciler{Store: store, Ops: ops, ProvenanceBase: strings.Repeat("a", 40)}).Apply(context.Background(), full); err != nil {
 				t.Fatal(err)
 			}
 			found := false

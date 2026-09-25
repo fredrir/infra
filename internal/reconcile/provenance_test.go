@@ -148,7 +148,7 @@ func (f *provenanceFixture) deploy(image string, run int) string {
 
 func (f *provenanceFixture) verify(base, head string) error {
 	f.t.Helper()
-	return (&Commands{Runner: ci.Runner{Dir: f.root}, Work: f.t.TempDir()}).Provenance(context.Background(), base, head)
+	return (&Commands{Runner: ci.Runner{Dir: f.root}, Work: f.t.TempDir()}).Provenance(context.Background(), ProvenanceRange{Base: base, Revision: head})
 }
 
 func TestProvenanceGate(t *testing.T) {
@@ -253,7 +253,6 @@ func TestProvenanceBase(t *testing.T) {
 	for _, test := range []struct {
 		name, base, want string
 	}{
-		{name: "missing", want: ErrNoProvenanceBase.Error()},
 		{name: "invalid", base: "HEAD", want: "invalid provenance base"},
 		{name: "unknown", base: strings.Repeat("e", 40), want: "is not in the checkout"},
 		{name: "not an ancestor", base: unrelated, want: "is not an ancestor of " + head},
@@ -269,24 +268,51 @@ func TestProvenanceBase(t *testing.T) {
 	}
 }
 
-func TestProvenanceGatesApplyBeforePlanning(t *testing.T) {
+func TestProvenanceRange(t *testing.T) {
 	for _, test := range []struct {
-		name, override, want string
-		fail                 bool
+		name, applied, override string
+		want                    ProvenanceRange
+		err                     string
 	}{
-		{name: "applied base", want: "old..new"},
-		{name: "override", override: "admin", want: "admin..new"},
-		{name: "unverified", want: "old..new", fail: true},
+		{name: "applied", applied: "old", want: ProvenanceRange{Base: "old", Revision: "new"}},
+		{name: "override", applied: "old", override: "admin", want: ProvenanceRange{Base: "admin", Revision: "new", Override: true}},
+		{name: "first reconciliation", override: "admin", want: ProvenanceRange{Base: "admin", Revision: "new", Override: true}},
+		{name: "no base", err: ErrNoProvenanceBase.Error()},
+		{name: "override at the revision", applied: "old", override: "new", err: "must be an ancestor of new"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := NewProvenanceRange(test.applied, test.override, "new")
+			if got != test.want || (test.err == "") != (err == nil) || (err != nil && !strings.Contains(err.Error(), test.err)) {
+				t.Fatalf("range %+v, %v; want %+v, %q", got, err, test.want, test.err)
+			}
+		})
+	}
+}
+
+func TestProvenanceGatesApplyBeforeAnyCheckoutTooling(t *testing.T) {
+	for _, test := range []struct {
+		name, override string
+		selection      Selection
+		want           ProvenanceRange
+		fail           bool
+	}{
+		{name: "applied base", selection: All(), want: ProvenanceRange{Base: "old", Revision: "new"}},
+		{name: "override", override: "admin", selection: All(), want: ProvenanceRange{Base: "admin", Revision: "new", Override: true}},
+		{name: "unverified", selection: All(), want: ProvenanceRange{Base: "old", Revision: "new"}, fail: true},
+		{name: "unverified tooling change", selection: Selection{Tooling: true}, want: ProvenanceRange{Base: "old", Revision: "new"}, fail: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
-			ops := &fakeOps{selection: All()}
+			ops := &fakeOps{selection: test.selection}
 			if test.fail {
 				ops.fail = "provenance"
 			}
 			err := (Reconciler{Store: store, Ops: ops, ProvenanceBase: test.override}).Apply(context.Background(), false)
 			if len(ops.provenance) != 1 || ops.provenance[0] != test.want {
-				t.Fatalf("provenance verified %v, want %s", ops.provenance, test.want)
+				t.Fatalf("provenance verified %v, want %+v", ops.provenance, test.want)
+			}
+			if store.status.Provenance == nil || *store.status.Provenance != test.want {
+				t.Fatalf("status records provenance %+v", store.status.Provenance)
 			}
 			if !test.fail {
 				if err != nil {
@@ -294,13 +320,13 @@ func TestProvenanceGatesApplyBeforePlanning(t *testing.T) {
 				}
 				return
 			}
-			if !strings.HasPrefix(fmt.Sprint(err), "provenance: unverified commits") || len(ops.calls) != 0 || store.status.Stage != "provenance" || store.status.Failure == "" || store.status.Applied != "old" {
+			if !strings.HasPrefix(fmt.Sprint(err), "provenance: unverified commits") || len(ops.calls) != 0 || len(ops.drift) != 0 || store.status.Stage != "provenance" || store.status.Failure == "" || store.status.Applied != "old" {
 				t.Fatalf("unverified commits reached %v with %+v: %v", ops.calls, store.status, err)
 			}
 		})
 	}
-	ops := &fakeOps{selection: All(), fail: "provenance", failure: ErrNoProvenanceBase}
-	if err := (Reconciler{Store: &memoryStore{}, Ops: ops}).Apply(context.Background(), false); !errors.Is(err, ErrNoProvenanceBase) || ops.provenance[0] != "..new" {
-		t.Fatalf("first reconciliation without a base returned %v after %v", err, ops.provenance)
+	ops := &fakeOps{selection: All()}
+	if err := (Reconciler{Store: &memoryStore{}, Ops: ops}).Apply(context.Background(), false); !errors.Is(err, ErrNoProvenanceBase) || len(ops.provenance) != 0 || len(ops.calls) != 0 {
+		t.Fatalf("first reconciliation without a base returned %v after %v", err, ops.calls)
 	}
 }
