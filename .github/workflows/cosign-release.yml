@@ -62,7 +62,8 @@ jobs:
           image=$(jq -er .go_image build/tools/cosign/source.json)
           version=$(jq -er .version build/tools/cosign/source.json)
           revision=$(jq -er .upstream_revision build/tools/cosign/source.json)
-          docker run --rm --user "$(id -u):$(id -g)" --cpus=2 --memory=5g --memory-swap=5g \
+          build_memory="$(awk '/^MemTotal:/ { print int($2 * 3 / 4 / 1024) "m" }' /proc/meminfo)"
+          docker run --rm --user "$(id -u):$(id -g)" --cpus="$(nproc)" --memory="$build_memory" --memory-swap="$build_memory" \
             --volume "$RUNNER_TEMP/cosign-source:/source" --volume "$RUNNER_TEMP/release:/release" \
             --volume "$HOME/.cache/infra-cosign-go:/cache" --workdir /source \
             --env CGO_ENABLED=0 --env GOOS=linux --env GOARCH=amd64 --env GOTOOLCHAIN=local \
