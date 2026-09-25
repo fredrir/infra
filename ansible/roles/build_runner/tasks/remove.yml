@@ -1,33 +1,89 @@
+- name: Read retired runner registration
+  ansible.builtin.slurp:
+    src: '/home/runner/{{ build_runner_retired }}/.runner'
+  register: build_runner_retired_registration
+
 - name: Read retired runner service registration
   ansible.builtin.stat:
     path: '/home/runner/{{ build_runner_retired }}/.service'
-  register: build_runner_retired_registration
+  register: build_runner_retired_service_registration
 
-- name: Remove retired runner service
-  when: build_runner_retired_registration.stat.exists
+- name: Retire the runner from GitHub and its host
   vars:
+    build_runner_retired_identity: "{{ build_runner_retired_registration.content | b64decode | regex_replace('^﻿', '') | from_json }}"
+    build_runner_retired_repository: "{{ build_runner_retired_identity.gitHubUrl | default('') | regex_replace('^https://github[.]com/' ~ build_runner_owner ~ '/', '') }}"
+    build_runner_retired_api: 'repos/{{ build_runner_owner }}/{{ build_runner_retired_repository }}/actions/runners/{{ build_runner_retired_identity.agentId | default(0) }}'
     build_runner_retired_unit: '{{ build_runner_retired_service.content | b64decode | trim }}'
   block:
+    - name: Require the retired runner's own registration
+      ansible.builtin.assert:
+        that:
+        - build_runner_retired_identity.agentName | default('') == inventory_hostname ~ '-' ~ build_runner_retired
+        - build_runner_retired_identity.agentId | default(0) | int > 0
+        - build_runner_retired_repository is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+
     - name: Read retired runner service
       ansible.builtin.slurp:
         src: '/home/runner/{{ build_runner_retired }}/.service'
       register: build_runner_retired_service
+      when: build_runner_retired_service_registration.stat.exists
 
     - name: Require the retired runner's own service
       ansible.builtin.assert:
-        that: build_runner_retired_unit == 'actions.runner.' ~ build_runner_owner ~ '-' ~ build_runner_retired ~ '.' ~ inventory_hostname ~ '-' ~ build_runner_retired ~ '.service'
+        that: build_runner_retired_unit == 'actions.runner.' ~ build_runner_owner ~ '-' ~ build_runner_retired_repository ~ '.' ~ inventory_hostname ~ '-' ~ build_runner_retired ~ '.service'
+      when: build_runner_retired_service_registration.stat.exists
+
+    - name: Withdraw retired runner from new jobs
+      delegate_to: localhost
+      become: false
+      ansible.builtin.command:
+        argv: [gh, api, --method, DELETE, --silent, '{{ build_runner_retired_api }}/labels']
+      register: build_runner_retired_withdrawal
+      failed_when: build_runner_retired_withdrawal.rc != 0 and 'HTTP 404' not in build_runner_retired_withdrawal.stderr
+
+    - name: Start retired runner drain deadline
+      ansible.builtin.set_fact:
+        build_runner_drain_deadline: '{{ build_runner_drain_deadline | default(now().timestamp() | int + build_runner_drain_minutes | int * 60) }}'
+
+    - name: Wait for GitHub to report the retired runner idle
+      delegate_to: localhost
+      become: false
+      ansible.builtin.command:
+        argv: [gh, api, '{{ build_runner_retired_api }}', --jq, .busy]
+      register: build_runner_retired_busy
+      changed_when: false
+      failed_when: build_runner_retired_busy.rc != 0 and 'HTTP 404' not in build_runner_retired_busy.stderr
+      until: build_runner_retired_busy.stdout == 'false' or 'HTTP 404' in build_runner_retired_busy.stderr
+      retries: '{{ [1, (build_runner_drain_deadline | int - now().timestamp() | int) // build_runner_drain_interval | int] | max }}'
+      delay: '{{ build_runner_drain_interval | int }}'
+
+    - name: Wait for the retired runner to finish its job
+      ansible.builtin.command:
+        argv: [pgrep, --full, "{{ ('/home/runner/' ~ build_runner_retired ~ '/bin/Runner.Worker') | regex_escape }}( |$)"]
+      register: build_runner_retired_worker
+      changed_when: false
+      failed_when: build_runner_retired_worker.rc not in [0, 1]
+      until: build_runner_retired_worker.rc == 1
+      retries: '{{ [1, (build_runner_drain_deadline | int - now().timestamp() | int) // build_runner_drain_interval | int] | max }}'
+      delay: '{{ build_runner_drain_interval | int }}'
+
+    - name: Require an idle retired runner
+      ansible.builtin.assert:
+        that: build_runner_retired_worker.rc == 1
+        fail_msg: '{{ build_runner_retired }} is still running a job at the drain deadline'
 
     - name: Read retired runner unit
       ansible.builtin.stat:
         path: '/etc/systemd/system/{{ build_runner_retired_unit }}'
       register: build_runner_retired_unit_file
+      when: build_runner_retired_service_registration.stat.exists
 
     - name: Stop retired runner service
       ansible.builtin.systemd_service:
         name: '{{ build_runner_retired_unit }}'
         state: stopped
         enabled: false
-      when: build_runner_retired_unit_file.stat.exists
+      when: build_runner_retired_unit_file.stat.exists | default(false)
 
     - name: Remove retired runner unit and resource override
       ansible.builtin.file:
@@ -36,10 +92,20 @@
       loop:
         - '{{ build_runner_retired_unit }}'
         - '{{ build_runner_retired_unit }}.d'
+      when: build_runner_retired_service_registration.stat.exists
 
     - name: Reload systemd without retired runner
       ansible.builtin.systemd_service:
         daemon_reload: true
+      when: build_runner_retired_service_registration.stat.exists
+
+    - name: Deregister retired runner
+      delegate_to: localhost
+      become: false
+      ansible.builtin.command:
+        argv: [gh, api, --method, DELETE, --silent, '{{ build_runner_retired_api }}']
+      register: build_runner_retired_deregistration
+      failed_when: build_runner_retired_deregistration.rc != 0 and 'HTTP 404' not in build_runner_retired_deregistration.stderr
 
 - name: Remove retired runner
   ansible.builtin.file:

@@ -246,6 +246,7 @@ Do not delete leases while their workers are running; corrupted lease state fail
 | Drain deadline   | `build_runner_drain_minutes` (50), shared by all runners in one play                                      |
 | Busy at deadline | Play fails; runner keeps its job and binaries                                                             |
 | Labels restored  | After its replacement, including failed replacements                                                      |
+| Retirement       | Undeclared runners lose their labels, drain like replacements and are deregistered before their root is removed |
 | Job routing      | `dagger-amd64` or `infra-trusted`; `self-hosted`, `Linux` and `X64` stay during a drain                   |
 
 A changed digest for an unchanged version is not proposed; investigate it before editing the pin.

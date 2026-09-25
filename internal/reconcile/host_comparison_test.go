@@ -196,7 +196,7 @@ func TestRunnerVerificationReportsRunnerPlayDifferences(t *testing.T) {
 					mu.Lock()
 					queried++
 					mu.Unlock()
-					return runnerResponse(t, healthyRunner(fleet, queriedRepository(options))), nil
+					return runnerResponse(t, healthyRunners(fleet, queriedRepository(options))...), nil
 				}
 				return process.Result{}, fmt.Errorf("unexpected command %s", options.Name)
 			}}}
@@ -380,7 +380,7 @@ func TestDeepVerificationComparesDeclarationsDuringLiveChecks(t *testing.T) {
 			playbook := strings.TrimSuffix(playbookArgument(options), ".yml")
 			return fakePlaybooks{reports: []string{junitReport(playbook, junitCase("[fredrir-04] Configure Ubuntu hosts: ubuntu : Harden SSH authentication", "roles/ubuntu/tasks/main.yml:22", junitResult(false)))}}.execute(t, options)
 		case "gh":
-			return runnerResponse(t, healthyRunner(fleet, queriedRepository(options))), nil
+			return runnerResponse(t, healthyRunners(fleet, queriedRepository(options))...), nil
 		}
 		t.Errorf("unexpected command %s", options.Name)
 		return process.Result{}, errors.New("unexpected command")

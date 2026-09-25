@@ -98,7 +98,7 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 					return process.Result{}, nil
 				case "gh":
 					queried++
-					return runnerResponse(t, healthyRunner(fleet, queriedRepository(opts))), nil
+					return runnerResponse(t, healthyRunners(fleet, queriedRepository(opts))...), nil
 				}
 				t.Errorf("unexpected command: %s", opts.Name)
 				return process.Result{}, errors.New("unexpected command")
@@ -150,7 +150,7 @@ func TestHostVerificationReportsEveryFailure(t *testing.T) {
 		calls.Add(1)
 		if opts.Name == "gh" {
 			queried.Add(1)
-			return runnerResponse(t, healthyRunner(fleet, queriedRepository(opts))), nil
+			return runnerResponse(t, healthyRunners(fleet, queriedRepository(opts))...), nil
 		}
 		return process.Result{}, failure
 	}}}
@@ -167,13 +167,15 @@ func TestHostVerificationReportsEveryFailure(t *testing.T) {
 		if opts.Name != "gh" {
 			return process.Result{}, nil
 		}
-		runner := healthyRunner(fleet, queriedRepository(opts))
-		runner.Status = "offline"
-		return runnerResponse(t, runner), nil
+		runners := healthyRunners(fleet, queriedRepository(opts))
+		for index := range runners {
+			runners[index].Status = "offline"
+		}
+		return runnerResponse(t, runners...), nil
 	}}}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	if err := commands.VerifyHosts(ctx, Plan{Affected: All()}); err == nil || !strings.Contains(err.Error(), "infra-build-09-infra is offline") {
+	if err := commands.VerifyHosts(ctx, Plan{Affected: All()}); err == nil || !strings.Contains(err.Error(), "infra-build-09-infra-1 is offline") {
 		t.Fatalf("runner fleet drift passed host verification: %v", err)
 	}
 }

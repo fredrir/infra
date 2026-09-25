@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,13 +19,36 @@ import (
 )
 
 type RunnerFleet struct {
-	Schema       int      `json:"schema"`
-	Owner        string   `json:"owner"`
-	Host         string   `json:"host"`
-	Version      string   `json:"version"`
-	SHA256       string   `json:"sha256"`
-	Labels       []string `json:"labels"`
-	Repositories []string `json:"repositories"`
+	Schema       int            `json:"schema"`
+	Owner        string         `json:"owner"`
+	Host         string         `json:"host"`
+	Version      string         `json:"version"`
+	SHA256       string         `json:"sha256"`
+	Labels       []string       `json:"labels"`
+	Repositories map[string]int `json:"repositories"`
+}
+
+type fleetRunner struct {
+	Repository string
+	Name       string
+}
+
+func (f RunnerFleet) RepositoryNames() []string {
+	return slices.Sorted(maps.Keys(f.Repositories))
+}
+
+func (f RunnerFleet) Runners() []fleetRunner {
+	var runners []fleetRunner
+	for _, repository := range f.RepositoryNames() {
+		for index := 1; index <= f.Repositories[repository]; index++ {
+			runners = append(runners, fleetRunner{Repository: repository, Name: fmt.Sprintf("%s-%d", repository, index)})
+		}
+	}
+	return runners
+}
+
+func (f RunnerFleet) registeredName(runner fleetRunner) string {
+	return f.Host + "-" + runner.Name
 }
 
 type registeredRunner struct {
@@ -64,7 +88,7 @@ func LoadRunnerFleet(root string) (RunnerFleet, error) {
 		return RunnerFleet{}, fmt.Errorf("runner fleet: trailing data after declaration")
 	}
 	switch {
-	case fleet.Schema != 1:
+	case fleet.Schema != 2:
 		return RunnerFleet{}, fmt.Errorf("runner fleet: unsupported schema %d", fleet.Schema)
 	case !runnerOwnerPattern.MatchString(fleet.Owner):
 		return RunnerFleet{}, fmt.Errorf("runner fleet: invalid owner %q", fleet.Owner)
@@ -78,11 +102,21 @@ func LoadRunnerFleet(root string) (RunnerFleet, error) {
 	if err := uniqueNames("label", fleet.Labels, runnerLabelPattern); err != nil {
 		return RunnerFleet{}, err
 	}
-	if err := uniqueNames("repository", fleet.Repositories, runnerRepositoryPattern); err != nil {
-		return RunnerFleet{}, err
+	if len(fleet.Repositories) == 0 {
+		return RunnerFleet{}, fmt.Errorf("runner fleet: no repository declared")
+	}
+	for repository, count := range fleet.Repositories {
+		if !runnerRepositoryPattern.MatchString(repository) {
+			return RunnerFleet{}, fmt.Errorf("runner fleet: invalid repository %q", repository)
+		}
+		if count < 1 || count > maxRepositoryRunners {
+			return RunnerFleet{}, fmt.Errorf("runner fleet: %s declares %d runners, want 1 to %d", repository, count, maxRepositoryRunners)
+		}
 	}
 	return fleet, nil
 }
+
+const maxRepositoryRunners = 8
 
 func uniqueNames(kind string, names []string, pattern *regexp.Regexp) error {
 	if len(names) == 0 {
@@ -110,9 +144,9 @@ func (c *Commands) runnerStates(ctx context.Context, fleet RunnerFleet) (map[str
 	}
 	group, groupContext := errgroup.WithContext(ctx)
 	group.SetLimit(8)
-	for _, repository := range fleet.Repositories {
+	for _, repository := range fleet.RepositoryNames() {
 		group.Go(func() error {
-			data, err := runner.Output(groupContext, "gh", "api", "repos/"+fleet.Owner+"/"+repository+"/actions/runners?name="+fleet.Host+"-"+repository)
+			data, err := runner.Output(groupContext, "gh", "api", "repos/"+fleet.Owner+"/"+repository+"/actions/runners?per_page=100")
 			if err != nil {
 				return fmt.Errorf("read runners of %s/%s: %w", fleet.Owner, repository, err)
 			}
@@ -134,10 +168,10 @@ func (c *Commands) runnerStates(ctx context.Context, fleet RunnerFleet) (map[str
 	return states, nil
 }
 
-func namedRunners(fleet RunnerFleet, states map[string][]registeredRunner, repository string) []registeredRunner {
+func namedRunners(fleet RunnerFleet, states map[string][]registeredRunner, declared fleetRunner) []registeredRunner {
 	var matches []registeredRunner
-	for _, runner := range states[repository] {
-		if runner.Name == fleet.Host+"-"+repository {
+	for _, runner := range states[declared.Repository] {
+		if runner.Name == fleet.registeredName(declared) {
 			matches = append(matches, runner)
 		}
 	}
@@ -158,11 +192,13 @@ func customLabels(runner registeredRunner) []string {
 func runnerDrift(fleet RunnerFleet, states map[string][]registeredRunner) []string {
 	labels := slices.Sorted(slices.Values(fleet.Labels))
 	var problems []string
-	for _, repository := range fleet.Repositories {
-		name := fleet.Host + "-" + repository
-		matches := namedRunners(fleet, states, repository)
+	declared := map[string]bool{}
+	for _, runner := range fleet.Runners() {
+		name := fleet.registeredName(runner)
+		declared[name] = true
+		matches := namedRunners(fleet, states, runner)
 		if len(matches) != 1 {
-			problems = append(problems, fmt.Sprintf("%s/%s has %d runners named %s, want 1", fleet.Owner, repository, len(matches), name))
+			problems = append(problems, fmt.Sprintf("%s/%s has %d runners named %s, want 1", fleet.Owner, runner.Repository, len(matches), name))
 			continue
 		}
 		runner := matches[0]
@@ -176,6 +212,13 @@ func runnerDrift(fleet RunnerFleet, states map[string][]registeredRunner) []stri
 		}
 		if custom := customLabels(runner); !slices.Equal(custom, labels) {
 			problems = append(problems, fmt.Sprintf("%s has labels [%s], want [%s]", name, strings.Join(custom, " "), strings.Join(labels, " ")))
+		}
+	}
+	for _, repository := range fleet.RepositoryNames() {
+		for _, runner := range states[repository] {
+			if strings.HasPrefix(runner.Name, fleet.Host+"-") && !declared[runner.Name] {
+				problems = append(problems, fmt.Sprintf("%s/%s registers undeclared runner %s", fleet.Owner, repository, runner.Name))
+			}
 		}
 	}
 	return problems
@@ -211,9 +254,9 @@ func (c *Commands) readRunnerStates(ctx context.Context, fleet RunnerFleet) (map
 
 func offlineRunners(fleet RunnerFleet, states map[string][]registeredRunner) []string {
 	var offline []string
-	for _, repository := range fleet.Repositories {
-		if slices.ContainsFunc(namedRunners(fleet, states, repository), func(runner registeredRunner) bool { return runner.Status == "offline" }) {
-			offline = append(offline, repository)
+	for _, runner := range fleet.Runners() {
+		if slices.ContainsFunc(namedRunners(fleet, states, runner), func(registered registeredRunner) bool { return registered.Status == "offline" }) {
+			offline = append(offline, runner.Name)
 		}
 	}
 	return offline
@@ -221,9 +264,9 @@ func offlineRunners(fleet RunnerFleet, states map[string][]registeredRunner) []s
 
 func missingRunners(fleet RunnerFleet, states map[string][]registeredRunner) []string {
 	var missing []string
-	for _, repository := range fleet.Repositories {
-		if len(namedRunners(fleet, states, repository)) == 0 {
-			missing = append(missing, repository)
+	for _, runner := range fleet.Runners() {
+		if len(namedRunners(fleet, states, runner)) == 0 {
+			missing = append(missing, runner.Name)
 		}
 	}
 	return missing
@@ -234,23 +277,29 @@ func (c *Commands) unregisteredRunners(ctx context.Context, fleet RunnerFleet, s
 	if len(missing) == 0 || pause(ctx, runnerMissingPause) != nil {
 		return nil
 	}
-	fleet.Repositories = missing
-	confirmed, err := c.runnerStates(ctx, fleet)
+	affected := fleet
+	affected.Repositories = map[string]int{}
+	for _, runner := range fleet.Runners() {
+		if slices.Contains(missing, runner.Name) {
+			affected.Repositories[runner.Repository] = fleet.Repositories[runner.Repository]
+		}
+	}
+	confirmed, err := c.runnerStates(ctx, affected)
 	if err != nil {
 		c.warn("confirm missing runner registrations: %v", err)
 		return nil
 	}
-	return missingRunners(fleet, confirmed)
+	return slices.DeleteFunc(missingRunners(affected, confirmed), func(name string) bool { return !slices.Contains(missing, name) })
 }
 
 func (c *Commands) convergeRunnerLabels(ctx context.Context, fleet RunnerFleet, states map[string][]registeredRunner) {
 	labels := slices.Sorted(slices.Values(fleet.Labels))
-	for _, repository := range fleet.Repositories {
-		matches := namedRunners(fleet, states, repository)
+	for _, runner := range fleet.Runners() {
+		matches := namedRunners(fleet, states, runner)
 		if len(matches) != 1 || slices.Equal(customLabels(matches[0]), labels) {
 			continue
 		}
-		args := []string{"api", "--method", "PUT", "--silent", fmt.Sprintf("repos/%s/%s/actions/runners/%d/labels", fleet.Owner, repository, matches[0].ID)}
+		args := []string{"api", "--method", "PUT", "--silent", fmt.Sprintf("repos/%s/%s/actions/runners/%d/labels", fleet.Owner, runner.Repository, matches[0].ID)}
 		for _, label := range fleet.Labels {
 			args = append(args, "-f", "labels[]="+label)
 		}

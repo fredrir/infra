@@ -317,7 +317,7 @@ func TestVerificationCollectsEveryPart(t *testing.T) {
 				case "ansible-playbook":
 					return fakePlaybooks{reports: []string{junitReport("verify-runners", drift)}, exit: 2}.execute(t, options)
 				case "gh":
-					return runnerResponse(t, healthyRunner(fleet, queriedRepository(options))), nil
+					return runnerResponse(t, healthyRunners(fleet, queriedRepository(options))...), nil
 				}
 				t.Errorf("unexpected command %s", options.Name)
 				return process.Result{}, errors.New("unexpected command")

@@ -1,25 +1,25 @@
 - name: Declare repository runner directory
   ansible.builtin.import_tasks: repository-directories.yml
   vars:
-    build_runner_state_repositories: ['{{ build_runner_repository }}']
+    build_runner_state_repositories: ['{{ build_runner_instance.name }}']
 
 - name: Read runner registration
   ansible.builtin.stat:
-    path: '/home/runner/{{ build_runner_repository }}/.runner'
+    path: '/home/runner/{{ build_runner_instance.name }}/.runner'
   register: build_runner_registration
 
 - name: Select runner registration
   ansible.builtin.set_fact:
-    build_runner_register: '{{ not build_runner_registration.stat.exists or build_runner_repository in build_runner_reregister | default([]) }}'
+    build_runner_register: '{{ not build_runner_registration.stat.exists or build_runner_instance.name in build_runner_reregister | default([]) }}'
 
 - name: Read installed runner executable
   ansible.builtin.stat:
-    path: '/home/runner/{{ build_runner_repository }}/bin/Runner.Listener'
+    path: '/home/runner/{{ build_runner_instance.name }}/bin/Runner.Listener'
   register: build_runner_executable
 
 - name: Read installed runner version
   ansible.builtin.command:
-    argv: ['/home/runner/{{ build_runner_repository }}/bin/Runner.Listener', --version]
+    argv: ['/home/runner/{{ build_runner_instance.name }}/bin/Runner.Listener', --version]
   register: build_runner_installed_version
   changed_when: false
   failed_when: false
@@ -28,7 +28,7 @@
 
 - name: Read incomplete runner replacement
   ansible.builtin.stat:
-    path: '/home/runner/{{ build_runner_repository }}/.infra-runner-pending'
+    path: '/home/runner/{{ build_runner_instance.name }}/.infra-runner-pending'
   register: build_runner_pending
 
 - name: Select runner replacement
@@ -37,13 +37,13 @@
 
 - name: Read existing runner service registration
   ansible.builtin.stat:
-    path: '/home/runner/{{ build_runner_repository }}/.service'
+    path: '/home/runner/{{ build_runner_instance.name }}/.service'
   register: build_runner_existing_service
   when: build_runner_replace
 
 - name: Read service before runner replacement
   ansible.builtin.slurp:
-    src: '/home/runner/{{ build_runner_repository }}/.service'
+    src: '/home/runner/{{ build_runner_instance.name }}/.service'
   register: build_runner_previous_service
   when: build_runner_replace and build_runner_existing_service.stat.exists
 
@@ -56,7 +56,7 @@
   delegate_to: localhost
   become: false
   ansible.builtin.command:
-    argv: [gh, api, 'repos/{{ build_runner_owner }}/{{ build_runner_repository }}/actions/runners?name={{ inventory_hostname }}-{{ build_runner_repository }}', --jq, '.runners[] | select(.name == "{{ inventory_hostname }}-{{ build_runner_repository }}") | .id']
+    argv: [gh, api, 'repos/{{ build_runner_owner }}/{{ build_runner_instance.repository }}/actions/runners?name={{ inventory_hostname }}-{{ build_runner_instance.name }}', --jq, '.runners[] | select(.name == "{{ inventory_hostname }}-{{ build_runner_instance.name }}") | .id']
   register: build_runner_github_runners
   changed_when: false
   when: build_runner_replace and build_runner_existing_service.stat.exists
@@ -67,7 +67,7 @@
     delegate_to: localhost
     become: false
     ansible.builtin.command:
-      argv: [gh, api, --method, DELETE, --silent, 'repos/{{ build_runner_owner }}/{{ build_runner_repository }}/actions/runners/{{ item }}/labels']
+      argv: [gh, api, --method, DELETE, --silent, 'repos/{{ build_runner_owner }}/{{ build_runner_instance.repository }}/actions/runners/{{ item }}/labels']
     loop: '{{ build_runner_github_runners.stdout_lines | default([]) }}'
 
   - name: Start runner drain deadline
@@ -79,7 +79,7 @@
     delegate_to: localhost
     become: false
     ansible.builtin.command:
-      argv: [gh, api, 'repos/{{ build_runner_owner }}/{{ build_runner_repository }}/actions/runners/{{ item }}', --jq, .busy]
+      argv: [gh, api, 'repos/{{ build_runner_owner }}/{{ build_runner_instance.repository }}/actions/runners/{{ item }}', --jq, .busy]
     loop: '{{ build_runner_github_runners.stdout_lines | default([]) }}'
     register: build_runner_github_busy
     changed_when: false
@@ -89,7 +89,7 @@
 
   - name: Wait for the runner to finish its job
     ansible.builtin.command:
-      argv: [pgrep, --full, "{{ ('/home/runner/' ~ build_runner_repository ~ '/bin/Runner.Worker') | regex_escape }}( |$)"]
+      argv: [pgrep, --full, "{{ ('/home/runner/' ~ build_runner_instance.name ~ '/bin/Runner.Worker') | regex_escape }}( |$)"]
     register: build_runner_worker
     changed_when: false
     failed_when: build_runner_worker.rc not in [0, 1]
@@ -101,12 +101,12 @@
   - name: Require an idle runner before replacement
     ansible.builtin.assert:
       that: build_runner_worker.rc == 1
-      fail_msg: '{{ build_runner_repository }} is still running a job at the drain deadline'
+      fail_msg: '{{ build_runner_instance.name }} is still running a job at the drain deadline'
     when: build_runner_replace and build_runner_existing_service.stat.exists
 
   - name: Record incomplete runner replacement
     ansible.builtin.copy:
-      dest: '/home/runner/{{ build_runner_repository }}/.infra-runner-pending'
+      dest: '/home/runner/{{ build_runner_instance.name }}/.infra-runner-pending'
       content: '{{ build_runner_version }}\n'
       owner: root
       group: root
@@ -121,7 +121,7 @@
   - name: Extract pinned runner
     ansible.builtin.unarchive:
       src: '/var/cache/actions-runner-{{ build_runner_version }}.tar.gz'
-      dest: '/home/runner/{{ build_runner_repository }}'
+      dest: '/home/runner/{{ build_runner_instance.name }}'
       remote_src: true
       owner: runner
       group: runner
@@ -130,7 +130,7 @@
 
   - name: Complete runner replacement
     ansible.builtin.file:
-      path: '/home/runner/{{ build_runner_repository }}/.infra-runner-pending'
+      path: '/home/runner/{{ build_runner_instance.name }}/.infra-runner-pending'
       state: absent
     when: build_runner_replace
 
@@ -138,7 +138,7 @@
     delegate_to: localhost
     become: false
     ansible.builtin.command:
-      argv: [gh, api, --method, POST, 'repos/{{ build_runner_owner }}/{{ build_runner_repository }}/actions/runners/registration-token', --jq, .token]
+      argv: [gh, api, --method, POST, 'repos/{{ build_runner_owner }}/{{ build_runner_instance.repository }}/actions/runners/registration-token', --jq, .token]
     register: build_runner_token
     changed_when: false
     no_log: true
@@ -146,43 +146,43 @@
 
   - name: Remove unregistered runner identity
     ansible.builtin.file:
-      path: '/home/runner/{{ build_runner_repository }}/{{ item }}'
+      path: '/home/runner/{{ build_runner_instance.name }}/{{ item }}'
       state: absent
     loop: [.runner, .credentials, .credentials_rsaparams]
-    when: build_runner_repository in build_runner_reregister | default([])
+    when: build_runner_instance.name in build_runner_reregister | default([])
 
   - name: Register trusted repository runner
     become_user: runner
     ansible.builtin.command:
       argv:
-      - '/home/runner/{{ build_runner_repository }}/config.sh'
+      - '/home/runner/{{ build_runner_instance.name }}/config.sh'
       - --unattended
       - --replace
       - --disableupdate
       - --url
-      - 'https://github.com/{{ build_runner_owner }}/{{ build_runner_repository }}'
+      - 'https://github.com/{{ build_runner_owner }}/{{ build_runner_instance.repository }}'
       - --token
       - '{{ build_runner_token.stdout }}'
       - --name
-      - '{{ inventory_hostname }}-{{ build_runner_repository }}'
+      - '{{ inventory_hostname }}-{{ build_runner_instance.name }}'
       - --labels
       - '{{ build_runner_labels | join(",") }}'
       - --work
       - _work
-      chdir: '/home/runner/{{ build_runner_repository }}'
+      chdir: '/home/runner/{{ build_runner_instance.name }}'
     no_log: true
     when: build_runner_register
 
   - name: Install repository runner service
     ansible.builtin.command:
-      argv: ['/home/runner/{{ build_runner_repository }}/svc.sh', install, runner]
-      chdir: '/home/runner/{{ build_runner_repository }}'
-      creates: '/home/runner/{{ build_runner_repository }}/.service'
+      argv: ['/home/runner/{{ build_runner_instance.name }}/svc.sh', install, runner]
+      chdir: '/home/runner/{{ build_runner_instance.name }}'
+      creates: '/home/runner/{{ build_runner_instance.name }}/.service'
     register: build_runner_service_install
 
   - name: Read installed service name
     ansible.builtin.slurp:
-      src: '/home/runner/{{ build_runner_repository }}/.service'
+      src: '/home/runner/{{ build_runner_instance.name }}/.service'
     register: build_runner_service_file
 
   - name: Select runner service
@@ -193,14 +193,14 @@
     ansible.builtin.import_tasks: repository-services.yml
     vars:
       build_runner_state_services: ['{{ build_runner_service_name }}']
-      build_runner_state_restarts: "{{ [build_runner_service_name] if build_runner_repository in (build_runner_restart | default([])) + (build_runner_reregister | default([])) else [] }}"
+      build_runner_state_restarts: "{{ [build_runner_service_name] if build_runner_instance.name in (build_runner_restart | default([])) + (build_runner_reregister | default([])) else [] }}"
 
   always:
   - name: Read runner to return to new jobs
     delegate_to: localhost
     become: false
     ansible.builtin.command:
-      argv: [gh, api, 'repos/{{ build_runner_owner }}/{{ build_runner_repository }}/actions/runners?name={{ inventory_hostname }}-{{ build_runner_repository }}', --jq, '.runners[] | select(.name == "{{ inventory_hostname }}-{{ build_runner_repository }}") | .id']
+      argv: [gh, api, 'repos/{{ build_runner_owner }}/{{ build_runner_instance.repository }}/actions/runners?name={{ inventory_hostname }}-{{ build_runner_instance.name }}', --jq, '.runners[] | select(.name == "{{ inventory_hostname }}-{{ build_runner_instance.name }}") | .id']
     register: build_runner_returning_runners
     changed_when: false
     when: build_runner_github_runners.stdout_lines | default([]) | length > 0
@@ -209,6 +209,6 @@
     delegate_to: localhost
     become: false
     ansible.builtin.command:
-      argv: [gh, api, --method, PUT, --silent, 'repos/{{ build_runner_owner }}/{{ build_runner_repository }}/actions/runners/{{ item }}/labels', --input, '-']
+      argv: [gh, api, --method, PUT, --silent, 'repos/{{ build_runner_owner }}/{{ build_runner_instance.repository }}/actions/runners/{{ item }}/labels', --input, '-']
       stdin: '{{ {"labels": build_runner_labels} | to_json }}'
     loop: '{{ build_runner_returning_runners.stdout_lines | default([]) }}'

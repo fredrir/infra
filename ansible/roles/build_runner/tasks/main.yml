@@ -8,7 +8,9 @@
     - ansible_facts.virtualization_role == 'guest'
     - inventory_hostname not in groups.get('k3s_cluster', [])
     - inventory_hostname == build_runner_fleet.host
-    - build_runner_repositories | difference(build_runner_fleet.repositories) | length == 0
+    - build_runner_repositories.keys() | difference(build_runner_fleet.repositories.keys()) | length == 0
+    - build_runner_repositories.values() | min >= 1
+    - build_runner_repositories.values() | max <= 8
     - build_runner_memory is match('^[1-9][0-9]*G$')
     - build_runner_job_slots | int >= 1
     - build_runner_job_slots | int <= 8
@@ -64,9 +66,10 @@
 
 - name: Configure repository runners
   ansible.builtin.include_tasks: repository.yml
-  loop: '{{ build_runner_repositories }}'
+  loop: '{{ build_runner_instances }}'
   loop_control:
-    loop_var: build_runner_repository
+    loop_var: build_runner_instance
+    label: '{{ build_runner_instance.name }}'
 
 - name: Find repository runner registrations
   ansible.builtin.find:
@@ -79,6 +82,6 @@
 
 - name: Remove undeclared repository runners
   ansible.builtin.include_tasks: remove.yml
-  loop: "{{ build_runner_registrations.files | map(attribute='path') | map('dirname') | select('match', '^/home/runner/[A-Za-z0-9][A-Za-z0-9_.-]*$') | map('basename') | difference(build_runner_fleet.repositories) }}"
+  loop: "{{ build_runner_registrations.files | map(attribute='path') | map('dirname') | select('match', '^/home/runner/[A-Za-z0-9][A-Za-z0-9_.-]*$') | map('basename') | difference(build_runner_fleet_names) }}"
   loop_control:
     loop_var: build_runner_retired

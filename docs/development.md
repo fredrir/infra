@@ -150,7 +150,7 @@ git diff -- platform
 | Host boundary                   | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding; guest metrics forwarded to the tailnet address, port 9101              |
 | Guest metrics                   | Node exporter `:9100`; `infra_cgroup_*` for `infra-engine.slice` and `infra-runners.slice`; Prometheus job `build-vm`                      |
 | Activation gates                | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true`                                                       |
-| Runner registration             | Seven repository registrations share one VM; each accepts protected main pushes or manual runs only                                         |
+| Runner registration             | `build/runners.json` counts per repository, named `infra-build-09-<repository>-<n>`; protected main pushes or manual runs only              |
 | Runner slice                    | Eight CPUs / 3 GiB aggregate for runner services and native child processes                                                                 |
 | Production Dagger ceiling       | Eight CPUs / 12 GiB RAM / 3,072 processes / three parallel operations                                                                     |
 | Standalone engine defaults      | Four CPUs / 8 GiB RAM / one parallel operation; configurable within host capacity                                                         |

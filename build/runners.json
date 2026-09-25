@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "owner": "fredrir",
   "host": "infra-build-09",
   "version": "2.337.0",
@@ -8,13 +8,13 @@
     "dagger-amd64",
     "infra-trusted"
   ],
-  "repositories": [
-    "infra",
-    "Y",
-    "llunde-frontend",
-    "llunde-backend",
-    "llunde-pyparser",
-    "packages",
-    "portfolio"
-  ]
+  "repositories": {
+    "infra": 3,
+    "Y": 2,
+    "llunde-frontend": 1,
+    "llunde-backend": 1,
+    "llunde-pyparser": 1,
+    "packages": 1,
+    "portfolio": 2
+  }
 }

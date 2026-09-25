@@ -22,7 +22,7 @@ import (
 )
 
 func testRunnerFleet() RunnerFleet {
-	return RunnerFleet{Schema: 1, Owner: "fredrir", Host: "infra-build-09", Version: "2.337.0", SHA256: strings.Repeat("a", 64), Labels: []string{"dagger-amd64", "infra-trusted"}, Repositories: []string{"infra", "Y"}}
+	return RunnerFleet{Schema: 2, Owner: "fredrir", Host: "infra-build-09", Version: "2.337.0", SHA256: strings.Repeat("a", 64), Labels: []string{"dagger-amd64", "infra-trusted"}, Repositories: map[string]int{"infra": 2, "Y": 1}}
 }
 
 func writeRunnerFleet(t *testing.T, fleet RunnerFleet) string {
@@ -41,13 +41,31 @@ func writeRunnerFleet(t *testing.T, fleet RunnerFleet) string {
 	return root
 }
 
-func healthyRunner(fleet RunnerFleet, repository string) registeredRunner {
+func healthyRunner(fleet RunnerFleet, name string) registeredRunner {
 	version := fleet.Version
 	labels := []runnerLabel{{"self-hosted", "read-only"}, {"Linux", "read-only"}, {"X64", "read-only"}}
 	for _, label := range fleet.Labels {
 		labels = append(labels, runnerLabel{label, "custom"})
 	}
-	return registeredRunner{Name: fleet.Host + "-" + repository, Status: "online", Version: &version, Labels: labels}
+	return registeredRunner{Name: fleet.Host + "-" + name, Status: "online", Version: &version, Labels: labels}
+}
+
+func healthyRunners(fleet RunnerFleet, repository string) []registeredRunner {
+	var runners []registeredRunner
+	for _, runner := range fleet.Runners() {
+		if runner.Repository == repository {
+			runners = append(runners, healthyRunner(fleet, runner.Name))
+		}
+	}
+	return runners
+}
+
+func healthyStates(fleet RunnerFleet) map[string][]registeredRunner {
+	states := map[string][]registeredRunner{}
+	for _, repository := range fleet.RepositoryNames() {
+		states[repository] = healthyRunners(fleet, repository)
+	}
+	return states
 }
 
 func runnerResponse(t *testing.T, runners ...registeredRunner) process.Result {
@@ -96,11 +114,13 @@ func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process
 		if h.unreadable != nil && h.unreadable(h.queries) {
 			return process.Result{ExitCode: 1}, errors.New("HTTP 502")
 		}
-		runner := healthyRunner(h.fleet, queriedRepository(opts))
+		runners := healthyRunners(h.fleet, queriedRepository(opts))
 		if h.change != nil {
-			h.change(&runner)
+			for index := range runners {
+				h.change(&runners[index])
+			}
 		}
-		return runnerResponse(h.t, runner), nil
+		return runnerResponse(h.t, runners...), nil
 	}
 	h.t.Errorf("unexpected command: %s %q", opts.Name, opts.Args)
 	return process.Result{}, errors.New("unexpected command")
@@ -113,14 +133,14 @@ func fastRunnerReads(t *testing.T) {
 }
 
 func offlineY(runner *registeredRunner) {
-	if runner.Name == "infra-build-09-Y" {
+	if runner.Name == "infra-build-09-Y-1" {
 		runner.Status = "offline"
 	}
 }
 
 func unregisteredY(runner *registeredRunner) {
-	if runner.Name == "infra-build-09-Y" {
-		runner.Name = "infra-build-08-Y"
+	if runner.Name == "infra-build-09-Y-1" {
+		runner.Name = "infra-build-08-Y-1"
 	}
 }
 
@@ -130,7 +150,7 @@ func TestLoadRunnerFleetValidatesDeclaration(t *testing.T) {
 		t.Fatalf("valid runner fleet rejected: %+v, %v", fleet, err)
 	}
 	for name, change := range map[string]func(*RunnerFleet){
-		"schema":                func(f *RunnerFleet) { f.Schema = 2 },
+		"schema":                func(f *RunnerFleet) { f.Schema = 1 },
 		"owner":                 func(f *RunnerFleet) { f.Owner = "fredrir/infra" },
 		"host":                  func(f *RunnerFleet) { f.Host = "Infra_Build" },
 		"version":               func(f *RunnerFleet) { f.Version = "v2.337.0" },
@@ -141,8 +161,9 @@ func TestLoadRunnerFleetValidatesDeclaration(t *testing.T) {
 		"no labels":             func(f *RunnerFleet) { f.Labels = nil },
 		"duplicate label":       func(f *RunnerFleet) { f.Labels = []string{"infra-trusted", "infra-trusted"} },
 		"no repositories":       func(f *RunnerFleet) { f.Repositories = nil },
-		"duplicate repository":  func(f *RunnerFleet) { f.Repositories = []string{"infra", "Y", "infra"} },
-		"traversing repository": func(f *RunnerFleet) { f.Repositories = []string{".."} },
+		"no runners":            func(f *RunnerFleet) { f.Repositories = map[string]int{"infra": 0} },
+		"too many runners":      func(f *RunnerFleet) { f.Repositories = map[string]int{"infra": 9} },
+		"traversing repository": func(f *RunnerFleet) { f.Repositories = map[string]int{"..": 1} },
 	} {
 		t.Run(name, func(t *testing.T) {
 			fleet := testRunnerFleet()
@@ -184,22 +205,23 @@ func TestRunnerDrift(t *testing.T) {
 			s["Y"][0].Labels = append(s["Y"][0].Labels, runnerLabel{"ARM64", "read-only"})
 		}, ""},
 		{"label order ignored", func(s map[string][]registeredRunner) { slices.Reverse(s["Y"][0].Labels) }, ""},
-		{"missing", func(s map[string][]registeredRunner) { delete(s, "Y") }, "fredrir/Y has 0 runners named infra-build-09-Y, want 1"},
-		{"renamed", func(s map[string][]registeredRunner) { s["Y"][0].Name = "infra-build-08-Y" }, "fredrir/Y has 0 runners named infra-build-09-Y, want 1"},
-		{"duplicate", func(s map[string][]registeredRunner) { s["Y"] = append(s["Y"], s["Y"][0]) }, "fredrir/Y has 2 runners named infra-build-09-Y, want 1"},
-		{"offline", func(s map[string][]registeredRunner) { s["Y"][0].Status = "offline" }, "infra-build-09-Y is offline, want online"},
-		{"null version", func(s map[string][]registeredRunner) { s["Y"][0].Version = nil }, "infra-build-09-Y reports no version, want 2.337.0"},
-		{"stale version", func(s map[string][]registeredRunner) { s["Y"][0].Version = &stale }, "infra-build-09-Y runs 2.300.0, want 2.337.0"},
-		{"missing label", func(s map[string][]registeredRunner) { s["Y"][0].Labels = s["Y"][0].Labels[:4] }, "infra-build-09-Y has labels [dagger-amd64], want [dagger-amd64 infra-trusted]"},
+		{"missing", func(s map[string][]registeredRunner) { delete(s, "Y") }, "fredrir/Y has 0 runners named infra-build-09-Y-1, want 1"},
+		{"missing second runner", func(s map[string][]registeredRunner) { s["infra"] = s["infra"][:1] }, "fredrir/infra has 0 runners named infra-build-09-infra-2, want 1"},
+		{"renamed", func(s map[string][]registeredRunner) { s["Y"][0].Name = "infra-build-08-Y-1" }, "fredrir/Y has 0 runners named infra-build-09-Y-1, want 1"},
+		{"duplicate", func(s map[string][]registeredRunner) { s["Y"] = append(s["Y"], s["Y"][0]) }, "fredrir/Y has 2 runners named infra-build-09-Y-1, want 1"},
+		{"retired single-name runner", func(s map[string][]registeredRunner) {
+			s["infra"] = append(s["infra"], healthyRunner(fleet, "infra"))
+		}, "fredrir/infra registers undeclared runner infra-build-09-infra"},
+		{"offline", func(s map[string][]registeredRunner) { s["Y"][0].Status = "offline" }, "infra-build-09-Y-1 is offline, want online"},
+		{"null version", func(s map[string][]registeredRunner) { s["Y"][0].Version = nil }, "infra-build-09-Y-1 reports no version, want 2.337.0"},
+		{"stale version", func(s map[string][]registeredRunner) { s["Y"][0].Version = &stale }, "infra-build-09-Y-1 runs 2.300.0, want 2.337.0"},
+		{"missing label", func(s map[string][]registeredRunner) { s["Y"][0].Labels = s["Y"][0].Labels[:4] }, "infra-build-09-Y-1 has labels [dagger-amd64], want [dagger-amd64 infra-trusted]"},
 		{"extra label", func(s map[string][]registeredRunner) {
 			s["Y"][0].Labels = append(s["Y"][0].Labels, runnerLabel{"gpu", "custom"})
-		}, "infra-build-09-Y has labels [dagger-amd64 gpu infra-trusted], want [dagger-amd64 infra-trusted]"},
+		}, "infra-build-09-Y-1 has labels [dagger-amd64 gpu infra-trusted], want [dagger-amd64 infra-trusted]"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			states := map[string][]registeredRunner{}
-			for _, repository := range fleet.Repositories {
-				states[repository] = []registeredRunner{healthyRunner(fleet, repository)}
-			}
+			states := healthyStates(fleet)
 			test.change(states)
 			var want []string
 			if test.want != "" {
@@ -212,7 +234,7 @@ func TestRunnerDrift(t *testing.T) {
 	}
 }
 
-func TestRunnerStatesQueryEachRepositoryByRunnerName(t *testing.T) {
+func TestRunnerStatesQueryEachRepository(t *testing.T) {
 	fleet := testRunnerFleet()
 	var mu sync.Mutex
 	var queries []string
@@ -220,7 +242,7 @@ func TestRunnerStatesQueryEachRepositoryByRunnerName(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		queries = append(queries, opts.Name+" "+strings.Join(opts.Args, " "))
-		return runnerResponse(t, healthyRunner(fleet, queriedRepository(opts))), nil
+		return runnerResponse(t, healthyRunners(fleet, queriedRepository(opts))...), nil
 	}}}
 	states, err := commands.runnerStates(context.Background(), fleet)
 	if err != nil {
@@ -228,8 +250,8 @@ func TestRunnerStatesQueryEachRepositoryByRunnerName(t *testing.T) {
 	}
 	slices.Sort(queries)
 	want := []string{
-		"gh api repos/fredrir/Y/actions/runners?name=infra-build-09-Y",
-		"gh api repos/fredrir/infra/actions/runners?name=infra-build-09-infra",
+		"gh api repos/fredrir/Y/actions/runners?per_page=100",
+		"gh api repos/fredrir/infra/actions/runners?per_page=100",
 	}
 	if !reflect.DeepEqual(queries, want) {
 		t.Fatalf("unexpected queries: %q", queries)
@@ -249,14 +271,16 @@ func TestRunnerStatesQueryEachRepositoryByRunnerName(t *testing.T) {
 func TestRunnerFleetVerificationFailsWhenDriftPersists(t *testing.T) {
 	fleet := testRunnerFleet()
 	commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
-		runner := healthyRunner(fleet, queriedRepository(opts))
-		runner.Version = nil
-		return runnerResponse(t, runner), nil
+		runners := healthyRunners(fleet, queriedRepository(opts))
+		for index := range runners {
+			runners[index].Version = nil
+		}
+		return runnerResponse(t, runners...), nil
 	}}}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	err := commands.verifyRunnerFleet(ctx, fleet)
-	if !errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "infra-build-09-Y reports no version") {
+	if !errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "infra-build-09-Y-1 reports no version") {
 		t.Fatalf("persistent drift passed verification: %v", err)
 	}
 }
@@ -308,11 +332,11 @@ func TestFleetRoutingMatchesDeclaredRunners(t *testing.T) {
 	slices.Sort(routed)
 	routed = slices.Compact(routed)
 	for _, name := range routed {
-		if !slices.Contains(fleet.Repositories, name) {
+		if fleet.Repositories[name] == 0 {
 			t.Errorf("%s/%s routes to the runner fleet without a declared runner", fleet.Owner, name)
 		}
 	}
-	for _, name := range fleet.Repositories {
+	for _, name := range fleet.RepositoryNames() {
 		if !slices.Contains(routed, name) {
 			t.Errorf("%s/%s declares a runner that no workflow routes to the runner fleet", fleet.Owner, name)
 		}
@@ -321,22 +345,19 @@ func TestFleetRoutingMatchesDeclaredRunners(t *testing.T) {
 
 func TestRunnerRepairsFollowGitHubState(t *testing.T) {
 	fleet := testRunnerFleet()
-	states := map[string][]registeredRunner{}
-	for _, repository := range fleet.Repositories {
-		states[repository] = []registeredRunner{healthyRunner(fleet, repository)}
-	}
+	states := healthyStates(fleet)
 	if restart, missing := offlineRunners(fleet, states), missingRunners(fleet, states); restart != nil || missing != nil {
 		t.Fatalf("healthy runners repaired: restart %q, reregister %q", restart, missing)
 	}
 	states["Y"][0].Status = "offline"
-	foreign := healthyRunner(fleet, "infra")
-	foreign.Name, foreign.Status = "infra-build-08-infra", "offline"
+	foreign := healthyRunner(fleet, "infra-1")
+	foreign.Name, foreign.Status = "infra-build-08-infra-1", "offline"
 	states["infra"] = append(states["infra"], foreign)
-	if restart := offlineRunners(fleet, states); !reflect.DeepEqual(restart, []string{"Y"}) {
+	if restart := offlineRunners(fleet, states); !reflect.DeepEqual(restart, []string{"Y-1"}) {
 		t.Fatalf("restart list does not match offline fleet runners: %q", restart)
 	}
 	states["infra"] = states["infra"][1:]
-	if missing := missingRunners(fleet, states); !reflect.DeepEqual(missing, []string{"infra"}) {
+	if missing := missingRunners(fleet, states); !reflect.DeepEqual(missing, []string{"infra-1"}) {
 		t.Fatalf("reregistration list does not match missing fleet runners: %q", missing)
 	}
 }
@@ -356,17 +377,17 @@ func TestRunnerConvergenceArguments(t *testing.T) {
 		{"CLI release", runners(cli...), nil, "build-runners.yml --tags=infra_binary"},
 		{"CLI release and fleet", runners("build/cli-release.json", "build/runners.json"), nil, "build-runners.yml"},
 		{"runner role", runners("ansible/roles/build_runner/tasks/main.yml"), nil, "build-runners.yml"},
-		{"CLI release with offline runner", runners(cli...), offlineY, `build-runners.yml --extra-vars {"build_runner_restart":["Y"]}`},
+		{"CLI release with offline runner", runners(cli...), offlineY, `build-runners.yml --extra-vars {"build_runner_restart":["Y-1"]}`},
 		{"CLI release in full scope", Plan{Affected: Selection{Ansible: true, HostScope: HostScopeFull, RunnerInputs: cli}}, nil, "reconcile.yml"},
-		{"full with offline runner", Plan{Affected: All()}, offlineY, `reconcile.yml --extra-vars {"build_runner_restart":["Y"]}`},
-		{"all offline", Plan{Affected: All()}, func(runner *registeredRunner) { runner.Status = "offline" }, `reconcile.yml --extra-vars {"build_runner_restart":["infra","Y"]}`},
-		{"missing registration", runners(cli...), unregisteredY, `build-runners.yml --extra-vars {"build_runner_reregister":["Y"]}`},
+		{"full with offline runner", Plan{Affected: All()}, offlineY, `reconcile.yml --extra-vars {"build_runner_restart":["Y-1"]}`},
+		{"all offline", Plan{Affected: All()}, func(runner *registeredRunner) { runner.Status = "offline" }, `reconcile.yml --extra-vars {"build_runner_restart":["Y-1","infra-1","infra-2"]}`},
+		{"missing registration", runners(cli...), unregisteredY, `build-runners.yml --extra-vars {"build_runner_reregister":["Y-1"]}`},
 		{"missing and offline", Plan{Affected: All()}, func(runner *registeredRunner) {
 			unregisteredY(runner)
-			if runner.Name == "infra-build-09-infra" {
+			if runner.Name == "infra-build-09-infra-2" {
 				runner.Status = "offline"
 			}
-		}, `reconcile.yml --extra-vars {"build_runner_reregister":["Y"],"build_runner_restart":["infra"]}`},
+		}, `reconcile.yml --extra-vars {"build_runner_reregister":["Y-1"],"build_runner_restart":["infra-2"]}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), change: test.change}
@@ -383,7 +404,7 @@ func TestRunnerConvergenceArguments(t *testing.T) {
 func TestRunnerLabelsConvergeOnlyMismatchedRunners(t *testing.T) {
 	harness := &fleetHarness{t: t, fleet: testRunnerFleet(), change: func(runner *registeredRunner) {
 		runner.ID = 7
-		if runner.Name == "infra-build-09-Y" {
+		if runner.Name == "infra-build-09-Y-1" {
 			runner.ID = 42
 			runner.Labels = append(runner.Labels[:3], runnerLabel{"dagger-amd64", "custom"}, runnerLabel{"gpu", "custom"})
 		}
@@ -407,7 +428,7 @@ func TestRunnerConvergenceRetriesTransientReads(t *testing.T) {
 	if err := harness.commands().Hosts(context.Background(), Plan{Affected: All()}); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{`reconcile.yml --extra-vars {"build_runner_restart":["Y"]}`}; !reflect.DeepEqual(harness.calls, want) || harness.stderr.Len() != 0 {
+	if want := []string{`reconcile.yml --extra-vars {"build_runner_restart":["Y-1"]}`}; !reflect.DeepEqual(harness.calls, want) || harness.stderr.Len() != 0 {
 		t.Fatalf("transient read failure lost GitHub repairs: %q\n%s", harness.calls, harness.stderr.String())
 	}
 }
@@ -441,14 +462,14 @@ func TestUnreadableRunnerFleetDoesNotGateConvergence(t *testing.T) {
 
 func TestRejectedLabelUpdateOnlyWarns(t *testing.T) {
 	harness := &fleetHarness{t: t, fleet: testRunnerFleet(), rejectLabels: true, change: func(runner *registeredRunner) {
-		if runner.Name == "infra-build-09-Y" {
+		if runner.Name == "infra-build-09-Y-1" {
 			runner.Labels = runner.Labels[:3]
 		}
 	}}
 	if err := harness.commands().Hosts(context.Background(), Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners}}); err != nil {
 		t.Fatal(err)
 	}
-	if len(harness.calls) != 2 || harness.calls[1] != "build-runners.yml" || !strings.Contains(harness.stderr.String(), "warning: set labels of infra-build-09-Y") {
+	if len(harness.calls) != 2 || harness.calls[1] != "build-runners.yml" || !strings.Contains(harness.stderr.String(), "warning: set labels of infra-build-09-Y-1") {
 		t.Fatalf("rejected label update stopped convergence or went unreported: %q\n%s", harness.calls, harness.stderr.String())
 	}
 }
@@ -462,13 +483,13 @@ func TestMissingRunnersAreConfirmedBeforeReregistration(t *testing.T) {
 		want       string
 	}{
 		{"registration appeared", 1, nil, "build-runners.yml"},
-		{"registration missing", 2, nil, `build-runners.yml --extra-vars {"build_runner_reregister":["Y"]}`},
+		{"registration missing", 2, nil, `build-runners.yml --extra-vars {"build_runner_reregister":["Y-1"]}`},
 		{"confirmation unreadable", 2, func(query int) bool { return query == 3 }, "build-runners.yml"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			reads := 0
 			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: test.unreadable, change: func(runner *registeredRunner) {
-				if runner.Name == "infra-build-09-Y" {
+				if runner.Name == "infra-build-09-Y-1" {
 					if reads++; reads <= test.missing {
 						unregisteredY(runner)
 					}

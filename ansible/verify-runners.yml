@@ -7,7 +7,7 @@
     build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
     build_runner_fleet: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/runners.json') | from_json }}"
     build_runner_probed_registrations: "{{ build_runner_probe.stdout_lines | select('match', '^runner ') | map('split') | list }}"
-    build_runner_state_repositories: '{{ build_runner_repositories }}'
+    build_runner_state_repositories: "{{ build_runner_instances | map(attribute='name') | list }}"
     build_runner_state_services: "{{ build_runner_probed_registrations | map('last') | list }}"
   tasks:
   - name: Validate declared engine pin
@@ -42,12 +42,12 @@
       - build_runner_probe.stdout_lines | select('match', '^pending ') | list == []
       - "'slice-reload no' in build_runner_probe.stdout_lines"
       - build_runner_probed_registrations | length > 0
-      - build_runner_probed_registrations | map(attribute='1') | sort == build_runner_repositories | sort
+      - build_runner_probed_registrations | map(attribute='1') | sort == build_runner_instances | map(attribute='name') | sort
       fail_msg: "The build VM differs from its declared runner host:\n{{ build_runner_probe.stdout }}"
 
   - name: Verify registered runner services
     ansible.builtin.assert:
-      that: item | length == 3 and item[2] == 'actions.runner.' ~ build_runner_owner ~ '-' ~ item[1] ~ '.' ~ inventory_hostname ~ '-' ~ item[1] ~ '.service'
+      that: item | length == 3 and item[2] == 'actions.runner.' ~ build_runner_owner ~ '-' ~ (build_runner_instances | selectattr('name', 'equalto', item[1]) | map(attribute='repository') | first | default('')) ~ '.' ~ inventory_hostname ~ '-' ~ item[1] ~ '.service'
       fail_msg: "{{ item[1] }} is registered as {{ item[2:] | join(' ') }} instead of its own runner service"
     loop: '{{ build_runner_probed_registrations }}'
     loop_control:
