@@ -56,7 +56,7 @@ func Affected(paths []string) Selection {
 			selectHosts(&selected, HostScopeMonitor)
 		case strings.HasPrefix(path, "ansible/roles/gatus/"):
 			selectHosts(&selected, HostScopeMonitor)
-		case path == "build/cli-release.json", path == "build/toolchain.json", path == "ansible/build-runners.yml", path == "ansible/verify-runners.yml", strings.HasPrefix(path, "ansible/roles/build_runner/"), strings.HasPrefix(path, "ansible/roles/build_engine/"):
+		case path == "build/cli-release.json", path == "build/runners.json", path == "build/toolchain.json", path == "ansible/build-runners.yml", path == "ansible/verify-runners.yml", strings.HasPrefix(path, "ansible/roles/build_runner/"), strings.HasPrefix(path, "ansible/roles/build_engine/"):
 			selectHosts(&selected, HostScopeRunners)
 		case strings.HasPrefix(path, "tofu/"):
 			selected.Tofu = true

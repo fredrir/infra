@@ -1,8 +1,8 @@
-build_runner_repositories: [infra]
-build_runner_owner: fredrir
-build_runner_version: 2.337.0
-build_runner_sha256: 70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613
-build_runner_labels: [dagger-amd64, infra-trusted]
+build_runner_repositories: '{{ build_runner_fleet.repositories }}'
+build_runner_owner: '{{ build_runner_fleet.owner }}'
+build_runner_version: '{{ build_runner_fleet.version }}'
+build_runner_sha256: '{{ build_runner_fleet.sha256 }}'
+build_runner_labels: '{{ build_runner_fleet.labels }}'
 build_runner_memory: 2G
 build_runner_job_slots: 1
 build_runner_admission_enabled: true

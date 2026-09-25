@@ -12,6 +12,11 @@ func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 	case HostScopeMonitor:
 		playbooks = []string{"external.yml", "verify.yml"}
 	}
+	if scope := effectiveHostScope(plan.Affected); scope == HostScopeFull || scope == HostScopeRunners {
+		if _, err := LoadRunnerFleet(c.Runner.Dir); err != nil {
+			return err
+		}
+	}
 	for _, playbook := range playbooks {
 		for _, check := range []string{"--syntax-check", "--list-tasks"} {
 			args := []string{check}
@@ -42,16 +47,25 @@ func (c *Commands) Hosts(ctx context.Context, plan Plan) error {
 }
 
 func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
+	var err error
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
-		return c.ansible(ctx, "verify.yml", "verify-runners.yml")
+		err = c.ansible(ctx, "verify.yml", "verify-runners.yml")
 	case HostScopeRunners:
-		return c.ansible(ctx, "verify-runners.yml")
+		err = c.ansible(ctx, "verify-runners.yml")
 	case HostScopeMonitor:
 		return c.ansible(ctx, "verify.yml", "--limit=external")
 	default:
 		return nil
 	}
+	if err != nil {
+		return err
+	}
+	fleet, err := LoadRunnerFleet(c.Runner.Dir)
+	if err != nil {
+		return err
+	}
+	return c.verifyRunnerFleet(ctx, fleet)
 }
 
 func (c *Commands) Monitor(ctx context.Context, plan Plan) error {

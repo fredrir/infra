@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ func TestHostScopeSelection(t *testing.T) {
 		{"runner role", []string{"ansible/roles/build_runner/tasks/main.yml"}, HostScopeRunners, false, false},
 		{"engine role", []string{"ansible/roles/build_engine/templates/infra-dagger.service.j2"}, HostScopeRunners, false, false},
 		{"CLI release", []string{"build/cli-release.json"}, HostScopeRunners, false, false},
+		{"runner fleet", []string{"build/runners.json"}, HostScopeRunners, false, false},
 		{"engine toolchain", []string{"build/toolchain.json"}, HostScopeRunners, false, false},
 		{"monitor", []string{"ansible/roles/gatus/templates/config.yml.j2"}, HostScopeMonitor, false, false},
 		{"mixed hosts", []string{"ansible/roles/gatus/tasks/main.yml", "ansible/roles/build_runner/tasks/main.yml"}, HostScopeFull, false, false},
@@ -58,23 +60,35 @@ func TestHostScopeSelection(t *testing.T) {
 }
 
 func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
+	fleet := testRunnerFleet()
+	root := writeRunnerFleet(t, fleet)
 	for _, test := range []struct {
-		scope string
-		want  []string
+		scope   string
+		want    []string
+		runners bool
 	}{
-		{HostScopeFull, []string{"reconcile.yml", "external.yml", "verify.yml verify-runners.yml"}},
-		{HostScopeRunners, []string{"build-runners.yml", "verify-runners.yml"}},
-		{HostScopeMonitor, []string{"external.yml --tags=gatus", "verify.yml --limit=external"}},
-		{HostScopeNone, nil},
+		{HostScopeFull, []string{"reconcile.yml", "external.yml", "verify.yml verify-runners.yml"}, true},
+		{HostScopeRunners, []string{"build-runners.yml", "verify-runners.yml"}, true},
+		{HostScopeMonitor, []string{"external.yml --tags=gatus", "verify.yml --limit=external"}, false},
+		{HostScopeNone, nil, false},
 	} {
 		t.Run(test.scope, func(t *testing.T) {
+			var mu sync.Mutex
 			var calls []string
-			commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
-				if opts.Name != "ansible-playbook" {
-					t.Fatalf("unexpected command: %s", opts.Name)
+			queried := 0
+			commands := Commands{Runner: ci.Runner{Dir: root, Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				switch opts.Name {
+				case "ansible-playbook":
+					calls = append(calls, strings.Join(opts.Args[2:], " "))
+					return process.Result{}, nil
+				case "gh":
+					queried++
+					return runnerResponse(t, healthyRunner(fleet, queriedRepository(opts))), nil
 				}
-				calls = append(calls, strings.Join(opts.Args[2:], " "))
-				return process.Result{}, nil
+				t.Errorf("unexpected command: %s", opts.Name)
+				return process.Result{}, errors.New("unexpected command")
 			}}}
 			plan := Plan{Affected: Selection{Ansible: test.scope != HostScopeNone, HostScope: test.scope}}
 			for _, operation := range []func(context.Context, Plan) error{commands.Hosts, commands.Monitor, commands.VerifyHosts} {
@@ -84,6 +98,13 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 			}
 			if !reflect.DeepEqual(calls, test.want) {
 				t.Fatalf("scope leaked or missed verification: %v", calls)
+			}
+			want := 0
+			if test.runners {
+				want = len(fleet.Repositories)
+			}
+			if queried != want {
+				t.Fatalf("runner fleet verification leaked or missed: %d queries", queried)
 			}
 		})
 	}
@@ -98,6 +119,34 @@ func TestHostScopeStopsOnVerificationFailure(t *testing.T) {
 	}}}
 	if err := commands.VerifyHosts(context.Background(), Plan{Affected: All()}); !errors.Is(err, failure) || calls != 1 {
 		t.Fatalf("verification failure lost: calls=%d, error=%v", calls, err)
+	}
+	fleet := testRunnerFleet()
+	commands = Commands{Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+		if opts.Name != "gh" {
+			return process.Result{}, nil
+		}
+		runner := healthyRunner(fleet, queriedRepository(opts))
+		runner.Status = "offline"
+		return runnerResponse(t, runner), nil
+	}}}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if err := commands.VerifyHosts(ctx, Plan{Affected: All()}); err == nil || !strings.Contains(err.Error(), "infra-build-09-infra is offline") {
+		t.Fatalf("runner fleet drift passed host verification: %v", err)
+	}
+}
+
+func TestHostPlanValidatesRunnerFleet(t *testing.T) {
+	commands := Commands{Runner: ci.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
+		return process.Result{}, nil
+	}}}
+	for _, scope := range []string{HostScopeFull, HostScopeRunners} {
+		if err := commands.PlanHosts(context.Background(), Plan{Affected: Selection{Ansible: true, HostScope: scope}}); err == nil {
+			t.Fatalf("%s plan accepted a missing runner fleet", scope)
+		}
+	}
+	if err := commands.PlanHosts(context.Background(), Plan{Affected: Selection{Ansible: true, HostScope: HostScopeMonitor}}); err != nil {
+		t.Fatalf("monitor plan required the runner fleet: %v", err)
 	}
 }
 

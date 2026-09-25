@@ -64,8 +64,8 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 		}
 		return data
 	}
-	defaults := map[string]any{}
-	if err := yaml.Unmarshal(read(filepath.Join(root, "ansible/roles/build_runner/defaults/main.yml")), &defaults); err != nil {
+	fleet, err := LoadRunnerFleet(root)
+	if err != nil {
 		t.Fatal(err)
 	}
 	engineDefaults := map[string]any{}
@@ -76,7 +76,7 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 	if err := json.Unmarshal(read(filepath.Join(root, "build/toolchain.json")), &toolchain); err != nil {
 		t.Fatal(err)
 	}
-	version := defaults["build_runner_version"].(string)
+	version := fleet.Version
 	cli := "#!/bin/sh\necho fixture\n"
 	write("infra", cli, true)
 	write("vars.json", fmt.Sprintf(`{"build_runner_cli":{"sha256":"%x"}}`, sha256.Sum256([]byte(cli))), false)

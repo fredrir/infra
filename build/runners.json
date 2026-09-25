@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "owner": "fredrir",
+  "host": "infra-build-09",
+  "version": "2.337.0",
+  "sha256": "70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613",
+  "labels": [
+    "dagger-amd64",
+    "infra-trusted"
+  ],
+  "repositories": [
+    "infra",
+    "Y",
+    "llunde-frontend",
+    "llunde-backend",
+    "llunde-pyparser",
+    "packages",
+    "nsql",
+    "portfolio"
+  ]
+}

@@ -164,6 +164,7 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 		{"ansible/roles/gatus/tasks/main.yml", Selection{Ansible: true, MonitorOnly: true}},
 		{"platform/projects/y/application.yaml", Selection{Kubernetes: true, Projects: []string{"y"}}},
 		{"build/cli-release.json", Selection{Ansible: true, HostScope: HostScopeRunners}},
+		{"build/runners.json", Selection{Ansible: true, HostScope: HostScopeRunners}},
 		{"build/toolchain.json", Selection{Ansible: true, HostScope: HostScopeRunners}},
 		{"ansible/roles/host_packages/tasks/main.yml", Selection{Ansible: true}},
 		{"internal/reconcile/run.go", Selection{Tooling: true}},

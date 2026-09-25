@@ -117,7 +117,6 @@ all:
           build_engine_dagger_cache_gib: 32
           build_engine_parallelism: 1
           build_runner_cpus_percent: 400
-          build_runner_repositories: [infra, Y, llunde-frontend, llunde-backend, llunde-pyparser, packages, nsql, portfolio]
           infra_binary_url: 'https://github.com/fredrir/infra/releases/download/{{ build_runner_cli.tag }}/infra-linux-amd64'
           infra_binary_revision: '{{ build_runner_cli.revision }}'
           infra_binary_sha256: '{{ build_runner_cli.sha256 }}'

@@ -33,3 +33,13 @@ filegroup(
     ],
     visibility = ["//internal/contracts:__pkg__"],
 )
+
+filegroup(
+    name = "runner_routing_data",
+    srcs = [
+        ".github/workflows/build-image.yml",
+        ".github/workflows/packages-publish.yml",
+        "//build:runners.json",
+    ],
+    visibility = ["//internal/reconcile:__pkg__"],
+)
