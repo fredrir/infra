@@ -46,12 +46,18 @@ func newReconcileCommand() *cobra.Command {
 			child.Flags().BoolVar(&deep, "deep", false, "Also compare OpenTofu and every host play with production in check mode")
 		}
 		child.RunE = func(cmd *cobra.Command, _ []string) (err error) {
-			publisherKey := os.Getenv("PUBLISHER_APP_PRIVATE_KEY")
-			if err := os.Unsetenv("PUBLISHER_APP_PRIVATE_KEY"); err != nil {
+			runnerToken, publisherKeyFile := os.Getenv("GH_TOKEN"), os.Getenv("PUBLISHER_APP_PRIVATE_KEY_FILE")
+			if err := errors.Join(os.Unsetenv("GH_TOKEN"), os.Unsetenv("PUBLISHER_APP_PRIVATE_KEY_FILE")); err != nil {
 				return err
 			}
-			if action == "apply" && publisherKey == "" {
-				return errors.New("PUBLISHER_APP_PRIVATE_KEY required")
+			var publisherKey []byte
+			if publisherKeyFile != "" {
+				if publisherKey, err = reconcile.ConsumePrivateKey(publisherKeyFile); err != nil {
+					return fmt.Errorf("PUBLISHER_APP_PRIVATE_KEY_FILE: %w", err)
+				}
+			}
+			if action == "apply" && publisherKey == nil {
+				return errors.New("PUBLISHER_APP_PRIVATE_KEY_FILE required")
 			}
 			var verified string
 			if action == "verify" && report != "" {
@@ -108,7 +114,7 @@ func newReconcileCommand() *cobra.Command {
 				return err
 			}
 			defer os.RemoveAll(work)
-			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ProvenanceEnv: attestations}
+			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ProvenanceEnv: attestations, RunnerToken: runnerToken}
 			if ops.GitHub, err = reconcile.GitHubClient(reconcile.GitHubAPI, token); err != nil {
 				return err
 			}
@@ -117,7 +123,7 @@ func newReconcileCommand() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				publisher.PrivateKey = []byte(publisherKey)
+				publisher.PrivateKey = publisherKey
 				ops.Publisher = &publisher
 				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, LockWait: wait, Log: cmd.ErrOrStderr(), ProvenanceBase: provenanceBase, Report: func(status reconcile.Status) error {
 					fmt.Fprintf(cmd.OutOrStdout(), "%s desired=%s applied=%s\n", status.Stage, status.Desired, status.Applied)

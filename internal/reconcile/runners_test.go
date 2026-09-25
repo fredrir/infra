@@ -505,3 +505,55 @@ func TestMissingRunnersAreConfirmedBeforeReregistration(t *testing.T) {
 		})
 	}
 }
+
+func TestRunnerTokenReachesOnlyRunnerChildren(t *testing.T) {
+	fastRunnerReads(t)
+	const token = "GH_TOKEN=runner-app-secret"
+	fleet := testRunnerFleet()
+	var mu sync.Mutex
+	var children []process.Options
+	commands := &Commands{Work: t.TempDir(), RunnerToken: "runner-app-secret", Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		children = append(children, options)
+		switch {
+		case options.Name == "gh" && !slices.Contains(options.Args, "PUT"):
+			return runnerResponse(t, healthyRunner(fleet, queriedRepository(options))), nil
+		case options.Name == "tofu" && slices.Contains(options.Args, "show"):
+			return process.Result{Stdout: []byte("{}")}, nil
+		}
+		return process.Result{}, nil
+	}}}
+	ctx := context.Background()
+	full, runners := Plan{Affected: All()}, Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: []string{"build/runners.json"}}}
+	for _, operation := range []func() error{
+		func() error { return commands.Plan(ctx, Plan{Affected: Selection{Tofu: true}}) },
+		func() error { return commands.PlanHosts(ctx, full) },
+		func() error { return commands.PlanHosts(ctx, runners) },
+		func() error { return commands.Hosts(ctx, full) },
+		func() error { return commands.Hosts(ctx, runners) },
+		func() error { return commands.Monitor(ctx, full) },
+		func() error { return commands.VerifyHosts(ctx, full) },
+		func() error { return commands.compareHosts(ctx) },
+	} {
+		operation()
+	}
+	granted := map[string]bool{}
+	for _, child := range children {
+		command := child.Name + " " + strings.Join(child.Args, " ")
+		playbook := child.Name == "ansible-playbook" && len(child.Args) > 2 && (child.Args[2] == "reconcile.yml" || child.Args[2] == "build-runners.yml") && !slices.ContainsFunc(child.Args, func(arg string) bool { return arg == "--check" || arg == "--syntax-check" || arg == "--list-tasks" })
+		fleetAPI := child.Name == "gh" && strings.Contains(command, "repos/fredrir/") && strings.Contains(command, "/actions/runners")
+		if slices.Contains(child.Env, token) != (playbook || fleetAPI) {
+			t.Errorf("runner token reached=%t for %s", slices.Contains(child.Env, token), command)
+		}
+		granted[child.Name] = granted[child.Name] || slices.Contains(child.Env, token)
+	}
+	for _, name := range []string{"tofu", "ansible-playbook", "gh"} {
+		if !slices.ContainsFunc(children, func(child process.Options) bool { return child.Name == name }) {
+			t.Errorf("no %s child exercised", name)
+		}
+	}
+	if !granted["gh"] || !granted["ansible-playbook"] || granted["tofu"] {
+		t.Errorf("runner token granted to %v", granted)
+	}
+}

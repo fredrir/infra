@@ -24,7 +24,10 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-const publisherSecret = "ghs_publisher-installation-secret"
+const (
+	publisherSecret = "ghs_publisher-installation-secret"
+	publisherBasic  = "eC1hY2Nlc3MtdG9rZW46Z2hzX3B1Ymxpc2hlci1pbnN0YWxsYXRpb24tc2VjcmV0"
+)
 
 type publisherAppServer struct {
 	t       *testing.T
@@ -95,6 +98,7 @@ func newPublishingFixture(t *testing.T) *publishingFixture {
 	t.Helper()
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GITHUB_ACTIONS", "")
 	area := t.TempDir()
 	f := &publishingFixture{t: t, area: area, origin: filepath.Join(area, "origin.git"), checkout: filepath.Join(area, "checkout"), pusher: filepath.Join(area, "pusher")}
 	f.run(area, "init", "--quiet", "--bare", "--initial-branch=main", f.origin)
@@ -118,7 +122,7 @@ func newPublishingFixture(t *testing.T) *publishingFixture {
 		return process.Run(ctx, options)
 	}
 	f.commands = &Commands{
-		Runner:      ci.Runner{Dir: f.checkout, Execute: record, Stdout: &f.logs, Stderr: &f.logs},
+		Runner:      ci.Runner{Dir: f.checkout, Execute: record, Stdout: &f.logs, Stderr: &f.logs, Env: []string{"GIT_TRACE=1", "GIT_TRACE_CURL=1", "GIT_CURL_VERBOSE=1", "GIT_TRACE_REDACT=0"}},
 		RequireMain: true,
 		Publisher:   &Publisher{Repository: "fredrir/infra", AppID: 42, InstallationID: 43, PrivateKey: encoded, API: app.URL, Remote: remote.URL + "/origin.git"},
 	}
@@ -180,6 +184,9 @@ func (f *publishingFixture) assertTokenConfinedToThePush() {
 			if options.Name != "git" || len(options.Args) == 0 || options.Args[0] != "push" {
 				f.t.Errorf("token in the environment of %s %q", options.Name, options.Args)
 			}
+			if tracing := slices.DeleteFunc(slices.Clone(options.Env), func(entry string) bool { return !gitTracing(entry) }); !slices.Equal(tracing, []string{"GIT_TRACE_REDACT=1"}) {
+				f.t.Errorf("push traces with %q", tracing)
+			}
 			pushes++
 		}
 		if slices.Contains(options.Args, "--force") || slices.ContainsFunc(options.Args, func(arg string) bool { return strings.HasPrefix(arg, "+") }) {
@@ -198,7 +205,15 @@ func (f *publishingFixture) assertTokenConfinedToThePush() {
 			f.t.Errorf("%s persists the publisher credential:\n%s", path, data)
 		}
 	}
-	if strings.Contains(f.logs.String(), publisherSecret) {
+	logs := f.logs.String()
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		masked := strings.Replace(logs, "::add-mask::"+publisherSecret+"\n", "", 1)
+		if masked == logs {
+			f.t.Error("token not masked in GitHub Actions")
+		}
+		logs = masked
+	}
+	if strings.Contains(logs, publisherSecret) || strings.Contains(logs, publisherBasic) {
 		f.t.Errorf("token logged:\n%s", f.logs.String())
 	}
 	for _, url := range f.git.urls {
@@ -206,7 +221,7 @@ func (f *publishingFixture) assertTokenConfinedToThePush() {
 			f.t.Errorf("token in URL %s", url)
 		}
 	}
-	if !slices.Contains(f.git.authorizations, "Basic eC1hY2Nlc3MtdG9rZW46Z2hzX3B1Ymxpc2hlci1pbnN0YWxsYXRpb24tc2VjcmV0") {
+	if !slices.Contains(f.git.authorizations, "Basic "+publisherBasic) {
 		f.t.Errorf("remote never received the publisher token: %q", f.git.authorizations)
 	}
 	if !reflect.DeepEqual(f.app.minted, []map[string]any{{"repositories": []any{"infra"}, "permissions": map[string]any{"contents": "write"}}}) {
@@ -227,6 +242,52 @@ func TestPublishPushesWithARevokedAppTokenOnlyThroughTheGitChild(t *testing.T) {
 		t.Fatalf("production at %q, want %s", production, revision)
 	}
 	f.assertTokenConfinedToThePush()
+}
+
+func TestPublishMasksTheTokenInGitHubActions(t *testing.T) {
+	f := newPublishingFixture(t)
+	t.Setenv("GITHUB_ACTIONS", "true")
+	if err := f.commands.Publish(context.Background(), f.run(f.checkout, "rev-parse", "HEAD")); err != nil {
+		t.Fatalf("publish: %v\n%s", err, f.logs.String())
+	}
+	f.assertTokenConfinedToThePush()
+}
+
+func TestPublisherKeyFileIsConsumedOnce(t *testing.T) {
+	directory := t.TempDir()
+	write := func(name, content string, mode os.FileMode) string {
+		t.Helper()
+		path := filepath.Join(directory, name)
+		if err := os.WriteFile(path, []byte(content), mode); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	private := write("private.pem", "key\n", 0o600)
+	if key, err := ConsumePrivateKey(private); err != nil || string(key) != "key\n" {
+		t.Fatalf("private key read as %q: %v", key, err)
+	}
+	target := write("target.pem", "key\n", 0o600)
+	link := filepath.Join(directory, "link.pem")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{write("shared.pem", "key\n", 0o640), write("empty.pem", "\n", 0o600), link, filepath.Join(directory, "missing.pem")} {
+		if key, err := ConsumePrivateKey(path); err == nil || key != nil {
+			t.Errorf("%s accepted as %q", filepath.Base(path), key)
+		}
+	}
+	for _, name := range []string{"private.pem", "shared.pem", "empty.pem", "link.pem"} {
+		if _, err := os.Lstat(filepath.Join(directory, name)); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("%s left behind: %v", name, err)
+		}
+	}
+	if _, err := os.Stat(target); err != nil {
+		t.Errorf("symlink target removed: %v", err)
+	}
 }
 
 func TestPublishNeverForcesProduction(t *testing.T) {

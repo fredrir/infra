@@ -61,7 +61,7 @@ infra dev clean --all
 | `onboarding` | `INFRA_ONBOARD_INTEGRATION=1` | age-keygen, sops, helm, kustomize |
 | `image` | `INFRA_DAGGER_IMAGE_TEST_ROOT` | engine |
 | `reconcile-plan` | `INFRA_RECONCILE_PLAN_QUALIFY=1` | tofu |
-| `publishing` | `INFRA_PUBLISHING_QUALIFY=1` | live `fredrir/infra`; `GH_TOKEN` administrator with `workflow` scope; `PUBLISHER_APP_PRIVATE_KEY`; [publishing](../docs/runbook.md#publishing) |
+| `publishing` | `INFRA_PUBLISHING_QUALIFY=1` | live `fredrir/infra`; `GH_TOKEN` administrator with `workflow` scope; `PUBLISHER_APP_PRIVATE_KEY_FILE`; [publishing](../docs/runbook.md#publishing) |
 | `kustomize` | `INFRA_KUSTOMIZE_QUALIFY=1` | kubectl |
 | `packages` | `INFRA_PACKAGE_QUALIFY=1` | nfpm, gpg, openssl, go, engine, binary |
 | `kata` | `INFRA_KATA_ENGINE_TEST=1` | kata engine profile, binary |

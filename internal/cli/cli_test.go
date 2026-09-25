@@ -127,21 +127,45 @@ func TestProvenanceReportsItsFailureAndDropsItsToken(t *testing.T) {
 	}
 }
 
-func TestApplyRequiresThePublisherKeyAndEveryActionDropsIt(t *testing.T) {
+func TestReconcileConsumesThePublisherKeyFileAndRunnerToken(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	t.Setenv("AWS_ACCESS_KEY_ID", "")
-	t.Setenv("PUBLISHER_APP_PRIVATE_KEY", "")
+	t.Setenv("PUBLISHER_APP_PRIVATE_KEY_FILE", "")
 	var output bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"reconcile", "apply", "--root", t.TempDir()}, &output, &output); err == nil || err.Error() != "PUBLISHER_APP_PRIVATE_KEY required" {
+	if err := cli.Run(context.Background(), []string{"reconcile", "apply", "--root", t.TempDir()}, &output, &output); err == nil || err.Error() != "PUBLISHER_APP_PRIVATE_KEY_FILE required" {
 		t.Fatalf("apply without the publisher key returned %v", err)
 	}
 	for _, action := range []string{"plan", "apply", "verify", "status", "requirements", "provenance"} {
-		t.Setenv("PUBLISHER_APP_PRIVATE_KEY", "publisher-secret")
+		key := filepath.Join(t.TempDir(), "key.pem")
+		if err := os.WriteFile(key, []byte("publisher-secret\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("PUBLISHER_APP_PRIVATE_KEY_FILE", key)
+		t.Setenv("GH_TOKEN", "runner-secret")
 		output.Reset()
 		cli.Run(context.Background(), []string{"reconcile", action, "--root", t.TempDir()}, &output, &output)
-		if key := os.Getenv("PUBLISHER_APP_PRIVATE_KEY"); key != "" || strings.Contains(output.String(), "publisher-secret") {
-			t.Errorf("%s left the publisher key in the environment of child processes or its output", action)
+		if _, err := os.Stat(key); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("%s left the publisher key file: %v", action, err)
 		}
+		for _, name := range []string{"PUBLISHER_APP_PRIVATE_KEY_FILE", "GH_TOKEN"} {
+			if value, set := os.LookupEnv(name); set {
+				t.Errorf("%s left %s=%q in the environment of child processes", action, name, value)
+			}
+		}
+		if strings.Contains(output.String(), "publisher-secret") || strings.Contains(output.String(), "runner-secret") {
+			t.Errorf("%s printed a credential:\n%s", action, output.String())
+		}
+	}
+	key := filepath.Join(t.TempDir(), "key.pem")
+	if err := os.WriteFile(key, []byte("publisher-secret\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PUBLISHER_APP_PRIVATE_KEY_FILE", key)
+	if err := cli.Run(context.Background(), []string{"reconcile", "apply", "--root", t.TempDir()}, &output, &output); err == nil || !strings.Contains(err.Error(), "readable only by its owner") {
+		t.Fatalf("apply with a world-readable key returned %v", err)
+	}
+	if _, err := os.Stat(key); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("rejected publisher key file left behind: %v", err)
 	}
 }
 

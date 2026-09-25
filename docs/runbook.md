@@ -135,10 +135,11 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 infra reconcile provenance
 go build -o .infra/bin/infra ./cmd/infra
 .infra/bin/infra reconcile plan --base BASE_SHA
-doppler run --project infra --config prd_reconciliation_apply --only-secrets PUBLISHER_APP_PRIVATE_KEY -- .infra/bin/infra reconcile apply --report .infra/reconciliation/status.json
+publisher_key() { key="$(mktemp)" && doppler secrets get PUBLISHER_APP_PRIVATE_KEY --project infra --config prd_reconciliation_apply --plain > "$key" && printf '%s\n' "$key"; }
+PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" .infra/bin/infra reconcile apply --report .infra/reconciliation/status.json
 .infra/bin/infra reconcile status
 .infra/bin/infra reconcile verify
-doppler run --project infra --config prd_reconciliation_apply --only-secrets PUBLISHER_APP_PRIVATE_KEY -- .infra/bin/infra reconcile apply --full
+PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" .infra/bin/infra reconcile apply --full
 ```
 
 ### Publishing
@@ -146,22 +147,25 @@ doppler run --project infra --config prd_reconciliation_apply --only-secrets PUB
 | Publishing | Value |
 | --- | --- |
 | Identity | GitHub App `fredrir-infra-publisher`: `contents: write`, `metadata: read`; `fredrir/infra` only; no webhook; App and installation IDs in `build/publisher.json` |
-| Private key | `PUBLISHER_APP_PRIVATE_KEY`, Doppler `prd_reconciliation_apply`; CI passes it only to the apply path of the `reconcile` step, never to the gate or verification; removed from the environment before any child process; `apply` fails without it |
+| Private key | `PUBLISHER_APP_PRIVATE_KEY`, Doppler `prd_reconciliation_apply`; never in a process environment |
+| Key delivery | `PUBLISHER_APP_PRIVATE_KEY_FILE`: a regular file readable only by its owner; the CLI reads and deletes it before any child process; `apply` fails without it; CI writes `$RUNNER_TEMP/publisher/key.pem` with `umask 077` in a separate step for apply runs only, never for the gate or verification; session cleanup removes it |
+| Key rotation | Generate a key in the App settings; `doppler secrets set PUBLISHER_APP_PRIVATE_KEY --project infra --config prd_reconciliation_apply < NEW_KEY.pem`; delete the previous key |
 | Token | Minted after the `main` checks; repository `infra`, `contents: write`; revoked after the push |
-| Push | `git push --no-verify https://github.com/fredrir/infra.git REVISION:refs/heads/production`; never forced; token only in the push child's environment through an inline credential helper; never argv, `.git/config` or logs; global, system and other helper configuration ignored |
+| Push | `git push --no-verify https://github.com/fredrir/infra.git REVISION:refs/heads/production`; never forced; token only in the push child's environment through an inline credential helper; never argv, `.git/config` or logs; global, system and other helper configuration ignored; `GIT_TRACE*` and `GIT_CURL_VERBOSE` removed, `GIT_TRACE_REDACT=1`; `::add-mask::` under GitHub Actions |
 | Apply job token | `contents: read`; checkout persists no credentials |
+| Runner token | `GH_TOKEN` of the runner App (repository administration on `build/runners.json` repositories, `infra` included); removed from the CLI's environment at start; passed only to runner-fleet API calls and `build-runners.yml` and `reconcile.yml` runs; OpenTofu, Kubernetes tools, other playbooks and check-mode runs never receive it |
 | [`production`](../.github/production-ruleset.json) ruleset | Creation and update of `refs/heads/production`; bypass: publisher App only |
 | [`production-history`](../.github/production-history-ruleset.json) ruleset | Deletion and non-fast-forward of `refs/heads/production`; no bypass |
 | Two rulesets | A bypass actor skips every rule of the ruleset listing it; the history ruleset holds the publisher to fast-forwards |
 | Administrators | Not bypass actors; their pushes to `production` are rejected |
 | Drift | Hourly verification: a published revision not on `main` is a `revision` difference; live rulesets that differ from their declaration are `rulesets` differences and dispatch no repair |
-| Ruleset read | `metadata: read` (`github.token`); bypass actors are returned only with write access to the ruleset (repository administration), so verification compares them only in administrator runs and the qualification |
-| Break-glass | An administrator publishes as the App with the Doppler key; fallback: disable `production`, push, re-enable |
+| Ruleset read | `metadata: read` (`github.token`); bypass actors are returned only with write access to the ruleset (repository administration: write); the verification runner token (`administration: read`) receives none either, so verification compares them only in administrator runs and the qualification |
+| Break-glass | An administrator publishes as the App with the Doppler key through `PUBLISHER_APP_PRIVATE_KEY_FILE`; no administrator bypass |
 | Rollback | Disable both rulesets |
 
 | `infra dev qualify publishing` | Value |
 | --- | --- |
-| Requires | `GH_TOKEN` of a repository administrator with the `workflow` scope; `PUBLISHER_APP_PRIVATE_KEY` |
+| Requires | `GH_TOKEN` of a repository administrator with the `workflow` scope; `PUBLISHER_APP_PRIVATE_KEY_FILE`, consumed like the CLI's |
 | Applies | Both declared rulesets, then adds `refs/heads/production-canary` to them |
 | Rejected | Administrator fast-forward; `GITHUB_TOKEN` fast-forward with `contents: write` from a throwaway push workflow on `production-canary-probe`; publisher force-push; publisher deletion |
 | Accepted | Publisher fast-forward |
@@ -170,7 +174,8 @@ doppler run --project infra --config prd_reconciliation_apply --only-secrets PUB
 
 ```sh
 gh auth refresh --scopes workflow
-GH_TOKEN="$(gh auth token)" doppler run --project infra --config prd_reconciliation_apply --only-secrets PUBLISHER_APP_PRIVATE_KEY -- go run ./cmd/infra dev qualify publishing -- -timeout=30m
+publisher_key() { key="$(mktemp)" && doppler secrets get PUBLISHER_APP_PRIVATE_KEY --project infra --config prd_reconciliation_apply --plain > "$key" && printf '%s\n' "$key"; }
+GH_TOKEN="$(gh auth token)" PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" go run ./cmd/infra dev qualify publishing -- -timeout=30m
 ```
 
 ### Initial activation
@@ -205,7 +210,7 @@ These activation steps provision external credentials once; merge, verification 
 | `SSH_KNOWN_HOSTS` | Unset | Verified Tailnet host keys, `fredrir-06` and `infra-build-09` aliases |
 | `SOPS_AGE_KEY` | Unset | Decrypt host monitoring, verification trigger and backup credentials |
 | `RUNNER_APP_ID`, `RUNNER_APP_PRIVATE_KEY` | Unset | Existing runner GitHub App; mint a short-lived installation token with repository administration permission |
-| `PUBLISHER_APP_PRIVATE_KEY` | Unset | [Publisher App](#publishing) private key |
+| `PUBLISHER_APP_PRIVATE_KEY` | Unset | [Publisher App](#publishing) private key; delivered to the engine as a file |
 
 | OIDC setting | `infrastructure-plan` | `infrastructure-apply` |
 | --- | --- | --- |
@@ -249,11 +254,24 @@ gh workflow run reconcile.yml --ref main
 | On-demand or hourly verification supersedes a run queued in the `infrastructure-production` concurrency group | When the superseded run carried deploying changes, the superseding hourly verification, or the next hourly one after an on-demand verification, reports the unapplied revision and dispatches a full reconciliation; dispatch `verify=true` when no apply is queued |
 | Failed apply or verification | Rerun the workflow or run `infra reconcile apply --full` from a clean current `main` checkout |
 | Unverified commits | Revert unwanted changes; push an owner-signed commit with one `Provenance-Acknowledged: SHA` trailer per listed commit |
-| Published revision not on `main` | Publisher key compromised: rotate it in the App settings and Doppler; disable both rulesets; `git push --force origin APPLIED_SHA:refs/heads/production`; rerun `infra dev qualify publishing`; `infra reconcile apply --full` |
+| Published revision not on `main` | Publisher fast-forward to a commit off `main`: rotate the publisher key first. `main` force-pushed by a `main` bypass actor (repository admin role, Octo STS `801323`): no key rotation. Either way, rewind as below |
+| Rewinding `production` | `production-history` has no bypass, so nobody can force-push `production` while it is enforced; an administrator disables both rulesets, force-pushes the fork point with `main`, re-enables both, and applies from that base |
 | Ruleset differences | Rerun `infra dev qualify publishing`; it restores the declared rulesets |
 | Process terminated without lock cleanup | Hourly verification reports the held lock until its recorded expiry, then the incomplete reconciliation as a difference |
 | Remaining OpenTofu drift | Inspect the final plan; nonzero drift keeps the run failed |
 | Image publication succeeds | Check the separate reconciliation workflow for production readiness |
+
+```sh
+git fetch origin main production
+base="$(git merge-base origin/production origin/main)"
+ruleset() { gh api repos/fredrir/infra/rulesets --jq ".[] | select(.name == \"$1\") | .id"; }
+gh api --method PUT "repos/fredrir/infra/rulesets/$(ruleset production-history)" -f enforcement=disabled
+gh api --method PUT "repos/fredrir/infra/rulesets/$(ruleset production)" -f enforcement=disabled
+git push --force origin "$base:refs/heads/production"
+gh api --method PUT "repos/fredrir/infra/rulesets/$(ruleset production)" -f enforcement=active
+gh api --method PUT "repos/fredrir/infra/rulesets/$(ruleset production-history)" -f enforcement=active
+PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" .infra/bin/infra reconcile apply --full --provenance-base "$base"
+```
 
 Do not remove an active reconciliation or OpenTofu lock while its writer is running.
 

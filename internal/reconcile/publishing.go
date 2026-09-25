@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/google/go-github/v88/github"
 )
 
@@ -47,6 +49,24 @@ func ReadPublisher(root string) (Publisher, error) {
 	publisher.API = GitHubAPI
 	publisher.Remote = "https://github.com/" + publisher.Repository + ".git"
 	return publisher, nil
+}
+
+func ConsumePrivateKey(path string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	key, err := os.ReadFile(path)
+	err = errors.Join(err, os.Remove(path))
+	switch {
+	case err != nil:
+		return nil, err
+	case !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0:
+		return nil, fmt.Errorf("%s must be a regular file readable only by its owner", path)
+	case len(bytes.TrimSpace(key)) == 0:
+		return nil, fmt.Errorf("%s is empty", path)
+	}
+	return key, nil
 }
 
 func (p Publisher) repository() (string, string, error) {
@@ -95,19 +115,40 @@ func GitHubClient(api, token string) (*github.Client, error) {
 }
 
 func tokenGit(runner ci.Runner, token string) ci.Runner {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		log := runner.Stdout
+		if log == nil {
+			log = os.Stdout
+		}
+		fmt.Fprintf(log, "::add-mask::%s\n", token)
+	}
 	helper := `!f() { if [ "$1" = get ]; then printf 'username=x-access-token\npassword=%s\n' "$` + gitToken + `"; fi; }; f`
-	runner.Env = append(slices.Clone(runner.Env),
-		gitToken+"="+token,
+	credentials := []string{
+		gitToken + "=" + token,
 		"GIT_TERMINAL_PROMPT=0",
+		"GIT_TRACE_REDACT=1",
 		"GIT_CONFIG_NOSYSTEM=1",
-		"GIT_CONFIG_GLOBAL="+os.DevNull,
+		"GIT_CONFIG_GLOBAL=" + os.DevNull,
 		"GIT_CONFIG_COUNT=2",
 		"GIT_CONFIG_KEY_0=credential.helper",
 		"GIT_CONFIG_VALUE_0=",
 		"GIT_CONFIG_KEY_1=credential.helper",
-		"GIT_CONFIG_VALUE_1="+helper,
-	)
+		"GIT_CONFIG_VALUE_1=" + helper,
+	}
+	execute := runner.Execute
+	if execute == nil {
+		execute = process.Run
+	}
+	runner.Execute = func(ctx context.Context, options process.Options) (process.Result, error) {
+		options.Env = append(slices.DeleteFunc(slices.Clone(options.Env), gitTracing), credentials...)
+		return execute(ctx, options)
+	}
 	return runner
+}
+
+func gitTracing(entry string) bool {
+	name, _, _ := strings.Cut(entry, "=")
+	return strings.HasPrefix(name, "GIT_TRACE") || name == "GIT_CURL_VERBOSE"
 }
 
 func (c *Commands) push(ctx context.Context, revision string) error {

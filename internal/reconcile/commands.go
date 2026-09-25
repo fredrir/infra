@@ -28,6 +28,7 @@ type Commands struct {
 	ProvenanceEnv []string
 	Publisher     *Publisher
 	GitHub        *github.Client
+	RunnerToken   string
 	kubernetes    *kubernetesState
 }
 
@@ -210,8 +211,19 @@ func (c *Commands) verifyTofu(ctx context.Context) error {
 }
 
 func (c *Commands) ansible(ctx context.Context, playbook string, extra ...string) error {
+	return ansiblePlaybook(ctx, c.Runner, playbook, extra...)
+}
+
+func (c *Commands) runnerAPI() ci.Runner {
 	runner := c.Runner
-	runner.Dir = filepath.Join(c.Runner.Dir, "ansible")
+	if c.RunnerToken != "" {
+		runner.Env = append(slices.Clone(runner.Env), "GH_TOKEN="+c.RunnerToken)
+	}
+	return runner
+}
+
+func ansiblePlaybook(ctx context.Context, runner ci.Runner, playbook string, extra ...string) error {
+	runner.Dir = filepath.Join(runner.Dir, "ansible")
 	runner.Env = append(slices.Clone(runner.Env), "ANSIBLE_CONFIG="+filepath.Join(runner.Dir, "ansible.cfg"))
 	args := append([]string{"-i", "inventory/production.yml", playbook}, extra...)
 	if os.Getenv("INFRA_RECONCILE_TAILNET") == "true" {

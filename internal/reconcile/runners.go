@@ -138,7 +138,7 @@ func uniqueNames(kind string, names []string, pattern *regexp.Regexp) error {
 func (c *Commands) runnerStates(ctx context.Context, fleet RunnerFleet) (map[string][]registeredRunner, error) {
 	states := make(map[string][]registeredRunner, len(fleet.Repositories))
 	var mu sync.Mutex
-	runner := c.Runner
+	runner := c.runnerAPI()
 	if runner.Stderr != nil {
 		runner.Stderr = &lockedWriter{mu: &mu, writer: runner.Stderr}
 	}
@@ -303,7 +303,7 @@ func (c *Commands) convergeRunnerLabels(ctx context.Context, fleet RunnerFleet, 
 		for _, label := range fleet.Labels {
 			args = append(args, "-f", "labels[]="+label)
 		}
-		if err := c.Runner.Run(ctx, "gh", args...); err != nil {
+		if err := c.runnerAPI().Run(ctx, "gh", args...); err != nil {
 			c.warn("set labels of %s: %v", matches[0].Name, err)
 		}
 	}
@@ -320,7 +320,7 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 	}
 	if err != nil {
 		c.warn("runner fleet state unavailable; converging runners without GitHub repairs: %v", err)
-		return c.ansible(ctx, playbook)
+		return ansiblePlaybook(ctx, c.runnerAPI(), playbook)
 	}
 	c.convergeRunnerLabels(ctx, fleet, states)
 	repairs := map[string][]string{}
@@ -341,7 +341,7 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 	if len(runnerDrift(fleet, states)) == 0 && effectiveHostScope(plan.Affected) == HostScopeRunners && slices.Equal(plan.Affected.RunnerInputs, []string{"build/cli-release.json"}) {
 		args = append(args, "--tags=infra_binary")
 	}
-	return c.ansible(ctx, playbook, args...)
+	return ansiblePlaybook(ctx, c.runnerAPI(), playbook, args...)
 }
 
 func (c *Commands) warn(format string, args ...any) {

@@ -608,9 +608,14 @@ func TestProvenanceGateRunsBeforeAnyCheckoutCode(t *testing.T) {
 	}
 }
 
-const publisherKey = "PUBLISHER_APP_PRIVATE_KEY"
+const (
+	publisherKey      = "PUBLISHER_APP_PRIVATE_KEY"
+	publisherKeyStep  = "Write publisher key"
+	publisherKeyPath  = `"$RUNNER_TEMP/publisher/key.pem"`
+	publisherKeyInput = "${{ env.VERIFICATION != 'true' && format('{0}/publisher/key.pem', runner.temp) || '' }}"
+)
 
-func TestPublisherKeyReachesOnlyThePublishingEngine(t *testing.T) {
+func TestPublisherKeyReachesTheEngineOnlyAsAFile(t *testing.T) {
 	workflow := readWorkflow(t, "reconcile-job.yml")
 	if _, ok := workflow.Env[publisherKey]; ok {
 		t.Error("every job receives the publisher key")
@@ -623,11 +628,14 @@ func TestPublisherKeyReachesOnlyThePublishingEngine(t *testing.T) {
 			t.Errorf("job %s can push with its workflow token", name)
 		}
 		for _, step := range job.Steps {
-			key, ok := step.Env[publisherKey]
-			if publisher := name == "apply" && step.ID == "reconcile"; ok != publisher || (publisher && key != "${{ env.VERIFICATION != 'true' && steps.doppler.outputs.PUBLISHER_APP_PRIVATE_KEY || '' }}") {
+			writer := name == "apply" && step.Name == publisherKeyStep
+			if key, ok := step.Env[publisherKey]; ok != writer || (writer && key != "${{ steps.doppler.outputs.PUBLISHER_APP_PRIVATE_KEY }}") {
 				t.Errorf("job %s step %q receives publisher key %q", name, cmp.Or(step.ID, step.Name, step.Uses), key)
 			}
-			if strings.Contains(step.Run, publisherKey) || slices.ContainsFunc(slices.Collect(maps.Values(step.With)), func(value string) bool { return strings.Contains(value, publisherKey) }) {
+			if path, ok := step.Env[publisherKey+"_FILE"]; ok != (name == "apply" && step.ID == "reconcile") || (ok && path != publisherKeyInput) {
+				t.Errorf("job %s step %q receives publisher key file %q", name, cmp.Or(step.ID, step.Name, step.Uses), path)
+			}
+			if !writer && (strings.Contains(step.Run, publisherKey) || slices.ContainsFunc(slices.Collect(maps.Values(step.With)), func(value string) bool { return strings.Contains(value, publisherKey) })) {
 				t.Errorf("job %s step %q reads the publisher key outside the engine", name, cmp.Or(step.ID, step.Name, step.Uses))
 			}
 		}
@@ -636,15 +644,42 @@ func TestPublisherKeyReachesOnlyThePublishingEngine(t *testing.T) {
 	if !reflect.DeepEqual(apply.Permissions, map[string]string{"contents": "read", "id-token": "write", "actions": "read", "packages": "read"}) {
 		t.Errorf("apply permissions %v", apply.Permissions)
 	}
-	gate := apply.step(t, func(step workflowStep) bool { return step.Name == provenanceGateStep })
-	reconcile := apply.step(t, func(step workflowStep) bool { return step.ID == "reconcile" })
-	if _, ok := gate.Env[publisherKey]; ok || !strings.Contains(reconcile.Run, `if [ "$VERIFICATION" = true ]; then`) || !strings.Contains(reconcile.Run, "infra reconcile verify") || !strings.Contains(reconcile.Run, "infra reconcile apply") {
-		t.Errorf("publisher key reaches the gate or the reconcile step no longer separates verification:\n%s", reconcile.Run)
+	writer := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.Name == publisherKeyStep })
+	reconcile := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.ID == "reconcile" })
+	gate := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.Name == provenanceGateStep })
+	if writer < 0 || reconcile != writer+1 || gate > writer {
+		t.Fatalf("publisher key written at step %d, gate %d, reconcile %d", writer, gate, reconcile)
+	}
+	write := apply.Steps[writer]
+	if write.If != "env.VERIFICATION != 'true'" || !strings.HasPrefix(write.Run, "umask 077\n") || !strings.Contains(write.Run, `"$`+publisherKey+`" > `+publisherKeyPath) {
+		t.Errorf("publisher key written when %q by:\n%s", write.If, write.Run)
+	}
+	run := apply.Steps[reconcile].Run
+	if !strings.Contains(run, `if [ "$VERIFICATION" = true ]; then`) || !strings.Contains(run, "infra reconcile verify") || !strings.Contains(run, "infra reconcile apply") {
+		t.Errorf("reconcile step no longer separates verification from apply:\n%s", run)
+	}
+	cleanup := apply.step(t, func(step workflowStep) bool { return step.Name == "Remove session credentials" })
+	if cleanup.If != "always()" || !strings.Contains(cleanup.Run, publisherKeyPath) {
+		t.Errorf("session cleanup when %q does not remove the publisher key:\n%s", cleanup.If, cleanup.Run)
 	}
 	for _, name := range []string{"reconcile.yml", "reconcile-job.yml"} {
 		for job, definition := range readWorkflow(t, name).Jobs {
 			if definition.Permissions["contents"] == "write" {
 				t.Errorf("%s job %s grants contents: write", name, job)
+			}
+		}
+	}
+}
+
+func TestRunnerTokenReachesOnlyTheEngine(t *testing.T) {
+	for name, job := range readWorkflow(t, "reconcile-job.yml").Jobs {
+		for _, step := range job.Steps {
+			engine := name == "apply" && step.ID == "reconcile"
+			if token := step.Env["GH_TOKEN"]; (token == "${{ steps.runner-token.outputs.token }}") != engine {
+				t.Errorf("job %s step %q receives GH_TOKEN %q", name, cmp.Or(step.ID, step.Name, step.Uses), token)
+			}
+			if strings.Contains(step.Run, "steps.runner-token") || (!engine && slices.ContainsFunc(slices.Collect(maps.Values(step.Env)), func(value string) bool { return strings.Contains(value, "steps.runner-token") })) {
+				t.Errorf("job %s step %q reads the runner token", name, cmp.Or(step.ID, step.Name, step.Uses))
 			}
 		}
 	}

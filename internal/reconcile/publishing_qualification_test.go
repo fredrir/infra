@@ -43,7 +43,7 @@ type publishingQualification struct {
 
 func TestPublishingQualification(t *testing.T) {
 	if os.Getenv("INFRA_PUBLISHING_QUALIFY") != "1" {
-		t.Skip("INFRA_PUBLISHING_QUALIFY=1, GH_TOKEN of a repository administrator with the workflow scope and PUBLISHER_APP_PRIVATE_KEY apply and qualify the production rulesets")
+		t.Skip("INFRA_PUBLISHING_QUALIFY=1, GH_TOKEN of a repository administrator with the workflow scope and PUBLISHER_APP_PRIVATE_KEY_FILE apply and qualify the production rulesets")
 	}
 	q := newPublishingQualification(t)
 	q.restore()
@@ -67,15 +67,17 @@ func TestPublishingQualification(t *testing.T) {
 func newPublishingQualification(t *testing.T) *publishingQualification {
 	t.Helper()
 	q := &publishingQualification{t: t, ctx: context.Background(), root: cmp.Or(os.Getenv("INFRA_TEST_SOURCE_ROOT"), repositoryRoot), adminToken: os.Getenv("GH_TOKEN"), repository: t.TempDir()}
-	key := os.Getenv("PUBLISHER_APP_PRIVATE_KEY")
-	if q.adminToken == "" || key == "" {
-		t.Fatal("GH_TOKEN and PUBLISHER_APP_PRIVATE_KEY required")
+	if q.adminToken == "" || os.Getenv("PUBLISHER_APP_PRIVATE_KEY_FILE") == "" {
+		t.Fatal("GH_TOKEN and PUBLISHER_APP_PRIVATE_KEY_FILE required")
 	}
-	var err error
+	key, err := ConsumePrivateKey(os.Getenv("PUBLISHER_APP_PRIVATE_KEY_FILE"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if q.publisher, err = ReadPublisher(q.root); err != nil {
 		t.Fatal(err)
 	}
-	q.publisher.PrivateKey = []byte(key)
+	q.publisher.PrivateKey = key
 	if q.owner, q.name, err = q.publisher.repository(); err != nil {
 		t.Fatal(err)
 	}
