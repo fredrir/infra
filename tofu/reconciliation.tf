@@ -33,7 +33,7 @@ resource "aws_iam_policy" "workload_boundary" {
       {
         Effect   = "Deny"
         Action   = ["s3:*"]
-        Resource = ["${data.aws_s3_bucket.dataset.arn}/tofu-state/*", "${data.aws_s3_bucket.dataset.arn}/reconciliation/*"]
+        Resource = [for prefix in ["tofu-state", "tf-state-backups", "reconciliation"] : "${data.aws_s3_bucket.dataset.arn}/${prefix}/*"]
       },
       ], var.platform_mail == null ? [] : [
       {
@@ -65,7 +65,7 @@ resource "aws_iam_policy" "reconciliation" {
     Statement = concat([
       {
         Effect   = "Allow"
-        Action   = ["s3:ListBucket", "s3:GetBucketLocation", "s3:GetBucketVersioning", "s3:GetEncryptionConfiguration", "s3:GetBucketPublicAccessBlock"]
+        Action   = ["s3:ListBucket", "s3:GetBucketLocation", "s3:GetBucketVersioning", "s3:GetEncryptionConfiguration", "s3:GetBucketPublicAccessBlock", "s3:GetLifecycleConfiguration"]
         Resource = [data.aws_s3_bucket.dataset.arn]
       },
       {

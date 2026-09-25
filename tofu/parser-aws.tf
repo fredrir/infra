@@ -28,6 +28,35 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "dataset" {
   }
 }
 
+resource "aws_s3_bucket_lifecycle_configuration" "dataset" {
+  bucket = data.aws_s3_bucket.dataset.id
+
+  rule {
+    id     = "expire-retired-host-restic"
+    status = "Enabled"
+    filter {
+      prefix = "restic/llunde-"
+    }
+    expiration {
+      date = "2026-12-25T00:00:00Z"
+    }
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+  }
+
+  rule {
+    id     = "remove-retired-host-restic-delete-markers"
+    status = "Enabled"
+    filter {
+      prefix = "restic/llunde-"
+    }
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
+}
+
 # ---- IAM ----
 
 data "aws_iam_policy_document" "dataset_access" {
@@ -75,6 +104,22 @@ resource "aws_iam_policy" "dataset_access" {
   name_prefix = "pyparser-dataset-"
   description = "Read/write access to the pyparser dataset bucket"
   policy      = data.aws_iam_policy_document.dataset_access.json
+}
+
+resource "aws_iam_user" "dataset" {
+  name                 = "platform-dataset-parser"
+  path                 = "/platform/"
+  permissions_boundary = aws_iam_policy.workload_boundary.arn
+  force_destroy        = false
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_iam_user_policy_attachment" "dataset" {
+  user       = aws_iam_user.dataset.name
+  policy_arn = aws_iam_policy.dataset_access.arn
 }
 
 resource "aws_iam_user" "leploy" {

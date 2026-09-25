@@ -229,7 +229,7 @@ These activation steps provision external credentials once; merge, verification 
 | Doppler scope | Separate config-scoped read tokens; neither token can edit secrets or read `infra/ops` |
 | Doppler parent config | `infra/prd` contains no credentials; reconciliation configs contain only their scoped identities |
 | AWS identity policies | `tofu/reconciliation.tf`; attached managed policies; deployment identities cannot change their own grants |
-| AWS workload boundary | `policy/boundary/infra-workload-boundary` on every IAM user outside `/automation/`; dataset S3 objects except `tofu-state/` and `reconciliation/`, SES from the alert sender; the apply identity cannot edit, remove or bypass it |
+| AWS workload boundary | `policy/boundary/infra-workload-boundary` on every OpenTofu-managed IAM user outside `/automation/`; dataset S3 objects except `tofu-state/`, `tf-state-backups/` and `reconciliation/`, SES from the alert sender; the apply identity cannot edit, remove or bypass it |
 | Kubernetes identities | `platform/components/policy/reconciliation.yaml` |
 | Kubernetes tokens | Controller-populated `infrastructure-plan-credentials` and `infrastructure-apply-credentials` Secrets in `flux-system` |
 | Kubernetes API address | Reachable control-plane Tailnet address with a matching certificate; include its CA in each kubeconfig |
@@ -238,7 +238,7 @@ These activation steps provision external credentials once; merge, verification 
 | Tailnet apply scope | Control-plane API and SSH to managed hosts |
 | Host SSH key | `ansible/files/reconciliation.pub`; maintained by `ansible/reconciliation-identity.yml` |
 | CI SOPS recipient | Added only to host monitoring, verification trigger and backup secret files |
-| Provider-policy or workload-boundary changes, revoked credentials | Administrator repair required |
+| Provider-policy, workload-boundary or bucket-lifecycle changes, revoked credentials | Administrator repair required |
 
 ```sh
 doppler configs tokens create github-reconciliation-plan --project infra --config prd_reconciliation_plan --access read --plain | gh secret set DOPPLER_TOKEN --env infrastructure-plan

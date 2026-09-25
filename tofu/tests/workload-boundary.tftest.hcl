@@ -43,7 +43,7 @@ run "workload_boundary" {
   command = plan
 
   plan_options {
-    target = [aws_iam_policy.reconciliation, aws_iam_user.platform_backup, aws_iam_user_policy_attachment.platform_backup, aws_iam_user.restic_host, aws_iam_user.leploy, module.platform_mail]
+    target = [aws_iam_policy.reconciliation, aws_iam_user.platform_backup, aws_iam_user_policy_attachment.platform_backup, aws_iam_user.restic_host, aws_iam_user.leploy, aws_iam_user.dataset, module.platform_mail, aws_s3_bucket_lifecycle_configuration.dataset]
   }
 
   assert {
@@ -57,7 +57,7 @@ run "workload_boundary" {
       ]) &&
       contains([
         for statement in jsondecode(aws_iam_policy.workload_boundary.policy).Statement : statement.Resource if statement.Effect == "Deny" && statement.Action == ["s3:*"]
-      ], ["arn:aws:s3:::dataset/tofu-state/*", "arn:aws:s3:::dataset/reconciliation/*"])
+      ], ["arn:aws:s3:::dataset/tofu-state/*", "arn:aws:s3:::dataset/tf-state-backups/*", "arn:aws:s3:::dataset/reconciliation/*"])
     )
     error_message = "The workload boundary must grant only named dataset S3 and SES actions and keep OpenTofu state out of reach."
   }
@@ -65,7 +65,7 @@ run "workload_boundary" {
   assert {
     condition = (
       alltrue([
-        for user in concat(values(aws_iam_user.platform_backup), values(aws_iam_user.restic_host), [aws_iam_user.leploy]) :
+        for user in concat(values(aws_iam_user.platform_backup), values(aws_iam_user.restic_host), [aws_iam_user.leploy, aws_iam_user.dataset]) :
         user.permissions_boundary == aws_iam_policy.workload_boundary.arn
       ]) &&
       output.platform_mail.iam_user_boundary == aws_iam_policy.workload_boundary.arn &&
@@ -132,5 +132,21 @@ run "workload_boundary" {
       statement.Condition == { ArnNotEquals = { "iam:PermissionsBoundary" = aws_iam_policy.workload_boundary.arn } }
     ])
     error_message = "The apply identity must create, rebound or grant users only under exactly the workload boundary."
+  }
+
+  assert {
+    condition = alltrue([
+      for identity, policy in aws_iam_policy.reconciliation : anytrue([
+        for statement in jsondecode(policy.policy).Statement : statement.Effect == "Allow" && contains(statement.Action, "s3:GetLifecycleConfiguration")
+        ]) && !anytrue([
+        for statement in jsondecode(policy.policy).Statement : statement.Effect == "Allow" && contains(statement.Action, "s3:PutLifecycleConfiguration")
+      ])
+    ])
+    error_message = "Reconciliation identities must read but never rewrite bucket lifecycle rules."
+  }
+
+  assert {
+    condition     = alltrue([for rule in aws_s3_bucket_lifecycle_configuration.dataset.rule : length(rule.filter) == 1 && startswith(rule.filter[0].prefix, "restic/llunde-")])
+    error_message = "Lifecycle expiration must stay scoped to the retired host repositories."
   }
 }
