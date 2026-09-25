@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 func walkComparedPlays(t *testing.T, root, file string, visitPlay func(ansiblePlay), visit func(ansibleTask)) {
@@ -41,6 +43,44 @@ func walkComparedPlays(t *testing.T, root, file string, visitPlay func(ansiblePl
 }
 
 const checkModeSerial = "{{ '100%' if ansible_check_mode else 1 }}"
+
+func switchesOnCheckMode(task ansibleTask) bool {
+	return strings.Contains(fmt.Sprint(task.Definition, task.Inherited, task.When), "ansible_check_mode")
+}
+
+func playCheckModeProblem(play ansiblePlay) string {
+	switch {
+	case play.CheckMode == nil:
+		return ""
+	case *play.CheckMode:
+		return "never applies its declarations"
+	default:
+		return "applies its declarations for real in check mode"
+	}
+}
+
+func roleVariableSwitches(t *testing.T, root string) []string {
+	t.Helper()
+	files, err := filepath.Glob(filepath.Join(root, "roles", "*", "*", "*.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var switches []string
+	for _, file := range files {
+		if section := filepath.Base(filepath.Dir(file)); section != "defaults" && section != "vars" {
+			continue
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), "ansible_check_mode") {
+			relative, _ := filepath.Rel(root, file)
+			switches = append(switches, relative)
+		}
+	}
+	return switches
+}
 
 func references(text, name string) []string {
 	return regexp.MustCompile(`\b`+regexp.QuoteMeta(name)+`\b(\.[A-Za-z_]+)?`).FindAllString(text, -1)
@@ -87,8 +127,8 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 	var definitions []ansibleTask
 	for _, playbook := range comparedPlaybooks {
 		walkComparedPlays(t, root, playbook, func(play ansiblePlay) {
-			if play.CheckMode {
-				t.Errorf("%s: play %q never applies its declarations", playbook, play.Name)
+			if problem := playCheckModeProblem(play); problem != "" {
+				t.Errorf("%s: play %q %s", playbook, play.Name, problem)
 			}
 			if play.Serial != nil && play.Serial != checkModeSerial {
 				t.Errorf("%s: play %q uses serial %v instead of lifting its batches in check mode with %s", playbook, play.Name, play.Serial, checkModeSerial)
@@ -99,7 +139,6 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 			if !classifiedModule(t, task) {
 				return
 			}
-			definition := fmt.Sprint(task.Definition)
 			options, _ := task.Definition[task.Module].(map[string]any)
 			_, creates := options["creates"]
 			_, removes := options["removes"]
@@ -109,7 +148,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 			changedWhen, reportsChanges := task.Definition["changed_when"]
 			reportsChanges = reportsChanges && changedWhen != false
 			register, _ := task.Definition["register"].(string)
-			if strings.Contains(definition, "ansible_check_mode") && !slices.Contains(dryRuns, task.Key) {
+			if switchesOnCheckMode(task) && !slices.Contains(dryRuns, task.Key) {
 				t.Errorf("%s runs differently in check mode", task.Key)
 			}
 			if task.CheckModeDeclared && task.CheckMode {
@@ -207,12 +246,67 @@ func TestCheckModePlaysNeverReachDryRunSwitches(t *testing.T) {
 	for _, playbook := range playbooks {
 		walkAnsiblePlays(t, root, filepath.Base(playbook), func(task ansibleTask) {
 			walked++
-			if (task.CheckMode || task.EnclosingCheckMode) && strings.Contains(fmt.Sprint(task.Definition), "ansible_check_mode") {
+			if (task.CheckMode || task.EnclosingCheckMode) && switchesOnCheckMode(task) {
 				t.Errorf("%s: %s switches on ansible_check_mode inside a check_mode: true play, where it would apply for real", filepath.Base(playbook), task.Key)
 			}
 		})
 	}
 	if walked == 0 {
 		t.Fatal("no playbook tasks walked")
+	}
+	for _, file := range roleVariableSwitches(t, root) {
+		t.Errorf("%s switches on ansible_check_mode for every task that reads it", file)
+	}
+}
+
+func TestCheckModeGuardsReadPlayAndRoleKeywords(t *testing.T) {
+	root := t.TempDir()
+	for path, data := range map[string]string{
+		"site.yml":                      "- name: Apply for real\n  hosts: all\n  check_mode: false\n  vars:\n    live: \"{{ not ansible_check_mode }}\"\n  roles:\n  - role: base\n    check_mode: false\n  - base\n",
+		"unclassified.yml":              "- name: Ignore failures\n  hosts: all\n  ignore_errors: true\n",
+		"roles/base/tasks/main.yml":     "- name: Declare state\n  ansible.builtin.copy:\n    dest: /etc/state\n    content: \"{{ live }}\"\n- name: Group declarations\n  vars:\n    staged: \"{{ ansible_check_mode }}\"\n  block:\n  - name: Declare staged state\n    ansible.builtin.copy:\n      dest: /etc/staged\n      content: \"{{ staged }}\"\n",
+		"roles/base/defaults/main.yml":  "base_live: \"{{ not ansible_check_mode }}\"\n",
+		"roles/other/defaults/main.yml": "other_state: declared\n",
+	} {
+		if err := os.MkdirAll(filepath.Join(root, filepath.Dir(path)), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, path), []byte(data), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var tasks []ansibleTask
+	plays := walkAnsiblePlays(t, root, "site.yml", func(task ansibleTask) { tasks = append(tasks, task) })
+	if problem := playCheckModeProblem(plays[0]); problem != "applies its declarations for real in check mode" {
+		t.Errorf("play check_mode: false classified as %q", problem)
+	}
+	if len(tasks) != 4 || !tasks[0].CheckModeDeclared || tasks[0].CheckMode {
+		t.Fatalf("role check_mode: false not inherited: %+v", tasks)
+	}
+	for _, task := range tasks {
+		if !switchesOnCheckMode(task) {
+			t.Errorf("%s does not see the play variable switching on check mode", task.Key)
+		}
+	}
+	plays[0].Vars = nil
+	var switches []string
+	walkAnsiblePlay(t, root, "site.yml", plays[0], func(task ansibleTask) {
+		if switchesOnCheckMode(task) {
+			switches = append(switches, task.Key)
+		}
+	})
+	if staged := "roles/base/tasks/main.yml: Declare staged state"; !slices.Equal(switches, []string{staged, staged}) {
+		t.Errorf("block variables switching on check mode seen by %q", switches)
+	}
+	if switches := roleVariableSwitches(t, root); !slices.Equal(switches, []string{"roles/base/defaults/main.yml"}) {
+		t.Errorf("role defaults switching on check mode found in %q", switches)
+	}
+	var unclassified []ansiblePlay
+	data, err := os.ReadFile(filepath.Join(root, "unclassified.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal(data, &unclassified); err == nil || !strings.Contains(err.Error(), "play uses unclassified keyword ignore_errors") {
+		t.Errorf("unclassified play keyword accepted: %v", err)
 	}
 }

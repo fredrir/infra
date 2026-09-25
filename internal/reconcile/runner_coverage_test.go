@@ -16,26 +16,49 @@ type ansiblePlay struct {
 	ImportPlaybook string           `yaml:"import_playbook"`
 	Tags           any              `yaml:"tags"`
 	Serial         any              `yaml:"serial"`
-	CheckMode      bool             `yaml:"check_mode"`
+	CheckMode      *bool            `yaml:"check_mode"`
+	Vars           map[string]any   `yaml:"vars"`
 	PreTasks       []map[string]any `yaml:"pre_tasks"`
 	Roles          []ansibleRole    `yaml:"roles"`
 	Tasks          []map[string]any `yaml:"tasks"`
 	Handlers       []map[string]any `yaml:"handlers"`
 }
 
-type ansibleRole struct{ Name string }
+var playKeywords = []string{"any_errors_fatal", "become", "check_mode", "gather_facts", "handlers", "hosts", "import_playbook", "name", "order", "pre_tasks", "roles", "serial", "tags", "tasks", "vars"}
+
+func (p *ansiblePlay) UnmarshalYAML(node *yaml.Node) error {
+	if err := classifiedKeywords(node, "play", playKeywords); err != nil {
+		return err
+	}
+	type play ansiblePlay
+	return node.Decode((*play)(p))
+}
+
+type ansibleRole struct {
+	Name      string         `yaml:"role"`
+	CheckMode *bool          `yaml:"check_mode"`
+	When      any            `yaml:"when"`
+	Vars      map[string]any `yaml:"vars"`
+	Tags      any            `yaml:"tags"`
+}
 
 func (r *ansibleRole) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
 		return node.Decode(&r.Name)
 	}
-	var entry struct {
-		Role string `yaml:"role"`
-	}
-	if err := node.Decode(&entry); err != nil {
+	if err := classifiedKeywords(node, "role entry", []string{"check_mode", "role", "tags", "vars", "when"}); err != nil {
 		return err
 	}
-	r.Name = entry.Role
+	type role ansibleRole
+	return node.Decode((*role)(r))
+}
+
+func classifiedKeywords(node *yaml.Node, kind string, keywords []string) error {
+	for index := 0; index+1 < len(node.Content); index += 2 {
+		if key := node.Content[index]; !slices.Contains(keywords, key.Value) {
+			return fmt.Errorf("line %d: %s uses unclassified keyword %s", key.Line, kind, key.Value)
+		}
+	}
 	return nil
 }
 
@@ -44,6 +67,7 @@ type ansibleTask struct {
 	Module             string
 	Role               string
 	Definition         map[string]any
+	Inherited          []any
 	CheckMode          bool
 	CheckModeDeclared  bool
 	EnclosingCheckMode bool
@@ -167,15 +191,25 @@ func walkAnsiblePlays(t *testing.T, root, file string, visit func(ansibleTask)) 
 	return plays
 }
 
+func declareCheckMode(task *ansibleTask, value *bool) {
+	if value != nil {
+		task.CheckMode, task.CheckModeDeclared = *value, true
+	}
+}
+
 func walkAnsiblePlay(t *testing.T, root, file string, play ansiblePlay, visit func(ansibleTask)) {
 	t.Helper()
-	inherited := ansibleTask{CheckMode: play.CheckMode}
+	inherited := ansibleTask{Inherited: []any{play.Vars}}
+	declareCheckMode(&inherited, play.CheckMode)
 	names := map[string]bool{}
 	requireAnsibleTaskNames(t, file, play.PreTasks, names)
 	walkAnsibleTasks(t, root, file, play.PreTasks, inherited, visit)
 	for _, role := range play.Roles {
 		roleTask := inherited
 		roleTask.Role = role.Name
+		declareCheckMode(&roleTask, role.CheckMode)
+		roleTask.When = append(slices.Clone(inherited.When), ansibleStrings(t, role.When)...)
+		roleTask.Inherited = append(slices.Clone(inherited.Inherited), role.Vars)
 		walkAnsibleFile(t, root, filepath.Join("roles", role.Name, "tasks", "main.yml"), roleTask, visit)
 	}
 	requireAnsibleTaskNames(t, file, play.Tasks, names)
@@ -197,6 +231,7 @@ func walkAnsibleTasks(t *testing.T, root, file string, tasks []map[string]any, i
 			Key:                file + ": " + name,
 			Role:               inherited.Role,
 			Definition:         definition,
+			Inherited:          inherited.Inherited,
 			CheckMode:          inherited.CheckMode,
 			CheckModeDeclared:  inherited.CheckModeDeclared,
 			EnclosingCheckMode: inherited.CheckMode,
@@ -217,8 +252,10 @@ func walkAnsibleTasks(t *testing.T, root, file string, tasks []map[string]any, i
 			task.Notify = ansibleStrings(t, value)
 		}
 		if _, ok := definition["block"]; ok {
+			block := task
+			block.Inherited = append(slices.Clone(task.Inherited), definition["vars"])
 			for _, section := range []string{"block", "rescue", "always"} {
-				walkAnsibleTasks(t, root, file, ansibleBlockSection(t, file, definition, section), task, visit)
+				walkAnsibleTasks(t, root, file, ansibleBlockSection(t, file, definition, section), block, visit)
 			}
 			continue
 		}
@@ -289,7 +326,7 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 		if task.IgnoreErrors {
 			t.Errorf("verification ignores errors of %s", task.Key)
 		}
-		if slices.ContainsFunc(task.When, func(condition string) bool { return strings.Contains(condition, "ansible_check_mode") }) {
+		if switchesOnCheckMode(task) {
 			t.Errorf("verification runs %s differently from the runner play", task.Key)
 		}
 		switch {
