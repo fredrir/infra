@@ -128,15 +128,17 @@ func TestVerificationDefersToHeldReconciliationLock(t *testing.T) {
 	recovery := []Difference{{System: "reconciliation", Item: "applied b, desired c, stage hosts"}}
 	for _, test := range []struct {
 		name         string
-		lease        *lease
+		lease, taken *lease
 		wantCompared []string
 		want         Verification
 	}{
 		{name: "held", lease: &lease{Owner: "local", Expires: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)}, want: Verification{Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"comparisons skipped: reconciliation locked by local until 2099-01-01 00:00:00 +0000 UTC"}}},
 		{name: "expired", lease: &lease{Owner: "orphaned", Expires: time.Now().Add(-time.Minute)}, wantCompared: []string{"deep c"}, want: Verification{Revision: "c", Outcome: OutcomeDiffers, Differences: recovery, Errors: []string{}}},
 		{name: "absent", wantCompared: []string{"deep c"}, want: Verification{Revision: "c", Outcome: OutcomeDiffers, Differences: recovery, Errors: []string{}}},
+		{name: "taken during comparison", taken: &lease{Owner: "local", Expires: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)}, wantCompared: []string{"deep c"}, want: Verification{Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"comparisons discarded: reconciliation locked by local until 2099-01-01 00:00:00 +0000 UTC"}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			lockReads := 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodGet {
 					t.Errorf("verification sent %s %s", r.Method, r.URL.Path)
@@ -148,12 +150,17 @@ func TestVerificationDefersToHeldReconciliationLock(t *testing.T) {
 					w.Header().Set("ETag", `"status"`)
 					w.Write(status)
 				case "/bucket/production/lock.json":
-					if test.lease == nil {
+					lockReads++
+					held := test.lease
+					if lockReads > 1 && test.taken != nil {
+						held = test.taken
+					}
+					if held == nil {
 						w.WriteHeader(404)
 						return
 					}
 					w.Header().Set("ETag", `"lease"`)
-					json.NewEncoder(w).Encode(test.lease)
+					json.NewEncoder(w).Encode(held)
 				default:
 					t.Errorf("unexpected path: %s", r.URL.Path)
 					w.WriteHeader(404)

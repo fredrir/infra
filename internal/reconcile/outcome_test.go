@@ -8,13 +8,20 @@ import (
 )
 
 type recordedStatus struct {
-	status Status
-	err    error
-	locked error
+	status              Status
+	err                 error
+	locked, lockedAfter error
+	lockReads           int
 }
 
-func (s recordedStatus) Read(context.Context) (Status, error) { return s.status, s.err }
-func (s recordedStatus) Unlocked(context.Context) error       { return s.locked }
+func (s *recordedStatus) Read(context.Context) (Status, error) { return s.status, s.err }
+func (s *recordedStatus) Unlocked(context.Context) error {
+	s.lockReads++
+	if s.lockReads > 1 {
+		return s.lockedAfter
+	}
+	return s.locked
+}
 
 type verificationOps struct {
 	revision, published string
@@ -49,7 +56,7 @@ func TestVerificationReportsIncompleteReconciliationAsDifference(t *testing.T) {
 		name                string
 		status              Status
 		readErr             error
-		locked              error
+		locked, lockedAfter error
 		revision, published string
 		pending             Selection
 		result              error
@@ -74,10 +81,12 @@ func TestVerificationReportsIncompleteReconciliationAsDifference(t *testing.T) {
 		{name: "tooling-only change evaluated", status: Status{Desired: "a", Applied: "a", Stage: "evaluated", Evaluated: "b"}, revision: "b", published: "a", pending: Selection{Tooling: true}, deep: true, wantCompared: []string{"deep a"}, wantRevision: "a"},
 		{name: "reconciliation lock held", status: Status{Desired: "c", Applied: "b", Stage: "hosts"}, locked: errors.New("reconciliation locked by abc until 2026-09-25 18:00:00 +0000 UTC"), revision: "c", published: "b", pending: Selection{Ansible: true}, deep: true, wantErrors: []string{"comparisons skipped: reconciliation locked by abc until 2026-09-25 18:00:00 +0000 UTC"}},
 		{name: "reconciliation lock unreadable", status: complete("a"), locked: errors.New("read reconciliation lock: access denied"), revision: "a", published: "a", deep: true, wantErrors: []string{"comparisons skipped: read reconciliation lock: access denied"}},
+		{name: "reconciliation locked during comparison", status: complete("a"), lockedAfter: errors.New("reconciliation locked by local until 2026-09-25 18:00:00 +0000 UTC"), revision: "a", published: "a", result: Differences{{System: "hosts", Host: "fredrir-04", Item: "edited file"}}, deep: true, wantCompared: []string{"deep a"}, wantErrors: []string{"comparisons discarded: reconciliation locked by local until 2026-09-25 18:00:00 +0000 UTC"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ops := &verificationOps{revision: test.revision, published: test.published, pending: test.pending, result: test.result}
-			verified, err := Verifier{Store: recordedStatus{test.status, test.readErr, test.locked}, Ops: ops, Host: "logs.fredrir.com", Deep: test.deep}.Verify(context.Background())
+			store := &recordedStatus{status: test.status, err: test.readErr, locked: test.locked, lockedAfter: test.lockedAfter}
+			verified, err := Verifier{Store: store, Ops: ops, Host: "logs.fredrir.com", Deep: test.deep}.Verify(context.Background())
 			if !reflect.DeepEqual(ops.compared, test.wantCompared) {
 				t.Errorf("compared %q, want %q", ops.compared, test.wantCompared)
 			}

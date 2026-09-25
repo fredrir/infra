@@ -101,6 +101,14 @@ func (v Verifier) Verify(ctx context.Context) (string, error) {
 	if err := v.Store.Unlocked(ctx); err != nil {
 		return "", fmt.Errorf("comparisons skipped: %w", err)
 	}
+	revision, err := v.compare(ctx)
+	if locked := v.Store.Unlocked(ctx); locked != nil {
+		return "", fmt.Errorf("comparisons discarded: %w", locked)
+	}
+	return revision, err
+}
+
+func (v Verifier) compare(ctx context.Context) (string, error) {
 	recorded := v.recordedReconciliation(ctx)
 	revision, err := v.Ops.Revision(ctx)
 	if err != nil {
@@ -121,11 +129,11 @@ func (v Verifier) Verify(ctx context.Context) (string, error) {
 		revision = published
 	}
 	plan := Plan{Revision: revision, Affected: All(), Host: v.Host}
-	compare := v.Ops.VerifyLive
+	verify := v.Ops.VerifyLive
 	if v.Deep {
-		compare = v.Ops.VerifyDeep
+		verify = v.Ops.VerifyDeep
 	}
-	return revision, errors.Join(recorded, compare(ctx, plan))
+	return revision, errors.Join(recorded, verify(ctx, plan))
 }
 
 func (v Verifier) recordedReconciliation(ctx context.Context) error {
