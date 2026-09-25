@@ -218,6 +218,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         GH_REPO: ${{ github.repository }}
       run: |
+        # shellcheck disable=SC2016
         newer=$(gh run list --workflow reconcile.yml --event push --branch main --json databaseId,status --jq '.[] | select(.databaseId > ($ENV.GITHUB_RUN_ID | tonumber) and .status != "completed") | .databaseId')
         for run in $newer; do
           applied=$(gh api --paginate "repos/$GH_REPO/actions/runs/$run/jobs" --jq '.jobs[] | select(.name == "reconcile / apply" and .status == "completed") | .status')
