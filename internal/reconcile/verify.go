@@ -446,6 +446,9 @@ func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
 	if err != nil {
 		return err
 	}
+	if source.Spec.Suspend {
+		return fmt.Errorf("GitRepository flux-system/flux-system is suspended")
+	}
 	if source.Spec.Ref.Branch != "production" || !strings.HasSuffix(source.Status.Artifact.Revision, ":"+plan.Revision) {
 		return kubernetesDifference("GitRepository flux-system/flux-system is at %s of branch %s, want production@sha1:%s", source.Status.Artifact.Revision, source.Spec.Ref.Branch, plan.Revision)
 	}

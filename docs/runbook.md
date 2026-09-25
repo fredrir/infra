@@ -46,6 +46,7 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | Errors | Unreachable hosts, failed host tasks, playbooks that could not be compared, API failures, readiness, timeouts, suspended Flux objects, replica counts a manifest does not declare |
 | Held or unreadable reconciliation lock | Error; comparisons skipped, or discarded when the lock is taken during them |
 | No state bucket access | Error; comparisons skipped |
+| Ten-minute budget exceeded | Error; comparisons discarded; report and log written |
 | Unpublished deploying changes | Difference; comparisons skipped |
 | Repair not dispatched | Push reconciliation on `main` with an incomplete `reconcile / apply` job; latest bot dispatch for the commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled |
 | Repair cap reset | New commit on `main` |

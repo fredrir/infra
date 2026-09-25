@@ -149,10 +149,15 @@ func (c *Commands) verifyArtifacts(ctx context.Context, plan Plan, owners []reso
 	}
 	var problems []error
 	problems = append(problems, conditionReady(generator))
+	observed := generator.Spec
+	observed.Suspend = c.kubernetes.generator.Spec.Suspend
 	expected, _ := json.Marshal(c.kubernetes.generator.Spec)
-	actual, _ := json.Marshal(generator.Spec)
+	actual, _ := json.Marshal(observed)
 	if string(expected) != string(actual) {
 		problems = append(problems, kubernetesDifference("ArtifactGenerator flux-system/platform-artifacts differs from its declaration"))
+	}
+	if generator.Spec.Suspend {
+		return errors.Join(problems...)
 	}
 	var inventory []struct{ Name, Namespace, Digest string }
 	if err = json.Unmarshal(generator.Status.Inventory, &inventory); err != nil {

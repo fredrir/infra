@@ -112,7 +112,10 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 	revision := strings.Repeat("a", 40)
 	digest := "sha256:" + strings.Repeat("b", 64)
 	generator := artifactFixture(t, fmt.Sprintf(`{"kind":"ArtifactGenerator","metadata":{"name":"platform-artifacts","namespace":"flux-system","uid":"generator-id","generation":1},"spec":{"sources":[{"alias":"repo","kind":"GitRepository","name":"flux-system"}],"artifacts":[{"name":"project-y","originRevision":"@repo","copy":[{"from":"@repo/platform/projects/y/**","to":"@artifact/platform/projects/y/"}]}]},"status":{"conditions":[{"type":"Ready","status":"True","observedGeneration":1}],"inventory":[{"name":"project-y","namespace":"flux-system","digest":%q}]}}`, digest))
-	artifact := artifactFixture(t, fmt.Sprintf(`{"kind":"ExternalArtifact","metadata":{"name":"project-y","namespace":"flux-system","generation":1,"labels":{"source.extensions.fluxcd.io/generator":"generator-id"}},"spec":{"sourceRef":{"kind":"ArtifactGenerator","name":"platform-artifacts","namespace":"flux-system"}},"status":{"conditions":[{"type":"Ready","status":"True","observedGeneration":1}],"artifact":{"digest":%q,"revision":%q,"metadata":{"org.opencontainers.image.revision":%q}}}}`, digest, "latest@"+digest, "production@sha1:"+revision))
+	externalArtifact := func(origin string) resource {
+		return artifactFixture(t, fmt.Sprintf(`{"kind":"ExternalArtifact","metadata":{"name":"project-y","namespace":"flux-system","generation":1,"labels":{"source.extensions.fluxcd.io/generator":"generator-id"}},"spec":{"sourceRef":{"kind":"ArtifactGenerator","name":"platform-artifacts","namespace":"flux-system"}},"status":{"conditions":[{"type":"Ready","status":"True","observedGeneration":1}],"artifact":{"digest":%q,"revision":%q,"metadata":{"org.opencontainers.image.revision":%q}}}}`, digest, "latest@"+digest, "production@sha1:"+origin))
+	}
+	artifact := externalArtifact(revision)
 	source := readyResource(t, "GitRepository", "flux-system", "flux-system")
 	source.Spec.Ref.Branch, source.Status.Artifact.Revision = "production", "production@sha1:"+revision
 	declared := map[string]resource{}
@@ -129,8 +132,8 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 	monitoring := readyResource(t, "HelmRelease", "observability", "monitoring")
 	monitoring.Spec.Values.Grafana.INI.Server.RootURL = "https://logs.fredrir.com"
 	type state struct {
-		source, deployment, monitoring resource
-		owners                         map[string]resource
+		source, generator, artifact, deployment, monitoring resource
+		owners                                              map[string]resource
 	}
 	image := Difference{System: "kubernetes", Item: "Deployment y/api does not run the declared container images"}
 	for _, test := range []struct {
@@ -141,6 +144,15 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 	}{
 		{name: "matching", mutate: func(*state) {}},
 		{name: "source changed", mutate: func(s *state) { s.source.Status.Artifact.Revision = "production@sha1:old" }, differences: []Difference{{System: "kubernetes", Item: "GitRepository flux-system/flux-system is at production@sha1:old of branch production, want production@sha1:" + revision}}},
+		{name: "suspended source", mutate: func(s *state) {
+			s.source.Spec.Suspend = true
+			s.source.Status.Artifact.Revision = "production@sha1:old"
+		}, errors: []string{"GitRepository flux-system/flux-system is suspended"}},
+		{name: "suspended generator", mutate: func(s *state) {
+			s.generator.Spec.Suspend = true
+			s.artifact = externalArtifact(strings.Repeat("c", 40))
+		}, errors: []string{"ArtifactGenerator flux-system/platform-artifacts is suspended"}},
+		{name: "unadvanced provenance", mutate: func(s *state) { s.artifact = externalArtifact(strings.Repeat("c", 40)) }, differences: []Difference{{System: "kubernetes", Item: "ExternalArtifact flux-system/project-y provenance has not advanced from " + strings.Repeat("c", 40) + " to " + revision}}},
 		{name: "suspended owner", mutate: func(s *state) {
 			owner := s.owners["project-y"]
 			owner.Spec.Suspend = true
@@ -169,7 +181,7 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 		}, differences: []Difference{image}, errors: []string{"observability/monitoring is not ready"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			current := state{source: source, deployment: deployment, monitoring: monitoring, owners: map[string]resource{}}
+			current := state{source: source, generator: generator, artifact: artifact, deployment: deployment, monitoring: monitoring, owners: map[string]resource{}}
 			for name, owner := range declared {
 				current.owners[name] = owner
 			}
@@ -179,8 +191,8 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 			fake := kubernetesFake{
 				"get gitrepositories.source.toolkit.fluxcd.io flux-system":              current.source,
 				"get kustomizations.kustomize.toolkit.fluxcd.io -n=flux-system":         items(current.owners["flux-system"], current.owners["project-y"]),
-				"get artifactgenerators.source.extensions.fluxcd.io platform-artifacts": generator,
-				"get externalartifacts.source.toolkit.fluxcd.io":                        items(artifact),
+				"get artifactgenerators.source.extensions.fluxcd.io platform-artifacts": current.generator,
+				"get externalartifacts.source.toolkit.fluxcd.io":                        items(current.artifact),
 				"get deployments.apps -n=y":                                             items(current.deployment),
 				"get helmreleases.helm.toolkit.fluxcd.io --all-namespaces":              items(current.monitoring),
 			}

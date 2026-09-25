@@ -35,7 +35,7 @@ func Measure(ctx context.Context, runner Runner, stage string, budget time.Durat
 	}
 	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
-	result, err := runner.execute(ctx, process.Options{Name: command[0], Args: command[1:], Dir: runner.Dir, Env: append(os.Environ(), runner.Env...), Stdout: runner.Stdout, Stderr: runner.Stderr, KillGrace: 100 * time.Millisecond})
+	result, err := runner.execute(ctx, process.Options{Name: command[0], Args: command[1:], Dir: runner.Dir, Env: append(os.Environ(), runner.Env...), Stdout: runner.Stdout, Stderr: runner.Stderr, KillGrace: 10 * time.Second})
 	report.DurationSeconds = time.Since(report.Started).Seconds()
 	report.ExitCode = result.ExitCode
 	report.CPUSeconds, report.PeakMemoryBytes = result.CPUSeconds, result.PeakMemoryBytes

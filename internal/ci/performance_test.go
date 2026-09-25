@@ -26,6 +26,18 @@ func TestMeasureBudgetFailureWritesReport(t *testing.T) {
 	}
 }
 
+func TestMeasureBudgetLetsTheCommandFinishItsReport(t *testing.T) {
+	reported := filepath.Join(t.TempDir(), "report")
+	script := `trap 'sleep 0.5; echo done > "$0"; exit 1' TERM; while :; do sleep 0.1; done`
+	report, err := Measure(context.Background(), Runner{}, "drift-verification", time.Second, "", []string{"sh", "-c", script, reported})
+	if err == nil || !report.BudgetExceeded {
+		t.Fatalf("deadline passed: %+v %v", report, err)
+	}
+	if _, err := os.Stat(reported); err != nil {
+		t.Fatalf("command was killed before writing its report: %v", err)
+	}
+}
+
 func TestMeasureCommandFailureDoesNotBecomeSuccess(t *testing.T) {
 	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		return process.Result{ExitCode: 7}, errors.New("failed check")
