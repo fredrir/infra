@@ -1,0 +1,41 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: node-registration
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - nodes
+  matchConditions:
+  - name: kubelet
+    expression: "'system:nodes' in request.userInfo.groups"
+  variables:
+  - name: declared
+    expression: "['fredrir-04', 'fredrir-05', 'fredrir-07', 'fredrir-08', 'fredrir-09', 'fredrir-10']"
+  - name: volatile
+    expression: "['fredrir-10']"
+  validations:
+  - expression: object.metadata.name in variables.declared
+    message: Only inventory nodes may register
+  - expression: >-
+      !(object.metadata.name in variables.volatile) || (has(object.spec.taints) && object.spec.taints.exists(t,
+      t.key == 'node-restriction.kubernetes.io/volatile' && has(t.value) && t.value == 'true' && t.effect == 'NoSchedule'))
+    message: Volatile nodes must carry their volatile taint
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: node-registration
+spec:
+  policyName: node-registration
+  validationActions:
+  - Deny

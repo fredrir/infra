@@ -11,5 +11,6 @@ resources:
 - quotas.yaml
 - reconciler.yaml
 - admission.yaml
+- nodes.yaml
 - dns.yaml
 - reconciliation.yaml

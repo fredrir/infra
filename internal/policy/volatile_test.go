@@ -42,7 +42,7 @@ func declaresVolatileToleration(value any) bool {
 	case []any:
 		return slices.ContainsFunc(value, declaresVolatileToleration)
 	case string:
-		return strings.Contains(value, volatileTaint)
+		return strings.Contains(value, "tolerations") && strings.Contains(value, volatileTaint)
 	}
 	return false
 }

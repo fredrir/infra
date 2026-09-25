@@ -5,12 +5,14 @@ go_test(
     srcs = [
         "helpers_test.go",
         "listener_test.go",
+        "node_test.go",
         "project_test.go",
         "quota_test.go",
         "runner_test.go",
         "volatile_test.go",
     ],
     data = [
+        "//:node_registration_data",
         "//:workflows",
         "//platform:policy_testdata",
     ],

@@ -48,6 +48,12 @@ filegroup(
 )
 
 filegroup(
+    name = "node_registration_data",
+    srcs = ["ansible/inventory/production.yml"],
+    visibility = ["//internal/policy:__pkg__"],
+)
+
+filegroup(
     name = "renovate_pin_data",
     srcs = glob(["images/*/Containerfile"]) + [
         "renovate.json",
