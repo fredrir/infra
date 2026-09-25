@@ -13,9 +13,26 @@ import (
 
 type ansiblePlay struct {
 	CheckMode bool             `yaml:"check_mode"`
-	Roles     []string         `yaml:"roles"`
+	PreTasks  []map[string]any `yaml:"pre_tasks"`
+	Roles     []ansibleRole    `yaml:"roles"`
 	Tasks     []map[string]any `yaml:"tasks"`
 	Handlers  []map[string]any `yaml:"handlers"`
+}
+
+type ansibleRole struct{ Name string }
+
+func (r *ansibleRole) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		return node.Decode(&r.Name)
+	}
+	var entry struct {
+		Role string `yaml:"role"`
+	}
+	if err := node.Decode(&entry); err != nil {
+		return err
+	}
+	r.Name = entry.Role
+	return nil
 }
 
 type ansibleTask struct {
@@ -97,10 +114,13 @@ func walkAnsiblePlays(t *testing.T, root, file string, visit func(ansibleTask)) 
 	plays := loadAnsible[[]ansiblePlay](t, root, file)
 	for _, play := range plays {
 		inherited := ansibleTask{CheckMode: play.CheckMode}
+		names := map[string]bool{}
+		requireAnsibleTaskNames(t, file, play.PreTasks, names)
+		walkAnsibleTasks(t, root, file, play.PreTasks, inherited, visit)
 		for _, role := range play.Roles {
-			walkAnsibleFile(t, root, filepath.Join("roles", role, "tasks", "main.yml"), inherited, visit)
+			walkAnsibleFile(t, root, filepath.Join("roles", role.Name, "tasks", "main.yml"), inherited, visit)
 		}
-		requireAnsibleTaskNames(t, file, play.Tasks, map[string]bool{})
+		requireAnsibleTaskNames(t, file, play.Tasks, names)
 		walkAnsibleTasks(t, root, file, play.Tasks, inherited, visit)
 	}
 	return plays
@@ -184,6 +204,7 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 		"ansible.builtin.assert",
 		"ansible.builtin.find",
 		"ansible.builtin.set_fact",
+		"ansible.builtin.setup",
 		"ansible.builtin.slurp",
 		"ansible.builtin.stat",
 	}

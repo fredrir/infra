@@ -34,7 +34,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
-      actions: read
+      actions: write
     uses: ./.github/workflows/reconcile-job.yml
     secrets: inherit
     with:

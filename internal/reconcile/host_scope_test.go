@@ -103,12 +103,64 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 			}
 			want := 0
 			if test.runners {
-				want = len(fleet.Repositories)
+				want = 2 * len(fleet.Repositories)
 			}
 			if queried != want {
-				t.Fatalf("runner fleet verification leaked or missed: %d queries", queried)
+				t.Fatalf("runner fleet convergence or verification leaked or missed: %d queries", queried)
 			}
 		})
+	}
+}
+
+func TestScheduledHostsSkipOnlyVerifiedUnchangedRunners(t *testing.T) {
+	fleet := testRunnerFleet()
+	for _, test := range []struct {
+		name    string
+		failing []string
+		change  func(*registeredRunner)
+		skipped bool
+		hosts   []string
+	}{
+		{"verified", nil, nil, true, []string{"reconcile.yml --skip-tags=runners", "verify-runners.yml"}},
+		{"GitHub drift", nil, offlineY, false, []string{"reconcile.yml --skip-tags=runners", `build-runners.yml --extra-vars {"build_runner_restart":["Y"]}`}},
+		{"guest drift", []string{"verify-runners.yml"}, nil, false, []string{"reconcile.yml --skip-tags=runners", "verify-runners.yml", "build-runners.yml"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			harness := &fleetHarness{t: t, fleet: fleet, failing: test.failing, change: test.change}
+			commands := harness.commands()
+			plan := Plan{Affected: All(), RunnersUnchanged: true}
+			if err := commands.Hosts(context.Background(), plan); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(harness.calls, test.hosts) || harness.queries != len(fleet.Repositories) {
+				t.Fatalf("unexpected runner convergence: %q, %d queries", harness.calls, harness.queries)
+			}
+			harness.calls, harness.queries, harness.failing, harness.change = nil, 0, nil, nil
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			if err := commands.VerifyHosts(ctx, plan); err != nil {
+				t.Fatal(err)
+			}
+			verify, queries := []string{"verify.yml verify-runners.yml"}, len(fleet.Repositories)
+			if test.skipped {
+				verify, queries = []string{"verify.yml"}, 0
+			}
+			if !reflect.DeepEqual(harness.calls, verify) || harness.queries != queries {
+				t.Fatalf("runner verification duplicated or missed: %q, %d queries", harness.calls, harness.queries)
+			}
+		})
+	}
+}
+
+func TestVerifiedRunnerScopeDoesNotReverify(t *testing.T) {
+	harness := &fleetHarness{t: t, fleet: testRunnerFleet()}
+	commands := harness.commands()
+	commands.runnersVerified = true
+	if err := commands.VerifyHosts(context.Background(), Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(harness.calls) != 0 || harness.queries != 0 {
+		t.Fatalf("verified runners were verified again: %q, %d queries", harness.calls, harness.queries)
 	}
 }
 

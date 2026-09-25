@@ -61,6 +61,52 @@ func queriedRepository(opts process.Options) string {
 	return strings.Split(opts.Args[1], "/")[2]
 }
 
+type fleetHarness struct {
+	t       *testing.T
+	fleet   RunnerFleet
+	mu      sync.Mutex
+	calls   []string
+	queries int
+	failing []string
+	change  func(*registeredRunner)
+}
+
+func (h *fleetHarness) commands() *Commands {
+	return &Commands{Runner: ci.Runner{Dir: writeRunnerFleet(h.t, h.fleet), Execute: h.execute}}
+}
+
+func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process.Result, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	switch {
+	case opts.Name == "ansible-playbook":
+		call := strings.Join(opts.Args[2:], " ")
+		h.calls = append(h.calls, call)
+		if slices.Contains(h.failing, call) {
+			return process.Result{ExitCode: 2}, errors.New(call + " failed")
+		}
+		return process.Result{}, nil
+	case opts.Name == "gh" && slices.Contains(opts.Args, "PUT"):
+		h.calls = append(h.calls, "gh "+strings.Join(opts.Args, " "))
+		return process.Result{}, nil
+	case opts.Name == "gh":
+		h.queries++
+		runner := healthyRunner(h.fleet, queriedRepository(opts))
+		if h.change != nil {
+			h.change(&runner)
+		}
+		return runnerResponse(h.t, runner), nil
+	}
+	h.t.Errorf("unexpected command: %s %q", opts.Name, opts.Args)
+	return process.Result{}, errors.New("unexpected command")
+}
+
+func offlineY(runner *registeredRunner) {
+	if runner.Name == "infra-build-09-Y" {
+		runner.Status = "offline"
+	}
+}
+
 func TestLoadRunnerFleetValidatesDeclaration(t *testing.T) {
 	fleet, err := LoadRunnerFleet(writeRunnerFleet(t, testRunnerFleet()))
 	if err != nil || !reflect.DeepEqual(fleet, testRunnerFleet()) {
@@ -253,5 +299,75 @@ func TestFleetRoutingMatchesDeclaredRunners(t *testing.T) {
 		if !slices.Contains(routed, name) {
 			t.Errorf("%s/%s declares a runner that no workflow routes to the runner fleet", fleet.Owner, name)
 		}
+	}
+}
+
+func TestOfflineRunnersSelectRestarts(t *testing.T) {
+	fleet := testRunnerFleet()
+	states := map[string][]registeredRunner{}
+	for _, repository := range fleet.Repositories {
+		states[repository] = []registeredRunner{healthyRunner(fleet, repository)}
+	}
+	if restart := offlineRunners(fleet, states); restart != nil {
+		t.Fatalf("healthy runners restarted: %q", restart)
+	}
+	states["Y"][0].Status = "offline"
+	foreign := healthyRunner(fleet, "infra")
+	foreign.Name, foreign.Status = "infra-build-08-infra", "offline"
+	states["infra"] = append(states["infra"], foreign)
+	if restart := offlineRunners(fleet, states); !reflect.DeepEqual(restart, []string{"Y"}) {
+		t.Fatalf("restart list does not match offline fleet runners: %q", restart)
+	}
+}
+
+func TestRunnerConvergenceArguments(t *testing.T) {
+	cli := []string{"build/cli-release.json"}
+	runners := func(inputs ...string) Plan {
+		return Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: inputs}}
+	}
+	for _, test := range []struct {
+		name   string
+		plan   Plan
+		change func(*registeredRunner)
+		want   string
+	}{
+		{"CLI release", runners(cli...), nil, "build-runners.yml --tags=infra_binary"},
+		{"CLI release and fleet", runners("build/cli-release.json", "build/runners.json"), nil, "build-runners.yml"},
+		{"runner role", runners("ansible/roles/build_runner/tasks/main.yml"), nil, "build-runners.yml"},
+		{"CLI release with offline runner", runners(cli...), offlineY, `build-runners.yml --extra-vars {"build_runner_restart":["Y"]}`},
+		{"CLI release in full scope", Plan{Affected: Selection{Ansible: true, HostScope: HostScopeFull, RunnerInputs: cli}}, nil, "reconcile.yml"},
+		{"full with offline runner", Plan{Affected: All()}, offlineY, `reconcile.yml --extra-vars {"build_runner_restart":["Y"]}`},
+		{"all offline", Plan{Affected: All()}, func(runner *registeredRunner) { runner.Status = "offline" }, `reconcile.yml --extra-vars {"build_runner_restart":["infra","Y"]}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), change: test.change}
+			if err := harness.commands().Hosts(context.Background(), test.plan); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(harness.calls, []string{test.want}) {
+				t.Fatalf("unexpected runner convergence: %q", harness.calls)
+			}
+		})
+	}
+}
+
+func TestRunnerLabelsConvergeOnlyMismatchedRunners(t *testing.T) {
+	harness := &fleetHarness{t: t, fleet: testRunnerFleet(), change: func(runner *registeredRunner) {
+		runner.ID = 7
+		if runner.Name == "infra-build-09-Y" {
+			runner.ID = 42
+			runner.Labels = append(runner.Labels[:3], runnerLabel{"dagger-amd64", "custom"}, runnerLabel{"gpu", "custom"})
+		}
+	}}
+	plan := Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: []string{"build/runners.json"}}}
+	if err := harness.commands().Hosts(context.Background(), plan); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"gh api --method PUT --silent repos/fredrir/Y/actions/runners/42/labels -f labels[]=dagger-amd64 -f labels[]=infra-trusted",
+		"build-runners.yml",
+	}
+	if !reflect.DeepEqual(harness.calls, want) {
+		t.Fatalf("labels converged on the wrong runners: %q", harness.calls)
 	}
 }

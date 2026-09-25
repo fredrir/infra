@@ -183,6 +183,10 @@ esac
 		t.Fatalf("declared runner state does not converge without restarts:\n%s", output)
 	}
 	t.Log("declared runner state converges idempotently without restarting services")
+	if output := run("/fixture/converge.yml", true, "--extra-vars", `{"build_runner_restart":["Y"]}`); restarted() != steady+runnerUnit("Y")+"\n" {
+		t.Fatalf("requested runner restart restarted %q, want only %s:\n%s", strings.TrimPrefix(restarted(), steady), runnerUnit("Y"), output)
+	}
+	t.Log("runners reported offline restart without restarting the rest of the fleet")
 	outcome := func(output string) (changed, failed []string) {
 		var task string
 		for line := range strings.SplitSeq(output, "\n") {

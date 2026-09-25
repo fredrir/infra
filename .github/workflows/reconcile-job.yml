@@ -99,6 +99,8 @@ jobs:
       contents: write
       id-token: write
       actions: read
+    outputs:
+      reconciliation: ${{ steps.reconcile.outcome }}
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
@@ -159,6 +161,7 @@ jobs:
         repositories: ${{ steps.runner-fleet.outputs.repositories }}
         permission-administration: ${{ github.event.schedule == '47 * * * *' && 'read' || 'write' }}
     - name: Reconcile merged revision
+      id: reconcile
       env:
         AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
@@ -168,6 +171,7 @@ jobs:
         SOPS_AGE_KEY: ${{ steps.doppler.outputs.SOPS_AGE_KEY }}
         GH_TOKEN: ${{ steps.runner-token.outputs.token }}
         FULL: ${{ github.event.schedule == '17 */6 * * *' || (github.event_name == 'workflow_dispatch' && inputs.full) }}
+        SCHEDULED: ${{ github.event.schedule == '17 */6 * * *' }}
         DRIFT_ONLY: ${{ github.event.schedule == '47 * * * *' }}
         STRATEGY_OVERRIDE: ${{ vars.INFRA_ANSIBLE_STRATEGY }}
       run: |
@@ -175,7 +179,7 @@ jobs:
         if [ "$DRIFT_ONLY" = true ]; then
           infra ci measure --stage drift-verification --budget 5m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --verify-artifacts="$VERIFY_ARTIFACTS"
         else
-          infra reconcile apply --full="$FULL" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/status.json"
+          infra reconcile apply --full="$FULL" --scheduled="$SCHEDULED" --scope-hosts="$SCOPE_HOSTS" --scope-projects="$SCOPE_PROJECTS" --verify-artifacts="$VERIFY_ARTIFACTS" --report="$RUNNER_TEMP/reconciliation/status.json"
         fi
     - name: Record workflow timing
       if: always()
@@ -206,3 +210,16 @@ jobs:
       if: always()
       run: |
         rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"
+  repair:
+    needs: apply
+    if: ${{ failure() && github.event.schedule == '47 * * * *' && needs.apply.outputs.reconciliation == 'failure' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+    - name: Request full reconciliation
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+      run: gh workflow run reconcile.yml --ref main -f full=true

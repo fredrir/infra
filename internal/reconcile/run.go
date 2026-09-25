@@ -8,10 +8,11 @@ import (
 )
 
 type Plan struct {
-	Revision string    `json:"revision"`
-	Base     string    `json:"base_revision"`
-	Affected Selection `json:"affected"`
-	Host     string    `json:"grafana_host"`
+	Revision         string    `json:"revision"`
+	Base             string    `json:"base_revision"`
+	Affected         Selection `json:"affected"`
+	Host             string    `json:"grafana_host"`
+	RunnersUnchanged bool      `json:"runners_unchanged,omitempty"`
 }
 
 type Operations interface {
@@ -37,6 +38,7 @@ type Reconciler struct {
 	Report          func(Status) error
 	SkipUnchanged   bool
 	VerifyArtifacts bool
+	Scheduled       bool
 }
 
 func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
@@ -69,6 +71,15 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	if err != nil {
 		return err
 	}
+	runnersUnchanged := false
+	if r.Scheduled && !recovery && status.Applied != "" {
+		changed, err := r.Ops.Select(ctx, status.Applied, false)
+		if err != nil {
+			return err
+		}
+		scope := effectiveHostScope(changed)
+		runnersUnchanged = scope == HostScopeNone || scope == HostScopeMonitor
+	}
 	if full || status.Applied == "" || recovery || (selected.Tooling && !r.SkipUnchanged) {
 		selected = All()
 	}
@@ -76,7 +87,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		selected.Projects = nil
 		selected.Reasons = append(selected.Reasons, "full artifact verification baseline required")
 	}
-	plan := Plan{Revision: revision, Base: status.Applied, Affected: selected, Host: r.Host}
+	plan := Plan{Revision: revision, Base: status.Applied, Affected: selected, Host: r.Host, RunnersUnchanged: runnersUnchanged}
 	skip := r.SkipUnchanged && !full && !recovery && status.Applied != "" && !selected.Tofu && !selected.Ansible && !selected.Kubernetes
 	status.Evaluated, status.Selection = revision, selected
 	status.Failure, status.HostsReusedFrom, status.HostScope = "", "", ""

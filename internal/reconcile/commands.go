@@ -24,6 +24,7 @@ type Commands struct {
 	ScopeProjects   bool
 	VerifyArtifacts bool
 	kubernetes      *kubernetesState
+	runnersVerified bool
 }
 
 func (c *Commands) Revision(ctx context.Context) (string, error) {

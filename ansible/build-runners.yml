@@ -1,11 +1,17 @@
 - name: Register trusted dedicated build runners
   hosts: build_engines
   become: true
-  gather_facts: true
+  gather_facts: false
+  tags: [runners]
   vars:
     build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
     build_runner_fleet: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/runners.json') | from_json }}"
+  pre_tasks:
+  - name: Gather runner host facts
+    ansible.builtin.setup:
+    tags: [infra_binary]
   roles:
-  - infra_binary
+  - role: infra_binary
+    tags: [infra_binary]
   - build_runner
   - build_engine

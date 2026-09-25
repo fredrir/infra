@@ -52,4 +52,4 @@
     name: '{{ item }}'
     daemon_reload: true
     state: restarted
-  loop: '{{ build_runner_stale_services.stdout_lines }}'
+  loop: '{{ build_runner_stale_services.stdout_lines | union(build_runner_state_restarts | default([])) }}'

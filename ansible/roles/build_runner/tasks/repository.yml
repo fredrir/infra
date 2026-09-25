@@ -130,3 +130,4 @@
   ansible.builtin.import_tasks: repository-services.yml
   vars:
     build_runner_state_services: ['{{ build_runner_service_name }}']
+    build_runner_state_restarts: "{{ [build_runner_service_name] if build_runner_repository in build_runner_restart | default([]) else [] }}"

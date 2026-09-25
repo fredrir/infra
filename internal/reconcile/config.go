@@ -12,14 +12,15 @@ import (
 )
 
 type Selection struct {
-	Tofu        bool     `json:"tofu"`
-	Kubernetes  bool     `json:"kubernetes"`
-	Ansible     bool     `json:"ansible"`
-	MonitorOnly bool     `json:"monitor_only"`
-	Tooling     bool     `json:"tooling"`
-	Projects    []string `json:"projects,omitempty"`
-	HostScope   string   `json:"host_scope"`
-	Reasons     []string `json:"reasons,omitempty"`
+	Tofu         bool     `json:"tofu"`
+	Kubernetes   bool     `json:"kubernetes"`
+	Ansible      bool     `json:"ansible"`
+	MonitorOnly  bool     `json:"monitor_only"`
+	Tooling      bool     `json:"tooling"`
+	Projects     []string `json:"projects,omitempty"`
+	HostScope    string   `json:"host_scope"`
+	RunnerInputs []string `json:"runner_inputs,omitempty"`
+	Reasons      []string `json:"reasons,omitempty"`
 }
 
 var projectNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
@@ -57,6 +58,7 @@ func Affected(paths []string) Selection {
 		case strings.HasPrefix(path, "ansible/roles/gatus/"):
 			selectHosts(&selected, HostScopeMonitor)
 		case path == "build/cli-release.json", path == "build/runners.json", path == "build/toolchain.json", path == "ansible/build-runners.yml", path == "ansible/verify-runners.yml", strings.HasPrefix(path, "ansible/roles/build_runner/"), strings.HasPrefix(path, "ansible/roles/build_engine/"):
+			selected.RunnerInputs = append(selected.RunnerInputs, path)
 			selectHosts(&selected, HostScopeRunners)
 		case strings.HasPrefix(path, "tofu/"):
 			selected.Tofu = true

@@ -16,7 +16,7 @@ import (
 
 func newReconcileCommand() *cobra.Command {
 	var root, bucket, prefix, base, report string
-	var full, scopeHosts, scopeProjects, verifyArtifacts bool
+	var full, scheduled, scopeHosts, scopeProjects, verifyArtifacts bool
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
 	command.PersistentFlags().StringVar(&root, "root", ".", "Source checkout")
 	command.PersistentFlags().StringVar(&bucket, "state-bucket", "llunde-pyparser-bucket", "Reconciliation state bucket")
@@ -30,6 +30,9 @@ func newReconcileCommand() *cobra.Command {
 		child := &cobra.Command{Use: action, Args: cobra.NoArgs}
 		if action == "plan" {
 			child.Flags().StringVar(&base, "base", "", "Comparison revision")
+		}
+		if action == "apply" {
+			child.Flags().BoolVar(&scheduled, "scheduled", false, "Skip the runner play when verification proves the fleet unchanged")
 		}
 		child.RunE = func(cmd *cobra.Command, _ []string) error {
 			absolute, err := filepath.Abs(root)
@@ -76,7 +79,7 @@ func newReconcileCommand() *cobra.Command {
 			defer os.RemoveAll(work)
 			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ScopeHosts: scopeHosts, ScopeProjects: scopeProjects, VerifyArtifacts: verifyArtifacts}
 			if action == "apply" {
-				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, SkipUnchanged: scopeHosts, VerifyArtifacts: verifyArtifacts, Report: func(status reconcile.Status) error {
+				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, SkipUnchanged: scopeHosts, VerifyArtifacts: verifyArtifacts, Scheduled: scheduled, Report: func(status reconcile.Status) error {
 					data, err := json.MarshalIndent(status, "", "  ")
 					if err != nil {
 						return err

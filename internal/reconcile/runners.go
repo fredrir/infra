@@ -28,6 +28,7 @@ type RunnerFleet struct {
 }
 
 type registeredRunner struct {
+	ID      int64         `json:"id"`
 	Name    string        `json:"name"`
 	Status  string        `json:"status"`
 	Version *string       `json:"version"`
@@ -133,17 +134,33 @@ func (c *Commands) runnerStates(ctx context.Context, fleet RunnerFleet) (map[str
 	return states, nil
 }
 
+func namedRunners(fleet RunnerFleet, states map[string][]registeredRunner, repository string) []registeredRunner {
+	var matches []registeredRunner
+	for _, runner := range states[repository] {
+		if runner.Name == fleet.Host+"-"+repository {
+			matches = append(matches, runner)
+		}
+	}
+	return matches
+}
+
+func customLabels(runner registeredRunner) []string {
+	var custom []string
+	for _, label := range runner.Labels {
+		if label.Type != "read-only" {
+			custom = append(custom, label.Name)
+		}
+	}
+	slices.Sort(custom)
+	return custom
+}
+
 func runnerDrift(fleet RunnerFleet, states map[string][]registeredRunner) []string {
 	labels := slices.Sorted(slices.Values(fleet.Labels))
 	var problems []string
 	for _, repository := range fleet.Repositories {
 		name := fleet.Host + "-" + repository
-		var matches []registeredRunner
-		for _, runner := range states[repository] {
-			if runner.Name == name {
-				matches = append(matches, runner)
-			}
-		}
+		matches := namedRunners(fleet, states, repository)
 		if len(matches) != 1 {
 			problems = append(problems, fmt.Sprintf("%s/%s has %d runners named %s, want 1", fleet.Owner, repository, len(matches), name))
 			continue
@@ -157,18 +174,76 @@ func runnerDrift(fleet RunnerFleet, states map[string][]registeredRunner) []stri
 		} else if *runner.Version != fleet.Version {
 			problems = append(problems, fmt.Sprintf("%s runs %s, want %s", name, *runner.Version, fleet.Version))
 		}
-		var custom []string
-		for _, label := range runner.Labels {
-			if label.Type != "read-only" {
-				custom = append(custom, label.Name)
-			}
-		}
-		slices.Sort(custom)
-		if !slices.Equal(custom, labels) {
+		if custom := customLabels(runner); !slices.Equal(custom, labels) {
 			problems = append(problems, fmt.Sprintf("%s has labels [%s], want [%s]", name, strings.Join(custom, " "), strings.Join(labels, " ")))
 		}
 	}
 	return problems
+}
+
+func offlineRunners(fleet RunnerFleet, states map[string][]registeredRunner) []string {
+	var offline []string
+	for _, repository := range fleet.Repositories {
+		if slices.ContainsFunc(namedRunners(fleet, states, repository), func(runner registeredRunner) bool { return runner.Status == "offline" }) {
+			offline = append(offline, repository)
+		}
+	}
+	return offline
+}
+
+func (c *Commands) convergeRunnerLabels(ctx context.Context, fleet RunnerFleet, states map[string][]registeredRunner) error {
+	labels := slices.Sorted(slices.Values(fleet.Labels))
+	for _, repository := range fleet.Repositories {
+		matches := namedRunners(fleet, states, repository)
+		if len(matches) != 1 || slices.Equal(customLabels(matches[0]), labels) {
+			continue
+		}
+		args := []string{"api", "--method", "PUT", "--silent", fmt.Sprintf("repos/%s/%s/actions/runners/%d/labels", fleet.Owner, repository, matches[0].ID)}
+		for _, label := range fleet.Labels {
+			args = append(args, "-f", "labels[]="+label)
+		}
+		if err := c.Runner.Run(ctx, "gh", args...); err != nil {
+			return fmt.Errorf("set labels of %s: %w", matches[0].Name, err)
+		}
+	}
+	return nil
+}
+
+func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook string) error {
+	fleet, err := LoadRunnerFleet(c.Runner.Dir)
+	if err != nil {
+		return err
+	}
+	states, err := c.runnerStates(ctx, fleet)
+	if err != nil {
+		return err
+	}
+	drift := runnerDrift(fleet, states)
+	if plan.RunnersUnchanged && len(drift) == 0 && c.ansible(ctx, "verify-runners.yml") == nil {
+		c.runnersVerified = true
+		if c.Runner.Stdout != nil {
+			fmt.Fprintln(c.Runner.Stdout, "Runner fleet matches its declaration; skipping the runner play")
+		}
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := c.convergeRunnerLabels(ctx, fleet, states); err != nil {
+		return err
+	}
+	var args []string
+	if restart := offlineRunners(fleet, states); len(restart) > 0 {
+		variables, err := json.Marshal(map[string][]string{"build_runner_restart": restart})
+		if err != nil {
+			return err
+		}
+		args = append(args, "--extra-vars", string(variables))
+	}
+	if len(drift) == 0 && effectiveHostScope(plan.Affected) == HostScopeRunners && slices.Equal(plan.Affected.RunnerInputs, []string{"build/cli-release.json"}) {
+		args = append(args, "--tags=infra_binary")
+	}
+	return c.ansible(ctx, playbook, args...)
 }
 
 func (c *Commands) verifyRunnerFleet(ctx context.Context, fleet RunnerFleet) error {
