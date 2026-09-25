@@ -34,6 +34,7 @@ go_test(
         "ansible_integration_test.go",
         "artifacts_test.go",
         "checkpoint_test.go",
+        "host_comparison_test.go",
         "host_scope_test.go",
         "projects_test.go",
         "published_test.go",

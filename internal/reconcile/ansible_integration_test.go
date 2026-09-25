@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -604,4 +606,92 @@ esac
 		t.Fatalf("unattended upgrade policy not applied:\n%s", output)
 	}
 	t.Log("declared patching configuration validates and converges idempotently")
+}
+
+func TestHostComparisonWithLocalContainer(t *testing.T) {
+	image := os.Getenv("INFRA_ANSIBLE_TEST_IMAGE")
+	if image == "" {
+		t.Skip("requires a local Linux container image with Python matching the Ansible environment")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	command := func(args ...string) string {
+		t.Helper()
+		output, err := exec.CommandContext(ctx, args[0], args[1:]...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s: %v\n%s", strings.Join(args, " "), err, output)
+		}
+		return string(output)
+	}
+	root := strings.TrimSpace(command("git", "rev-parse", "--show-toplevel"))
+	packages := os.Getenv("INFRA_ANSIBLE_SITE_PACKAGES")
+	if packages == "" {
+		matches, err := filepath.Glob(filepath.Join(root, ".venv/lib/python*/site-packages"))
+		if err != nil || len(matches) != 1 {
+			t.Fatal("set INFRA_ANSIBLE_SITE_PACKAGES to the local Ansible Python package directory")
+		}
+		packages = matches[0]
+	}
+	fixture := t.TempDir()
+	for path, data := range map[string]string{
+		"ansible/ansible.cfg":              "[defaults]\nroles_path = /source/ansible/roles\nstrategy_plugins = /source/ansible/plugins/strategy\nstrategy = mitogen_linear\nretry_files_enabled = False\n",
+		"ansible/inventory/production.yml": "all:\n  hosts:\n    localhost:\n      ansible_connection: local\n      ansible_user: root\n      ansible_python_interpreter: /usr/bin/python3\n",
+		"ansible/reconcile.yml":            "- name: Declare patching\n  hosts: all\n  gather_facts: false\n  roles: [host_patching]\n- name: Register runners\n  hosts: all\n  gather_facts: false\n  tags: [runners]\n  tasks:\n  - name: Reject runner comparison\n    ansible.builtin.fail:\n      msg: runner play compared\n",
+		"ansible/external.yml":             "- name: Declare monitor\n  hosts: all\n  gather_facts: false\n  tasks:\n  - name: Install monitor settings\n    ansible.builtin.copy:\n      dest: /etc/infra-monitor.conf\n      content: \"declared\\n\"\n",
+	} {
+		if err := os.MkdirAll(filepath.Join(fixture, filepath.Dir(path)), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(fixture, path), []byte(data), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	name := fmt.Sprintf("infra-host-comparison-%d", time.Now().UnixNano())
+	command("docker", "run", "-d", "--name", name, "--network=none", "-v", root+":/source:ro", "-v", fixture+":"+fixture, "-v", packages+":/opt/ansible:ro", "-e", "PYTHONPATH=/opt/ansible", image, "sleep", "infinity")
+	t.Cleanup(func() {
+		_ = exec.Command("docker", "exec", name, "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), fixture).Run()
+		_ = exec.Command("docker", "rm", "-f", name).Run()
+	})
+	var output strings.Builder
+	commands := Commands{Work: fixture, Runner: ci.Runner{Dir: fixture, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
+		args := []string{"exec", "-w", options.Dir}
+		for _, entry := range options.Env {
+			if strings.HasPrefix(entry, "ANSIBLE_") || strings.HasPrefix(entry, "JUNIT_") {
+				args = append(args, "-e", entry)
+			}
+		}
+		result, err := exec.CommandContext(ctx, "docker", append(append(args, name, "python3", "-m", "ansible.cli.playbook"), options.Args...)...).CombinedOutput()
+		output.Write(result)
+		return process.Result{Stdout: result}, err
+	}}}
+	converge := func() {
+		t.Helper()
+		command("docker", "exec", "-w", filepath.Join(fixture, "ansible"), "-e", "ANSIBLE_CONFIG="+filepath.Join(fixture, "ansible/ansible.cfg"), name, "python3", "-m", "ansible.cli.playbook", "-i", "inventory/production.yml", "reconcile.yml", "external.yml", "--skip-tags=runners")
+	}
+	converge()
+	if err := commands.compareHosts(ctx); err != nil {
+		t.Fatalf("converged host differs from its declaration: %v\n%s", err, output.String())
+	}
+	t.Log("converged host matches its declaration in check mode")
+	command("docker", "exec", name, "sh", "-c", `echo 'APT::Periodic::Unattended-Upgrade "0";' >> /etc/apt/apt.conf.d/20auto-upgrades && echo drift > /etc/infra-monitor.conf`)
+	err := commands.compareHosts(ctx)
+	for _, task := range []string{"[localhost] Declare patching: host_patching : Enable unattended security updates", "[localhost] Declare monitor: Install monitor settings"} {
+		if strings.Count(fmt.Sprint(err), task) != 1 {
+			t.Fatalf("drift of %s not reported exactly once: %v\n%s", task, err, output.String())
+		}
+	}
+	for _, task := range []string{"Reject runner comparison", "Limit unattended upgrades", "Create service restart policy directory"} {
+		if strings.Contains(fmt.Sprint(err), task) {
+			t.Fatalf("unchanged or skipped task %s reported as drift: %v", task, err)
+		}
+	}
+	if monitor := command("docker", "exec", name, "cat", "/etc/infra-monitor.conf"); monitor != "drift\n" {
+		t.Fatalf("check mode repaired the monitor settings: %q", monitor)
+	}
+	t.Log("edited managed files fail the comparison without being repaired")
+	converge()
+	if err := commands.compareHosts(ctx); err != nil {
+		t.Fatalf("repaired host still differs: %v", err)
+	}
+	t.Log("repair converges the host back to a matching comparison")
 }

@@ -16,7 +16,7 @@ import (
 
 func newReconcileCommand() *cobra.Command {
 	var root, bucket, prefix, base, report string
-	var full, scheduled, scopeHosts, scopeProjects, verifyArtifacts bool
+	var full, scheduled, deep, scopeHosts, scopeProjects, verifyArtifacts bool
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
 	command.PersistentFlags().StringVar(&root, "root", ".", "Source checkout")
 	command.PersistentFlags().StringVar(&bucket, "state-bucket", "llunde-pyparser-bucket", "Reconciliation state bucket")
@@ -33,6 +33,9 @@ func newReconcileCommand() *cobra.Command {
 		}
 		if action == "apply" {
 			child.Flags().BoolVar(&scheduled, "scheduled", false, "Skip the runner play when verification proves the fleet unchanged")
+		}
+		if action == "verify" {
+			child.Flags().BoolVar(&deep, "deep", false, "Also compare OpenTofu and every host play with production in check mode")
 		}
 		child.RunE = func(cmd *cobra.Command, _ []string) error {
 			absolute, err := filepath.Abs(root)
@@ -120,6 +123,9 @@ func newReconcileCommand() *cobra.Command {
 				return err
 			}
 			plan := reconcile.Plan{Revision: revision, Base: base, Affected: selected, Host: host}
+			if action == "verify" && deep {
+				return ops.VerifyDeep(cmd.Context(), plan)
+			}
 			if action == "verify" {
 				return ops.VerifyLive(cmd.Context(), plan)
 			}

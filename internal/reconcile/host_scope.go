@@ -1,6 +1,15 @@
 package reconcile
 
-import "context"
+import (
+	"context"
+	"encoding/xml"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+)
 
 func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 	var playbooks []string
@@ -70,6 +79,67 @@ func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
 	default:
 		return nil
 	}
+}
+
+var comparedPlaybooks = []string{"reconcile.yml", "external.yml"}
+
+func (c *Commands) compareHosts(ctx context.Context) error {
+	reports, err := os.MkdirTemp(c.Work, "host-comparison-")
+	if err != nil {
+		return err
+	}
+	compare := Commands{Runner: c.Runner}
+	compare.Runner.Env = append(slices.Clone(c.Runner.Env), "ANSIBLE_CALLBACKS_ENABLED=ansible.builtin.junit", "JUNIT_OUTPUT_DIR="+reports, "JUNIT_FAIL_ON_CHANGE=true", "JUNIT_HIDE_TASK_ARGUMENTS=true")
+	run := compare.ansible(ctx, comparedPlaybooks[0], append(slices.Clone(comparedPlaybooks[1:]), "--check", "--skip-tags=runners")...)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	differences, err := hostDifferences(reports)
+	if err != nil {
+		return errors.Join(run, err)
+	}
+	if len(differences) > 0 {
+		return errors.Join(run, fmt.Errorf("hosts differ from their declarations: %s", strings.Join(differences, "; ")))
+	}
+	return run
+}
+
+func hostDifferences(reports string) ([]string, error) {
+	files, err := filepath.Glob(filepath.Join(reports, "*.xml"))
+	if err != nil {
+		return nil, err
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("host comparison recorded no task results")
+	}
+	var differences []string
+	for _, file := range files {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		var report struct {
+			Suites []struct {
+				Cases []struct {
+					Name     string     `xml:"name,attr"`
+					Failures []xml.Name `xml:"failure"`
+					Errors   []xml.Name `xml:"error"`
+				} `xml:"testcase"`
+			} `xml:"testsuite"`
+		}
+		if err := xml.Unmarshal(data, &report); err != nil {
+			return nil, fmt.Errorf("host comparison report %s: %w", filepath.Base(file), err)
+		}
+		for _, suite := range report.Suites {
+			for _, task := range suite.Cases {
+				if len(task.Failures) > 0 || len(task.Errors) > 0 {
+					differences = append(differences, task.Name)
+				}
+			}
+		}
+	}
+	slices.Sort(differences)
+	return slices.Compact(differences), nil
 }
 
 func (c *Commands) verifyRunnerHosts(ctx context.Context, playbook string, extra ...string) error {

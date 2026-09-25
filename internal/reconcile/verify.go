@@ -1,8 +1,10 @@
 package reconcile
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/fredrir/infra/internal/ci"
 	"io"
@@ -305,6 +307,36 @@ func (c *Commands) VerifyDrift(ctx context.Context, plan Plan) error {
 		return err
 	}
 	return c.VerifyLive(ctx, plan)
+}
+
+func (c *Commands) VerifyDeep(ctx context.Context, plan Plan) error {
+	if err := c.VerifyLive(ctx, plan); err != nil {
+		return err
+	}
+	return c.compareDeclarations(ctx)
+}
+
+func (c *Commands) compareDeclarations(ctx context.Context) error {
+	var output bytes.Buffer
+	tofu := Commands{Runner: c.Runner}
+	tofu.Runner.Stdout, tofu.Runner.Stderr = &output, &output
+	planned := make(chan error, 1)
+	go func() {
+		err := tofu.tofuInit(ctx)
+		if err == nil {
+			err = tofu.verifyTofu(ctx)
+		}
+		planned <- err
+	}()
+	hosts := c.compareHosts(ctx)
+	infrastructure := <-planned
+	if c.Runner.Stdout != nil {
+		_, _ = c.Runner.Stdout.Write(output.Bytes())
+	}
+	if infrastructure != nil {
+		infrastructure = fmt.Errorf("OpenTofu comparison: %w", infrastructure)
+	}
+	return errors.Join(hosts, infrastructure)
 }
 
 func (c *Commands) VerifyLive(ctx context.Context, plan Plan) error {
