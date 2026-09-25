@@ -130,5 +130,6 @@
   ansible.builtin.wait_for:
     host: 127.0.0.1
     port: '{{ build_vm_ssh_port }}'
-    timeout: 60
+    search_regex: OpenSSH
+    timeout: 300
   check_mode: false
