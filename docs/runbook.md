@@ -168,6 +168,17 @@ Install the pinned CLI release before enabling admission, and drain active jobs 
 For rollback, disable admission and reconcile idle listeners before downgrading the CLI.
 Do not delete leases while their workers are running; corrupted lease state fails admission until an operator repairs it with listeners drained.
 
+| Runner upgrade   | Value                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| Pin update       | Renovate pull request with the release's published sha256; digest-only updates disabled  |
+| Drain            | Replaced runner's custom labels removed; waits for its `Runner.Worker` to exit           |
+| Drain deadline   | `build_runner_drain_minutes` (50), shared by all runners in one play                     |
+| Busy at deadline | Play fails; runner keeps its job and binaries                                            |
+| Labels restored  | After its replacement, including failed replacements                                     |
+| Job routing      | `dagger-amd64` or `infra-trusted`; `self-hosted`, `Linux` and `X64` stay during a drain  |
+
+A changed digest for an unchanged version is not proposed; investigate it before editing the pin.
+
 The Rust reusable workflow accepts `build-output-cache: false` to skip target archive restore and publication while retaining compiler `sccache`.
 `nsql` uses this setting because the measured archive refresh cost exceeded the compilation saved; identical-output reruns benefited from archive reuse.
 Compare `rust-cache-restore`, `rust-preparation`, `rust-cache-save` and total job duration before changing this setting.
