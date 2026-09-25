@@ -121,7 +121,8 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 | Owner-signed | Authenticates the owner's workstation key: any process on that workstation can sign; the gate blocks remote writers (Octo STS, stolen deploy tokens, other machines), not a compromised workstation |
 | Provenance base | Applied revision; none or not an ancestor refuses; `--provenance-base SHA` overrides and must precede `HEAD`; base, revision and override are recorded in `status.json` |
 | Standalone gate | `infra reconcile provenance [--provenance-base SHA] [--report PATH]`; reads the applied revision without the lease |
-| CI gate | The `Verify commit provenance` step in `reconcile-job.yml` runs a release CLI pinned in that workflow before any composite action, checkout-built CLI or checkout tooling; workflow files need the `workflows` permission, which Octo STS lacks; without that step, a push by a ruleset bypass actor such as Octo STS runs its own composite actions and CLI and can skip the in-engine gate |
+| CI gate | The `Verify commit provenance` step in `reconcile-job.yml` runs a release CLI pinned in that workflow before any composite action, checkout-built CLI or checkout tooling, for apply, drift verification and verification; workflow files need the `workflows` permission, which Octo STS lacks |
+| CI gate release | `GATE_RELEASE` and `GATE_SHA256` in `reconcile-job.yml`; a changed pin is a workflow change |
 | Workstation apply | Run `infra reconcile provenance` with an installed release CLI before building or running anything from the checkout; a CLI built from an unverified checkout can skip its own gate |
 | OpenTofu locking | S3 lockfile retained; acquisition timeout 5 minutes |
 | Failed verification | Old routes retained; applied revision unchanged |

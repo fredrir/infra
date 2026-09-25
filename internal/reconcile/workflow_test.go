@@ -19,6 +19,7 @@ import (
 )
 
 type workflowStep struct {
+	Name string            `yaml:"name"`
 	ID   string            `yaml:"id"`
 	If   string            `yaml:"if"`
 	Uses string            `yaml:"uses"`
@@ -537,7 +538,7 @@ func TestProvenanceCredentialsReachOnlyTheApplyEngine(t *testing.T) {
 		}
 		for _, step := range job.Steps {
 			token, ok := step.Env["PROVENANCE_TOKEN"]
-			if engine := name == "apply" && step.ID == "reconcile"; ok != engine || (engine && token != "${{ github.token }}") {
+			if verifier := name == "apply" && (step.ID == "reconcile" || step.Name == provenanceGateStep); ok != verifier || (verifier && token != "${{ github.token }}") {
 				t.Errorf("job %s step %q receives provenance token %q", name, cmp.Or(step.ID, step.Uses, step.Run), token)
 			}
 		}
@@ -561,5 +562,48 @@ func TestProvenanceCredentialsReachOnlyTheApplyEngine(t *testing.T) {
 		return step.Env["IDENTITY"] == "${{ inputs.identity }}" && strings.Contains(step.Run, `if [ "$IDENTITY" = apply ]; then infra ci install-tools gh cosign; fi`)
 	}) {
 		t.Error("apply tooling lacks the attestation verifiers")
+	}
+}
+
+const provenanceGateStep = "Verify commit provenance"
+
+func TestProvenanceGateRunsBeforeAnyCheckoutCode(t *testing.T) {
+	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
+	gate := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.Name == provenanceGateStep })
+	if gate < 0 {
+		t.Fatal("apply has no provenance gate")
+	}
+	pinnedAction := regexp.MustCompile(`@[a-f0-9]{40}$`)
+	trusted := apply.Steps[:gate]
+	if len(trusted) != 3 || !strings.HasPrefix(trusted[0].Uses, "actions/checkout@") || trusted[1].Name != "Install provenance gate" || !strings.HasPrefix(trusted[2].Uses, "dopplerhq/secrets-fetch-action@") || !pinnedAction.MatchString(trusted[0].Uses) || !pinnedAction.MatchString(trusted[2].Uses) {
+		t.Fatalf("steps before the provenance gate: %+v", trusted)
+	}
+	install, verify := trusted[1], apply.Steps[gate]
+	if !regexp.MustCompile(`^infra-v[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(install.Env["GATE_RELEASE"]) || !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(install.Env["GATE_SHA256"]) {
+		t.Fatalf("provenance gate pin %q %q", install.Env["GATE_RELEASE"], install.Env["GATE_SHA256"])
+	}
+	for _, fragment := range []string{`gate="$RUNNER_TEMP/provenance-gate/infra"`, `"https://github.com/fredrir/infra/releases/download/$GATE_RELEASE/infra-linux-amd64" --output "$gate"`, `printf '%s  %s\n' "$GATE_SHA256" "$gate" | sha256sum --check --strict`, `"$gate" ci install-tools gh cosign`} {
+		if !strings.Contains(install.Run, fragment) {
+			t.Errorf("gate installation lacks %s:\n%s", fragment, install.Run)
+		}
+	}
+	if strings.Contains(install.Run, "build/") || strings.Contains(install.Run, "./") {
+		t.Errorf("gate installation reads the checkout:\n%s", install.Run)
+	}
+	if verify.If != "" || strings.TrimSpace(verify.Run) != `"$RUNNER_TEMP/provenance-gate/infra" reconcile provenance --report "$RUNNER_TEMP/reconciliation/provenance.json"` {
+		t.Errorf("provenance gate runs %q when %q", verify.Run, verify.If)
+	}
+	for _, credential := range []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"} {
+		if verify.Env[credential] != "${{ steps.doppler.outputs."+credential+" }}" {
+			t.Errorf("provenance gate reads state with %s=%q", credential, verify.Env[credential])
+		}
+	}
+	for index, step := range apply.Steps {
+		if index <= gate && (strings.HasPrefix(step.Uses, "./") || regexp.MustCompile(`(^|\s)infra `).MatchString(step.Run)) {
+			t.Errorf("step %d runs checkout code before the provenance gate: %+v", index, step)
+		}
+	}
+	if summary := apply.step(t, func(step workflowStep) bool { return step.Name == "Summarize reconciliation" }); !strings.Contains(summary.Run, "for report in provenance ") {
+		t.Errorf("provenance report is not summarized:\n%s", summary.Run)
 	}
 }

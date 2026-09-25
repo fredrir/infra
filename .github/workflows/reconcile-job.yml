@@ -114,11 +114,29 @@ jobs:
         ref: ${{ github.sha }}
         fetch-depth: 0
         persist-credentials: ${{ env.VERIFICATION != 'true' }}
-    - uses: ./.github/actions/setup-reconciliation-cli
+    - name: Install provenance gate
+      env:
+        GATE_RELEASE: infra-v0.2.11
+        GATE_SHA256: a2ed770151bcca5feb94b0f85341be202a454e6c894aa4aeb9110f89048bfb9f
+      run: |
+        gate="$RUNNER_TEMP/provenance-gate/infra"
+        mkdir -p "$(dirname "$gate")"
+        curl --fail --silent --show-error --location --retry 2 --max-time 60 "https://github.com/fredrir/infra/releases/download/$GATE_RELEASE/infra-linux-amd64" --output "$gate"
+        printf '%s  %s\n' "$GATE_SHA256" "$gate" | sha256sum --check --strict
+        chmod 755 "$gate"
+        "$gate" ci install-tools gh cosign
     - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
       id: doppler
       with:
         doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+    - name: Verify commit provenance
+      env:
+        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
+        PROVENANCE_TOKEN: ${{ github.token }}
+      run: |
+        "$RUNNER_TEMP/provenance-gate/infra" reconcile provenance --report "$RUNNER_TEMP/reconciliation/provenance.json"
+    - uses: ./.github/actions/setup-reconciliation-cli
     - uses: ./.github/actions/setup-reconciliation
       id: setup
       with:
@@ -231,7 +249,7 @@ jobs:
     - name: Summarize reconciliation
       if: always()
       run: |
-        for report in status verification; do
+        for report in provenance status verification; do
           if [ -f "$RUNNER_TEMP/reconciliation/$report.json" ]; then
             {
               printf '```json\n'
