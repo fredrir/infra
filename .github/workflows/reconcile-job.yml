@@ -223,9 +223,11 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         GH_REPO: ${{ github.repository }}
       run: |
-        previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --commit "$GITHUB_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // ""')
-        if [ "$previous" = failure ]; then
-          echo "::warning::A dispatched full reconciliation of $GITHUB_SHA already failed; not dispatching another"
+        previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --user 'github-actions[bot]' --commit "$GITHUB_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // ""')
+        case "$previous" in
+        failure|timed_out|startup_failure)
+          echo "::warning::The dispatched full reconciliation of $GITHUB_SHA ended in $previous; not dispatching another"
           exit 0
-        fi
+          ;;
+        esac
         gh workflow run reconcile.yml --ref main -f full=true

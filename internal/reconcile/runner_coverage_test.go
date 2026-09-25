@@ -232,6 +232,7 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 	hostReads := []string{
 		"verify-runners.yml: Probe observed runner host",
 		"roles/host_packages/tasks/main.yml: Check declared packages",
+		"roles/build_runner/tasks/state.yml: Find stale runner slice",
 		"roles/build_runner/tasks/repository-services.yml: Find stale runner services",
 		"roles/build_engine/tasks/state.yml: Find stale build engine",
 	}

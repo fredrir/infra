@@ -15,7 +15,7 @@
 
     - name: Require the retired runner's own service
       ansible.builtin.assert:
-        that: build_runner_retired_unit is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]' ~ ((inventory_hostname ~ '-' ~ build_runner_retired) | regex_escape) ~ '[.]service$')
+        that: build_runner_retired_unit == 'actions.runner.' ~ build_runner_owner ~ '-' ~ build_runner_retired ~ '.' ~ inventory_hostname ~ '-' ~ build_runner_retired ~ '.service'
 
     - name: Read retired runner unit
       ansible.builtin.stat:

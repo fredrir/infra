@@ -26,7 +26,9 @@
   ansible.builtin.shell: |
     set -eu
     started=$(systemctl show --timestamp=us+utc --property=ActiveEnterTimestamp --value infra-dagger)
+    image=$(docker container inspect --format '{{ "{{.Config.Image}}" }}' {{ build_engine_dagger_name | quote }} 2>/dev/null || true)
     if [ -z "$started" ] || [ "$(systemctl show --property=NeedDaemonReload --value infra-dagger)" = yes ] ||
+      { [ -n "$image" ] && [ "$image" != {{ build_engine_image | quote }} ]; } ||
       [ -n "$(find /etc/infra-dagger.toml /etc/systemd/system/infra-dagger.service -newermt "$started")" ]; then
       echo infra-dagger
     fi

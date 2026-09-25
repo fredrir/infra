@@ -39,7 +39,7 @@
     for unit in {{ build_runner_state_services | map('quote') | join(' ') }}; do
       started=$(systemctl show --timestamp=us+utc --property=ActiveEnterTimestamp --value "$unit")
       if [ -z "$started" ] || [ "$(systemctl show --property=NeedDaemonReload --value "$unit")" = yes ] ||
-        [ -n "$(find "/etc/systemd/system/$unit.d/resources.conf" /etc/systemd/system/infra-runners.slice -newermt "$started")" ]; then
+        [ -n "$(find "/etc/systemd/system/$unit.d/resources.conf" -newermt "$started")" ]; then
         echo "$unit"
       fi
     done

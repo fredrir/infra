@@ -34,6 +34,18 @@
       TasksMax=4096
   register: build_runner_resource_slice
 
+- name: Find stale runner slice
+  ansible.builtin.command:
+    argv: [systemctl, show, --property=NeedDaemonReload, --value, infra-runners.slice]
+  register: build_runner_stale_slice
+  changed_when: false
+  check_mode: false
+
+- name: Reload stale runner slice
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: build_runner_stale_slice.stdout == 'yes'
+
 - name: Create trusted hook adapter directory
   ansible.builtin.file:
     path: /usr/local/libexec

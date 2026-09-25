@@ -181,18 +181,32 @@ func runnerDrift(fleet RunnerFleet, states map[string][]registeredRunner) []stri
 	return problems
 }
 
-var runnerStateWindow = 10 * time.Second
+var (
+	runnerStateWindow   = 10 * time.Second
+	runnerStateInterval = 2 * time.Second
+	runnerMissingPause  = 5 * time.Second
+)
+
+func pause(ctx context.Context, duration time.Duration) error {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
 
 func (c *Commands) readRunnerStates(ctx context.Context, fleet RunnerFleet) (map[string][]registeredRunner, error) {
 	read, cancel := context.WithTimeout(ctx, runnerStateWindow)
 	defer cancel()
-	var states map[string][]registeredRunner
-	err := poll(read, func() error {
-		var err error
-		states, err = c.runnerStates(read, fleet)
-		return err
-	})
-	return states, err
+	for {
+		states, err := c.runnerStates(read, fleet)
+		if err == nil || pause(read, runnerStateInterval) != nil {
+			return states, err
+		}
+	}
 }
 
 func offlineRunners(fleet RunnerFleet, states map[string][]registeredRunner) []string {
@@ -213,6 +227,20 @@ func missingRunners(fleet RunnerFleet, states map[string][]registeredRunner) []s
 		}
 	}
 	return missing
+}
+
+func (c *Commands) unregisteredRunners(ctx context.Context, fleet RunnerFleet, states map[string][]registeredRunner) []string {
+	missing := missingRunners(fleet, states)
+	if len(missing) == 0 || pause(ctx, runnerMissingPause) != nil {
+		return nil
+	}
+	fleet.Repositories = missing
+	confirmed, err := c.runnerStates(ctx, fleet)
+	if err != nil {
+		c.warn("confirm missing runner registrations: %v", err)
+		return nil
+	}
+	return missingRunners(fleet, confirmed)
 }
 
 func (c *Commands) convergeRunnerLabels(ctx context.Context, fleet RunnerFleet, states map[string][]registeredRunner) {
@@ -247,22 +275,25 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 	}
 	drift := runnerDrift(fleet, states)
 	if plan.RunnersUnchanged {
-		if len(drift) == 0 && c.ansible(ctx, "verify-runners.yml") == nil {
+		switch {
+		case len(drift) > 0:
+			c.note("GitHub reported runner drift; converging runners")
+		case c.ansible(ctx, "verify-runners.yml") == nil:
 			c.runnersVerified = true
 			c.note("runner fleet matches its declaration; skipping the runner play")
 			return nil
+		case ctx.Err() != nil:
+			return ctx.Err()
+		default:
+			c.note("runner verification reported drift; converging runners")
 		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		c.note("runner verification reported drift; converging runners")
 	}
 	c.convergeRunnerLabels(ctx, fleet, states)
 	repairs := map[string][]string{}
 	if restart := offlineRunners(fleet, states); len(restart) > 0 {
 		repairs["build_runner_restart"] = restart
 	}
-	if missing := missingRunners(fleet, states); len(missing) > 0 {
+	if missing := c.unregisteredRunners(ctx, fleet, states); len(missing) > 0 {
 		repairs["build_runner_reregister"] = missing
 	}
 	var args []string

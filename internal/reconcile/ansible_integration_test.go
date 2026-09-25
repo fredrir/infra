@@ -82,7 +82,9 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 	version := fleet.Version
 	cli := "#!/bin/sh\necho fixture\n"
 	engine := fmt.Sprintf("true %s\n", toolchain["engine_image"])
-	runnerUnit := func(repository string) string { return "actions.runner.fixture.localhost-" + repository + ".service" }
+	runnerUnit := func(repository string) string {
+		return "actions.runner." + fleet.Owner + "-" + repository + ".localhost-" + repository + ".service"
+	}
 	write("infra", cli, true)
 	write("vars.json", fmt.Sprintf(`{"build_runner_cli":{"sha256":"%x"}}`, sha256.Sum256([]byte(cli))), false)
 	write("inventory.yml", "all:\n  children:\n    build_engines:\n      hosts:\n        localhost:\n          ansible_connection: local\n          ansible_user: root\n          ansible_python_interpreter: /usr/bin/python3\n          build_runner_repositories: [infra, Y]\n          build_runner_packages: [dpkg, tar]\n", false)
@@ -106,14 +108,15 @@ show)
   esac ;;
 is-enabled) if listed disabled-units "$2"; then echo disabled; exit 1; fi; echo enabled ;;
 start) started "$2" ;;
-restart) echo "$2" >> "$state/restarted"; started "$2" ;;
+restart) echo "$2" >> "$state/restarted"; started "$2"; if [ "$2" = infra-dagger ]; then cp "$state/engine-pinned" "$state/engine"; fi ;;
 stop) echo "$2" >> "$state/stopped" ;;
 disable) echo "$2" >> "$state/disabled" ;;
 daemon-reload) if rm "$state/reload-failure" 2>/dev/null; then exit 1; fi; rm -f "$state/reload-units"; echo reload >> "$state/reloaded" ;;
 esac
 `, true)
-	write("bin/docker", "#!/bin/sh\ncat /fixture/state/engine\n", true)
+	write("bin/docker", "#!/bin/sh\ncase \"$*\" in\n*State.Running*) cat /fixture/state/engine ;;\n*) cut -d ' ' -f 2 /fixture/state/engine ;;\nesac\n", true)
 	write("state/engine", engine, false)
+	write("state/engine-pinned", engine, false)
 	write("converge.yml", `- hosts: build_engines
   gather_facts: false
   vars:
@@ -201,14 +204,22 @@ esac
 		t.Fatalf("binary-only runner convergence selects more than facts and the binary: %q", binary)
 	}
 	t.Log("skipping runners removes only the runner play and the binary tag selects only facts and the binary")
-	restarted := func() string {
-		data, err := os.ReadFile(filepath.Join(fixture, "state/restarted"))
+	record := func(name string) string {
+		data, err := os.ReadFile(filepath.Join(fixture, "state", name))
 		if err != nil && !os.IsNotExist(err) {
 			t.Fatal(err)
 		}
 		return string(data)
 	}
+	restarted := func() string { return record("restarted") }
 	converge := func() { run("/fixture/converge.yml", true) }
+	reloadsOnly := func() {
+		restarts, reloads := restarted(), record("reloaded")
+		converge()
+		if restarted() != restarts || record("reloaded") == reloads || record("reload-units") != "" {
+			t.Fatalf("slice repair restarted %q or left the slice unreloaded", strings.TrimPrefix(restarted(), restarts))
+		}
+	}
 	repairs := func(want string) func() {
 		return func() {
 			before := restarted()
@@ -228,19 +239,31 @@ esac
 		t.Fatalf("requested runner restart restarted %q, want only %s:\n%s", strings.TrimPrefix(restarted(), steady), runnerUnit("Y"), output)
 	}
 	t.Log("runners reported offline restart without restarting the rest of the fleet")
-	write("bin/gh", "#!/bin/sh\necho fixture-token\n", true)
+	identity := []string{".runner", ".credentials", ".credentials_rsaparams"}
+	reregisterY := `{"build_runner_reregister":["Y"]}`
+	write("bin/gh", "#!/bin/sh\nif [ -e /fixture/state/token-failure ]; then exit 1; fi\necho fixture-token\n", true)
 	write("runners/Y/config.sh", "#!/bin/sh\nset -eu\necho \"$*\" >> /fixture/state/registered\nfor file in .runner .credentials .credentials_rsaparams; do echo registered > \"$file\"; done\n", true)
-	write("runners/Y/.credentials", "stale\n", false)
-	write("runners/Y/.credentials_rsaparams", "stale\n", false)
+	for _, file := range identity {
+		write("runners/Y/"+file, "stale\n", false)
+	}
+	write("state/token-failure", "", false)
+	run("/fixture/converge.yml", false, "--extra-vars", reregisterY)
+	for _, file := range identity {
+		if kept := string(read(filepath.Join(fixture, "runners/Y", file))); kept != "stale\n" || record("registered") != "" {
+			t.Fatalf("failed registration token replaced %s with %q", file, kept)
+		}
+	}
+	remove("state/token-failure")
+	t.Log("a registration token failure keeps the existing runner identity")
 	before := restarted()
-	reregistered := run("/fixture/converge.yml", true, "--extra-vars", `{"build_runner_reregister":["Y"]}`)
+	reregistered := run("/fixture/converge.yml", true, "--extra-vars", reregisterY)
 	registration := string(read(filepath.Join(fixture, "state/registered")))
 	if strings.Count(registration, "\n") != 1 || !strings.Contains(registration, "--replace") || !strings.Contains(registration, "--token fixture-token") || !strings.Contains(registration, "--name localhost-Y ") {
 		t.Fatalf("missing registration did not re-register only Y with --replace: %q\n%s", registration, reregistered)
 	}
-	for _, file := range []string{".runner", ".credentials", ".credentials_rsaparams"} {
-		if identity := string(read(filepath.Join(fixture, "runners/Y", file))); identity != "registered\n" {
-			t.Fatalf("re-registration kept stale %s %q", file, identity)
+	for _, file := range identity {
+		if current := string(read(filepath.Join(fixture, "runners/Y", file))); current != "registered\n" {
+			t.Fatalf("re-registration kept stale %s %q", file, current)
 		}
 	}
 	if got := strings.TrimPrefix(restarted(), before); got != runnerUnit("Y")+"\n" {
@@ -327,10 +350,19 @@ esac
 			failed: []string{"build_engine : Validate engine pin"},
 		},
 		{
-			name:      "wrong engine image",
-			introduce: func() { write("state/engine", "true wrong\n", false) },
-			restore:   func() { write("state/engine", engine, false) },
+			name:      "engine running an unpinned image",
+			introduce: func() { write("state/engine", "true registry.dagger.io/engine:v0.0.1\n", false) },
+			restore:   repairs("infra-dagger"),
 			failed:    observed,
+		},
+		{
+			name: "edited runner slice",
+			introduce: func() {
+				command("docker", "exec", name, "sh", "-c", "echo >> /etc/systemd/system/infra-runners.slice")
+				write("state/reload-units", "infra-runners.slice\n", false)
+			},
+			restore: reloadsOnly,
+			failed:  observed,
 		},
 		{
 			name:      "wrong CLI",
@@ -356,6 +388,12 @@ esac
 		{
 			name:      "foreign runner service",
 			introduce: func() { write("runners/Y/.service", runnerUnit("infra")+"\n", false) },
+			restore:   func() { write("runners/Y/.service", runnerUnit("Y")+"\n", false) },
+			failed:    []string{"Verify registered runner services"},
+		},
+		{
+			name:      "foreign owner runner service",
+			introduce: func() { write("runners/Y/.service", "actions.runner.someone-Y.localhost-Y.service\n", false) },
 			restore:   func() { write("runners/Y/.service", runnerUnit("Y")+"\n", false) },
 			failed:    []string{"Verify registered runner services"},
 		},
@@ -458,7 +496,7 @@ esac
 			task["ansible.builtin.include_tasks"] = "/source/ansible/roles/build_runner/tasks/" + path
 		}
 	}
-	removal, err := yaml.Marshal([]any{map[string]any{"hosts": "build_engines", "gather_facts": false, "vars": map[string]any{"build_runner_fleet": "{{ lookup('ansible.builtin.file', '/source/build/runners.json') | from_json }}"}, "tasks": removalTasks}})
+	removal, err := yaml.Marshal([]any{map[string]any{"hosts": "build_engines", "gather_facts": false, "vars": map[string]any{"build_runner_fleet": "{{ lookup('ansible.builtin.file', '/source/build/runners.json') | from_json }}", "build_runner_owner": "{{ build_runner_fleet.owner }}"}, "tasks": removalTasks}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,6 +533,15 @@ esac
 	if err := os.RemoveAll(filepath.Join(fixture, "runners/infra.bak")); err != nil {
 		t.Fatal(err)
 	}
+	write("runners/retired/.runner", "{}", false)
+	write("runners/retired/.service", "actions.runner.someone-retired.localhost-retired.service", false)
+	if output := run("/fixture/removal.yml", false); !strings.Contains(output, "Assertion failed") {
+		t.Fatalf("runner root naming another owner's service did not fail its identity check:\n%s", output)
+	}
+	if record("stopped") != "" || record("disabled") != "" || !exists(retiredUnit) {
+		t.Fatal("runner root naming another owner's service changed a service")
+	}
+	t.Log("runner root naming another owner's service fails closed")
 	outside := slices.DeleteFunc(slices.Clone(fleet.Repositories), func(repository string) bool { return repository == "infra" || repository == "Y" })
 	if len(outside) == 0 {
 		t.Fatal("fleet declares no repository outside the host subset")

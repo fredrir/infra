@@ -19,6 +19,7 @@
     ansible.builtin.shell: |
       set -eu
       printf 'cli %s\n' "$(sha256sum < /usr/local/bin/infra | cut -d ' ' -f 1)"
+      printf 'slice-reload %s\n' "$(systemctl show --property=NeedDaemonReload --value infra-runners.slice)"
       printf 'engine %s\n' "$(docker inspect --format '{{ "{{.State.Running}} {{.Config.Image}}" }}' {{ build_engine_dagger_name | quote }})"
       cd /home/runner
       for root in *; do
@@ -39,13 +40,14 @@
       - ('cli ' ~ build_runner_cli.sha256) in build_runner_probe.stdout_lines
       - ('engine true ' ~ build_engine_image) in build_runner_probe.stdout_lines
       - build_runner_probe.stdout_lines | select('match', '^pending ') | list == []
+      - "'slice-reload no' in build_runner_probe.stdout_lines"
       - build_runner_probed_registrations | length > 0
       - build_runner_probed_registrations | map(attribute='1') | sort == build_runner_repositories | sort
       fail_msg: "The build VM differs from its declared runner host:\n{{ build_runner_probe.stdout }}"
 
   - name: Verify registered runner services
     ansible.builtin.assert:
-      that: item | length == 3 and item[2] is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]' ~ ((inventory_hostname ~ '-' ~ item[1]) | regex_escape) ~ '[.]service$')
+      that: item | length == 3 and item[2] == 'actions.runner.' ~ build_runner_owner ~ '-' ~ item[1] ~ '.' ~ inventory_hostname ~ '-' ~ item[1] ~ '.service'
       fail_msg: "{{ item[1] }} is registered as {{ item[2:] | join(' ') }} instead of its own runner service"
     loop: '{{ build_runner_probed_registrations }}'
     loop_control:

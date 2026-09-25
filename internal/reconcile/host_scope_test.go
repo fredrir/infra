@@ -136,8 +136,11 @@ func TestScheduledHostsSkipOnlyVerifiedUnchangedRunners(t *testing.T) {
 				t.Fatalf("unexpected runner convergence: %q, %d queries", harness.calls, harness.queries)
 			}
 			note := "runner verification reported drift; converging runners\n"
-			if test.skipped {
+			switch {
+			case test.skipped:
 				note = "runner fleet matches its declaration; skipping the runner play\n"
+			case test.change != nil:
+				note = "GitHub reported runner drift; converging runners\n"
 			}
 			if harness.stdout.String() != note {
 				t.Fatalf("runner convergence note %q, want %q", harness.stdout.String(), note)

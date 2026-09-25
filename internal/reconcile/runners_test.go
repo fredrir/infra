@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -69,7 +68,7 @@ type fleetHarness struct {
 	mu             sync.Mutex
 	calls          []string
 	queries        int
-	unreadable     int
+	unreadable     func(query int) bool
 	rejectLabels   bool
 	failing        []string
 	change         func(*registeredRunner)
@@ -99,7 +98,7 @@ func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process
 		return process.Result{}, nil
 	case opts.Name == "gh":
 		h.queries++
-		if h.queries <= h.unreadable {
+		if h.unreadable != nil && h.unreadable(h.queries) {
 			return process.Result{ExitCode: 1}, errors.New("HTTP 502")
 		}
 		runner := healthyRunner(h.fleet, queriedRepository(opts))
@@ -110,6 +109,12 @@ func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process
 	}
 	h.t.Errorf("unexpected command: %s %q", opts.Name, opts.Args)
 	return process.Result{}, errors.New("unexpected command")
+}
+
+func fastRunnerReads(t *testing.T) {
+	window, interval, missing := runnerStateWindow, runnerStateInterval, runnerMissingPause
+	runnerStateInterval, runnerMissingPause = time.Millisecond, time.Millisecond
+	t.Cleanup(func() { runnerStateWindow, runnerStateInterval, runnerMissingPause = window, interval, missing })
 }
 
 func offlineY(runner *registeredRunner) {
@@ -342,6 +347,7 @@ func TestRunnerRepairsFollowGitHubState(t *testing.T) {
 }
 
 func TestRunnerConvergenceArguments(t *testing.T) {
+	fastRunnerReads(t)
 	cli := []string{"build/cli-release.json"}
 	runners := func(inputs ...string) Plan {
 		return Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: inputs}}
@@ -401,7 +407,8 @@ func TestRunnerLabelsConvergeOnlyMismatchedRunners(t *testing.T) {
 }
 
 func TestRunnerConvergenceRetriesTransientReads(t *testing.T) {
-	harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: 1, change: offlineY}
+	fastRunnerReads(t)
+	harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: func(query int) bool { return query == 1 }, change: offlineY}
 	if err := harness.commands().Hosts(context.Background(), Plan{Affected: All()}); err != nil {
 		t.Fatal(err)
 	}
@@ -411,9 +418,8 @@ func TestRunnerConvergenceRetriesTransientReads(t *testing.T) {
 }
 
 func TestUnreadableRunnerFleetDoesNotGateConvergence(t *testing.T) {
-	window := runnerStateWindow
+	fastRunnerReads(t)
 	runnerStateWindow = 50 * time.Millisecond
-	t.Cleanup(func() { runnerStateWindow = window })
 	for _, test := range []struct {
 		name string
 		plan Plan
@@ -424,7 +430,7 @@ func TestUnreadableRunnerFleetDoesNotGateConvergence(t *testing.T) {
 		{"unchanged runners", Plan{Affected: All(), RunnersUnchanged: true}, []string{"reconcile.yml --skip-tags=runners", "build-runners.yml"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: math.MaxInt}
+			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: func(int) bool { return true }}
 			commands := harness.commands()
 			if err := commands.Hosts(context.Background(), test.plan); err != nil {
 				t.Fatal(err)
@@ -462,6 +468,9 @@ func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
 		Jobs map[string]struct {
 			If          string            `yaml:"if"`
 			Permissions map[string]string `yaml:"permissions"`
+			Steps       []struct {
+				Run string `yaml:"run"`
+			} `yaml:"steps"`
 		} `yaml:"jobs"`
 	}
 	if err := yaml.Unmarshal(data, &workflow); err != nil {
@@ -476,9 +485,50 @@ func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
 			t.Errorf("repair job condition %q does not require %s", repair.If, condition)
 		}
 	}
+	var script strings.Builder
+	for _, step := range repair.Steps {
+		script.WriteString(step.Run)
+	}
+	for _, guard := range []string{"--workflow reconcile.yml", "--event workflow_dispatch", "--user 'github-actions[bot]'", `--commit "$GITHUB_SHA"`, "failure|timed_out|startup_failure)"} {
+		if !strings.Contains(script.String(), guard) {
+			t.Errorf("repair dispatch lacks guard %s:\n%s", guard, script.String())
+		}
+	}
 	for name, job := range workflow.Jobs {
 		if name != "repair" && job.Permissions["actions"] == "write" {
 			t.Errorf("job %s can dispatch workflows", name)
 		}
+	}
+}
+
+func TestMissingRunnersAreConfirmedBeforeReregistration(t *testing.T) {
+	fastRunnerReads(t)
+	for _, test := range []struct {
+		name       string
+		missing    int
+		unreadable func(int) bool
+		want       string
+	}{
+		{"registration appeared", 1, nil, "build-runners.yml"},
+		{"registration missing", 2, nil, `build-runners.yml --extra-vars {"build_runner_reregister":["Y"]}`},
+		{"confirmation unreadable", 2, func(query int) bool { return query == 3 }, "build-runners.yml"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			reads := 0
+			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: test.unreadable, change: func(runner *registeredRunner) {
+				if runner.Name == "infra-build-09-Y" {
+					if reads++; reads <= test.missing {
+						unregisteredY(runner)
+					}
+				}
+			}}
+			plan := Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: []string{"build/runners.json"}}}
+			if err := harness.commands().Hosts(context.Background(), plan); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(harness.calls, []string{test.want}) || harness.queries != len(testRunnerFleet().Repositories)+1 {
+				t.Fatalf("unconfirmed registration repaired: %q after %d queries", harness.calls, harness.queries)
+			}
+		})
 	}
 }

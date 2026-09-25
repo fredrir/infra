@@ -3,17 +3,14 @@
   vars:
     build_runner_state_repositories: ['{{ build_runner_repository }}']
 
-- name: Remove unregistered runner identity
-  ansible.builtin.file:
-    path: '/home/runner/{{ build_runner_repository }}/{{ item }}'
-    state: absent
-  loop: [.runner, .credentials, .credentials_rsaparams]
-  when: build_runner_repository in build_runner_reregister | default([])
-
 - name: Read runner registration
   ansible.builtin.stat:
     path: '/home/runner/{{ build_runner_repository }}/.runner'
   register: build_runner_registration
+
+- name: Select runner registration
+  ansible.builtin.set_fact:
+    build_runner_register: '{{ not build_runner_registration.stat.exists or build_runner_repository in build_runner_reregister | default([]) }}'
 
 - name: Read installed runner executable
   ansible.builtin.stat:
@@ -93,7 +90,14 @@
   register: build_runner_token
   changed_when: false
   no_log: true
-  when: not build_runner_registration.stat.exists
+  when: build_runner_register
+
+- name: Remove unregistered runner identity
+  ansible.builtin.file:
+    path: '/home/runner/{{ build_runner_repository }}/{{ item }}'
+    state: absent
+  loop: [.runner, .credentials, .credentials_rsaparams]
+  when: build_runner_repository in build_runner_reregister | default([])
 
 - name: Register trusted repository runner
   become_user: runner
@@ -115,7 +119,7 @@
     - _work
     chdir: '/home/runner/{{ build_runner_repository }}'
   no_log: true
-  when: not build_runner_registration.stat.exists
+  when: build_runner_register
 
 - name: Install repository runner service
   ansible.builtin.command:
