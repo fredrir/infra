@@ -6,6 +6,7 @@ self-hosted-runner:
   - rust-amd64
   - rust-pr-amd64
   - rust-release-amd64
+  - rust-tag-amd64
   - publish-amd64
 paths:
   .github/workflows/infra-cli.yml:

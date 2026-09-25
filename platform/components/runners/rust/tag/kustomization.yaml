@@ -1,0 +1,65 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+nameSuffix: -tag
+resources:
+- ../pool
+patches:
+- target:
+    kind: HelmRelease
+    name: rust
+  patch: |
+    - op: replace
+      path: /spec/values/runnerScaleSetName
+      value: rust-tag-amd64
+    - op: replace
+      path: /spec/values/maxRunners
+      value: 1
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/0/name
+      value: CI_POOL
+    - op: replace
+      path: /spec/values/template/spec/containers/0/env/0/value
+      value: main
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/2/name
+      value: SCCACHE_BUCKET
+    - op: remove
+      path: /spec/values/template/spec/containers/0/env/2
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/2/name
+      value: SCCACHE_S3_RW_MODE
+    - op: remove
+      path: /spec/values/template/spec/containers/0/env/2
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/2/name
+      value: AWS_ACCESS_KEY_ID
+    - op: remove
+      path: /spec/values/template/spec/containers/0/env/2
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/2/name
+      value: AWS_SECRET_ACCESS_KEY
+    - op: remove
+      path: /spec/values/template/spec/containers/0/env/2
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/2/name
+      value: SCCACHE_ENDPOINT
+    - op: remove
+      path: /spec/values/template/spec/containers/0/env/2
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/2/name
+      value: RUSTC_WRAPPER
+    - op: remove
+      path: /spec/values/template/spec/containers/0/env/2
+    - op: replace
+      path: /spec/values/template/spec/containers/0/resources
+      value:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+          ephemeral-storage: 2Gi
+          infra.fredrir.com/ci-slot: '1'
+        limits:
+          cpu: '1'
+          memory: 2Gi
+          ephemeral-storage: 10Gi
+          infra.fredrir.com/ci-slot: '1'

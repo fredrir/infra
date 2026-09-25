@@ -4,8 +4,8 @@ metadata:
   name: builds
 spec:
   hard:
-    pods: '5'
-    requests.cpu: 10500m
-    requests.memory: 31Gi
-    limits.cpu: 38500m
-    limits.memory: 75Gi
+    pods: '6'
+    requests.cpu: 10850m
+    requests.memory: 32Gi
+    limits.cpu: 39600m
+    limits.memory: 77Gi

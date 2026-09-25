@@ -11,7 +11,7 @@ jobs:
   tag:
     needs: cli
     if: github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && !startsWith(github.event.head_commit.message, 'release:')
-    runs-on: rust-amd64
+    runs-on: rust-tag-amd64
     timeout-minutes: 20
     permissions:
       contents: read

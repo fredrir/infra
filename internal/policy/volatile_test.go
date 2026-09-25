@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 const volatileTaint = "node-restriction.kubernetes.io/volatile"
@@ -93,5 +95,43 @@ func TestOnlyNodeMetricsAndUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T)
 	monitoring := at(load(t, "platform/components/observability/monitoring.yaml"), "spec", "values").(object)
 	if at(monitoring, "nodeExporter", "enabled") != true || !toleratesVolatile(at(monitoring, "prometheus-node-exporter", "tolerations")) {
 		t.Error("node metrics do not cover volatile workers")
+	}
+}
+
+func TestReleaseTaggingRunsOffVolatileWorkers(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), ".github/workflows/rust-auto-tag.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			RunsOn string `yaml:"runs-on"`
+		}
+	}
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	label := workflow.Jobs["tag"].RunsOn
+	found := false
+	for _, resource := range rendered(t, "platform/components/runners/nsql") {
+		if resource["kind"] != "HelmRelease" || at(resource, "spec", "values", "runnerScaleSetName") != label {
+			continue
+		}
+		found = true
+		spec := at(resource, "spec", "values", "template", "spec").(object)
+		if toleratesVolatile(spec["tolerations"]) || spec["affinity"] != nil {
+			t.Errorf("release tagging pool %s can run on volatile workers", label)
+		}
+		for _, container := range spec["containers"].([]any) {
+			env, _ := at(container, "env").([]any)
+			for _, variable := range env {
+				if from, ok := at(variable, "valueFrom").(object); ok && from["secretKeyRef"] != nil {
+					t.Errorf("release tagging pool %s mounts %v", label, at(variable, "name"))
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("release tagging runs on undeclared pool %q", label)
 	}
 }

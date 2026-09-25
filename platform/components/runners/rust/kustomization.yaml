@@ -4,6 +4,7 @@ resources:
 - pr
 - main
 - release
+- tag
 - network.yaml
 - hooks.yaml
 patches:

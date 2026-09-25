@@ -14,6 +14,7 @@ exports_files([
 filegroup(
     name = "workflows",
     srcs = glob([".github/workflows/*.yml"]),
+    visibility = ["//internal/policy:__pkg__"],
 )
 
 filegroup(

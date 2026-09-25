@@ -10,7 +10,10 @@ go_test(
         "runner_test.go",
         "volatile_test.go",
     ],
-    data = ["//platform:policy_testdata"],
+    data = [
+        "//:workflows",
+        "//platform:policy_testdata",
+    ],
     deps = [
         "//internal/kustomize",
         "@dev_cel_cel_go//cel",
