@@ -97,7 +97,7 @@ jobs:
     if: ${{ !cancelled() && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     environment: infrastructure-apply
-    timeout-minutes: 100
+    timeout-minutes: 120
     permissions:
       contents: write
       id-token: write
@@ -240,6 +240,11 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         GH_REPO: ${{ github.repository }}
       run: |
+        pushed=$(gh run list --workflow reconcile.yml --event push --commit "$GITHUB_SHA" --json status --jq '.[] | select(.status != "completed") | .status')
+        if [ -n "$pushed" ]; then
+          echo "::warning::The push reconciliation of $GITHUB_SHA has not completed; not dispatching a repair"
+          exit 0
+        fi
         previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --user 'github-actions[bot]' --commit "$GITHUB_SHA" --limit 1 --json conclusion,createdAt --jq '.[] | if (.conclusion | IN("failure", "timed_out", "startup_failure")) then "ended in \(.conclusion)" elif .conclusion != "cancelled" and now - (.createdAt | fromdateiso8601) < 21600 then "started within six hours" else empty end')
         if [ -n "$previous" ]; then
           echo "::warning::The dispatched full reconciliation of $GITHUB_SHA $previous; not dispatching another"

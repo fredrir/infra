@@ -21,10 +21,11 @@ type workflowStep struct {
 }
 
 type workflowJob struct {
-	If          string            `yaml:"if"`
-	Env         map[string]string `yaml:"env"`
-	Permissions map[string]string `yaml:"permissions"`
-	Steps       []workflowStep    `yaml:"steps"`
+	If             string            `yaml:"if"`
+	TimeoutMinutes int               `yaml:"timeout-minutes"`
+	Env            map[string]string `yaml:"env"`
+	Permissions    map[string]string `yaml:"permissions"`
+	Steps          []workflowStep    `yaml:"steps"`
 }
 
 type workflowFile struct {
@@ -103,20 +104,87 @@ func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
 	}
 }
 
-func TestRepairCapFollowsLatestDispatchedReconciliation(t *testing.T) {
+func repairQuery(t *testing.T, listing string) *gojq.Code {
+	t.Helper()
 	script := readWorkflow(t, "reconcile-job.yml").Jobs["repair"].script()
-	match := regexp.MustCompile(`--jq '([^']+)'`).FindStringSubmatch(script)
-	if match == nil {
-		t.Fatalf("repair dispatch has no cap:\n%s", script)
+	for _, line := range strings.Split(script, "\n") {
+		match := regexp.MustCompile(`--jq '([^']+)'`).FindStringSubmatch(line)
+		if match == nil || !strings.Contains(line, listing) {
+			continue
+		}
+		query, err := gojq.Parse(match[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		program, err := gojq.Compile(query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return program
 	}
-	query, err := gojq.Parse(match[1])
-	if err != nil {
-		t.Fatal(err)
+	t.Fatalf("repair dispatch has no query over %s runs:\n%s", listing, script)
+	return nil
+}
+
+func queryResults(t *testing.T, program *gojq.Code, runs []any) []any {
+	t.Helper()
+	var results []any
+	iterator := program.Run(runs)
+	for {
+		result, ok := iterator.Next()
+		if !ok {
+			return results
+		}
+		if err, ok := result.(error); ok {
+			t.Fatal(err)
+		}
+		results = append(results, result)
 	}
-	program, err := gojq.Compile(query)
-	if err != nil {
-		t.Fatal(err)
+}
+
+func TestRepairWaitsForPushReconciliationOfTheSameCommit(t *testing.T) {
+	script := readWorkflow(t, "reconcile-job.yml").Jobs["repair"].script()
+	for _, guard := range []string{"--workflow reconcile.yml --event push", `--commit "$GITHUB_SHA"`, "--json status"} {
+		if !strings.Contains(script, guard) {
+			t.Errorf("repair dispatch lacks push guard %s:\n%s", guard, script)
+		}
 	}
+	if strings.Index(script, "--event push") > strings.Index(script, "gh workflow run") {
+		t.Errorf("repair dispatches before checking the push reconciliation:\n%s", script)
+	}
+	program := repairQuery(t, "--event push")
+	for _, test := range []struct {
+		statuses []string
+		dispatch bool
+	}{
+		{dispatch: true},
+		{statuses: []string{"completed"}, dispatch: true},
+		{statuses: []string{"completed", "completed"}, dispatch: true},
+		{statuses: []string{"queued"}},
+		{statuses: []string{"pending"}},
+		{statuses: []string{"waiting"}},
+		{statuses: []string{"in_progress"}},
+		{statuses: []string{"completed", "requested"}},
+	} {
+		runs := []any{}
+		for _, status := range test.statuses {
+			runs = append(runs, map[string]any{"status": status})
+		}
+		if blocked := queryResults(t, program, runs); (len(blocked) == 0) != test.dispatch {
+			t.Errorf("push runs %v blocked the repair with %q, want dispatch %t", test.statuses, blocked, test.dispatch)
+		}
+	}
+}
+
+func TestApplyJobOutlivesTheApplyDeadline(t *testing.T) {
+	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
+	if margin := time.Duration(apply.TimeoutMinutes)*time.Minute - applyDeadline; margin < 30*time.Minute {
+		t.Fatalf("apply job timeout of %d minutes leaves %s beyond the apply deadline for setup and reporting", apply.TimeoutMinutes, margin)
+	}
+}
+
+func TestRepairCapFollowsLatestDispatchedReconciliation(t *testing.T) {
+	program := repairQuery(t, "--event workflow_dispatch")
 	for _, test := range []struct {
 		name       string
 		conclusion string
@@ -138,18 +206,7 @@ func TestRepairCapFollowsLatestDispatchedReconciliation(t *testing.T) {
 			if test.age > 0 {
 				runs = append(runs, map[string]any{"conclusion": test.conclusion, "createdAt": time.Now().Add(-test.age).UTC().Format(time.RFC3339)})
 			}
-			var suppressed []any
-			results := program.Run(runs)
-			for {
-				result, ok := results.Next()
-				if !ok {
-					break
-				}
-				if err, ok := result.(error); ok {
-					t.Fatal(err)
-				}
-				suppressed = append(suppressed, result)
-			}
+			suppressed := queryResults(t, program, runs)
 			if (len(suppressed) == 0) != test.dispatch {
 				t.Fatalf("previous reconciliation %+v suppressed the repair with %q", runs, suppressed)
 			}

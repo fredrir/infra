@@ -30,6 +30,8 @@ type Operations interface {
 	Retire(context.Context, Plan) error
 }
 
+const applyDeadline = 90 * time.Minute
+
 type Reconciler struct {
 	Store           Store
 	Ops             Operations
@@ -40,7 +42,7 @@ type Reconciler struct {
 }
 
 func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, applyDeadline)
 	defer cancel()
 	unlock, err := r.Store.Lock(ctx)
 	if err != nil {
