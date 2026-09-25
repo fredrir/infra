@@ -1,6 +1,6 @@
 - name: Reconcile enrolled cluster transport
   hosts: k3s_cluster
-  serial: "{{ '100%' if ansible_check_mode else 1 }}"
+  serial: "{{ '100%' if ansible_check_mode else [1, '100%'] }}"
   become: true
   gather_facts: true
   vars:

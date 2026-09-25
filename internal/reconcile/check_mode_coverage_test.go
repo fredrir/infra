@@ -42,7 +42,10 @@ func walkComparedPlays(t *testing.T, root, file string, visitPlay func(ansiblePl
 	}
 }
 
-const checkModeSerial = "{{ '100%' if ansible_check_mode else 1 }}"
+const (
+	checkModeSerial       = "{{ '100%' if ansible_check_mode else 1 }}"
+	checkModeCanarySerial = "{{ '100%' if ansible_check_mode else [1, '100%'] }}"
+)
 
 func switchesOnCheckMode(task ansibleTask) bool {
 	return strings.Contains(fmt.Sprint(task.Definition, task.Inherited, task.When), "ansible_check_mode")
@@ -130,8 +133,8 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 			if problem := playCheckModeProblem(play); problem != "" {
 				t.Errorf("%s: play %q %s", playbook, play.Name, problem)
 			}
-			if play.Serial != nil && play.Serial != checkModeSerial {
-				t.Errorf("%s: play %q uses serial %v instead of lifting its batches in check mode with %s", playbook, play.Name, play.Serial, checkModeSerial)
+			if play.Serial != nil && play.Serial != checkModeSerial && play.Serial != checkModeCanarySerial {
+				t.Errorf("%s: play %q uses serial %v instead of lifting its batches in check mode with %s or %s", playbook, play.Name, play.Serial, checkModeSerial, checkModeCanarySerial)
 			}
 		}, func(task ansibleTask) {
 			seen[task.Key] = true
