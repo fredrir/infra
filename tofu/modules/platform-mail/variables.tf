@@ -52,3 +52,8 @@ variable "smtp_user_name" {
     error_message = "Use a stable lowercase IAM user name of 3 to 60 characters."
   }
 }
+
+variable "permissions_boundary" {
+  type     = string
+  nullable = false
+}

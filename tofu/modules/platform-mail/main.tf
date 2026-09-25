@@ -66,7 +66,7 @@ resource "aws_iam_policy" "sender" {
 resource "aws_iam_user" "sender" {
   name                 = var.smtp_user_name
   path                 = "/platform/"
-  permissions_boundary = aws_iam_policy.sender.arn
+  permissions_boundary = var.permissions_boundary
   force_destroy        = false
   tags                 = local.tags
 

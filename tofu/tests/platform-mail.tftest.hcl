@@ -14,11 +14,12 @@ mock_provider "aws" {
 mock_provider "cloudflare" {}
 
 variables {
-  domain         = "example.com"
-  zone_id        = "0123456789abcdef0123456789abcdef"
-  sender         = "alerts@example.com"
-  recipient      = "operator@example.net"
-  smtp_user_name = "test-alerts"
+  domain               = "example.com"
+  zone_id              = "0123456789abcdef0123456789abcdef"
+  sender               = "alerts@example.com"
+  recipient            = "operator@example.net"
+  smtp_user_name       = "test-alerts"
+  permissions_boundary = "arn:aws:iam::123456789012:policy/boundary/test-workload-boundary"
 }
 
 run "scoped_smtp_identity" {
@@ -46,12 +47,13 @@ run "scoped_smtp_identity" {
   }
   assert {
     condition = (
-      aws_iam_user.sender.permissions_boundary == aws_iam_policy.sender.arn &&
+      aws_iam_user.sender.permissions_boundary == var.permissions_boundary &&
+      aws_iam_user.sender.permissions_boundary != aws_iam_policy.sender.arn &&
       aws_iam_user_policy_attachment.sender.policy_arn == aws_iam_policy.sender.arn &&
       aws_iam_user_policy_attachment.sender.user == aws_iam_user.sender.name &&
       !aws_iam_user.sender.force_destroy
     )
-    error_message = "The sender permission grant and maximum authority must remain identical, with access keys protected from forced deletion."
+    error_message = "The sender grant must stay separate from the fixed workload boundary, with access keys protected from forced deletion."
   }
   assert {
     condition = (

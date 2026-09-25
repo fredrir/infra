@@ -9,7 +9,7 @@
 | Signing        | AWS-managed Easy DKIM, RSA 2048; no private signing key in state                                                     |
 | SMTP authority | `ses:SendRawEmail`, sending-domain and exact verified-recipient identity ARNs, exact From, every To/CC/BCC recipient |
 | Transport      | Verified STARTTLS or implicit TLS in Alertmanager and Gatus; SES requires SMTP TLS                                   |
-| IAM boundary   | The same sending policy limits and grants the user's permissions                                                     |
+| IAM boundary   | Fixed `infra-workload-boundary`; the sending policy alone grants                                                     |
 | Credentials    | Create and rotate SMTP access keys outside OpenTofu; deliver through private runtime credentials                     |
 | Existing DNS   | No apex, MX, SPF, DMARC, MAIL FROM or other zone records managed here                                                |
 | DNS ownership  | OpenTofu; these DKIM selectors must not also appear in `platform_dns_records`                                        |

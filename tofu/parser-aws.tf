@@ -78,7 +78,8 @@ resource "aws_iam_policy" "dataset_access" {
 }
 
 resource "aws_iam_user" "leploy" {
-  name = "leploy"
+  name                 = "leploy"
+  permissions_boundary = aws_iam_policy.workload_boundary.arn
 }
 
 resource "aws_iam_user_policy_attachment" "leploy_dataset" {
@@ -113,8 +114,9 @@ data "aws_iam_policy_document" "restic_host" {
 }
 
 resource "aws_iam_user" "restic_host" {
-  for_each = local.restic_hosts
-  name     = "restic-${each.key}"
+  for_each             = local.restic_hosts
+  name                 = "restic-${each.key}"
+  permissions_boundary = aws_iam_policy.workload_boundary.arn
 }
 
 resource "aws_iam_policy" "restic_host" {

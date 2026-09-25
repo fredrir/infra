@@ -56,7 +56,7 @@ resource "aws_iam_user" "platform_backup" {
   for_each             = local.platform_backup_projects
   name                 = "platform-restic-${each.key}"
   path                 = "/platform/"
-  permissions_boundary = aws_iam_policy.platform_backup[each.key].arn
+  permissions_boundary = aws_iam_policy.workload_boundary.arn
   force_destroy        = false
 
   lifecycle {
