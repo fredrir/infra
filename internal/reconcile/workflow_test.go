@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -21,6 +22,8 @@ type workflowStep struct {
 }
 
 type workflowJob struct {
+	Name           string            `yaml:"name"`
+	Uses           string            `yaml:"uses"`
 	If             string            `yaml:"if"`
 	TimeoutMinutes int               `yaml:"timeout-minutes"`
 	Env            map[string]string `yaml:"env"`
@@ -172,6 +175,14 @@ func TestRepairWaitsForPendingPushApplies(t *testing.T) {
 		if got := queryResults(t, pending, runs); !reflect.DeepEqual(got, test.want) {
 			t.Errorf("push runs %v awaited %v, want %v", test.statuses, got, test.want)
 		}
+	}
+	caller := readWorkflow(t, "reconcile.yml").Jobs["reconcile"]
+	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
+	if caller.Uses != "./.github/workflows/reconcile-job.yml" {
+		t.Fatalf("reconcile job calls %q", caller.Uses)
+	}
+	if name := cmp.Or(caller.Name, "reconcile") + " / " + cmp.Or(apply.Name, "apply"); !strings.Contains(script, `.name == "`+name+`"`) {
+		t.Errorf("repair dispatch does not wait for the %q job:\n%s", name, script)
 	}
 	applied := repairQuery(t, "/jobs")
 	for _, test := range []struct {
