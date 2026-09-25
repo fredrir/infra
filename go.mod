@@ -6,6 +6,9 @@ require (
 	cel.dev/cel-go v0.32.0
 	dagger.io/dagger v0.21.9
 	github.com/aws/aws-sdk-go-v2 v1.47.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
+	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/google/go-github/v88 v88.0.0
 	github.com/itchyny/gojq v0.12.19
 	github.com/kdomanski/iso9660 v0.4.0
 	github.com/klauspost/compress v1.20.0
@@ -48,6 +51,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.27.1 // indirect
 	github.com/go-openapi/swag/yamlutils v0.27.1 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
+	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/itchyny/timefmt-go v0.1.8 // indirect

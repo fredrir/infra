@@ -66,13 +66,13 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 }
 
 func TestCommandValidation(t *testing.T) {
-	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}} {
+	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err == nil {
 			t.Errorf("accepted invalid command %q", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--deep", "--help"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--deep", "--help"}, {"reconcile", "request-verification", "--help"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
 			t.Errorf("command %q: %v, output=%q", args, err, &output)
@@ -101,5 +101,19 @@ func TestVerificationWritesItsOutcomeReport(t *testing.T) {
 	}
 	if !outcome.Deep || outcome.Outcome != "failed" || outcome.Differences == nil || len(outcome.Differences) != 0 || len(outcome.Errors) != 1 || !strings.Contains(outcome.Errors[0], "settings.yaml") {
 		t.Fatalf("verification error reported as %s", data)
+	}
+}
+
+func TestVerificationRequestReadsTheSystemdCredential(t *testing.T) {
+	credentials := t.TempDir()
+	t.Setenv("CREDENTIALS_DIRECTORY", credentials)
+	var output bytes.Buffer
+	err := cli.Run(context.Background(), []string{"reconcile", "request-verification", "--app-id=1", "--installation-id=2"}, &output, &output)
+	if err == nil || !strings.Contains(err.Error(), filepath.Join(credentials, "github-app-key")) {
+		t.Fatalf("request without the credential file returned %v", err)
+	}
+	t.Setenv("CREDENTIALS_DIRECTORY", "")
+	if err := cli.Run(context.Background(), []string{"reconcile", "request-verification", "--app-id=1", "--installation-id=2"}, &output, &output); err == nil || !strings.Contains(err.Error(), "--private-key") {
+		t.Fatalf("request without a credential directory or key returned %v", err)
 	}
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,13 +20,14 @@ func newReconcileCommand() *cobra.Command {
 	var root, bucket, prefix, base, report string
 	var full, deep bool
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
-	command.PersistentFlags().StringVar(&root, "root", ".", "Source checkout")
-	command.PersistentFlags().StringVar(&bucket, "state-bucket", "llunde-pyparser-bucket", "Reconciliation state bucket")
-	command.PersistentFlags().StringVar(&prefix, "state-prefix", "reconciliation/production", "Reconciliation state prefix")
-	command.PersistentFlags().StringVar(&report, "report", "", "Status or verification outcome report path")
-	command.PersistentFlags().BoolVar(&full, "full", false, "Reconcile all systems, including external drift")
+	command.AddCommand(newRequestVerificationCommand())
 	for _, action := range []string{"plan", "apply", "verify", "status", "requirements"} {
 		child := &cobra.Command{Use: action, Args: cobra.NoArgs}
+		child.Flags().StringVar(&root, "root", ".", "Source checkout")
+		child.Flags().StringVar(&bucket, "state-bucket", "llunde-pyparser-bucket", "Reconciliation state bucket")
+		child.Flags().StringVar(&prefix, "state-prefix", "reconciliation/production", "Reconciliation state prefix")
+		child.Flags().StringVar(&report, "report", "", "Status or verification outcome report path")
+		child.Flags().BoolVar(&full, "full", false, "Reconcile all systems, including external drift")
 		if action == "plan" {
 			child.Flags().StringVar(&base, "base", "", "Comparison revision")
 		}
@@ -111,6 +113,37 @@ func newReconcileCommand() *cobra.Command {
 		}
 		command.AddCommand(child)
 	}
+	return command
+}
+
+func newRequestVerificationCommand() *cobra.Command {
+	request := reconcile.VerificationRequest{API: "https://api.github.com"}
+	var key string
+	command := &cobra.Command{Use: "request-verification", Short: "Dispatch deep verification with drift repair as a GitHub App", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		if key == "" {
+			return errors.New("--private-key is required outside a systemd credential directory")
+		}
+		var err error
+		if request.PrivateKey, err = os.ReadFile(key); err != nil {
+			return err
+		}
+		run, err := reconcile.RequestVerification(cmd.Context(), request)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), "Requested verification:", cmp.Or(run, request.Repository+" "+request.Workflow+"@"+request.Ref))
+		return err
+	}}
+	var credentials string
+	if directory := os.Getenv("CREDENTIALS_DIRECTORY"); directory != "" {
+		credentials = filepath.Join(directory, "github-app-key")
+	}
+	command.Flags().Int64Var(&request.AppID, "app-id", 0, "GitHub App ID")
+	command.Flags().Int64Var(&request.InstallationID, "installation-id", 0, "GitHub App installation ID")
+	command.Flags().StringVar(&key, "private-key", credentials, "GitHub App private key file")
+	command.Flags().StringVar(&request.Repository, "repository", "fredrir/infra", "Repository as OWNER/NAME")
+	command.Flags().StringVar(&request.Workflow, "workflow", "reconcile.yml", "Workflow file name")
+	command.Flags().StringVar(&request.Ref, "ref", "main", "Workflow revision")
 	return command
 }
 
