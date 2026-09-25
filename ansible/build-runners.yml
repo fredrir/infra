@@ -4,7 +4,6 @@
   gather_facts: true
   vars:
     build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
-    build_runner_toolchain: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json }}"
     build_runner_fleet: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/runners.json') | from_json }}"
   roles:
   - infra_binary

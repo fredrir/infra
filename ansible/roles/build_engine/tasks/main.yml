@@ -15,48 +15,34 @@
     - build_engine_pids | int <= 8192
     - build_engine_parallelism | int >= 1
     - build_engine_parallelism | int <= build_engine_cpus | int
-    - build_engine_cache_cpus | int >= 1
-    - build_engine_cache_cpus | int <= build_engine_cpus | int
-    - build_engine_cache_memory is match('^[1-9][0-9]*g$')
-    - build_engine_cache_gib | int >= 4
     - build_engine_dagger_cache_gib | int >= 4
     - build_engine_named_cache_hours | int >= 1
     - build_engine_named_cache_hours | int <= 168
     - build_engine_gc_emergency_free_gib | int >= 1
     - build_engine_gc_free_gib | int > build_engine_gc_emergency_free_gib | int
-    - build_engine_cache_port | int > 1024
-    - build_engine_cache_port | int < 65536
-    - build_engine_cache_port | int == 9092
     - build_engine_dagger_name == 'infra-dagger'
 
 - name: Read engine pin
   ansible.builtin.set_fact:
     build_engine_image: "{{ (lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json).engine_image }}"
 
-- name: Validate engine pins
+- name: Validate engine pin
   ansible.builtin.assert:
     that:
     - build_engine_image is match('^registry.dagger.io/engine:v[0-9.]+@sha256:[a-f0-9]{64}$')
-    - build_engine_bazel_image is match('^buchgr/bazel-remote-cache:v[0-9.]+@sha256:[a-f0-9]{64}$')
 
-- name: Inspect pinned engine images
+- name: Inspect pinned engine image
   ansible.builtin.command:
-    argv: [docker, image, inspect, --format, '{{ "{{.Id}}" }}', '{{ item }}']
-  loop:
-  - '{{ build_engine_image }}'
-  - '{{ build_engine_bazel_image }}'
-  register: build_engine_local_images
+    argv: [docker, image, inspect, --format, '{{ "{{.Id}}" }}', '{{ build_engine_image }}']
+  register: build_engine_local_image
   changed_when: false
-  failed_when: build_engine_local_images.rc not in [0, 1]
+  failed_when: build_engine_local_image.rc not in [0, 1]
   check_mode: false
 
-- name: Pull missing pinned engine images
+- name: Pull missing pinned engine image
   ansible.builtin.command:
-    argv: [docker, pull, '{{ item.item }}']
-  loop: '{{ build_engine_local_images.results }}'
-  loop_control:
-    label: '{{ item.item }}'
-  when: item.rc != 0
+    argv: [docker, pull, '{{ build_engine_image }}']
+  when: build_engine_local_image.rc != 0
   register: build_engine_pull
   changed_when: "'Downloaded newer image' in build_engine_pull.stdout"
 
@@ -79,25 +65,12 @@
   register: build_engine_dagger_unit
   notify: Restart infra-dagger
 
-- name: Install Bazel cache unit
-  ansible.builtin.template:
-    src: infra-bazel-cache.service.j2
-    dest: /etc/systemd/system/infra-bazel-cache.service
-    owner: root
-    group: root
-    mode: '0644'
-  register: build_engine_cache_unit
-  notify: Restart infra-bazel-cache
-
-- name: Start build engines
+- name: Start build engine
   ansible.builtin.systemd_service:
-    name: '{{ item }}'
-    daemon_reload: '{{ build_engine_dagger_unit.changed or build_engine_cache_unit.changed }}'
+    name: infra-dagger
+    daemon_reload: '{{ build_engine_dagger_unit.changed }}'
     enabled: true
     state: started
-  loop:
-  - infra-dagger
-  - infra-bazel-cache
 
 - name: Read retired prewarming timer
   ansible.builtin.stat:
@@ -126,3 +99,62 @@
   ansible.builtin.systemd_service:
     daemon_reload: true
   when: build_engine_prewarm_removed.changed
+
+- name: Read retired Bazel cache unit
+  ansible.builtin.stat:
+    path: /etc/systemd/system/infra-bazel-cache.service
+  register: build_engine_bazel_cache_unit
+
+- name: Stop retired Bazel cache
+  ansible.builtin.systemd_service:
+    name: infra-bazel-cache
+    state: stopped
+    enabled: false
+  when: build_engine_bazel_cache_unit.stat.exists
+
+- name: Inspect retired Bazel cache container and volume
+  ansible.builtin.command:
+    argv: [docker, '{{ item }}', inspect, infra-bazel-cache]
+  loop: [container, volume]
+  register: build_engine_bazel_cache_objects
+  changed_when: false
+  failed_when: build_engine_bazel_cache_objects.rc not in [0, 1]
+  check_mode: false
+
+- name: Remove retired Bazel cache container and volume
+  ansible.builtin.command:
+    argv: [docker, '{{ item.item }}', rm, --force, infra-bazel-cache]
+  loop: '{{ build_engine_bazel_cache_objects.results }}'
+  loop_control:
+    label: '{{ item.item }}'
+  when: item.rc == 0
+
+- name: Find retired Bazel cache images
+  ansible.builtin.command:
+    argv: [docker, image, ls, --all, --quiet, --filter, reference=buchgr/bazel-remote-cache]
+  register: build_engine_bazel_cache_images
+  changed_when: false
+  check_mode: false
+
+- name: Remove retired Bazel cache images
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'image', 'rm', '--force'] + build_engine_bazel_cache_images.stdout_lines | unique }}"
+  when: build_engine_bazel_cache_images.stdout_lines | length > 0
+
+- name: Remove retired native Bazel state
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+  - /etc/systemd/system/infra-bazel-cache.service
+  - /usr/local/bin/bazel
+  - /etc/bazel.bazelrc
+  - /var/cache/infra/bazel-repo
+  - /home/runner/.cache/bazel
+  - /home/runner/prewarm-reports
+  register: build_engine_bazel_removed
+
+- name: Reload units without retired Bazel cache
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: build_engine_bazel_removed.changed

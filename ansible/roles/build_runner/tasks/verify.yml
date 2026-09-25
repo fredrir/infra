@@ -11,7 +11,7 @@
 - name: Verify build services
   ansible.builtin.command:
     argv: [systemctl, is-active, '{{ item }}']
-  loop: [docker, infra-dagger, infra-bazel-cache]
+  loop: [docker, infra-dagger]
   changed_when: false
 - name: Verify repository runners
   ansible.builtin.include_tasks: verify-repository.yml
