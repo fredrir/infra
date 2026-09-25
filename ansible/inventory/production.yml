@@ -71,15 +71,15 @@ all:
                   provider_id: '141119325'
                   machine_type: ccx23
                   architecture: amd64
-                  k3s_ci_slots: 1
+                  k3s_ci_slots: 2
                   public_ipv4: 95.217.135.164
                 fredrir-09:
                   ansible_host: "{{ tailscale_ip if infra_reconcile_tailnet | default(false) | bool else public_ipv4 }}"
                   ansible_user: administrator
                   ci_kata_enabled: true
-                  k3s_system_reserved_cpu: 4250m
-                  k3s_system_reserved_memory: 10Gi
-                  k3s_ci_slots: 3
+                  k3s_system_reserved_cpu: 8250m
+                  k3s_system_reserved_memory: 18Gi
+                  k3s_ci_slots: 0
                   tailscale_ip: 100.87.168.66
                   provider: one.com
                   machine_type: Cloud server XXL
@@ -115,11 +115,14 @@ all:
           ansible_ssh_common_args: -o ProxyJump=administrator@{{ hostvars['fredrir-09'].tailscale_ip if infra_reconcile_tailnet | default(false) | bool else hostvars['fredrir-09'].public_ipv4 }} -o HostKeyAlias=infra-build-09 -o StrictHostKeyChecking=yes -o ConnectTimeout=10
           build_engine_dedicated: true
           build_engine_qualified: true
-          build_engine_cpus: 4
-          build_engine_memory: 4g
+          build_engine_cpus: 8
+          build_engine_memory: 12g
+          build_engine_pids: 3072
           build_engine_dagger_cache_gib: 32
-          build_engine_parallelism: 1
-          build_runner_cpus_percent: 400
+          build_engine_parallelism: 3
+          build_runner_cpus_percent: 800
+          build_runner_memory: 3G
+          build_runner_job_slots: 3
           infra_binary_url: 'https://github.com/fredrir/infra/releases/download/{{ build_runner_cli.tag }}/infra-linux-amd64'
           infra_binary_revision: '{{ build_runner_cli.revision }}'
           infra_binary_sha256: '{{ build_runner_cli.sha256 }}'

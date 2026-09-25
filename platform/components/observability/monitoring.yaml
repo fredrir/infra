@@ -194,6 +194,8 @@ spec:
       tls:
         enabled: false
     kube-state-metrics:
+      metricLabelsAllowlist:
+      - nodes=[infra.fredrir.com/ci-slots]
       resources:
         requests:
           cpu: 100m
@@ -232,6 +234,7 @@ spec:
           rules:
           - alert: CiWorkerWithoutSlots
             expr: kube_node_info unless on(node) kube_node_spec_taint{key="node-role.kubernetes.io/control-plane"}
+              unless on(node) kube_node_labels{label_infra_fredrir_com_ci_slots="0"}
               unless on(node) kube_node_status_allocatable{resource="infra_fredrir_com_ci_slot"} > 0
             for: 15m
             labels:

@@ -128,7 +128,7 @@ spec:
               - SETUID
           resources:
             requests:
-              cpu: '2'
+              cpu: '1'
               memory: 6Gi
               ephemeral-storage: 20Gi
               infra.fredrir.com/ci-slot: '1'

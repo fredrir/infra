@@ -145,14 +145,14 @@ git diff -- platform
 | Host provisioning               | `ansible/build-vms.yml`; inventory group `build_vm_hosts`                                                                                   |
 | Runner and engine provisioning  | `ansible/build-runners.yml`; inventory group `build_engines`                                                                                |
 | Production placement            | `ansible/inventory/production.yml`; `infra-build-09` on `fredrir-09`                                                                        |
-| Host reservation                | 4.25 CPUs / 10 GiB reserved; resulting allocatable 11.5 CPUs / 21,585,868 KiB                                                               |
-| Guest                           | Four CPUs / 8 GiB RAM / 80 GiB sparse persistent disk                                                                                       |
+| Host reservation                | 8.25 CPUs / 18 GiB reserved; resulting allocatable 7.5 CPUs / 13,197,260 KiB                                                                |
+| Guest                           | Eight CPUs / 16 GiB RAM / 80 GiB sparse persistent disk                                                                                     |
 | Host boundary                   | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding; guest metrics forwarded to the tailnet address, port 9101              |
 | Guest metrics                   | Node exporter `:9100`; `infra_cgroup_*` for `infra-engine.slice` and `infra-runners.slice`; Prometheus job `build-vm`                      |
 | Activation gates                | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true`                                                       |
 | Runner registration             | Seven repository registrations share one VM; each accepts protected main pushes or manual runs only                                         |
-| Runner slice                    | Four CPUs / 2 GiB aggregate for runner services and native child processes                                                                   |
-| Production Dagger ceiling       | Four CPUs / 4 GiB RAM / 1,024 processes / one parallel operation                                                                           |
+| Runner slice                    | Eight CPUs / 3 GiB aggregate for runner services and native child processes                                                                 |
+| Production Dagger ceiling       | Eight CPUs / 12 GiB RAM / 3,072 processes / three parallel operations                                                                     |
 | Standalone engine defaults      | Four CPUs / 8 GiB RAM / one parallel operation; configurable within host capacity                                                         |
 | Dagger connection               | Local `docker-container://infra-dagger`; no published engine port                                                                           |
 | Persistent caches               | `infra-dagger-cache` Docker volume; engine-local Bazel action cache                                                                         |

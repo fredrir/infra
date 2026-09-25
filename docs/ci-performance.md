@@ -55,7 +55,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | CLI release caches | [Cache scope](../build/evidence/cli-release-cache-scope.json): sibling release tags cannot restore each other's caches, and no matching cache is produced on the default branch | Qualify a trusted default-branch cache producer or persistent release cache without adding speculative compilation to ordinary commits |
 | Signed package build | [Production canary](../build/evidence/package-production-canary.json): build step 97 seconds; installation checks 7.487 seconds | Profile catalog downloads and repeated attestation verification; preserve the ten-second installation gate and separate publish credentials |
 | Declaration OpenTofu validation | `tofu validate` 2.0 seconds natively, 2.6 under gVisor; test-file validation is 0.95 and 1.25 of those; all-declaration validation waits on it | Qualify `-no-tests` against a separate `tofu test` validation before adopting it |
-| Runner queueing | Whole-job admission limits the build VM to one expensive job; short canaries do not establish queue percentiles | Compare admission wait, GitHub queue time and memory pressure before increasing slots or moving workloads |
+| Runner queueing | Whole-job admission limits the build VM to three expensive jobs; short canaries do not establish queue percentiles | Compare admission wait, GitHub queue time and memory pressure before increasing slots or moving workloads |
 | Application delivery handoff | [Frontend sample](../build/evidence/frontend-delivery-startup.json): 137.4 seconds from workflow creation to hosted verification; publication wait 37.3 seconds and Kubernetes reconciliation 20.1 seconds | Profile remaining workflow startup, protected environment setup and rollout readiness separately |
 | Full host reconciliation | [Task spans](../build/evidence/reconciliation-host-overhead.json): 435 task starts and 637.174 seconds total in one historical run; smart gathering already caches facts within a run | Profile remaining role work and preserve drift detection and registration checks |
 | Production revision publication | Full infrastructure convergence still serializes application publication; a concurrent frontend change exceeded its original serving deadline during qualification | Keep publication queueing visible and bounded; isolate application delivery further only with an equivalent infrastructure and artifact baseline |
@@ -90,7 +90,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Timing | A read-only completion observer retains job and step timestamps for successful and failed workflow attempts for 30 days |
 | Frontend deadlines | Publication queueing has a separate eight-minute measurement; the subsequent exact served-revision check retains its 60-second budget within the existing ten-minute job |
 
-VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; the default slot count is one for the 8 GiB build VM.
+VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; production admits three jobs on the 16 GiB build VM.
 An hourly verification report that lists differences dispatches one full reconciliation of `main` unless a push reconciliation on `main` has not completed its apply or the latest bot dispatch for the same commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled; a new commit on `main` lifts the cap; `verify=true` without `repair=true` never dispatches.
 These controls do not establish an ordinary-traffic latency percentile; compare the completion observer's post-rollout samples with equivalent workloads.
 
@@ -123,7 +123,7 @@ The restored archive still recompiled the workspace in 7.60–7.84 seconds.
 The reusable workflow defaults the archive to enabled and records environment, restore, preparation, save and checks independently.
 The no-archive checks took 4.29 seconds under the unchanged ten-second ceiling.
 
-Admission remains at one slot with the existing 2 GiB runner and 4 GiB engine limits because these short samples do not justify higher concurrency.
+The build VM admits three jobs with a 3 GiB runner slice and a 12 GiB engine at three parallel operations; the `build-vm` cgroup alerts report OOM kills and working sets near either limit.
 Workflow completion reports retain attempt identity and queue timestamps for 30 days; compare total delivery latency, failures and resource use alongside the check metric.
 
 ## Frontend delivery startup
