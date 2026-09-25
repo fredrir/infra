@@ -2,7 +2,7 @@ package reconcile
 
 import (
 	"context"
-	"fmt"
+	"errors"
 )
 
 func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
@@ -66,23 +66,23 @@ func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
 var comparedPlaybooks = []string{"reconcile.yml", "external.yml"}
 
 func (c *Commands) compareHosts(ctx context.Context) error {
-	run, err := c.recordPlaybooks(ctx, comparedPlaybooks, "--check", "--skip-tags=runners")
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return ctxErr
-	}
-	if err == nil && !run.Reported {
-		err = fmt.Errorf("host comparison recorded no task results")
-	}
-	var differences Differences
-	var failed []string
-	for _, task := range run.Tasks {
-		if task.Failed {
-			failed = append(failed, "["+task.Host+"] "+task.Task)
-		} else {
-			differences = append(differences, Difference{System: "hosts", Host: task.Host, Item: task.Task})
+	var problems []error
+	for _, run := range c.recordPlaybooks(ctx, comparedPlaybooks, "--check", "--skip-tags=runners") {
+		var differences Differences
+		var failed []string
+		for _, task := range run.Tasks {
+			if task.Failed {
+				failed = append(failed, "["+task.Host+"] "+task.Task)
+			} else {
+				differences = append(differences, Difference{System: "hosts", Host: task.Host, Item: task.Task})
+			}
 		}
+		problems = append(problems, run.outcome(differences, failed))
 	}
-	return run.outcome(differences, failed, err)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return errors.Join(problems...)
 }
 
 func (c *Commands) verifyRunnerHosts(ctx context.Context, playbooks ...string) error {
@@ -90,24 +90,24 @@ func (c *Commands) verifyRunnerHosts(ctx context.Context, playbooks ...string) e
 	if err != nil {
 		return err
 	}
-	run, err := c.recordPlaybooks(ctx, playbooks)
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return ctxErr
-	}
-	var differences Differences
-	var failed []string
-	for _, task := range run.Tasks {
-		switch {
-		case task.Playbook == "verify-runners":
-			differences = append(differences, Difference{System: "runners", Host: task.Host, Item: task.Task})
-		case task.Failed:
-			failed = append(failed, "["+task.Host+"] "+task.Task)
+	var problems []error
+	for _, run := range c.recordPlaybooks(ctx, playbooks) {
+		var differences Differences
+		var failed []string
+		for _, task := range run.Tasks {
+			switch {
+			case run.Playbook == "verify-runners.yml":
+				differences = append(differences, Difference{System: "runners", Host: task.Host, Item: task.Task})
+			case task.Failed:
+				failed = append(failed, "["+task.Host+"] "+task.Task)
+			}
 		}
+		problems = append(problems, run.outcome(differences, failed))
 	}
-	if err := run.outcome(differences, failed, err); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return c.verifyRunnerFleet(ctx, fleet)
+	return errors.Join(append(problems, c.verifyRunnerFleet(ctx, fleet))...)
 }
 
 func (c *Commands) Monitor(ctx context.Context, plan Plan) error {

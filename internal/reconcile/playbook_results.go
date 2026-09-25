@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type playbookTask struct {
@@ -26,9 +27,11 @@ type playbookTask struct {
 }
 
 type playbookRun struct {
+	Playbook    string
 	Reported    bool
 	Tasks       []playbookTask
 	Unreachable []string
+	Err         error
 }
 
 var (
@@ -37,10 +40,31 @@ var (
 	testCasePattern = regexp.MustCompile(`^\[([^\]]+)\] (.+)$`)
 )
 
-func (c *Commands) recordPlaybooks(ctx context.Context, playbooks []string, args ...string) (playbookRun, error) {
+func (c *Commands) recordPlaybooks(ctx context.Context, playbooks []string, args ...string) []playbookRun {
+	runs := make([]playbookRun, len(playbooks))
+	logs := make([]bytes.Buffer, len(playbooks))
+	var group sync.WaitGroup
+	for index, playbook := range playbooks {
+		record := Commands{Runner: c.Runner, Work: c.Work}
+		if index > 0 {
+			log := &lockedWriter{mu: &sync.Mutex{}, writer: &logs[index]}
+			record.Runner.Stdout, record.Runner.Stderr = log, log
+		}
+		group.Go(func() { runs[index] = record.recordPlaybook(ctx, playbook, args...) })
+	}
+	group.Wait()
+	if c.Runner.Stdout != nil {
+		for _, log := range logs[1:] {
+			_, _ = c.Runner.Stdout.Write(log.Bytes())
+		}
+	}
+	return runs
+}
+
+func (c *Commands) recordPlaybook(ctx context.Context, playbook string, args ...string) playbookRun {
 	reports, err := os.MkdirTemp(c.Work, "ansible-results-")
 	if err != nil {
-		return playbookRun{}, err
+		return playbookRun{Playbook: playbook, Err: err}
 	}
 	defer os.RemoveAll(reports)
 	var output bytes.Buffer
@@ -50,11 +74,12 @@ func (c *Commands) recordPlaybooks(ctx context.Context, playbooks []string, args
 	if c.Runner.Stdout != nil {
 		record.Runner.Stdout = io.MultiWriter(c.Runner.Stdout, &output)
 	}
-	run := record.ansible(ctx, playbooks[0], append(slices.Clone(playbooks[1:]), args...)...)
-	result := playbookRun{Unreachable: unreachableHosts(output.String())}
+	run := record.ansible(ctx, playbook, args...)
+	result := playbookRun{Playbook: playbook, Unreachable: unreachableHosts(output.String())}
 	var reportErr error
 	result.Reported, result.Tasks, reportErr = recordedTasks(reports)
-	return result, errors.Join(run, reportErr)
+	result.Err = errors.Join(run, reportErr)
+	return result
 }
 
 func unreachableHosts(output string) []string {
@@ -121,20 +146,23 @@ func recordedTasks(reports string) (bool, []playbookTask, error) {
 	return len(files) > 0, tasks, nil
 }
 
-func (r playbookRun) outcome(differences Differences, failed []string, err error) error {
+func (r playbookRun) outcome(differences Differences, failed []string) error {
 	var problems []error
 	if len(differences) > 0 {
 		problems = append(problems, differences)
 	}
+	if !r.Reported {
+		return errors.Join(append(problems, fmt.Errorf("%s was not compared: %w", r.Playbook, cmp.Or(r.Err, errors.New("no task results recorded"))))...)
+	}
 	if len(failed) > 0 {
-		problems = append(problems, fmt.Errorf("host tasks failed: %s", strings.Join(failed, "; ")))
+		problems = append(problems, fmt.Errorf("%s comparison incomplete: host tasks failed: %s", r.Playbook, strings.Join(failed, "; ")))
 	}
 	if len(r.Unreachable) > 0 {
-		problems = append(problems, fmt.Errorf("unreachable hosts: %s", strings.Join(r.Unreachable, ", ")))
+		problems = append(problems, fmt.Errorf("%s comparison incomplete: unreachable hosts: %s", r.Playbook, strings.Join(r.Unreachable, ", ")))
 	}
 	explained := len(r.Unreachable) > 0 || slices.ContainsFunc(r.Tasks, func(task playbookTask) bool { return task.Failed })
-	if err != nil && !explained {
-		problems = append(problems, err)
+	if r.Err != nil && !explained {
+		problems = append(problems, fmt.Errorf("%s comparison incomplete: %w", r.Playbook, r.Err))
 	}
 	return errors.Join(problems...)
 }

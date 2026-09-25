@@ -5,8 +5,10 @@ import (
 	"errors"
 	"os/exec"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -67,7 +69,7 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 		want    []string
 		runners bool
 	}{
-		{HostScopeFull, []string{"reconcile.yml", "external.yml", "verify.yml verify-runners.yml"}, true},
+		{HostScopeFull, []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, true},
 		{HostScopeRunners, []string{"build-runners.yml", "verify-runners.yml"}, true},
 		{HostScopeMonitor, []string{"external.yml --tags=gatus", "verify.yml --limit=external"}, false},
 		{HostScopeNone, nil, false},
@@ -82,6 +84,9 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 				switch opts.Name {
 				case "ansible-playbook":
 					calls = append(calls, strings.Join(opts.Args[2:], " "))
+					if environment(opts, "JUNIT_OUTPUT_DIR") != "" {
+						return fakePlaybooks{reports: []string{junitReport(strings.TrimSuffix(opts.Args[2], ".yml"))}}.execute(t, opts)
+					}
 					return process.Result{}, nil
 				case "gh":
 					queried++
@@ -98,6 +103,7 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			slices.Sort(calls)
 			if !reflect.DeepEqual(calls, test.want) {
 				t.Fatalf("scope leaked or missed verification: %v", calls)
 			}
@@ -112,21 +118,26 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 	}
 }
 
-func TestHostScopeStopsOnVerificationFailure(t *testing.T) {
+func TestHostVerificationReportsEveryFailure(t *testing.T) {
 	fleet := testRunnerFleet()
 	failure := errors.New("verification failed")
-	calls := 0
-	commands := Commands{Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(context.Context, process.Options) (process.Result, error) {
-		calls++
+	var calls, queried atomic.Int32
+	commands := Commands{Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+		calls.Add(1)
+		if opts.Name == "gh" {
+			queried.Add(1)
+			return runnerResponse(t, healthyRunner(fleet, queriedRepository(opts))), nil
+		}
 		return process.Result{}, failure
 	}}}
-	if err := commands.VerifyHosts(context.Background(), Plan{Affected: All()}); !errors.Is(err, failure) || calls != 1 {
-		t.Fatalf("verification failure lost: calls=%d, error=%v", calls, err)
+	err := commands.VerifyHosts(context.Background(), Plan{Affected: All()})
+	if want := []string{"verify.yml was not compared: verification failed", "verify-runners.yml was not compared: verification failed"}; !errors.Is(err, failure) || !reflect.DeepEqual(VerificationOutcome("", false, err).Errors, want) || int(queried.Load()) != len(fleet.Repositories) {
+		t.Fatalf("host verification hid a failing part: fleet queries=%d, error=%v", queried.Load(), err)
 	}
-	calls = 0
+	calls.Store(0)
 	commands.Runner.Dir = t.TempDir()
-	if err := commands.VerifyHosts(context.Background(), Plan{Affected: All()}); err == nil || calls != 0 {
-		t.Fatalf("missing runner fleet reached host verification: calls=%d, error=%v", calls, err)
+	if err := commands.VerifyHosts(context.Background(), Plan{Affected: All()}); err == nil || calls.Load() != 0 {
+		t.Fatalf("missing runner fleet reached host verification: calls=%d, error=%v", calls.Load(), err)
 	}
 	commands = Commands{Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
 		if opts.Name != "gh" {

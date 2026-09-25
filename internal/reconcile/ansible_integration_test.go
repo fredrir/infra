@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -637,7 +638,7 @@ func TestHostComparisonWithLocalContainer(t *testing.T) {
 	for path, data := range map[string]string{
 		"ansible/ansible.cfg":              "[defaults]\nroles_path = /source/ansible/roles\nstrategy_plugins = /source/ansible/plugins/strategy\nstrategy = mitogen_linear\nretry_files_enabled = False\n",
 		"ansible/inventory/production.yml": "all:\n  hosts:\n    localhost:\n      ansible_connection: local\n      ansible_user: root\n      ansible_python_interpreter: /usr/bin/python3\n",
-		"ansible/reconcile.yml":            "- name: Declare patching\n  hosts: all\n  gather_facts: false\n  roles: [host_patching]\n- name: Register runners\n  hosts: all\n  gather_facts: false\n  tags: [runners]\n  tasks:\n  - name: Reject runner comparison\n    ansible.builtin.fail:\n      msg: runner play compared\n",
+		"ansible/reconcile.yml":            "- name: Declare patching\n  hosts: all\n  gather_facts: false\n  roles: [host_patching]\n- name: Declare host enrollment\n  hosts: all\n  gather_facts: false\n  tasks:\n  - name: Inspect the enrolled host\n    ansible.builtin.stat:\n      path: /etc/infra-host.enrolled\n    register: host_enrollment\n  - name: Require the enrolled host\n    ansible.builtin.assert:\n      that: host_enrollment.stat.exists\n- name: Register runners\n  hosts: all\n  gather_facts: false\n  tags: [runners]\n  tasks:\n  - name: Reject runner comparison\n    ansible.builtin.fail:\n      msg: runner play compared\n",
 		"ansible/external.yml":             "- name: Declare monitor\n  hosts: all\n  gather_facts: false\n  tasks:\n  - name: Inspect the enrolled monitor\n    ansible.builtin.stat:\n      path: /etc/infra-monitor.enrolled\n    register: monitor_enrollment\n  - name: Require the enrolled monitor\n    ansible.builtin.assert:\n      that: monitor_enrollment.stat.exists\n  - name: Install monitor settings\n    ansible.builtin.copy:\n      dest: /etc/infra-monitor.conf\n      content: \"declared\\n\"\n",
 	} {
 		if err := os.MkdirAll(filepath.Join(fixture, filepath.Dir(path)), 0755); err != nil {
@@ -653,6 +654,7 @@ func TestHostComparisonWithLocalContainer(t *testing.T) {
 		_ = exec.Command("docker", "exec", name, "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), fixture).Run()
 		_ = exec.Command("docker", "rm", "-f", name).Run()
 	})
+	var mu sync.Mutex
 	var output strings.Builder
 	commands := Commands{Work: fixture, Runner: ci.Runner{Dir: fixture, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
 		args := []string{"exec", "-w", options.Dir}
@@ -662,7 +664,9 @@ func TestHostComparisonWithLocalContainer(t *testing.T) {
 			}
 		}
 		result, err := exec.CommandContext(ctx, "docker", append(append(args, name, "python3", "-m", "ansible.cli.playbook"), options.Args...)...).CombinedOutput()
+		mu.Lock()
 		output.Write(result)
+		mu.Unlock()
 		if options.Stdout != nil {
 			_, _ = options.Stdout.Write(result)
 		}
@@ -680,7 +684,7 @@ func TestHostComparisonWithLocalContainer(t *testing.T) {
 		}
 		output.Reset()
 	}
-	command("docker", "exec", name, "touch", "/etc/infra-monitor.enrolled")
+	command("docker", "exec", name, "touch", "/etc/infra-monitor.enrolled", "/etc/infra-host.enrolled")
 	converge()
 	compare(nil, nil)
 	t.Log("converged host matches its declaration in check mode")
@@ -694,9 +698,15 @@ func TestHostComparisonWithLocalContainer(t *testing.T) {
 	}
 	t.Log("edited managed files are reported once as differences without being repaired")
 	command("docker", "exec", name, "rm", "/etc/infra-monitor.enrolled")
-	compare([]Difference{{System: "hosts", Host: "localhost", Item: "Declare patching: host_patching : Enable unattended security updates"}}, []string{"host tasks failed: [localhost] Declare monitor: Require the enrolled monitor"})
+	compare([]Difference{{System: "hosts", Host: "localhost", Item: "Declare patching: host_patching : Enable unattended security updates"}}, []string{"external.yml comparison incomplete: host tasks failed: [localhost] Declare monitor: Require the enrolled monitor"})
 	t.Log("failed requirements are reported as errors, not differences")
-	command("docker", "exec", name, "touch", "/etc/infra-monitor.enrolled")
+	command("docker", "exec", name, "sh", "-c", "touch /etc/infra-monitor.enrolled && rm /etc/infra-host.enrolled")
+	compare([]Difference{
+		{System: "hosts", Host: "localhost", Item: "Declare patching: host_patching : Enable unattended security updates"},
+		{System: "hosts", Host: "localhost", Item: "Declare monitor: Install monitor settings"},
+	}, []string{"reconcile.yml comparison incomplete: host tasks failed: [localhost] Declare host enrollment: Require the enrolled host"})
+	t.Log("a failing reconcile.yml host leaves the monitor playbook compared")
+	command("docker", "exec", name, "touch", "/etc/infra-host.enrolled")
 	converge()
 	compare(nil, nil)
 	t.Log("repair converges the host back to a matching comparison")
