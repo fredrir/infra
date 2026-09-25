@@ -76,7 +76,7 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 	}
 	engine, found, err := inspectEngine(ctx)
 	if err != nil {
-		return "", err
+		fmt.Fprintf(opts.Log, "warning: %v; Go builds keep their Containerfile defaults\n", err)
 	}
 	if found {
 		if opts.BuildArgs == nil {

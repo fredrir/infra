@@ -16,6 +16,8 @@
     content: |
       [Service]
       Slice=infra-runners.slice
+      Environment=DOCKER_CONFIG=/home/runner/{{ item | regex_replace('^actions[.]runner[.].+[.]' ~ (inventory_hostname | regex_escape) ~ '-', '') | regex_replace('[.]service$', '') }}/.docker
+      Environment=GH_CONFIG_DIR=/home/runner/{{ item | regex_replace('^actions[.]runner[.].+[.]' ~ (inventory_hostname | regex_escape) ~ '-', '') | regex_replace('[.]service$', '') }}/.config/gh
       Environment=ACTIONS_RUNNER_HOOK_JOB_STARTED=/usr/local/libexec/infra-runner-hook.sh
       {% if build_runner_admission_enabled | bool %}
       Environment=ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/usr/local/libexec/infra-runner-completed.sh

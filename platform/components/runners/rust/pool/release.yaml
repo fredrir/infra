@@ -133,7 +133,7 @@ spec:
               ephemeral-storage: 20Gi
               infra.fredrir.com/ci-slot: '1'
             limits:
-              cpu: '6'
+              cpu: '3'
               memory: 10Gi
               ephemeral-storage: 80Gi
               infra.fredrir.com/ci-slot: '1'

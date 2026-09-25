@@ -123,7 +123,7 @@ The restored archive still recompiled the workspace in 7.60–7.84 seconds.
 The reusable workflow defaults the archive to enabled and records environment, restore, preparation, save and checks independently.
 The no-archive checks took 4.29 seconds under the unchanged ten-second ceiling.
 
-The build VM admits three jobs with a 3 GiB runner slice and a 12 GiB engine at three parallel operations; the `build-vm` cgroup alerts report OOM kills and working sets near either limit.
+The build VM admits three jobs with a 4 GiB runner slice and a 10 GiB engine at three parallel operations; guest OOM kills prefer the runner slice (`--oom-score-adj=-500` on the engine), and the `build-vm` cgroup alerts report OOM kills and working sets near either limit.
 Workflow completion reports retain attempt identity and queue timestamps for 30 days; compare total delivery latency, failures and resource use alongside the check metric.
 
 ## Frontend delivery startup

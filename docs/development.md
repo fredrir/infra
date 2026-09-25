@@ -151,8 +151,8 @@ git diff -- platform
 | Guest metrics                   | Node exporter `:9100`; `infra_cgroup_*` for `infra-engine.slice` and `infra-runners.slice`; Prometheus job `build-vm`                      |
 | Activation gates                | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true`                                                       |
 | Runner registration             | `build/runners.json` counts per repository, named `infra-build-09-<repository>-<n>`; protected main pushes or manual runs only              |
-| Runner slice                    | Eight CPUs / 3 GiB aggregate for runner services and native child processes                                                                 |
-| Production Dagger ceiling       | Eight CPUs / 12 GiB RAM / 3,072 processes / three parallel operations                                                                     |
+| Runner slice                    | Eight CPUs / 4 GiB aggregate for runner services and native child processes                                                                 |
+| Production Dagger ceiling       | Eight CPUs / 10 GiB RAM / 3,072 processes / three parallel operations                                                                     |
 | Standalone engine defaults      | Four CPUs / 8 GiB RAM / one parallel operation; configurable within host capacity                                                         |
 | Dagger connection               | Local `docker-container://infra-dagger`; no published engine port                                                                           |
 | Persistent caches               | `infra-dagger-cache` Docker volume; engine-local Bazel action cache                                                                         |
