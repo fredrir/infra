@@ -83,6 +83,43 @@ func (f kubernetesFake) execute(t *testing.T, options process.Options) (process.
 
 func items(resources ...resource) any { return struct{ Items []resource }{resources} }
 
+func TestKustomizationWaitRequiresTheAppliedRequestedRevision(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	root := func(t *testing.T) resource {
+		item := readyResource(t, "Kustomization", "flux-system", "flux-system")
+		item.Spec.SourceRef.Kind, item.Spec.SourceRef.Name = "GitRepository", "flux-system"
+		item.Status.LastAppliedRevision, item.Status.LastHandledReconcileAt = "production@sha1:"+revision, "token"
+		return item
+	}
+	for _, test := range []struct {
+		name   string
+		mutate func(*resource)
+		want   string
+	}{
+		{name: "applied"},
+		{name: "suspended root", mutate: func(item *resource) { item.Spec.Suspend = true }, want: "Kustomization flux-system/flux-system is suspended"},
+		{name: "missing root", mutate: func(item *resource) { item.Metadata.Name = "platform-cache" }, want: "active Flux root not found"},
+		{name: "unapplied revision", mutate: func(item *resource) { item.Status.LastAppliedRevision = "production@sha1:old" }, want: "Kustomization flux-system/flux-system has not applied " + revision},
+		{name: "unhandled request", mutate: func(item *resource) { item.Status.LastHandledReconcileAt = "earlier" }, want: "flux-system has not reconciled its requested configuration"},
+		{name: "unready", mutate: func(item *resource) { notReady(item) }, want: "flux-system/flux-system is not ready"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			item := root(t)
+			if test.mutate != nil {
+				test.mutate(&item)
+			}
+			fake := kubernetesFake{"get kustomizations.kustomize.toolkit.fluxcd.io --all-namespaces": items(item)}
+			commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				return fake.execute(t, options)
+			}}}
+			err := commands.verifyKubernetes(context.Background(), revision, "token")
+			if test.want == "" && err != nil || test.want != "" && (err == nil || !strings.Contains(err.Error(), test.want)) {
+				t.Fatalf("Kustomization wait returned %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestHelmReleaseMismatchesAreDifferences(t *testing.T) {
 	monitoring := func(t *testing.T) resource {
 		item := readyResource(t, "HelmRelease", "observability", "monitoring")
