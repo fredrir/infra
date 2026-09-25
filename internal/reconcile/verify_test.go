@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
@@ -332,5 +333,66 @@ func TestVerificationCollectsEveryPart(t *testing.T) {
 				t.Fatalf("verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
 			}
 		})
+	}
+}
+
+func runnerSet(t *testing.T, namespace, name, phase string) resource {
+	return artifactFixture(t, fmt.Sprintf(`{"kind":"AutoscalingRunnerSet","metadata":{"name":%q,"namespace":%q},"status":{"phase":%q}}`, name, namespace, phase))
+}
+
+func listenerPod(t *testing.T, namespace, name string, ready bool) resource {
+	return artifactFixture(t, fmt.Sprintf(`{"kind":"Pod","metadata":{"name":"%s-listener","namespace":"arc-system","labels":{"actions.github.com/scale-set-name":%q,"actions.github.com/scale-set-namespace":%q}},"status":{"conditions":[{"type":"Ready","status":%q}]}}`, name, name, namespace, map[bool]string{true: "True", false: "False"}[ready]))
+}
+
+func TestRunnerSetsWithoutRunningListenersFailVerification(t *testing.T) {
+	check, deploy := runnerSet(t, "ci-infra", "check-amd64", "Running"), runnerSet(t, "ci-infra", "deploy-amd64", "Running")
+	listeners := []resource{listenerPod(t, "ci-infra", "check-amd64", true), listenerPod(t, "ci-infra", "deploy-amd64", true)}
+	missing := "AutoscalingRunnerSet ci-infra/check-amd64 has no running listener"
+	for _, test := range []struct {
+		name      string
+		sets      []resource
+		listeners func(poll int) []resource
+		want      string
+	}{
+		{name: "listening", sets: []resource{check, deploy}, listeners: func(int) []resource { return listeners }},
+		{name: "listener recreated within the grace period", sets: []resource{check, deploy}, listeners: func(poll int) []resource {
+			if poll == 0 {
+				return listeners[1:]
+			}
+			return listeners
+		}},
+		{name: "listener deleted", sets: []resource{check, deploy}, listeners: func(int) []resource { return listeners[1:] }, want: missing + ` in phase "Running"`},
+		{name: "listener unready", sets: []resource{check, deploy}, listeners: func(int) []resource {
+			return []resource{listenerPod(t, "ci-infra", "check-amd64", false), listeners[1]}
+		}, want: missing + ` in phase "Running"`},
+		{name: "runner set waiting for runners", sets: []resource{runnerSet(t, "ci-infra", "check-amd64", "Pending"), deploy}, listeners: func(int) []resource { return listeners }, want: missing + ` in phase "Pending"`},
+		{name: "listener of another namespace", sets: []resource{check}, listeners: func(int) []resource { return []resource{listenerPod(t, "ci-nsql", "check-amd64", true)} }, want: missing + ` in phase "Running"`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var mu sync.Mutex
+			polls := 0
+			commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				fake := kubernetesFake{"get autoscalingrunnersets.actions.github.com --all-namespaces": items(test.sets...), "get pods -n=arc-system -l=app.kubernetes.io/component=runner-scale-set-listener": items(test.listeners(polls)...)}
+				if strings.HasPrefix(strings.Join(options.Args, " "), "get pods") {
+					polls++
+				}
+				return fake.execute(t, options)
+			}}}
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			err := commands.verifyRunnerListeners(ctx, Plan{Affected: All()})
+			if test.want == "" && err != nil || test.want != "" && (err == nil || !strings.Contains(err.Error(), test.want)) {
+				t.Fatalf("listener verification returned %v, want %q", err, test.want)
+			}
+		})
+	}
+	scoped := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		t.Errorf("project-scoped verification ran kubectl %s", strings.Join(options.Args, " "))
+		return process.Result{}, errors.New("unexpected command")
+	}}}
+	if err := scoped.verifyRunnerListeners(context.Background(), Plan{Affected: Selection{Kubernetes: true, Projects: []string{"portfolio"}}}); err != nil {
+		t.Fatal(err)
 	}
 }

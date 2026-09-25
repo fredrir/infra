@@ -61,6 +61,7 @@ type resource struct {
 		}
 	}
 	Status struct {
+		Phase                                                                                                                                                        string
 		ObservedGeneration                                                                                                                                           int64
 		Replicas, UpdatedReplicas, ReadyReplicas, AvailableReplicas, UpdatedNumberScheduled, NumberReady, NumberAvailable, DesiredNumberScheduled, Succeeded, Failed int64
 		CurrentRevision, UpdateRevision                                                                                                                              string
@@ -270,7 +271,7 @@ func (c *Commands) Verify(ctx context.Context, plan Plan) error {
 }
 
 func (c *Commands) verifyParts(ctx context.Context, plan Plan, cluster error) error {
-	return errors.Join(cluster, c.VerifyHosts(ctx, plan), c.verifyServed(ctx, plan))
+	return errors.Join(cluster, c.verifyRunnerListeners(ctx, plan), c.VerifyHosts(ctx, plan), c.verifyServed(ctx, plan))
 }
 
 func (c *Commands) verifyServed(ctx context.Context, plan Plan) error {
@@ -474,6 +475,46 @@ func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
 	}
 	if len(plan.Affected.Projects) == 0 {
 		problems = append(problems, c.verifyHelm(ctx, "", plan.Host))
+	}
+	return errors.Join(problems...)
+}
+
+func (c *Commands) verifyRunnerListeners(ctx context.Context, plan Plan) error {
+	if len(plan.Affected.Projects) > 0 {
+		return nil
+	}
+	wait, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+	return poll(wait, func() error { return c.runnerListeners(wait) })
+}
+
+func (c *Commands) runnerListeners(ctx context.Context) error {
+	sets, err := c.resources(ctx, "autoscalingrunnersets.actions.github.com")
+	if err != nil {
+		return err
+	}
+	data, err := c.Runner.Output(ctx, "kubectl", "get", "pods", "-n=arc-system", "-l=app.kubernetes.io/component=runner-scale-set-listener", "-o=json", "--request-timeout=30s")
+	if err != nil {
+		return err
+	}
+	var pods struct{ Items []resource }
+	if err := json.Unmarshal(data, &pods); err != nil {
+		return err
+	}
+	listening := map[string]bool{}
+	for _, pod := range pods.Items {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == "Ready" && condition.Status == "True" {
+				listening[pod.Metadata.Labels["actions.github.com/scale-set-namespace"]+"/"+pod.Metadata.Labels["actions.github.com/scale-set-name"]] = true
+			}
+		}
+	}
+	var problems []error
+	for _, set := range sets {
+		name := set.Metadata.Namespace + "/" + set.Metadata.Name
+		if set.Status.Phase != "Running" || !listening[name] {
+			problems = append(problems, fmt.Errorf("AutoscalingRunnerSet %s has no running listener in phase %q", name, set.Status.Phase))
+		}
 	}
 	return errors.Join(problems...)
 }

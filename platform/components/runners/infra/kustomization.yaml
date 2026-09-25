@@ -13,3 +13,18 @@ components:
 - ../buildkit-cache
 patches:
 - path: quota.yaml
+configurations:
+- release-references.yaml
+configMapGenerator:
+- name: check-release
+  files:
+  - check.yaml
+  options:
+    annotations:
+      config.kubernetes.io/local-config: 'true'
+- name: deploy-release
+  files:
+  - deploy.yaml
+  options:
+    annotations:
+      config.kubernetes.io/local-config: 'true'

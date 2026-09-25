@@ -72,6 +72,10 @@ func load(t *testing.T, path string) object {
 }
 func rendered(t *testing.T, path string) []object {
 	t.Helper()
+	return renderedWith(t, path, nil)
+}
+func renderedWith(t *testing.T, path string, overrides map[string][]byte) []object {
+	t.Helper()
 	memory := filesys.MakeFsInMemory()
 	root := repoRoot(t)
 	e := filepath.WalkDir(filepath.Join(root, "platform/components/runners"), func(source string, d fs.DirEntry, err error) error {
@@ -86,7 +90,10 @@ func rendered(t *testing.T, path string) []object {
 		if d.IsDir() {
 			return memory.MkdirAll(target)
 		}
-		data, err := os.ReadFile(source)
+		data, ok := overrides[relative]
+		if !ok {
+			data, err = os.ReadFile(source)
+		}
 		if err != nil {
 			return err
 		}

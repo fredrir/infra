@@ -250,6 +250,13 @@ Do not delete leases while their workers are running; corrupted lease state fail
 
 A changed digest for an unchanged version is not proposed; investigate it before editing the pin.
 
+| Missing ARC listener | Value |
+| --- | --- |
+| Symptom | Jobs for one scale-set label stay queued; `AutoscalingRunnerSet` phase `Pending`; controller log `waiting for the running and pending runners to finish`; verification reports `has no running listener` |
+| Cause | A release change outside the runner template deletes the listener, and `updateStrategy: eventual` waits for a warm idle runner that cannot finish without one |
+| Prevention | Warm scale sets carry their release file hash in the runner template annotation `infra.fredrir.com/release`, so ARC replaces idle runners |
+| Remediation | `kubectl -n <namespace> get ephemeralrunnersets`, then `kubectl -n <namespace> patch ephemeralrunnerset <name> --type=merge -p '{"spec":{"replicas":0}}'`; ARC recreates the listener |
+
 The Rust reusable workflow accepts `build-output-cache: false` to skip target archive restore and publication while retaining compiler `sccache`.
 `nsql` uses this setting because the measured archive refresh cost exceeded the compilation saved; identical-output reruns benefited from archive reuse.
 Compare `rust-cache-restore`, `rust-preparation`, `rust-cache-save` and total job duration before changing this setting.

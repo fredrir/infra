@@ -47,6 +47,9 @@ spec:
               - ALL
             readOnlyRootFilesystem: true
     template:
+      metadata:
+        annotations:
+          infra.fredrir.com/release: deploy-release
       spec:
         serviceAccountName: ci-job
         automountServiceAccountToken: false
