@@ -38,6 +38,15 @@ filegroup(
 )
 
 filegroup(
+    name = "build_vm_metrics_data",
+    srcs = [
+        "ansible/inventory/production.yml",
+        "//platform:components/observability/build-vm.yaml",
+    ],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "renovate_pin_data",
     srcs = glob(["images/*/Containerfile"]) + [
         "renovate.json",

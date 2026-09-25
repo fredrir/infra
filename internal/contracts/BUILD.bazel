@@ -3,11 +3,13 @@ load("@rules_go//go:def.bzl", "go_test")
 go_test(
     name = "contracts_test",
     srcs = [
+        "build_vm_test.go",
         "cancellation_test.go",
         "images_test.go",
         "renovate_test.go",
     ],
     data = [
+        "//:build_vm_metrics_data",
         "//:image_contract_data",
         "//:renovate_pin_data",
     ],

@@ -1,0 +1,51 @@
+- name: Download verified node exporter archive
+  ansible.builtin.get_url:
+    url: 'https://github.com/prometheus/node_exporter/releases/download/v{{ build_runner_node_exporter_version }}/{{ build_runner_node_exporter_release }}.tar.gz'
+    dest: '/var/cache/{{ build_runner_node_exporter_release }}.tar.gz'
+    checksum: 'sha256:{{ build_runner_node_exporter_sha256 }}'
+    owner: root
+    group: root
+    mode: '0644'
+    timeout: 30
+  register: build_runner_node_exporter_archive
+
+- name: Compare the extracted node exporter with its verified archive
+  ansible.builtin.shell: '{{ build_runner_node_exporter_verify }}'
+  register: build_runner_node_exporter_extracted
+  changed_when: build_runner_node_exporter_extracted.rc != 0
+  failed_when: false
+  check_mode: false
+
+- name: Extract verified node exporter
+  ansible.builtin.unarchive:
+    src: '/var/cache/{{ build_runner_node_exporter_release }}.tar.gz'
+    dest: /opt
+    remote_src: true
+    include: ['{{ build_runner_node_exporter_release }}/node_exporter']
+    owner: root
+    group: root
+  register: build_runner_node_exporter_extraction
+  when: build_runner_node_exporter_extracted.changed
+
+- name: Require the node exporter from its verified archive
+  ansible.builtin.shell: '{{ build_runner_node_exporter_verify }}'
+  changed_when: false
+  check_mode: false
+  when: build_runner_node_exporter_extraction.changed
+
+- name: Find superseded node exporter releases
+  ansible.builtin.find:
+    paths: [/var/cache, /opt]
+    patterns: 'node_exporter-*'
+    file_type: any
+  register: build_runner_node_exporter_releases
+  when: build_runner_node_exporter_archive.changed
+
+- name: Remove superseded node exporter releases
+  ansible.builtin.file:
+    path: '{{ item.path }}'
+    state: absent
+  loop: "{{ build_runner_node_exporter_releases.files | default([]) | rejectattr('path', 'search', build_runner_node_exporter_release | regex_escape) | list }}"
+  loop_control:
+    label: '{{ item.path }}'
+  when: build_runner_node_exporter_archive.changed

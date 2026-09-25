@@ -7,7 +7,10 @@ filegroup(
     visibility = ["//internal/policy:__pkg__"],
 )
 
-exports_files(["components/backups/tools.Dockerfile"])
+exports_files([
+    "components/backups/tools.Dockerfile",
+    "components/observability/build-vm.yaml",
+])
 
 filegroup(
     name = "promotion_testdata",

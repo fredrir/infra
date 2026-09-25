@@ -298,8 +298,9 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 	}
 	applyOnlyTasks := []string{
 		"roles/infra_binary/tasks/main.yml: Remove superseded binary revisions",
-		"roles/build_runner/tasks/main.yml: Download verified node exporter archive",
-		"roles/build_runner/tasks/main.yml: Remove superseded node exporter releases",
+		"roles/build_runner/tasks/node-exporter.yml: Download verified node exporter archive",
+		"roles/build_runner/tasks/node-exporter.yml: Remove superseded node exporter releases",
+		"roles/build_runner/tasks/main.yml: Restart replaced node exporter",
 		"roles/build_runner/tasks/main.yml: Download verified runner archive",
 		"roles/build_runner/tasks/main.yml: Remove superseded runner archives",
 		"roles/build_runner/tasks/repository.yml: Remove unregistered runner identity",

@@ -135,6 +135,7 @@ spec:
             memory: 4Gi
         nodeSelector:
           node-restriction.kubernetes.io/critical: 'true'
+          kubernetes.io/hostname: fredrir-09
         storageSpec:
           volumeClaimTemplate:
             spec:
