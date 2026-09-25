@@ -12,11 +12,15 @@ import (
 )
 
 type ansiblePlay struct {
-	CheckMode bool             `yaml:"check_mode"`
-	PreTasks  []map[string]any `yaml:"pre_tasks"`
-	Roles     []ansibleRole    `yaml:"roles"`
-	Tasks     []map[string]any `yaml:"tasks"`
-	Handlers  []map[string]any `yaml:"handlers"`
+	Name           string           `yaml:"name"`
+	ImportPlaybook string           `yaml:"import_playbook"`
+	Tags           any              `yaml:"tags"`
+	Serial         any              `yaml:"serial"`
+	CheckMode      bool             `yaml:"check_mode"`
+	PreTasks       []map[string]any `yaml:"pre_tasks"`
+	Roles          []ansibleRole    `yaml:"roles"`
+	Tasks          []map[string]any `yaml:"tasks"`
+	Handlers       []map[string]any `yaml:"handlers"`
 }
 
 type ansibleRole struct{ Name string }
@@ -36,13 +40,57 @@ func (r *ansibleRole) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type ansibleTask struct {
-	Key          string
-	Module       string
-	Definition   map[string]any
-	CheckMode    bool
-	IgnoreErrors bool
-	Notify       []string
-	When         []string
+	Key               string
+	Module            string
+	Role              string
+	Definition        map[string]any
+	CheckMode         bool
+	CheckModeDeclared bool
+	IgnoreErrors      bool
+	Notify            []string
+	When              []string
+}
+
+var (
+	checkModeModules = []string{
+		"ansible.builtin.apt",
+		"ansible.builtin.copy",
+		"ansible.builtin.file",
+		"ansible.builtin.get_url",
+		"ansible.builtin.hostname",
+		"ansible.builtin.lineinfile",
+		"ansible.builtin.systemd_service",
+		"ansible.builtin.template",
+		"ansible.builtin.user",
+	}
+	readOnlyModules = []string{
+		"ansible.builtin.assert",
+		"ansible.builtin.fail",
+		"ansible.builtin.find",
+		"ansible.builtin.getent",
+		"ansible.builtin.meta",
+		"ansible.builtin.set_fact",
+		"ansible.builtin.setup",
+		"ansible.builtin.slurp",
+		"ansible.builtin.stat",
+	}
+	checkModeSkippedModules = []string{
+		"ansible.builtin.command",
+		"ansible.builtin.shell",
+		"ansible.builtin.unarchive",
+		"ansible.builtin.uri",
+		"ansible.builtin.wait_for",
+		"ansible.builtin.wait_for_connection",
+	}
+)
+
+func classifiedModule(t *testing.T, task ansibleTask) bool {
+	t.Helper()
+	if slices.Contains(checkModeModules, task.Module) || slices.Contains(readOnlyModules, task.Module) || slices.Contains(checkModeSkippedModules, task.Module) {
+		return true
+	}
+	t.Errorf("%s uses unclassified module %s", task.Key, task.Module)
+	return false
 }
 
 func loadAnsible[T any](t *testing.T, root, file string) T {
@@ -113,17 +161,24 @@ func walkAnsiblePlays(t *testing.T, root, file string, visit func(ansibleTask)) 
 	t.Helper()
 	plays := loadAnsible[[]ansiblePlay](t, root, file)
 	for _, play := range plays {
-		inherited := ansibleTask{CheckMode: play.CheckMode}
-		names := map[string]bool{}
-		requireAnsibleTaskNames(t, file, play.PreTasks, names)
-		walkAnsibleTasks(t, root, file, play.PreTasks, inherited, visit)
-		for _, role := range play.Roles {
-			walkAnsibleFile(t, root, filepath.Join("roles", role.Name, "tasks", "main.yml"), inherited, visit)
-		}
-		requireAnsibleTaskNames(t, file, play.Tasks, names)
-		walkAnsibleTasks(t, root, file, play.Tasks, inherited, visit)
+		walkAnsiblePlay(t, root, file, play, visit)
 	}
 	return plays
+}
+
+func walkAnsiblePlay(t *testing.T, root, file string, play ansiblePlay, visit func(ansibleTask)) {
+	t.Helper()
+	inherited := ansibleTask{CheckMode: play.CheckMode}
+	names := map[string]bool{}
+	requireAnsibleTaskNames(t, file, play.PreTasks, names)
+	walkAnsibleTasks(t, root, file, play.PreTasks, inherited, visit)
+	for _, role := range play.Roles {
+		roleTask := inherited
+		roleTask.Role = role.Name
+		walkAnsibleFile(t, root, filepath.Join("roles", role.Name, "tasks", "main.yml"), roleTask, visit)
+	}
+	requireAnsibleTaskNames(t, file, play.Tasks, names)
+	walkAnsibleTasks(t, root, file, play.Tasks, inherited, visit)
 }
 
 func walkAnsibleFile(t *testing.T, root, file string, inherited ansibleTask, visit func(ansibleTask)) {
@@ -138,17 +193,20 @@ func walkAnsibleTasks(t *testing.T, root, file string, tasks []map[string]any, i
 	for _, definition := range tasks {
 		name, _ := definition["name"].(string)
 		task := ansibleTask{
-			Key:          file + ": " + name,
-			Definition:   definition,
-			CheckMode:    inherited.CheckMode,
-			IgnoreErrors: inherited.IgnoreErrors,
-			Notify:       inherited.Notify,
-			When:         append(slices.Clone(inherited.When), ansibleStrings(t, definition["when"])...),
+			Key:               file + ": " + name,
+			Role:              inherited.Role,
+			Definition:        definition,
+			CheckMode:         inherited.CheckMode,
+			CheckModeDeclared: inherited.CheckModeDeclared,
+			IgnoreErrors:      inherited.IgnoreErrors,
+			Notify:            inherited.Notify,
+			When:              append(slices.Clone(inherited.When), ansibleStrings(t, definition["when"])...),
 		}
 		if value, ok := definition["check_mode"]; ok {
 			if task.CheckMode, ok = value.(bool); !ok {
 				t.Fatalf("%s has non-literal check_mode %v", task.Key, value)
 			}
+			task.CheckModeDeclared = true
 		}
 		if value, ok := definition["ignore_errors"]; ok {
 			task.IgnoreErrors = value != false
@@ -183,7 +241,8 @@ func walkAnsibleTasks(t *testing.T, root, file string, tasks []map[string]any, i
 			if filepath.Ext(tasksFrom) == "" {
 				tasksFrom += ".yml"
 			}
-			walkAnsibleFile(t, root, filepath.Join("roles", role["name"].(string), "tasks", tasksFrom), task, visit)
+			task.Role = role["name"].(string)
+			walkAnsibleFile(t, root, filepath.Join("roles", task.Role, "tasks", tasksFrom), task, visit)
 		default:
 			visit(task)
 		}
@@ -192,35 +251,15 @@ func walkAnsibleTasks(t *testing.T, root, file string, tasks []map[string]any, i
 
 func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 	root := filepath.Join("..", "..", "ansible")
-	comparedModules := []string{
-		"ansible.builtin.apt",
-		"ansible.builtin.copy",
-		"ansible.builtin.file",
-		"ansible.builtin.systemd_service",
-		"ansible.builtin.template",
-		"ansible.builtin.user",
-	}
-	readOnlyModules := []string{
-		"ansible.builtin.assert",
-		"ansible.builtin.find",
-		"ansible.builtin.set_fact",
-		"ansible.builtin.setup",
-		"ansible.builtin.slurp",
-		"ansible.builtin.stat",
-	}
-	applyOnlyModules := []string{
-		"ansible.builtin.command",
-		"ansible.builtin.get_url",
-		"ansible.builtin.shell",
-		"ansible.builtin.unarchive",
-	}
 	probedTasks := []string{
 		"roles/infra_binary/tasks/main.yml: Create root-owned artifact cache",
+		"roles/infra_binary/tasks/main.yml: Download verified compiled binary",
 		"roles/infra_binary/tasks/main.yml: Activate verified binary",
 		"roles/build_runner/tasks/remove.yml: Remove retired runner",
 	}
 	applyOnlyTasks := []string{
 		"roles/infra_binary/tasks/main.yml: Remove superseded binary revisions",
+		"roles/build_runner/tasks/main.yml: Download verified runner archive",
 		"roles/build_runner/tasks/main.yml: Remove superseded runner archives",
 		"roles/build_runner/tasks/repository.yml: Remove unregistered runner identity",
 		"roles/build_runner/tasks/repository.yml: Record incomplete runner replacement",
@@ -236,16 +275,9 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 		"roles/build_runner/tasks/repository-services.yml: Find stale runner services",
 		"roles/build_engine/tasks/state.yml: Find stale build engine",
 	}
-	classified := func(task ansibleTask) bool {
-		if slices.Contains(comparedModules, task.Module) || slices.Contains(readOnlyModules, task.Module) || slices.Contains(applyOnlyModules, task.Module) {
-			return true
-		}
-		t.Errorf("%s uses unclassified module %s", task.Key, task.Module)
-		return false
-	}
 	applied := map[string]bool{}
 	walkAnsiblePlays(t, root, "build-runners.yml", func(task ansibleTask) {
-		if classified(task) && slices.Contains(comparedModules, task.Module) {
+		if classifiedModule(t, task) && slices.Contains(checkModeModules, task.Module) {
 			applied[task.Key] = true
 		}
 	})
@@ -259,15 +291,15 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 			t.Errorf("verification runs %s differently from the runner play", task.Key)
 		}
 		switch {
-		case !classified(task):
+		case !classifiedModule(t, task):
 		case !task.CheckMode:
 			read[task.Key] = true
 			if !slices.Contains(hostReads, task.Key) || task.Definition["changed_when"] != false {
 				t.Errorf("verification runs %s outside check mode without being a declared host read", task.Key)
 			}
-		case slices.Contains(comparedModules, task.Module):
+		case slices.Contains(checkModeModules, task.Module):
 			compared = append(compared, task)
-		case slices.Contains(applyOnlyModules, task.Module):
+		case slices.Contains(checkModeSkippedModules, task.Module):
 			t.Errorf("verification skips %s in check mode", task.Key)
 		}
 	})
