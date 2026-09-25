@@ -100,7 +100,7 @@ all:
                   - node-restriction.kubernetes.io/volatile=true:NoSchedule
                   firewall_admin_ipv4_cidrs:
                   - 10.50.0.0/16
-                  data_volume_device: null
+                  data_volume_device: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_577daadf-6f2c-4cdc-8639-86108aa264b7
                   data_volume_binds:
                   - /var/lib/rancher
                   - /var/lib/kubelet

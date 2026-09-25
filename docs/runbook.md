@@ -301,10 +301,12 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 
 | Data volume | Value |
 | --- | --- |
-| Device | `data_volume_device` under `/dev/disk/by-id/`; partition `-part1`; ext4 label `infra-data` |
+| Device | `data_volume_device`; 500 GB OpenStack SSD `scsi-0QEMU_QEMU_HARDDISK_577daadf-6f2c-4cdc-8639-86108aa264b7`; partition `-part1`; ext4 label `infra-data` |
+| Performance | Per-volume QoS cap (same as root): ~1000 IOPS 4k random, ~500 MB/s sequential, p99 ~50 ms; SSD class does not raise IOPS |
 | Formatting | Only when `wipefs` finds no signature; foreign or whole-disk signatures fail closed |
 | Mount | `srv-data.mount` at `/srv/data`; `Options=nofail`; `WantedBy=local-fs.target` |
-| Layout | `data_volume_binds`: `/srv/data/<name>` bound onto `/var/lib/rancher`, `/var/lib/kubelet`, `/var/lib/infra-build-vm` |
+| Layout | `data_volume_binds` (inventory-driven): `/srv/data/<name>` bound onto `/var/lib/rancher` (containerd images), `/var/lib/kubelet` (pod emptyDirs), `/var/lib/infra-build-vm` (nested VM qcow2 and Dagger cache) — large mostly-sequential caches |
+| Hot scratch | Latency-sensitive CI scratch (Rust `target`, sccache) belongs in a `medium: Memory` emptyDir counted against the pod's memory, not on the IOPS-capped volume; deferred until fio-on-real-volume and pod-limit headroom are confirmed (3 Rust pods at 16Gi vs 62 GiB RAM), so it is a measured follow-up, not yet applied |
 | Consumers | `data_volume_consumers` get `RequiresMountsFor=` on the layout; running consumers restart once when a mount activates |
 | Missing volume | Consumers stay stopped; nothing writes the 40 GB root |
 
