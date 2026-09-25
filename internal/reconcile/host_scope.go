@@ -3,35 +3,40 @@ package reconcile
 import (
 	"context"
 	"errors"
+	"slices"
 )
 
+const (
+	monitorTags    = "--tags=gatus,verification_trigger"
+	monitorCLITags = "--tags=infra_binary"
+)
+
+func monitorCLIChanged(selected Selection) bool {
+	return effectiveHostScope(selected) == HostScopeRunners && slices.Contains(selected.RunnerInputs, "build/cli-release.json")
+}
+
 func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
-	var playbooks []string
+	var playbooks [][]string
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
 		if _, err := LoadRunnerFleet(c.Runner.Dir); err != nil {
 			return err
 		}
-		playbooks = []string{"reconcile.yml", "external.yml", "verify.yml", "verify-runners.yml"}
+		playbooks = [][]string{{"reconcile.yml"}, {"external.yml"}, {"verify.yml"}, {"verify-runners.yml"}}
 	case HostScopeRunners:
 		if _, err := LoadRunnerFleet(c.Runner.Dir); err != nil {
 			return err
 		}
-		playbooks = []string{"build-runners.yml", "verify-runners.yml"}
+		playbooks = [][]string{{"build-runners.yml"}, {"verify-runners.yml"}}
+		if monitorCLIChanged(plan.Affected) {
+			playbooks = append(playbooks, []string{"external.yml", monitorCLITags})
+		}
 	case HostScopeMonitor:
-		playbooks = []string{"external.yml", "verify.yml"}
+		playbooks = [][]string{{"external.yml", monitorTags}, {"verify.yml", "--limit=external"}}
 	}
 	for _, playbook := range playbooks {
 		for _, check := range []string{"--syntax-check", "--list-tasks"} {
-			args := []string{check}
-			if effectiveHostScope(plan.Affected) == HostScopeMonitor {
-				if playbook == "external.yml" {
-					args = append(args, "--tags=gatus")
-				} else {
-					args = append(args, "--limit=external")
-				}
-			}
-			if err := c.ansible(ctx, playbook, args...); err != nil {
+			if err := c.ansible(ctx, playbook[0], append([]string{check}, playbook[1:]...)...); err != nil {
 				return err
 			}
 		}
@@ -111,11 +116,13 @@ func (c *Commands) verifyRunnerHosts(ctx context.Context, playbooks ...string) e
 }
 
 func (c *Commands) Monitor(ctx context.Context, plan Plan) error {
-	switch effectiveHostScope(plan.Affected) {
-	case HostScopeFull:
+	switch {
+	case effectiveHostScope(plan.Affected) == HostScopeFull:
 		return c.ansible(ctx, "external.yml")
-	case HostScopeMonitor:
-		return c.ansible(ctx, "external.yml", "--tags=gatus")
+	case effectiveHostScope(plan.Affected) == HostScopeMonitor:
+		return c.ansible(ctx, "external.yml", monitorTags)
+	case monitorCLIChanged(plan.Affected):
+		return c.ansible(ctx, "external.yml", monitorCLITags)
 	default:
 		return nil
 	}

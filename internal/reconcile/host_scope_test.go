@@ -29,6 +29,8 @@ func TestHostScopeSelection(t *testing.T) {
 		{"runner fleet", []string{"build/runners.json"}, HostScopeRunners, false, false},
 		{"engine toolchain", []string{"build/toolchain.json"}, HostScopeRunners, false, false},
 		{"monitor", []string{"ansible/roles/gatus/templates/config.yml.j2"}, HostScopeMonitor, false, false},
+		{"verification trigger", []string{"ansible/roles/verification_trigger/templates/infra-verification-request.timer.j2"}, HostScopeMonitor, false, false},
+		{"CLI release and verification trigger", []string{"build/cli-release.json", "ansible/roles/verification_trigger/tasks/main.yml"}, HostScopeFull, false, false},
 		{"mixed hosts", []string{"ansible/roles/gatus/tasks/main.yml", "ansible/roles/build_runner/tasks/main.yml"}, HostScopeFull, false, false},
 		{"settings", []string{"platform/clusters/production/settings.yaml"}, HostScopeMonitor, true, true},
 		{"inventory", []string{"ansible/inventory/production.yml"}, HostScopeFull, false, false},
@@ -64,17 +66,23 @@ func TestHostScopeSelection(t *testing.T) {
 func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 	fleet := testRunnerFleet()
 	root := writeRunnerFleet(t, fleet)
+	cli := []string{"build/cli-release.json"}
 	for _, test := range []struct {
+		name    string
 		scope   string
+		inputs  []string
 		want    []string
+		planned []string
 		runners bool
 	}{
-		{HostScopeFull, []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, true},
-		{HostScopeRunners, []string{"build-runners.yml", "verify-runners.yml"}, true},
-		{HostScopeMonitor, []string{"external.yml --tags=gatus", "verify.yml --limit=external"}, false},
-		{HostScopeNone, nil, false},
+		{name: HostScopeFull, scope: HostScopeFull, want: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, planned: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, runners: true},
+		{name: HostScopeRunners, scope: HostScopeRunners, want: []string{"build-runners.yml", "verify-runners.yml"}, planned: []string{"build-runners.yml", "verify-runners.yml"}, runners: true},
+		{name: "CLI release", scope: HostScopeRunners, inputs: cli, want: []string{"build-runners.yml --tags=infra_binary", "external.yml --tags=infra_binary", "verify-runners.yml"}, planned: []string{"build-runners.yml", "external.yml --tags=infra_binary", "verify-runners.yml"}, runners: true},
+		{name: HostScopeMonitor, scope: HostScopeMonitor, want: []string{"external.yml --tags=gatus,verification_trigger", "verify.yml --limit=external"}, planned: []string{"external.yml --tags=gatus,verification_trigger", "verify.yml --limit=external"}},
+		{name: "CLI release in full scope", scope: HostScopeFull, inputs: cli, want: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, planned: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml"}, runners: true},
+		{name: HostScopeNone, scope: HostScopeNone},
 	} {
-		t.Run(test.scope, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			var mu sync.Mutex
 			var calls []string
 			queried := 0
@@ -95,9 +103,25 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 				t.Errorf("unexpected command: %s", opts.Name)
 				return process.Result{}, errors.New("unexpected command")
 			}}}
-			plan := Plan{Affected: Selection{Ansible: test.scope != HostScopeNone, HostScope: test.scope}}
+			plan := Plan{Affected: Selection{Ansible: test.scope != HostScopeNone, HostScope: test.scope, RunnerInputs: test.inputs}}
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
+			if err := commands.PlanHosts(ctx, plan); err != nil {
+				t.Fatal(err)
+			}
+			var syntax, listed []string
+			for _, call := range calls {
+				syntax = append(syntax, strings.Replace(call, " --syntax-check", "", 1))
+				listed = append(listed, strings.Replace(call, " --list-tasks", "", 1))
+			}
+			syntax = slices.DeleteFunc(syntax, func(call string) bool { return strings.Contains(call, "--list-tasks") })
+			listed = slices.DeleteFunc(listed, func(call string) bool { return strings.Contains(call, "--syntax-check") })
+			slices.Sort(syntax)
+			slices.Sort(listed)
+			if !slices.Equal(syntax, test.planned) || !slices.Equal(listed, test.planned) {
+				t.Fatalf("plan checked %v", calls)
+			}
+			calls = nil
 			for _, operation := range []func(context.Context, Plan) error{commands.Hosts, commands.Monitor, commands.VerifyHosts} {
 				if err := operation(ctx, plan); err != nil {
 					t.Fatal(err)

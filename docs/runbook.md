@@ -35,8 +35,8 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | --- | --- | --- |
 | Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu expansion and final-state plans, Flux rendering, Ansible task lists |
 | Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout; apply against the last successful revision |
-| Scheduled verification | `infra reconcile verify --deep --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and each host playbook at minute 47 every hour (UTC); a report listing differences dispatches one full reconciliation of `main` |
-| On-demand verification | `gh workflow run reconcile.yml --ref main -f verify=true` | The scheduled verification on demand; differences are reported without dispatching a reconciliation |
+| Hourly verification | `infra-verification-request.timer` on `fredrir-06` → `reconcile.yml` with `verify=true`, `repair=true` → `infra reconcile verify --deep --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and each host playbook; a report listing differences dispatches one full reconciliation of `main` |
+| On-demand verification | `gh workflow run reconcile.yml --ref main -f verify=true` | The hourly verification on demand; differences are reported without dispatching a reconciliation unless `-f repair=true` |
 | Verification | `infra reconcile verify` | Reconciliation lock and recorded status, exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision; every comparison runs when another fails |
 | Status | `infra reconcile status` | Desired revision, successfully applied revision, failing stage and stage durations |
 
@@ -48,8 +48,40 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | No state bucket access | Error; comparisons skipped |
 | Ten-minute budget exceeded | Error; comparisons discarded; report and log written |
 | Unpublished deploying changes | Difference; comparisons skipped |
-| Repair not dispatched | Push reconciliation on `main` with an incomplete `reconcile / apply` job; latest bot dispatch for the commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled |
+| Repair not dispatched | `repair=false`; push reconciliation on `main` with an incomplete `reconcile / apply` job; latest `github-actions[bot]` dispatch for the commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled |
 | Repair cap reset | New commit on `main` |
+
+| Verification trigger | Value |
+| --- | --- |
+| Host / role | `fredrir-06` (`external`) / `ansible/roles/verification_trigger` |
+| Timer | `infra-verification-request.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |
+| Service | `infra-verification-request.service`: oneshot `infra reconcile request-verification`, `DynamicUser=yes`, IPv4/IPv6 sockets only, read-only system |
+| Binary | `/usr/local/bin/infra` from `build/cli-release.json`; a CLI release also runs `external.yml --tags=infra_binary` |
+| Credential | Root `0600` `/etc/infra-verification/github-app.pem`, delivered through `LoadCredential=github-app-key` |
+| Token | Installation token restricted to `infra` with `actions: write` |
+| Dispatch | `reconcile.yml` at `main`, `verify=true`, `repair=true`, actor `fredrir-infra-verification[bot]` |
+| Failed dispatch | Unit `failed`; journal `infra: dispatch reconcile.yml in fredrir/infra at main: ERROR`; no new dispatched run; the next hour retries |
+| Deployment scope | Role changes run `external.yml --tags=gatus,verification_trigger` |
+
+```sh
+ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl list-timers infra-verification-request.timer --no-pager
+ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 journalctl -u infra-verification-request.service --no-pager -n 20
+ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl start infra-verification-request.service
+```
+
+| GitHub App | Value |
+| --- | --- |
+| Name | `fredrir-infra-verification` |
+| Permissions | Actions: read and write; Metadata: read |
+| Webhook | Disabled |
+| Installation | `fredrir/infra` only |
+| App / installation ID | `5077572` / `164918469`; `fredrir-06` in `ansible/inventory/production.yml` |
+| Private key | `ansible/roles/verification_trigger/files/github-app.sops.yaml`, field `private_key`; recipients in [Secrets](Secrets.md) |
+| Rotation | Generate a key in the App settings; replace `private_key`; reconcile; delete the previous key |
+
+```sh
+sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["private_key"]' "$(jq -Rs . < NEW_KEY.pem)"
+```
 
 | Owner | Managed state |
 | --- | --- |
@@ -113,7 +145,7 @@ These activation steps provision external credentials once; merge, verification 
 | `PLATFORM_MAIL_RECIPIENT` | Private OpenTofu mail recipient | Same recipient |
 | `SSH_PRIVATE_KEY` | Unset | Dedicated key for managed hosts and build guest |
 | `SSH_KNOWN_HOSTS` | Unset | Verified Tailnet host keys, `fredrir-06` and `infra-build-09` aliases |
-| `SOPS_AGE_KEY` | Unset | Decrypt host monitoring and backup credentials |
+| `SOPS_AGE_KEY` | Unset | Decrypt host monitoring, verification trigger and backup credentials |
 | `RUNNER_APP_ID`, `RUNNER_APP_PRIVATE_KEY` | Unset | Existing runner GitHub App; mint a short-lived installation token with repository administration permission |
 
 | OIDC setting | `infrastructure-plan` | `infrastructure-apply` |
@@ -140,7 +172,7 @@ These activation steps provision external credentials once; merge, verification 
 | Tailnet plan scope | Control-plane API only |
 | Tailnet apply scope | Control-plane API and SSH to managed hosts |
 | Host SSH key | `ansible/files/reconciliation.pub`; maintained by `ansible/reconciliation-identity.yml` |
-| CI SOPS recipient | Added only to host monitoring and backup secret files |
+| CI SOPS recipient | Added only to host monitoring, verification trigger and backup secret files |
 | Provider-policy changes or revoked credentials | Administrator repair required |
 
 ```sh

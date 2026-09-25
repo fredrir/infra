@@ -2,10 +2,12 @@ package reconcile
 
 import (
 	"cmp"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 
 type workflowStep struct {
 	ID   string            `yaml:"id"`
+	If   string            `yaml:"if"`
 	Uses string            `yaml:"uses"`
 	With map[string]string `yaml:"with"`
 	Run  string            `yaml:"run"`
@@ -24,6 +27,7 @@ type workflowStep struct {
 type workflowJob struct {
 	Name           string            `yaml:"name"`
 	Uses           string            `yaml:"uses"`
+	With           map[string]string `yaml:"with"`
 	If             string            `yaml:"if"`
 	TimeoutMinutes int               `yaml:"timeout-minutes"`
 	Env            map[string]string `yaml:"env"`
@@ -31,18 +35,29 @@ type workflowJob struct {
 	Steps          []workflowStep    `yaml:"steps"`
 }
 
+type workflowInput struct {
+	Type    string `yaml:"type"`
+	Default any    `yaml:"default"`
+}
+
 type workflowFile struct {
-	On struct {
-		Schedule []struct {
-			Cron string `yaml:"cron"`
-		} `yaml:"schedule"`
-		Dispatch struct {
-			Inputs map[string]struct {
-				Type string `yaml:"type"`
-			} `yaml:"inputs"`
-		} `yaml:"workflow_dispatch"`
-	} `yaml:"on"`
+	On   map[string]yaml.Node   `yaml:"on"`
 	Jobs map[string]workflowJob `yaml:"jobs"`
+}
+
+func (w workflowFile) inputs(t *testing.T, trigger string) map[string]workflowInput {
+	t.Helper()
+	node, ok := w.On[trigger]
+	if !ok {
+		t.Fatalf("workflow is not triggered by %s", trigger)
+	}
+	var declaration struct {
+		Inputs map[string]workflowInput `yaml:"inputs"`
+	}
+	if err := node.Decode(&declaration); err != nil {
+		t.Fatal(err)
+	}
+	return declaration.Inputs
 }
 
 func readWorkflow(t *testing.T, name string) workflowFile {
@@ -77,15 +92,54 @@ func (j workflowJob) script() string {
 	return script.String()
 }
 
-func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
+func conjunction(t *testing.T, condition string, facts map[string]bool) bool {
+	t.Helper()
+	expression := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(condition), "${{"), "}}"))
+	if strings.Contains(expression, "||") {
+		t.Fatalf("condition %q is not a conjunction", condition)
+	}
+	for _, term := range strings.Split(expression, "&&") {
+		value, ok := facts[strings.TrimSpace(term)]
+		if !ok {
+			t.Fatalf("condition %q has unclassified term %q", condition, strings.TrimSpace(term))
+		}
+		if !value {
+			return false
+		}
+	}
+	return true
+}
+
+func TestDriftRepairDispatchRequiresRequestedRepairOfVerification(t *testing.T) {
 	workflow := readWorkflow(t, "reconcile-job.yml")
 	repair, ok := workflow.Jobs["repair"]
 	if !ok || !reflect.DeepEqual(repair.Permissions, map[string]string{"actions": "write"}) {
 		t.Fatalf("repair job permissions are not exactly actions: write: %+v", repair.Permissions)
 	}
-	for _, condition := range []string{"github.event.schedule == '47 * * * *'", "needs.apply.result == 'failure'", "!cancelled()", "needs.apply.outputs.differences == 'true'"} {
-		if !strings.Contains(repair.If, condition) || strings.Contains(repair.If, "||") {
-			t.Errorf("repair job condition %q does not require %s", repair.If, condition)
+	facts := func(verify, repair bool) map[string]bool {
+		return map[string]bool{"inputs.verify": verify, "inputs.repair": repair, "!cancelled()": true, "needs.apply.result == 'failure'": true, "needs.apply.outputs.reconciliation == 'failure'": true, "needs.apply.outputs.differences == 'true'": true}
+	}
+	for _, test := range []struct {
+		name           string
+		verify, repair bool
+		dispatch       bool
+	}{
+		{name: "push"},
+		{name: "on-demand verification", verify: true},
+		{name: "repair without verification", repair: true},
+		{name: "verification with repair", verify: true, repair: true, dispatch: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if dispatch := conjunction(t, repair.If, facts(test.verify, test.repair)); dispatch != test.dispatch {
+				t.Fatalf("repair dispatched=%t for condition %q", dispatch, repair.If)
+			}
+		})
+	}
+	for _, requirement := range []string{"!cancelled()", "needs.apply.result == 'failure'", "needs.apply.outputs.reconciliation == 'failure'", "needs.apply.outputs.differences == 'true'"} {
+		scenario := facts(true, true)
+		scenario[requirement] = false
+		if conjunction(t, repair.If, scenario) {
+			t.Errorf("repair job condition %q does not require %s", repair.If, requirement)
 		}
 	}
 	for _, guard := range []string{"--workflow reconcile.yml", "--event workflow_dispatch", "--user 'github-actions[bot]'", `--commit "$GITHUB_SHA"`, "--limit 1", "--json conclusion,createdAt"} {
@@ -98,12 +152,36 @@ func TestDriftRepairDispatchIsScopedToHourlyVerification(t *testing.T) {
 			t.Errorf("job %s can dispatch workflows", name)
 		}
 	}
-	if verification := workflow.Jobs["apply"].Env["VERIFICATION"]; verification != "${{ github.event.schedule == '47 * * * *' || inputs.verify }}" {
-		t.Errorf("hourly and dispatched verification select %q", verification)
+	if verification := workflow.Jobs["apply"].Env["VERIFICATION"]; verification != "${{ inputs.verify }}" {
+		t.Errorf("dispatched verification selects %q", verification)
 	}
-	trigger := readWorkflow(t, "reconcile.yml")
-	if len(trigger.On.Schedule) != 1 || trigger.On.Schedule[0].Cron != "47 * * * *" || trigger.On.Dispatch.Inputs["verify"].Type != "boolean" {
-		t.Errorf("reconciliation is scheduled beyond hourly verification or lacks on-demand verification: %+v", trigger.On)
+	caller := readWorkflow(t, "reconcile.yml")
+	if forwarded := caller.Jobs["reconcile"].With; forwarded["verify"] != "${{ inputs.verify || false }}" || forwarded["repair"] != "${{ inputs.repair || false }}" {
+		t.Errorf("reconciliation forwards %v", forwarded)
+	}
+	triggers := slices.Sorted(maps.Keys(caller.On))
+	if !slices.Equal(triggers, []string{"pull_request", "push", "workflow_dispatch"}) {
+		t.Errorf("reconciliation triggers %v, want push, pull_request and workflow_dispatch only", triggers)
+	}
+	inputs := caller.inputs(t, "workflow_dispatch")
+	for name, want := range map[string]workflowInput{"full": {Type: "boolean", Default: true}, "verify": {Type: "boolean", Default: false}, "repair": {Type: "boolean", Default: false}} {
+		if inputs[name] != want {
+			t.Errorf("dispatch input %s is %+v, want %+v", name, inputs[name], want)
+		}
+	}
+	for name, input := range readWorkflow(t, "reconcile-job.yml").inputs(t, "workflow_call") {
+		if input != (workflowInput{Type: "boolean", Default: false}) {
+			t.Errorf("called input %s is %+v", name, input)
+		}
+	}
+	for _, name := range []string{"reconcile.yml", "reconcile-job.yml"} {
+		data, err := os.ReadFile(filepath.Join("..", "..", ".github/workflows", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), "schedule") {
+			t.Errorf("%s still depends on a GitHub schedule", name)
+		}
 	}
 }
 
@@ -262,7 +340,7 @@ func TestVerificationRunsWithReadOnlyCredentials(t *testing.T) {
 	if full := setup.With["full"]; full != "${{ env.VERIFICATION == 'true' || inputs.full }}" {
 		t.Errorf("verification prepares tooling with full=%q", full)
 	}
-	if check := readWorkflow(t, "reconcile.yml").Jobs["check"].If; check != "github.event_name != 'schedule' && !inputs.verify" {
+	if check := readWorkflow(t, "reconcile.yml").Jobs["check"].If; check != "${{ !inputs.verify }}" {
 		t.Errorf("verification runs repository checks with condition %q", check)
 	}
 }

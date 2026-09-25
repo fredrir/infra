@@ -21,7 +21,7 @@
 | `fredrir-03`          | Future home capacity                                 | Configuration incomplete        |
 | `fredrir-04`          | Shared production and CI worker                      | 24/7                            |
 | `fredrir-05`          | K3s control plane and etcd                           | 24/7                            |
-| `fredrir-06`          | Independent Gatus monitoring                         | 24/7; outside Kubernetes        |
+| `fredrir-06`          | Independent Gatus monitoring; verification timer     | 24/7; outside Kubernetes        |
 | `fredrir-07`          | K3s control plane and etcd                           | 24/7                            |
 | `fredrir-08`          | K3s control plane and etcd                           | 24/7                            |
 | `fredrir-09`          | Shared production and CI worker; retained local data | 24/7                            |

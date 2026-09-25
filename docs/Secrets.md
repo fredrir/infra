@@ -11,6 +11,7 @@
 | Application source environments       | Each project's existing Doppler configuration                                                                                                                                          |
 | Cluster runtime secrets               | `platform/**/*.secret.sops.yaml`                                                                                                                                                       |
 | Independent monitoring                | `ansible/roles/gatus/files/config.sops.yaml`                                                                                                                                           |
+| Verification trigger App key          | `ansible/roles/verification_trigger/files/github-app.sops.yaml`                                                                                                                        |
 | Decryption                            | Macie, Archie `~/.config/age/keys.txt`; Flux `flux-system/sops-age`; CI apply Doppler `prd_reconciliation_apply` `SOPS_AGE_KEY`                                                        |
 | Host tokens                           | Private `/etc/rancher/k3s/server-token` and `agent-token`                                                                                                                              |
 | Recovery archives                     | Private `.infra/` on Macie and independent Archie copies                                                                                                                               |
@@ -21,7 +22,7 @@
 | Macie | `age1wflp6cynwm97wndq5zxmpaxwz59h62a7dku8qdyue5zm9g4djfnqwj9n0m` |
 | Archie | `age1mxszcn7gs8gnvhpq8ku748szqe8u6raferefg986slu83r3zkcmswe29zs` |
 | Flux | `age1eva47ddzjgmvrzjd8mxm7h0n6vvamw5xp94aqvlm2d3yf3uvracqypxu7x` |
-| CI apply | `age1jm6xj8qlmfjlhw0vdseaaqkpt3mqj3yl0upx3smwutsaghcq6pesvrka2t`; backup secret and Gatus config only |
+| CI apply | `age1jm6xj8qlmfjlhw0vdseaaqkpt3mqj3yl0upx3smwutsaghcq6pesvrka2t`; backup secret, Gatus config and verification trigger App key only |
 
 | Env | Value |
 | --- | --- |

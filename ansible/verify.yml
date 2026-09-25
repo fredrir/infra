@@ -38,3 +38,7 @@
       use_proxy: false
     retries: 1
     delay: 5
+  - name: Verify scheduled verification requests
+    ansible.builtin.command:
+      argv: [systemctl, is-active, infra-verification-request.timer]
+    changed_when: false

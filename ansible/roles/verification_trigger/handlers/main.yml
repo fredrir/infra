@@ -1,0 +1,5 @@
+- name: Restart the verification request timer
+  ansible.builtin.systemd_service:
+    name: infra-verification-request.timer
+    state: restarted
+    daemon_reload: true

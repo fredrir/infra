@@ -1,0 +1,56 @@
+- name: Require the GitHub App installation
+  ansible.builtin.assert:
+    that:
+      - verification_trigger_app_id is integer
+      - verification_trigger_app_id > 0
+      - verification_trigger_installation_id is integer
+      - verification_trigger_installation_id > 0
+
+- name: Require the encrypted GitHub App key
+  ansible.builtin.assert:
+    that: verification_trigger_key_sops_file is file
+    fail_msg: "Missing SOPS-encrypted GitHub App key {{ verification_trigger_key_sops_file }}"
+
+- name: Install the verified infrastructure binary
+  ansible.builtin.import_role:
+    name: infra_binary
+  vars:
+    infra_binary_url: "https://github.com/fredrir/infra/releases/download/{{ verification_trigger_cli.tag }}/infra-linux-amd64"
+    infra_binary_revision: "{{ verification_trigger_cli.revision }}"
+    infra_binary_sha256: "{{ verification_trigger_cli.sha256 }}"
+  tags: [infra_binary]
+
+- name: Create the verification credential directory
+  ansible.builtin.file:
+    path: "{{ verification_trigger_key | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install the GitHub App private key
+  ansible.builtin.copy:
+    content: "{{ (lookup('ansible.builtin.pipe', 'sops --decrypt ' ~ (verification_trigger_key_sops_file | quote)) | from_yaml).private_key }}"
+    dest: "{{ verification_trigger_key }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  diff: false
+
+- name: Install the verification request units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [infra-verification-request.service, infra-verification-request.timer]
+  notify: Restart the verification request timer
+
+- name: Schedule verification requests
+  ansible.builtin.systemd_service:
+    name: infra-verification-request.timer
+    state: started
+    enabled: true
+    daemon_reload: true

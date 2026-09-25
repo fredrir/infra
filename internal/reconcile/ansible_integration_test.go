@@ -691,6 +691,37 @@ esac
 		t.Fatalf("unattended upgrade policy not applied:\n%s", output)
 	}
 	t.Log("declared patching configuration validates and converges idempotently")
+	write("bin/sops", "#!/bin/sh\nprintf 'private_key: declared-key\\n'\n", true)
+	write("app-key.sops.yaml", "", false)
+	write("trigger.yml", "- hosts: build_engines\n  gather_facts: false\n  vars:\n    verification_trigger_app_id: 1\n    verification_trigger_installation_id: 2\n    verification_trigger_key_sops_file: /fixture/app-key.sops.yaml\n  roles:\n  - verification_trigger\n", false)
+	trigger := func(success bool, extra ...string) string {
+		return run("/fixture/trigger.yml", success, append([]string{"--skip-tags=infra_binary"}, extra...)...)
+	}
+	if output := trigger(true, "--diff"); strings.Contains(output, "declared-key") {
+		t.Fatalf("verification trigger printed its private key:\n%s", output)
+	}
+	if key := command("docker", "exec", name, "stat", "-c", "%a %U %s", "/etc/infra-verification/github-app.pem"); string(key) != "600 root 12\n" {
+		t.Fatalf("GitHub App key installed as %q", key)
+	}
+	for _, mode := range [][]string{nil, {"--check"}} {
+		if output := trigger(true, mode...); !strings.Contains(output, "changed=0") {
+			t.Fatalf("verification trigger %v is not idempotent:\n%s", mode, output)
+		}
+	}
+	command("docker", "exec", name, "sed", "-i", "s/OnCalendar=hourly/OnCalendar=daily/", "/etc/systemd/system/infra-verification-request.timer")
+	if changed, _ := outcome(trigger(true, "--check")); !slices.Equal(changed, []string{"verification_trigger : Install the verification request units", "verification_trigger : Restart the verification request timer"}) {
+		t.Fatalf("edited verification timer reported as %q", changed)
+	}
+	before = restarted()
+	trigger(true)
+	if got := strings.TrimPrefix(restarted(), before); got != "infra-verification-request.timer\n" {
+		t.Fatalf("timer repair restarted %q", got)
+	}
+	command("docker", "exec", name, "rm", "/fixture/app-key.sops.yaml")
+	if output := trigger(false, "--check"); !strings.Contains(output, "Missing SOPS-encrypted GitHub App key /fixture/app-key.sops.yaml") {
+		t.Fatalf("missing encrypted key did not fail clearly:\n%s", output)
+	}
+	t.Log("verification trigger installs its key privately, converges idempotently, restarts an edited timer and requires its encrypted key")
 }
 
 func TestHostComparisonWithLocalContainer(t *testing.T) {

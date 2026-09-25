@@ -95,6 +95,8 @@ all:
               machine_type: Nanode 1 GB
               architecture: amd64
               public_ipv4: 172.232.145.251
+              verification_trigger_app_id: 5077572
+              verification_trigger_installation_id: 164918469
 
     build_vm_hosts:
       hosts:

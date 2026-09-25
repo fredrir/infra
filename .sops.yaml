@@ -3,6 +3,10 @@ keys:
   - &admin age13upkqrd7v97a4gcgerwnkuwvznxh60u2g56x6cj55hemwq68q3lsalynwn
   - &llunde-01 age1thj000t9nt90g7m23tpkz3krt3h5aurj8euayvqs3kq48geaxahs3e0q3r
   - &llunde-parser age1zap47wruuc6wp387hpqq2chdx0uavt3jt0xystjn29rxgvljmplqectmnz
+  - &flux age1eva47ddzjgmvrzjd8mxm7h0n6vvamw5xp94aqvlm2d3yf3uvracqypxu7x
+  - &macie age1wflp6cynwm97wndq5zxmpaxwz59h62a7dku8qdyue5zm9g4djfnqwj9n0m
+  - &ci-apply age1jm6xj8qlmfjlhw0vdseaaqkpt3mqj3yl0upx3smwutsaghcq6pesvrka2t
+  - &archie age1mxszcn7gs8gnvhpq8ku748szqe8u6raferefg986slu83r3zkcmswe29zs
 creation_rules:
   - path_regex: secrets/gitops-llunde-parser\.yaml$
     key_groups:
@@ -25,3 +29,17 @@ creation_rules:
       - age:
           - *admin
           - *llunde-01
+  - path_regex: ansible/roles/gatus/files/config\.sops\.yaml$
+    encrypted_regex: ^(username|password|token)$
+    key_groups:
+      - age:
+          - *flux
+          - *macie
+          - *ci-apply
+          - *archie
+  - path_regex: ansible/roles/[^/]+/files/[^/]+\.sops\.yaml$
+    key_groups:
+      - age:
+          - *macie
+          - *ci-apply
+          - *archie

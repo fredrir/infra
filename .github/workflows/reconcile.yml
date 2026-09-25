@@ -7,14 +7,15 @@ on:
       - "docs/**/*.md"
       - "build/evidence/*.json"
   pull_request:
-  schedule:
-    - cron: '47 * * * *'
   workflow_dispatch:
     inputs:
       full:
         type: boolean
         default: true
       verify:
+        type: boolean
+        default: false
+      repair:
         type: boolean
         default: false
 permissions:
@@ -26,7 +27,7 @@ jobs:
   cli:
     uses: ./.github/workflows/infra-cli.yml
   check:
-    if: github.event_name != 'schedule' && !inputs.verify
+    if: ${{ !inputs.verify }}
     needs: cli
     uses: ./.github/workflows/check.yml
     with:
@@ -42,6 +43,7 @@ jobs:
     with:
       full: ${{ inputs.full || false }}
       verify: ${{ inputs.verify || false }}
+      repair: ${{ inputs.repair || false }}
   images:
     needs: cli
     if: github.event_name == 'push' && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected

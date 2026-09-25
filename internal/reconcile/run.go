@@ -171,7 +171,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	if err = stage("kubernetes", func() error { return r.Ops.Kubernetes(ctx, plan) }); err != nil {
 		return err
 	}
-	if selected.Ansible && effectiveHostScope(selected) != HostScopeRunners {
+	if selected.Ansible && (effectiveHostScope(selected) != HostScopeRunners || monitorCLIChanged(selected)) {
 		if err = stage("monitor", func() error { return r.Ops.Monitor(ctx, plan) }); err != nil {
 			return err
 		}

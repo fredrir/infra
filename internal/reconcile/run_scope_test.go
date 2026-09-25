@@ -146,6 +146,17 @@ func TestRunnerSuccessDoesNotRefreshFullVerification(t *testing.T) {
 	}
 }
 
+func TestCLIReleaseConvergesTheMonitorBinary(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
+	ops := &fakeOps{selection: Affected([]string{"build/cli-release.json"})}
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(ops.calls, []string{"plan", "hosts", "publish", "kubernetes", "monitor", "verify"}) || store.status.HostScope != HostScopeRunners {
+		t.Fatalf("CLI release skipped the monitor binary or widened scope: %v, %+v", ops.calls, store.status)
+	}
+}
+
 func TestCompletionWriteFailurePreservesVerificationBaseline(t *testing.T) {
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "older"}, fail: "complete"}
 	ops := &fakeOps{selection: All()}

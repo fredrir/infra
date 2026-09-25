@@ -8,6 +8,9 @@ on:
       verify:
         type: boolean
         default: false
+      repair:
+        type: boolean
+        default: false
 permissions:
   contents: read
 env:
@@ -100,7 +103,7 @@ jobs:
       id-token: write
       actions: read
     env:
-      VERIFICATION: ${{ github.event.schedule == '47 * * * *' || inputs.verify }}
+      VERIFICATION: ${{ inputs.verify }}
     outputs:
       reconciliation: ${{ steps.reconcile.outcome }}
       differences: ${{ steps.verification.outputs.differences }}
@@ -185,7 +188,7 @@ jobs:
         fi
     - name: Read declared differences
       id: verification
-      if: always() && github.event.schedule == '47 * * * *'
+      if: always() && inputs.verify && inputs.repair
       run: |
         report="$RUNNER_TEMP/reconciliation/verification.json"
         differences=false
@@ -226,7 +229,7 @@ jobs:
         rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"
   repair:
     needs: apply
-    if: ${{ !cancelled() && needs.apply.result == 'failure' && github.event.schedule == '47 * * * *' && needs.apply.outputs.reconciliation == 'failure' && needs.apply.outputs.differences == 'true' }}
+    if: ${{ !cancelled() && needs.apply.result == 'failure' && inputs.verify && inputs.repair && needs.apply.outputs.reconciliation == 'failure' && needs.apply.outputs.differences == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
