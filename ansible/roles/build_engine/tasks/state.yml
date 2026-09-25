@@ -5,7 +5,6 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Restart infra-dagger
 
 - name: Install Dagger unit
   ansible.builtin.template:
@@ -15,7 +14,6 @@
     group: root
     mode: '0644'
   register: build_engine_dagger_unit
-  notify: Restart infra-dagger
 
 - name: Start build engine
   ansible.builtin.systemd_service:
@@ -23,3 +21,22 @@
     daemon_reload: '{{ build_engine_dagger_unit.changed }}'
     enabled: true
     state: started
+
+- name: Find stale build engine
+  ansible.builtin.shell: |
+    set -eu
+    started=$(systemctl show --timestamp=us+utc --property=ActiveEnterTimestamp --value infra-dagger)
+    if [ -z "$started" ] || [ "$(systemctl show --property=NeedDaemonReload --value infra-dagger)" = yes ] ||
+      [ -n "$(find /etc/infra-dagger.toml /etc/systemd/system/infra-dagger.service -newermt "$started")" ]; then
+      echo infra-dagger
+    fi
+  register: build_engine_stale
+  changed_when: false
+  check_mode: false
+
+- name: Restart stale build engine
+  ansible.builtin.systemd_service:
+    name: infra-dagger
+    daemon_reload: true
+    state: restarted
+  when: build_engine_stale.stdout_lines | length > 0

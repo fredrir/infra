@@ -1,0 +1,5 @@
+- name: Validate engine pin
+  ansible.builtin.assert:
+    that:
+    - build_engine_image == build_engine_toolchain.engine_image
+    - build_engine_image is match('^registry.dagger.io/engine:v[0-9.]+@sha256:[a-f0-9]{64}$')

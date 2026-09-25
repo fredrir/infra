@@ -1,5 +1,0 @@
-- name: Restart infra-dagger
-  ansible.builtin.systemd_service:
-    name: infra-dagger
-    daemon_reload: true
-    state: restarted

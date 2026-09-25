@@ -82,23 +82,34 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 	version := fleet.Version
 	cli := "#!/bin/sh\necho fixture\n"
 	engine := fmt.Sprintf("true %s\n", toolchain["engine_image"])
+	runnerUnit := func(repository string) string { return "actions.runner.fixture.localhost-" + repository + ".service" }
 	write("infra", cli, true)
 	write("vars.json", fmt.Sprintf(`{"build_runner_cli":{"sha256":"%x"}}`, sha256.Sum256([]byte(cli))), false)
 	write("inventory.yml", "all:\n  children:\n    build_engines:\n      hosts:\n        localhost:\n          ansible_connection: local\n          ansible_user: root\n          ansible_python_interpreter: /usr/bin/python3\n          build_runner_repositories: [infra, Y]\n          build_runner_packages: [dpkg, tar]\n", false)
 	for _, repository := range []string{"infra", "Y"} {
 		write("runners/"+repository+"/.runner", "{}\n", false)
-		write("runners/"+repository+"/.service", "actions.runner.fixture."+repository+".service\n", false)
+		write("runners/"+repository+"/.service", runnerUnit(repository)+"\n", false)
 		write("runners/"+repository+"/bin/Runner.Listener", "#!/bin/sh\ncat /fixture/state/version-"+repository+"\n", true)
 		write("state/version-"+repository, version, false)
 	}
 	write("bin/systemctl", `#!/bin/sh
+state=/fixture/state
+listed() { grep -qxF "$2" "$state/$1" 2>/dev/null; }
+started() { python3 -c 'import datetime; print(datetime.datetime.now(datetime.UTC).strftime("%a %Y-%m-%d %H:%M:%S.%f UTC"))' > "$state/started-$1"; }
 case "$1" in
-show) if grep -qxF "$2" /fixture/state/inactive-units 2>/dev/null; then state=inactive; else state=active; fi; printf 'LoadState=loaded\nActiveState=%s\n' "$state" ;;
-is-enabled) if grep -qxF "$2" /fixture/state/disabled-units 2>/dev/null; then echo disabled; exit 1; fi; echo enabled ;;
-stop) echo "$2" >> /fixture/state/stopped ;;
-disable) echo "$2" >> /fixture/state/disabled ;;
-restart) echo "$2" >> /fixture/state/restarted ;;
-daemon-reload) if rm /fixture/state/reload-failure 2>/dev/null; then exit 1; fi; echo reload >> /fixture/state/reloaded ;;
+show)
+  eval "unit=\${$#}"
+  case "$*" in
+  *ActiveEnterTimestamp*) cat "$state/started-$unit" 2>/dev/null || true ;;
+  *NeedDaemonReload*) if listed reload-units "$unit"; then echo yes; else echo no; fi ;;
+  *) if listed inactive-units "$unit"; then echo ActiveState=inactive; else echo ActiveState=active; fi; echo LoadState=loaded ;;
+  esac ;;
+is-enabled) if listed disabled-units "$2"; then echo disabled; exit 1; fi; echo enabled ;;
+start) started "$2" ;;
+restart) echo "$2" >> "$state/restarted"; started "$2" ;;
+stop) echo "$2" >> "$state/stopped" ;;
+disable) echo "$2" >> "$state/disabled" ;;
+daemon-reload) if rm "$state/reload-failure" 2>/dev/null; then exit 1; fi; rm -f "$state/reload-units"; echo reload >> "$state/reloaded" ;;
 esac
 `, true)
 	write("bin/docker", "#!/bin/sh\ncat /fixture/state/engine\n", true)
@@ -107,7 +118,7 @@ esac
   gather_facts: false
   vars:
     build_runner_fleet: "{{ lookup('ansible.builtin.file', '/source/build/runners.json') | from_json }}"
-    build_engine_image: "{{ (lookup('ansible.builtin.file', '/source/build/toolchain.json') | from_json).engine_image }}"
+    build_engine_toolchain: "{{ lookup('ansible.builtin.file', '/source/build/toolchain.json') | from_json }}"
   tasks:
   - ansible.builtin.import_role:
       name: build_runner
@@ -149,12 +160,29 @@ esac
 		t.Fatalf("runner-only path lost full-path prerequisites:\n%s", runners)
 	}
 	t.Log("full and runner-only paths resolve the same ordered runner tasks")
-	converge := func() { run("/fixture/converge.yml", true) }
-	converge()
-	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") {
-		t.Fatalf("declared runner state does not converge:\n%s", output)
+	restarted := func() string {
+		data, err := os.ReadFile(filepath.Join(fixture, "state/restarted"))
+		if err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		return string(data)
 	}
-	t.Log("declared runner state converges idempotently")
+	converge := func() { run("/fixture/converge.yml", true) }
+	repairs := func(want string) func() {
+		return func() {
+			before := restarted()
+			converge()
+			if got := strings.TrimPrefix(restarted(), before); got != want+"\n" {
+				t.Fatalf("repair restarted %q, want only %s", got, want)
+			}
+		}
+	}
+	converge()
+	steady := restarted()
+	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") || restarted() != steady {
+		t.Fatalf("declared runner state does not converge without restarts:\n%s", output)
+	}
+	t.Log("declared runner state converges idempotently without restarting services")
 	outcome := func(output string) (changed, failed []string) {
 		var task string
 		for line := range strings.SplitSeq(output, "\n") {
@@ -168,13 +196,6 @@ esac
 			}
 		}
 		return slices.Compact(changed), slices.Compact(failed)
-	}
-	restarted := func() string {
-		data, err := os.ReadFile(filepath.Join(fixture, "state/restarted"))
-		if err != nil && !os.IsNotExist(err) {
-			t.Fatal(err)
-		}
-		return string(data)
 	}
 	drift := []string{"Reject declared runner state drift"}
 	observed := []string{"Verify observed runner host"}
@@ -195,7 +216,7 @@ esac
 		},
 		{
 			name:      "disabled runner",
-			introduce: func() { write("state/disabled-units", "actions.runner.fixture.Y.service\n", false) },
+			introduce: func() { write("state/disabled-units", runnerUnit("Y")+"\n", false) },
 			restore:   func() { remove("state/disabled-units") },
 			changed:   []string{"build_runner : Start registered runner"},
 			failed:    drift,
@@ -211,13 +232,32 @@ esac
 			name:      "edited engine configuration",
 			introduce: func() { command("docker", "exec", name, "sh", "-c", "echo >> /etc/infra-dagger.toml") },
 			restore:   converge,
-			changed:   []string{"build_engine : Install bounded engine cache retention"},
+			changed:   []string{"build_engine : Install bounded engine cache retention", "build_engine : Restart stale build engine"},
+			failed:    drift,
+		},
+		{
+			name:      "stale engine",
+			introduce: func() { command("docker", "exec", name, "touch", "/etc/infra-dagger.toml") },
+			restore:   repairs("infra-dagger"),
+			changed:   []string{"build_engine : Restart stale build engine"},
+			failed:    drift,
+		},
+		{
+			name:      "runner awaiting daemon reload",
+			introduce: func() { write("state/reload-units", runnerUnit("Y")+"\n", false) },
+			restore:   repairs(runnerUnit("Y")),
+			changed:   []string{"build_runner : Restart stale runner service"},
 			failed:    drift,
 		},
 		{
 			name:   "missing package",
 			extra:  []string{"--extra-vars", `{"build_runner_packages":["dpkg","infra-fixture-absent"]}`},
 			failed: []string{"host_packages : Install missing declared packages"},
+		},
+		{
+			name:   "overridden engine pin",
+			extra:  []string{"--extra-vars", `{"build_engine_image":"registry.dagger.io/engine:v0.0.1@sha256:` + strings.Repeat("0", 64) + `"}`},
+			failed: []string{"build_engine : Validate engine pin"},
 		},
 		{
 			name:      "wrong engine image",
@@ -235,11 +275,36 @@ esac
 			name: "undeclared runner",
 			introduce: func() {
 				write("runners/Z/.runner", "{}\n", false)
-				write("runners/Z/.service", "actions.runner.fixture.Z.service\n", false)
+				write("runners/Z/.service", runnerUnit("Z")+"\n", false)
 			},
 			restore: func() { remove("runners/Z") },
 			failed:  observed,
 		},
+		{
+			name:      "pending runner replacement",
+			introduce: func() { write("runners/Y/.infra-runner-pending", version+"\n", false) },
+			restore:   func() { remove("runners/Y/.infra-runner-pending") },
+			failed:    observed,
+		},
+		{
+			name:      "foreign runner service",
+			introduce: func() { write("runners/Y/.service", runnerUnit("infra")+"\n", false) },
+			restore:   func() { write("runners/Y/.service", runnerUnit("Y")+"\n", false) },
+			failed:    []string{"Verify registered runner services"},
+		},
+		{
+			name: "no registered runners",
+			introduce: func() {
+				remove("runners/infra/.runner")
+				remove("runners/Y/.runner")
+			},
+			restore: func() {
+				write("runners/infra/.runner", "{}\n", false)
+				write("runners/Y/.runner", "{}\n", false)
+			},
+			failed: observed,
+		},
+		{name: "repaired"},
 	} {
 		if scenario.introduce != nil {
 			scenario.introduce()
@@ -288,7 +353,7 @@ esac
 	write("state/version-infra", "0.0.0", false)
 	converge()
 	stopped := string(read(filepath.Join(fixture, "state/stopped")))
-	if stopped != "actions.runner.fixture.infra.service\n" {
+	if stopped != runnerUnit("infra")+"\n" {
 		t.Fatalf("wrong service stopped: %q", stopped)
 	}
 	if output := run("/source/ansible/verify-runners.yml", true); !strings.Contains(output, "changed=0") {
@@ -331,8 +396,8 @@ esac
 		t.Fatal(err)
 	}
 	write("removal.yml", string(removal), false)
-	declaredUnit := "/etc/systemd/system/actions.runner.fixture.infra.service"
-	retiredService := "actions.runner.fixture.localhost-retired.service"
+	declaredUnit := "/etc/systemd/system/" + runnerUnit("infra")
+	retiredService := runnerUnit("retired")
 	retiredUnit := "/etc/systemd/system/" + retiredService
 	for _, unit := range []string{declaredUnit, retiredUnit} {
 		command("docker", "exec", name, "mkdir", "-p", unit+".d")

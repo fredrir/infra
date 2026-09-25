@@ -6,19 +6,28 @@
   vars:
     build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
     build_runner_fleet: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/runners.json') | from_json }}"
-    build_runner_probed_registrations: "{{ build_runner_probe.stdout_lines[2:] | map('split') | list }}"
+    build_runner_probed_registrations: "{{ build_runner_probe.stdout_lines | select('match', '^runner ') | map('split') | list }}"
     build_runner_state_repositories: '{{ build_runner_repositories }}'
     build_runner_state_services: "{{ build_runner_probed_registrations | map('last') | list }}"
   tasks:
+  - name: Validate declared engine pin
+    ansible.builtin.import_role:
+      name: build_engine
+      tasks_from: pin.yml
+
   - name: Probe observed runner host
     ansible.builtin.shell: |
       set -eu
-      sha256sum < /usr/local/bin/infra
-      docker inspect --format '{{ "{{.State.Running}} {{.Config.Image}}" }}' {{ build_engine_dagger_name | quote }}
+      printf 'cli %s\n' "$(sha256sum < /usr/local/bin/infra | cut -d ' ' -f 1)"
+      printf 'engine %s\n' "$(docker inspect --format '{{ "{{.State.Running}} {{.Config.Image}}" }}' {{ build_engine_dagger_name | quote }})"
       cd /home/runner
-      for registration in */.runner; do
-        printf '%s ' "${registration%/.runner}"
-        awk 'NR == 1' "${registration%.runner}.service"
+      for root in *; do
+        if [ -e "$root/.runner" ]; then
+          printf 'runner %s %s\n' "$root" "$(awk 'NR == 1' "$root/.service" 2>/dev/null || echo -)"
+        fi
+        if [ -e "$root/.infra-runner-pending" ]; then
+          printf 'pending %s\n' "$root"
+        fi
       done
     register: build_runner_probe
     changed_when: false
@@ -27,10 +36,20 @@
   - name: Verify observed runner host
     ansible.builtin.assert:
       that:
-      - build_runner_probe.stdout_lines[0] == build_runner_cli.sha256 ~ '  -'
-      - build_runner_probe.stdout_lines[1] == 'true ' ~ build_engine_image
-      - build_runner_probed_registrations | map('first') | sort == build_runner_repositories | sort
-      - build_runner_probed_registrations | map('length') | unique == [2]
+      - ('cli ' ~ build_runner_cli.sha256) in build_runner_probe.stdout_lines
+      - ('engine true ' ~ build_engine_image) in build_runner_probe.stdout_lines
+      - build_runner_probe.stdout_lines | select('match', '^pending ') | list == []
+      - build_runner_probed_registrations | length > 0
+      - build_runner_probed_registrations | map(attribute='1') | sort == build_runner_repositories | sort
+      fail_msg: "The build VM differs from its declared runner host:\n{{ build_runner_probe.stdout }}"
+
+  - name: Verify registered runner services
+    ansible.builtin.assert:
+      that: item | length == 3 and item[2] is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]' ~ ((inventory_hostname ~ '-' ~ item[1]) | regex_escape) ~ '[.]service$')
+      fail_msg: "{{ item[1] }} is registered as {{ item[2:] | join(' ') }} instead of its own runner service"
+    loop: '{{ build_runner_probed_registrations }}'
+    loop_control:
+      label: '{{ item[1] }}'
 
   - name: Compare declared runner state
     notify: Reject declared runner state drift
@@ -54,6 +73,5 @@
 
   handlers:
   - name: Reject declared runner state drift
-    listen: Restart infra-dagger
     ansible.builtin.fail:
       msg: The build VM differs from its declared runner state
