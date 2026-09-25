@@ -254,7 +254,7 @@ A changed digest for an unchanged version is not proposed; investigate it before
 | --- | --- |
 | Symptom | Jobs for one scale-set label stay queued; `AutoscalingRunnerSet` phase `Pending`; controller log `waiting for the running and pending runners to finish`; verification reports `has no running listener` |
 | Cause | A release change outside the runner template deletes the listener, and `updateStrategy: eventual` waits for a warm idle runner that cannot finish without one |
-| Prevention | Warm scale sets carry their release file hash in the runner template annotation `infra.fredrir.com/release`, so ARC replaces idle runners |
+| Prevention | Warm scale sets carry a hash of their Helm values file in the runner template annotation `infra.fredrir.com/values`, so ARC replaces idle runners |
 | Remediation | `kubectl -n <namespace> get ephemeralrunnersets`, then `kubectl -n <namespace> patch ephemeralrunnerset <name> --type=merge -p '{"spec":{"replicas":0}}'`; ARC recreates the listener |
 
 The Rust reusable workflow accepts `build-output-cache: false` to skip target archive restore and publication while retaining compiler `sccache`.

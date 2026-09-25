@@ -20,3 +20,9 @@ filegroup(
     ]),
     visibility = ["//internal/platformops:__pkg__"],
 )
+
+filegroup(
+    name = "arc_chart_data",
+    srcs = glob(["components/**/*.yaml"]),
+    visibility = ["//internal/contracts:__pkg__"],
+)

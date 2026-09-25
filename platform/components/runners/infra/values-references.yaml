@@ -3,4 +3,4 @@ nameReference:
   version: v1
   fieldSpecs:
   - kind: HelmRelease
-    path: spec/values/template/metadata/annotations/infra.fredrir.com\/release
+    path: spec/values/template/metadata/annotations/infra.fredrir.com\/values

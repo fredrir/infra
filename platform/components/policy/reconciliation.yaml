@@ -77,7 +77,7 @@ rules:
   resources: [jobs]
   verbs: [get, list]
 - apiGroups: [actions.github.com]
-  resources: [autoscalingrunnersets]
+  resources: [autoscalingrunnersets, ephemeralrunners]
   verbs: [get, list]
 - apiGroups: [source.toolkit.fluxcd.io]
   resources: [gitrepositories]

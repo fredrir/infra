@@ -79,7 +79,7 @@ func TestRunnerSlotQuantitiesAreExact(t *testing.T) {
 
 func TestCheckAndDeployPoolsRemainBounded(t *testing.T) {
 	e := newEvaluator(t)
-	check := runner(t, "infra/check.yaml")
+	check := runner(t, "infra/check-values.yaml")
 	check["metadata"] = object{"name": "check-1", "labels": object{"actions.github.com/scale-set-name": "check-amd64"}}
 	if !e.runner(check, "ci-infra", controller) {
 		t.Fatal("approved check pool rejected")
@@ -88,7 +88,7 @@ func TestCheckAndDeployPoolsRemainBounded(t *testing.T) {
 	if e.runner(check, "ci-infra", controller) {
 		t.Fatal("unapproved image admitted")
 	}
-	deploy := runner(t, "infra/deploy.yaml")
+	deploy := runner(t, "infra/deploy-values.yaml")
 	deploy["metadata"] = object{"name": "deploy-1", "labels": object{"actions.github.com/scale-set-name": "deploy-amd64"}}
 	if !e.runner(deploy, "ci-infra", controller) || e.runner(deploy, "ci-y", controller) {
 		t.Fatal("deploy namespace boundary")

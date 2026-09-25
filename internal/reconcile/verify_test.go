@@ -344,17 +344,23 @@ func listenerPod(t *testing.T, namespace, name string, ready bool) resource {
 	return artifactFixture(t, fmt.Sprintf(`{"kind":"Pod","metadata":{"name":"%s-listener","namespace":"arc-system","labels":{"actions.github.com/scale-set-name":%q,"actions.github.com/scale-set-namespace":%q}},"status":{"conditions":[{"type":"Ready","status":%q}]}}`, name, name, namespace, map[bool]string{true: "True", false: "False"}[ready]))
 }
 
+func ephemeralRunner(t *testing.T, namespace, scaleSet, job string) resource {
+	return artifactFixture(t, fmt.Sprintf(`{"kind":"EphemeralRunner","metadata":{"name":"%s-runner","namespace":%q,"labels":{"actions.github.com/scale-set-name":%q,"actions.github.com/scale-set-namespace":%q}},"status":{"phase":"Running","jobId":%q}}`, scaleSet, namespace, scaleSet, namespace, job))
+}
+
 func TestRunnerSetsWithoutRunningListenersFailVerification(t *testing.T) {
 	check, deploy := runnerSet(t, "ci-infra", "check-amd64", "Running"), runnerSet(t, "ci-infra", "deploy-amd64", "Running")
 	listeners := []resource{listenerPod(t, "ci-infra", "check-amd64", true), listenerPod(t, "ci-infra", "deploy-amd64", true)}
+	idle, busy := ephemeralRunner(t, "ci-infra", "check-amd64", ""), ephemeralRunner(t, "ci-infra", "check-amd64", "1234")
 	missing := "AutoscalingRunnerSet ci-infra/check-amd64 has no running listener"
 	for _, test := range []struct {
 		name      string
 		sets      []resource
 		listeners func(poll int) []resource
+		runners   []resource
 		want      string
 	}{
-		{name: "listening", sets: []resource{check, deploy}, listeners: func(int) []resource { return listeners }},
+		{name: "listening", sets: []resource{check, deploy}, listeners: func(int) []resource { return listeners }, runners: []resource{idle}},
 		{name: "listener recreated within the grace period", sets: []resource{check, deploy}, listeners: func(poll int) []resource {
 			if poll == 0 {
 				return listeners[1:]
@@ -362,19 +368,27 @@ func TestRunnerSetsWithoutRunningListenersFailVerification(t *testing.T) {
 			return listeners
 		}},
 		{name: "listener deleted", sets: []resource{check, deploy}, listeners: func(int) []resource { return listeners[1:] }, want: missing + ` in phase "Running"`},
+		{name: "listener deleted while its warm runner idles", sets: []resource{runnerSet(t, "ci-infra", "check-amd64", "Pending"), deploy}, listeners: func(int) []resource { return listeners[1:] }, runners: []resource{idle}, want: missing + ` in phase "Pending"`},
+		{name: "listener deleted while a runner finishes its job", sets: []resource{runnerSet(t, "ci-infra", "check-amd64", "Pending"), deploy}, listeners: func(int) []resource { return listeners[1:] }, runners: []resource{idle, busy}},
+		{name: "busy runner of another scale set", sets: []resource{check, deploy}, listeners: func(int) []resource { return listeners[1:] }, runners: []resource{ephemeralRunner(t, "ci-nsql", "check-amd64", "1234")}, want: missing + ` in phase "Running"`},
+		{name: "outdated runner set", sets: []resource{runnerSet(t, "ci-infra", "check-amd64", "Outdated"), deploy}, listeners: func(int) []resource { return listeners }, runners: []resource{busy}, want: "AutoscalingRunnerSet ci-infra/check-amd64 is outdated"},
 		{name: "listener unready", sets: []resource{check, deploy}, listeners: func(int) []resource {
 			return []resource{listenerPod(t, "ci-infra", "check-amd64", false), listeners[1]}
 		}, want: missing + ` in phase "Running"`},
-		{name: "runner set waiting for runners", sets: []resource{runnerSet(t, "ci-infra", "check-amd64", "Pending"), deploy}, listeners: func(int) []resource { return listeners }, want: missing + ` in phase "Pending"`},
 		{name: "listener of another namespace", sets: []resource{check}, listeners: func(int) []resource { return []resource{listenerPod(t, "ci-nsql", "check-amd64", true)} }, want: missing + ` in phase "Running"`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			var mu sync.Mutex
 			polls := 0
 			commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				mu.Lock()
 				defer mu.Unlock()
-				fake := kubernetesFake{"get autoscalingrunnersets.actions.github.com --all-namespaces": items(test.sets...), "get pods -n=arc-system -l=app.kubernetes.io/component=runner-scale-set-listener": items(test.listeners(polls)...)}
+				fake := kubernetesFake{
+					"get autoscalingrunnersets.actions.github.com --all-namespaces":                   items(test.sets...),
+					"get pods -n=arc-system -l=app.kubernetes.io/component=runner-scale-set-listener": items(test.listeners(polls)...),
+					"get ephemeralrunners.actions.github.com --all-namespaces":                        items(test.runners...),
+				}
 				if strings.HasPrefix(strings.Join(options.Args, " "), "get pods") {
 					polls++
 				}

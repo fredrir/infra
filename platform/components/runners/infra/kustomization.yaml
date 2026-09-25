@@ -13,18 +13,20 @@ components:
 - ../buildkit-cache
 patches:
 - path: quota.yaml
+- path: check-values.yaml
+- path: deploy-values.yaml
 configurations:
-- release-references.yaml
+- values-references.yaml
 configMapGenerator:
-- name: check-release
+- name: check-values
   files:
-  - check.yaml
+  - check-values.yaml
   options:
     annotations:
       config.kubernetes.io/local-config: 'true'
-- name: deploy-release
+- name: deploy-values
   files:
-  - deploy.yaml
+  - deploy-values.yaml
   options:
     annotations:
       config.kubernetes.io/local-config: 'true'

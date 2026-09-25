@@ -3,20 +3,22 @@ package policy
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
 )
 
-const releaseAnnotation = "infra.fredrir.com/release"
+const valuesAnnotation = "infra.fredrir.com/values"
 
-func releaseHash(t *testing.T, resources []object, name string) string {
+func valuesHash(t *testing.T, resources []object, name string) string {
 	t.Helper()
 	for _, resource := range resources {
 		if resource["kind"] == "HelmRelease" && at(resource, "metadata", "name") == name {
 			annotations, _ := at(resource, "spec", "values", "template", "metadata", "annotations").(object)
-			hash, _ := annotations[releaseAnnotation].(string)
+			hash, _ := annotations[valuesAnnotation].(string)
 			return hash
 		}
 	}
@@ -24,15 +26,29 @@ func releaseHash(t *testing.T, resources []object, name string) string {
 	return ""
 }
 
-func TestWarmRunnerSetsReplaceIdleRunnersWhenTheirReleaseChanges(t *testing.T) {
+func TestWarmRunnerSetsReplaceIdleRunnersWhenTheirValuesChange(t *testing.T) {
 	warm := 0
 	for _, overlay := range at(load(t, "platform/components/runners/kustomization.yaml"), "resources").([]any) {
 		directory := "platform/components/runners/" + overlay.(string)
-		sources := map[string]string{}
-		generators, _ := load(t, directory+"/kustomization.yaml")["configMapGenerator"].([]any)
+		kustomization := load(t, directory+"/kustomization.yaml")
+		sources, releases := map[string]string{}, map[string]string{}
+		generators, _ := kustomization["configMapGenerator"].([]any)
 		for _, generator := range generators {
 			files := at(generator, "files").([]any)
 			sources[at(generator, "name").(string)] = directory + "/" + files[0].(string)
+		}
+		resources, _ := kustomization["resources"].([]any)
+		for _, file := range resources {
+			path := directory + "/" + file.(string)
+			data, err := os.ReadFile(filepath.Join(repoRoot(t), path))
+			if err != nil {
+				continue
+			}
+			for _, document := range yamlObjects(t, data) {
+				if document["kind"] == "HelmRelease" {
+					releases[at(document, "metadata", "name").(string)] = path
+				}
+			}
 		}
 		for _, release := range rendered(t, directory) {
 			if release["kind"] != "HelmRelease" || at(release, "spec", "chart", "spec", "chart") != "gha-runner-scale-set" {
@@ -47,14 +63,14 @@ func TestWarmRunnerSetsReplaceIdleRunnersWhenTheirReleaseChanges(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				metadata, _ := at(values, "template").(object)["metadata"].(object)
 				annotations, _ := metadata["annotations"].(object)
-				hash, _ := annotations[releaseAnnotation].(string)
+				hash, _ := annotations[valuesAnnotation].(string)
 				generator := hash[:max(strings.LastIndex(hash, "-"), 0)]
 				source, ok := sources[generator]
 				if !ok {
-					t.Fatalf("idle runners of %s outlive listener changes because its runner template has no %s hash of its release", name, releaseAnnotation)
+					t.Fatalf("idle runners of %s outlive listener changes because its runner template has no %s hash of its values", name, valuesAnnotation)
 				}
 				declared := load(t, source)
-				set(values, generator, "template", "metadata", "annotations", releaseAnnotation)
+				set(values, generator, "template", "metadata", "annotations", valuesAnnotation)
 				live, _ := json.Marshal(values)
 				want, _ := json.Marshal(at(declared, "spec", "values"))
 				if !bytes.Equal(live, want) {
@@ -71,10 +87,19 @@ func TestWarmRunnerSetsReplaceIdleRunnersWhenTheirReleaseChanges(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					rehashed := releaseHash(t, renderedWith(t, directory, map[string][]byte{source: data}), name)
+					rehashed := valuesHash(t, renderedWith(t, directory, map[string][]byte{source: data}), name)
 					if rehashed == hash || !strings.HasPrefix(rehashed, generator+"-") {
 						t.Errorf("changing %s keeps the runner template hash %s: %s", field, hash, rehashed)
 					}
+				}
+				release := load(t, releases[name])
+				set(release, "45m", "spec", "interval")
+				data, err := yaml.Marshal(release)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if rehashed := valuesHash(t, renderedWith(t, directory, map[string][]byte{releases[name]: data}), name); rehashed != hash {
+					t.Errorf("changing the reconcile interval of %s replaces its idle runners: %s", name, rehashed)
 				}
 			})
 		}

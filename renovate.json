@@ -104,6 +104,11 @@
       "groupName": "github actions"
     },
     {
+      "matchManagers": ["flux"],
+      "matchPackageNames": ["gha-runner-scale-set", "gha-runner-scale-set-controller"],
+      "groupName": "actions runner controller"
+    },
+    {
       "matchManagers": ["terraform"],
       "groupName": "tofu providers"
     },

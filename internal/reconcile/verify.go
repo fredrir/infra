@@ -61,7 +61,7 @@ type resource struct {
 		}
 	}
 	Status struct {
-		Phase                                                                                                                                                        string
+		Phase, JobID                                                                                                                                                 string
 		ObservedGeneration                                                                                                                                           int64
 		Replicas, UpdatedReplicas, ReadyReplicas, AvailableReplicas, UpdatedNumberScheduled, NumberReady, NumberAvailable, DesiredNumberScheduled, Succeeded, Failed int64
 		CurrentRevision, UpdateRevision                                                                                                                              string
@@ -488,32 +488,54 @@ func (c *Commands) verifyRunnerListeners(ctx context.Context, plan Plan) error {
 	return poll(wait, func() error { return c.runnerListeners(wait) })
 }
 
+func (c *Commands) list(ctx context.Context, args ...string) ([]resource, error) {
+	data, err := c.Runner.Output(ctx, "kubectl", append(append([]string{"get"}, args...), "-o=json", "--request-timeout=30s")...)
+	if err != nil {
+		return nil, err
+	}
+	var result struct{ Items []resource }
+	return result.Items, json.Unmarshal(data, &result)
+}
+
+func scaleSet(item resource) string {
+	return item.Metadata.Labels["actions.github.com/scale-set-namespace"] + "/" + item.Metadata.Labels["actions.github.com/scale-set-name"]
+}
+
 func (c *Commands) runnerListeners(ctx context.Context) error {
 	sets, err := c.resources(ctx, "autoscalingrunnersets.actions.github.com")
 	if err != nil {
 		return err
 	}
-	data, err := c.Runner.Output(ctx, "kubectl", "get", "pods", "-n=arc-system", "-l=app.kubernetes.io/component=runner-scale-set-listener", "-o=json", "--request-timeout=30s")
+	pods, err := c.list(ctx, "pods", "-n=arc-system", "-l=app.kubernetes.io/component=runner-scale-set-listener")
 	if err != nil {
 		return err
 	}
-	var pods struct{ Items []resource }
-	if err := json.Unmarshal(data, &pods); err != nil {
+	runners, err := c.list(ctx, "ephemeralrunners.actions.github.com", "--all-namespaces")
+	if err != nil {
 		return err
 	}
-	listening := map[string]bool{}
-	for _, pod := range pods.Items {
+	listening, draining := map[string]bool{}, map[string]bool{}
+	for _, pod := range pods {
 		for _, condition := range pod.Status.Conditions {
 			if condition.Type == "Ready" && condition.Status == "True" {
-				listening[pod.Metadata.Labels["actions.github.com/scale-set-namespace"]+"/"+pod.Metadata.Labels["actions.github.com/scale-set-name"]] = true
+				listening[scaleSet(pod)] = true
 			}
+		}
+	}
+	for _, runner := range runners {
+		if runner.Status.JobID != "" {
+			draining[scaleSet(runner)] = true
 		}
 	}
 	var problems []error
 	for _, set := range sets {
 		name := set.Metadata.Namespace + "/" + set.Metadata.Name
-		if set.Status.Phase != "Running" || !listening[name] {
-			problems = append(problems, fmt.Errorf("AutoscalingRunnerSet %s has no running listener in phase %q", name, set.Status.Phase))
+		switch {
+		case set.Status.Phase == "Outdated":
+			problems = append(problems, fmt.Errorf("AutoscalingRunnerSet %s is outdated", name))
+		case set.Status.Phase == "Running" && listening[name], draining[name]:
+		default:
+			problems = append(problems, fmt.Errorf("AutoscalingRunnerSet %s has no running listener in phase %q and no runner finishing a job", name, set.Status.Phase))
 		}
 	}
 	return errors.Join(problems...)

@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_test")
 go_test(
     name = "contracts_test",
     srcs = [
+        "arc_test.go",
         "build_vm_test.go",
         "cancellation_test.go",
         "images_test.go",
@@ -13,6 +14,7 @@ go_test(
         "//:build_vm_metrics_data",
         "//:image_contract_data",
         "//:renovate_pin_data",
+        "//platform:arc_chart_data",
     ],
     deps = [
         "//internal/ci",
