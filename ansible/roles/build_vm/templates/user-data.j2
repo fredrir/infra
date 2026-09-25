@@ -10,5 +10,3 @@ users:
   lock_passwd: true
   ssh_authorized_keys:
   - {{ build_vm_ssh_public_key | to_json }}
-package_update: true
-packages: [docker.io, python3, git, curl, jq, libicu74, build-essential]

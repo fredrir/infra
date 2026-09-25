@@ -40,11 +40,10 @@
     - build_vm_kvm.stat.ischr | default(false)
 
 - name: Install VM tools
-  ansible.builtin.apt:
-    name: [qemu-system-x86, qemu-utils, cloud-image-utils]
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
+  ansible.builtin.import_role:
+    name: host_packages
+  vars:
+    host_packages_required: "{{ build_vm_packages }}"
 
 - name: Create isolated VM account
   ansible.builtin.user:

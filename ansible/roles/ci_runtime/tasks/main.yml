@@ -5,11 +5,10 @@
       - inventory_hostname in groups['agent']
 
 - name: Install runtime archive support
-  ansible.builtin.apt:
-    name: bzip2
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
+  ansible.builtin.import_role:
+    name: host_packages
+  vars:
+    host_packages_required: "{{ ci_runtime_packages }}"
 
 - name: Create the runtime directory
   ansible.builtin.file:

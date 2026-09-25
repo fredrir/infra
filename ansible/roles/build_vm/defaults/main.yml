@@ -11,3 +11,4 @@ build_vm_image_sha256: 612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db1
 build_vm_directory: /var/lib/infra-build-vm
 build_vm_system_reserved_cpu: 4250m
 build_vm_system_reserved_memory: 10Gi
+build_vm_packages: [qemu-system-x86, qemu-utils, cloud-image-utils]

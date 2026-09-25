@@ -8,10 +8,10 @@
   no_log: true
 
 - name: Install Restic
-  ansible.builtin.apt:
-    name: restic
-    state: present
-    policy_rc_d: 101
+  ansible.builtin.import_role:
+    name: host_packages
+  vars:
+    host_packages_required: "{{ control_backup_packages }}"
 
 - name: Create private backup directories
   ansible.builtin.file:

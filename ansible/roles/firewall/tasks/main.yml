@@ -1,8 +1,8 @@
 - name: Install nftables
-  ansible.builtin.apt:
-    name: nftables
-    state: present
-    policy_rc_d: 101
+  ansible.builtin.import_role:
+    name: host_packages
+  vars:
+    host_packages_required: "{{ firewall_packages }}"
 
 - name: Require the enrolled management interface
   ansible.builtin.command: ip address show dev tailscale0

@@ -1,0 +1,17 @@
+- name: Check declared packages
+  ansible.builtin.command:
+    argv: "{{ ['dpkg-query', '--show', '--showformat=${db:Status-Abbrev}\\n'] + host_packages_required }}"
+  register: host_packages_state
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Install missing declared packages
+  ansible.builtin.apt:
+    name: "{{ host_packages_required }}"
+    state: present
+    update_cache: true
+    policy_rc_d: 101
+  environment:
+    NEEDRESTART_MODE: l
+  when: host_packages_state.rc != 0 or host_packages_state.stdout_lines | reject('match', '^[ih]i ') | list | length > 0

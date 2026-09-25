@@ -10,13 +10,10 @@
     name: "{{ inventory_hostname }}"
 
 - name: Install host prerequisites
-  ansible.builtin.apt:
-    name: [ca-certificates, curl, iproute2, iptables, kmod, openssh-server, policycoreutils]
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
-    lock_timeout: 60
-    policy_rc_d: 101
+  ansible.builtin.import_role:
+    name: host_packages
+  vars:
+    host_packages_required: "{{ ubuntu_packages }}"
 
 - name: Harden SSH authentication
   ansible.builtin.copy:

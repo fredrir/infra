@@ -222,4 +222,18 @@ cat "/fixture/state/$2.json"
 		t.Fatal("successful recovery left its pending marker", err)
 	}
 	t.Log("partial extraction failure retains recovery proof and retries successfully")
+	write("packages.yml", "- hosts: build_engines\n  gather_facts: false\n  module_defaults:\n    ansible.builtin.apt:\n      update_cache_retries: 1\n  roles:\n  - role: host_packages\n    vars:\n      host_packages_required: '{{ packages }}'\n", false)
+	installed := `{"packages":["dpkg","tar"]}`
+	if output := run("/fixture/packages.yml", true, "--extra-vars", installed); !strings.Contains(output, "changed=0") {
+		t.Fatalf("installed packages refreshed the index:\n%s", output)
+	}
+	command("docker", "exec", name, "apt-mark", "hold", "tar")
+	if output := run("/fixture/packages.yml", true, "--extra-vars", installed); !strings.Contains(output, "changed=0") {
+		t.Fatalf("held package refreshed the index:\n%s", output)
+	}
+	command("docker", "exec", name, "apt-mark", "unhold", "tar")
+	if output := run("/fixture/packages.yml", false, "--extra-vars", `{"packages":["dpkg","infra-fixture-absent"]}`); !strings.Contains(output, "Install missing declared packages") || strings.Contains(output, "skipping: [localhost]") {
+		t.Fatalf("missing package did not reach installation:\n%s", output)
+	}
+	t.Log("package index refreshes only when a declared package is missing")
 }

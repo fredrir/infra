@@ -30,11 +30,9 @@
     - name: Apply supported Ubuntu package updates
       ansible.builtin.apt:
         update_cache: true
-        cache_valid_time: 3600
         upgrade: safe
         force_apt_get: true
         policy_rc_d: 101
-        lock_timeout: 60
         dpkg_options: force-confdef,force-confold
       environment:
         NEEDRESTART_MODE: l

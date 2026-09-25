@@ -29,6 +29,12 @@
 - name: Check bootstrap credential and host state
   ansible.builtin.include_tasks: tailscale-bootstrap-credentials.yml
 
+- name: Install transport prerequisites
+  ansible.builtin.import_role:
+    name: host_packages
+  vars:
+    host_packages_required: "{{ platform_tailscale_packages }}"
+
 - name: Install transport
   ansible.builtin.include_tasks: install.yml
 
