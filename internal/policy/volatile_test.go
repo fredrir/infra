@@ -135,3 +135,56 @@ func TestReleaseTaggingRunsOffVolatileWorkers(t *testing.T) {
 		t.Fatalf("release tagging runs on undeclared pool %q", label)
 	}
 }
+
+func requiresCriticalNodes(affinity any) bool {
+	declared, _ := affinity.(object)
+	nodeAffinity, _ := declared["nodeAffinity"].(object)
+	required, _ := nodeAffinity["requiredDuringSchedulingIgnoredDuringExecution"].(object)
+	terms, _ := required["nodeSelectorTerms"].([]any)
+	return len(terms) > 0 && !slices.ContainsFunc(terms, func(term any) bool {
+		expressions, _ := term.(object)["matchExpressions"].([]any)
+		return !slices.ContainsFunc(expressions, func(expression any) bool {
+			return at(expression, "key") == "node-restriction.kubernetes.io/critical" && at(expression, "operator") == "In" && slices.Equal(at(expression, "values").([]any), []any{"true"})
+		})
+	})
+}
+
+func TestClusterControllersRequireCriticalNodes(t *testing.T) {
+	checked := 0
+	for _, resource := range renderedTree(t, "platform/clusters/production/flux-system", "platform/clusters/production/flux-system") {
+		if resource["kind"] == "Deployment" {
+			checked++
+			if !requiresCriticalNodes(at(resource, "spec", "template", "spec").(object)["affinity"]) {
+				t.Errorf("Flux %s may run outside critical nodes", at(resource, "metadata", "name"))
+			}
+		}
+	}
+	for _, resource := range renderedTree(t, "platform/components/controllers", "platform/components/controllers") {
+		var affinity any
+		switch resource["kind"] {
+		case "HelmRelease":
+			affinity = at(resource, "spec", "values").(object)["affinity"]
+		case "Deployment":
+			affinity = at(resource, "spec", "template", "spec").(object)["affinity"]
+		default:
+			continue
+		}
+		checked++
+		if !requiresCriticalNodes(affinity) {
+			t.Errorf("%s %s may run outside critical nodes", resource["kind"], at(resource, "metadata", "name"))
+		}
+	}
+	for _, overlay := range at(load(t, "platform/components/runners/kustomization.yaml"), "resources").([]any) {
+		for _, resource := range rendered(t, "platform/components/runners/"+overlay.(string)) {
+			if resource["kind"] == "HelmRelease" {
+				checked++
+				if !requiresCriticalNodes(at(resource, "spec", "values", "listenerTemplate", "spec").(object)["affinity"]) {
+					t.Errorf("listener of %s may run outside critical nodes", at(resource, "spec", "values", "runnerScaleSetName"))
+				}
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no controllers checked")
+	}
+}

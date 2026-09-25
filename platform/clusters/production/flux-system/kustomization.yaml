@@ -6,6 +6,20 @@ resources:
 patches:
 - target:
     kind: Deployment
+  patch: |
+    - op: add
+      path: /spec/template/spec/affinity
+      value:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-restriction.kubernetes.io/critical
+                operator: In
+                values:
+                - 'true'
+- target:
+    kind: Deployment
     name: kustomize-controller
   patch: |
     - op: add

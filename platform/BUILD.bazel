@@ -1,6 +1,7 @@
 filegroup(
     name = "policy_testdata",
     srcs = glob([
+        "clusters/production/flux-system/*.yaml",
         "components/**/*.yaml",
         "projects/**/*.yaml",
     ]),

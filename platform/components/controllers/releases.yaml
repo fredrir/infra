@@ -53,6 +53,15 @@ spec:
       seccompProfile:
         type: RuntimeDefault
     priorityClassName: platform-critical
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-restriction.kubernetes.io/critical
+              operator: In
+              values:
+              - 'true'
     topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: kubernetes.io/hostname

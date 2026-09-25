@@ -74,11 +74,19 @@ func rendered(t *testing.T, path string) []object {
 	t.Helper()
 	return renderedWith(t, path, nil)
 }
+func renderedTree(t *testing.T, tree, path string) []object {
+	t.Helper()
+	return renderedFrom(t, tree, path, nil)
+}
 func renderedWith(t *testing.T, path string, overrides map[string][]byte) []object {
+	t.Helper()
+	return renderedFrom(t, "platform/components/runners", path, overrides)
+}
+func renderedFrom(t *testing.T, tree, path string, overrides map[string][]byte) []object {
 	t.Helper()
 	memory := filesys.MakeFsInMemory()
 	root := repoRoot(t)
-	e := filepath.WalkDir(filepath.Join(root, "platform/components/runners"), func(source string, d fs.DirEntry, err error) error {
+	e := filepath.WalkDir(filepath.Join(root, tree), func(source string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
