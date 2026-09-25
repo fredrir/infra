@@ -2,11 +2,13 @@ package reconcile
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -109,7 +111,7 @@ show)
 is-enabled) if listed disabled-units "$2"; then echo disabled; exit 1; fi; echo enabled ;;
 start) started "$2" ;;
 restart) echo "$2" >> "$state/restarted"; started "$2"; if [ "$2" = infra-dagger ]; then cp "$state/engine-pinned" "$state/engine"; fi ;;
-stop) echo "$2" >> "$state/stopped" ;;
+stop) echo "$2" >> "$state/stopped"; if pgrep --full '/bin/Runner[.]Worker' > /dev/null; then echo "$2" >> "$state/stopped-mid-job"; fi ;;
 disable) echo "$2" >> "$state/disabled" ;;
 daemon-reload) if rm "$state/reload-failure" 2>/dev/null; then exit 1; fi; rm -f "$state/reload-units"; echo reload >> "$state/reloaded" ;;
 esac
@@ -146,11 +148,12 @@ esac
 	command("docker", "exec", name, "groupadd", "docker")
 	command("docker", "exec", name, "mkdir", "-p", "/etc/tmpfiles.d")
 	command("docker", "exec", name, "ln", "-s", "/fixture/infra", "/usr/local/bin/infra")
+	playbookArgs := func(playbook string, extra ...string) []string {
+		return append([]string{"exec", "-e", "PYTHONUNBUFFERED=1", name, "python3", "-m", "ansible.cli.playbook", "-i", "/fixture/inventory.yml", playbook, "--extra-vars", "@/fixture/vars.json"}, extra...)
+	}
 	run := func(playbook string, success bool, extra ...string) string {
 		t.Helper()
-		args := []string{"exec", name, "python3", "-m", "ansible.cli.playbook", "-i", "/fixture/inventory.yml", playbook, "--extra-vars", "@/fixture/vars.json"}
-		args = append(args, extra...)
-		output, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+		output, err := exec.CommandContext(ctx, "docker", playbookArgs(playbook, extra...)...).CombinedOutput()
 		if (err == nil) != success {
 			t.Fatalf("Ansible success=%t: %v\n%s", success, err, output)
 		}
@@ -456,11 +459,44 @@ esac
 	archive()
 	command("docker", "exec", name, "ln", "-s", "/fixture/runner.tar.gz", "/var/cache/actions-runner-"+version+".tar.gz")
 	write("state/version-infra", "0.0.0", false)
-	converge()
+	write("runners/infra/bin/Runner.Worker", "#!/bin/sh\nwhile [ -e /fixture/state/job-infra ]; do sleep 0.1; done\n", true)
+	write("state/job-infra", "", false)
+	command("docker", "exec", "-d", name, "/home/runner/infra/bin/Runner.Worker", "spawnclient", "1", "2")
+	run("/fixture/converge.yml", false, "--extra-vars", `{"build_runner_drain_minutes":0,"build_runner_drain_interval":1}`)
+	if _, err := os.Stat(filepath.Join(fixture, "runners/infra/.infra-runner-pending")); record("stopped") != "" || !os.IsNotExist(err) {
+		t.Fatalf("drain deadline interrupted the busy runner: stopped %q, pending marker %v", record("stopped"), err)
+	}
+	t.Log("a runner still busy at the drain deadline keeps its job and its binaries")
+	upgrade := exec.CommandContext(ctx, "docker", playbookArgs("/fixture/converge.yml", "--extra-vars", `{"build_runner_drain_interval":1}`)...)
+	progress, err := upgrade.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	upgrade.Stderr = upgrade.Stdout
+	if err := upgrade.Start(); err != nil {
+		t.Fatal(err)
+	}
+	var upgradeOutput strings.Builder
+	lines := bufio.NewScanner(progress)
+	for lines.Scan() && !(strings.HasPrefix(lines.Text(), "FAILED - RETRYING: ") && strings.Contains(lines.Text(), "Wait for the runner to finish its job")) {
+		upgradeOutput.WriteString(lines.Text() + "\n")
+	}
+	if record("stopped") != "" {
+		t.Fatalf("upgrade stopped the runner during its job:\n%s", upgradeOutput.String())
+	}
+	remove("state/job-infra")
+	rest, _ := io.ReadAll(progress)
+	if err := upgrade.Wait(); err != nil {
+		t.Fatalf("upgrade after the job finished: %v\n%s%s", err, upgradeOutput.String(), rest)
+	}
 	stopped := string(read(filepath.Join(fixture, "state/stopped")))
 	if stopped != runnerUnit("infra")+"\n" {
 		t.Fatalf("wrong service stopped: %q", stopped)
 	}
+	if busy := record("stopped-mid-job"); busy != "" {
+		t.Fatalf("upgrade stopped %q while a job was running", busy)
+	}
+	t.Log("runner upgrade waits for the running job before stopping the runner")
 	if output := run("/source/ansible/verify-runners.yml", true); !strings.Contains(output, "changed=0") {
 		t.Fatalf("verification after runner upgrade reports drift:\n%s", output)
 	}

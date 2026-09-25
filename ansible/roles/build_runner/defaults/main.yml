@@ -5,6 +5,8 @@ build_runner_sha256: '{{ build_runner_fleet.sha256 }}'
 build_runner_labels: '{{ build_runner_fleet.labels }}'
 build_runner_memory: 2G
 build_runner_job_slots: 1
+build_runner_drain_minutes: 50
+build_runner_drain_interval: 10
 build_runner_admission_enabled: true
 build_runner_cpus_percent: 400
 build_runner_packages: [docker.io, git, curl, jq, libicu74, build-essential, unattended-upgrades]

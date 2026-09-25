@@ -72,6 +72,7 @@ type fleetHarness struct {
 	rejectLabels   bool
 	failing        []string
 	change         func(*registeredRunner)
+	play           func()
 	stdout, stderr bytes.Buffer
 }
 
@@ -79,21 +80,27 @@ func (h *fleetHarness) commands() *Commands {
 	return &Commands{Runner: ci.Runner{Dir: writeRunnerFleet(h.t, h.fleet), Execute: h.execute, Stdout: &h.stdout, Stderr: &h.stderr}}
 }
 
-func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process.Result, error) {
+func (h *fleetHarness) execute(ctx context.Context, opts process.Options) (process.Result, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	switch {
 	case opts.Name == "ansible-playbook":
 		call := strings.Join(opts.Args[2:], " ")
 		h.calls = append(h.calls, call)
+		if h.play != nil {
+			h.play()
+		}
 		if slices.Contains(h.failing, call) {
 			return process.Result{ExitCode: 2}, errors.New(call + " failed")
 		}
 		return process.Result{}, nil
-	case opts.Name == "gh" && slices.Contains(opts.Args, "PUT"):
+	case opts.Name == "gh" && (slices.Contains(opts.Args, "PUT") || slices.Contains(opts.Args, "DELETE")):
 		h.calls = append(h.calls, "gh "+strings.Join(opts.Args, " "))
 		if h.rejectLabels {
 			return process.Result{ExitCode: 1}, errors.New("HTTP 403")
+		}
+		if ctx.Err() != nil {
+			return process.Result{ExitCode: -1}, ctx.Err()
 		}
 		return process.Result{}, nil
 	case opts.Name == "gh":
@@ -456,6 +463,48 @@ func TestRejectedLabelUpdateOnlyWarns(t *testing.T) {
 	}
 	if len(harness.calls) != 2 || harness.calls[1] != "build-runners.yml" || !strings.Contains(harness.stderr.String(), "warning: set labels of infra-build-09-Y") {
 		t.Fatalf("rejected label update stopped convergence or went unreported: %q\n%s", harness.calls, harness.stderr.String())
+	}
+}
+
+func TestOutdatedRunnersTakeNoNewJobsUntilReplaced(t *testing.T) {
+	stale := "2.336.0"
+	outdatedY := func(runner *registeredRunner) {
+		runner.ID = 7
+		if runner.Name == "infra-build-09-Y" {
+			runner.ID, runner.Version = 42, &stale
+		}
+	}
+	withdraw := "gh api --method DELETE --silent repos/fredrir/Y/actions/runners/42/labels"
+	restore := "gh api --method PUT --silent repos/fredrir/Y/actions/runners/42/labels -f labels[]=dagger-amd64 -f labels[]=infra-trusted"
+	plan := Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: []string{"build/runners.json"}}}
+	for _, test := range []struct {
+		name    string
+		harness func(*fleetHarness, context.CancelFunc)
+		failure bool
+		want    []string
+		warning string
+	}{
+		{"replaced", func(*fleetHarness, context.CancelFunc) {}, false, []string{withdraw, "build-runners.yml", restore}, ""},
+		{"failed play", func(h *fleetHarness, _ context.CancelFunc) { h.failing = []string{"build-runners.yml"} }, true, []string{withdraw, "build-runners.yml", restore}, ""},
+		{"reconciliation deadline during play", func(h *fleetHarness, cancel context.CancelFunc) { h.play = cancel }, false, []string{withdraw, "build-runners.yml", restore}, ""},
+		{"rejected withdrawal", func(h *fleetHarness, _ context.CancelFunc) { h.rejectLabels = true }, false, []string{withdraw, "build-runners.yml"}, "warning: withdraw infra-build-09-Y from new jobs"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), change: outdatedY}
+			test.harness(harness, cancel)
+			err := harness.commands().Hosts(ctx, plan)
+			if (err != nil) != test.failure {
+				t.Fatalf("runner replacement returned %v", err)
+			}
+			if !reflect.DeepEqual(harness.calls, test.want) {
+				t.Fatalf("outdated runner was not withdrawn for exactly the play: %q", harness.calls)
+			}
+			if stderr := harness.stderr.String(); (test.warning == "" && stderr != "") || !strings.Contains(stderr, test.warning) {
+				t.Fatalf("unexpected warnings: %q", stderr)
+			}
+		})
 	}
 }
 

@@ -243,20 +243,64 @@ func (c *Commands) unregisteredRunners(ctx context.Context, fleet RunnerFleet, s
 	return missingRunners(fleet, confirmed)
 }
 
+type fleetRunner struct {
+	repository string
+	registeredRunner
+}
+
+func (r fleetRunner) labelsEndpoint(fleet RunnerFleet) string {
+	return fmt.Sprintf("repos/%s/%s/actions/runners/%d/labels", fleet.Owner, r.repository, r.ID)
+}
+
+func outdatedRunners(fleet RunnerFleet, states map[string][]registeredRunner) []fleetRunner {
+	var outdated []fleetRunner
+	for _, repository := range fleet.Repositories {
+		matches := namedRunners(fleet, states, repository)
+		if len(matches) == 1 && (matches[0].Version == nil || *matches[0].Version != fleet.Version) {
+			outdated = append(outdated, fleetRunner{repository, matches[0]})
+		}
+	}
+	return outdated
+}
+
+func (c *Commands) setRunnerLabels(ctx context.Context, fleet RunnerFleet, runner fleetRunner) {
+	args := []string{"api", "--method", "PUT", "--silent", runner.labelsEndpoint(fleet)}
+	for _, label := range fleet.Labels {
+		args = append(args, "-f", "labels[]="+label)
+	}
+	if err := c.Runner.Run(ctx, "gh", args...); err != nil {
+		c.warn("set labels of %s: %v", runner.Name, err)
+	}
+}
+
 func (c *Commands) convergeRunnerLabels(ctx context.Context, fleet RunnerFleet, states map[string][]registeredRunner) {
 	labels := slices.Sorted(slices.Values(fleet.Labels))
 	for _, repository := range fleet.Repositories {
 		matches := namedRunners(fleet, states, repository)
-		if len(matches) != 1 || slices.Equal(customLabels(matches[0]), labels) {
+		if len(matches) == 1 && !slices.Equal(customLabels(matches[0]), labels) {
+			c.setRunnerLabels(ctx, fleet, fleetRunner{repository, matches[0]})
+		}
+	}
+}
+
+func (c *Commands) withdrawRunners(ctx context.Context, fleet RunnerFleet, runners []fleetRunner) []fleetRunner {
+	var withdrawn []fleetRunner
+	for _, runner := range runners {
+		if err := c.Runner.Run(ctx, "gh", "api", "--method", "DELETE", "--silent", runner.labelsEndpoint(fleet)); err != nil {
+			c.warn("withdraw %s from new jobs: %v", runner.Name, err)
 			continue
 		}
-		args := []string{"api", "--method", "PUT", "--silent", fmt.Sprintf("repos/%s/%s/actions/runners/%d/labels", fleet.Owner, repository, matches[0].ID)}
-		for _, label := range fleet.Labels {
-			args = append(args, "-f", "labels[]="+label)
-		}
-		if err := c.Runner.Run(ctx, "gh", args...); err != nil {
-			c.warn("set labels of %s: %v", matches[0].Name, err)
-		}
+		c.note("withdrew %s from new jobs until it is replaced", runner.Name)
+		withdrawn = append(withdrawn, runner)
+	}
+	return withdrawn
+}
+
+func (c *Commands) restoreRunners(ctx context.Context, fleet RunnerFleet, runners []fleetRunner) {
+	restore, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+	defer cancel()
+	for _, runner := range runners {
+		c.setRunnerLabels(restore, fleet, runner)
 	}
 }
 
@@ -307,7 +351,10 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 	if len(drift) == 0 && effectiveHostScope(plan.Affected) == HostScopeRunners && slices.Equal(plan.Affected.RunnerInputs, []string{"build/cli-release.json"}) {
 		args = append(args, "--tags=infra_binary")
 	}
-	return c.ansible(ctx, playbook, args...)
+	withdrawn := c.withdrawRunners(ctx, fleet, outdatedRunners(fleet, states))
+	err = c.ansible(ctx, playbook, args...)
+	c.restoreRunners(ctx, fleet, withdrawn)
+	return err
 }
 
 func (c *Commands) note(format string, args ...any) {

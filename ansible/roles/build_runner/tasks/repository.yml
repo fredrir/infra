@@ -52,6 +52,28 @@
     that: (build_runner_previous_service.content | b64decode | trim) is match('^actions[.]runner[.][A-Za-z0-9_.-]+[.]service$')
   when: build_runner_replace and build_runner_existing_service.stat.exists
 
+- name: Start runner drain deadline
+  ansible.builtin.set_fact:
+    build_runner_drain_deadline: '{{ build_runner_drain_deadline | default(now().timestamp() | int + build_runner_drain_minutes | int * 60) }}'
+  when: build_runner_replace and build_runner_existing_service.stat.exists
+
+- name: Wait for the runner to finish its job
+  ansible.builtin.command:
+    argv: [pgrep, --full, "{{ ('/home/runner/' ~ build_runner_repository ~ '/bin/Runner.Worker') | regex_escape }}( |$)"]
+  register: build_runner_worker
+  changed_when: false
+  failed_when: build_runner_worker.rc not in [0, 1]
+  until: build_runner_worker.rc == 1
+  retries: '{{ [1, (build_runner_drain_deadline | int - now().timestamp() | int) // build_runner_drain_interval | int] | max }}'
+  delay: '{{ build_runner_drain_interval | int }}'
+  when: build_runner_replace and build_runner_existing_service.stat.exists
+
+- name: Require an idle runner before replacement
+  ansible.builtin.assert:
+    that: build_runner_worker.rc == 1
+    fail_msg: '{{ build_runner_repository }} is still running a job at the drain deadline'
+  when: build_runner_replace and build_runner_existing_service.stat.exists
+
 - name: Record incomplete runner replacement
   ansible.builtin.copy:
     dest: '/home/runner/{{ build_runner_repository }}/.infra-runner-pending'
