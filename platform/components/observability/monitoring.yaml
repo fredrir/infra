@@ -243,8 +243,17 @@ spec:
               summary: Worker advertises no CI job slots
     nodeExporter:
       enabled: true
+    kubelet:
+      enabled: true
+      serviceMonitor:
+        sampleLimit: 5000
+        labelLimit: 40
+        labelNameLengthLimit: 63
+        labelValueLengthLimit: 1024
     prometheus-node-exporter:
       namespaceOverride: node-exporter
+      serviceAccount:
+        automountServiceAccountToken: false
       tolerations:
       - operator: Exists
         effect: NoSchedule
@@ -276,6 +285,10 @@ spec:
           type: RuntimeDefault
       prometheus:
         monitor:
+          sampleLimit: 2000
+          labelLimit: 40
+          labelNameLengthLimit: 63
+          labelValueLengthLimit: 1024
           relabelings:
           - sourceLabels:
             - __meta_kubernetes_pod_node_name
