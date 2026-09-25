@@ -6,6 +6,7 @@ go_test(
         "build_vm_test.go",
         "cancellation_test.go",
         "images_test.go",
+        "kustomize_test.go",
         "renovate_test.go",
     ],
     data = [
@@ -14,6 +15,7 @@ go_test(
         "//:renovate_pin_data",
     ],
     deps = [
+        "//internal/ci",
         "//internal/images",
         "@dev_cel_cel_go//cel",
         "@dev_cel_cel_go//common/types",

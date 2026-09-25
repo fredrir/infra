@@ -10,9 +10,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/fredrir/infra/internal/kustomize"
 	"go.yaml.in/yaml/v3"
-	"sigs.k8s.io/kustomize/api/krusty"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 type DeployOptions struct{ Root, RepositoryID, Revision, Image, Digest, Token string }
@@ -323,7 +322,7 @@ func WorkflowRevisions(pattern string) ([]string, error) {
 	return nil, fmt.Errorf("workflow trust requires one or two anchored exact revisions")
 }
 func renderDeployment(directory string) error {
-	_, err := krusty.MakeKustomizer(krusty.MakeDefaultOptions()).Run(filesys.MakeFsOnDisk(), directory)
+	_, err := kustomize.Build(directory)
 	return err
 }
 func updateImagePin(path, image, digest string) error {

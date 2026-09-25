@@ -11,10 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fredrir/infra/internal/kustomize"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
-	"sigs.k8s.io/kustomize/api/krusty"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 type deployFixture struct {
@@ -132,11 +131,7 @@ func (f *deployFixture) kustomization(directory string, resources []string, pinn
 }
 func (f *deployFixture) rendered(directory string) string {
 	f.t.Helper()
-	r, err := krusty.MakeKustomizer(krusty.MakeDefaultOptions()).Run(filesys.MakeFsOnDisk(), filepath.Join(f.project, directory))
-	if err != nil {
-		f.t.Fatal(err)
-	}
-	b, err := r.AsYaml()
+	b, err := kustomize.Build(filepath.Join(f.project, directory))
 	if err != nil {
 		f.t.Fatal(err)
 	}

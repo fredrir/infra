@@ -304,7 +304,7 @@ func (c *Commands) verifyFrontend(ctx context.Context, client *http.Client) erro
 }
 
 func (c *Commands) VerifyDrift(ctx context.Context, plan Plan) error {
-	if err := c.checkGenerated(ctx); err != nil {
+	if err := c.checkGenerated(); err != nil {
 		return err
 	}
 	if err := c.tofuInit(ctx); err != nil {

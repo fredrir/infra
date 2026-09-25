@@ -2,19 +2,17 @@ package fluxartifacts
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
+	"github.com/fredrir/infra/internal/kustomize"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -26,15 +24,7 @@ func Run(root string, check bool) error {
 	if !check {
 		return generate(root, false)
 	}
-	return Check(root, func(path string) ([]byte, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		data, err := exec.CommandContext(ctx, "kubectl", "kustomize", path).CombinedOutput()
-		if err != nil {
-			return nil, fmt.Errorf("render %s: %w: %s", path, err, data)
-		}
-		return data, nil
-	})
+	return Check(root, kustomize.Build)
 }
 
 func Check(root string, render func(string) ([]byte, error)) error {

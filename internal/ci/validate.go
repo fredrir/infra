@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 
@@ -165,21 +167,38 @@ func kustomizations(root string) ([]string, error) {
 func runChecks(ctx context.Context, runner Runner, checks []declarationCheck) error {
 	transcripts := make([]transcript, len(checks))
 	failures := make([]error, len(checks))
+	finished := make([]chan struct{}, len(checks))
+	for index := range finished {
+		finished[index] = make(chan struct{})
+	}
 	var group errgroup.Group
 	group.SetLimit(runtime.GOMAXPROCS(0))
-	for index, check := range checks {
-		group.Go(func() error {
-			isolated := runner
-			isolated.Stdout, isolated.Stderr = transcripts[index].writer(runner.Stdout), transcripts[index].writer(runner.Stderr)
-			failures[index] = check(ctx, isolated)
-			return nil
-		})
-	}
-	group.Wait()
-	for index := range transcripts {
+	go func() {
+		for index, check := range checks {
+			group.Go(func() error {
+				defer close(finished[index])
+				isolated := runner
+				isolated.Stdout, isolated.Stderr = transcripts[index].writer(runner.Stdout), transcripts[index].writer(runner.Stderr)
+				failures[index] = runCheck(ctx, isolated, check)
+				return nil
+			})
+		}
+	}()
+	for index := range checks {
+		<-finished[index]
 		transcripts[index].replay()
 	}
+	group.Wait()
 	return errors.Join(failures...)
+}
+
+func runCheck(ctx context.Context, runner Runner, check declarationCheck) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("declaration check panicked: %v\n%s", recovered, debug.Stack())
+		}
+	}()
+	return check(ctx, runner)
 }
 
 type transcript struct {
@@ -212,6 +231,8 @@ func (w transcriptWriter) Write(data []byte) (int, error) {
 }
 
 func (t *transcript) replay() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	for _, write := range t.writes {
 		write.destination.Write(write.data)
 	}

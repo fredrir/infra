@@ -1,14 +1,17 @@
 package platformops
 
 import (
+	"bytes"
+	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"sigs.k8s.io/kustomize/api/krusty"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
+	"github.com/fredrir/infra/internal/kustomize"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
@@ -93,11 +96,7 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 	}
 	for _, directory := range []string{"components/controllers", "components/build-cache", "projects/y", "projects/llunde-pyparser", "projects/portfolio", "components/cache"} {
 		t.Run(directory, func(t *testing.T) {
-			result, err := krusty.MakeKustomizer(krusty.MakeDefaultOptions()).Run(filesys.MakeFsOnDisk(), filepath.Join(root, "platform", directory))
-			if err != nil {
-				t.Fatal(err)
-			}
-			data, err := result.AsYaml()
+			data, err := kustomize.Build(filepath.Join(root, "platform", directory))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -110,12 +109,21 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 					t.Fatalf("render retained %s", legacy)
 				}
 			}
-			for _, resource := range result.Resources() {
-				if resource.GetKind() == "ConfigMap" {
-					name := resource.GetName()
+			decoder := yaml.NewDecoder(bytes.NewReader(data))
+			for {
+				var resource struct {
+					Kind     string
+					Metadata struct{ Name string }
+				}
+				if err := decoder.Decode(&resource); errors.Is(err, io.EOF) {
+					break
+				} else if err != nil {
+					t.Fatal(err)
+				}
+				if resource.Kind == "ConfigMap" {
 					for _, legacy := range []string{"ci-slots-", "build-cache-provisioner-", "backup-hook-"} {
-						if strings.HasPrefix(name, legacy) {
-							t.Fatalf("render retained generated legacy ConfigMap %s", name)
+						if strings.HasPrefix(resource.Metadata.Name, legacy) {
+							t.Fatalf("render retained generated legacy ConfigMap %s", resource.Metadata.Name)
 						}
 					}
 				}

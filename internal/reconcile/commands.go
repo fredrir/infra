@@ -12,6 +12,7 @@ import (
 
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/fluxartifacts"
+	"github.com/fredrir/infra/internal/kustomize"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -71,7 +72,7 @@ func (c *Commands) Select(ctx context.Context, base string, full bool) (Selectio
 
 func (c *Commands) Plan(ctx context.Context, plan Plan) error {
 	if c.RequireMain {
-		if err := c.checkGenerated(ctx); err != nil {
+		if err := c.checkGenerated(); err != nil {
 			return err
 		}
 	}
@@ -113,10 +114,8 @@ func (c *Commands) Plan(ctx context.Context, plan Plan) error {
 	return nil
 }
 
-func (c *Commands) checkGenerated(ctx context.Context) error {
-	return fluxartifacts.Check(c.Runner.Dir, func(path string) ([]byte, error) {
-		return c.Runner.Output(ctx, "kubectl", "kustomize", path)
-	})
+func (c *Commands) checkGenerated() error {
+	return fluxartifacts.Check(c.Runner.Dir, kustomize.Build)
 }
 
 func (c *Commands) tofuInit(ctx context.Context) error {

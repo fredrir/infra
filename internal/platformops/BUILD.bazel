@@ -41,8 +41,8 @@ go_test(
     data = ["//platform:promotion_testdata"],
     embed = [":platformops"],
     deps = [
+        "//internal/kustomize",
         "//internal/process",
-        "@io_k8s_sigs_kustomize_api//krusty",
-        "@io_k8s_sigs_kustomize_kyaml//filesys",
+        "@in_yaml_go_yaml_v3//:yaml",
     ],
 )

@@ -24,6 +24,7 @@ go_library(
     deps = [
         "//internal/ci",
         "//internal/fluxartifacts",
+        "//internal/kustomize",
         "//internal/objectstore",
         "//internal/platformops",
         "//internal/process",

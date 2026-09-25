@@ -5,7 +5,10 @@ go_library(
     srcs = ["generate.go"],
     importpath = "github.com/fredrir/infra/internal/fluxartifacts",
     visibility = ["//:__subpackages__"],
-    deps = ["@in_yaml_go_yaml_v3//:yaml"],
+    deps = [
+        "//internal/kustomize",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
 )
 
 go_test(

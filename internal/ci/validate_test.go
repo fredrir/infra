@@ -131,6 +131,66 @@ func TestDeclarationChecksReportOutputAndErrorsInDeclarationOrder(t *testing.T) 
 	}
 }
 
+type streamRecorder struct {
+	lock    sync.Mutex
+	writes  []string
+	written chan struct{}
+}
+
+func (r *streamRecorder) Write(data []byte) (int, error) {
+	r.lock.Lock()
+	r.writes = append(r.writes, string(data))
+	r.lock.Unlock()
+	select {
+	case r.written <- struct{}{}:
+	default:
+	}
+	return len(data), nil
+}
+
+func TestDeclarationChecksStreamFinishedOutputWhileLaterChecksRun(t *testing.T) {
+	recorder := &streamRecorder{written: make(chan struct{}, 1)}
+	failure := errors.New("first failure")
+	checks := []declarationCheck{
+		func(_ context.Context, runner Runner) error {
+			runner.Stderr.Write([]byte("first stderr\n"))
+			return failure
+		},
+		func(context.Context, Runner) error {
+			select {
+			case <-recorder.written:
+				return nil
+			case <-time.After(5 * time.Second):
+				return errors.New("finished check output held back")
+			}
+		},
+	}
+	if err := runChecks(context.Background(), Runner{Stdout: recorder, Stderr: recorder}, checks); err == nil || err.Error() != failure.Error() {
+		t.Fatalf("unexpected result: %v", err)
+	}
+	if !reflect.DeepEqual(recorder.writes, []string{"first stderr\n"}) {
+		t.Fatalf("streamed output: %q", recorder.writes)
+	}
+}
+
+func TestDeclarationCheckPanicBecomesItsErrorWhileSiblingsFinish(t *testing.T) {
+	var output bytes.Buffer
+	checks := []declarationCheck{
+		func(context.Context, Runner) error { panic("broken check") },
+		func(_ context.Context, runner Runner) error {
+			runner.Stdout.Write([]byte("sibling finished\n"))
+			return nil
+		},
+	}
+	err := runChecks(context.Background(), Runner{Stdout: &output, Stderr: &output}, checks)
+	if err == nil || !strings.HasPrefix(err.Error(), "declaration check panicked: broken check\n") || !strings.Contains(err.Error(), "runCheck") {
+		t.Fatalf("panic not reported with its stack: %v", err)
+	}
+	if output.String() != "sibling finished\n" {
+		t.Fatalf("sibling output lost: %q", output.String())
+	}
+}
+
 func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
 	var lock sync.Mutex
 	var calls [][]string

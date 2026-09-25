@@ -10,11 +10,11 @@ go_test(
     ],
     data = ["//platform:policy_testdata"],
     deps = [
+        "//internal/kustomize",
         "@dev_cel_cel_go//cel",
         "@dev_cel_cel_go//common/types",
         "@in_yaml_go_yaml_v3//:yaml",
         "@io_k8s_apimachinery//pkg/api/resource",
-        "@io_k8s_sigs_kustomize_api//krusty",
         "@io_k8s_sigs_kustomize_kyaml//filesys",
     ],
 )

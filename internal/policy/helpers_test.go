@@ -11,8 +11,8 @@ import (
 
 	"cel.dev/cel-go/cel"
 	"cel.dev/cel-go/common/types"
+	"github.com/fredrir/infra/internal/kustomize"
 	"go.yaml.in/yaml/v3"
-	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
@@ -95,11 +95,7 @@ func rendered(t *testing.T, path string) []object {
 	if e != nil {
 		t.Fatal(e)
 	}
-	result, e := krusty.MakeKustomizer(krusty.MakeDefaultOptions()).Run(memory, "/"+filepath.ToSlash(path))
-	if e != nil {
-		t.Fatal(e)
-	}
-	b, e := result.AsYaml()
+	b, e := kustomize.BuildFileSystem(memory, "/"+filepath.ToSlash(path))
 	if e != nil {
 		t.Fatal(e)
 	}
