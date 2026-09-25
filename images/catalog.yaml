@@ -23,25 +23,6 @@
     kubectl version --client; kustomize version; helm version --short; actionlint -version; tofu version;
     ansible-playbook --version | head -n1; sops --version; age --version;
     /opt/venv/bin/python -c 'import ansible, jinja2, yaml'
-- image: ghcr.io/fredrir/infra-runner-dagger
-  dockerfile: images/runner-dagger/Containerfile
-  inputs:
-  - images/runner-dagger
-  - cmd
-  - internal
-  - go.mod
-  - go.sum
-  - build/toolchain.json
-  - build/dagger-embed.patch
-  - build/BUILD.bazel
-  - MODULE.bazel
-  - MODULE.bazel.lock
-  - .bazelversion
-  - .bazelrc
-  - BUILD.bazel
-  excludes:
-  - internal/dev
-  check: /home/runner/run.sh --version | grep -x 2.337.0; dagger version; infra version
 - image: ghcr.io/fredrir/infra-runner-rust
   dockerfile: images/runner-rust/Containerfile
   inputs:
