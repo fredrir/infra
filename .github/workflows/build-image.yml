@@ -156,7 +156,9 @@ jobs:
           password: ${{ github.token }}
       - name: Start isolated Dagger engine
         if: steps.affected.outputs.changed == 'true' && (runner.environment == 'github-hosted')
-        run: docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus=2 --memory=5g --memory-swap=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+        run: |
+          engine_memory="$(awk '/^MemTotal:/ { print int($2 * 3 / 4 / 1024) "m" }' /proc/meminfo)"
+          docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus="$(nproc)" --memory="$engine_memory" --memory-swap="$engine_memory" --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
       - name: Verify dedicated engine
         if: steps.affected.outputs.changed == 'true' && (runner.environment == 'self-hosted')
         run: infra doctor --root .infra-build-recipe --engine-only
