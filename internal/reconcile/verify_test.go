@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
@@ -378,28 +379,28 @@ func TestRunnerSetsWithoutRunningListenersFailVerification(t *testing.T) {
 		{name: "listener of another namespace", sets: []resource{check}, listeners: func(int) []resource { return []resource{listenerPod(t, "ci-nsql", "check-amd64", true)} }, want: missing + ` in phase "Running"`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			var mu sync.Mutex
-			polls := 0
-			commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
-				mu.Lock()
-				defer mu.Unlock()
-				fake := kubernetesFake{
-					"get autoscalingrunnersets.actions.github.com --all-namespaces":                   items(test.sets...),
-					"get pods -n=arc-system -l=app.kubernetes.io/component=runner-scale-set-listener": items(test.listeners(polls)...),
-					"get ephemeralrunners.actions.github.com --all-namespaces":                        items(test.runners...),
+			synctest.Test(t, func(t *testing.T) {
+				polls := 0
+				commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+					fake := kubernetesFake{
+						"get autoscalingrunnersets.actions.github.com --all-namespaces":                   items(test.sets...),
+						"get pods -n=arc-system -l=app.kubernetes.io/component=runner-scale-set-listener": items(test.listeners(polls)...),
+						"get ephemeralrunners.actions.github.com --all-namespaces":                        items(test.runners...),
+					}
+					if strings.HasPrefix(strings.Join(options.Args, " "), "get pods") {
+						polls++
+					}
+					return fake.execute(t, options)
+				}}}
+				started := time.Now()
+				err := commands.verifyRunnerListeners(t.Context(), Plan{Affected: All()})
+				if test.want == "" && err != nil || test.want != "" && (err == nil || !strings.Contains(err.Error(), test.want)) {
+					t.Fatalf("listener verification returned %v, want %q", err, test.want)
 				}
-				if strings.HasPrefix(strings.Join(options.Args, " "), "get pods") {
-					polls++
+				if waited := time.Since(started); test.want != "" && waited < 3*time.Minute {
+					t.Fatalf("listener verification failed after %s, before its three-minute window", waited)
 				}
-				return fake.execute(t, options)
-			}}}
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			defer cancel()
-			err := commands.verifyRunnerListeners(ctx, Plan{Affected: All()})
-			if test.want == "" && err != nil || test.want != "" && (err == nil || !strings.Contains(err.Error(), test.want)) {
-				t.Fatalf("listener verification returned %v, want %q", err, test.want)
-			}
+			})
 		})
 	}
 	scoped := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
