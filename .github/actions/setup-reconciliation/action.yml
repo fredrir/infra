@@ -42,9 +42,11 @@ runs:
   - shell: bash
     env:
       FULL: ${{ steps.requirements.outputs.full }}
+      IDENTITY: ${{ inputs.identity }}
     run: |
       infra ci install-tools flux kubectl helm actionlint
       if [ "$FULL" = true ]; then infra ci install-tools tofu sops uv; fi
+      if [ "$IDENTITY" = apply ]; then infra ci install-tools gh cosign; fi
   - shell: bash
     if: steps.requirements.outputs.full == 'true'
     run: |

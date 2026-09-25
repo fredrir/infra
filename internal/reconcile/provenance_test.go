@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -24,13 +25,15 @@ type provenanceFixture struct {
 	t                            *testing.T
 	root, remote, owner, visitor string
 	base                         string
+	attested                     map[string]int
+	verifications                []process.Options
 }
 
 func newProvenanceFixture(t *testing.T) *provenanceFixture {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	area := t.TempDir()
-	f := &provenanceFixture{t: t, root: filepath.Join(area, "infra"), remote: filepath.Join(area, "origin.git"), owner: filepath.Join(area, "owner"), visitor: filepath.Join(area, "visitor")}
+	f := &provenanceFixture{t: t, root: filepath.Join(area, "infra"), remote: filepath.Join(area, "origin.git"), owner: filepath.Join(area, "owner"), visitor: filepath.Join(area, "visitor"), attested: map[string]int{}}
 	for _, key := range []string{f.owner, f.visitor} {
 		if output, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", filepath.Base(key), "-f", key).CombinedOutput(); err != nil {
 			t.Fatalf("ssh-keygen: %v\n%s", err, output)
@@ -48,8 +51,10 @@ func newProvenanceFixture(t *testing.T) *provenanceFixture {
 	pinned := fmt.Sprintf("apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n- application.yaml\nimages:\n- name: %[1]s\n  newName: %[1]s\n  digest: sha256:%[2]s\n", deployedImage, strings.Repeat("c", 64))
 	f.base = f.commit(f.owner, "Declare deployments", map[string]string{
 		adminKeys:                                                  f.publicKey(f.owner),
-		".github/deployments/1.yaml":                               fmt.Sprintf("repository: fredrir/example\nvisibility: public\nimages:\n  %s:\n    path: platform/projects/example\n    mode: kustomize\n  %s:\n    path: platform/projects/web\n    mode: helmrelease\n    workload: web\n", deployedImage, releasedImage),
+		".github/deployments/1.yaml":                               fmt.Sprintf("repository: fredrir/example\nvisibility: public\nimages:\n  %s:\n    path: platform/projects/example\n    mode: kustomize\n", deployedImage),
+		".github/deployments/2.yaml":                               fmt.Sprintf("repository: fredrir/web\nvisibility: private\nimages:\n  %s:\n    path: platform/projects/web\n    mode: helmrelease\n    workload: web\n", releasedImage),
 		".github/chainguard/deploy-1.sts.yaml":                     "claim_pattern:\n  job_workflow_sha: '^" + strings.Repeat("d", 40) + "$'\n",
+		".github/chainguard/deploy-2.sts.yaml":                     "claim_pattern:\n  job_workflow_sha: '^(" + strings.Repeat("d", 40) + "|" + strings.Repeat("e", 40) + ")$'\n",
 		"platform/projects/example/kustomization.yaml":             "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n- namespace.yaml\n",
 		"platform/projects/example/namespace.yaml":                 "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: example\n",
 		"platform/projects/example/application/application.yaml":   deployment("application"),
@@ -114,6 +119,18 @@ func (f *provenanceFixture) commit(key, message string, files map[string]string)
 	return f.git("rev-parse", "HEAD")
 }
 
+func (f *provenanceFixture) forge(commit string, header func(string) string) string {
+	f.t.Helper()
+	original, message, _ := strings.Cut(f.git("cat-file", "commit", commit), "\n\n")
+	command := exec.Command("git", "hash-object", "-t", "commit", "-w", "--literally", "--stdin")
+	command.Dir, command.Stdin = f.root, strings.NewReader(header(original)+"\n\n"+message+"\n")
+	output, err := command.Output()
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return strings.TrimSpace(string(output))
+}
+
 func (f *provenanceFixture) amend(files map[string]string) string {
 	f.t.Helper()
 	f.write(files)
@@ -131,16 +148,29 @@ func (f *provenanceFixture) read(name string) string {
 	return string(data)
 }
 
+func (f *provenanceFixture) attestation(ctx context.Context, options process.Options) (process.Result, error) {
+	if options.Name != "gh" && options.Name != "cosign" {
+		return process.Run(ctx, options)
+	}
+	f.verifications = append(f.verifications, options)
+	subject := strings.TrimPrefix(options.Args[slices.IndexFunc(options.Args, func(arg string) bool { return strings.Contains(arg, "ghcr.io/") })], "oci://")
+	run, ok := f.attested[subject]
+	if !ok || (options.Name == "cosign" && !strings.Contains(strings.Join(options.Args, " "), "workflow-revision="+strings.Repeat("e", 40))) {
+		return process.Result{ExitCode: 1}, errors.New("no matching attestation")
+	}
+	if options.Name == "cosign" {
+		return process.Result{Stdout: fmt.Appendf(nil, `[{"optional":{"source-run-id":"%d","source-run-attempt":"1"}}]`, run)}, nil
+	}
+	repository := options.Args[slices.Index(options.Args, "--repo")+1]
+	return process.Result{Stdout: fmt.Appendf(nil, `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/%s/actions/runs/%d/attempts/1"}}}}]`, repository, run)}, nil
+}
+
 func (f *provenanceFixture) deploy(image string, run int) string {
 	f.t.Helper()
-	runner := ci.Runner{Dir: f.root, Stdout: io.Discard, Stderr: io.Discard, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
-		if options.Name == "gh" {
-			return process.Result{Stdout: fmt.Appendf(nil, `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/fredrir/example/actions/runs/%d/attempts/1"}}}}]`, run)}, nil
-		}
-		return process.Run(ctx, options)
-	}}
-	options := ci.DeployOptions{Root: f.root, RepositoryID: "1", Revision: fmt.Sprintf("%040x", run), Image: image, Digest: fmt.Sprintf("sha256:%064x", run), Token: "token"}
-	if err := ci.Deploy(context.Background(), runner, options); err != nil {
+	repository := map[string]string{deployedImage: "1", releasedImage: "2"}[image]
+	options := ci.DeployOptions{Root: f.root, RepositoryID: repository, Revision: fmt.Sprintf("%040x", run), Image: image, Digest: fmt.Sprintf("sha256:%064x", run), Token: "token"}
+	f.attested[image+"@"+options.Digest] = run
+	if err := ci.Deploy(context.Background(), ci.Runner{Dir: f.root, Stdout: io.Discard, Stderr: io.Discard, Execute: f.attestation}, options); err != nil {
 		f.t.Fatal(err)
 	}
 	return f.git("rev-parse", "HEAD")
@@ -148,7 +178,8 @@ func (f *provenanceFixture) deploy(image string, run int) string {
 
 func (f *provenanceFixture) verify(base, head string) error {
 	f.t.Helper()
-	return (&Commands{Runner: ci.Runner{Dir: f.root}, Work: f.t.TempDir()}).Provenance(context.Background(), ProvenanceRange{Base: base, Revision: head})
+	f.verifications = nil
+	return (&Commands{Runner: ci.Runner{Dir: f.root, Stderr: io.Discard, Execute: f.attestation}, Work: f.t.TempDir()}).Provenance(context.Background(), ProvenanceRange{Base: base, Revision: head})
 }
 
 func TestProvenanceGate(t *testing.T) {
@@ -172,17 +203,22 @@ func TestProvenanceGate(t *testing.T) {
 			return f.commit(f.visitor, "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
 		}, unverified: "not by a key in keys/admin_keys"},
 		{name: "OpenPGP signature", build: func() string {
-			object := f.git("cat-file", "commit", f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"}))
-			header, message, _ := strings.Cut(object, "\n\n")
-			forged := header + "\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n -----END PGP SIGNATURE-----\n\n" + message + "\n"
-			command := exec.Command("git", "hash-object", "-t", "commit", "-w", "--stdin")
-			command.Dir, command.Stdin = f.root, strings.NewReader(forged)
-			output, err := command.Output()
-			if err != nil {
-				t.Fatal(err)
-			}
-			return strings.TrimSpace(string(output))
+			return f.forge(f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"}), func(header string) string {
+				return header + "\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n -----END PGP SIGNATURE-----"
+			})
 		}, unverified: "not an SSH signature"},
+		{name: "second signature header", build: func() string {
+			return f.forge(f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# owner\n"}), func(header string) string {
+				_, signature, _ := strings.Cut(header, "\ngpgsig ")
+				return header + "\ngpgsig-sha256 " + signature
+			})
+		}, unverified: "2 signature headers"},
+		{name: "replaced object", build: func() string {
+			unsigned := f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
+			f.git("reset", "--quiet", "--hard", "HEAD^")
+			f.git("replace", unsigned, f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# owner\n"}))
+			return unsigned
+		}, unverified: `"Change infrastructure": unsigned`},
 		{name: "kustomize deployment", build: func() string { return f.deploy(deployedImage, 101) }},
 		{name: "HelmRelease deployment", build: func() string { return f.deploy(releasedImage, 101) }},
 		{name: "consecutive deployments", build: func() string {
@@ -201,6 +237,16 @@ func TestProvenanceGate(t *testing.T) {
 		{name: "receipt without pins", build: func() string {
 			return f.commit("", "Deploy example", map[string]string{"platform/projects/example/.deployments/example.json": strings.ReplaceAll(f.read("platform/projects/example/.deployments/example.json"), `"run_id": 100`, `"run_id": 101`)})
 		}, unverified: "a deployment changes"},
+		{name: "unattested deployment", build: func() string {
+			deployed := f.deploy(deployedImage, 101)
+			clear(f.attested)
+			return deployed
+		}, unverified: "image provenance did not match an approved workflow revision"},
+		{name: "deployment of another run's attestation", build: func() string {
+			deployed := f.deploy(releasedImage, 101)
+			f.attested[fmt.Sprintf("%s@sha256:%064x", releasedImage, 101)] = 102
+			return deployed
+		}, unverified: "receipt names run 101 attempt 1"},
 		{name: "rolled back deployment", build: func() string {
 			f.deploy(deployedImage, 101)
 			return f.amend(map[string]string{"platform/projects/example/.deployments/example.json": strings.ReplaceAll(f.read("platform/projects/example/.deployments/example.json"), `"run_id": 101`, `"run_id": 99`)})
@@ -233,6 +279,9 @@ func TestProvenanceGate(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			f.git("checkout", "--quiet", "main")
 			f.git("reset", "--quiet", "--hard", f.base)
+			for _, replacement := range strings.Fields(f.git("for-each-ref", "--format=%(refname)", "refs/replace/")) {
+				f.git("update-ref", "-d", replacement)
+			}
 			f.git("push", "--quiet", "--force", "origin", "HEAD:main")
 			err := f.verify(f.base, test.build())
 			if test.unverified == "" && err != nil {
@@ -242,6 +291,24 @@ func TestProvenanceGate(t *testing.T) {
 				t.Fatalf("got %v, want an unverified commit with %q", err, test.unverified)
 			}
 		})
+	}
+}
+
+func TestDeploymentAttestationNamesTheMappedSource(t *testing.T) {
+	f := newProvenanceFixture(t)
+	f.deploy(deployedImage, 101)
+	head := f.deploy(releasedImage, 101)
+	if err := f.verify(f.base, head); err != nil {
+		t.Fatal(err)
+	}
+	var commands []string
+	for _, verification := range f.verifications {
+		commands = append(commands, verification.Name+" "+strings.Join(verification.Args, " "))
+	}
+	public := fmt.Sprintf("gh attestation verify oci://%s@sha256:%064x --repo fredrir/example --signer-workflow fredrir/infra/.github/workflows/build-image.yml --signer-digest %s --source-ref refs/heads/main --source-digest %040x --format json", deployedImage, 101, strings.Repeat("d", 40), 101)
+	private := fmt.Sprintf("--certificate-github-workflow-repository fredrir/web --certificate-github-workflow-sha %040x", 101)
+	if len(commands) != 3 || commands[0] != public || !strings.HasPrefix(commands[1], "cosign verify") || !strings.Contains(commands[1], strings.Repeat("d", 40)) || !strings.Contains(commands[2], strings.Repeat("e", 40)) || !strings.Contains(commands[2], private) {
+		t.Fatalf("attestations verified with:\n%s", strings.Join(commands, "\n"))
 	}
 }
 

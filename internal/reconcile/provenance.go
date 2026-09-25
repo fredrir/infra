@@ -27,6 +27,7 @@ const (
 	adminKeys              = "keys/admin_keys"
 	acknowledgementTrailer = "Provenance-Acknowledged"
 	deploymentMappings     = ".github/deployments"
+	deploymentTrust        = ".github/chainguard"
 )
 
 var ErrNoProvenanceBase = errors.New("no applied revision to verify commits from; apply once with --provenance-base")
@@ -159,20 +160,21 @@ func (g provenanceGate) ownerSigned(ctx context.Context, commit provenanceCommit
 		return err
 	}
 	header, _, _ := bytes.Cut(object.Stdout, []byte("\n\n"))
-	var signature string
+	var signatures []string
 	for line := range strings.Lines(string(header)) {
-		if value, ok := strings.CutPrefix(line, "gpgsig "); ok {
-			signature = strings.TrimSpace(value)
+		if name, value, _ := strings.Cut(line, " "); strings.HasPrefix(name, "gpgsig") {
+			signatures = append(signatures, name+" "+strings.TrimSpace(value))
 		}
 	}
-	switch signature {
-	case "":
+	switch {
+	case len(signatures) == 0:
 		return errors.New("unsigned")
-	case "-----BEGIN SSH SIGNATURE-----":
-	default:
+	case len(signatures) > 1:
+		return fmt.Errorf("%d signature headers", len(signatures))
+	case signatures[0] != "gpgsig -----BEGIN SSH SIGNATURE-----":
 		return errors.New("not an SSH signature")
 	}
-	if _, err := g.commands.git(ctx, nil, "-c", "gpg.ssh.allowedSignersFile="+g.signers, "-c", "gpg.ssh.program=ssh-keygen", "verify-commit", commit.hash); err != nil {
+	if _, err := g.commands.git(ctx, nil, "-c", "gpg.program=false", "-c", "gpg.openpgp.program=false", "-c", "gpg.x509.program=false", "-c", "gpg.ssh.program=ssh-keygen", "-c", "gpg.ssh.allowedSignersFile="+g.signers, "verify-commit", commit.hash); err != nil {
 		return fmt.Errorf("SSH signature not by a key in %s at the base revision: %w", adminKeys, err)
 	}
 	return nil
@@ -204,29 +206,18 @@ func (g provenanceGate) deployment(ctx context.Context, commit provenanceCommit)
 	if err != nil {
 		return fmt.Errorf("not a deployment: %s: %w", receipts[0], err)
 	}
-	tree, err := g.commands.tree(ctx, parent, deploymentMappings, path.Dir(path.Dir(receipts[0])))
+	tree, err := g.commands.tree(ctx, parent, deploymentMappings, deploymentTrust, path.Dir(path.Dir(receipts[0])))
 	if err != nil {
 		return fmt.Errorf("not a deployment: %w", err)
 	}
-	targets, err := deploymentTargets(tree, order.Image)
+	sources, err := deploymentSources(tree, order.Image)
 	if err != nil {
 		return fmt.Errorf("not a deployment: %w", err)
 	}
 	mismatches := []error{fmt.Errorf("not a deployment of %s@%s", order.Image, order.Digest)}
-	for _, target := range targets {
-		written, err := ci.DeploymentFiles(tree, target, order)
-		if err != nil {
+	for _, source := range sources {
+		if err := g.deployedBy(ctx, commit.hash, changed, tree, source, order); err != nil {
 			mismatches = append(mismatches, err)
-			continue
-		}
-		expected := map[string][]byte{}
-		for name, data := range written {
-			if tree[name] == nil || !bytes.Equal(tree[name].Data, data) {
-				expected[name] = data
-			}
-		}
-		if mismatch := g.commands.matches(ctx, commit.hash, changed, expected); mismatch != nil {
-			mismatches = append(mismatches, mismatch)
 			continue
 		}
 		return nil
@@ -234,25 +225,58 @@ func (g provenanceGate) deployment(ctx context.Context, commit provenanceCommit)
 	return errors.Join(mismatches...)
 }
 
-func deploymentTargets(tree fstest.MapFS, image string) ([]ci.DeploymentTarget, error) {
+func (g provenanceGate) deployedBy(ctx context.Context, commit string, changed map[string]bool, tree fstest.MapFS, source deploymentSource, order ci.DeploymentOrder) error {
+	written, err := ci.DeploymentFiles(tree, source.target, order)
+	if err != nil {
+		return err
+	}
+	expected := map[string][]byte{}
+	for name, data := range written {
+		if tree[name] == nil || !bytes.Equal(tree[name].Data, data) {
+			expected[name] = data
+		}
+	}
+	if err := g.commands.matches(ctx, commit, changed, expected); err != nil {
+		return err
+	}
+	attestations := g.commands.Runner
+	attestations.Env = append(slices.Clone(attestations.Env), g.commands.ProvenanceEnv...)
+	attestations.Stdout = nil
+	attested, err := ci.VerifyDeploymentProvenance(ctx, attestations, tree, source.repositoryID, source.mapping, order.Image, order.Digest, order.Revision)
+	if err != nil {
+		return fmt.Errorf("%s at %s: %w", order.Image+"@"+order.Digest, order.Revision, err)
+	}
+	if attested != order {
+		return fmt.Errorf("receipt names run %d attempt %d of %s, attested run %d attempt %d of %s", order.RunID, order.Attempt, order.Revision, attested.RunID, attested.Attempt, attested.Revision)
+	}
+	return nil
+}
+
+type deploymentSource struct {
+	repositoryID string
+	mapping      ci.DeploymentMapping
+	target       ci.DeploymentTarget
+}
+
+func deploymentSources(tree fstest.MapFS, image string) ([]deploymentSource, error) {
 	mappings, err := fs.Glob(tree, deploymentMappings+"/*.yaml")
 	if err != nil {
 		return nil, err
 	}
-	var targets []ci.DeploymentTarget
+	var sources []deploymentSource
 	for _, name := range mappings {
 		var mapping ci.DeploymentMapping
 		if err := yaml.Unmarshal(tree[name].Data, &mapping); err != nil {
 			return nil, fmt.Errorf("decode %s: %w", name, err)
 		}
 		if target, ok := mapping.Images[image]; ok {
-			targets = append(targets, target)
+			sources = append(sources, deploymentSource{repositoryID: strings.TrimSuffix(path.Base(name), ".yaml"), mapping: mapping, target: target})
 		}
 	}
-	if len(targets) == 0 {
+	if len(sources) == 0 {
 		return nil, fmt.Errorf("%s has no deployment mapping", image)
 	}
-	return targets, nil
+	return sources, nil
 }
 
 func (c *Commands) matches(ctx context.Context, commit string, changed map[string]bool, expected map[string][]byte) error {
@@ -367,7 +391,7 @@ func (c *Commands) git(ctx context.Context, stdin io.Reader, args ...string) (pr
 	if execute == nil {
 		execute = process.Run
 	}
-	result, err := execute(ctx, process.Options{Name: "git", Args: args, Dir: c.Runner.Dir, Env: append(os.Environ(), c.Runner.Env...), Stdin: stdin})
+	result, err := execute(ctx, process.Options{Name: "git", Args: args, Dir: c.Runner.Dir, Env: append(append(os.Environ(), c.Runner.Env...), "GIT_NO_REPLACE_OBJECTS=1"), Stdin: stdin})
 	if err != nil {
 		return result, errors.New(cmp.Or(lastLine(result.Stderr), err.Error()))
 	}

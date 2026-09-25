@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,8 +72,13 @@ func newReconcileCommand() *cobra.Command {
 				}
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(status)
 			}
+			attestations, removeCredentials, err := provenanceCredentials()
+			if err != nil {
+				return err
+			}
+			defer removeCredentials()
 			if action == "provenance" {
-				return verifyProvenance(cmd, store, &reconcile.Commands{Runner: runner}, provenanceBase, report)
+				return verifyProvenance(cmd, store, &reconcile.Commands{Runner: runner, ProvenanceEnv: attestations}, provenanceBase, report)
 			}
 			if action == "requirements" {
 				status, err := store.Read(cmd.Context())
@@ -95,7 +101,7 @@ func newReconcileCommand() *cobra.Command {
 				return err
 			}
 			defer os.RemoveAll(work)
-			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply"}
+			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ProvenanceEnv: attestations}
 			if action == "apply" {
 				engine := reconcile.Reconciler{Store: store, Ops: ops, Host: host, LockWait: wait, Log: cmd.ErrOrStderr(), ProvenanceBase: provenanceBase, Report: func(status reconcile.Status) error {
 					fmt.Fprintf(cmd.OutOrStdout(), "%s desired=%s applied=%s\n", status.Stage, status.Desired, status.Applied)
@@ -127,6 +133,18 @@ func newReconcileCommand() *cobra.Command {
 		command.AddCommand(child)
 	}
 	return command
+}
+
+func provenanceCredentials() ([]string, func(), error) {
+	token := os.Getenv("PROVENANCE_TOKEN")
+	if err := os.Unsetenv("PROVENANCE_TOKEN"); err != nil || token == "" {
+		return nil, func() {}, err
+	}
+	directory, err := ci.RegistryConfig(cmp.Or(os.Getenv("GITHUB_ACTOR"), "provenance"), token)
+	if err != nil {
+		return nil, nil, err
+	}
+	return []string{"GH_TOKEN=" + token, "DOCKER_CONFIG=" + directory}, func() { os.RemoveAll(directory) }, nil
 }
 
 func verifyProvenance(cmd *cobra.Command, store reconcile.S3Store, ops *reconcile.Commands, override, report string) (err error) {

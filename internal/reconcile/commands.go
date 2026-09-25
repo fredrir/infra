@@ -20,11 +20,12 @@ import (
 )
 
 type Commands struct {
-	Runner      ci.Runner
-	Work        string
-	Retained    []string
-	RequireMain bool
-	kubernetes  *kubernetesState
+	Runner        ci.Runner
+	Work          string
+	Retained      []string
+	RequireMain   bool
+	ProvenanceEnv []string
+	kubernetes    *kubernetesState
 }
 
 func (c *Commands) Revision(ctx context.Context) (string, error) {
@@ -221,7 +222,7 @@ var ErrSuperseded = errors.New("main advanced; retry reconciliation at its curre
 var pushIgnoredPaths = []string{"*.md", "docs/**/*.md", "build/evidence/*.json"}
 
 func (c *Commands) currentMain(ctx context.Context, revision string) error {
-	if err := c.Runner.Run(ctx, "git", "fetch", "--quiet", "origin", "refs/heads/main"); err != nil {
+	if err := c.Runner.Run(ctx, "git", "fetch", "--quiet", "--no-tags", "origin", "refs/heads/main"); err != nil {
 		return err
 	}
 	data, err := c.Runner.Output(ctx, "git", "rev-parse", "FETCH_HEAD")

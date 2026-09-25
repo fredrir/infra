@@ -114,7 +114,10 @@ sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["privat
 | Run deadline / apply job timeout | 90 minutes / 120 minutes |
 | Exit codes | 0 success; 75 retry: lease held (`apply`, `verify`), or `main` advanced beyond root Markdown, `docs/**/*.md` and `build/evidence/*.json`; 1 failure |
 | Retry in CI | Succeeds only while a newer push reconciliation of `main` has not completed its apply job |
-| Provenance gate | Before any checkout tooling runs, including drift verification, each commit after the applied revision is SSH-signed by a key in `keys/admin_keys` at the applied revision, reproduces the `infra ci deploy` rewrite of its parent byte for byte, or is named by a later owner-signed `Provenance-Acknowledged: SHA` trailer |
+| Provenance gate | Before any checkout tooling runs, including drift verification, each commit after the applied revision is SSH-signed by a key in `keys/admin_keys` at the applied revision, is a deployment, or is named by a later owner-signed `Provenance-Acknowledged: SHA` trailer |
+| Deployment commit | Reproduces the `infra ci deploy` rewrite of its parent byte for byte, and its image digest is attested for the receipt's revision, run and attempt by the mapped repository's approved `build-image.yml` revision |
+| Attestation tools | `gh attestation verify` for public repositories, `cosign verify` for private ones; both on `PATH` |
+| Attestation credentials | `PROVENANCE_TOKEN`, a GitHub token with `packages: read`; unset uses the ambient `gh` login and Docker configuration; removed from the environment before any child process |
 | Owner-signed | Authenticates the owner's workstation key: any process on that workstation can sign; the gate blocks remote writers (Octo STS, stolen deploy tokens, other machines), not a compromised workstation |
 | Provenance base | Applied revision; none or not an ancestor refuses; `--provenance-base SHA` overrides and must precede `HEAD`; base, revision and override are recorded in `status.json` |
 | Standalone gate | `infra reconcile provenance [--provenance-base SHA] [--report PATH]`; reads the applied revision without the lease |

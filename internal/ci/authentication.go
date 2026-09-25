@@ -13,23 +13,32 @@ import (
 )
 
 func DeployAuthenticated(ctx context.Context, runner Runner, options DeployOptions, actor, token string) error {
-	if actor == "" || token == "" {
-		return fmt.Errorf("registry actor and token are required")
-	}
-	directory, err := os.MkdirTemp("", "infra-registry-")
+	directory, err := RegistryConfig(actor, token)
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(directory)
-	data, err := json.Marshal(map[string]any{"auths": map[string]any{"ghcr.io": map[string]string{"username": actor, "password": token}}})
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(directory, "config.json"), data, 0600); err != nil {
-		return err
-	}
 	runner.Env = append(runner.Env, "DOCKER_CONFIG="+directory, "REGISTRY_TOKEN=")
 	return Deploy(ctx, runner, options)
+}
+
+func RegistryConfig(actor, token string) (string, error) {
+	if actor == "" || token == "" {
+		return "", fmt.Errorf("registry actor and token are required")
+	}
+	directory, err := os.MkdirTemp("", "infra-registry-")
+	if err != nil {
+		return "", err
+	}
+	data, err := json.Marshal(map[string]any{"auths": map[string]any{"ghcr.io": map[string]string{"username": actor, "password": token}}})
+	if err == nil {
+		err = os.WriteFile(filepath.Join(directory, "config.json"), data, 0600)
+	}
+	if err != nil {
+		os.RemoveAll(directory)
+		return "", err
+	}
+	return directory, nil
 }
 
 func NotifyReconciler(ctx context.Context, address string, output io.Writer) error {

@@ -102,6 +102,7 @@ jobs:
       contents: write
       id-token: write
       actions: read
+      packages: read
     env:
       VERIFICATION: ${{ inputs.verify }}
     outputs:
@@ -177,6 +178,7 @@ jobs:
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
         SOPS_AGE_KEY: ${{ steps.doppler.outputs.SOPS_AGE_KEY }}
         GH_TOKEN: ${{ steps.runner-token.outputs.token }}
+        PROVENANCE_TOKEN: ${{ github.token }}
         FULL: ${{ inputs.full }}
         STRATEGY_OVERRIDE: ${{ vars.INFRA_ANSIBLE_STRATEGY }}
       run: |

@@ -71,42 +71,9 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 	if project != resolved {
 		return fmt.Errorf("deployment project must not traverse symlinks")
 	}
-	var identity struct {
-		ClaimPattern struct {
-			WorkflowSHA string `yaml:"job_workflow_sha"`
-		} `yaml:"claim_pattern"`
-	}
-	if err := readYAML(filepath.Join(root, ".github/chainguard", "deploy-"+options.RepositoryID+".sts.yaml"), &identity); err != nil {
-		return err
-	}
-	revisions, err := WorkflowRevisions(identity.ClaimPattern.WorkflowSHA)
+	order, err := VerifyDeploymentProvenance(ctx, runner, os.DirFS(root), options.RepositoryID, mapping, options.Image, options.Digest, options.Revision)
 	if err != nil {
 		return err
-	}
-	verified := false
-	var order DeploymentOrder
-	for _, workflowRevision := range revisions {
-		name, arguments, err := ProvenanceCommand(mapping.Visibility, mapping.Repository, workflowRevision, options.Revision, options.Image+"@"+options.Digest)
-		if err != nil {
-			return err
-		}
-		if mapping.Visibility == "public" {
-			arguments = append(arguments, "--format", "json")
-		}
-		if data, verifyErr := runner.Output(ctx, name, arguments...); verifyErr == nil {
-			order, err = verifiedDeploymentOrder(data, mapping.Visibility, mapping.Repository, options)
-			if err != nil {
-				return err
-			}
-			verified = true
-			break
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-	}
-	if !verified {
-		return fmt.Errorf("image provenance did not match an approved workflow revision")
 	}
 	files, err := DeploymentFiles(os.DirFS(root), target, order)
 	if err != nil {
@@ -175,6 +142,45 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 		}
 	}
 	return fmt.Errorf("deployment push failed after three attempts")
+}
+
+func VerifyDeploymentProvenance(ctx context.Context, runner Runner, root fs.FS, repositoryID string, mapping DeploymentMapping, image, digest, revision string) (DeploymentOrder, error) {
+	if !repositoryIDPattern.MatchString(repositoryID) {
+		return DeploymentOrder{}, fmt.Errorf("invalid deployment repository ID")
+	}
+	var identity struct {
+		ClaimPattern struct {
+			WorkflowSHA string `yaml:"job_workflow_sha"`
+		} `yaml:"claim_pattern"`
+	}
+	trust := path.Join(".github/chainguard", "deploy-"+repositoryID+".sts.yaml")
+	data, err := fs.ReadFile(root, trust)
+	if err != nil {
+		return DeploymentOrder{}, err
+	}
+	if err := yaml.Unmarshal(data, &identity); err != nil {
+		return DeploymentOrder{}, fmt.Errorf("decode %s: %w", trust, err)
+	}
+	revisions, err := WorkflowRevisions(identity.ClaimPattern.WorkflowSHA)
+	if err != nil {
+		return DeploymentOrder{}, err
+	}
+	for _, workflowRevision := range revisions {
+		name, arguments, err := ProvenanceCommand(mapping.Visibility, mapping.Repository, workflowRevision, revision, image+"@"+digest)
+		if err != nil {
+			return DeploymentOrder{}, err
+		}
+		if mapping.Visibility == "public" {
+			arguments = append(arguments, "--format", "json")
+		}
+		if data, verifyErr := runner.Output(ctx, name, arguments...); verifyErr == nil {
+			return verifiedDeploymentOrder(data, mapping.Visibility, mapping.Repository, DeployOptions{Image: image, Digest: digest, Revision: revision})
+		}
+		if err := ctx.Err(); err != nil {
+			return DeploymentOrder{}, err
+		}
+	}
+	return DeploymentOrder{}, fmt.Errorf("image provenance did not match an approved workflow revision")
 }
 
 func ProvenanceCommand(visibility, repository, workflowRevision, revision, image string) (string, []string, error) {

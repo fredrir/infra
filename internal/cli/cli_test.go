@@ -105,6 +105,28 @@ func TestExitCodeSeparatesRetryFromFailure(t *testing.T) {
 	}
 }
 
+func TestProvenanceReportsItsFailureAndDropsItsToken(t *testing.T) {
+	t.Setenv("PROVENANCE_TOKEN", "attestation-secret")
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	report := filepath.Join(t.TempDir(), "provenance.json")
+	var output bytes.Buffer
+	if err := cli.Run(context.Background(), []string{"reconcile", "provenance", "--root", t.TempDir(), "--report", report}, &output, &output); err == nil {
+		t.Fatal("provenance without reconciliation state succeeded")
+	}
+	if token := os.Getenv("PROVENANCE_TOKEN"); token != "" {
+		t.Fatal("provenance token left in the environment of child processes")
+	}
+	data, err := os.ReadFile(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var outcome struct{ Base, Error string }
+	if err := json.Unmarshal(data, &outcome); err != nil || outcome.Base != "" || !strings.Contains(outcome.Error, "aws") {
+		t.Fatalf("provenance failure reported as %s: %v", data, err)
+	}
+}
+
 func TestVerificationWritesItsOutcomeReport(t *testing.T) {
 	report := filepath.Join(t.TempDir(), "reports", "verification.json")
 	var output bytes.Buffer
