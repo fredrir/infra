@@ -47,6 +47,7 @@ go_test(
         "runner_coverage_test.go",
         "runners_test.go",
         "store_http_test.go",
+        "verify_test.go",
         "workflow_test.go",
         "workloads_test.go",
     ],

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -49,13 +50,19 @@ func VerificationOutcome(revision string, deep bool, err error) Verification {
 		switch err := err.(type) {
 		case nil:
 		case Differences:
-			verification.Differences = append(verification.Differences, err...)
+			for _, difference := range err {
+				if !slices.Contains(verification.Differences, difference) {
+					verification.Differences = append(verification.Differences, difference)
+				}
+			}
 		case interface{ Unwrap() []error }:
 			for _, inner := range err.Unwrap() {
 				visit(inner)
 			}
 		default:
-			verification.Errors = append(verification.Errors, err.Error())
+			if !slices.Contains(verification.Errors, err.Error()) {
+				verification.Errors = append(verification.Errors, err.Error())
+			}
 		}
 	}
 	visit(err)

@@ -202,35 +202,41 @@ func (c *Commands) bootstrapProduction(ctx context.Context, plan Plan) error {
 	return c.Kubernetes(ctx, plan)
 }
 
+func kubernetesDifference(format string, args ...any) error {
+	return Differences{{System: "kubernetes", Item: fmt.Sprintf(format, args...)}}
+}
+
 func (c *Commands) verifyKubernetes(ctx context.Context, revision, token string) error {
 	items, err := c.resources(ctx, "kustomizations.kustomize.toolkit.fluxcd.io")
 	if err != nil {
 		return err
 	}
+	var problems []error
 	root := false
 	for _, item := range items {
+		name := item.Metadata.Namespace + "/" + item.Metadata.Name
 		if item.Spec.Suspend {
+			if name == "flux-system/flux-system" {
+				root = true
+				problems = append(problems, kubernetesDifference("Kustomization %s is suspended", name))
+			}
 			continue
 		}
-		if err := ready(item); err != nil {
-			return err
-		}
+		problems = append(problems, ready(item))
 		if token != "" && item.Status.LastHandledReconcileAt != token {
-			return fmt.Errorf("%s has not reconciled its requested configuration", item.Metadata.Name)
+			problems = append(problems, fmt.Errorf("%s has not reconciled its requested configuration", item.Metadata.Name))
 		}
 		if item.Spec.SourceRef.Kind == "GitRepository" && item.Spec.SourceRef.Name == "flux-system" {
 			if !strings.HasSuffix(item.Status.LastAppliedRevision, ":"+revision) {
-				return fmt.Errorf("%s has not applied %s", item.Metadata.Name, revision)
+				problems = append(problems, kubernetesDifference("Kustomization %s has not applied %s", name, revision))
 			}
-			if item.Metadata.Name == "flux-system" && item.Metadata.Namespace == "flux-system" {
-				root = true
-			}
+			root = root || name == "flux-system/flux-system"
 		}
 	}
 	if !root {
-		return fmt.Errorf("active Flux root not found")
+		problems = append(problems, fmt.Errorf("active Flux root not found"))
 	}
-	return nil
+	return errors.Join(problems...)
 }
 
 func (c *Commands) verifyHelm(ctx context.Context, token, host string) error {
@@ -238,57 +244,66 @@ func (c *Commands) verifyHelm(ctx context.Context, token, host string) error {
 	if err != nil {
 		return err
 	}
+	var problems []error
 	grafana := false
 	for _, item := range items {
+		name := item.Metadata.Namespace + "/" + item.Metadata.Name
+		monitoring := name == "observability/monitoring"
+		grafana = grafana || monitoring
 		if item.Spec.Suspend {
+			if monitoring {
+				problems = append(problems, kubernetesDifference("HelmRelease %s is suspended", name))
+			}
 			continue
 		}
-		if err := ready(item); err != nil {
-			return err
-		}
+		problems = append(problems, ready(item))
 		if token != "" && item.Status.LastHandledReconcileAt != token {
-			return fmt.Errorf("%s has not reconciled drift", item.Metadata.Name)
+			problems = append(problems, fmt.Errorf("%s has not reconciled drift", item.Metadata.Name))
 		}
-		if item.Metadata.Namespace == "observability" && item.Metadata.Name == "monitoring" {
-			grafana = true
-			if host != "" && item.Spec.Values.Grafana.INI.Server.RootURL != "https://"+host {
-				return fmt.Errorf("Grafana root_url does not match %s", host)
-			}
+		if rootURL := item.Spec.Values.Grafana.INI.Server.RootURL; monitoring && host != "" && rootURL != "https://"+host {
+			problems = append(problems, kubernetesDifference("HelmRelease %s serves Grafana at %q, want %q", name, rootURL, "https://"+host))
 		}
 	}
 	if !grafana {
-		return fmt.Errorf("active Grafana release not found")
+		problems = append(problems, kubernetesDifference("HelmRelease observability/monitoring is missing"))
 	}
-	return nil
+	return errors.Join(problems...)
 }
 
 func (c *Commands) Verify(ctx context.Context, plan Plan) error {
+	return c.verifyParts(ctx, plan, c.verifyCluster(ctx, plan))
+}
+
+func (c *Commands) verifyCluster(ctx context.Context, plan Plan) error {
 	if c.VerifyArtifacts {
-		if err := c.verifyDeployment(ctx, plan); err != nil {
-			return err
-		}
-	} else {
-		if err := c.verifyKubernetes(ctx, plan.Revision, ""); err != nil {
-			return err
-		}
-		if err := c.verifyHelm(ctx, "", plan.Host); err != nil {
-			return err
-		}
+		return c.verifyDeployment(ctx, plan)
 	}
-	if err := c.VerifyHosts(ctx, plan); err != nil {
-		return err
-	}
+	return errors.Join(c.verifyKubernetes(ctx, plan.Revision, ""), c.verifyHelm(ctx, "", plan.Host))
+}
+
+func (c *Commands) verifyParts(ctx context.Context, plan Plan, cluster error) error {
+	return errors.Join(cluster, c.VerifyHosts(ctx, plan), c.verifyServed(ctx, plan))
+}
+
+func (c *Commands) verifyServed(ctx context.Context, plan Plan) error {
 	wait, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	client := &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	var grafana, frontend error
+	var group sync.WaitGroup
 	if len(plan.Affected.Projects) == 0 {
-		if err := poll(wait, func() error { return verifyGrafana(wait, client, "https://"+plan.Host) }); err != nil {
-			return err
-		}
+		group.Go(func() {
+			grafana = poll(wait, func() error { return verifyGrafana(wait, client, "https://"+plan.Host) })
+		})
 	}
-	if len(plan.Affected.Projects) > 0 && !slices.Contains(plan.Affected.Projects, "llunde") {
-		return nil
+	if len(plan.Affected.Projects) == 0 || slices.Contains(plan.Affected.Projects, "llunde") {
+		group.Go(func() { frontend = c.verifyFrontend(wait, client) })
 	}
+	group.Wait()
+	return errors.Join(grafana, frontend)
+}
+
+func (c *Commands) verifyFrontend(ctx context.Context, client *http.Client) error {
 	data, err := os.ReadFile(filepath.Join(c.Runner.Dir, "platform/projects/llunde/.deployments/llunde-frontend.json"))
 	if err != nil {
 		return err
@@ -297,7 +312,7 @@ func (c *Commands) Verify(ctx context.Context, plan Plan) error {
 	if err = json.Unmarshal(data, &frontend); err != nil {
 		return err
 	}
-	return ci.WaitRevision(wait, client, "https://llunde.no/.well-known/revision", frontend.Revision, 2*time.Second)
+	return ci.WaitRevision(ctx, client, "https://llunde.no/.well-known/revision", frontend.Revision, 2*time.Second)
 }
 
 func (c *Commands) VerifyDrift(ctx context.Context, plan Plan) error {
@@ -402,6 +417,10 @@ func (c *Commands) compareTofu(ctx context.Context, log io.Writer) error {
 }
 
 func (c *Commands) VerifyLive(ctx context.Context, plan Plan) error {
+	return c.verifyParts(ctx, plan, c.verifyRenderedCluster(ctx, plan))
+}
+
+func (c *Commands) verifyRenderedCluster(ctx context.Context, plan Plan) error {
 	plan, err := c.Preflight(ctx, plan)
 	if err != nil {
 		return err
@@ -409,7 +428,7 @@ func (c *Commands) VerifyLive(ctx context.Context, plan Plan) error {
 	if err := c.RenderKubernetes(ctx, plan); err != nil {
 		return err
 	}
-	return c.Verify(ctx, plan)
+	return c.verifyCluster(ctx, plan)
 }
 
 func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
@@ -421,7 +440,7 @@ func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
 		return err
 	}
 	if source.Spec.Ref.Branch != "production" || !strings.HasSuffix(source.Status.Artifact.Revision, ":"+plan.Revision) {
-		return fmt.Errorf("Flux source has changed from %s", plan.Revision)
+		return kubernetesDifference("GitRepository flux-system/flux-system is at %s of branch %s, want production@sha1:%s", source.Status.Artifact.Revision, source.Spec.Ref.Branch, plan.Revision)
 	}
 	if err = conditionReady(source); err != nil {
 		return err
@@ -436,42 +455,46 @@ func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
 		names = append(names, "platform-policy", "flux-system")
 	}
 	snapshot := resourceSnapshot{}
+	var problems []error
 	owners := make([]resource, 0, len(names))
 	for _, name := range names {
 		item, err := c.snapshotResource(ctx, snapshot, "kustomizations.kustomize.toolkit.fluxcd.io", "flux-system", name)
 		if err != nil {
-			return err
+			problems = append(problems, err)
+			continue
 		}
 		if item.Spec.Suspend {
-			return fmt.Errorf("selected Kustomization %s is suspended", name)
+			problems = append(problems, kubernetesDifference("Kustomization flux-system/%s is suspended", name))
+			continue
 		}
-		expected := c.kubernetes.owners[name]
-		if item.Spec.Path != expected.Spec.Path || item.Spec.SourceRef != expected.Spec.SourceRef || !reflect.DeepEqual(item.Spec.DependsOn, expected.Spec.DependsOn) {
-			return fmt.Errorf("%s source topology differs", name)
-		}
-		if token := c.kubernetes.requested["kustomizations.kustomize.toolkit.fluxcd.io/flux-system/"+name]; token != "" && item.Status.LastHandledReconcileAt != token {
-			return fmt.Errorf("%s has not handled its requested reconciliation", name)
-		}
-		if err = ready(item); err != nil {
-			return err
-		}
-		if item.Spec.SourceRef.Kind == "GitRepository" && !strings.HasSuffix(item.Status.LastAppliedRevision, ":"+plan.Revision) {
-			return fmt.Errorf("%s has not applied %s", name, plan.Revision)
-		}
+		problems = append(problems, c.verifyOwner(item, plan))
 		owners = append(owners, item)
 	}
-	if err = c.verifyArtifacts(ctx, plan, owners); err != nil {
-		return err
-	}
+	problems = append(problems, c.verifyArtifacts(ctx, plan, owners))
 	for _, owner := range owners {
-		if err = c.verifyOwnedWorkloads(ctx, owner, snapshot); err != nil {
-			return err
-		}
+		problems = append(problems, c.verifyOwnedWorkloads(ctx, owner, snapshot))
 	}
 	if len(plan.Affected.Projects) == 0 {
-		return c.verifyHelm(ctx, "", plan.Host)
+		problems = append(problems, c.verifyHelm(ctx, "", plan.Host))
 	}
-	return nil
+	return errors.Join(problems...)
+}
+
+func (c *Commands) verifyOwner(item resource, plan Plan) error {
+	name := item.Metadata.Name
+	var problems []error
+	expected := c.kubernetes.owners[name]
+	if item.Spec.Path != expected.Spec.Path || item.Spec.SourceRef != expected.Spec.SourceRef || !reflect.DeepEqual(item.Spec.DependsOn, expected.Spec.DependsOn) {
+		problems = append(problems, kubernetesDifference("Kustomization flux-system/%s source topology differs from its declaration", name))
+	}
+	if token := c.kubernetes.requested["kustomizations.kustomize.toolkit.fluxcd.io/flux-system/"+name]; token != "" && item.Status.LastHandledReconcileAt != token {
+		problems = append(problems, fmt.Errorf("%s has not handled its requested reconciliation", name))
+	}
+	problems = append(problems, ready(item))
+	if item.Spec.SourceRef.Kind == "GitRepository" && !strings.HasSuffix(item.Status.LastAppliedRevision, ":"+plan.Revision) {
+		problems = append(problems, kubernetesDifference("Kustomization flux-system/%s has not applied %s", name, plan.Revision))
+	}
+	return errors.Join(problems...)
 }
 
 func verifyGrafana(ctx context.Context, client *http.Client, base string) error {
