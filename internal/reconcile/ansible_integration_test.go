@@ -718,6 +718,29 @@ esac
 		t.Fatalf("unattended upgrade policy not applied:\n%s", output)
 	}
 	t.Log("declared patching configuration validates and converges idempotently")
+	write("engines.yml", "- hosts: build_engines\n  gather_facts: false\n  roles:\n  - no_container_engines\n", false)
+	write("bin/podman", "#!/bin/sh\ncase \"$1\" in\nps) cat /fixture/state/podman-containers 2>/dev/null || true ;;\nrm) echo \"$*\" >> /fixture/state/podman-removed; rm -f /fixture/state/podman-containers ;;\nesac\n", true)
+	write("state/podman-containers", "0f1ea21a55fa\n", false)
+	command("docker", "exec", name, "sh", "-c", "mkdir -p /var/lib/docker/image /var/lib/containers/storage /etc/apt/sources.list.d && touch /etc/apt/sources.list.d/docker.list")
+	if output := run("/fixture/engines.yml", true, "--check"); !strings.Contains(output, "changed=") || strings.Contains(output, "changed=0") {
+		t.Fatalf("check mode hid container engines:\n%s", output)
+	}
+	if removed := record("podman-removed"); removed != "" {
+		t.Fatalf("check mode removed containers: %q", removed)
+	}
+	run("/fixture/engines.yml", true)
+	if removed := record("podman-removed"); removed != "rm --all --force --volumes\n" {
+		t.Fatalf("root containers removed with %q", removed)
+	}
+	if exec.CommandContext(ctx, "docker", "exec", name, "sh", "-c", "test -e /var/lib/docker || test -e /var/lib/containers || test -e /etc/apt/sources.list.d/docker.list").Run() == nil {
+		t.Fatal("container engine state remains")
+	}
+	for _, extra := range [][]string{nil, {"--check"}} {
+		if output := run("/fixture/engines.yml", true, extra...); !strings.Contains(output, "changed=0") {
+			t.Fatalf("engine removal %q is not idempotent:\n%s", extra, output)
+		}
+	}
+	t.Log("container engines, their containers and their state are removed once and compare clean afterwards")
 	write("bin/sops", "#!/bin/sh\nprintf 'private_key: declared-key\\ntoken: declared-token\\n'\n", true)
 	write("app-key.sops.yaml", "", false)
 	write("heartbeat.sops.yaml", "", false)

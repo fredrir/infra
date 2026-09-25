@@ -1,0 +1,16 @@
+no_container_engines_packages:
+  - docker-ce
+  - docker-ce-cli
+  - docker-ce-rootless-extras
+  - docker-buildx-plugin
+  - docker-compose-plugin
+  - containerd.io
+  - podman
+  - buildah
+no_container_engines_paths:
+  - /var/lib/docker
+  - /var/lib/containerd
+  - /var/lib/containers
+  - /etc/docker
+  - /etc/apt/sources.list.d/docker.list
+  - /etc/apt/keyrings/docker.asc

@@ -48,24 +48,10 @@
       create: true
       owner: '{{ ansible_user }}'
       mode: '0600'
-  - name: Find unmanaged root containers
-    ansible.builtin.shell: |
-      set -eu
-      if command -v podman > /dev/null; then podman ps --all --format '{{ "{{.Names}}" }}'; fi
-    register: volatile_unmanaged_containers
-    changed_when: volatile_unmanaged_containers.stdout_lines | length > 0
-    check_mode: false
-  - name: Remove unmanaged root containers
-    ansible.builtin.command:
-      argv: "{{ ['podman', 'rm', '--force', '--volumes'] + volatile_unmanaged_containers.stdout_lines }}"
-    when: volatile_unmanaged_containers.changed
-  - name: Remove unmanaged root container images
-    ansible.builtin.command:
-      argv: [podman, image, prune, --all, --force]
-    when: volatile_unmanaged_containers.changed
   roles:
   - ubuntu
   - firewall
+  - no_container_engines
   - data_volume
   - k3s
   - ci_runtime

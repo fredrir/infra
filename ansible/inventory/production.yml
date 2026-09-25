@@ -104,13 +104,9 @@ all:
                   data_volume_binds:
                   - /var/lib/rancher
                   - /var/lib/kubelet
-                  - /var/lib/containerd
-                  - /var/lib/docker
                   - /var/lib/infra-build-vm
                   data_volume_consumers:
                   - k3s-agent.service
-                  - containerd.service
-                  - docker.service
                   - infra-build-vm.service
         external:
           hosts:

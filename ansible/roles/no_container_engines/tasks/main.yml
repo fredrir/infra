@@ -1,0 +1,33 @@
+- name: Find root Podman containers
+  ansible.builtin.shell: |
+    set -eu
+    if command -v podman > /dev/null; then podman ps --all --quiet; fi
+  register: no_container_engines_containers
+  changed_when: no_container_engines_containers.stdout_lines | length > 0
+  check_mode: false
+
+- name: Remove root Podman containers
+  ansible.builtin.command:
+    argv: [podman, rm, --all, --force, --volumes]
+  when: no_container_engines_containers.changed
+
+- name: Find installed container engines
+  ansible.builtin.command:
+    argv: "{{ ['dpkg-query', '--show', '--showformat=${db:Status-Abbrev}${Package}\\n'] + no_container_engines_packages }}"
+  register: no_container_engines_installed
+  changed_when: no_container_engines_installed.stdout_lines | select('match', '^[ir]') | list | length > 0
+  failed_when: false
+  check_mode: false
+
+- name: Remove container engines
+  ansible.builtin.apt:
+    name: "{{ no_container_engines_installed.stdout_lines | select('match', '^[ir]') | map('split') | map('last') | list }}"
+    state: absent
+    purge: true
+  when: no_container_engines_installed.changed
+
+- name: Remove container engine state
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ no_container_engines_paths }}"
