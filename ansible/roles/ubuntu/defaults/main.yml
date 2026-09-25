@@ -1,1 +1,1 @@
-ubuntu_packages: [ca-certificates, curl, iproute2, iptables, kmod, openssh-server]
+ubuntu_packages: [ca-certificates, curl, iproute2, iptables, kmod, openssh-server, unattended-upgrades]

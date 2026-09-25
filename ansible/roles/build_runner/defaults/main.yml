@@ -8,4 +8,4 @@ build_runner_job_slots: 1
 build_runner_admission_enabled: true
 build_runner_cpus_percent: 400
 build_runner_bazel_idle_seconds: 300
-build_runner_packages: [docker.io, git, curl, jq, libicu74, build-essential]
+build_runner_packages: [docker.io, git, curl, jq, libicu74, build-essential, unattended-upgrades]

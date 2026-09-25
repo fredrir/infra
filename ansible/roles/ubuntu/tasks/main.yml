@@ -15,6 +15,10 @@
   vars:
     host_packages_required: "{{ ubuntu_packages }}"
 
+- name: Declare unattended patching
+  ansible.builtin.import_role:
+    name: host_patching
+
 - name: Harden SSH authentication
   ansible.builtin.copy:
     dest: /etc/ssh/sshd_config.d/00-platform.conf

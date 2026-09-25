@@ -33,6 +33,10 @@
   vars:
     host_packages_required: "{{ build_runner_packages }}"
 
+- name: Declare unattended patching
+  ansible.builtin.import_role:
+    name: host_patching
+
 - name: Start dedicated Docker engine
   ansible.builtin.systemd_service:
     name: docker

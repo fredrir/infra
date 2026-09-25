@@ -236,4 +236,13 @@ cat "/fixture/state/$2.json"
 		t.Fatalf("missing package did not reach installation:\n%s", output)
 	}
 	t.Log("package index refreshes only when a declared package is missing")
+	write("patching.yml", "- hosts: build_engines\n  gather_facts: false\n  roles:\n  - host_patching\n", false)
+	run("/fixture/patching.yml", true)
+	if output := run("/fixture/patching.yml", true); !strings.Contains(output, "changed=0") {
+		t.Fatalf("declared patching configuration is not idempotent:\n%s", output)
+	}
+	if output := string(command("docker", "exec", name, "apt-config", "dump", "Unattended-Upgrade")); !strings.Contains(output, `-security"`) || !strings.Contains(output, `Automatic-Reboot "false"`) {
+		t.Fatalf("unattended upgrade policy not applied:\n%s", output)
+	}
+	t.Log("declared patching configuration validates and converges idempotently")
 }
