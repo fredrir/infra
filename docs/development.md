@@ -154,13 +154,11 @@ git diff -- platform
 | Production Dagger ceiling       | Four CPUs / 4 GiB RAM / 1,024 processes / one parallel operation                                                                           |
 | Standalone engine defaults      | Four CPUs / 8 GiB RAM / one parallel operation; configurable within host capacity                                                         |
 | Dagger connection               | Local `docker-container://infra-dagger`; no published engine port                                                                           |
-| Bazel cache                     | `127.0.0.1:9092`; one CPU / 1 GiB RAM; VM-local trusted writes                                                                              |
-| Bazel server retention | 300 s idle timeout; repository, disk and remote action caches persist |
-| Persistent caches               | Separate Docker volumes for Dagger and Bazel; engine-local Bazel action cache; native repository downloads in `/var/cache/infra/bazel-repo` |
-| Runner cache environment        | `BAZEL_REMOTE_CACHE=http://127.0.0.1:9092`; `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger`                              |
+| Persistent caches               | `infra-dagger-cache` Docker volume; engine-local Bazel action cache                                                                         |
+| Runner environment              | `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger`                                                                          |
 | Runner enforcement              | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected                                            |
-| Cache collection                | Dagger ordinary layers first; named caches preferred for 48 h; 20 GiB target / 4 GiB emergency free space; Bazel remote 20 GiB target / 21 GiB admission ceiling                                                      |
-| Verified tooling                | CLI release checksum and revision; pinned native Bazel; pinned GitHub runner archive                                                        |
+| Cache collection                | Dagger ordinary layers first; named caches preferred for 48 h; 20 GiB target / 4 GiB emergency free space                                   |
+| Verified tooling                | CLI release checksum and revision; pinned GitHub runner archive                                                                             |
 | Warm ARC capacity               | One deploy runner and one declaration-check runner                                                                                          |
 | Pool isolation                  | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines                                                           |
 
@@ -182,9 +180,9 @@ ansible-playbook -i ansible/inventory/production.yml \
 | Verify latency        | Measure queue, setup, checks, publication and revision readiness independently                                            |
 | Roll back routing     | Disable qualification variables before stopping services; retain guest disk and cache volumes                             |
 
-The reservation and dedicated guest are provisioned and natively qualified; workflow routing remains separately gated by release identity and qualified-pool variables. The guest shares physical CPUs with Kubernetes; reservations constrain schedulable capacity rather than guaranteeing latency. Runner registrations share one capped engine, so concurrent repositories may queue. Cache thresholds are retention targets rather than filesystem quotas, except for Bazel remote's write-admission ceiling and the guest disk's virtual capacity.
+The reservation and dedicated guest are provisioned and natively qualified; workflow routing remains separately gated by release identity and qualified-pool variables. The guest shares physical CPUs with Kubernetes; reservations constrain schedulable capacity rather than guaranteeing latency. Runner registrations share one capped engine, so concurrent repositories may queue. Cache thresholds are retention targets rather than filesystem quotas, except for the guest disk's virtual capacity.
 
-The VM-local Bazel endpoint permits writes; a client read-only flag does not enforce a security boundary. Only trusted repositories and protected branches may use this VM.
+Only trusted repositories and protected branches may use this VM.
 
 ## Consumer cutover
 

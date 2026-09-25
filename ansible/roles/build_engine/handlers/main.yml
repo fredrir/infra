@@ -3,9 +3,3 @@
     name: infra-dagger
     daemon_reload: true
     state: restarted
-
-- name: Restart infra-bazel-cache
-  ansible.builtin.systemd_service:
-    name: infra-bazel-cache
-    daemon_reload: true
-    state: restarted

@@ -68,10 +68,6 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 	if err := yaml.Unmarshal(read(filepath.Join(root, "ansible/roles/build_runner/defaults/main.yml")), &defaults); err != nil {
 		t.Fatal(err)
 	}
-	engineDefaults := map[string]any{}
-	if err := yaml.Unmarshal(read(filepath.Join(root, "ansible/roles/build_engine/defaults/main.yml")), &engineDefaults); err != nil {
-		t.Fatal(err)
-	}
 	toolchain := map[string]any{}
 	if err := json.Unmarshal(read(filepath.Join(root, "build/toolchain.json")), &toolchain); err != nil {
 		t.Fatal(err)
@@ -95,14 +91,11 @@ echo active
 if [ -e /fixture/state/wrong-image ]; then printf '[{"State":{"Running":true},"Config":{"Image":"wrong"}}]'; exit 0; fi
 cat "/fixture/state/$2.json"
 `, true)
-	for name, image := range map[string]any{"infra-dagger": toolchain["engine_image"], "infra-bazel-cache": engineDefaults["build_engine_bazel_image"]} {
-		encoded, err := json.Marshal([]any{map[string]any{"State": map[string]any{"Running": true}, "Config": map[string]any{"Image": image}}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		write("state/"+name+".json", string(encoded), false)
+	engine, err := json.Marshal([]any{map[string]any{"State": map[string]any{"Running": true}, "Config": map[string]any{"Image": toolchain["engine_image"]}}})
+	if err != nil {
+		t.Fatal(err)
 	}
-	write("health/status", "{}", false)
+	write("state/infra-dagger.json", string(engine), false)
 	name := fmt.Sprintf("infra-ansible-scope-%d", time.Now().UnixNano())
 	command("docker", "run", "-d", "--name", name, "--network=none", "-v", root+":/source:ro", "-v", fixture+":/fixture", "-v", filepath.Join(fixture, "runners")+":/home/runner", "-v", packages+":/opt/ansible:ro", "-e", "PYTHONPATH=/opt/ansible", "-e", "ANSIBLE_CONFIG=/source/ansible/ansible.cfg", "-e", "PATH=/fixture/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", image, "sleep", "infinity")
 	t.Cleanup(func() {
@@ -111,7 +104,6 @@ cat "/fixture/state/$2.json"
 	})
 	command("docker", "exec", name, "useradd", "--non-unique", "--uid", fmt.Sprint(os.Getuid()), "--no-create-home", "runner")
 	command("docker", "exec", name, "ln", "-s", "/fixture/infra", "/usr/local/bin/infra")
-	command("docker", "exec", "-d", name, "python3", "-m", "http.server", "9092", "--bind", "127.0.0.1", "--directory", "/fixture/health")
 	run := func(playbook string, success bool, extra ...string) string {
 		t.Helper()
 		args := []string{"exec", name, "python3", "-m", "ansible.cli.playbook", "-i", "/fixture/inventory.yml", playbook, "--extra-vars", "@/fixture/vars.json"}
@@ -129,7 +121,7 @@ cat "/fixture/state/$2.json"
 		t.Fatalf("runner-only path lost full-path prerequisites:\n%s", runners)
 	}
 	t.Log("full and runner-only paths resolve the same ordered runner tasks")
-	for _, scenario := range []string{"valid", "service-failure", "wrong-image", "wrong-version", "wrong-cli", "cache-failure"} {
+	for _, scenario := range []string{"valid", "service-failure", "wrong-image", "wrong-version", "wrong-cli"} {
 		t.Run(scenario, func(t *testing.T) {
 			switch scenario {
 			case "service-failure", "wrong-image":
@@ -138,10 +130,6 @@ cat "/fixture/state/$2.json"
 				write("state/version-Y", "0.0.0", false)
 			case "wrong-cli":
 				write("infra", "wrong", true)
-			case "cache-failure":
-				if err := os.Remove(filepath.Join(fixture, "health/status")); err != nil {
-					t.Fatal(err)
-				}
 			}
 			output := run("/source/ansible/verify-runners.yml", scenario == "valid")
 			if scenario == "valid" && !strings.Contains(output, "changed=0") {

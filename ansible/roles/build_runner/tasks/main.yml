@@ -17,8 +17,6 @@
     - build_runner_job_slots | int <= 8
     - build_runner_cpus_percent | int >= 1
     - build_runner_cpus_percent | int <= 400
-    - build_runner_bazel_idle_seconds | int >= 60
-    - build_runner_bazel_idle_seconds | int <= 300
     - build_runner_labels | select('match', '^[a-zA-Z0-9_-]+$') | list | length == build_runner_labels | length
 
 - name: Wait for cloud initialization
@@ -49,36 +47,6 @@
     groups: docker
     shell: /bin/bash
     create_home: true
-
-- name: Install verified native Bazel
-  ansible.builtin.get_url:
-    url: 'https://github.com/bazelbuild/bazel/releases/download/{{ build_runner_toolchain.bazel }}/bazel-{{ build_runner_toolchain.bazel }}-linux-x86_64'
-    dest: /usr/local/bin/bazel
-    checksum: 'sha256:{{ build_runner_toolchain.bazel_sha256 }}'
-    owner: root
-    group: root
-    mode: '0755'
-    timeout: 30
-
-- name: Create shared native repository cache
-  ansible.builtin.file:
-    path: /var/cache/infra/bazel-repo
-    state: directory
-    owner: runner
-    group: runner
-    mode: '0750'
-
-- name: Bound native Bazel startup and compilation
-  ansible.builtin.copy:
-    dest: /etc/bazel.bazelrc
-    owner: root
-    group: root
-    mode: '0644'
-    content: |
-      startup --host_jvm_args=-Xmx512m
-      startup --max_idle_secs={{ build_runner_bazel_idle_seconds | int }}
-      build --jobs=2
-      build --repository_cache=/var/cache/infra/bazel-repo
 
 - name: Install aggregate runner resource limits
   ansible.builtin.copy:
