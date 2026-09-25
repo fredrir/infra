@@ -126,10 +126,10 @@ func repairQuery(t *testing.T, listing string) *gojq.Code {
 	return nil
 }
 
-func queryResults(t *testing.T, program *gojq.Code, runs []any) []any {
+func queryResults(t *testing.T, program *gojq.Code, input any) []any {
 	t.Helper()
 	var results []any
-	iterator := program.Run(runs)
+	iterator := program.Run(input)
 	for {
 		result, ok := iterator.Next()
 		if !ok {
@@ -142,37 +142,60 @@ func queryResults(t *testing.T, program *gojq.Code, runs []any) []any {
 	}
 }
 
-func TestRepairWaitsForPushReconciliationOfTheSameCommit(t *testing.T) {
+func TestRepairWaitsForPendingPushApplies(t *testing.T) {
 	script := readWorkflow(t, "reconcile-job.yml").Jobs["repair"].script()
-	for _, guard := range []string{"--workflow reconcile.yml --event push", `--commit "$GITHUB_SHA"`, "--json status"} {
+	for _, guard := range []string{"--workflow reconcile.yml --event push --branch main", "--json databaseId,status", `gh api --paginate "repos/$GH_REPO/actions/runs/$run/jobs"`} {
 		if !strings.Contains(script, guard) {
 			t.Errorf("repair dispatch lacks push guard %s:\n%s", guard, script)
 		}
 	}
-	if strings.Index(script, "--event push") > strings.Index(script, "gh workflow run") {
-		t.Errorf("repair dispatches before checking the push reconciliation:\n%s", script)
+	if strings.Contains(script, "--event push --commit") {
+		t.Errorf("repair dispatch only waits for push reconciliations of its own commit:\n%s", script)
 	}
-	program := repairQuery(t, "--event push")
+	if strings.Index(script, "/jobs") > strings.Index(script, "gh workflow run") {
+		t.Errorf("repair dispatches before checking pending push applies:\n%s", script)
+	}
+	pending := repairQuery(t, "--event push")
 	for _, test := range []struct {
 		statuses []string
-		dispatch bool
+		want     []any
 	}{
-		{dispatch: true},
-		{statuses: []string{"completed"}, dispatch: true},
-		{statuses: []string{"completed", "completed"}, dispatch: true},
-		{statuses: []string{"queued"}},
-		{statuses: []string{"pending"}},
-		{statuses: []string{"waiting"}},
-		{statuses: []string{"in_progress"}},
-		{statuses: []string{"completed", "requested"}},
+		{},
+		{statuses: []string{"completed", "completed"}},
+		{statuses: []string{"queued", "completed", "in_progress"}, want: []any{0, 2}},
+		{statuses: []string{"pending", "waiting", "requested"}, want: []any{0, 1, 2}},
 	} {
 		runs := []any{}
-		for _, status := range test.statuses {
-			runs = append(runs, map[string]any{"status": status})
+		for id, status := range test.statuses {
+			runs = append(runs, map[string]any{"databaseId": id, "status": status})
 		}
-		if blocked := queryResults(t, program, runs); (len(blocked) == 0) != test.dispatch {
-			t.Errorf("push runs %v blocked the repair with %q, want dispatch %t", test.statuses, blocked, test.dispatch)
+		if got := queryResults(t, pending, runs); !reflect.DeepEqual(got, test.want) {
+			t.Errorf("push runs %v awaited %v, want %v", test.statuses, got, test.want)
 		}
+	}
+	applied := repairQuery(t, "/jobs")
+	for _, test := range []struct {
+		name     string
+		jobs     map[string]string
+		dispatch bool
+	}{
+		{name: "jobs not yet created"},
+		{name: "plan running", jobs: map[string]string{"reconcile / plan": "in_progress"}},
+		{name: "apply queued behind the production group", jobs: map[string]string{"reconcile / plan": "completed", "reconcile / apply": "pending"}},
+		{name: "apply waiting", jobs: map[string]string{"reconcile / apply": "waiting"}},
+		{name: "apply running", jobs: map[string]string{"reconcile / apply": "in_progress"}},
+		{name: "apply completed while an image build waits for its runner", jobs: map[string]string{"reconcile / apply": "completed", "images / image (runner) / build": "queued", "check / validate": "queued"}, dispatch: true},
+		{name: "apply superseded while images build", jobs: map[string]string{"reconcile / apply": "completed", "images / plan": "in_progress"}, dispatch: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			jobs := []any{}
+			for name, status := range test.jobs {
+				jobs = append(jobs, map[string]any{"name": name, "status": status})
+			}
+			if completed := queryResults(t, applied, map[string]any{"jobs": jobs}); (len(completed) > 0) != test.dispatch {
+				t.Fatalf("jobs %v found completed applies %q, want dispatch %t", test.jobs, completed, test.dispatch)
+			}
+		})
 	}
 }
 

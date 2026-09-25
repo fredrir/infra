@@ -240,11 +240,14 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         GH_REPO: ${{ github.repository }}
       run: |
-        pushed=$(gh run list --workflow reconcile.yml --event push --commit "$GITHUB_SHA" --json status --jq '.[] | select(.status != "completed") | .status')
-        if [ -n "$pushed" ]; then
-          echo "::warning::The push reconciliation of $GITHUB_SHA has not completed; not dispatching a repair"
-          exit 0
-        fi
+        pushed=$(gh run list --workflow reconcile.yml --event push --branch main --json databaseId,status --jq '.[] | select(.status != "completed") | .databaseId')
+        for run in $pushed; do
+          applied=$(gh api --paginate "repos/$GH_REPO/actions/runs/$run/jobs" --jq '.jobs[] | select(.name == "reconcile / apply" and .status == "completed") | .status')
+          if [ -z "$applied" ]; then
+            echo "::warning::Push reconciliation run $run has not completed its apply; not dispatching a repair"
+            exit 0
+          fi
+        done
         previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --user 'github-actions[bot]' --commit "$GITHUB_SHA" --limit 1 --json conclusion,createdAt --jq '.[] | if (.conclusion | IN("failure", "timed_out", "startup_failure")) then "ended in \(.conclusion)" elif .conclusion != "cancelled" and now - (.createdAt | fromdateiso8601) < 21600 then "started within six hours" else empty end')
         if [ -n "$previous" ]; then
           echo "::warning::The dispatched full reconciliation of $GITHUB_SHA $previous; not dispatching another"
