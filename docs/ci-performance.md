@@ -76,7 +76,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Application setup | Durable applied state selects tools; application-only changes skip host tooling, SSH and runner-registration credentials; recovery retains full setup |
 | State operations | Signed S3 requests reuse HTTP connections with conditional lease ownership, encryption and durable status updates |
 | Permission preflight | Up to four read-only workload permission checks run concurrently before mutation |
-| Scheduled work | Hourly deep verification at minute 47 reads live state and the recorded reconciliation status and compares OpenTofu and host plays in check mode; merges run the selected `infra reconcile apply`; a full reconciliation runs when a verification report lists differences, including an incomplete or superseded apply |
+| Scheduled work | Hourly deep verification at minute 47 reads live state and the recorded reconciliation status and compares OpenTofu and each host playbook concurrently in check mode; merges run the selected `infra reconcile apply`; a full reconciliation runs when a verification report lists differences, including an incomplete or superseded apply |
 | Deployment selection | Explicit CI-only paths skip deployment; supported project changes select the union of their dependency chains; tooling inputs never widen scope; shared and unknown inputs retain full fallback |
 | Tooling changes | `cmd/`, `internal/`, `.github/`, Go and Bazel modules and listed `build/` inputs run read-only drift verification of the applied revision: generated artifacts, `tofu plan -detailed-exitcode`, workloads and hosts; failure forces full recovery; `INFRA_SCOPE_HOSTS=false` restores full convergence |
 | Workload verification | Each verification poll lists workloads once per kind and namespace; expected ownership, images, readiness and generations remain required |
@@ -87,7 +87,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Frontend deadlines | Publication queueing has a separate eight-minute measurement; the subsequent exact served-revision check retains its 60-second budget within the existing ten-minute job |
 
 VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; the default slot count is one for the 8 GiB build VM.
-An hourly verification report that lists differences dispatches one full reconciliation of `main` unless the latest bot dispatch for the same commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled; a new commit on `main` lifts the cap; `verify=true` never dispatches.
+An hourly verification report that lists differences dispatches one full reconciliation of `main` unless a push reconciliation of the same commit has not completed or the latest bot dispatch for the same commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled; a new commit on `main` lifts the cap; `verify=true` never dispatches.
 These controls do not establish an ordinary-traffic latency percentile; compare the completion observer's post-rollout samples with equivalent workloads.
 
 ## Execution measurements
@@ -99,7 +99,7 @@ Failed attempts remain part of the evidence, including the frontend serving dead
 | --- | --- | --- |
 | Scheduled full reconciliation | 48 → 0 runs/day, plus 24 read-only deep verifications/day | Configured frequency; repairs run only for listed differences; daily resource savings are not yet measured |
 | Workload API reads | 49 → 16 kubectl calls; median 6.21 → 2.08 seconds; client CPU 2.10 → 0.67 seconds | Three alternating samples per mode, 49 matching resources over the local tailnet; excludes rollout waiting |
-| Read-only drift verification | 36.76 seconds; 5.26 client CPU seconds; no Ansible changes | Local tailnet execution of the hourly command |
+| Read-only live verification | 36.76 seconds; 5.26 client CPU seconds; no Ansible changes | Local tailnet execution of `infra reconcile verify` without `--deep`; excludes the OpenTofu and host check-mode comparisons of the hourly deep verification |
 | Whole-job admission | One active lease; a second worker timed out without displacing the owner | Installed production CLI; live acquire and release hooks verified |
 | Active build memory | Runner slice 1.81 GiB peak; engine 3.62 GiB peak; no OOM event increase | Twenty-second sample at four samples/second; includes page cache |
 | External frontend observation, raw | 195.33 seconds from workflow creation to local observation | Clocks were not calibrated; use the hosted comparison below for percentages; the initial 60-second serving wait failed |
