@@ -80,6 +80,39 @@
         "seconds": 68.0,
         "success": true
       }
+    },
+    {
+      "change": "Replace the six-hourly full reconciliation with hourly deep verification that dispatches a repair only for declared differences",
+      "run": "https://github.com/fredrir/infra/actions/runs/36161372799",
+      "drain": "INFRA_VM_POOL_QUALIFIED false in 7 routed repositories 16:31-16:47 UTC; no queued or busy VM jobs",
+      "stage_seconds": {
+        "plan": 8.8,
+        "hosts": 135.7,
+        "publish": 1.5,
+        "kubernetes": 51.8,
+        "monitor": 16.9,
+        "verify": 37.2
+      },
+      "scheduled_full_reconciliations_per_day": {
+        "before": 4,
+        "after": 0
+      },
+      "deep_verification": {
+        "run": "https://github.com/fredrir/infra/actions/runs/36162949481",
+        "trigger": "workflow_dispatch verify=true",
+        "seconds": 71.1,
+        "budget_seconds": 600,
+        "cpu_seconds": 49.5,
+        "peak_memory_bytes": 334864384,
+        "outcome": "matches",
+        "differences": 0,
+        "errors": 0,
+        "compared": "OpenTofu plan; reconcile.yml and external.yml in check mode; verify.yml and verify-runners.yml; runner fleet at GitHub; Flux, workloads and served endpoints",
+        "changed_tasks": 0
+      },
+      "limitations": [
+        "One sample; the hourly verification has not yet run on this revision"
+      ]
     }
   ]
 }
