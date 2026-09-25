@@ -58,10 +58,10 @@ spec:
       resources:
         requests:
           cpu: 100m
-          memory: 256Mi
+          memory: 768Mi
         limits:
           cpu: '1'
-          memory: 768Mi
+          memory: 1536Mi
       grafana.ini:
         server:
           root_url: https://${GRAFANA_HOST}
@@ -129,10 +129,10 @@ spec:
         resources:
           requests:
             cpu: 300m
-            memory: 1Gi
+            memory: 2560Mi
           limits:
             cpu: '2'
-            memory: 3Gi
+            memory: 4Gi
         nodeSelector:
           node-restriction.kubernetes.io/critical: 'true'
         storageSpec:

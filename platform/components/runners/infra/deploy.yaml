@@ -35,7 +35,7 @@ spec:
         - name: listener
           resources:
             requests:
-              cpu: 50m
+              cpu: 10m
               memory: 64Mi
             limits:
               cpu: 500m
@@ -92,7 +92,7 @@ spec:
               memory: 256Mi
               ephemeral-storage: 1Gi
             limits:
-              cpu: '1'
+              cpu: '2'
               memory: 1Gi
               ephemeral-storage: 4Gi
         affinity:

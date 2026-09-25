@@ -70,7 +70,7 @@ spec:
               seconds: 5
         resources:
           requests:
-            cpu: 200m
+            cpu: 75m
             memory: 512Mi
           limits:
             cpu: '2'

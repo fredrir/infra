@@ -11,3 +11,31 @@ patches:
     - op: add
       path: /spec/template/spec/containers/0/args/-
       value: --requeue-dependency=5s
+- target:
+    kind: Deployment
+    name: helm-controller
+  patch: |
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests
+      value: {cpu: 60m, memory: 160Mi}
+- target:
+    kind: Deployment
+    name: kustomize-controller
+  patch: |
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests
+      value: {cpu: 70m, memory: 224Mi}
+- target:
+    kind: Deployment
+    name: notification-controller
+  patch: |
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests
+      value: {cpu: 25m, memory: 128Mi}
+- target:
+    kind: Deployment
+    name: source-controller
+  patch: |
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests
+      value: {cpu: 25m, memory: 192Mi}

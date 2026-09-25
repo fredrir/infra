@@ -82,10 +82,10 @@ spec:
           containerPort: 27017
         resources:
           requests:
-            cpu: 250m
-            memory: 256Mi
+            cpu: 160m
+            memory: 512Mi
           limits:
-            cpu: '1'
+            cpu: '2'
             memory: 1Gi
         volumeMounts:
         - name: database

@@ -76,8 +76,8 @@ spec:
           value: /var/cache/pyparser/huggingface
         resources:
           requests:
-            cpu: 250m
-            memory: 512Mi
+            cpu: 25m
+            memory: 384Mi
           limits:
             cpu: '2'
             memory: 2Gi
@@ -200,8 +200,8 @@ spec:
           value: /var/cache/pyparser/huggingface
         resources:
           requests:
-            cpu: 1000m
-            memory: 2Gi
+            cpu: 25m
+            memory: 128Mi
           limits:
             cpu: '3'
             memory: 6Gi
@@ -294,8 +294,8 @@ spec:
           value: /var/cache/pyparser/huggingface
         resources:
           requests:
-            cpu: 250m
-            memory: 512Mi
+            cpu: 25m
+            memory: 96Mi
           limits:
             cpu: '1'
             memory: 2Gi

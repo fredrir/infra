@@ -197,7 +197,7 @@ spec:
         && (("infra.fredrir.com/ci-slot" in dyn(c.resources).limits && string(dyn(c.resources).limits["infra.fredrir.com/ci-slot"]) == "1")
           || (request.namespace == "ci-infra" && has(object.metadata.labels) && "actions.github.com/scale-set-name" in object.metadata.labels
             && object.metadata.labels["actions.github.com/scale-set-name"] == "deploy-amd64" && !("infra.fredrir.com/ci-slot" in dyn(c.resources).limits)
-            && string(dyn(c.resources).limits["cpu"]) == "1" && string(dyn(c.resources).limits["memory"]) == "1Gi")))
+            && string(dyn(c.resources).limits["cpu"]) == "2" && string(dyn(c.resources).limits["memory"]) == "1Gi")))
     message: CI jobs must hold exactly one worker slot unless they are bounded deploy jobs
 ---
 apiVersion: admissionregistration.k8s.io/v1

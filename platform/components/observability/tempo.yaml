@@ -27,8 +27,8 @@ spec:
       tag: 3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
       resources:
         requests:
-          cpu: 200m
-          memory: 512Mi
+          cpu: 25m
+          memory: 224Mi
         limits:
           cpu: '2'
           memory: 2Gi
