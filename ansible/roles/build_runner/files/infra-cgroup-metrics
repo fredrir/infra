@@ -1,41 +1,45 @@
 #!/bin/sh
-set -eu
-cd /sys/fs/cgroup
+set -u
+cd /sys/fs/cgroup || exit
 textfile=/var/lib/node_exporter/textfile_collector/infra-cgroups.prom
 while :; do
   set --
   for slice in infra.slice/infra-engine.slice infra.slice/infra-runners.slice; do
-    if [ -d "$slice" ]; then
-      set -- "$@" "$slice/memory.current" "$slice/memory.peak" "$slice/memory.events" "$slice/memory.stat" "$slice/memory.max" "$slice/cpu.stat" "$slice/cpu.max"
-      for child in "$slice"/*/; do
-        if [ -d "$child" ]; then
-          set -- "$@" "${child}memory.max" "${child}cpu.max" "${child}cpu.stat"
-        fi
-      done
-    fi
+    for file in "$slice"/memory.current "$slice"/memory.peak "$slice"/memory.events "$slice"/memory.stat "$slice"/memory.max "$slice"/cpu.stat "$slice"/cpu.max \
+      "$slice"/*/memory.max "$slice"/*/cpu.max "$slice"/*/cpu.stat; do
+      if [ -e "$file" ]; then
+        set -- "$@" "$file"
+      fi
+    done
   done
-  awk '
-    {
-      depth = split(FILENAME, path, "/")
-      cgroup = path[2]
-      file = path[depth]
-    }
-    file == "memory.max" && $1 != "max" && (!(cgroup in memory_max) || $1 < memory_max[cgroup]) { memory_max[cgroup] = $1 }
-    file == "cpu.max" && $1 != "max" && (!(cgroup in cpu_max) || $1 / $2 < cpu_max[cgroup]) { cpu_max[cgroup] = $1 / $2 }
-    file == "cpu.stat" && $1 == "nr_periods" { periods[cgroup] += $2 }
-    file == "cpu.stat" && $1 == "nr_throttled" { throttled_periods[cgroup] += $2 }
-    file == "cpu.stat" && $1 == "throttled_usec" { throttled[cgroup] += $2 / 1000000 }
-    depth > 3 { next }
-    file == "cpu.stat" && $1 == "usage_usec" { usage[cgroup] = $2 / 1000000 }
-    file == "memory.current" { current[cgroup] = $1 }
-    file == "memory.peak" { peak[cgroup] = $1 }
-    file == "memory.stat" && $1 == "inactive_file" { inactive_file[cgroup] = $2 }
-    file == "memory.events" { events[cgroup "\",event=\"" $1] = $2 }
+  if awk -v now="$(date +%s)" '
     function emit(name, type, values, format,    key) {
       printf "# TYPE infra_cgroup_%s %s\n", name, type
       for (key in values) printf "infra_cgroup_%s{cgroup=\"%s\"} " format "\n", name, key, values[key]
     }
-    END {
+    BEGIN {
+      for (argument = 1; argument < ARGC; argument++) {
+        file = ARGV[argument]
+        depth = split(file, path, "/")
+        cgroup = path[2]
+        name = path[depth]
+        while ((status = (getline line < file)) > 0) {
+          split(line, field, " ")
+          if (name == "memory.max" && field[1] != "max" && (!(cgroup in memory_max) || field[1] + 0 < memory_max[cgroup])) memory_max[cgroup] = field[1] + 0
+          if (name == "cpu.max" && field[1] != "max" && (!(cgroup in cpu_max) || field[1] / field[2] < cpu_max[cgroup])) cpu_max[cgroup] = field[1] / field[2]
+          if (name == "cpu.stat" && field[1] == "nr_periods") periods[cgroup] += field[2]
+          if (name == "cpu.stat" && field[1] == "nr_throttled") throttled_periods[cgroup] += field[2]
+          if (name == "cpu.stat" && field[1] == "throttled_usec") throttled[cgroup] += field[2] / 1000000
+          if (depth > 3) continue
+          if (name == "cpu.stat" && field[1] == "usage_usec") usage[cgroup] = field[2] / 1000000
+          if (name == "memory.current") current[cgroup] = field[1]
+          if (name == "memory.peak") peak[cgroup] = field[1]
+          if (name == "memory.stat" && field[1] == "inactive_file") inactive_file[cgroup] = field[2]
+          if (name == "memory.events") events[cgroup "\",event=\"" field[1]] = field[2]
+        }
+        if (status < 0) read_errors++
+        close(file)
+      }
       for (cgroup in current) working_set[cgroup] = current[cgroup] - inactive_file[cgroup]
       emit("memory_current_bytes", "gauge", current, "%.0f")
       emit("memory_peak_bytes", "gauge", peak, "%.0f")
@@ -47,7 +51,12 @@ while :; do
       emit("cpu_periods_total", "counter", periods, "%.0f")
       emit("cpu_throttled_periods_total", "counter", throttled_periods, "%.0f")
       emit("cpu_max_cores", "gauge", cpu_max, "%g")
+      printf "# TYPE infra_cgroup_collector_read_errors gauge\ninfra_cgroup_collector_read_errors %d\n", read_errors
+      printf "# TYPE infra_cgroup_collector_last_success_timestamp_seconds gauge\ninfra_cgroup_collector_last_success_timestamp_seconds %d\n", now
+      exit
     }
-  ' "$@" > "$textfile.tmp" && mv "$textfile.tmp" "$textfile"
+  ' "$@" > "$textfile.tmp"; then
+    mv "$textfile.tmp" "$textfile"
+  fi
   sleep 15
 done

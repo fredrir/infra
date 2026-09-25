@@ -52,16 +52,26 @@ spec:
   - name: build-vm
     rules:
     - alert: BuildVmMetricsMissing
-      expr: |
-        absent(node_textfile_mtime_seconds{job="build-vm"})
-        or time() - node_textfile_mtime_seconds{job="build-vm"} > 300
+      expr: up{job="build-vm"} == 0 or absent(up{job="build-vm"})
       for: 10m
       labels:
         severity: warning
       annotations:
-        summary: Build VM guest or cgroup metrics are missing or stale
+        summary: Build VM node exporter is unreachable
+    - alert: BuildVmCgroupCollectorFailing
+      expr: |
+        up{job="build-vm"} == 1 unless on(job, instance) infra_cgroup_collector_last_success_timestamp_seconds
+        or time() - infra_cgroup_collector_last_success_timestamp_seconds{job="build-vm"} > 300
+        or infra_cgroup_collector_read_errors{job="build-vm"} > 0
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Build VM cgroup metric writer is failing; journalctl -u infra-cgroup-metrics in the guest names the cause
     - alert: BuildEngineCgroupMissing
-      expr: absent(infra_cgroup_memory_max_bytes{job="build-vm",cgroup="infra-engine.slice"})
+      expr: |
+        absent(infra_cgroup_memory_max_bytes{job="build-vm",cgroup="infra-engine.slice"})
+        and on() time() - infra_cgroup_collector_last_success_timestamp_seconds{job="build-vm"} < 300
       for: 15m
       labels:
         severity: warning

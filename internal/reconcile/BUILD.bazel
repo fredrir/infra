@@ -39,6 +39,7 @@ go_test(
     srcs = [
         "ansible_integration_test.go",
         "artifacts_test.go",
+        "cgroup_metrics_integration_test.go",
         "check_mode_coverage_test.go",
         "checkpoint_test.go",
         "host_comparison_test.go",
