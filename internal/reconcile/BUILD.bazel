@@ -39,11 +39,15 @@ go_test(
         "published_test.go",
         "reconcile_test.go",
         "run_scope_test.go",
+        "runner_coverage_test.go",
         "runners_test.go",
         "store_http_test.go",
         "workloads_test.go",
     ],
-    data = ["//:runner_routing_data"],
+    data = [
+        "//:runner_play_data",
+        "//:runner_routing_data",
+    ],
     embed = [":reconcile"],
     deps = [
         "//internal/ci",

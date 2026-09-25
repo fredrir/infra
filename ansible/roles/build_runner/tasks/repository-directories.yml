@@ -1,0 +1,8 @@
+- name: Create repository runner directory
+  ansible.builtin.file:
+    path: '/home/runner/{{ item }}'
+    state: directory
+    owner: runner
+    group: runner
+    mode: '0750'
+  loop: '{{ build_runner_state_repositories }}'

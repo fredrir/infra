@@ -2,16 +2,58 @@
   hosts: build_engines
   become: true
   gather_facts: false
+  check_mode: true
   vars:
     build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
-    build_runner_toolchain: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json }}"
     build_runner_fleet: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/runners.json') | from_json }}"
+    build_runner_probed_registrations: "{{ build_runner_probe.stdout_lines[2:] | map('split') | list }}"
+    build_runner_state_repositories: '{{ build_runner_repositories }}'
+    build_runner_state_services: "{{ build_runner_probed_registrations | map('last') | list }}"
   tasks:
-  - name: Verify installed runners
-    ansible.builtin.import_role:
-      name: build_runner
-      tasks_from: verify.yml
-  - name: Verify installed build engines
-    ansible.builtin.import_role:
-      name: build_engine
-      tasks_from: verify.yml
+  - name: Probe observed runner host
+    ansible.builtin.shell: |
+      set -eu
+      sha256sum < /usr/local/bin/infra
+      docker inspect --format '{{ "{{.State.Running}} {{.Config.Image}}" }}' {{ build_engine_dagger_name | quote }}
+      cd /home/runner
+      for registration in */.runner; do
+        printf '%s ' "${registration%/.runner}"
+        awk 'NR == 1' "${registration%.runner}.service"
+      done
+    register: build_runner_probe
+    changed_when: false
+    check_mode: false
+
+  - name: Verify observed runner host
+    ansible.builtin.assert:
+      that:
+      - build_runner_probe.stdout_lines[0] == build_runner_cli.sha256 ~ '  -'
+      - build_runner_probe.stdout_lines[1] == 'true ' ~ build_engine_image
+      - build_runner_probed_registrations | map('first') | sort == build_runner_repositories | sort
+      - build_runner_probed_registrations | map('length') | unique == [2]
+
+  - name: Compare declared runner state
+    notify: Reject declared runner state drift
+    block:
+    - name: Compare declared runner host state
+      ansible.builtin.import_role:
+        name: build_runner
+        tasks_from: state.yml
+    - name: Compare declared repository runner directories
+      ansible.builtin.import_role:
+        name: build_runner
+        tasks_from: repository-directories.yml
+    - name: Compare declared repository runner services
+      ansible.builtin.import_role:
+        name: build_runner
+        tasks_from: repository-services.yml
+    - name: Compare declared build engine state
+      ansible.builtin.import_role:
+        name: build_engine
+        tasks_from: state.yml
+
+  handlers:
+  - name: Reject declared runner state drift
+    listen: Restart infra-dagger
+    ansible.builtin.fail:
+      msg: The build VM differs from its declared runner state

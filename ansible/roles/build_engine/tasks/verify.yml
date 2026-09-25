@@ -1,9 +1,0 @@
-- name: Read pinned engine container
-  ansible.builtin.command:
-    argv: [docker, inspect, '{{ build_engine_dagger_name }}']
-  register: runner_container
-  changed_when: false
-  failed_when: >-
-    runner_container.rc != 0 or
-    not (runner_container.stdout | from_json | first).State.Running or
-    (runner_container.stdout | from_json | first).Config.Image != build_runner_toolchain.engine_image

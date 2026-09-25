@@ -65,6 +65,12 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 		}
 		return data
 	}
+	remove := func(path string) {
+		t.Helper()
+		if err := os.RemoveAll(filepath.Join(fixture, path)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	fleet, err := LoadRunnerFleet(root)
 	if err != nil {
 		t.Fatal(err)
@@ -75,35 +81,47 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 	}
 	version := fleet.Version
 	cli := "#!/bin/sh\necho fixture\n"
+	engine := fmt.Sprintf("true %s\n", toolchain["engine_image"])
 	write("infra", cli, true)
 	write("vars.json", fmt.Sprintf(`{"build_runner_cli":{"sha256":"%x"}}`, sha256.Sum256([]byte(cli))), false)
-	write("inventory.yml", "all:\n  children:\n    build_engines:\n      hosts:\n        localhost:\n          ansible_connection: local\n          ansible_user: root\n          ansible_python_interpreter: /usr/bin/python3\n          build_runner_repositories: [infra, Y]\n", false)
+	write("inventory.yml", "all:\n  children:\n    build_engines:\n      hosts:\n        localhost:\n          ansible_connection: local\n          ansible_user: root\n          ansible_python_interpreter: /usr/bin/python3\n          build_runner_repositories: [infra, Y]\n          build_runner_packages: [dpkg, tar]\n", false)
 	for _, repository := range []string{"infra", "Y"} {
-		write("runners/"+repository+"/.runner", "{}", false)
-		write("runners/"+repository+"/.service", "actions.runner.fixture."+repository+".service", false)
+		write("runners/"+repository+"/.runner", "{}\n", false)
+		write("runners/"+repository+"/.service", "actions.runner.fixture."+repository+".service\n", false)
 		write("runners/"+repository+"/bin/Runner.Listener", "#!/bin/sh\ncat /fixture/state/version-"+repository+"\n", true)
 		write("state/version-"+repository, version, false)
 	}
 	write("bin/systemctl", `#!/bin/sh
 case "$1" in
-stop) echo "$2" >> /fixture/state/stopped; exit 0 ;;
-disable) echo "$2" >> /fixture/state/disabled; exit 0 ;;
-show) printf 'LoadState=loaded\nActiveState=active\n'; exit 0 ;;
-is-enabled) echo enabled; exit 0 ;;
-daemon-reload) if rm /fixture/state/reload-failure 2>/dev/null; then exit 1; fi; echo reload >> /fixture/state/reloaded; exit 0 ;;
+show) if grep -qxF "$2" /fixture/state/inactive-units 2>/dev/null; then state=inactive; else state=active; fi; printf 'LoadState=loaded\nActiveState=%s\n' "$state" ;;
+is-enabled) if grep -qxF "$2" /fixture/state/disabled-units 2>/dev/null; then echo disabled; exit 1; fi; echo enabled ;;
+stop) echo "$2" >> /fixture/state/stopped ;;
+disable) echo "$2" >> /fixture/state/disabled ;;
+restart) echo "$2" >> /fixture/state/restarted ;;
+daemon-reload) if rm /fixture/state/reload-failure 2>/dev/null; then exit 1; fi; echo reload >> /fixture/state/reloaded ;;
 esac
-if [ -e /fixture/state/service-failure ] && [ "$2" = actions.runner.fixture.Y.service ]; then exit 1; fi
-echo active
 `, true)
-	write("bin/docker", `#!/bin/sh
-if [ -e /fixture/state/wrong-image ]; then printf '[{"State":{"Running":true},"Config":{"Image":"wrong"}}]'; exit 0; fi
-cat "/fixture/state/$2.json"
-`, true)
-	engine, err := json.Marshal([]any{map[string]any{"State": map[string]any{"Running": true}, "Config": map[string]any{"Image": toolchain["engine_image"]}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	write("state/infra-dagger.json", string(engine), false)
+	write("bin/docker", "#!/bin/sh\ncat /fixture/state/engine\n", true)
+	write("state/engine", engine, false)
+	write("converge.yml", `- hosts: build_engines
+  gather_facts: false
+  vars:
+    build_runner_fleet: "{{ lookup('ansible.builtin.file', '/source/build/runners.json') | from_json }}"
+    build_engine_image: "{{ (lookup('ansible.builtin.file', '/source/build/toolchain.json') | from_json).engine_image }}"
+  tasks:
+  - ansible.builtin.import_role:
+      name: build_runner
+      tasks_from: state.yml
+  - ansible.builtin.include_role:
+      name: build_runner
+      tasks_from: repository.yml
+    loop: '{{ build_runner_repositories }}'
+    loop_control:
+      loop_var: build_runner_repository
+  - ansible.builtin.import_role:
+      name: build_engine
+      tasks_from: state.yml
+`, false)
 	name := fmt.Sprintf("infra-ansible-scope-%d", time.Now().UnixNano())
 	command("docker", "run", "-d", "--name", name, "--network=none", "-v", root+":/source:ro", "-v", fixture+":/fixture", "-v", filepath.Join(fixture, "runners")+":/home/runner", "-v", packages+":/opt/ansible:ro", "-e", "PYTHONPATH=/opt/ansible", "-e", "ANSIBLE_CONFIG=/source/ansible/ansible.cfg", "-e", "PATH=/fixture/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", image, "sleep", "infinity")
 	t.Cleanup(func() {
@@ -111,6 +129,8 @@ cat "/fixture/state/$2.json"
 		_ = exec.Command("docker", "rm", "-f", name).Run()
 	})
 	command("docker", "exec", name, "useradd", "--non-unique", "--uid", fmt.Sprint(os.Getuid()), "--no-create-home", "runner")
+	command("docker", "exec", name, "groupadd", "docker")
+	command("docker", "exec", name, "mkdir", "-p", "/etc/tmpfiles.d")
 	command("docker", "exec", name, "ln", "-s", "/fixture/infra", "/usr/local/bin/infra")
 	run := func(playbook string, success bool, extra ...string) string {
 		t.Helper()
@@ -129,44 +149,115 @@ cat "/fixture/state/$2.json"
 		t.Fatalf("runner-only path lost full-path prerequisites:\n%s", runners)
 	}
 	t.Log("full and runner-only paths resolve the same ordered runner tasks")
-	for _, scenario := range []string{"valid", "service-failure", "wrong-image", "wrong-version", "wrong-cli"} {
-		t.Run(scenario, func(t *testing.T) {
-			switch scenario {
-			case "service-failure", "wrong-image":
-				write("state/"+scenario, "", false)
-			case "wrong-version":
-				write("state/version-Y", "0.0.0", false)
-			case "wrong-cli":
-				write("infra", "wrong", true)
-			}
-			output := run("/source/ansible/verify-runners.yml", scenario == "valid")
-			if scenario == "valid" && !strings.Contains(output, "changed=0") {
-				t.Fatalf("verification changed the host:\n%s", output)
-			}
-			if scenario == "service-failure" || scenario == "wrong-image" {
-				if err := os.Remove(filepath.Join(fixture, "state/"+scenario)); err != nil {
-					t.Fatal(err)
-				}
-			}
-			write("state/version-Y", version, false)
-			write("infra", cli, true)
-		})
+	converge := func() { run("/fixture/converge.yml", true) }
+	converge()
+	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") {
+		t.Fatalf("declared runner state does not converge:\n%s", output)
 	}
-	var tasks []map[string]any
-	if err := yaml.Unmarshal(read(filepath.Join(root, "ansible/roles/build_runner/tasks/repository.yml")), &tasks); err != nil {
-		t.Fatal(err)
-	}
-	for index, task := range tasks {
-		if task["name"] == "Obtain single-use runner registration token" {
-			tasks = tasks[:index]
-			break
+	t.Log("declared runner state converges idempotently")
+	outcome := func(output string) (changed, failed []string) {
+		var task string
+		for line := range strings.SplitSeq(output, "\n") {
+			switch {
+			case strings.HasPrefix(line, "TASK ["), strings.HasPrefix(line, "RUNNING HANDLER ["):
+				task = line[strings.Index(line, "[")+1 : strings.LastIndex(line, "]")]
+			case strings.HasPrefix(line, "changed: "):
+				changed = append(changed, task)
+			case strings.HasPrefix(line, "fatal: "), strings.HasPrefix(line, "failed: "):
+				failed = append(failed, task)
+			}
 		}
+		return slices.Compact(changed), slices.Compact(failed)
 	}
-	upgrade, err := yaml.Marshal([]any{map[string]any{"hosts": "build_engines", "gather_facts": false, "vars": map[string]any{"build_runner_repository": "infra", "build_runner_version": version}, "tasks": tasks}})
-	if err != nil {
-		t.Fatal(err)
+	restarted := func() string {
+		data, err := os.ReadFile(filepath.Join(fixture, "state/restarted"))
+		if err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		return string(data)
 	}
-	write("upgrade.yml", string(upgrade), false)
+	drift := []string{"Reject declared runner state drift"}
+	observed := []string{"Verify observed runner host"}
+	for _, scenario := range []struct {
+		name            string
+		introduce       func()
+		restore         func()
+		extra           []string
+		changed, failed []string
+	}{
+		{name: "valid"},
+		{
+			name:      "stopped engine",
+			introduce: func() { write("state/inactive-units", "infra-dagger\n", false) },
+			restore:   func() { remove("state/inactive-units") },
+			changed:   []string{"build_engine : Start build engine"},
+			failed:    drift,
+		},
+		{
+			name:      "disabled runner",
+			introduce: func() { write("state/disabled-units", "actions.runner.fixture.Y.service\n", false) },
+			restore:   func() { remove("state/disabled-units") },
+			changed:   []string{"build_runner : Start registered runner"},
+			failed:    drift,
+		},
+		{
+			name:      "edited hook",
+			introduce: func() { command("docker", "exec", name, "sh", "-c", "echo >> /usr/local/libexec/infra-runner-hook.sh") },
+			restore:   converge,
+			changed:   []string{"build_runner : Install immutable trusted-job hook adapter"},
+			failed:    drift,
+		},
+		{
+			name:      "edited engine configuration",
+			introduce: func() { command("docker", "exec", name, "sh", "-c", "echo >> /etc/infra-dagger.toml") },
+			restore:   converge,
+			changed:   []string{"build_engine : Install bounded engine cache retention"},
+			failed:    drift,
+		},
+		{
+			name:   "missing package",
+			extra:  []string{"--extra-vars", `{"build_runner_packages":["dpkg","infra-fixture-absent"]}`},
+			failed: []string{"host_packages : Install missing declared packages"},
+		},
+		{
+			name:      "wrong engine image",
+			introduce: func() { write("state/engine", "true wrong\n", false) },
+			restore:   func() { write("state/engine", engine, false) },
+			failed:    observed,
+		},
+		{
+			name:      "wrong CLI",
+			introduce: func() { write("infra", "wrong", true) },
+			restore:   func() { write("infra", cli, true) },
+			failed:    observed,
+		},
+		{
+			name: "undeclared runner",
+			introduce: func() {
+				write("runners/Z/.runner", "{}\n", false)
+				write("runners/Z/.service", "actions.runner.fixture.Z.service\n", false)
+			},
+			restore: func() { remove("runners/Z") },
+			failed:  observed,
+		},
+	} {
+		if scenario.introduce != nil {
+			scenario.introduce()
+		}
+		before := restarted()
+		output := run("/source/ansible/verify-runners.yml", scenario.failed == nil, scenario.extra...)
+		changed, failed := outcome(output)
+		if !slices.Equal(changed, scenario.changed) || !slices.Equal(failed, scenario.failed) {
+			t.Fatalf("%s: changed %q and failed %q, want %q and %q:\n%s", scenario.name, changed, failed, scenario.changed, scenario.failed, output)
+		}
+		if restarted() != before {
+			t.Fatalf("%s: verification restarted a service:\n%s", scenario.name, output)
+		}
+		if scenario.restore != nil {
+			scenario.restore()
+		}
+		t.Logf("verification of %s fails %q", scenario.name, failed)
+	}
 	archive := func() {
 		t.Helper()
 		file, err := os.Create(filepath.Join(fixture, "runner.tar.gz"))
@@ -176,7 +267,7 @@ cat "/fixture/state/$2.json"
 		compressed := gzip.NewWriter(file)
 		writer := tar.NewWriter(compressed)
 		data := "#!/bin/sh\necho " + version + "\n"
-		for _, header := range []*tar.Header{{Name: "bin/", Typeflag: tar.TypeDir, Mode: 0755}, {Name: "bin/Runner.Listener", Mode: 0755, Size: int64(len(data))}} {
+		for _, header := range []*tar.Header{{Name: "./", Typeflag: tar.TypeDir, Mode: 0755}, {Name: "./bin/", Typeflag: tar.TypeDir, Mode: 0755}, {Name: "./bin/Runner.Listener", Mode: 0755, Size: int64(len(data))}} {
 			if err := writer.WriteHeader(header); err != nil {
 				t.Fatal(err)
 			}
@@ -195,25 +286,28 @@ cat "/fixture/state/$2.json"
 	archive()
 	command("docker", "exec", name, "ln", "-s", "/fixture/runner.tar.gz", "/var/cache/actions-runner-"+version+".tar.gz")
 	write("state/version-infra", "0.0.0", false)
-	run("/fixture/upgrade.yml", true)
+	converge()
 	stopped := string(read(filepath.Join(fixture, "state/stopped")))
 	if stopped != "actions.runner.fixture.infra.service\n" {
 		t.Fatalf("wrong service stopped: %q", stopped)
 	}
-	output := run("/fixture/upgrade.yml", true)
+	if output := run("/source/ansible/verify-runners.yml", true); !strings.Contains(output, "changed=0") {
+		t.Fatalf("verification after runner upgrade reports drift:\n%s", output)
+	}
+	output := run("/fixture/converge.yml", true)
 	if !strings.Contains(output, "changed=0") || string(read(filepath.Join(fixture, "state/stopped"))) != stopped {
 		t.Fatalf("runner replacement is not idempotent:\n%s", output)
 	}
 	t.Log("runner upgrade stops only its own service and converges idempotently")
 	write("runners/infra/bin/Runner.Listener", "#!/bin/sh\necho 0.0.0\n", true)
 	write("runner.tar.gz", "invalid archive", false)
-	run("/fixture/upgrade.yml", false)
+	run("/fixture/converge.yml", false)
 	pending := filepath.Join(fixture, "runners/infra/.infra-runner-pending")
 	if _, err := os.Stat(pending); err != nil {
 		t.Fatal("partial replacement lost its recovery marker", err)
 	}
 	archive()
-	run("/fixture/upgrade.yml", true)
+	converge()
 	if _, err := os.Stat(pending); !os.IsNotExist(err) {
 		t.Fatal("successful recovery left its pending marker", err)
 	}
@@ -247,9 +341,8 @@ cat "/fixture/state/$2.json"
 	exists := func(path string) bool {
 		return exec.CommandContext(ctx, "docker", "exec", name, "test", "-e", path).Run() == nil
 	}
-	if err := os.Remove(filepath.Join(fixture, "state/stopped")); err != nil {
-		t.Fatal(err)
-	}
+	remove("state/stopped")
+	remove("state/reloaded")
 	write("runners/infra.bak/.runner", "{}", false)
 	write("runners/infra.bak/.service", string(read(filepath.Join(fixture, "runners/infra/.service"))), false)
 	if output := run("/fixture/removal.yml", false); !strings.Contains(output, "Assertion failed") {

@@ -22,10 +22,6 @@
     - build_engine_gc_free_gib | int > build_engine_gc_emergency_free_gib | int
     - build_engine_dagger_name == 'infra-dagger'
 
-- name: Read engine pin
-  ansible.builtin.set_fact:
-    build_engine_image: "{{ (lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json).engine_image }}"
-
 - name: Validate engine pin
   ansible.builtin.assert:
     that:
@@ -46,59 +42,8 @@
   register: build_engine_pull
   changed_when: "'Downloaded newer image' in build_engine_pull.stdout"
 
-- name: Install bounded engine cache retention
-  ansible.builtin.template:
-    src: infra-dagger.toml.j2
-    dest: /etc/infra-dagger.toml
-    owner: root
-    group: root
-    mode: '0644'
-  notify: Restart infra-dagger
-
-- name: Install Dagger unit
-  ansible.builtin.template:
-    src: infra-dagger.service.j2
-    dest: /etc/systemd/system/infra-dagger.service
-    owner: root
-    group: root
-    mode: '0644'
-  register: build_engine_dagger_unit
-  notify: Restart infra-dagger
-
-- name: Start build engine
-  ansible.builtin.systemd_service:
-    name: infra-dagger
-    daemon_reload: '{{ build_engine_dagger_unit.changed }}'
-    enabled: true
-    state: started
-
-- name: Read retired prewarming timer
-  ansible.builtin.stat:
-    path: /etc/systemd/system/infra-build-prewarm.timer
-  register: build_engine_prewarm_timer
-
-- name: Stop retired prewarming timer
-  ansible.builtin.systemd_service:
-    name: infra-build-prewarm.timer
-    state: stopped
-    enabled: false
-  when: build_engine_prewarm_timer.stat.exists
-
-- name: Remove retired prewarming state
-  ansible.builtin.file:
-    path: '{{ item }}'
-    state: absent
-  loop:
-  - /etc/systemd/system/infra-build-prewarm.timer
-  - /etc/systemd/system/infra-build-prewarm.service
-  - /var/lib/infra/build
-  - /home/runner/.cache/infra/source-cli
-  register: build_engine_prewarm_removed
-
-- name: Reload units without retired prewarming
-  ansible.builtin.systemd_service:
-    daemon_reload: true
-  when: build_engine_prewarm_removed.changed
+- name: Declare build engine state
+  ansible.builtin.import_tasks: state.yml
 
 - name: Read retired Bazel cache unit
   ansible.builtin.stat:

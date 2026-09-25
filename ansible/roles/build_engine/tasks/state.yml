@@ -1,0 +1,25 @@
+- name: Install bounded engine cache retention
+  ansible.builtin.template:
+    src: infra-dagger.toml.j2
+    dest: /etc/infra-dagger.toml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart infra-dagger
+
+- name: Install Dagger unit
+  ansible.builtin.template:
+    src: infra-dagger.service.j2
+    dest: /etc/systemd/system/infra-dagger.service
+    owner: root
+    group: root
+    mode: '0644'
+  register: build_engine_dagger_unit
+  notify: Restart infra-dagger
+
+- name: Start build engine
+  ansible.builtin.systemd_service:
+    name: infra-dagger
+    daemon_reload: '{{ build_engine_dagger_unit.changed }}'
+    enabled: true
+    state: started

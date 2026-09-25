@@ -10,3 +10,4 @@ build_engine_gc_free_gib: 8
 build_engine_gc_emergency_free_gib: 4
 build_engine_parallelism: 4
 build_engine_dagger_name: infra-dagger
+build_engine_image: "{{ (lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json).engine_image }}"

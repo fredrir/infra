@@ -1,0 +1,36 @@
+- name: Create runner resource override directory
+  ansible.builtin.file:
+    path: '/etc/systemd/system/{{ item }}.d'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: '{{ build_runner_state_services }}'
+
+- name: Place repository runner in bounded resource slice
+  ansible.builtin.copy:
+    dest: '/etc/systemd/system/{{ item }}.d/resources.conf'
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Service]
+      Slice=infra-runners.slice
+      Environment=ACTIONS_RUNNER_HOOK_JOB_STARTED=/usr/local/libexec/infra-runner-hook.sh
+      {% if build_runner_admission_enabled | bool %}
+      Environment=ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/usr/local/libexec/infra-runner-completed.sh
+      {% endif %}
+      Environment=CI_POOL=main
+      Environment=_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger
+  loop: '{{ build_runner_state_services }}'
+  register: build_runner_service_override
+
+- name: Start registered runner
+  ansible.builtin.systemd_service:
+    name: '{{ item.item }}'
+    enabled: true
+    daemon_reload: '{{ build_runner_resource_slice.changed or build_runner_service_install.changed | default(false) or item.changed }}'
+    state: '{{ "restarted" if item.changed else "started" }}'
+  loop: '{{ build_runner_service_override.results }}'
+  loop_control:
+    label: '{{ item.item }}'
