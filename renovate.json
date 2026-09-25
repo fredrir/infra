@@ -62,7 +62,7 @@
     "ziglang": {
       "defaultRegistryUrlTemplate": "https://pypi.org/pypi/ziglang/json",
       "transformTemplates": [
-        "{'releases': [$each(releases, function($files, $version) { {'version': $version, 'releaseTimestamp': $files[0].upload_time_iso_8601, 'digest': $files[filename = 'ziglang-' & $version & '-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl'].digests.sha256} })], 'sourceUrl': 'https://github.com/ziglang/zig-pypi'}"
+        "{'releases': [$each(releases, function($files, $version) { ($available := $files[yanked = false]; $available ? {'version': $version, 'releaseTimestamp': $available[0].upload_time_iso_8601, 'digest': $available[filename = 'ziglang-' & $version & '-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl'].digests.sha256}) })], 'sourceUrl': 'https://github.com/ziglang/zig-pypi'}"
       ]
     }
   },
@@ -101,6 +101,18 @@
       "matchManagers": ["custom.regex"],
       "matchFileNames": ["images/**/Containerfile"],
       "groupName": "runner tools"
+    },
+    {
+      "matchDatasources": [
+        "custom.actions-runner",
+        "custom.cargo-zigbuild",
+        "custom.sccache",
+        "custom.cargo-nextest",
+        "custom.cargo-audit",
+        "custom.ziglang"
+      ],
+      "matchUpdateTypes": ["digest"],
+      "enabled": false
     }
   ],
   "nix": {

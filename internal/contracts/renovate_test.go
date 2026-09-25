@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -11,6 +12,16 @@ import (
 type renovatePin struct {
 	start, end int
 	groups     map[string]string
+}
+
+type renovateRule struct {
+	MatchDatasources []string `json:"matchDatasources"`
+	MatchUpdateTypes []string `json:"matchUpdateTypes"`
+	Enabled          *bool    `json:"enabled"`
+}
+
+func (r renovateRule) disablesDigestUpdates(datasource string) bool {
+	return slices.Contains(r.MatchDatasources, datasource) && slices.Equal(r.MatchUpdateTypes, []string{"digest"}) && r.Enabled != nil && !*r.Enabled
 }
 
 func TestRenovateUpdatesEveryPinWithItsDigest(t *testing.T) {
@@ -22,9 +33,15 @@ func TestRenovateUpdatesEveryPinWithItsDigest(t *testing.T) {
 			DatasourceTemplate  string   `json:"datasourceTemplate"`
 		} `json:"customManagers"`
 		CustomDatasources map[string]json.RawMessage `json:"customDatasources"`
+		PackageRules      []renovateRule             `json:"packageRules"`
 	}
 	if err := json.Unmarshal(read(t, filepath.Join(repository, "renovate.json")), &config); err != nil {
 		t.Fatal(err)
+	}
+	for name := range config.CustomDatasources {
+		if !slices.ContainsFunc(config.PackageRules, func(rule renovateRule) bool { return rule.disablesDigestUpdates("custom." + name) }) {
+			t.Errorf("Renovate may rewrite the pinned digest of an unchanged custom.%s version", name)
+		}
 	}
 	pins := func(path string) (string, []renovatePin) {
 		content := string(read(t, filepath.Join(repository, path)))
@@ -96,13 +113,19 @@ func TestRenovateUpdatesEveryPinWithItsDigest(t *testing.T) {
 				t.Errorf("%s: Renovate does not update %q with a digest", relative, content[line[0]:line[1]])
 			}
 		}
+		downloads := map[string]string{}
+		for _, download := range regexp.MustCompile(`--output (\S+) "([^"]+)"`).FindAllStringSubmatch(content, -1) {
+			downloads[download[1]] = download[2]
+		}
 		for _, argument := range digestArgument.FindAllStringSubmatchIndex(content, -1) {
 			name := content[argument[2]:argument[3]]
 			if !covered(argument[0]) {
 				t.Errorf("%s: Renovate does not update %s", relative, name)
 			}
-			if !strings.Contains(content[argument[1]:], `"$`+name+`"`) {
-				t.Errorf("%s: %s is never checked", relative, name)
+			version := "${" + strings.TrimSuffix(name, "_SHA256") + "_VERSION}"
+			checked := regexp.MustCompile(`"\$` + regexp.QuoteMeta(name) + `" (\S+)`).FindStringSubmatch(content[argument[1]:])
+			if checked == nil || !strings.Contains(downloads[checked[1]], version) {
+				t.Errorf("%s: %s does not check the download of %s", relative, name, version)
 			}
 		}
 	}
