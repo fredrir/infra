@@ -25,7 +25,7 @@ type provenanceFixture struct {
 	t                            *testing.T
 	root, remote, owner, visitor string
 	base                         string
-	attested                     map[string]int
+	attested                     map[string][]int
 	verifications                []process.Options
 }
 
@@ -33,7 +33,7 @@ func newProvenanceFixture(t *testing.T) *provenanceFixture {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	area := t.TempDir()
-	f := &provenanceFixture{t: t, root: filepath.Join(area, "infra"), remote: filepath.Join(area, "origin.git"), owner: filepath.Join(area, "owner"), visitor: filepath.Join(area, "visitor"), attested: map[string]int{}}
+	f := &provenanceFixture{t: t, root: filepath.Join(area, "infra"), remote: filepath.Join(area, "origin.git"), owner: filepath.Join(area, "owner"), visitor: filepath.Join(area, "visitor"), attested: map[string][]int{}}
 	for _, key := range []string{f.owner, f.visitor} {
 		if output, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", filepath.Base(key), "-f", key).CombinedOutput(); err != nil {
 			t.Fatalf("ssh-keygen: %v\n%s", err, output)
@@ -154,22 +154,26 @@ func (f *provenanceFixture) attestation(ctx context.Context, options process.Opt
 	}
 	f.verifications = append(f.verifications, options)
 	subject := strings.TrimPrefix(options.Args[slices.IndexFunc(options.Args, func(arg string) bool { return strings.Contains(arg, "ghcr.io/") })], "oci://")
-	run, ok := f.attested[subject]
-	if !ok || (options.Name == "cosign" && !strings.Contains(strings.Join(options.Args, " "), "workflow-revision="+strings.Repeat("e", 40))) {
-		return process.Result{ExitCode: 1}, errors.New("no matching attestation")
+	runs := f.attested[subject]
+	if len(runs) == 0 || (options.Name == "cosign" && !strings.Contains(strings.Join(options.Args, " "), "workflow-revision="+strings.Repeat("e", 40))) {
+		return process.Result{ExitCode: 1, Stderr: []byte("Error: no matching attestations found\n")}, errors.New(options.Name + " failed: exit status 1")
 	}
-	if options.Name == "cosign" {
-		return process.Result{Stdout: fmt.Appendf(nil, `[{"optional":{"source-run-id":"%d","source-run-attempt":"1"}}]`, run)}, nil
+	var results []string
+	for _, run := range runs {
+		if options.Name == "cosign" {
+			results = append(results, fmt.Sprintf(`{"optional":{"source-run-id":"%d","source-run-attempt":"1"}}`, run))
+		} else {
+			results = append(results, fmt.Sprintf(`{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/%s/actions/runs/%d/attempts/1"}}}}`, options.Args[slices.Index(options.Args, "--repo")+1], run))
+		}
 	}
-	repository := options.Args[slices.Index(options.Args, "--repo")+1]
-	return process.Result{Stdout: fmt.Appendf(nil, `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/%s/actions/runs/%d/attempts/1"}}}}]`, repository, run)}, nil
+	return process.Result{Stdout: []byte("[" + strings.Join(results, ",") + "]")}, nil
 }
 
 func (f *provenanceFixture) deploy(image string, run int) string {
 	f.t.Helper()
 	repository := map[string]string{deployedImage: "1", releasedImage: "2"}[image]
 	options := ci.DeployOptions{Root: f.root, RepositoryID: repository, Revision: fmt.Sprintf("%040x", run), Image: image, Digest: fmt.Sprintf("sha256:%064x", run), Token: "token"}
-	f.attested[image+"@"+options.Digest] = run
+	f.attested[image+"@"+options.Digest] = []int{run}
 	if err := ci.Deploy(context.Background(), ci.Runner{Dir: f.root, Stdout: io.Discard, Stderr: io.Discard, Execute: f.attestation}, options); err != nil {
 		f.t.Fatal(err)
 	}
@@ -241,12 +245,17 @@ func TestProvenanceGate(t *testing.T) {
 			deployed := f.deploy(deployedImage, 101)
 			clear(f.attested)
 			return deployed
-		}, unverified: "image provenance did not match an approved workflow revision"},
+		}, unverified: "image provenance did not match an approved workflow revision: gh at workflow dddddddddddd: Error: no matching attestations found"},
 		{name: "deployment of another run's attestation", build: func() string {
 			deployed := f.deploy(releasedImage, 101)
-			f.attested[fmt.Sprintf("%s@sha256:%064x", releasedImage, 101)] = 102
+			f.attested[fmt.Sprintf("%s@sha256:%064x", releasedImage, 101)] = []int{102}
 			return deployed
-		}, unverified: "receipt names run 101 attempt 1"},
+		}, unverified: fmt.Sprintf("no attestation names run 101 attempt 1 of %040x", 101)},
+		{name: "deployment attested again by a later run", build: func() string {
+			deployed := f.deploy(deployedImage, 101)
+			f.attested[fmt.Sprintf("%s@sha256:%064x", deployedImage, 101)] = []int{102, 101}
+			return deployed
+		}},
 		{name: "rolled back deployment", build: func() string {
 			f.deploy(deployedImage, 101)
 			return f.amend(map[string]string{"platform/projects/example/.deployments/example.json": strings.ReplaceAll(f.read("platform/projects/example/.deployments/example.json"), `"run_id": 101`, `"run_id": 99`)})

@@ -2,37 +2,69 @@ package ci
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
+
+	"github.com/fredrir/infra/internal/process"
 )
 
-func TestVerifiedDeploymentOrder(t *testing.T) {
-	options := DeployOptions{Image: "ghcr.io/fredrir/example", Revision: strings.Repeat("b", 40), Digest: "sha256:" + strings.Repeat("a", 64)}
+func TestProvenanceVerifierFailuresNameTheirCause(t *testing.T) {
+	trust := fstest.MapFS{".github/chainguard/deploy-1.sts.yaml": {Data: []byte("claim_pattern:\n  job_workflow_sha: '^" + strings.Repeat("d", 40) + "$'\n")}}
+	mapping := DeploymentMapping{Repository: "fredrir/example", Visibility: "public"}
+	for _, test := range []struct {
+		name   string
+		result process.Result
+		err    error
+		want   string
+	}{
+		{name: "rejected credentials", result: process.Result{ExitCode: 1, Stderr: []byte("verifying\nHTTP 401: Bad credentials for ghs_attestationsecret\n")}, err: errors.New("gh failed: exit status 1"), want: "gh at workflow dddddddddddd: HTTP 401: Bad credentials for [redacted]"},
+		{name: "missing verifier", result: process.Result{ExitCode: -1}, err: errors.New(`start gh: exec: "gh": executable file not found in $PATH`), want: `executable file not found`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runner := Runner{Env: []string{"GH_TOKEN=ghs_attestationsecret"}, Execute: func(context.Context, process.Options) (process.Result, error) { return test.result, test.err }}
+			_, err := VerifyDeploymentProvenance(context.Background(), runner, trust, "1", mapping, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40))
+			if err == nil || !strings.Contains(err.Error(), test.want) || strings.Contains(err.Error(), "ghs_attestationsecret") {
+				t.Fatalf("verifier failure reported as %v", err)
+			}
+		})
+	}
+}
+
+func TestAttestedDeploymentOrders(t *testing.T) {
+	image, revision, digest := "ghcr.io/fredrir/example", strings.Repeat("b", 40), "sha256:"+strings.Repeat("a", 64)
 	cases := []struct {
 		name, visibility, data string
-		valid                  bool
+		runs                   [][2]uint64
 	}{
-		{"public", "public", `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/fredrir/example/actions/runs/35525556507/attempts/2"}}}}]`, true},
-		{"private", "private", `[{"optional":{"source-run-id":"35525556507","source-run-attempt":"2"}}]`, true},
-		{"wrong-repository", "public", `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/other/example/actions/runs/35525556507/attempts/2"}}}}]`, false},
-		{"mutable-statement", "public", `[{"verificationResult":{"statement":{"predicate":{"runDetails":{"metadata":{"invocationId":"https://github.com/fredrir/example/actions/runs/35525556507/attempts/2"}}}}}}]`, false},
-		{"unsigned-root-field", "public", `[{"run_id":35525556507}]`, false},
-		{"legacy-private", "private", `[{"optional":{"source-revision":"abc"}}]`, false},
-		{"numeric-annotation", "private", `[{"optional":{"source-run-id":35525556507,"source-run-attempt":"2"}}]`, false},
-		{"overflow", "private", `[{"optional":{"source-run-id":"18446744073709551616","source-run-attempt":"2"}}]`, false},
+		{"public", "public", `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/fredrir/example/actions/runs/35525556507/attempts/2"}}}}]`, [][2]uint64{{35525556507, 2}}},
+		{"private", "private", `[{"optional":{"source-run-id":"35525556507","source-run-attempt":"2"}}]`, [][2]uint64{{35525556507, 2}}},
+		{"re-run", "public", `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/fredrir/example/actions/runs/7/attempts/2"}}}},{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/fredrir/example/actions/runs/7/attempts/1"}}}}]`, [][2]uint64{{7, 2}, {7, 1}}},
+		{"wrong-repository", "public", `[{"verificationResult":{"signature":{"certificate":{"runInvocationURI":"https://github.com/other/example/actions/runs/35525556507/attempts/2"}}}}]`, nil},
+		{"mutable-statement", "public", `[{"verificationResult":{"statement":{"predicate":{"runDetails":{"metadata":{"invocationId":"https://github.com/fredrir/example/actions/runs/35525556507/attempts/2"}}}}}}]`, nil},
+		{"unsigned-root-field", "public", `[{"run_id":35525556507}]`, nil},
+		{"legacy-private", "private", `[{"optional":{"source-revision":"abc"}}]`, nil},
+		{"numeric-annotation", "private", `[{"optional":{"source-run-id":35525556507,"source-run-attempt":"2"}}]`, nil},
+		{"overflow", "private", `[{"optional":{"source-run-id":"18446744073709551616","source-run-attempt":"2"}}]`, nil},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			order, err := verifiedDeploymentOrder([]byte(test.data), test.visibility, "fredrir/example", options)
-			if (err == nil) != test.valid {
-				t.Fatalf("order=%+v err=%v", order, err)
+			orders, err := attestedDeploymentOrders([]byte(test.data), test.visibility, "fredrir/example", image, digest, revision)
+			if err != nil || len(orders) != len(test.runs) {
+				t.Fatalf("orders=%+v err=%v", orders, err)
 			}
-			if test.valid && (order.RunID != 35525556507 || order.Attempt != 2 || order.Image != options.Image) {
-				t.Fatal(order)
+			for index, order := range orders {
+				if order != (DeploymentOrder{Schema: 1, Image: image, Revision: revision, Digest: digest, RunID: test.runs[index][0], Attempt: test.runs[index][1]}) {
+					t.Fatalf("order %d = %+v", index, order)
+				}
 			}
 		})
+	}
+	if _, err := attestedDeploymentOrders([]byte(`[]`), "internal", "fredrir/example", image, digest, revision); err == nil {
+		t.Fatal("unclassified visibility accepted")
 	}
 }
 

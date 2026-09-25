@@ -1,6 +1,7 @@
 package ci
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,7 +21,10 @@ type DeploymentOrder struct {
 	Attempt  uint64 `json:"attempt"`
 }
 
-func verifiedDeploymentOrder(data []byte, visibility, repository string, options DeployOptions) (DeploymentOrder, error) {
+func attestedDeploymentOrders(data []byte, visibility, repository, image, digest, revision string) ([]DeploymentOrder, error) {
+	if visibility != "public" && visibility != "private" {
+		return nil, fmt.Errorf("unsupported deployment visibility")
+	}
 	var results []struct {
 		VerificationResult struct {
 			Signature struct {
@@ -32,9 +36,9 @@ func verifiedDeploymentOrder(data []byte, visibility, repository string, options
 		Optional map[string]any `json:"optional"`
 	}
 	if err := json.Unmarshal(data, &results); err != nil {
-		return DeploymentOrder{}, fmt.Errorf("decode verified deployment provenance: %w", err)
+		return nil, fmt.Errorf("decode verified deployment provenance: %w", err)
 	}
-	order := DeploymentOrder{Schema: 1, Image: options.Image, Revision: options.Revision, Digest: options.Digest}
+	var orders []DeploymentOrder
 	for _, result := range results {
 		var run, attempt string
 		switch visibility {
@@ -52,22 +56,19 @@ func verifiedDeploymentOrder(data []byte, visibility, repository string, options
 		case "private":
 			run, _ = result.Optional["source-run-id"].(string)
 			attempt, _ = result.Optional["source-run-attempt"].(string)
-		default:
-			return DeploymentOrder{}, fmt.Errorf("unsupported deployment visibility")
 		}
 		id, e1 := strconv.ParseUint(run, 10, 64)
 		number, e2 := strconv.ParseUint(attempt, 10, 64)
 		if e1 != nil || e2 != nil || id == 0 || number == 0 {
 			continue
 		}
-		if id > order.RunID || (id == order.RunID && number > order.Attempt) {
-			order.RunID, order.Attempt = id, number
-		}
+		orders = append(orders, DeploymentOrder{Schema: 1, Image: image, Revision: revision, Digest: digest, RunID: id, Attempt: number})
 	}
-	if order.RunID == 0 {
-		return DeploymentOrder{}, fmt.Errorf("verified provenance has no deployment run identity")
-	}
-	return order, nil
+	return orders, nil
+}
+
+func compareDeploymentRuns(a, b DeploymentOrder) int {
+	return cmp.Or(cmp.Compare(a.RunID, b.RunID), cmp.Compare(a.Attempt, b.Attempt))
 }
 
 func DecodeDeploymentOrder(data []byte) (DeploymentOrder, error) {

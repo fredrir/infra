@@ -63,6 +63,7 @@ go_test(
     ],
     data = [
         "//:host_play_data",
+        "//:reconciliation_action_data",
         "//:runner_routing_data",
     ],
     embed = [":reconcile"],

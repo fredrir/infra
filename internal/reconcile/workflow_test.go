@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ type workflowStep struct {
 	If   string            `yaml:"if"`
 	Uses string            `yaml:"uses"`
 	With map[string]string `yaml:"with"`
+	Env  map[string]string `yaml:"env"`
 	Run  string            `yaml:"run"`
 }
 
@@ -43,6 +45,7 @@ type workflowInput struct {
 
 type workflowFile struct {
 	On   map[string]yaml.Node   `yaml:"on"`
+	Env  map[string]string      `yaml:"env"`
 	Jobs map[string]workflowJob `yaml:"jobs"`
 }
 
@@ -307,9 +310,21 @@ func TestApplyJobOutlivesTheApplyDeadline(t *testing.T) {
 	if err != nil || wait <= leaseTTL {
 		t.Fatalf("apply waits %s for a lease that expires after %s", flag[1], leaseTTL)
 	}
+	action, err := os.ReadFile(filepath.Join("..", "..", ".github/actions/setup-reconciliation-cli/action.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	build := regexp.MustCompile(`deadline = time\.monotonic\(\) \+ (\d+)\n`).FindSubmatch(action)
+	if build == nil {
+		t.Fatal("shared CLI build wait is unbounded")
+	}
+	seconds, err := strconv.Atoi(string(build[1]))
+	if err != nil {
+		t.Fatal(err)
+	}
 	minutes, ok := apply.TimeoutMinutes.(int)
-	if margin := time.Duration(minutes)*time.Minute - wait - applyDeadline; !ok || margin < 15*time.Minute {
-		t.Fatalf("apply job timeout of %v minutes leaves %s beyond the lease wait and apply deadline for setup and reporting", apply.TimeoutMinutes, margin)
+	if margin := time.Duration(minutes)*time.Minute - time.Duration(seconds)*time.Second - wait - applyDeadline; !ok || margin < 3*time.Minute {
+		t.Fatalf("apply job timeout of %v minutes leaves %s beyond the shared CLI build wait, lease wait and apply deadline for setup and reporting", apply.TimeoutMinutes, margin)
 	}
 }
 
@@ -493,5 +508,46 @@ func TestRetriedApplyRequiresANewerPendingPushApply(t *testing.T) {
 		if got := queryResults(t, newer, runs); !reflect.DeepEqual(got, test.want) {
 			t.Errorf("runs %v deferred to %v, want %v", test.runs, got, test.want)
 		}
+	}
+}
+
+func TestProvenanceCredentialsReachOnlyTheApplyEngine(t *testing.T) {
+	workflow := readWorkflow(t, "reconcile-job.yml")
+	if _, ok := workflow.Env["PROVENANCE_TOKEN"]; ok {
+		t.Error("every job receives the provenance token")
+	}
+	for name, job := range workflow.Jobs {
+		if packages := job.Permissions["packages"]; packages != map[bool]string{true: "read"}[name == "apply"] {
+			t.Errorf("job %s has packages permission %q", name, packages)
+		}
+		if _, ok := job.Env["PROVENANCE_TOKEN"]; ok {
+			t.Errorf("job %s passes the provenance token to every step", name)
+		}
+		for _, step := range job.Steps {
+			token, ok := step.Env["PROVENANCE_TOKEN"]
+			if engine := name == "apply" && step.ID == "reconcile"; ok != engine || (engine && token != "${{ github.token }}") {
+				t.Errorf("job %s step %q receives provenance token %q", name, cmp.Or(step.ID, step.Uses, step.Run), token)
+			}
+		}
+	}
+	if setup := workflow.Jobs["apply"].step(t, func(step workflowStep) bool { return step.ID == "setup" }); setup.Uses != "./.github/actions/setup-reconciliation" || setup.With["identity"] != "apply" {
+		t.Fatalf("apply prepares tooling with %+v", setup)
+	}
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github/actions/setup-reconciliation/action.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var action struct {
+		Runs struct {
+			Steps []workflowStep `yaml:"steps"`
+		} `yaml:"runs"`
+	}
+	if err := yaml.Unmarshal(data, &action); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(action.Runs.Steps, func(step workflowStep) bool {
+		return step.Env["IDENTITY"] == "${{ inputs.identity }}" && strings.Contains(step.Run, `if [ "$IDENTITY" = apply ]; then infra ci install-tools gh cosign; fi`)
+	}) {
+		t.Error("apply tooling lacks the attestation verifiers")
 	}
 }

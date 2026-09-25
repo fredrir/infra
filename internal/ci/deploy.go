@@ -1,7 +1,9 @@
 package ci
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -13,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/fredrir/infra/internal/kustomize"
+	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -71,10 +74,11 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 	if project != resolved {
 		return fmt.Errorf("deployment project must not traverse symlinks")
 	}
-	order, err := VerifyDeploymentProvenance(ctx, runner, os.DirFS(root), options.RepositoryID, mapping, options.Image, options.Digest, options.Revision)
+	attested, err := VerifyDeploymentProvenance(ctx, runner, os.DirFS(root), options.RepositoryID, mapping, options.Image, options.Digest, options.Revision)
 	if err != nil {
 		return err
 	}
+	order := attested[len(attested)-1]
 	files, err := DeploymentFiles(os.DirFS(root), target, order)
 	if err != nil {
 		return err
@@ -144,9 +148,9 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 	return fmt.Errorf("deployment push failed after three attempts")
 }
 
-func VerifyDeploymentProvenance(ctx context.Context, runner Runner, root fs.FS, repositoryID string, mapping DeploymentMapping, image, digest, revision string) (DeploymentOrder, error) {
+func VerifyDeploymentProvenance(ctx context.Context, runner Runner, root fs.FS, repositoryID string, mapping DeploymentMapping, image, digest, revision string) ([]DeploymentOrder, error) {
 	if !repositoryIDPattern.MatchString(repositoryID) {
-		return DeploymentOrder{}, fmt.Errorf("invalid deployment repository ID")
+		return nil, fmt.Errorf("invalid deployment repository ID")
 	}
 	var identity struct {
 		ClaimPattern struct {
@@ -156,31 +160,60 @@ func VerifyDeploymentProvenance(ctx context.Context, runner Runner, root fs.FS, 
 	trust := path.Join(".github/chainguard", "deploy-"+repositoryID+".sts.yaml")
 	data, err := fs.ReadFile(root, trust)
 	if err != nil {
-		return DeploymentOrder{}, err
+		return nil, err
 	}
 	if err := yaml.Unmarshal(data, &identity); err != nil {
-		return DeploymentOrder{}, fmt.Errorf("decode %s: %w", trust, err)
+		return nil, fmt.Errorf("decode %s: %w", trust, err)
 	}
 	revisions, err := WorkflowRevisions(identity.ClaimPattern.WorkflowSHA)
 	if err != nil {
-		return DeploymentOrder{}, err
+		return nil, err
 	}
+	environment := append(os.Environ(), runner.Env...)
+	var attested []DeploymentOrder
+	failure := errors.New("no attestation names a deployment run")
 	for _, workflowRevision := range revisions {
 		name, arguments, err := ProvenanceCommand(mapping.Visibility, mapping.Repository, workflowRevision, revision, image+"@"+digest)
 		if err != nil {
-			return DeploymentOrder{}, err
+			return nil, err
 		}
 		if mapping.Visibility == "public" {
 			arguments = append(arguments, "--format", "json")
 		}
-		if data, verifyErr := runner.Output(ctx, name, arguments...); verifyErr == nil {
-			return verifiedDeploymentOrder(data, mapping.Visibility, mapping.Repository, DeployOptions{Image: image, Digest: digest, Revision: revision})
+		result, err := runner.execute(ctx, process.Options{Name: name, Args: arguments, Dir: runner.Dir, Env: environment, Stderr: runner.Stderr})
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
 		}
-		if err := ctx.Err(); err != nil {
-			return DeploymentOrder{}, err
+		if err != nil {
+			failure = fmt.Errorf("%s at workflow %s: %s", name, workflowRevision[:12], redacted(cmp.Or(lastLine(result.Stderr), err.Error()), environment))
+			continue
+		}
+		orders, err := attestedDeploymentOrders(result.Stdout, mapping.Visibility, mapping.Repository, image, digest, revision)
+		if err != nil {
+			return nil, err
+		}
+		attested = append(attested, orders...)
+	}
+	if len(attested) == 0 {
+		return nil, fmt.Errorf("image provenance did not match an approved workflow revision: %w", failure)
+	}
+	slices.SortFunc(attested, compareDeploymentRuns)
+	return slices.Compact(attested), nil
+}
+
+func lastLine(output []byte) string {
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
+func redacted(text string, environment []string) string {
+	for _, entry := range environment {
+		name, value, _ := strings.Cut(entry, "=")
+		if len(value) >= 8 && (strings.Contains(name, "TOKEN") || strings.Contains(name, "PASSWORD") || strings.Contains(name, "SECRET")) {
+			text = strings.ReplaceAll(text, value, "[redacted]")
 		}
 	}
-	return DeploymentOrder{}, fmt.Errorf("image provenance did not match an approved workflow revision")
+	return text
 }
 
 func ProvenanceCommand(visibility, repository, workflowRevision, revision, image string) (string, []string, error) {

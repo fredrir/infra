@@ -246,8 +246,8 @@ func (g provenanceGate) deployedBy(ctx context.Context, commit string, changed m
 	if err != nil {
 		return fmt.Errorf("%s at %s: %w", order.Image+"@"+order.Digest, order.Revision, err)
 	}
-	if attested != order {
-		return fmt.Errorf("receipt names run %d attempt %d of %s, attested run %d attempt %d of %s", order.RunID, order.Attempt, order.Revision, attested.RunID, attested.Attempt, attested.Revision)
+	if !slices.Contains(attested, order) {
+		return fmt.Errorf("no attestation names run %d attempt %d of %s", order.RunID, order.Attempt, order.Revision)
 	}
 	return nil
 }

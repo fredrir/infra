@@ -97,7 +97,7 @@ jobs:
     if: ${{ !cancelled() && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     environment: infrastructure-apply
-    timeout-minutes: 120
+    timeout-minutes: 130
     permissions:
       contents: write
       id-token: write

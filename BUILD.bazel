@@ -65,6 +65,15 @@ filegroup(
 )
 
 filegroup(
+    name = "reconciliation_action_data",
+    srcs = [
+        ".github/actions/setup-reconciliation-cli/action.yml",
+        ".github/actions/setup-reconciliation/action.yml",
+    ],
+    visibility = ["//internal/reconcile:__pkg__"],
+)
+
+filegroup(
     name = "host_play_data",
     srcs = glob([
         "ansible/*.yml",
