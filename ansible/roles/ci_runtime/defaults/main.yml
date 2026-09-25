@@ -1,6 +1,10 @@
 ci_gvisor_version: release-20260907.0
 ci_gvisor_sha256: 81416511897ab8abd4e723d66823c5b0461a2ee3311cfa70d152404ef9b860cf
 ci_gvisor_directory: /opt/gvisor/release-20260907.0
+ci_gvisor_binaries_sha256:
+  runsc: 3e0df2fa28f6ff5430b004f92573b81b75f442f78c780e0c85fdf6c2d572817a
+  containerd-shim-runsc-v1: ab441cda2625eee7324a5f991b22852724fdd9144ac3ffaf3aac492dc9e46737
+ci_gvisor_checksums: "{% for name, checksum in ci_gvisor_binaries_sha256.items() %}{{ checksum }}  {{ ci_gvisor_directory }}/{{ name }}\n{% endfor %}"
 ci_kata_archive: ''
 ci_kata_sha256: de3676bae12983cd23a5416608af42d8c8cb16fe3fb29835f5fdae5ee1a8b64f
 ci_kata_enabled: false

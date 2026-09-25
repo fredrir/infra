@@ -25,10 +25,17 @@
         name: tailscale
         tasks_from: install.yml
 
+    - name: Read the embedded SSH server preference
+      ansible.builtin.command:
+        argv: [/usr/local/bin/tailscale, debug, prefs]
+      register: external_transport_preferences
+      changed_when: (external_transport_preferences.stdout | from_json).RunSSH
+      check_mode: false
+
     - name: Disable the embedded SSH server
       ansible.builtin.command:
         argv: [/usr/local/bin/tailscale, set, --ssh=false]
-      changed_when: false
+      when: external_transport_preferences.changed
 
     - name: Read the restored transport address
       ansible.builtin.command:

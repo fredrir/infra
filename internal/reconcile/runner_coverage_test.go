@@ -40,15 +40,16 @@ func (r *ansibleRole) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type ansibleTask struct {
-	Key               string
-	Module            string
-	Role              string
-	Definition        map[string]any
-	CheckMode         bool
-	CheckModeDeclared bool
-	IgnoreErrors      bool
-	Notify            []string
-	When              []string
+	Key                string
+	Module             string
+	Role               string
+	Definition         map[string]any
+	CheckMode          bool
+	CheckModeDeclared  bool
+	EnclosingCheckMode bool
+	IgnoreErrors       bool
+	Notify             []string
+	When               []string
 }
 
 var (
@@ -193,14 +194,15 @@ func walkAnsibleTasks(t *testing.T, root, file string, tasks []map[string]any, i
 	for _, definition := range tasks {
 		name, _ := definition["name"].(string)
 		task := ansibleTask{
-			Key:               file + ": " + name,
-			Role:              inherited.Role,
-			Definition:        definition,
-			CheckMode:         inherited.CheckMode,
-			CheckModeDeclared: inherited.CheckModeDeclared,
-			IgnoreErrors:      inherited.IgnoreErrors,
-			Notify:            inherited.Notify,
-			When:              append(slices.Clone(inherited.When), ansibleStrings(t, definition["when"])...),
+			Key:                file + ": " + name,
+			Role:               inherited.Role,
+			Definition:         definition,
+			CheckMode:          inherited.CheckMode,
+			CheckModeDeclared:  inherited.CheckModeDeclared,
+			EnclosingCheckMode: inherited.CheckMode,
+			IgnoreErrors:       inherited.IgnoreErrors,
+			Notify:             inherited.Notify,
+			When:               append(slices.Clone(inherited.When), ansibleStrings(t, definition["when"])...),
 		}
 		if value, ok := definition["check_mode"]; ok {
 			if task.CheckMode, ok = value.(bool); !ok {

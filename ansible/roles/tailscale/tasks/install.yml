@@ -18,10 +18,16 @@
     mode: "0644"
   notify: Restart bootstrap Tailscale
 
+- name: Find unloaded tunnel support
+  ansible.builtin.shell: if modprobe --dry-run --first-time tun 2>/dev/null; then echo tun; fi
+  register: platform_tailscale_tun
+  changed_when: platform_tailscale_tun.stdout != ''
+  check_mode: false
+
 - name: Load tunnel support
   ansible.builtin.command:
     argv: [modprobe, tun]
-  changed_when: false
+  when: platform_tailscale_tun.changed
 
 - name: Inspect tunnel device
   ansible.builtin.stat:

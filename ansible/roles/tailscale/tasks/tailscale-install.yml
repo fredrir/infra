@@ -30,7 +30,7 @@
       print(json.dumps(result))
     - 'tailscale_{{ platform_tailscale_version }}_{{ platform_architecture }}'
   register: platform_tailscale_compare
-  changed_when: false
+  changed_when: (platform_tailscale_compare.stdout | from_json).extract or (platform_tailscale_compare.stdout | from_json).install
   check_mode: false
 
 - name: Extract Tailscale binaries

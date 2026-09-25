@@ -22,6 +22,8 @@
   delegate_to: "{{ k3s_registration_server }}"
   changed_when: false
   check_mode: false
+  retries: 1
+  delay: 5
   when: inventory_hostname != k3s_registration_server
   tags: [registration-check, worker-labels]
 
@@ -54,11 +56,19 @@
     mode: "0644"
     content: "overlay\nbr_netfilter\nvxlan\n"
 
+- name: Find unloaded kernel modules
+  ansible.builtin.shell: |
+    for module in overlay br_netfilter vxlan; do
+      if modprobe --dry-run --first-time "$module" 2>/dev/null; then echo "$module"; fi
+    done
+  register: k3s_unloaded_modules
+  changed_when: k3s_unloaded_modules.stdout_lines | length > 0
+  check_mode: false
+
 - name: Load kernel modules
   ansible.builtin.command:
     argv: [modprobe, "{{ item }}"]
-  loop: [overlay, br_netfilter, vxlan]
-  changed_when: false
+  loop: "{{ k3s_unloaded_modules.stdout_lines }}"
 
 - name: Configure Kubernetes kernel settings
   ansible.builtin.copy:
@@ -153,6 +163,20 @@
     state: "{{ 'restarted' if k3s_configuration.changed or (k3s_binary | default({})).get('changed', false) or (k3s_transport | default({})).get('changed', false) else 'started' }}"
   tags: [capacity]
 
+- name: Compare the upstream service with its declared command
+  ansible.builtin.shell: |
+    set -eu
+    unit={{ k3s_service }}.service
+    property() { systemctl show "$unit" --property="$1" --value; }
+    [ "$(property FragmentPath)" = "/etc/systemd/system/$unit" ] || echo "unit file $(property FragmentPath)"
+    command=$(property ExecStart | sed -n 's/.*argv\[\]=\([^;]*\) ;.*/\1/p')
+    [ "$command" = "/usr/local/bin/k3s {{ k3s_role }}" ] || echo "command $command"
+    [ -f "/etc/systemd/system/$unit.env" ] && [ ! -s "/etc/systemd/system/$unit.env" ] || echo "environment in /etc/systemd/system/$unit.env"
+    [ "$(property NeedDaemonReload)" = no ] || echo "pending daemon reload"
+  register: k3s_upstream_service
+  changed_when: k3s_upstream_service.stdout != ''
+  check_mode: false
+
 - name: Wait for the node to become ready
   ansible.builtin.command:
     argv:
@@ -188,6 +212,8 @@
       - "--dry-run={{ 'server' if ansible_check_mode else 'none' }}"
   delegate_to: "{{ k3s_registration_server }}"
   check_mode: false
+  retries: 1
+  delay: 5
   when: k3s_role == 'agent'
   register: k3s_labels
   changed_when: "'not labeled' not in k3s_labels.stdout"
@@ -208,6 +234,8 @@
       - "--dry-run={{ 'server' if ansible_check_mode else 'none' }}"
   delegate_to: "{{ k3s_registration_server }}"
   check_mode: false
+  retries: 1
+  delay: 5
   when: k3s_role == 'agent'
   register: k3s_ci_slot_patch
   changed_when: "'(no change)' not in k3s_ci_slot_patch.stdout"
