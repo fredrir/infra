@@ -287,7 +287,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Deep verification | `volatile.yml --check` beside the fleet; results under `degraded`; outcome and exit status unchanged |
 | Unenrolled host | `tailscale_ip: null`; skipped |
 | Node admission | `node-registration` policy: kubelets register only inventory nodes; volatile nodes must carry the taint; nodes cannot remove taints |
-| Join credential | Per-node `k3s token create --ttl`; the k3s role refuses the shared agent token; joined agents restart after it expires |
+| Join credential | Per-node `k3s token create --ttl 30m`, deleted after join; the k3s role refuses the shared agent token and fails if any file under `/var/lib/rancher` matches its checksum; a joined agent keeps working across restarts and token deletion |
 | Scheduling | Taint `node-restriction.kubernetes.io/volatile=true:NoSchedule`, applied before labels `gvisor`, `volatile`, `infra.fredrir.com/ci-slots=3`; no `critical` or `stateful` |
 | Critical controllers | Flux, ARC controller and listeners, ci-slots: required `node-restriction.kubernetes.io/critical=true` |
 | CI pools | `check-amd64`, `rust-amd64` and `rust-pr-amd64` tolerate and prefer it and leave 30 s after not-ready or unreachable; `rust-release-amd64` and `rust-tag-amd64` never run there |
@@ -329,8 +329,9 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | 7 | Set inventory values | `tailscale_ip`, `data_volume_device` |
 | 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in Doppler `SSH_KNOWN_HOSTS` and the admin `known_hosts` |
 | 9 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 11 |
-| 10 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 2h --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
+| 10 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 30m --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
 | 11 | First converge from Macie or Archie within the token lifetime | `ansible-playbook ansible/volatile.yml --limit fredrir-10`; installs the reconciliation key and sets the hostname |
+| 12 | Delete the join token | On fredrir-07: `k3s token delete <id>`; the agent keeps its client cert and reconnects across restarts after the token is gone (verified) |
 
 ```sh
 inventory=$(mktemp)
