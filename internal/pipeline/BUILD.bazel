@@ -7,6 +7,7 @@ go_library(
         "cache.go",
         "config.go",
         "doctor.go",
+        "engine.go",
         "fast.go",
         "image.go",
         "metrics.go",
@@ -25,6 +26,7 @@ go_test(
     name = "pipeline_test",
     srcs = [
         "cache_test.go",
+        "engine_test.go",
         "image_test.go",
         "metrics_test.go",
         "pipeline_test.go",

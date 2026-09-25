@@ -2,9 +2,11 @@ FROM golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be902
 ENV CGO_ENABLED=0
 ENV GOTOOLCHAIN=local
 ENV GOWORK=off
-ENV GOMAXPROCS=2
-ENV GOMEMLIMIT=1GiB
-ENV GOFLAGS="-mod=readonly -p=2"
+ARG GO_BUILD_PARALLELISM=2
+ARG GO_BUILD_MEMORY_LIMIT=1GiB
+ENV GOMAXPROCS=${GO_BUILD_PARALLELISM}
+ENV GOMEMLIMIT=${GO_BUILD_MEMORY_LIMIT}
+ENV GOFLAGS="-mod=readonly -p=${GO_BUILD_PARALLELISM}"
 COPY images/runner-check/patches/actionlint.patch /tmp/actionlint.patch
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     mkdir -p /src/actionlint /out \

@@ -74,6 +74,20 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 	if strings.TrimPrefix(version, "v") != config.Dagger {
 		return "", fmt.Errorf("Dagger %s required, got %s", config.Dagger, version)
 	}
+	engine, found, err := inspectEngine(ctx)
+	if err != nil {
+		return "", err
+	}
+	if found {
+		if opts.BuildArgs == nil {
+			opts.BuildArgs = map[string]string{}
+		}
+		for name, value := range goBuildArgs(engine) {
+			if _, set := opts.BuildArgs[name]; !set {
+				opts.BuildArgs[name] = value
+			}
+		}
+	}
 	var args []dagger.BuildArg
 	for name, value := range opts.BuildArgs {
 		args = append(args, dagger.BuildArg{Name: name, Value: value})
