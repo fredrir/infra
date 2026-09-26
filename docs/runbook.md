@@ -243,6 +243,7 @@ These activation steps provision external credentials once; merge, verification 
 | Kubernetes apply scope | Verify scope; patch reconciliation annotations; admission rejects spec changes |
 | Tailnet plan scope | Control-plane API only |
 | Tailnet apply scope | Control-plane API and SSH to managed hosts |
+| Tailnet reconciler scope | `tag:infra-reconciler`: control-plane API and Gatus heartbeats; reached only by Macie and Archie on SSH |
 | Host SSH key | `ansible/files/reconciliation.pub`; maintained by `ansible/reconciliation-identity.yml` |
 | CI SOPS recipient | Added only to host monitoring, verification trigger and backup secret files |
 | Provider-policy, workload-boundary or bucket-lifecycle changes, revoked credentials | Administrator repair required |

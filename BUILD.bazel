@@ -57,6 +57,12 @@ filegroup(
 )
 
 filegroup(
+    name = "tailnet_policy_data",
+    srcs = ["tailscale/policy.hujson"],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "renovate_pin_data",
     srcs = glob(["images/*/Containerfile"]) + [
         "renovate.json",

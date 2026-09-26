@@ -26,6 +26,9 @@
     ],
     "tag:infra-apply": [
       "autogroup:admin"
+    ],
+    "tag:infra-reconciler": [
+      "autogroup:admin"
     ]
   },
   "hosts": {
@@ -153,6 +156,28 @@
         "tag:platform-worker:22",
         "tag:platform-volatile:22",
         "platform-monitor:22"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "tag:infra-reconciler"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "tag:platform-control:6443",
+        "platform-monitor:8080"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "macie",
+        "archie"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "tag:infra-reconciler:22"
       ]
     }
   ],
@@ -786,6 +811,142 @@
         "tag:platform-control:2380",
         "platform-monitor:8080",
         "tag:platform-volatile:10250"
+      ]
+    },
+    {
+      "src": "tag:infra-reconciler",
+      "proto": "tcp",
+      "accept": [
+        "tag:platform-control:6443",
+        "platform-monitor:8080"
+      ],
+      "deny": [
+        "tag:platform-control:22",
+        "tag:platform-control:2379",
+        "tag:platform-control:2380",
+        "tag:platform-control:9100",
+        "tag:platform-control:10250",
+        "tag:platform-worker:22",
+        "tag:platform-worker:6443",
+        "tag:platform-worker:9100",
+        "tag:platform-worker:10250",
+        "platform-control-05:2379",
+        "platform-control-05:2380",
+        "platform-control-07:2379",
+        "platform-control-07:2380",
+        "platform-control-08:2379",
+        "platform-control-08:2380",
+        "platform-monitor:22",
+        "macie:22",
+        "archie:22"
+      ]
+    },
+    {
+      "src": "tag:infra-reconciler",
+      "proto": "udp",
+      "deny": [
+        "tag:platform-control:8472",
+        "tag:platform-worker:8472"
+      ]
+    },
+    {
+      "src": "macie",
+      "proto": "tcp",
+      "accept": [
+        "tag:infra-reconciler:22"
+      ],
+      "deny": [
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "archie",
+      "proto": "tcp",
+      "accept": [
+        "tag:infra-reconciler:22"
+      ],
+      "deny": [
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "tag:platform-control",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "tag:platform-worker",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "tag:platform-enrollment",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "tag:infra-plan",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "tag:infra-apply",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "tag:ci",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "tag:server",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "platform-monitor",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "fredrir@github",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "10.42.0.10",
+      "proto": "tcp",
+      "deny": [
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
       ]
     }
   ]
