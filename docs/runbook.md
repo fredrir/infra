@@ -546,7 +546,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 
 | Setting | Value |
 | --- | --- |
-| Cells | `seaweedfs-hel1` on `fredrir-04`; namespace `object-store`; one `weed server` per node, no cross-node cluster |
+| Cells | `seaweedfs-hel1` on `fredrir-04` (CI caches), `seaweedfs-nl` on `fredrir-09` (`parser-dataset`); namespace `object-store`; one `weed server` per node, no cross-node cluster |
 | Endpoint | `https://seaweedfs-<cell>.object-store.svc.cluster.local:8333`, region `<cell>` |
 | Listeners | Pod IP: S3 8333 (TLS), metrics 9327, worker metrics 9328, S3 gRPC 18333 and admin gRPC 33646 (mTLS, client name allow-list); NetworkPolicy admits only 8333, 9327 and 9328; master, volume, filer and admin HTTP on loopback |
 | Trust | CA `platform/components/object-store-trust/ca.crt`, ConfigMap `object-store-ca` wherever the component is included, name-constrained to `object-store.svc`, `object-store.svc.cluster.local`, `localhost`, `127.0.0.1`; CA key `pki/ca.sops.yaml` (Macie, Archie) |
@@ -554,10 +554,11 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Identities | Actions `<cell>-identities.json`; credentials `<cell>-identities.secret.sops.yaml`, referenced as `${NAME}`; writers hold `Write:<bucket>/*` |
 | Buckets | `buckets.yaml`; `object-store-provisioner` hourly: create, then write versioning, COMPLIANCE lock, SSE, lifecycle and quota only where they drift; never deletes |
 | Configuration drift | Versioning or a lock on a bucket that declares neither fails the provisioner; SeaweedFS 4.47 still authorizes bucket subresource writes that carry `?prefix=` as object writes |
-| Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
+| Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; `seaweedfs-nl` has no admin or worker and no lifecycle buckets; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
 | Logs | stderr only (`-logtostderr=true`) |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
-| Disk guard | 1 GiB volumes; `hel1` `-volume.max=60` (60 GiB); read-only below 15% free node disk |
+| Disk guard | 1 GiB volumes; `hel1` `-volume.max=60` (60 GiB), `nl` `-volume.max=200` (200 GiB); read-only below 15% free node disk |
+| Memory | `hel1` server GOMEMLIMIT 512MiB, request 384Mi, limit 768Mi; `nl` server GOMEMLIMIT 320MiB, request 224Mi, limit 512Mi; `meta-backup` request 64Mi |
 | Certificates expire | 2029-09-26; `ObjectStoreCertificateExpiring` from 2029-08-27 |
 
 | Alert | Fires |

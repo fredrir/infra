@@ -27,6 +27,7 @@ spec:
           expr: |
             up{namespace="object-store",service=~"seaweedfs-.+",endpoint="metrics"} == 0
             or absent(up{namespace="object-store",service="seaweedfs-hel1",endpoint="metrics"})
+            or absent(up{namespace="object-store",service="seaweedfs-nl",endpoint="metrics"})
           for: 5m
           labels:
             severity: critical

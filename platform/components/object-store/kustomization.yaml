@@ -7,6 +7,9 @@ resources:
 - hel1.yaml
 - hel1.secret.sops.yaml
 - hel1-identities.secret.sops.yaml
+- nl.yaml
+- nl.secret.sops.yaml
+- nl-identities.secret.sops.yaml
 - ci/nsql.secret.sops.yaml
 - provisioner.yaml
 - network.yaml
@@ -16,9 +19,14 @@ configMapGenerator:
   files:
   - pki/hel1-s3.crt
   - pki/hel1-internal.crt
+  - pki/nl-s3.crt
+  - pki/nl-internal.crt
 - name: seaweedfs-hel1-identities
   files:
   - identities.json=hel1-identities.json
+- name: seaweedfs-nl-identities
+  files:
+  - identities.json=nl-identities.json
 - name: seaweedfs-meta-backup
   files:
   - backup_filer.toml

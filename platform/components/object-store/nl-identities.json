@@ -1,0 +1,43 @@
+{
+  "identities": [
+    {
+      "actions": [
+        "Admin"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${PROVISIONER_ACCESS_KEY_ID}",
+          "secretKey": "${PROVISIONER_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "provisioner"
+    },
+    {
+      "actions": [
+        "Read:parser-dataset",
+        "Write:parser-dataset/*",
+        "List:parser-dataset"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${PARSER_DATASET_ACCESS_KEY_ID}",
+          "secretKey": "${PARSER_DATASET_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "parser-dataset"
+    },
+    {
+      "actions": [
+        "Read:parser-dataset",
+        "List:parser-dataset"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${PARSER_MIRROR_ACCESS_KEY_ID}",
+          "secretKey": "${PARSER_MIRROR_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "parser-mirror"
+    }
+  ]
+}

@@ -27,7 +27,7 @@ import (
 
 const objectStore = "platform/components/object-store"
 
-var objectStoreCells = map[string]string{"hel1": "fredrir-04"}
+var objectStoreCells = map[string]string{"hel1": "fredrir-04", "nl": "fredrir-09"}
 
 var objectStoreGRPC = map[string][2]string{
 	"server":      {"MASTER VOLUME FILER S3 CLIENT", "MASTER VOLUME FILER S3"},
@@ -312,6 +312,10 @@ func objectStoreActions(identity string) []string {
 		return []string{"Admin"}
 	case "toolchains-upload":
 		return objectWriter("toolchains")
+	case "parser-dataset":
+		return objectWriter("parser-dataset")
+	case "parser-mirror":
+		return reader("parser-dataset")
 	}
 	if match := cacheIdentity.FindStringSubmatch(identity); match != nil {
 		switch match[2] {
@@ -614,6 +618,13 @@ var objectStorePeers = map[string]map[string][]object{
 		"8333": {
 			{"podSelector": object{"matchLabels": object{"app.kubernetes.io/name": "object-store-provisioner"}}},
 			{"namespaceSelector": object{"matchLabels": object{"infra.fredrir.com/tier": "ci"}}, "podSelector": object{"matchExpressions": []any{object{"key": "actions.github.com/scale-set-name", "operator": "In", "values": []any{"rust-amd64", "rust-pr-amd64", "rust-release-amd64"}}}}},
+		},
+		"9327": {prometheusPeer},
+		"9328": {prometheusPeer},
+	},
+	"nl": {
+		"8333": {
+			{"podSelector": object{"matchLabels": object{"app.kubernetes.io/name": "object-store-provisioner"}}},
 		},
 		"9327": {prometheusPeer},
 		"9328": {prometheusPeer},
