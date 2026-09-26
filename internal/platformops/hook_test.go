@@ -38,19 +38,3 @@ func TestRunnerPoolTrustBoundaries(t *testing.T) {
 		}
 	}
 }
-
-func TestCacheGrantsKeepPoolsSeparate(t *testing.T) {
-	keys := []CacheKey{{Project: "a", Role: "rw", ID: "a-rw"}, {Project: "a", Role: "ro", ID: "a-ro"}, {Project: "a", Role: "release", ID: "a-release"}, {Project: "b", Role: "rw", ID: "b-rw"}}
-	main := CacheGrants(keys, "admin", "a", "main")
-	if main["a-rw"] != (Permission{Read: true, Write: true}) || main["a-ro"] != (Permission{Read: true}) || len(main) != 3 {
-		t.Fatalf("main grants: %v", main)
-	}
-	release := CacheGrants(keys, "admin", "a", "release")
-	if len(release) != 2 || !release["a-release"].Write {
-		t.Fatalf("release grants: %v", release)
-	}
-	toolchains := CacheGrants(keys, "admin", "", "toolchains")
-	if len(toolchains) != 2 || toolchains["a-release"] != (Permission{Read: true}) || toolchains["admin"] != (Permission{Read: true, Write: true, Owner: true}) {
-		t.Fatalf("toolchain grants: %v", toolchains)
-	}
-}

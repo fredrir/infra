@@ -56,8 +56,7 @@ ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook \
 
 | Resource                                  | Cutover condition                                                                | Retention                                                                   |
 | ----------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| BuildKit ARC pools and cache credentials  | Every image and package caller uses the hosted Dagger workflow; old jobs drained | Previous workflow/image pins for rollback                                   |
-| Nix ARC pool and Attic reader credentials | Infrastructure checks use Bazel; no remaining Nix callers                        | Previous workflow/image pins for rollback                                   |
+| Attic reader credentials                  | Infrastructure checks use Bazel; no remaining Nix callers                        | Previous workflow/image pins for rollback                                   |
 | Attic StatefulSet, Service and tunnel     | StatefulSet scaled to zero; Service and tunnel retired                           | Attic namespace, PVC, local data and backups until rollback window closes   |
 | Attic monitoring                          | Service retirement approved                                                      | Re-encrypt Gatus configuration with SOPS; keep its integrity metadata valid |
 | Attic provider resources                  | Reviewed OpenTofu plan                                                           | Preserve backup objects; resolve `prevent_destroy` explicitly               |

@@ -10,7 +10,7 @@ import (
 
 func TestToolsPromotionChangesPinsAndCommandsTogether(t *testing.T) {
 	root := t.TempDir()
-	for _, path := range []string{"platform/components/controllers/ci-slots.yaml", "platform/components/build-cache/provisioner.yaml", "platform/components/object-store/provisioner.yaml", "platform/components/repository-maintenance/maintenance.yaml", "platform/projects/y/backup.yaml", "platform/projects/llunde-pyparser/backup.yaml", "platform/projects/portfolio/backup.yaml"} {
+	for _, path := range []string{"platform/components/controllers/ci-slots.yaml", "platform/components/object-store/provisioner.yaml", "platform/components/repository-maintenance/maintenance.yaml", "platform/projects/y/backup.yaml", "platform/projects/llunde-pyparser/backup.yaml", "platform/projects/portfolio/backup.yaml"} {
 		full := filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			t.Fatal(err)
@@ -22,7 +22,6 @@ func TestToolsPromotionChangesPinsAndCommandsTogether(t *testing.T) {
 	}
 	for _, fixture := range []struct{ directory, generator, files string }{
 		{"controllers", "ci-slots", "ci-slots.sh"},
-		{"build-cache", "build-cache-provisioner", "provision.sh"},
 		{"backup-job", "backup-hook", "backup.sh heartbeat.sh"},
 	} {
 		directory := filepath.Join(root, "platform/components", fixture.directory)
@@ -46,8 +45,8 @@ func TestToolsPromotionChangesPinsAndCommandsTogether(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(edits) != 14 {
-		t.Fatalf("expected fourteen changes, got %d", len(edits))
+	if len(edits) != 11 {
+		t.Fatalf("expected eleven changes, got %d", len(edits))
 	}
 	for _, edit := range edits {
 		text := string(edit.After)

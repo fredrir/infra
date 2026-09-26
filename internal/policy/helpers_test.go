@@ -20,7 +20,7 @@ type object = map[string]any
 
 const controller = "system:serviceaccount:arc-system:arc-controller"
 const reconciler = "system:serviceaccount:flux-system:platform-reconciler"
-const projectRunner = "system:serviceaccount:ci-portfolio-amd64:runner"
+const projectRunner = "system:serviceaccount:ci-example:runner"
 
 func repoRoot(t *testing.T) string {
 	t.Helper()

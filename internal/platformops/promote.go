@@ -35,7 +35,6 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 	}
 	paths := []struct{ path, command string }{
 		{"platform/components/controllers/ci-slots.yaml", "ci-slots"},
-		{"platform/components/build-cache/provisioner.yaml", "provision-cache"},
 		{"platform/components/object-store/provisioner.yaml", "provision-object-store"},
 		{"platform/components/repository-maintenance/maintenance.yaml", "repository-maintenance"},
 		{"platform/projects/y/backup.yaml", "backup"},
@@ -197,7 +196,6 @@ func legacyToolsCleanup(root string) ([]Edit, error) {
 		files           []string
 	}{
 		{"platform/components/controllers", "ci-slots", []string{"ci-slots.sh"}},
-		{"platform/components/build-cache", "build-cache-provisioner", []string{"provision.sh"}},
 		{"platform/components/backup-job", "backup-hook", []string{"backup.sh", "heartbeat.sh"}},
 	} {
 		path := filepath.Join(root, generator.directory, "kustomization.yaml")

@@ -42,7 +42,7 @@ func newPlatformCommand() *cobra.Command {
 		return platformops.CheckRunnerJob(platformops.RunnerJob{Pool: os.Getenv("CI_POOL"), Event: os.Getenv("GITHUB_EVENT_NAME"), Ref: os.Getenv("GITHUB_REF"), Protected: os.Getenv("GITHUB_REF_PROTECTED") == "true", Repository: os.Getenv("GITHUB_REPOSITORY"), OwnerID: os.Getenv("GITHUB_REPOSITORY_OWNER_ID")}, event)
 	}}, &cobra.Command{Use: "heartbeat PROJECT", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return platformops.Heartbeat(cmd.Context(), os.Getenv("BACKUP_HEARTBEAT_URL"), args[0], os.Getenv("BACKUP_HEARTBEAT_TOKEN"))
-	}}, newCacheProvisionCommand(), newObjectStoreProvisionCommand(), newBackupCommand(), newControlBackupCommand(), &cobra.Command{Use: "repository-maintenance", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	}}, newObjectStoreProvisionCommand(), newBackupCommand(), newControlBackupCommand(), &cobra.Command{Use: "repository-maintenance", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		for _, args := range [][]string{{"--retry-lock", "10m", "check", "--read-data-subset=10%"}, {"--retry-lock", "10m", "forget", "--group-by", "host,tags", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune"}} {
 			if _, err := process.Run(cmd.Context(), process.Options{Name: "restic", Args: args, Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}); err != nil {
 				return err
@@ -113,35 +113,6 @@ func newControlBackupCommand() *cobra.Command {
 			_, runErr := process.Run(ctx, process.Options{Name: name, Args: args, Stdout: file})
 			return errors.Join(runErr, file.Sync(), file.Close())
 		}})
-	}}
-}
-
-func newCacheProvisionCommand() *cobra.Command {
-	return &cobra.Command{Use: "provision-cache", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		api, namespace, err := platformops.KubernetesAPI(os.Getenv("KUBERNETES_API_URL"), os.Getenv("SERVICE_ACCOUNT_DIR"))
-		if err != nil {
-			return err
-		}
-		values := map[string]int64{}
-		for _, key := range []string{"LAYOUT_CAPACITY_BYTES", "MAIN_QUOTA_BYTES", "RELEASE_QUOTA_BYTES", "TOOLCHAINS_QUOTA_BYTES", "EXPIRATION_DAYS", "QUOTA_ALERT_PERCENT", "WAIT_ATTEMPTS", "WAIT_SECONDS"} {
-			fallback := ""
-			if key == "WAIT_ATTEMPTS" {
-				fallback = "60"
-			}
-			if key == "WAIT_SECONDS" {
-				fallback = "5"
-			}
-			value, err := strconv.ParseInt(envDefault(key, fallback), 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid %s", key)
-			}
-			values[key] = value
-		}
-		adminURL, token := os.Getenv("GARAGE_ADMIN_URL"), os.Getenv("GARAGE_ADMIN_TOKEN")
-		if adminURL == "" || token == "" {
-			return fmt.Errorf("Garage admin URL and token required")
-		}
-		return platformops.ProvisionCache(cmd.Context(), platformops.CacheConfig{Admin: platformops.API{URL: adminURL, Token: func() (string, error) { return token, nil }}, Kubernetes: api, Namespace: namespace, KeyID: os.Getenv("PROVISIONER_KEY_ID"), KeySecret: os.Getenv("PROVISIONER_KEY_SECRET"), Capacity: values["LAYOUT_CAPACITY_BYTES"], MainQuota: values["MAIN_QUOTA_BYTES"], ReleaseQuota: values["RELEASE_QUOTA_BYTES"], ToolchainQuota: values["TOOLCHAINS_QUOTA_BYTES"], ExpirationDays: int(values["EXPIRATION_DAYS"]), AlertPercent: int(values["QUOTA_ALERT_PERCENT"]), WaitAttempts: int(values["WAIT_ATTEMPTS"]), WaitInterval: time.Duration(values["WAIT_SECONDS"]) * time.Second, Log: cmd.ErrOrStderr()})
 	}}
 }
 

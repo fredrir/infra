@@ -60,7 +60,7 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 	}
 	image := "ghcr.io/fredrir/platform-backup-tools@sha256:" + strings.Repeat("c", 64)
 	expectedDeletes := 0
-	for _, path := range []string{"components/controllers/ci-slots.sh", "components/build-cache/provision.sh", "components/backup-job/backup.sh", "components/backup-job/heartbeat.sh"} {
+	for _, path := range []string{"components/controllers/ci-slots.sh", "components/backup-job/backup.sh", "components/backup-job/heartbeat.sh"} {
 		if _, err := os.Stat(filepath.Join(root, "platform", path)); err == nil {
 			expectedDeletes++
 		} else if !os.IsNotExist(err) {
@@ -94,7 +94,7 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 			}
 		}
 	}
-	for _, directory := range []string{"components/controllers", "components/build-cache", "components/object-store", "projects/y", "projects/llunde-pyparser", "projects/portfolio", "components/cache"} {
+	for _, directory := range []string{"components/controllers", "components/object-store", "projects/y", "projects/llunde-pyparser", "projects/portfolio", "components/cache"} {
 		t.Run(directory, func(t *testing.T) {
 			data, err := kustomize.Build(filepath.Join(root, "platform", directory))
 			if err != nil {
@@ -104,7 +104,7 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 			if !strings.Contains(text, image) || !strings.Contains(text, "/usr/local/bin/infra") {
 				t.Fatal("rendered workload did not select native tools image")
 			}
-			for _, legacy := range []string{"ci-slots.sh", "provision.sh", "backup.sh", "heartbeat.sh"} {
+			for _, legacy := range []string{"ci-slots.sh", "backup.sh", "heartbeat.sh"} {
 				if strings.Contains(text, legacy) {
 					t.Fatalf("render retained %s", legacy)
 				}
@@ -121,7 +121,7 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 					t.Fatal(err)
 				}
 				if resource.Kind == "ConfigMap" {
-					for _, legacy := range []string{"ci-slots-", "build-cache-provisioner-", "backup-hook-"} {
+					for _, legacy := range []string{"ci-slots-", "backup-hook-"} {
 						if strings.HasPrefix(resource.Metadata.Name, legacy) {
 							t.Fatalf("render retained generated legacy ConfigMap %s", resource.Metadata.Name)
 						}

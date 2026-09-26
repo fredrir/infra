@@ -5,21 +5,19 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"go.yaml.in/yaml/v3"
 )
 
 func TestRunnerAdmissionBoundaries(t *testing.T) {
 	e := newEvaluator(t)
-	base := runner(t, "base/buildkit.yaml")
-	if !e.runner(base, "ci-y", controller) {
+	base := rustRunner(t, "main")
+	if !e.runner(base, "ci-nsql", controller) {
 		t.Fatal("qualified runner rejected")
 	}
 	for name, value := range (object{"hostNetwork": true, "automountServiceAccountToken": true, "runtimeClassName": "runc", "activeDeadlineSeconds": 86400}) {
 		t.Run(name, func(t *testing.T) {
 			p := clone(base).(object)
 			set(p, value, "spec", name)
-			if e.runner(p, "ci-y", controller) {
+			if e.runner(p, "ci-nsql", controller) {
 				t.Fatal("unsafe runner admitted")
 			}
 		})
@@ -29,7 +27,7 @@ func TestRunnerAdmissionBoundaries(t *testing.T) {
 	}} {
 		p := clone(base).(object)
 		mutate(p)
-		if e.runner(p, "ci-y", controller) {
+		if e.runner(p, "ci-nsql", controller) {
 			t.Fatal("sidecar or secret volume admitted")
 		}
 	}
@@ -37,28 +35,20 @@ func TestRunnerAdmissionBoundaries(t *testing.T) {
 
 func TestRunnerJITTokenIsBoundToControllerAndOwnPod(t *testing.T) {
 	e := newEvaluator(t)
-	p := runner(t, "base/buildkit.yaml")
-	secret := object{"name": "ACTIONS_RUNNER_INPUT_JITCONFIG", "valueFrom": object{"secretKeyRef": object{"name": "runner-1", "key": "jitToken"}}}
+	p := rustRunner(t, "main")
+	secret := object{"name": "ACTIONS_RUNNER_INPUT_JITCONFIG", "valueFrom": object{"secretKeyRef": object{"name": "rust-1", "key": "jitToken"}}}
 	appendAt(p, secret, "spec", "containers", 0, "env")
-	if !e.runner(p, "ci-y", controller) || e.runner(p, "ci-y", "untrusted") {
+	if !e.runner(p, "ci-nsql", controller) || e.runner(p, "ci-nsql", "untrusted") {
 		t.Fatal("JIT controller boundary")
 	}
 	set(secret, "github-app", "valueFrom", "secretKeyRef", "name")
-	if e.runner(p, "ci-y", controller) {
+	if e.runner(p, "ci-nsql", controller) {
 		t.Fatal("foreign JIT token admitted")
 	}
 }
 
-func TestAtticCredentialsRemainBoundToQualifiedLegacyPool(t *testing.T) {
-	e := newEvaluator(t)
-	p := runner(t, "infra/nix.yaml")
-	if !e.runner(p, "ci-infra", controller) || e.runner(p, "ci-y", controller) || e.runner(p, "ci-infra", "untrusted") {
-		t.Fatal("legacy credential boundary")
-	}
-}
-
 func TestRunnerSlotQuantitiesAreExact(t *testing.T) {
-	base := runner(t, "base/buildkit.yaml")
+	base := rustRunner(t, "main")
 	for _, tc := range []struct {
 		value   any
 		allowed bool
@@ -71,7 +61,7 @@ func TestRunnerSlotQuantitiesAreExact(t *testing.T) {
 			} else {
 				set(p, tc.value, "spec", "containers", 0, "resources", "limits", "infra.fredrir.com/ci-slot")
 			}
-			if e.runner(p, "ci-y", controller) != tc.allowed {
+			if e.runner(p, "ci-nsql", controller) != tc.allowed {
 				t.Fatal("incorrect slot admission")
 			}
 		})
@@ -91,7 +81,7 @@ func TestCheckAndDeployPoolsRemainBounded(t *testing.T) {
 	}
 	deploy := runner(t, "infra/deploy-values.yaml")
 	deploy["metadata"] = object{"name": "deploy-1", "labels": object{"actions.github.com/scale-set-name": "deploy-amd64"}}
-	if !e.runner(deploy, "ci-infra", controller) || e.runner(deploy, "ci-y", controller) {
+	if !e.runner(deploy, "ci-infra", controller) || e.runner(deploy, "ci-nsql", controller) {
 		t.Fatal("deploy namespace boundary")
 	}
 	set(check, at(deploy, "spec", "containers", 0, "image"), "spec", "containers", 0, "image")
@@ -103,7 +93,7 @@ func TestCheckAndDeployPoolsRemainBounded(t *testing.T) {
 	if e.runner(unapprovedDeploy, "ci-infra", controller) {
 		t.Fatal("unapproved deploy image admitted")
 	}
-	for _, mutate := range []func(object){func(p object) { set(p, "buildkit-amd64", "metadata", "labels", "actions.github.com/scale-set-name") }, func(p object) { set(p, "4", "spec", "containers", 0, "resources", "limits", "cpu") }, func(p object) { set(p, "8Gi", "spec", "containers", 0, "resources", "limits", "memory") }} {
+	for _, mutate := range []func(object){func(p object) { set(p, "check-amd64", "metadata", "labels", "actions.github.com/scale-set-name") }, func(p object) { set(p, "4", "spec", "containers", 0, "resources", "limits", "cpu") }, func(p object) { set(p, "8Gi", "spec", "containers", 0, "resources", "limits", "memory") }} {
 		p := clone(deploy).(object)
 		mutate(p)
 		if e.runner(p, "ci-infra", controller) {
@@ -138,8 +128,8 @@ func TestRustCacheCredentialsStayWithinPool(t *testing.T) {
 		})
 	}
 	base := rustRunner(t, "main")
-	buildkitImage := at(runner(t, "base/buildkit.yaml"), "spec", "containers", 0, "image")
-	for _, mutate := range []func(object){func(p object) { set(p, object{}, "metadata", "labels") }, func(p object) { set(p, "buildkit-amd64", "metadata", "labels", "actions.github.com/scale-set-name") }, func(p object) { set(p, buildkitImage, "spec", "containers", 0, "image") }, func(p object) {
+	checkImage := at(runner(t, "infra/check-values.yaml"), "spec", "containers", 0, "image")
+	for _, mutate := range []func(object){func(p object) { set(p, object{}, "metadata", "labels") }, func(p object) { set(p, "check-amd64", "metadata", "labels", "actions.github.com/scale-set-name") }, func(p object) { set(p, checkImage, "spec", "containers", 0, "image") }, func(p object) {
 		set(p, "AWS_SECRET_ACCESS_KEY", "spec", "containers", 0, "env", 4, "valueFrom", "secretKeyRef", "key")
 	}, func(p object) {
 		appendAt(p, object{"name": "GITHUB_TOKEN", "valueFrom": object{"secretKeyRef": object{"name": "sccache-rw", "key": "AWS_ACCESS_KEY_ID"}}}, "spec", "containers", 0, "env")
@@ -156,38 +146,6 @@ func TestRustCacheCredentialsStayWithinPool(t *testing.T) {
 	set(p, object{"type": "Localhost", "localhostProfile": "kata-nix.json"}, "spec", "securityContext", "seccompProfile")
 	if e.runner(p, "ci-example", controller) {
 		t.Fatal("unqualified rust Kata runtime admitted")
-	}
-}
-
-func TestLegacyBuildkitCacheCredentialsStayWithinPool(t *testing.T) {
-	e := newEvaluator(t)
-	base := runner(t, "base/buildkit.yaml")
-	set(base, object{"actions.github.com/scale-set-name": "buildkit-amd64"}, "metadata", "labels")
-	component := load(t, "platform/components/runners/buildkit-cache/kustomization.yaml")
-	var patches []object
-	if err := yaml.Unmarshal([]byte(at(component, "patches", 0, "patch").(string)), &patches); err != nil {
-		t.Fatal(err)
-	}
-	for _, patch := range patches {
-		appendAt(base, patch["value"], "spec", "containers", 0, "env")
-	}
-	if !e.runner(base, "ci-y", controller) || e.runner(base, "ci-y", "untrusted") {
-		t.Fatal("build cache controller boundary")
-	}
-	rustImage := at(rustRunner(t, "main"), "spec", "containers", 0, "image")
-	last := len(at(base, "spec", "containers", 0, "env").([]any)) - 1
-	for _, mutate := range []func(object){func(p object) { set(p, object{}, "metadata", "labels") }, func(p object) { set(p, "publish-amd64", "metadata", "labels", "actions.github.com/scale-set-name") }, func(p object) { set(p, rustImage, "spec", "containers", 0, "image") }, func(p object) {
-		set(p, "sccache-rw", "spec", "containers", 0, "env", last, "valueFrom", "secretKeyRef", "name")
-	}, func(p object) {
-		set(p, "AWS_ACCESS_KEY_ID", "spec", "containers", 0, "env", last, "valueFrom", "secretKeyRef", "key")
-	}, func(p object) {
-		appendAt(p, object{"name": "GITHUB_TOKEN", "valueFrom": object{"secretKeyRef": object{"name": "buildkit-cache", "key": "AWS_ACCESS_KEY_ID"}}}, "spec", "containers", 0, "env")
-	}} {
-		p := clone(base).(object)
-		mutate(p)
-		if e.runner(p, "ci-y", controller) {
-			t.Fatal("build cache credential boundary bypass")
-		}
 	}
 }
 

@@ -1,9 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: ci-portfolio
-resources:
-- ../ci-namespace
-- github-app.secret.sops.yaml
-- buildkit-cache.secret.sops.yaml
-components:
-- ../buildkit-cache
