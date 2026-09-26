@@ -279,7 +279,8 @@ func TestVerificationRequestReadsItsCredentialFiles(t *testing.T) {
 	}
 }
 
-func TestApplyUnitConditionAndOperatorRequest(t *testing.T) {
+func applyUnitFixture(t *testing.T) (string, string, string) {
+	t.Helper()
 	origin := t.TempDir()
 	for _, args := range [][]string{{"init", "--quiet", "--initial-branch=main"}, {"commit", "--quiet", "--allow-empty", "--message", "fixture"}} {
 		command := exec.Command("git", append([]string{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, args...)...)
@@ -289,8 +290,10 @@ func TestApplyUnitConditionAndOperatorRequest(t *testing.T) {
 		}
 	}
 	shared, state := t.TempDir(), t.TempDir()
-	if err := os.Mkdir(filepath.Join(shared, "requests"), 0o770); err != nil {
-		t.Fatal(err)
+	for _, directory := range []string{"requests", "repairs"} {
+		if err := os.Mkdir(filepath.Join(shared, directory), 0o750); err != nil {
+			t.Fatal(err)
+		}
 	}
 	config := filepath.Join(t.TempDir(), "apply.json")
 	data, err := json.Marshal(map[string]any{
@@ -306,6 +309,11 @@ func TestApplyUnitConditionAndOperatorRequest(t *testing.T) {
 	if err := os.WriteFile(config, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	return config, state, origin
+}
+
+func TestApplyUnitConditionAndOperatorRequest(t *testing.T) {
+	config, state, _ := applyUnitFixture(t)
 	var output bytes.Buffer
 	if err := cli.Run(context.Background(), []string{"reconcile", "run", "pending", "--config", config}, &output, &output); err != nil || !strings.HasPrefix(output.String(), "main at ") {
 		t.Fatalf("a new main tip is not pending: %v %q", err, &output)
@@ -320,7 +328,7 @@ func TestApplyUnitConditionAndOperatorRequest(t *testing.T) {
 	}
 	output.Reset()
 	err = cli.Run(context.Background(), []string{"reconcile", "run", "pending", "--config", config}, &output, &output)
-	if err == nil || cli.ExitCode(err) != 1 {
+	if !errors.Is(err, cli.ErrNothingPending) || cli.ExitCode(err) != 1 || output.Len() != 0 {
 		t.Fatalf("an applied tip is pending: %v %q", err, &output)
 	}
 	if err := cli.Run(context.Background(), []string{"reconcile", "run", "request", "--full", "--config", config}, &output, &output); err != nil {
@@ -329,5 +337,46 @@ func TestApplyUnitConditionAndOperatorRequest(t *testing.T) {
 	output.Reset()
 	if err := cli.Run(context.Background(), []string{"reconcile", "run", "pending", "--config", config}, &output, &output); err != nil || output.String() != "requested: operator\n" {
 		t.Fatalf("an operator request is not pending: %v %q", err, &output)
+	}
+}
+
+func TestPendingExitCodesTellSystemdRunSkipOrFail(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		damage func(t *testing.T, config, state, origin string)
+		want   int
+	}{
+		{name: "new tip", want: 0},
+		{name: "broken configuration", want: 255, damage: func(t *testing.T, config, _, _ string) {
+			if err := os.WriteFile(config, []byte(`{"repository":"`), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "corrupt ledger", want: 255, damage: func(t *testing.T, _, state, _ string) {
+			if err := os.WriteFile(filepath.Join(state, "ledger.json"), []byte("{"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "unreadable main without other work", want: 255, damage: func(t *testing.T, _, state, origin string) {
+			ledger, _ := json.Marshal(map[string]any{"revision": strings.Repeat("a", 40), "outcome": "applied", "checked_at": time.Now().UTC()})
+			if err := os.WriteFile(filepath.Join(state, "ledger.json"), ledger, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.RemoveAll(origin); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config, state, origin := applyUnitFixture(t)
+			if test.damage != nil {
+				test.damage(t, config, state, origin)
+			}
+			var output bytes.Buffer
+			err := cli.Run(context.Background(), []string{"reconcile", "run", "pending", "--config", config}, &output, &output)
+			if got := cli.ExitCode(err); got != test.want {
+				t.Fatalf("pending exited %d (%v), want %d", got, err, test.want)
+			}
+		})
 	}
 }

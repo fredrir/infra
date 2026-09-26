@@ -289,10 +289,20 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 	return h
 }
 
+func TestMain(m *testing.M) {
+	memoryBacked = func(string) error { return nil }
+	os.Exit(m.Run())
+}
+
 func sharedDirectory(t *testing.T) string {
 	t.Helper()
 	shared := t.TempDir()
-	if err := os.Mkdir(filepath.Join(shared, "requests"), 0o770); err != nil {
+	for _, directory := range []string{"repairs", "requests"} {
+		if err := os.Mkdir(filepath.Join(shared, directory), 0o750); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(shared, "lock"), nil, 0o640); err != nil {
 		t.Fatal(err)
 	}
 	return shared

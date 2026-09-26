@@ -9,19 +9,37 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/fredrir/infra/internal/process"
 )
 
-const identityLimit = 16 << 10
+const (
+	identityLimit = 16 << 10
+	tmpfsMagic    = 0x01021994
+	ramfsMagic    = 0x858458f6
+)
 
-type session struct {
-	work, home, source string
-	commands           executor
+var memoryBacked = memoryBackedFilesystem
+
+func memoryBackedFilesystem(path string) error {
+	var filesystem syscall.Statfs_t
+	if err := syscall.Statfs(path, &filesystem); err != nil {
+		return err
+	}
+	if filesystem.Type != tmpfsMagic && filesystem.Type != ramfsMagic {
+		return fmt.Errorf("%s is not on a memory-backed file system", path)
+	}
+	return nil
 }
 
-func openSession(root string, execute func(context.Context, process.Options) (process.Result, error), log io.Writer, hosts bool) (session, func() error, error) {
+type session struct {
+	work, home, source, secrets string
+	commands                    executor
+}
+
+func openSession(root, credentials string, execute func(context.Context, process.Options) (process.Result, error), log io.Writer, hosts bool) (session, func() error, error) {
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return session{}, nil, err
 	}
@@ -32,7 +50,14 @@ func openSession(root string, execute func(context.Context, process.Options) (pr
 	if err != nil {
 		return session{}, nil, err
 	}
-	cleanup := func() error { return removeTree(work) }
+	secrets, err := os.MkdirTemp(filepath.Dir(credentials), "secrets-")
+	if err != nil {
+		return session{}, nil, errors.Join(err, removeTree(work))
+	}
+	cleanup := func() error { return errors.Join(removeTree(secrets), removeTree(work)) }
+	if err := memoryBacked(secrets); err != nil {
+		return session{}, nil, errors.Join(fmt.Errorf("secrets: %w", err), cleanup())
+	}
 	home := filepath.Join(work, "home")
 	if err := os.Mkdir(home, 0o700); err != nil {
 		return session{}, nil, errors.Join(err, cleanup())
@@ -42,7 +67,11 @@ func openSession(root string, execute func(context.Context, process.Options) (pr
 		path = filepath.Join(work, "venv", "bin") + ":" + path
 	}
 	environment := append([]string{"PATH=" + path, "HOME=" + home, "LANG=C.UTF-8", "TF_IN_AUTOMATION=true"}, hardenedGit...)
-	return session{work: work, home: home, source: filepath.Join(work, "source"), commands: executor{execute: execute, env: environment, log: log}}, cleanup, nil
+	return session{work: work, home: home, source: filepath.Join(work, "source"), secrets: secrets, commands: executor{execute: execute, env: environment, log: log}}, cleanup, nil
+}
+
+func (s session) secretEnvironment() []string {
+	return []string{"TMPDIR=" + s.secrets}
 }
 
 func (s session) kubeconfig(kubernetes Kubernetes, account, token string) (string, error) {
@@ -54,30 +83,53 @@ func (s session) kubeconfig(kubernetes Kubernetes, account, token string) (strin
 	if err != nil {
 		return "", err
 	}
-	path := filepath.Join(s.work, "kubeconfig")
+	path := filepath.Join(s.secrets, "kubeconfig")
 	return path, os.WriteFile(path, config, 0o600)
 }
 
-func (s session) hostAccess(identity, knownHosts string) error {
+func (s session) hostAccess(identity, knownHosts string) ([]string, error) {
+	for _, path := range []string{identity, knownHosts} {
+		if !cleanAbsolute(path) || strings.ContainsAny(path, " \t\n\"'%\\") {
+			return nil, fmt.Errorf("SSH path %q is not a plain absolute path", path)
+		}
+	}
 	key, err := readPrivate(identity, identityLimit)
 	if err != nil {
-		return fmt.Errorf("SSH identity: %w", err)
+		return nil, fmt.Errorf("SSH identity: %w", err)
 	}
 	if block, _ := pem.Decode(key); block == nil || block.Type != "OPENSSH PRIVATE KEY" {
-		return errors.New("SSH identity is not an OpenSSH private key")
+		return nil, errors.New("SSH identity is not an OpenSSH private key")
 	}
 	hosts, err := os.ReadFile(knownHosts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(bytes.TrimSpace(hosts)) == 0 {
-		return fmt.Errorf("%s declares no host keys", knownHosts)
+		return nil, fmt.Errorf("%s declares no host keys", knownHosts)
 	}
-	directory := filepath.Join(s.home, ".ssh")
-	if err := os.Mkdir(directory, 0o700); err != nil {
-		return err
+	config := filepath.Join(s.secrets, "ssh_config")
+	if err := os.WriteFile(config, []byte(sshConfig(identity, knownHosts)), 0o600); err != nil {
+		return nil, err
 	}
-	return errors.Join(os.WriteFile(filepath.Join(directory, "id_ed25519"), key, 0o600), os.WriteFile(filepath.Join(directory, "known_hosts"), hosts, 0o600))
+	return []string{"ANSIBLE_SSH_EXTRA_ARGS=-F " + config}, nil
+}
+
+func sshConfig(identity, knownHosts string) string {
+	return fmt.Sprintf(`Host *
+  IdentityFile %s
+  IdentitiesOnly yes
+  UserKnownHostsFile %s
+  GlobalKnownHostsFile /dev/null
+  StrictHostKeyChecking yes
+  UpdateHostKeys no
+  CheckHostIP no
+  ForwardAgent no
+  ForwardX11 no
+  BatchMode yes
+  PasswordAuthentication no
+  KbdInteractiveAuthentication no
+  PermitLocalCommand no
+`, identity, knownHosts)
 }
 
 func (s session) pythonEnvironment(ctx context.Context, cache string) error {

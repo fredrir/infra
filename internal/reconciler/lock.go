@@ -13,12 +13,11 @@ import (
 const lockPoll = time.Second
 
 func acquireHostLock(ctx context.Context, shared string, poll time.Duration) (func() error, error) {
-	path := filepath.Join(shared, "lock")
-	file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0o660)
+	file, err := os.OpenFile(filepath.Join(shared, "lock"), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, fmt.Errorf("host lock: %w", err)
 	}
-	if err := shareable(file); err != nil {
+	if err := singleRegularFile(file); err != nil {
 		return nil, errors.Join(fmt.Errorf("host lock: %w", err), file.Close())
 	}
 	for {
@@ -37,17 +36,13 @@ func acquireHostLock(ctx context.Context, shared string, poll time.Duration) (fu
 	}
 }
 
-func shareable(file *os.File) error {
+func singleRegularFile(file *os.File) error {
 	info, err := file.Stat()
 	if err != nil {
 		return err
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	switch {
-	case !info.Mode().IsRegular() || !ok || stat.Nlink != 1:
+	if stat, ok := info.Sys().(*syscall.Stat_t); !info.Mode().IsRegular() || !ok || stat.Nlink != 1 {
 		return errors.New("not a single-link regular file")
-	case stat.Uid == uint32(os.Geteuid()):
-		return file.Chmod(0o660)
 	}
 	return nil
 }

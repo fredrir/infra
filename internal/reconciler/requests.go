@@ -18,6 +18,8 @@ const (
 	requestLimit  = 64 << 10
 )
 
+var requestDirectories = map[string]string{RequestApply: "requests", RequestRepair: "repairs"}
+
 type Request struct {
 	Kind      string    `json:"kind"`
 	Revision  string    `json:"revision,omitempty"`
@@ -32,7 +34,7 @@ func (r Request) validate() error {
 		return errors.New("a repair names a main revision and is full")
 	case r.Kind == RequestApply && r.Revision != "":
 		return errors.New("an apply request names no revision")
-	case r.Kind != RequestApply && r.Kind != RequestRepair:
+	case requestDirectories[r.Kind] == "":
 		return fmt.Errorf("unknown request kind %q", r.Kind)
 	case r.Requested.IsZero():
 		return errors.New("requested_at is required")
@@ -40,8 +42,8 @@ func (r Request) validate() error {
 	return nil
 }
 
-func requestsDirectory(shared string) string {
-	return filepath.Join(shared, "requests")
+func requestPath(shared, kind string) string {
+	return filepath.Join(shared, requestDirectories[kind], kind+".json")
 }
 
 func WriteRequest(shared string, request Request) error {
@@ -52,35 +54,30 @@ func WriteRequest(shared string, request Request) error {
 	if err != nil {
 		return err
 	}
-	directory := requestsDirectory(shared)
-	file, err := os.CreateTemp(directory, "."+request.Kind+"-")
+	path := requestPath(shared, request.Kind)
+	file, err := os.CreateTemp(filepath.Dir(path), "."+request.Kind+"-")
 	if err != nil {
 		return fmt.Errorf("request %s: %w", request.Kind, err)
 	}
 	defer os.Remove(file.Name())
 	_, err = file.Write(data)
-	if err = errors.Join(err, file.Chmod(0o660), file.Close()); err != nil {
+	if err = errors.Join(err, file.Chmod(0o640), file.Close()); err != nil {
 		return fmt.Errorf("request %s: %w", request.Kind, err)
 	}
-	return os.Rename(file.Name(), filepath.Join(directory, request.Kind+".json"))
+	return os.Rename(file.Name(), path)
 }
 
-func readRequests(shared string, discard bool) (map[string]Request, error) {
+func readRequests(shared string) (map[string]Request, error) {
 	requests := map[string]Request{}
 	var problems []error
 	for _, kind := range []string{RequestApply, RequestRepair} {
-		path := filepath.Join(requestsDirectory(shared), kind+".json")
-		request, err := readRequest(path)
+		request, err := readRequest(requestPath(shared, kind))
 		switch {
 		case errors.Is(err, os.ErrNotExist):
 		case err == nil && request.Kind != kind:
-			err = fmt.Errorf("kind %q", request.Kind)
-			fallthrough
+			problems = append(problems, fmt.Errorf("%s request of kind %q", kind, request.Kind))
 		case err != nil:
-			if discard {
-				err = errors.Join(err, removeRequest(shared, kind))
-			}
-			problems = append(problems, fmt.Errorf("invalid %s request: %w", kind, err))
+			problems = append(problems, fmt.Errorf("%s request: %w", kind, err))
 		default:
 			requests[kind] = request
 		}
@@ -94,8 +91,8 @@ func readRequest(path string) (Request, error) {
 		return Request{}, err
 	}
 	defer file.Close()
-	if info, err := file.Stat(); err != nil || !info.Mode().IsRegular() {
-		return Request{}, errors.Join(errors.New("not a regular file"), err)
+	if err := singleRegularFile(file); err != nil {
+		return Request{}, err
 	}
 	data, err := io.ReadAll(io.LimitReader(file, requestLimit+1))
 	if err != nil {
@@ -111,11 +108,4 @@ func readRequest(path string) (Request, error) {
 		return Request{}, err
 	}
 	return request, request.validate()
-}
-
-func removeRequest(shared, kind string) error {
-	if err := os.Remove(filepath.Join(requestsDirectory(shared), kind+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	return nil
 }

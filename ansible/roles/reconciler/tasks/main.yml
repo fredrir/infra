@@ -31,14 +31,27 @@
 
 - name: Create the shared reconciliation directories
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ reconciler_shared }}/{{ item.path }}"
     state: directory
+    owner: "{{ item.owner }}"
+    group: infra-reconcile
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: "", owner: root, mode: "0750"}
+    - {path: repairs, owner: infra-verify, mode: "2750"}
+    - {path: requests, owner: root, mode: "2750"}
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Create the reconciler host lock
+  ansible.builtin.file:
+    path: "{{ reconciler_shared }}/lock"
+    state: touch
     owner: root
     group: infra-reconcile
-    mode: "2770"
-  loop:
-    - "{{ reconciler_shared }}"
-    - "{{ reconciler_shared }}/requests"
+    mode: "0640"
+    modification_time: preserve
+    access_time: preserve
 
 - name: Create the reconciler configuration directory
   ansible.builtin.file:
@@ -64,18 +77,29 @@
     creates: "{{ reconciler_ssh_identity }}"
   tags: [ssh_identity]
 
+- name: Restrict the reconciler SSH identity
+  ansible.builtin.file:
+    path: "{{ reconciler_ssh_identity }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: not ansible_check_mode
+  tags: [ssh_identity]
+
 - name: Read the reconciler SSH public key
   ansible.builtin.command:
     argv: [ssh-keygen, -y, -f, "{{ reconciler_ssh_identity }}"]
   register: reconciler_ssh_public_key
   changed_when: false
   check_mode: false
+  when: not ansible_check_mode
   tags: [ssh_identity]
 
 - name: Report the reconciler SSH public key
   ansible.builtin.assert:
     that: reconciler_ssh_public_key.stdout is match('^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$')
     success_msg: "{{ inventory_hostname }} {{ reconciler_ssh_public_key.stdout }}"
+  when: not ansible_check_mode
   tags: [ssh_identity]
 
 - name: Install the encrypted reconciler credentials

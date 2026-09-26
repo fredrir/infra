@@ -13,11 +13,14 @@ func TestReconcilerApplyTokenCoversExactlyTheManagedZones(t *testing.T) {
 	repository := root(t)
 	var settings struct {
 		Zones map[string]string `json:"platform_dns_zones"`
+		Mail  struct {
+			Zone string `json:"zone_id"`
+		} `json:"platform_mail"`
 	}
 	if err := json.Unmarshal(read(t, filepath.Join(repository, "tofu/production.tfvars.json")), &settings); err != nil {
 		t.Fatal(err)
 	}
-	managed := slices.Collect(maps.Values(settings.Zones))
+	managed := append(slices.Collect(maps.Values(settings.Zones)), settings.Mail.Zone)
 	for _, match := range regexp.MustCompile(`(?m)^\s*zone_id\s*=\s*"([0-9a-f]{32})"`).FindAllStringSubmatch(string(read(t, filepath.Join(repository, "tofu/cloudflare.tf"))), -1) {
 		managed = append(managed, match[1])
 	}

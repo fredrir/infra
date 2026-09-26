@@ -17,14 +17,11 @@ reconciler_verify_randomized_delay: 5min
 reconciler_verify:
   repository: https://github.com/fredrir/infra.git
   state: /var/lib/infra-verify
-  cache: /var/cache/infra-verify
-  shared: "{{ reconciler_shared }}"
   bucket: llunde-pyparser-bucket
   prefix: reconciliation/production
   region: eu-north-1
   gatus: "http://{{ hostvars['fredrir-06'].tailscale_ip }}:8080"
   heartbeat: reconciliation_verification
-  scope: cloud
   kubernetes:
     server: "https://{{ hostvars[groups['server'][0]].tailscale_ip }}:6443"
     certificate_authority: /etc/infra-reconcile/kubernetes-ca.crt

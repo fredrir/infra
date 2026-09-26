@@ -103,12 +103,17 @@ func envDefault(name, fallback string) string {
 	return fallback
 }
 
-const exitRetry = 75
+const (
+	exitRetry            = 75
+	exitConditionFailure = 255
+)
 
 func ExitCode(err error) int {
 	switch {
 	case err == nil:
 		return 0
+	case errors.As(err, new(conditionFailure)):
+		return exitConditionFailure
 	case reconcile.Retryable(err):
 		return exitRetry
 	default:

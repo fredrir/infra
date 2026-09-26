@@ -102,7 +102,7 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 	run.Started = s.now()
 	run.Stage = "checkout"
 	hosts := s.Config.Scope == reconcile.ScopeFull
-	current, cleanup, err := openSession(s.Config.State, s.Execute, log, hosts)
+	current, cleanup, err := openSession(s.Config.State, s.Credentials, s.Execute, log, hosts)
 	if err != nil {
 		return fail("checkout", err)
 	}
@@ -142,15 +142,16 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 	if err != nil {
 		return fail("tools", err)
 	}
-	environment := []string{"TF_PLUGIN_CACHE_DIR=" + plugins}
+	environment := append(current.secretEnvironment(), "TF_PLUGIN_CACHE_DIR="+plugins)
 	if hosts {
 		if err := current.pythonEnvironment(ctx, s.Config.Cache); err != nil {
 			return fail("tools", err)
 		}
-		if err := current.hostAccess(s.Identity, s.Config.KnownHosts); err != nil {
+		access, err := current.hostAccess(s.Identity, s.Config.KnownHosts)
+		if err != nil {
 			return fail("credentials", err)
 		}
-		environment = append(environment, "INFRA_RECONCILE_TAILNET=true")
+		environment = append(append(environment, access...), "INFRA_RECONCILE_TAILNET=true")
 	}
 	run.Stage = "credentials"
 	token, revoke, err := runnerFleetToken(ctx, s.Config.Observer, []byte(credentials[ObserverAppKey]), source, "read")
@@ -185,7 +186,13 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 }
 
 func (s Supervisor) requestRepair(run Run, main string, log io.Writer) {
-	if run.Outcome != reconcile.OutcomeDiffers || !slices.ContainsFunc(run.Verification.Differences, func(difference reconcile.Difference) bool { return difference.System != "rulesets" }) {
+	switch {
+	case run.Outcome == reconcile.OutcomeMatches:
+		if err := os.Remove(requestPath(s.Config.Shared, RequestRepair)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(log, "withdraw repair: %v\n", err)
+		}
+		return
+	case run.Outcome != reconcile.OutcomeDiffers || !slices.ContainsFunc(run.Verification.Differences, func(difference reconcile.Difference) bool { return difference.System != "rulesets" }):
 		return
 	}
 	request := Request{Kind: RequestRepair, Revision: main, Full: true, Reason: truncate(run.failure().Error()), Requested: s.now()}

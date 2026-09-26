@@ -90,8 +90,9 @@ filegroup(
 )
 
 filegroup(
-    name = "managed_zone_data",
+    name = "reconciler_access_data",
     srcs = [
+        "ansible/inventory/production.yml",
         "tofu/cloudflare.tf",
         "tofu/production.tfvars.json",
         "tofu/reconciler/credentials.tf",
@@ -174,7 +175,7 @@ filegroup(
 
 filegroup(
     name = "reconciler_role_data",
-    srcs = glob(["ansible/roles/reconciler/**"]),
+    srcs = glob(["ansible/roles/reconciler/**"]) + ["//build:cli-release.json"],
     visibility = ["//internal/reconciler:__pkg__"],
 )
 

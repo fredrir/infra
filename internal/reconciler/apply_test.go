@@ -40,6 +40,7 @@ const (
 type githubAPI struct {
 	mu         sync.Mutex
 	expiration string
+	failMint   bool
 	minted     map[string][]map[string]any
 	revoked    []string
 	checks     []string
@@ -57,6 +58,10 @@ func (g *githubAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/app/installations/") && strings.HasSuffix(r.URL.Path, "/access_tokens"):
 		installation := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/app/installations/"), "/access_tokens")
+		if g.failMint && installation == fmt.Sprint(runnerInstall) {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
 		g.minted[installation] = append(g.minted[installation], decoded)
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]any{"token": "ghs_" + installation, "expires_at": time.Now().Add(time.Hour).Format(time.RFC3339)})
@@ -140,8 +145,11 @@ type applyHarness struct {
 	gatus       *applyHeartbeats
 	mu          sync.Mutex
 	commands    []string
+	secrets     []string
+	selection   reconcile.Selection
 	gate        func(t *testing.T, call engineCall) (int, string)
 	engine      func(t *testing.T, call engineCall) (int, string)
+	step        func(t *testing.T, name string, call engineCall) (process.Result, error)
 	applies     []engineCall
 }
 
@@ -182,7 +190,7 @@ func validApplyConfig() ApplyConfig {
 func newApplyHarness(t *testing.T) *applyHarness {
 	t.Helper()
 	origin, applied := originRepository(t)
-	h := &applyHarness{origin: origin, applied: applied, tip: gitCommand(t, origin, "rev-parse", "main"), credentials: applyCredentialValues(t), github: &githubAPI{minted: map[string][]map[string]any{}, expiration: "2027-09-26 12:00:00 UTC"}, bucket: &stateBucket{applied: applied, puts: map[string][]byte{}}, gatus: &applyHeartbeats{}}
+	h := &applyHarness{origin: origin, applied: applied, tip: gitCommand(t, origin, "rev-parse", "main"), credentials: applyCredentialValues(t), github: &githubAPI{minted: map[string][]map[string]any{}, expiration: "2027-09-26 12:00:00 UTC"}, bucket: &stateBucket{applied: applied, puts: map[string][]byte{}}, gatus: &applyHeartbeats{}, selection: reconcile.Selection{Tofu: true, Ansible: true, HostScope: reconcile.HostScopeFull}}
 	urls := map[string]string{}
 	for name, handler := range map[string]http.Handler{"github": h.github, "s3": h.bucket, "gatus": h.gatus} {
 		server := httptest.NewServer(handler)
@@ -207,8 +215,35 @@ func newApplyHarness(t *testing.T) *applyHarness {
 	h.engine = func(t *testing.T, call engineCall) (int, string) {
 		return 0, fmt.Sprintf(`{"desired_revision":%q,"applied_revision":%q,"stage":"complete"}`, h.tip, h.tip)
 	}
-	h.applier = Applier{Config: config, Credentials: writeCredentials(t, anyValues(h.credentials)), Identity: identity, Self: supervisorBinary, Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, LockPoll: time.Millisecond, Execute: h.execute(t)}
+	h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) { return process.Result{}, nil }
+	h.applier = Applier{Config: config, Identity: identity, Self: supervisorBinary, Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, LockPoll: time.Millisecond, Execute: h.execute(t)}
+	h.writeCredentials(t)
 	return h
+}
+
+func (h *applyHarness) writeCredentials(t *testing.T) {
+	t.Helper()
+	h.applier.Credentials = writeCredentials(t, anyValues(h.credentials))
+}
+
+func (h *applyHarness) runtime() string {
+	return filepath.Dir(h.applier.Credentials)
+}
+
+func (h *applyHarness) secretFiles(t *testing.T) []string {
+	t.Helper()
+	var files []string
+	directories, _ := filepath.Glob(filepath.Join(h.runtime(), "secrets-*"))
+	for _, directory := range directories {
+		entries, err := os.ReadDir(directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range entries {
+			files = append(files, entry.Name())
+		}
+	}
+	return files
 }
 
 func (h *applyHarness) execute(t *testing.T) func(context.Context, process.Options) (process.Result, error) {
@@ -217,8 +252,9 @@ func (h *applyHarness) execute(t *testing.T) func(context.Context, process.Optio
 		if options.Name == supervisorBinary {
 			name = "supervisor"
 		}
+		command := name + " " + strings.Join(options.Args, " ")
 		h.mu.Lock()
-		h.commands = append(h.commands, name+" "+strings.Join(options.Args, " "))
+		h.commands = append(h.commands, command)
 		h.mu.Unlock()
 		if name == "git" || name == "infra" || name == "supervisor" {
 			for _, variable := range hardenedGit {
@@ -237,7 +273,9 @@ func (h *applyHarness) execute(t *testing.T) func(context.Context, process.Optio
 		switch {
 		case name == "supervisor" && options.Args[0] == "reconcile":
 			allowed = map[string]bool{AWSAccessKeyID: true, AWSSecretAccessKey: true, ProvenanceToken: true}
-		case name == "infra" && options.Args[0] == "reconcile":
+		case name == "infra" && slices.Equal(options.Args[:2], []string{"reconcile", "requirements"}):
+			allowed = map[string]bool{AWSAccessKeyID: true, AWSSecretAccessKey: true}
+		case name == "infra" && slices.Equal(options.Args[:2], []string{"reconcile", "apply"}):
 			allowed = map[string]bool{AWSAccessKeyID: true, AWSSecretAccessKey: true, CloudflareAPIToken: true, HcloudToken: true, PlatformMailRecipient: true, ProvenanceToken: true}
 		}
 		for _, variable := range options.Env {
@@ -245,6 +283,14 @@ func (h *applyHarness) execute(t *testing.T) func(context.Context, process.Optio
 				if strings.Contains(variable, strings.TrimSpace(secret)) && !allowed[credential] {
 					t.Errorf("%s %s received %s in %s", name, options.Args[0], credential, strings.SplitN(variable, "=", 2)[0])
 				}
+			}
+		}
+		if name == "go" || name == "uv" || (name == "infra" && options.Args[0] == "ci") {
+			if files := h.secretFiles(t); len(files) != 0 {
+				t.Errorf("%s ran while %v held secrets", command, files)
+			}
+			if slices.ContainsFunc(options.Env, func(variable string) bool { return strings.HasPrefix(variable, "ANSIBLE_SSH_EXTRA_ARGS=") }) {
+				t.Errorf("%s ran with host access", command)
 			}
 		}
 		report := func(code int, content string) (process.Result, error) {
@@ -265,17 +311,22 @@ func (h *applyHarness) execute(t *testing.T) func(context.Context, process.Optio
 			return process.Run(ctx, options)
 		case "supervisor":
 			if options.Args[0] == "ci" {
-				if !slices.Contains(options.Env, "INFRA_TOOL_CACHE="+filepath.Join(call.work, "gate", "tools")) || !slices.Equal(options.Args[4:], gateTools) {
+				if !slices.Contains(options.Env, "INFRA_TOOL_CACHE="+filepath.Join(call.work, "gate", "tools")) || !slices.Contains(options.Env, "INFRA_TOOL_DOWNLOADS="+filepath.Join(h.applier.Config.Cache, "gate-tools")) || !slices.Equal(options.Args[4:], gateTools) {
 					t.Errorf("gate tools installed with %q %q", options.Args, options.Env)
 				}
-				return process.Result{}, nil
+				return h.step(t, "gate-tools", call)
 			}
-			if !slices.Contains(options.Env, "PATH="+filepath.Join(call.work, "gate", "tools")+":/usr/local/bin:/usr/bin:/bin") {
-				t.Errorf("gate runs without its own tools: %q", options.Env)
+			if !slices.Contains(options.Env, "PATH="+filepath.Join(call.work, "gate", "tools")+":/usr/local/bin:/usr/bin:/bin") || !slices.ContainsFunc(options.Env, func(variable string) bool {
+				return strings.HasPrefix(variable, "TMPDIR="+filepath.Join(h.runtime(), "secrets-"))
+			}) {
+				t.Errorf("gate runs without its own tools and private TMPDIR: %q", options.Env)
 			}
 			return report(h.gate(t, call))
 		case "go":
 			downloadModules(t, filepath.Join(call.work, "go", "mod", "cache", "download"))
+			if result, err := h.step(t, "build", call); err != nil {
+				return result, err
+			}
 			return process.Result{}, os.WriteFile(options.Args[3], []byte("engine"), 0o755)
 		case "uv":
 			for _, variable := range []string{"UV_PROJECT_ENVIRONMENT=" + filepath.Join(call.work, "venv"), "UV_PYTHON_DOWNLOADS=never", "UV_CACHE_DIR=" + filepath.Join(h.applier.Config.Cache, "uv")} {
@@ -283,13 +334,22 @@ func (h *applyHarness) execute(t *testing.T) func(context.Context, process.Optio
 					t.Errorf("uv runs without %s", variable)
 				}
 			}
-			return process.Result{}, nil
+			return h.step(t, "uv", call)
 		case "infra":
-			if options.Args[0] == "ci" {
-				if options.Args[1] == "install-tools" && !slices.Equal(options.Args[4:], applyTools) {
+			switch {
+			case options.Args[0] == "ci" && options.Args[1] == "install-tools":
+				if !slices.Equal(options.Args[4:], applyTools) {
 					t.Errorf("engine installed %q", options.Args[4:])
 				}
-				return process.Result{}, nil
+				return h.step(t, "tools", call)
+			case options.Args[0] == "ci":
+				return h.step(t, options.Args[1], call)
+			case options.Args[1] == "requirements":
+				if result, err := h.step(t, "requirements", call); err != nil {
+					return result, err
+				}
+				data, _ := json.Marshal(h.selection)
+				return process.Result{Stdout: data}, nil
 			}
 			h.mu.Lock()
 			h.applies = append(h.applies, call)
@@ -309,23 +369,38 @@ func (h *applyHarness) inspectApply(t *testing.T, call engineCall) {
 		name, value, _ := strings.Cut(variable, "=")
 		environment[name] = value
 	}
-	for name, want := range map[string]string{"GH_TOKEN": fmt.Sprintf("ghs_%d", runnerInstall), "INFRA_RECONCILE_TAILNET": "true", "PROVENANCE_TOKEN": provenanceSecret, "AWS_ENDPOINT_URL_S3": h.applier.Config.Endpoint, "TF_PLUGIN_CACHE_DIR": filepath.Join(h.applier.Config.Cache, "tofu", fmt.Sprintf("%x", sha256.Sum256([]byte(providerLock))))} {
+	hosts := h.selection.Ansible || h.selection.Tooling
+	runnerToken := ""
+	if hosts {
+		runnerToken = fmt.Sprintf("ghs_%d", runnerInstall)
+	}
+	secrets := filepath.Dir(environment["KUBECONFIG"])
+	for name, want := range map[string]string{"GH_TOKEN": runnerToken, "INFRA_RECONCILE_TAILNET": "true", "PROVENANCE_TOKEN": provenanceSecret, "AWS_ENDPOINT_URL_S3": h.applier.Config.Endpoint, "TMPDIR": secrets, "TF_PLUGIN_CACHE_DIR": filepath.Join(h.applier.Config.Cache, "tofu", fmt.Sprintf("%x", sha256.Sum256([]byte(providerLock))))} {
 		if environment[name] != want {
 			t.Errorf("engine %s = %q, want %q", name, environment[name], want)
 		}
 	}
+	if filepath.Dir(secrets) != h.runtime() || !strings.HasPrefix(filepath.Base(secrets), "secrets-") || filepath.Dir(environment["PUBLISHER_APP_PRIVATE_KEY_FILE"]) != secrets {
+		t.Errorf("secret files outside the runtime directory: %q", environment)
+	}
 	if !strings.HasPrefix(environment["PATH"], filepath.Join(call.work, "venv", "bin")+":") {
 		t.Errorf("engine PATH %q lacks the Ansible environment", environment["PATH"])
 	}
-	for path, want := range map[string]string{environment["PUBLISHER_APP_PRIVATE_KEY_FILE"]: strings.TrimSpace(h.credentials[PublisherAppKey]) + "\n", filepath.Join(call.work, "home", ".ssh", "known_hosts"): "fredrir-06 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA\n"} {
-		data, err := os.ReadFile(path)
-		info, statErr := os.Stat(path)
-		if err != nil || statErr != nil || string(data) != want || info.Mode().Perm() != 0o600 {
-			t.Errorf("%s does not hold the expected private content (%v, %v)", path, err, statErr)
-		}
+	if data, err := os.ReadFile(environment["PUBLISHER_APP_PRIVATE_KEY_FILE"]); err != nil || string(data) != strings.TrimSpace(h.credentials[PublisherAppKey])+"\n" {
+		t.Errorf("publisher key file does not hold the key: %v", err)
 	}
-	if identity, err := os.ReadFile(filepath.Join(call.work, "home", ".ssh", "id_ed25519")); err != nil || !bytes.Contains(identity, []byte("OPENSSH PRIVATE KEY")) {
-		t.Errorf("SSH identity %q: %v", identity, err)
+	if entries, err := os.ReadDir(filepath.Join(call.work, "home")); err != nil || len(entries) != 0 {
+		t.Errorf("engine HOME holds %v: %v", entries, err)
+	}
+	extra, ok := environment["ANSIBLE_SSH_EXTRA_ARGS"]
+	if ok != hosts {
+		t.Fatalf("host access %q with hosts selected %v", extra, hosts)
+	}
+	if hosts {
+		config, err := os.ReadFile(strings.TrimPrefix(extra, "-F "))
+		if err != nil || filepath.Dir(strings.TrimPrefix(extra, "-F ")) != secrets || !strings.Contains(string(config), "IdentityFile "+h.applier.Identity+"\n") || !strings.Contains(string(config), "UserKnownHostsFile "+h.applier.Config.KnownHosts+"\n") {
+			t.Errorf("SSH configuration %q: %s %v", extra, config, err)
+		}
 	}
 	var config kubeconfig
 	data, err := os.ReadFile(environment["KUBECONFIG"])
@@ -378,23 +453,53 @@ func (h *applyHarness) ledger(t *testing.T) Ledger {
 	return ledger
 }
 
+func (h *applyHarness) commit(t *testing.T, files map[string]string) string {
+	t.Helper()
+	for path, content := range files {
+		if err := os.MkdirAll(filepath.Join(h.origin, filepath.Dir(path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(h.origin, path), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gitCommand(t, h.origin, "add", ".")
+	gitCommand(t, h.origin, "commit", "--quiet", "--no-gpg-sign", "-m", "change")
+	return gitCommand(t, h.origin, "rev-parse", "main")
+}
+
+func (h *applyHarness) settle(t *testing.T, ledger Ledger) {
+	t.Helper()
+	if err := saveLedger(h.applier.Config.State, ledger); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (h *applyHarness) reset(t *testing.T) {
+	t.Helper()
+	h.mu.Lock()
+	h.commands, h.applies = nil, nil
+	h.mu.Unlock()
+	h.github.checks, h.github.outputs, h.gatus.received = nil, nil, nil
+	h.bucket.puts = map[string][]byte{}
+	h.writeCredentials(t)
+}
+
 func TestApplyGatesTheMainTipBeforeBuildingAndPublishesThroughTheEngine(t *testing.T) {
 	h := newApplyHarness(t)
 	if err := h.applier.Apply(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	gate, build, apply := h.index(t, "supervisor reconcile provenance"), h.index(t, "go build"), h.index(t, "infra reconcile apply")
-	if gate < 0 || h.index(t, "supervisor ci install-tools") > gate || gate > build || build > apply || h.index(t, "uv sync") > apply {
+	gate, build, validate, apply := h.index(t, "supervisor reconcile provenance"), h.index(t, "go build"), h.index(t, "infra ci validate --before="+h.applied), h.index(t, "infra reconcile apply")
+	if gate < 0 || h.index(t, "supervisor ci install-tools") > gate || gate > build || build > validate || validate > apply || h.index(t, "uv sync") > validate || h.index(t, "infra ci prepare-validation --before="+h.applied) > validate {
 		t.Fatalf("commands ran in order %q", h.commands)
-	}
-	for _, step := range []string{"prepare-validation", "validate"} {
-		if position := h.index(t, "infra ci "+step+" --before="+h.applied); position < build || position > apply {
-			t.Errorf("ci %s ran at %d in %q", step, position, h.commands)
-		}
 	}
 	source := filepath.Join(h.applies[0].work, "source")
 	if want := []string{"reconcile", "apply", "--root=" + source, "--state-bucket=llunde-pyparser-bucket", "--state-prefix=reconciliation/production", "--wait=11m", "--report=" + filepath.Join(h.applies[0].work, "status.json")}; len(h.applies) != 1 || !slices.Equal(h.applies[0].args, want) {
 		t.Fatalf("engine applied %q, want %q", h.applies[0].args, want)
+	}
+	if requirements := h.commands[h.index(t, "infra reconcile requirements")]; requirements != "infra reconcile requirements --root="+source+" --state-bucket=llunde-pyparser-bucket --state-prefix=reconciliation/production" || h.index(t, "infra reconcile requirements") < validate {
+		t.Errorf("requirements ran as %q", requirements)
 	}
 	if gate := h.commands[h.index(t, "supervisor reconcile provenance")]; gate != "supervisor reconcile provenance --root="+source+" --state-bucket=llunde-pyparser-bucket --state-prefix=reconciliation/production --report="+filepath.Join(h.applies[0].work, "provenance.json") {
 		t.Errorf("gate ran %q", gate)
@@ -419,14 +524,14 @@ func TestApplyGatesTheMainTipBeforeBuildingAndPublishesThroughTheEngine(t *testi
 	if want := []url.Values{{"success": {"true"}}}; !reflect.DeepEqual(h.gatus.received, want) {
 		t.Errorf("heartbeats %v", h.gatus.received)
 	}
-	if ledger := h.ledger(t); ledger.Revision != h.tip || ledger.Outcome != OutcomeApplied || ledger.Repair != nil {
+	if ledger := h.ledger(t); ledger.Revision != h.tip || ledger.Outcome != OutcomeApplied || ledger.LastRepair != nil || ledger.Full || ledger.Attempts != 0 {
 		t.Errorf("ledger %+v", ledger)
 	}
 	if entries, err := os.ReadDir(filepath.Join(h.applier.Config.State, "runs")); err != nil || len(entries) != 0 {
 		t.Errorf("run directory kept %v: %v", entries, err)
 	}
-	if _, err := os.Stat(h.applier.Credentials); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("credentials outlived the run: %v", err)
+	if entries, err := os.ReadDir(h.runtime()); err != nil || len(entries) != 0 {
+		t.Errorf("runtime directory kept %v: %v", entries, err)
 	}
 	decision, err := h.applier.Pending(context.Background())
 	if err != nil || decision.Run {
@@ -434,32 +539,233 @@ func TestApplyGatesTheMainTipBeforeBuildingAndPublishesThroughTheEngine(t *testi
 	}
 }
 
-func TestApplyRefusesToBuildAnUnverifiedTip(t *testing.T) {
+func TestApplyMintsNoRunnerTokenOrHostAccessWithoutHostChanges(t *testing.T) {
 	h := newApplyHarness(t)
-	h.gate = func(t *testing.T, call engineCall) (int, string) {
-		return 1, fmt.Sprintf(`{"base":%q,"revision":%q,"error":"commit %s is not SSH-signed by an administrator"}`, h.applied, h.tip, h.tip[:12])
+	h.selection = reconcile.Selection{Kubernetes: true, Projects: []string{"portfolio"}}
+	if err := h.applier.Apply(context.Background()); err != nil {
+		t.Fatal(err)
 	}
-	err := h.applier.Apply(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "is not SSH-signed") {
-		t.Fatalf("apply returned %v", err)
+	if _, minted := h.github.minted[fmt.Sprint(runnerInstall)]; minted || len(h.applies) != 1 {
+		t.Fatalf("minted %v for applies %d", h.github.minted, len(h.applies))
 	}
-	if h.index(t, "go ") >= 0 || h.index(t, "infra ") >= 0 || h.index(t, "uv ") >= 0 {
-		t.Fatalf("checkout tooling ran after a failed gate: %q", h.commands)
+}
+
+func TestGateReportsBindTheCheckedRevision(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		report   func(h *applyHarness) (int, string)
+		want     string
+		terminal bool
+	}{
+		{name: "another revision", report: func(h *applyHarness) (int, string) {
+			return 0, fmt.Sprintf(`{"base":%q,"revision":%q}`, h.applied, h.applied)
+		}, want: "provenance report covers", terminal: true},
+		{name: "invalid base", report: func(h *applyHarness) (int, string) {
+			return 0, fmt.Sprintf(`{"base":"main","revision":%q}`, h.tip)
+		}, want: `invalid base "main"`, terminal: true},
+		{name: "rejected commit", report: func(h *applyHarness) (int, string) {
+			return 1, fmt.Sprintf(`{"base":%q,"revision":%q,"error":"commit %s is not SSH-signed by an administrator"}`, h.applied, h.tip, h.tip[:12])
+		}, want: "is not SSH-signed", terminal: true},
+		{name: "state unreadable", report: func(h *applyHarness) (int, string) {
+			return 1, `{"base":"","revision":"","error":"read reconciliation status: 503 Slow Down"}`
+		}, want: "503 Slow Down"},
+		{name: "gate crashed", report: func(h *applyHarness) (int, string) { return -1, "" }, want: "no such file"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			h := newApplyHarness(t)
+			h.gate = func(t *testing.T, call engineCall) (int, string) { return test.report(h) }
+			err := h.applier.Apply(context.Background())
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("apply returned %v, want %q", err, test.want)
+			}
+			if h.index(t, "go ") >= 0 || h.index(t, "infra ") >= 0 || h.index(t, "uv ") >= 0 {
+				t.Fatalf("checkout tooling ran after a failed gate: %q", h.commands)
+			}
+			run, _ := h.uploaded(t)
+			want, conclusion := OutcomeRetry, "complete neutral"
+			if test.terminal {
+				want, conclusion = reconcile.OutcomeFailed, "complete failure"
+			}
+			if run.Outcome != want || run.Stage != "provenance" || h.ledger(t).Outcome != want || !slices.Equal(h.github.checks, []string{"create " + h.tip + " in_progress", conclusion}) {
+				t.Errorf("uploaded run %+v, check run %q", run, h.github.checks)
+			}
+			if len(h.gatus.received) != 1 || h.gatus.received[0].Get("success") != "false" || !strings.Contains(h.gatus.received[0].Get("error"), test.want) {
+				t.Errorf("heartbeats %v", h.gatus.received)
+			}
+			decision, err := h.applier.Pending(context.Background())
+			if err != nil || decision.Run == test.terminal {
+				t.Errorf("after a %s gate failure pending decided %+v, %v", map[bool]string{true: "terminal", false: "transient"}[test.terminal], decision, err)
+			}
+		})
 	}
-	if run, _ := h.uploaded(t); run.Outcome != reconcile.OutcomeFailed || run.Stage != "provenance" {
-		t.Errorf("uploaded run %+v", run)
+}
+
+func TestTransientFailuresRetryAndDeterministicFailuresWait(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		prepare  func(h *applyHarness)
+		stage    string
+		terminal bool
+	}{
+		{name: "module proxy down", stage: "build", prepare: func(h *applyHarness) {
+			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) {
+				if name == "build" {
+					return process.Result{ExitCode: 1}, errors.New("proxy.golang.org: 502")
+				}
+				return process.Result{}, nil
+			}
+		}},
+		{name: "tool download", stage: "tools", prepare: func(h *applyHarness) {
+			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) {
+				if name == "tools" {
+					return process.Result{ExitCode: 1}, errors.New("download tofu: 503")
+				}
+				return process.Result{}, nil
+			}
+		}},
+		{name: "gate tool download", stage: "provenance", prepare: func(h *applyHarness) {
+			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) {
+				if name == "gate-tools" {
+					return process.Result{ExitCode: 1}, errors.New("download cosign: 503")
+				}
+				return process.Result{}, nil
+			}
+		}},
+		{name: "PyPI down", stage: "tools", prepare: func(h *applyHarness) {
+			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) {
+				if name == "uv" {
+					return process.Result{ExitCode: 2}, errors.New("pypi: timeout")
+				}
+				return process.Result{}, nil
+			}
+		}},
+		{name: "provider download during validation", stage: "validate", prepare: func(h *applyHarness) {
+			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) {
+				if name == "prepare-validation" {
+					return process.Result{ExitCode: 1}, errors.New("registry.opentofu.org: 503")
+				}
+				return process.Result{}, nil
+			}
+		}},
+		{name: "state unreadable for requirements", stage: "requirements", prepare: func(h *applyHarness) {
+			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) {
+				if name == "requirements" {
+					return process.Result{ExitCode: 1}, errors.New("s3: 503")
+				}
+				return process.Result{}, nil
+			}
+		}},
+		{name: "runner token", stage: "credentials", prepare: func(h *applyHarness) { h.github.failMint = true }},
+		{name: "missing credential", stage: "credentials", prepare: func(h *applyHarness) { delete(h.credentials, KubernetesToken) }},
+		{name: "engine killed", stage: "apply", prepare: func(h *applyHarness) {
+			h.engine = func(t *testing.T, call engineCall) (int, string) { return -1, "" }
+		}},
+		{name: "invalid declarations", stage: "validate", terminal: true, prepare: func(h *applyHarness) {
+			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) {
+				if name == "validate" {
+					return process.Result{ExitCode: 1}, errors.New("tofu validate failed")
+				}
+				return process.Result{}, nil
+			}
+		}},
+		{name: "engine failure", stage: "apply", terminal: true, prepare: func(h *applyHarness) {
+			h.engine = func(t *testing.T, call engineCall) (int, string) {
+				return 1, fmt.Sprintf(`{"desired_revision":%q,"applied_revision":%q,"stage":"hosts","failure":"hosts: fredrir-09 unreachable"}`, h.tip, h.applied)
+			}
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			h := newApplyHarness(t)
+			test.prepare(h)
+			if test.name == "missing credential" {
+				h.writeCredentials(t)
+			}
+			if err := h.applier.Apply(context.Background()); err == nil {
+				t.Fatal("a failed run returned no error")
+			}
+			ledger := h.ledger(t)
+			want, conclusion := OutcomeRetry, "neutral"
+			if test.terminal {
+				want, conclusion = reconcile.OutcomeFailed, "failure"
+			}
+			if ledger.Outcome != want || ledger.Revision != h.tip {
+				t.Fatalf("ledger %+v, want %s", ledger, want)
+			}
+			if run, _ := h.uploaded(t); run.Stage != test.stage {
+				t.Errorf("failed at %s, want %s", run.Stage, test.stage)
+			}
+			if test.name != "missing credential" && (len(h.github.checks) != 2 || h.github.checks[1] != "complete "+conclusion) {
+				t.Errorf("check run %q", h.github.checks)
+			}
+			if test.name != "missing credential" && (len(h.gatus.received) != 1 || h.gatus.received[0].Get("success") != "false") {
+				t.Errorf("heartbeats %v", h.gatus.received)
+			}
+			decision, err := h.applier.Pending(context.Background())
+			if err != nil || decision.Run == test.terminal {
+				t.Fatalf("pending decided %+v, %v", decision, err)
+			}
+			if test.terminal {
+				return
+			}
+			h.reset(t)
+			h.applier.Now = func() time.Time { return time.Date(2026, 9, 26, 3, 0, 1, 0, time.UTC) }
+			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) { return process.Result{}, nil }
+			h.github.failMint = false
+			h.credentials = applyCredentialValues(t)
+			h.writeCredentials(t)
+			h.engine = func(t *testing.T, call engineCall) (int, string) {
+				return 0, fmt.Sprintf(`{"desired_revision":%q,"applied_revision":%q,"stage":"complete"}`, h.tip, h.tip)
+			}
+			if err := h.applier.Apply(context.Background()); err != nil {
+				t.Fatalf("the retry failed: %v", err)
+			}
+			if ledger := h.ledger(t); ledger.Outcome != OutcomeApplied || ledger.Attempts != 0 {
+				t.Errorf("the retry left %+v", ledger)
+			}
+		})
 	}
-	if !slices.Equal(h.github.checks, []string{"create " + h.tip + " in_progress", "complete failure"}) {
-		t.Errorf("check run %q", h.github.checks)
+}
+
+func TestACrashedRunIsRetriedWithItsIntent(t *testing.T) {
+	h := newApplyHarness(t)
+	h.settle(t, Ledger{Revision: h.tip, Outcome: OutcomeRunning, Full: true, Repair: true, Attempts: 1, RetryAt: h.applier.Now(), Started: h.applier.Now().Add(-time.Hour), Checked: h.applier.Now().Add(-time.Hour)})
+	if err := h.applier.Apply(context.Background()); err != nil {
+		t.Fatal(err)
 	}
-	if len(h.gatus.received) != 1 || h.gatus.received[0].Get("success") != "false" || !strings.Contains(h.gatus.received[0].Get("error"), "is not SSH-signed") {
-		t.Errorf("heartbeats %v", h.gatus.received)
+	if len(h.applies) != 1 || !slices.Contains(h.applies[0].args, "--full") {
+		t.Fatalf("the retry applied %v", h.applies)
 	}
-	if ledger := h.ledger(t); ledger.Outcome != reconcile.OutcomeFailed || ledger.Revision != h.tip {
+	if ledger := h.ledger(t); ledger.Outcome != OutcomeApplied || ledger.LastRepair == nil || ledger.LastRepair.Revision != h.tip {
 		t.Errorf("ledger %+v", ledger)
 	}
-	if decision, err := h.applier.Pending(context.Background()); err != nil || decision.Run {
-		t.Errorf("a failed tip is retried: %+v, %v", decision, err)
+}
+
+func TestADeferredRepairKeepsFullAndDoesNotSpendTheCap(t *testing.T) {
+	h := newApplyHarness(t)
+	h.settle(t, Ledger{Revision: h.tip, Outcome: OutcomeApplied, Checked: h.applier.Now()})
+	if err := WriteRequest(h.applier.Config.Shared, Request{Kind: RequestRepair, Revision: h.tip, Full: true, Reason: "1 differences: opentofu: drift", Requested: h.applier.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	h.engine = func(t *testing.T, call engineCall) (int, string) { return exitRetry, "" }
+	if err := h.applier.Apply(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if ledger := h.ledger(t); ledger.Outcome != OutcomeDeferred || !ledger.Full || !ledger.Repair || ledger.LastRepair != nil {
+		t.Fatalf("deferred repair left %+v", ledger)
+	}
+	h.reset(t)
+	h.applier.Now = func() time.Time { return time.Date(2026, 9, 26, 3, 1, 0, 0, time.UTC) }
+	h.engine = func(t *testing.T, call engineCall) (int, string) {
+		return 0, fmt.Sprintf(`{"desired_revision":%q,"applied_revision":%q,"stage":"complete"}`, h.tip, h.tip)
+	}
+	if err := h.applier.Apply(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.applies) != 1 || !slices.Contains(h.applies[0].args, "--full") {
+		t.Fatalf("the retried repair applied %v", h.applies)
+	}
+	if ledger := h.ledger(t); ledger.LastRepair == nil || ledger.LastRepair.Outcome != OutcomeApplied || ledger.Full {
+		t.Errorf("ledger %+v", ledger)
 	}
 }
 
@@ -476,11 +782,7 @@ func TestApplyDefersOrYieldsWhenTheEngineAsksForARetry(t *testing.T) {
 			h := newApplyHarness(t)
 			h.engine = func(t *testing.T, call engineCall) (int, string) {
 				if test.advance {
-					if err := os.WriteFile(filepath.Join(h.origin, "next"), []byte("next"), 0o644); err != nil {
-						t.Fatal(err)
-					}
-					gitCommand(t, h.origin, "add", ".")
-					gitCommand(t, h.origin, "commit", "--quiet", "--no-gpg-sign", "-m", "next")
+					h.commit(t, map[string]string{"next": "next"})
 				}
 				return exitRetry, ""
 			}
@@ -501,89 +803,60 @@ func TestApplyDefersOrYieldsWhenTheEngineAsksForARetry(t *testing.T) {
 	}
 }
 
-func TestApplyFailureIsReportedOnceAndNotRetried(t *testing.T) {
-	h := newApplyHarness(t)
-	h.engine = func(t *testing.T, call engineCall) (int, string) {
-		return 1, fmt.Sprintf(`{"desired_revision":%q,"applied_revision":%q,"stage":"hosts","failure":"hosts: fredrir-09 unreachable"}`, h.tip, h.applied)
-	}
-	if err := h.applier.Apply(context.Background()); err == nil || !strings.Contains(err.Error(), "fredrir-09 unreachable") {
-		t.Fatalf("apply returned %v", err)
-	}
-	if len(h.gatus.received) != 1 || !strings.Contains(h.gatus.received[0].Get("error"), "reconciliation of "+h.tip+" failed: hosts: fredrir-09 unreachable") {
-		t.Errorf("heartbeats %v", h.gatus.received)
-	}
-	if h.github.outputs[0]["title"] != "Failed at apply" || !strings.Contains(h.github.outputs[0]["summary"].(string), "fredrir-09 unreachable") {
-		t.Errorf("check run output %v", h.github.outputs)
-	}
-	if decision, err := h.applier.Pending(context.Background()); err != nil || decision.Run {
-		t.Errorf("a failed tip is retried: %+v, %v", decision, err)
-	}
-}
-
-func TestApplyRecordsPushIgnoredCommitsWithoutRunning(t *testing.T) {
-	h := newApplyHarness(t)
-	if err := saveLedger(h.applier.Config.State, Ledger{Revision: h.tip, Outcome: OutcomeApplied, Checked: h.applier.Now()}); err != nil {
-		t.Fatal(err)
-	}
-	for path, content := range map[string]string{"docs/runbook.md": "runbook", "README.md": "readme", "build/evidence/run.json": "{}"} {
-		if err := os.MkdirAll(filepath.Join(h.origin, filepath.Dir(path)), 0o755); err != nil {
+func TestPushIgnoredCommitsAreSkippedOnlyAfterASettledAncestor(t *testing.T) {
+	documents := map[string]string{"docs/runbook.md": "runbook", "README.md": "readme", "build/evidence/run.json": "{}"}
+	t.Run("settled ancestor", func(t *testing.T) {
+		h := newApplyHarness(t)
+		h.settle(t, Ledger{Revision: h.tip, Outcome: OutcomeApplied, Checked: h.applier.Now()})
+		documented := h.commit(t, documents)
+		if err := h.applier.Apply(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(h.origin, path), []byte(content), 0o644); err != nil {
-			t.Fatal(err)
+		if h.index(t, "supervisor ") >= 0 || h.index(t, "go ") >= 0 || len(h.github.checks) != 0 || len(h.gatus.received) != 0 || len(h.bucket.puts) != 0 {
+			t.Fatalf("a push-ignored commit ran %q", h.commands)
 		}
+		if ledger := h.ledger(t); ledger.Revision != documented || ledger.Outcome != OutcomeApplied {
+			t.Errorf("ledger %+v", ledger)
+		}
+		h.reset(t)
+		h.tip = h.commit(t, map[string]string{"tofu/main.tf": "# change"})
+		if err := h.applier.Apply(context.Background()); err != nil || len(h.applies) != 1 {
+			t.Fatalf("a declaration change did not apply: %v %q", err, h.commands)
+		}
+	})
+	for _, outcome := range []string{OutcomeDeferred, OutcomeSuperseded, OutcomeRetry, OutcomeRunning} {
+		t.Run("unsettled "+outcome, func(t *testing.T) {
+			h := newApplyHarness(t)
+			h.settle(t, Ledger{Revision: h.tip, Outcome: outcome, Checked: h.applier.Now()})
+			h.tip = h.commit(t, documents)
+			if err := h.applier.Apply(context.Background()); err != nil || len(h.applies) != 1 {
+				t.Fatalf("an unapplied revision was skipped behind a push-ignored commit: %v %q", err, h.commands)
+			}
+		})
 	}
-	gitCommand(t, h.origin, "add", ".")
-	gitCommand(t, h.origin, "commit", "--quiet", "--no-gpg-sign", "-m", "document")
-	documented := gitCommand(t, h.origin, "rev-parse", "main")
-	if err := h.applier.Apply(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if h.index(t, "supervisor ") >= 0 || h.index(t, "go ") >= 0 || len(h.github.checks) != 0 || len(h.gatus.received) != 0 || len(h.bucket.puts) != 0 {
-		t.Fatalf("a push-ignored commit ran %q", h.commands)
-	}
-	if ledger := h.ledger(t); ledger.Revision != documented || ledger.Outcome != OutcomeApplied {
-		t.Errorf("ledger %+v", ledger)
-	}
-	if err := os.WriteFile(filepath.Join(h.origin, "tofu", "main.tf"), []byte("# change"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	gitCommand(t, h.origin, "add", ".")
-	gitCommand(t, h.origin, "commit", "--quiet", "--no-gpg-sign", "-m", "change")
-	h.tip = gitCommand(t, h.origin, "rev-parse", "main")
-	h.applier.Credentials = writeCredentials(t, anyValues(h.credentials))
-	if err := h.applier.Apply(context.Background()); err != nil || len(h.applies) != 1 {
-		t.Fatalf("a declaration change did not apply: %v %q", err, h.commands)
-	}
-}
-
-func TestApplyRepairsFullyOncePerRevision(t *testing.T) {
-	h := newApplyHarness(t)
-	if err := saveLedger(h.applier.Config.State, Ledger{Revision: h.tip, Outcome: OutcomeApplied, Checked: h.applier.Now()}); err != nil {
-		t.Fatal(err)
-	}
-	repair := Request{Kind: RequestRepair, Revision: h.tip, Full: true, Reason: "1 differences: opentofu: drift", Requested: h.applier.Now()}
-	if err := WriteRequest(h.applier.Config.Shared, repair); err != nil {
-		t.Fatal(err)
-	}
-	if err := h.applier.Apply(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if len(h.applies) != 1 || !slices.Contains(h.applies[0].args, "--full") {
-		t.Fatalf("repair applied %v", h.applies)
-	}
-	if ledger := h.ledger(t); ledger.Repair == nil || ledger.Repair.Revision != h.tip || ledger.Repair.Outcome != OutcomeApplied {
-		t.Errorf("ledger %+v", ledger)
-	}
-	if _, err := os.Stat(filepath.Join(h.applier.Config.Shared, "requests", "repair.json")); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("the repair request survived: %v", err)
-	}
-	if err := WriteRequest(h.applier.Config.Shared, repair); err != nil {
-		t.Fatal(err)
-	}
-	if decision, err := h.applier.Pending(context.Background()); err != nil || decision.Run {
-		t.Errorf("a second repair within six hours is pending: %+v, %v", decision, err)
-	}
+	t.Run("unrelated history", func(t *testing.T) {
+		h := newApplyHarness(t)
+		gitCommand(t, h.origin, "checkout", "--quiet", "--orphan", "rewritten")
+		gitCommand(t, h.origin, "commit", "--quiet", "--no-gpg-sign", "-m", "rewritten")
+		rewritten := gitCommand(t, h.origin, "rev-parse", "HEAD")
+		gitCommand(t, h.origin, "checkout", "--quiet", "main")
+		h.settle(t, Ledger{Revision: rewritten, Outcome: OutcomeApplied, Checked: h.applier.Now()})
+		if err := h.applier.Apply(context.Background()); err != nil || len(h.applies) != 1 {
+			t.Fatalf("a tip that does not descend from the handled revision was skipped: %v %q", err, h.commands)
+		}
+	})
+	t.Run("failed revision keeps the blame", func(t *testing.T) {
+		h := newApplyHarness(t)
+		failed := "reconciliation of " + h.tip + " failed at apply: hosts: unreachable"
+		h.settle(t, Ledger{Revision: h.tip, Outcome: reconcile.OutcomeFailed, Failure: failed, Checked: h.applier.Now()})
+		h.commit(t, documents)
+		if err := h.applier.Apply(context.Background()); err != nil || len(h.applies) != 0 {
+			t.Fatalf("a push-ignored commit ran after a failure: %v %q", err, h.commands)
+		}
+		if ledger := h.ledger(t); ledger.Failure != failed || ledger.Outcome != reconcile.OutcomeFailed {
+			t.Errorf("ledger %+v", ledger)
+		}
+	})
 }
 
 func TestReadinessReportsTheLedgerAndExpiringCredentialsDaily(t *testing.T) {
@@ -597,14 +870,12 @@ func TestReadinessReportsTheLedgerAndExpiringCredentialsDaily(t *testing.T) {
 		{name: "offset expiry", expiration: "2027-09-26 12:00:00 +0200", outcome: OutcomeApplied, want: url.Values{"success": {"true"}}},
 		{name: "expiring token", expiration: "2026-10-10 12:00:00 UTC", outcome: OutcomeApplied, want: url.Values{"success": {"false"}, "error": {"provenance token: expires 2026-10-10"}}},
 		{name: "token without expiry", outcome: OutcomeApplied, want: url.Values{"success": {"false"}, "error": {"provenance token: has no expiry"}}},
-		{name: "failed tip", expiration: "2027-09-26 12:00:00 UTC", outcome: reconcile.OutcomeFailed, want: url.Values{"success": {"false"}}},
+		{name: "failed tip", expiration: "2027-09-26 12:00:00 UTC", outcome: reconcile.OutcomeFailed, want: url.Values{"success": {"false"}, "error": {"reconciliation failed"}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			h := newApplyHarness(t)
 			h.github.expiration = test.expiration
-			if err := saveLedger(h.applier.Config.State, Ledger{Revision: h.tip, Outcome: test.outcome, Failure: "hosts: unreachable", Checked: h.applier.Now().Add(-readinessInterval)}); err != nil {
-				t.Fatal(err)
-			}
+			h.settle(t, Ledger{Revision: h.tip, Outcome: test.outcome, Failure: "reconciliation failed", Checked: h.applier.Now().Add(-readinessInterval)})
 			err := h.applier.Apply(context.Background())
 			if (err == nil) != (test.want.Get("success") == "true") {
 				t.Fatalf("readiness returned %v", err)
@@ -612,11 +883,7 @@ func TestReadinessReportsTheLedgerAndExpiringCredentialsDaily(t *testing.T) {
 			if len(h.applies) != 0 || h.index(t, "go ") >= 0 || len(h.github.checks) != 0 {
 				t.Fatalf("readiness reconciled: %q", h.commands)
 			}
-			got := h.gatus.received
-			if test.outcome == reconcile.OutcomeFailed && len(got) == 1 && strings.Contains(got[0].Get("error"), "reconciliation of "+h.tip+" failed: hosts: unreachable") {
-				got = []url.Values{{"success": got[0]["success"]}}
-			}
-			if !reflect.DeepEqual(got, []url.Values{test.want}) {
+			if !reflect.DeepEqual(h.gatus.received, []url.Values{test.want}) {
 				t.Errorf("heartbeats %v, want %v", h.gatus.received, test.want)
 			}
 			if ledger := h.ledger(t); !ledger.Checked.Equal(h.applier.Now()) || ledger.Outcome != test.outcome {
@@ -641,6 +908,9 @@ func TestPendingNeedsNoCredentials(t *testing.T) {
 	if len(h.github.minted)+h.github.rateReads+len(h.bucket.puts)+len(h.gatus.received) != 0 {
 		t.Error("pending reached a credentialed service")
 	}
+	if entries, err := os.ReadDir(h.applier.Config.State); err != nil || len(entries) != 0 {
+		t.Errorf("pending wrote %v: %v", entries, err)
+	}
 }
 
 func TestApplyWaitsForTheHostLock(t *testing.T) {
@@ -663,6 +933,70 @@ func TestApplyWaitsForTheHostLock(t *testing.T) {
 	}
 	if err := <-done; err != nil || len(h.applies) != 1 {
 		t.Fatalf("apply after release: %v", err)
+	}
+}
+
+func TestOnlyIgnoredRequiresTheHandledRevisionAsAnAncestor(t *testing.T) {
+	origin, _ := originRepository(t)
+	base := gitCommand(t, origin, "rev-parse", "main")
+	gitCommand(t, origin, "checkout", "--quiet", "-b", "side")
+	if err := os.WriteFile(filepath.Join(origin, "README.md"), []byte("side"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitCommand(t, origin, "add", ".")
+	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "side")
+	side := gitCommand(t, origin, "rev-parse", "side")
+	gitCommand(t, origin, "checkout", "--quiet", "main")
+	if err := os.WriteFile(filepath.Join(origin, "CHANGELOG.md"), []byte("main"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitCommand(t, origin, "add", ".")
+	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "main")
+	tip := gitCommand(t, origin, "rev-parse", "main")
+	hardened := hardenedExecutor(t)
+	if ignored, err := hardened.onlyIgnored(context.Background(), origin, base, tip); err != nil || !ignored {
+		t.Fatalf("an ancestor with push-ignored changes: %v, %v", ignored, err)
+	}
+	if ignored, err := hardened.onlyIgnored(context.Background(), origin, side, tip); err != nil || ignored {
+		t.Fatalf("a sibling with push-ignored differences was skipped: %v, %v", ignored, err)
+	}
+}
+
+func TestSecretsStayOnAMemoryBackedFileSystem(t *testing.T) {
+	if err := memoryBackedFilesystem("/dev/shm"); err != nil {
+		t.Skipf("no tmpfs at /dev/shm: %v", err)
+	}
+	disk, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if memoryBackedFilesystem(disk) == nil {
+		t.Skipf("%s is memory-backed", disk)
+	}
+	h := newApplyHarness(t)
+	memoryBacked = memoryBackedFilesystem
+	t.Cleanup(func() { memoryBacked = func(string) error { return nil } })
+	persistent, err := os.MkdirTemp(disk, ".credentials-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(persistent) })
+	data, err := os.ReadFile(h.applier.Credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.applier.Credentials = filepath.Join(persistent, "credentials.json")
+	if err := os.WriteFile(h.applier.Credentials, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.applier.Apply(context.Background()); err == nil || !strings.Contains(err.Error(), "is not on a memory-backed file system") {
+		t.Fatalf("apply returned %v", err)
+	}
+	if len(h.applies) != 0 || h.index(t, "supervisor ") >= 0 {
+		t.Fatalf("ran with secrets on disk: %q", h.commands)
+	}
+	if entries, err := os.ReadDir(persistent); err != nil || len(entries) != 0 {
+		t.Fatalf("left %v on disk: %v", entries, err)
 	}
 }
 

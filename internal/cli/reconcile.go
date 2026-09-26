@@ -238,7 +238,11 @@ func newRequestVerificationCommand() *cobra.Command {
 	return command
 }
 
-var errNothingPending = errors.New("nothing to reconcile")
+var ErrNothingPending = errors.New("nothing to reconcile")
+
+type conditionFailure struct{ error }
+
+func (c conditionFailure) Unwrap() error { return c.error }
 
 func newRunCommand() *cobra.Command {
 	var config, credentials, identity string
@@ -258,20 +262,23 @@ func newRunCommand() *cobra.Command {
 		}
 		return reconciler.Applier{Config: loaded, Credentials: credentials, Identity: identity, Log: cmd.OutOrStdout()}.Apply(cmd.Context())
 	}}
-	pending := &cobra.Command{Use: "pending", Short: "Exit 0 when the apply unit has work, without credentials", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	pending := &cobra.Command{Use: "pending", Short: "Exit 0 when the apply unit has work, 1 when it has none and 255 when it cannot tell, without credentials", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		loaded, err := reconciler.LoadApplyConfig(config)
 		if err != nil {
-			return err
+			return conditionFailure{err}
 		}
 		decision, err := reconciler.Applier{Config: loaded}.Pending(cmd.Context())
-		if err != nil {
-			fmt.Fprintln(cmd.ErrOrStderr(), "infra:", err)
+		switch {
+		case decision.Run:
+			if err != nil {
+				fmt.Fprintln(cmd.ErrOrStderr(), "infra:", err)
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), decision.Reason)
+			return nil
+		case err != nil:
+			return conditionFailure{err}
 		}
-		if !decision.Run {
-			return errNothingPending
-		}
-		fmt.Fprintln(cmd.OutOrStdout(), decision.Reason)
-		return nil
+		return ErrNothingPending
 	}}
 	request := &cobra.Command{Use: "request", Short: "Queue an apply of the main tip for the apply unit", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		loaded, err := reconciler.LoadApplyConfig(config)
