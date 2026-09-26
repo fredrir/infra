@@ -1,0 +1,60 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: node-local-dns
+  namespace: observability
+  labels:
+    release: monitoring
+spec:
+  jobLabel: k8s-app
+  sampleLimit: 5000
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  selector:
+    matchLabels:
+      k8s-app: node-local-dns
+  podMetricsEndpoints:
+  - port: metrics
+    relabelings:
+    - sourceLabels:
+      - __meta_kubernetes_pod_node_name
+      targetLabel: node
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: node-local-dns
+  namespace: observability
+spec:
+  groups:
+  - name: node-local-dns
+    rules:
+    - alert: NodeLocalDNSMetricsMissing
+      expr: up{job="node-local-dns"} == 0 or absent(up{job="node-local-dns"})
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Node-local DNS cache metrics are missing
+    - alert: NodeLocalDNSRestarted
+      expr: increase(kube_pod_container_status_restarts_total{namespace="kube-system",container="node-cache"}[15m]) > 0
+      labels:
+        severity: warning
+      annotations:
+        summary: Node-local DNS cache {{ $labels.pod }} restarted; pods on its node cannot resolve names while it is down
+    - alert: NodeLocalDNSSetupFailing
+      expr: increase(coredns_nodecache_setup_errors_total{job="node-local-dns"}[15m]) > 0
+      labels:
+        severity: warning
+      annotations:
+        summary: Node-local DNS cache on {{ $labels.node }} cannot maintain its {{ $labels.errortype }} setup
+    - alert: NodeLocalDNSServfailHigh
+      expr: |
+        sum by (node) (rate(coredns_dns_responses_total{job="node-local-dns",rcode="SERVFAIL"}[5m]))
+        / sum by (node) (rate(coredns_dns_responses_total{job="node-local-dns"}[5m])) > 0.05
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Node-local DNS cache on {{ $labels.node }} answers more than 5% of queries with SERVFAIL

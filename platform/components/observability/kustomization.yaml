@@ -10,6 +10,7 @@ resources:
 - alloy.yaml
 - network.yaml
 - node-exporter.yaml
+- node-local-dns.yaml
 - independent-monitor.yaml
 - build-vm.yaml
 - alertmanager.secret.sops.yaml

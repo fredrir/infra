@@ -37,6 +37,8 @@ spec:
       protocol: TCP
     - port: 9153
       protocol: TCP
+    - port: 9253
+      protocol: TCP
   - to:
     - namespaceSelector:
         matchLabels:
