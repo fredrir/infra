@@ -14,6 +14,7 @@ filegroup(
 exports_files([
     "components/backups/tools.Dockerfile",
     "components/observability/build-vm.yaml",
+    "versions.yaml",
 ])
 
 filegroup(

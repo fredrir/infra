@@ -61,6 +61,15 @@ filegroup(
 )
 
 filegroup(
+    name = "node_local_dns_data",
+    srcs = [
+        "ansible/roles/k3s/templates/config.yaml.j2",
+        "//platform:versions.yaml",
+    ],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "node_registration_data",
     srcs = ["ansible/inventory/production.yml"],
     visibility = ["//internal/policy:__pkg__"],
