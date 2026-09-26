@@ -210,7 +210,7 @@ func approval(login, commit string) *github.PullRequestReview {
 
 type reviewedMergeCase struct {
 	name       string
-	build      func() string
+	build      func(f *provenanceFixture) string
 	unverified []string
 }
 
@@ -223,17 +223,15 @@ func TestReviewedMergesThirdQuarter(t *testing.T) { testReviewedMergesQuarter(t,
 func TestReviewedMergesFourthQuarter(t *testing.T) { testReviewedMergesQuarter(t, 3) }
 
 func testReviewedMergesQuarter(t *testing.T, quarter int) {
-	f := newProvenanceFixture(t)
-	for index, test := range reviewedMergeCases(f) {
+	for index, test := range reviewedMergeCases(sharedProvenanceTemplate(t).base) {
 		if index%4 != quarter {
 			continue
 		}
 		t.Run(test.name, func(t *testing.T) {
-			f.git("checkout", "--quiet", "main")
-			f.git("reset", "--quiet", "--hard", f.base)
+			f := newProvenanceFixture(t)
 			f.git("push", "--quiet", "--force", "origin", "HEAD:main")
 			f.api.reset()
-			head := test.build()
+			head := test.build(f)
 			err := f.verify(f.base, head)
 			if len(test.unverified) == 0 {
 				if err != nil {
@@ -253,32 +251,32 @@ func testReviewedMergesQuarter(t *testing.T, quarter int) {
 	}
 }
 
-func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
+func reviewedMergeCases(base string) []reviewedMergeCase {
 	infrastructure := map[string]string{"tofu/main.tf": "# renovate\n"}
 	platform := map[string]string{"platform/projects/example/namespace.yaml": "# renovate\n"}
 	release := map[string]string{"platform/projects/web/release.yaml": "# renovate\n"}
-	advance := func() string {
+	advance := func(f *provenanceFixture) string {
 		return f.commit(f.owner, "Change platform", map[string]string{"platform/projects/web/kustomization.yaml": "# owner\n"})
 	}
 	return []reviewedMergeCase{
-		{name: "approved merge commit with its commits", build: func() string {
+		{name: "approved merge commit with its commits", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(7, infrastructure, platform)
-			advance()
+			advance(f)
 			merge := f.sign(f.mergeCommit(7, head), f.webFlow)
 			f.merged(7, renovate, head, merge, 2, approval(owner, head))
 			return merge
 		}},
-		{name: "approved squash merge", build: func() string {
+		{name: "approved squash merge", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(8, infrastructure, platform)
-			advance()
+			advance(f)
 			merge := f.sign(f.squash(8, head), f.webFlow)
 			f.forget(8)
 			f.merged(8, renovate, head, merge, 2, approval(owner, head))
 			return merge
 		}},
-		{name: "approved rebase merge of three commits", build: func() string {
+		{name: "approved rebase merge of three commits", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(9, infrastructure, platform, release)
-			advance()
+			advance(f)
 			merge := f.rebase(commits...)
 			f.forget(9)
 			if _, err := f.try("cat-file", "-e", head+"^{commit}"); err == nil {
@@ -288,7 +286,7 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.associate(9, f.git("rev-parse", merge+"~1"), f.git("rev-parse", merge+"~2"))
 			return merge
 		}},
-		{name: "approved merges by other code owners of their paths", build: func() string {
+		{name: "approved merges by other code owners of their paths", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(10, platform)
 			f.merged(10, renovate, head, f.sign(f.mergeCommit(10, head), f.webFlow), 1, approval(helper, head))
 			head, _ = f.pullRequest(11, infrastructure)
@@ -296,34 +294,34 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.merged(11, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}},
-		{name: "web-flow commit without a pull request", build: func() string {
+		{name: "web-flow commit without a pull request", build: func(f *provenanceFixture) string {
 			return f.sign(f.commit("", "Create tofu/main.tf", infrastructure), f.webFlow)
 		}, unverified: []string{"no pull request merged it"}},
-		{name: "owner-authored merge without approval", build: func() string {
+		{name: "owner-authored merge without approval", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(12, infrastructure)
 			merge := f.sign(f.mergeCommit(12, head), f.webFlow)
 			f.merged(12, owner, head, merge, 1)
 			return merge
 		}, unverified: []string{"no code owner approved the head", "accept them with a Provenance-Acknowledged trailer in an owner-signed commit, or push the change as owner-signed commits"}},
-		{name: "stale approval", build: func() string {
+		{name: "stale approval", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(13, platform, infrastructure)
 			merge := f.sign(f.mergeCommit(13, head), f.webFlow)
 			f.merged(13, renovate, head, merge, 2, approval(owner, commits[0]))
 			return merge
 		}, unverified: []string{"fredrir approved [0-9a-f]{12}, not the head"}},
-		{name: "approval by a reviewer outside CODEOWNERS", build: func() string {
+		{name: "approval by a reviewer outside CODEOWNERS", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(14, platform)
 			merge := f.sign(f.squash(14, head), f.webFlow)
 			f.merged(14, renovate, head, merge, 1, approval("outsider", head))
 			return merge
 		}, unverified: []string{"outsider is not a code owner in .github/CODEOWNERS"}},
-		{name: "approval by a code owner of other paths", build: func() string {
+		{name: "approval by a code owner of other paths", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(15, platform, infrastructure)
 			merge := f.sign(f.mergeCommit(15, head), f.webFlow)
 			f.merged(15, renovate, head, merge, 2, approval(helper, head))
 			return merge
 		}, unverified: []string{"no owner of tofu/main.tf in .github/CODEOWNERS"}},
-		{name: "approval by a bot", build: func() string {
+		{name: "approval by a bot", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(16, platform)
 			merge := f.sign(f.squash(16, head), f.webFlow)
 			bot := approval(helper, head)
@@ -331,13 +329,13 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.merged(16, renovate, head, merge, 1, bot)
 			return merge
 		}, unverified: []string{"helper is a Bot account"}},
-		{name: "approval by the author", build: func() string {
+		{name: "approval by the author", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(17, platform)
 			merge := f.sign(f.squash(17, head), f.webFlow)
 			f.merged(17, helper, head, merge, 1, approval(helper, head))
 			return merge
 		}, unverified: []string{"helper authored the pull request"}},
-		{name: "approval after an admin-bypass merge", build: func() string {
+		{name: "approval after an admin-bypass merge", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(18, platform)
 			merge := f.sign(f.squash(18, head), f.webFlow)
 			late := approval(owner, head)
@@ -345,7 +343,7 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.merged(18, renovate, head, merge, 1, late)
 			return merge
 		}, unverified: []string{"fredrir approved after the merge"}},
-		{name: "approval without a submission time", build: func() string {
+		{name: "approval without a submission time", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(37, platform)
 			merge := f.sign(f.squash(37, head), f.webFlow)
 			unsubmitted := approval(owner, head)
@@ -353,100 +351,100 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.merged(37, renovate, head, merge, 1, unsubmitted)
 			return merge
 		}, unverified: []string{"fredrir approved after the merge"}},
-		{name: "change to a path without a code owner", build: func() string {
+		{name: "change to a path without a code owner", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(38, platform, map[string]string{"ansible/site.yml": "# renovate\n"})
 			merge := f.sign(f.mergeCommit(38, head), f.webFlow)
 			f.merged(38, renovate, head, merge, 2, approval(owner, head))
 			return merge
 		}, unverified: []string{"no owner of ansible/site.yml in .github/CODEOWNERS"}},
-		{name: "merged pull request without a merge commit", build: func() string {
+		{name: "merged pull request without a merge commit", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(39, platform)
 			merge := f.sign(f.squash(39, head), f.webFlow)
 			f.merged(39, renovate, head, merge, 1, approval(owner, head)).MergeCommitSHA = github.Ptr("")
 			return merge
 		}, unverified: []string{`merge commit "" is not a revision`}},
-		{name: "changes requested after the approval", build: func() string {
+		{name: "changes requested after the approval", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(19, platform)
 			merge := f.sign(f.squash(19, head), f.webFlow)
 			f.merged(19, renovate, head, merge, 1, approval(owner, head), review(owner, "CHANGES_REQUESTED", head))
 			return merge
 		}, unverified: []string{"the latest review by fredrir is CHANGES_REQUESTED"}},
-		{name: "unmerged pull request", build: func() string {
+		{name: "unmerged pull request", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(20, platform)
 			merge := f.sign(f.mergeCommit(20, head), f.webFlow)
 			pull := f.merged(20, renovate, head, merge, 1, approval(owner, head))
 			pull.Merged, pull.MergedAt, pull.State = github.Ptr(false), nil, github.Ptr("open")
 			return merge
 		}, unverified: []string{"pull request #20: not merged"}},
-		{name: "pull request merged into another base", build: func() string {
+		{name: "pull request merged into another base", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(21, platform)
 			merge := f.sign(f.mergeCommit(21, head), f.webFlow)
 			f.merged(21, renovate, head, merge, 1, approval(owner, head)).Base.Ref = github.Ptr("develop")
 			return merge
 		}, unverified: []string{"merged into develop, not main"}},
-		{name: "commit pull requests API error", build: func() string {
+		{name: "commit pull requests API error", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(22, platform)
 			merge := f.sign(f.mergeCommit(22, head), f.webFlow)
 			f.merged(22, renovate, head, merge, 1, approval(owner, head))
 			f.api.unavailable = "/commits/"
 			return merge
 		}, unverified: []string{"list its pull requests", "502"}},
-		{name: "pull request API error", build: func() string {
+		{name: "pull request API error", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(23, platform)
 			merge := f.sign(f.squash(23, head), f.webFlow)
 			f.merged(23, renovate, head, merge, 1, approval(owner, head))
 			f.api.unavailable = "/pulls/23"
 			return merge
 		}, unverified: []string{"pull request #23: GET", "502"}},
-		{name: "review API error", build: func() string {
+		{name: "review API error", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(24, platform)
 			merge := f.sign(f.squash(24, head), f.webFlow)
 			f.merged(24, renovate, head, merge, 1, approval(owner, head))
 			f.api.unavailable = "/reviews"
 			return merge
 		}, unverified: []string{"pull request #24: list reviews", "502"}},
-		{name: "merge of another head", build: func() string {
+		{name: "merge of another head", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(25, platform, release)
-			advance()
+			advance(f)
 			merge := f.sign(f.mergeCommit(25, head), f.webFlow)
 			f.merged(25, renovate, commits[0], merge, 1, approval(owner, commits[0]))
 			return merge
 		}, unverified: []string{"merges [0-9a-f]{12}, not the head [0-9a-f]{12}"}},
-		{name: "unsigned merge commit", build: func() string {
+		{name: "unsigned merge commit", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(26, platform)
-			advance()
+			advance(f)
 			merge := f.mergeCommit(26, head)
 			f.merged(26, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"pull request #26: merge commit [0-9a-f]{12}: unsigned"}},
-		{name: "merge signed by another OpenPGP key", build: func() string {
+		{name: "merge signed by another OpenPGP key", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(27, platform)
 			merge := f.sign(f.squash(27, head), f.impostor)
 			f.merged(27, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"not signed by the key in keys/github-web-flow.asc at the base revision"}},
-		{name: "web-flow key replaced in the range", build: func() string {
+		{name: "web-flow key replaced in the range", build: func(f *provenanceFixture) string {
 			f.commit(f.owner, "Trust another web-flow key", map[string]string{webFlowKey: armoredPublicKey(f.t, f.impostor)})
 			head, _ := f.pullRequest(28, platform)
 			merge := f.sign(f.squash(28, head), f.impostor)
 			f.merged(28, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"not signed by the key in keys/github-web-flow.asc at the base revision"}},
-		{name: "code owner added in the range", build: func() string {
+		{name: "code owner added in the range", build: func(f *provenanceFixture) string {
 			f.commit(f.owner, "Add a code owner", map[string]string{codeOwners: "* @outsider\n"})
 			head, _ := f.pullRequest(29, platform)
 			merge := f.sign(f.squash(29, head), f.webFlow)
 			f.merged(29, renovate, head, merge, 1, approval("outsider", head))
 			return merge
-		}, unverified: []string{"outsider is not a code owner in .github/CODEOWNERS at " + f.base}},
-		{name: "merge commit outside the range", build: func() string {
+		}, unverified: []string{"outsider is not a code owner in .github/CODEOWNERS at " + base}},
+		{name: "merge commit outside the range", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(30, platform)
 			merge := f.sign(f.squash(30, head), f.webFlow)
 			f.merged(30, renovate, head, f.base, 1, approval(owner, head))
 			f.associate(30, merge)
 			return merge
-		}, unverified: []string{"merge commit " + f.base[:12] + " is not in the verified range"}},
-		{name: "unsigned commit attributed to an approved pull request", build: func() string {
+		}, unverified: []string{"merge commit " + base[:12] + " is not in the verified range"}},
+		{name: "unsigned commit attributed to an approved pull request", build: func(f *provenanceFixture) string {
 			foreign := f.commit("", "Change infrastructure", infrastructure)
 			head, _ := f.pullRequest(31, platform)
 			merge := f.sign(f.squash(31, head), f.webFlow)
@@ -454,7 +452,7 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.associate(31, foreign)
 			return merge
 		}, unverified: []string{"pull request #31: does not include it"}},
-		{name: "rebase merge with an interleaved foreign commit", build: func() string {
+		{name: "rebase merge with an interleaved foreign commit", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(32, platform, release, map[string]string{"platform/projects/example/application/application.yaml": "# renovate\n"})
 			f.rebase(commits[0])
 			f.commit("", "Change infrastructure", infrastructure)
@@ -463,7 +461,7 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.associate(32, f.git("rev-parse", merge+"~1"), f.git("rev-parse", merge+"~2"), f.git("rev-parse", merge+"~3"))
 			return merge
 		}, unverified: []string{"pull request #32: [0-9a-f]{12} differs from the head", `"Change infrastructure": unsigned`}},
-		{name: "rebase chain through a merge commit", build: func() string {
+		{name: "rebase chain through a merge commit", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(33, platform, release, infrastructure)
 			first := f.rebase(commits[0])
 			f.git("reset", "--quiet", "--hard", f.git("commit-tree", first+"^{tree}", "-p", first, "-p", f.base, "-m", "Merge applied history"))
@@ -473,7 +471,7 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.merged(33, renovate, head, merge, 3, approval(owner, head))
 			return merge
 		}, unverified: []string{"rebase merge of 3 commits is not a linear chain in the verified range"}},
-		{name: "rebased commits that change the approved content", build: func() string {
+		{name: "rebased commits that change the approved content", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(34, platform, release)
 			f.rebase(commits...)
 			merge := f.amend(infrastructure)
@@ -481,7 +479,7 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.associate(34, f.git("rev-parse", merge+"~1"))
 			return merge
 		}, unverified: []string{"pull request #34: [0-9a-f]{12} differs from the head"}},
-		{name: "rebase merge with a conflict", build: func() string {
+		{name: "rebase merge with a conflict", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(35, map[string]string{"platform/projects/web/release.yaml": "# renovate\n"})
 			main := f.commit(f.owner, "Change the release", map[string]string{"platform/projects/web/release.yaml": "# owner\n"})
 			conflicted, _ := f.try("merge-tree", "--write-tree", "--no-messages", main, head)
@@ -491,49 +489,49 @@ func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 			f.merged(35, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"merge the head"}},
-		{name: "merge commit with content beyond the head", build: func() string {
+		{name: "merge commit with content beyond the head", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(42, platform)
-			advance()
+			advance(f)
 			f.mergeCommit(42, head)
 			merge := f.sign(f.amend(infrastructure), f.webFlow)
 			f.merged(42, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"pull request #42: [0-9a-f]{12} differs from the head [0-9a-f]{12} merged onto"}},
-		{name: "squash with content beyond the head", build: func() string {
+		{name: "squash with content beyond the head", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(43, platform)
 			f.squash(43, head)
 			merge := f.sign(f.amend(infrastructure), f.webFlow)
 			f.merged(43, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"pull request #43: [0-9a-f]{12} differs from the head [0-9a-f]{12} merged onto"}},
-		{name: "rebase merge of a pull request updated from main", build: func() string {
+		{name: "rebase merge of a pull request updated from main", build: func(f *provenanceFixture) string {
 			return f.updatedRebase(44, false)
 		}, unverified: []string{`^unverified commits: [0-9a-f]{12} "Change infrastructure": [^|]*$`}},
-		{name: "rebase merge of a pull request with an empty commit updated from main", build: func() string {
+		{name: "rebase merge of a pull request with an empty commit updated from main", build: func(f *provenanceFixture) string {
 			return f.updatedRebase(45, true)
 		}, unverified: []string{`^unverified commits: [0-9a-f]{12} "Change infrastructure": [^|]*$`}},
-		{name: "pull request commits API error", build: func() string {
+		{name: "pull request commits API error", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(46, platform)
 			merge := f.rebase(commits...)
 			f.merged(46, renovate, head, merge, 1, approval(owner, head))
 			f.api.unavailable = "/pulls/46/commits"
 			return merge
 		}, unverified: []string{"pull request #46: list commits: GET", "502"}},
-		{name: "truncated pull request commits", build: func() string {
+		{name: "truncated pull request commits", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(47, platform, release)
 			merge := f.rebase(commits...)
 			f.merged(47, renovate, head, merge, 2, approval(owner, head))
 			f.api.commits[47] = commits[1:]
 			return merge
 		}, unverified: []string{"pull request #47: lists 1 of 2 commits"}},
-		{name: "pull request commit that is not a revision", build: func() string {
+		{name: "pull request commit that is not a revision", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(48, platform)
 			merge := f.rebase(commits...)
 			f.merged(48, renovate, head, merge, 1, approval(owner, head))
 			f.api.commits[48] = []string{"HEAD"}
 			return merge
 		}, unverified: []string{`pull request #48: commit "HEAD" is not a revision`}},
-		{name: "rebase merge of a head that cannot be fetched", build: func() string {
+		{name: "rebase merge of a head that cannot be fetched", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(36, platform)
 			merge := f.rebase(commits...)
 			f.git("push", "--quiet", "origin", "--delete", "refs/pull/36/head")

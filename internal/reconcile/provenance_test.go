@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
@@ -34,11 +36,98 @@ type provenanceFixture struct {
 	pullRequests                 PullRequests
 }
 
-func newProvenanceFixture(t *testing.T) *provenanceFixture {
+type provenanceTemplate struct {
+	area, base        string
+	webFlow, impostor *openpgp.Entity
+}
+
+var provenanceTemplates struct {
+	once     sync.Once
+	template *provenanceTemplate
+}
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if template := provenanceTemplates.template; template != nil {
+		os.RemoveAll(template.area)
+	}
+	os.Exit(code)
+}
+
+func sharedProvenanceTemplate(t *testing.T) *provenanceTemplate {
+	t.Helper()
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	provenanceTemplates.once.Do(func() { provenanceTemplates.template = buildProvenanceTemplate(t) })
+	if provenanceTemplates.template == nil {
+		t.Fatal("provenance fixture template unavailable")
+	}
+	return provenanceTemplates.template
+}
+
+func newProvenanceFixture(t *testing.T) *provenanceFixture {
+	t.Helper()
+	template := sharedProvenanceTemplate(t)
 	area := t.TempDir()
-	f := &provenanceFixture{t: t, root: filepath.Join(area, "infra"), remote: filepath.Join(area, "origin.git"), owner: filepath.Join(area, "owner"), visitor: filepath.Join(area, "visitor"), attested: map[string][]int{}}
+	copyTree(t, template.area, area)
+	configuration := filepath.Join(area, "infra", ".git", "config")
+	data, err := os.ReadFile(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configuration, []byte(strings.ReplaceAll(string(data), template.area, area)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := provenanceFixtureIn(t, area)
+	f.base, f.webFlow, f.impostor = template.base, template.webFlow, template.impostor
+	return f
+}
+
+func provenanceFixtureIn(t *testing.T, area string) *provenanceFixture {
+	t.Helper()
+	f := &provenanceFixture{t: t, root: filepath.Join(area, "infra"), remote: filepath.Join(area, "origin.git"), owner: filepath.Join(area, "owner"), visitor: filepath.Join(area, "visitor"), attested: map[string][]int{}, api: &pullRequestAPI{}}
+	server := httptest.NewServer(f.api)
+	t.Cleanup(server.Close)
+	client, err := GitHubClient(server.URL, "provenance-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.pullRequests = GitHubPullRequests{Client: client, Owner: "fredrir", Name: "infra"}
+	return f
+}
+
+func copyTree(t *testing.T, source, destination string) {
+	t.Helper()
+	err := filepath.WalkDir(source, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(destination, strings.TrimPrefix(path, source))
+		if entry.IsDir() {
+			return os.MkdirAll(target, info.Mode().Perm()|0o700)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, info.Mode().Perm())
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func buildProvenanceTemplate(t *testing.T) *provenanceTemplate {
+	t.Helper()
+	area, err := os.MkdirTemp("", "provenance-template-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := provenanceFixtureIn(t, area)
 	for _, key := range []string{f.owner, f.visitor} {
 		if output, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", filepath.Base(key), "-f", key).CombinedOutput(); err != nil {
 			t.Fatalf("ssh-keygen: %v\n%s", err, output)
@@ -51,14 +140,6 @@ func newProvenanceFixture(t *testing.T) *provenanceFixture {
 	}
 	f.git("remote", "add", "origin", "https://github.com/fredrir/infra")
 	f.webFlow, f.impostor = openPGPKey(t, "GitHub"), openPGPKey(t, "Impostor")
-	f.api = &pullRequestAPI{}
-	server := httptest.NewServer(f.api)
-	t.Cleanup(server.Close)
-	client, err := GitHubClient(server.URL, "provenance-token")
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.pullRequests = GitHubPullRequests{Client: client, Owner: "fredrir", Name: "infra"}
 	deployment := func(stage string) string {
 		return fmt.Sprintf("apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: %s\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n      - name: web\n        image: %s:latest\n", stage, deployedImage)
 	}
@@ -82,7 +163,7 @@ func newProvenanceFixture(t *testing.T) *provenanceFixture {
 		"platform/projects/web/release.yaml":                       "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: web\nspec:\n  values:\n    workloads:\n      web:\n        image: old\n        replicas: 0\n",
 		"tofu/main.tf":                                             "\n",
 	})
-	return f
+	return &provenanceTemplate{area: area, base: f.base, webFlow: f.webFlow, impostor: f.impostor}
 }
 
 func (f *provenanceFixture) run(dir string, args ...string) string {
@@ -202,113 +283,29 @@ func (f *provenanceFixture) verify(base, head string) error {
 	return (&Commands{Runner: ci.Runner{Dir: f.root, Stderr: io.Discard, Execute: f.attestation}, Work: f.t.TempDir(), PullRequests: f.pullRequests}).Provenance(context.Background(), ProvenanceRange{Base: base, Revision: head})
 }
 
-func TestProvenanceGate(t *testing.T) {
-	f := newProvenanceFixture(t)
-	for _, test := range []struct {
-		name       string
-		build      func() string
-		unverified string
-	}{
-		{name: "owner-signed", build: func() string {
-			return f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# owner\n"})
-		}},
-		{name: "unsigned change", build: func() string {
-			return f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
-		}, unverified: "unsigned; not a deployment"},
-		{name: "unknown signer", build: func() string {
-			return f.commit(f.visitor, "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
-		}, unverified: "not by a key in keys/admin_keys"},
-		{name: "signer added in the range", build: func() string {
-			f.commit(f.owner, "Trust visitor", map[string]string{adminKeys: f.publicKey(f.owner) + f.publicKey(f.visitor)})
-			return f.commit(f.visitor, "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
-		}, unverified: "not by a key in keys/admin_keys"},
-		{name: "OpenPGP signature", build: func() string {
-			return f.forge(f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"}), func(header string) string {
-				return header + "\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n -----END PGP SIGNATURE-----"
-			})
-		}, unverified: "not an SSH signature"},
-		{name: "second signature header", build: func() string {
-			return f.forge(f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# owner\n"}), func(header string) string {
-				_, signature, _ := strings.Cut(header, "\ngpgsig ")
-				return header + "\ngpgsig-sha256 " + signature
-			})
-		}, unverified: "2 signature headers"},
-		{name: "replaced object", build: func() string {
-			unsigned := f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
-			f.git("reset", "--quiet", "--hard", "HEAD^")
-			f.git("replace", unsigned, f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# owner\n"}))
-			return unsigned
-		}, unverified: `"Change infrastructure": unsigned`},
-		{name: "kustomize deployment", build: func() string { return f.deploy(deployedImage, 101) }},
-		{name: "HelmRelease deployment", build: func() string { return f.deploy(releasedImage, 101) }},
-		{name: "consecutive deployments", build: func() string {
-			f.deploy(deployedImage, 101)
-			f.deploy(releasedImage, 101)
-			return f.deploy(deployedImage, 102)
-		}},
-		{name: "deployment that also changes resources", build: func() string {
-			f.deploy(deployedImage, 101)
-			return f.amend(map[string]string{"platform/projects/example/application/kustomization.yaml": strings.Replace(f.read("platform/projects/example/application/kustomization.yaml"), "- application.yaml", "- application.yaml\n    - https://example.invalid/remote.yaml", 1)})
-		}, unverified: "application/kustomization.yaml differs from the deployment rewrite"},
-		{name: "deployment with another file", build: func() string {
-			f.deploy(deployedImage, 101)
-			return f.amend(map[string]string{"platform/projects/example/namespace.yaml": "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: other\n"})
-		}, unverified: "changes platform/projects/example/.deployments/example.json, platform/projects/example/application/kustomization.yaml, platform/projects/example/migration/kustomization.yaml, platform/projects/example/namespace.yaml"},
-		{name: "receipt without pins", build: func() string {
-			return f.commit("", "Deploy example", map[string]string{"platform/projects/example/.deployments/example.json": strings.ReplaceAll(f.read("platform/projects/example/.deployments/example.json"), `"run_id": 100`, `"run_id": 101`)})
-		}, unverified: "a deployment changes"},
-		{name: "unattested deployment", build: func() string {
-			deployed := f.deploy(deployedImage, 101)
-			clear(f.attested)
-			return deployed
-		}, unverified: "image provenance did not match an approved workflow revision: gh at workflow dddddddddddd: Error: no matching attestations found"},
-		{name: "deployment of another run's attestation", build: func() string {
-			deployed := f.deploy(releasedImage, 101)
-			f.attested[fmt.Sprintf("%s@sha256:%064x", releasedImage, 101)] = []int{102}
-			return deployed
-		}, unverified: fmt.Sprintf("no attestation names run 101 attempt 1 of %040x", 101)},
-		{name: "deployment attested again by a later run", build: func() string {
-			deployed := f.deploy(deployedImage, 101)
-			f.attested[fmt.Sprintf("%s@sha256:%064x", deployedImage, 101)] = []int{102, 101}
-			return deployed
-		}},
-		{name: "rolled back deployment", build: func() string {
-			f.deploy(deployedImage, 101)
-			return f.amend(map[string]string{"platform/projects/example/.deployments/example.json": strings.ReplaceAll(f.read("platform/projects/example/.deployments/example.json"), `"run_id": 101`, `"run_id": 99`)})
-		}, unverified: "stale deployment run 99/1"},
-		{name: "acknowledged", build: func() string {
-			failing := f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
-			return f.commit(f.owner, "Accept the change\n\n"+acknowledgementTrailer+": "+failing, nil)
-		}},
-		{name: "acknowledged by an unsigned commit", build: func() string {
-			failing := f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
-			return f.commit("", "Accept the change\n\n"+acknowledgementTrailer+": "+failing, nil)
-		}, unverified: `"Change infrastructure": unsigned`},
-		{name: "signed merge", build: func() string {
-			f.git("checkout", "--quiet", "-b", "signed")
-			f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# side\n"})
-			f.git("checkout", "--quiet", "main")
-			f.commit(f.owner, "Change platform", map[string]string{"platform/projects/example/namespace.yaml": "# main\n"})
-			f.git("-c", "user.signingkey="+f.owner, "merge", "--quiet", "--no-ff", "--gpg-sign", "--message", "Merge side", "signed")
-			return f.git("rev-parse", "HEAD")
-		}},
-		{name: "unsigned merge", build: func() string {
-			f.git("checkout", "--quiet", "-b", "unsigned")
-			f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# side\n"})
-			f.git("checkout", "--quiet", "main")
-			f.commit(f.owner, "Change platform", map[string]string{"platform/projects/example/namespace.yaml": "# main\n"})
-			f.git("merge", "--quiet", "--no-ff", "--no-gpg-sign", "--message", "Merge side", "unsigned")
-			return f.git("rev-parse", "HEAD")
-		}, unverified: `"Merge side": unsigned; not a deployment: merge commit`},
-	} {
+type provenanceGateCase struct {
+	name       string
+	build      func(f *provenanceFixture) string
+	unverified string
+}
+
+func TestProvenanceGateFirstQuarter(t *testing.T) { testProvenanceGateQuarter(t, 0) }
+
+func TestProvenanceGateSecondQuarter(t *testing.T) { testProvenanceGateQuarter(t, 1) }
+
+func TestProvenanceGateThirdQuarter(t *testing.T) { testProvenanceGateQuarter(t, 2) }
+
+func TestProvenanceGateFourthQuarter(t *testing.T) { testProvenanceGateQuarter(t, 3) }
+
+func testProvenanceGateQuarter(t *testing.T, quarter int) {
+	for index, test := range provenanceGateCases() {
+		if index%4 != quarter {
+			continue
+		}
 		t.Run(test.name, func(t *testing.T) {
-			f.git("checkout", "--quiet", "main")
-			f.git("reset", "--quiet", "--hard", f.base)
-			for _, replacement := range strings.Fields(f.git("for-each-ref", "--format=%(refname)", "refs/replace/")) {
-				f.git("update-ref", "-d", replacement)
-			}
+			f := newProvenanceFixture(t)
 			f.git("push", "--quiet", "--force", "origin", "HEAD:main")
-			err := f.verify(f.base, test.build())
+			err := f.verify(f.base, test.build(f))
 			if test.unverified == "" && err != nil {
 				t.Fatal(err)
 			}
@@ -316,6 +313,102 @@ func TestProvenanceGate(t *testing.T) {
 				t.Fatalf("got %v, want an unverified commit with %q", err, test.unverified)
 			}
 		})
+	}
+}
+
+func provenanceGateCases() []provenanceGateCase {
+	return []provenanceGateCase{
+		{name: "owner-signed", build: func(f *provenanceFixture) string {
+			return f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# owner\n"})
+		}},
+		{name: "unsigned change", build: func(f *provenanceFixture) string {
+			return f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
+		}, unverified: "unsigned; not a deployment"},
+		{name: "unknown signer", build: func(f *provenanceFixture) string {
+			return f.commit(f.visitor, "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
+		}, unverified: "not by a key in keys/admin_keys"},
+		{name: "signer added in the range", build: func(f *provenanceFixture) string {
+			f.commit(f.owner, "Trust visitor", map[string]string{adminKeys: f.publicKey(f.owner) + f.publicKey(f.visitor)})
+			return f.commit(f.visitor, "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
+		}, unverified: "not by a key in keys/admin_keys"},
+		{name: "OpenPGP signature", build: func(f *provenanceFixture) string {
+			return f.forge(f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"}), func(header string) string {
+				return header + "\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n -----END PGP SIGNATURE-----"
+			})
+		}, unverified: "not an SSH signature"},
+		{name: "second signature header", build: func(f *provenanceFixture) string {
+			return f.forge(f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# owner\n"}), func(header string) string {
+				_, signature, _ := strings.Cut(header, "\ngpgsig ")
+				return header + "\ngpgsig-sha256 " + signature
+			})
+		}, unverified: "2 signature headers"},
+		{name: "replaced object", build: func(f *provenanceFixture) string {
+			unsigned := f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
+			f.git("reset", "--quiet", "--hard", "HEAD^")
+			f.git("replace", unsigned, f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# owner\n"}))
+			return unsigned
+		}, unverified: `"Change infrastructure": unsigned`},
+		{name: "kustomize deployment", build: func(f *provenanceFixture) string { return f.deploy(deployedImage, 101) }},
+		{name: "HelmRelease deployment", build: func(f *provenanceFixture) string { return f.deploy(releasedImage, 101) }},
+		{name: "consecutive deployments", build: func(f *provenanceFixture) string {
+			f.deploy(deployedImage, 101)
+			f.deploy(releasedImage, 101)
+			return f.deploy(deployedImage, 102)
+		}},
+		{name: "deployment that also changes resources", build: func(f *provenanceFixture) string {
+			f.deploy(deployedImage, 101)
+			return f.amend(map[string]string{"platform/projects/example/application/kustomization.yaml": strings.Replace(f.read("platform/projects/example/application/kustomization.yaml"), "- application.yaml", "- application.yaml\n    - https://example.invalid/remote.yaml", 1)})
+		}, unverified: "application/kustomization.yaml differs from the deployment rewrite"},
+		{name: "deployment with another file", build: func(f *provenanceFixture) string {
+			f.deploy(deployedImage, 101)
+			return f.amend(map[string]string{"platform/projects/example/namespace.yaml": "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: other\n"})
+		}, unverified: "changes platform/projects/example/.deployments/example.json, platform/projects/example/application/kustomization.yaml, platform/projects/example/migration/kustomization.yaml, platform/projects/example/namespace.yaml"},
+		{name: "receipt without pins", build: func(f *provenanceFixture) string {
+			return f.commit("", "Deploy example", map[string]string{"platform/projects/example/.deployments/example.json": strings.ReplaceAll(f.read("platform/projects/example/.deployments/example.json"), `"run_id": 100`, `"run_id": 101`)})
+		}, unverified: "a deployment changes"},
+		{name: "unattested deployment", build: func(f *provenanceFixture) string {
+			deployed := f.deploy(deployedImage, 101)
+			clear(f.attested)
+			return deployed
+		}, unverified: "image provenance did not match an approved workflow revision: gh at workflow dddddddddddd: Error: no matching attestations found"},
+		{name: "deployment of another run's attestation", build: func(f *provenanceFixture) string {
+			deployed := f.deploy(releasedImage, 101)
+			f.attested[fmt.Sprintf("%s@sha256:%064x", releasedImage, 101)] = []int{102}
+			return deployed
+		}, unverified: fmt.Sprintf("no attestation names run 101 attempt 1 of %040x", 101)},
+		{name: "deployment attested again by a later run", build: func(f *provenanceFixture) string {
+			deployed := f.deploy(deployedImage, 101)
+			f.attested[fmt.Sprintf("%s@sha256:%064x", deployedImage, 101)] = []int{102, 101}
+			return deployed
+		}},
+		{name: "rolled back deployment", build: func(f *provenanceFixture) string {
+			f.deploy(deployedImage, 101)
+			return f.amend(map[string]string{"platform/projects/example/.deployments/example.json": strings.ReplaceAll(f.read("platform/projects/example/.deployments/example.json"), `"run_id": 101`, `"run_id": 99`)})
+		}, unverified: "stale deployment run 99/1"},
+		{name: "acknowledged", build: func(f *provenanceFixture) string {
+			failing := f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
+			return f.commit(f.owner, "Accept the change\n\n"+acknowledgementTrailer+": "+failing, nil)
+		}},
+		{name: "acknowledged by an unsigned commit", build: func(f *provenanceFixture) string {
+			failing := f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
+			return f.commit("", "Accept the change\n\n"+acknowledgementTrailer+": "+failing, nil)
+		}, unverified: `"Change infrastructure": unsigned`},
+		{name: "signed merge", build: func(f *provenanceFixture) string {
+			f.git("checkout", "--quiet", "-b", "signed")
+			f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# side\n"})
+			f.git("checkout", "--quiet", "main")
+			f.commit(f.owner, "Change platform", map[string]string{"platform/projects/example/namespace.yaml": "# main\n"})
+			f.git("-c", "user.signingkey="+f.owner, "merge", "--quiet", "--no-ff", "--gpg-sign", "--message", "Merge side", "signed")
+			return f.git("rev-parse", "HEAD")
+		}},
+		{name: "unsigned merge", build: func(f *provenanceFixture) string {
+			f.git("checkout", "--quiet", "-b", "unsigned")
+			f.commit(f.owner, "Change infrastructure", map[string]string{"tofu/main.tf": "# side\n"})
+			f.git("checkout", "--quiet", "main")
+			f.commit(f.owner, "Change platform", map[string]string{"platform/projects/example/namespace.yaml": "# main\n"})
+			f.git("merge", "--quiet", "--no-ff", "--no-gpg-sign", "--message", "Merge side", "unsigned")
+			return f.git("rev-parse", "HEAD")
+		}, unverified: `"Merge side": unsigned; not a deployment: merge commit`},
 	}
 }
 
