@@ -252,23 +252,32 @@
       - kubectl
       - get
       - nodes
-      - -l
-      - node-restriction.kubernetes.io/volatile
-      - -o=name
+      - -o=json
       - --request-timeout=10s
   delegate_to: "{{ k3s_registration_server }}"
   check_mode: false
   changed_when: false
+  retries: 6
+  delay: 5
+  until: k3s_volatile_nodes.rc == 0
   when: k3s_flannel_state is not skipped and inventory_hostname not in groups.get('volatile', [])
   register: k3s_volatile_nodes
 
 - name: Refuse to clear or first-register flannel while a volatile worker can race the API
+  vars:
+    k3s_volatile_node_names: >-
+      {{ ((k3s_volatile_nodes.stdout | from_json)['items']
+      | selectattr('spec.taints', 'defined') | selectattr('spec.taints', 'search', 'node-restriction.kubernetes.io/volatile')
+      | map(attribute='metadata.name') | list)
+      + ((k3s_volatile_nodes.stdout | from_json)['items']
+      | selectattr('metadata.labels', 'defined') | selectattr('metadata.labels', 'search', 'node-restriction.kubernetes.io/volatile')
+      | map(attribute='metadata.name') | list) }}
   ansible.builtin.assert:
-    that: k3s_volatile_nodes.stdout == '' or not (k3s_flannel_state.changed or k3s_flannel_state.stdout == '')
+    that: k3s_volatile_node_names | length == 0 or not (k3s_flannel_state.changed or k3s_flannel_state.stdout == '')
     fail_msg: >-
       A volatile worker is enrolled and this run would clear or first-set {{ inventory_hostname }}'s flannel backend,
       reopening the write-once race; cut every volatile worker off the API first (remove tag:platform-volatile's 6443
-      grant or deauthorize its tailnet node, then delete its Node object) — see docs/runbook.md.
+      grant or deauthorize its tailnet node, stop its agent, then delete its Node object) — see docs/runbook.md.
   when: k3s_volatile_nodes is not skipped
 
 - name: Release the previous flannel backend through the administrator API

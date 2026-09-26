@@ -215,19 +215,26 @@ func TestVolatileEnrollmentRequiresWireGuardFleet(t *testing.T) {
 
 func TestFlannelClearRefusesWhileVolatileWorkersAreEnrolled(t *testing.T) {
 	root := filepath.Join("..", "..", "ansible")
-	guarded := false
+	guarded, keyedOnTaint, retried := false, false, false
 	walkAnsibleFile(t, root, "roles/k3s/tasks/main.yml", ansibleTask{}, func(task ansibleTask) {
-		if task.Module != "ansible.builtin.assert" {
-			return
-		}
-		condition := fmt.Sprint(task.Definition[task.Module])
-		if strings.Contains(condition, "k3s_volatile_nodes.stdout == ''") &&
-			strings.Contains(condition, "k3s_flannel_state.changed") &&
-			strings.Contains(condition, "k3s_flannel_state.stdout == ''") {
-			guarded = true
+		switch task.Key {
+		case "roles/k3s/tasks/main.yml: Read enrolled volatile workers through the administrator API":
+			_, until := task.Definition["until"]
+			retried = until && task.Definition["retries"] != nil
+		case "roles/k3s/tasks/main.yml: Refuse to clear or first-register flannel while a volatile worker can race the API":
+			condition := fmt.Sprint(task.Definition[task.Module])
+			selection := fmt.Sprint(task.Definition["vars"])
+			guarded = strings.Contains(condition, "k3s_flannel_state.changed") && strings.Contains(condition, "k3s_flannel_state.stdout == ''")
+			keyedOnTaint = strings.Contains(selection, "spec.taints") && strings.Contains(selection, "node-restriction.kubernetes.io/volatile")
 		}
 	})
 	if !guarded {
 		t.Error("the k3s role clears or first-sets flannel without failing closed on enrolled volatile workers")
+	}
+	if !keyedOnTaint {
+		t.Error("the volatile guard does not key on the registration-enforced volatile taint, so a re-registered volatile Node passes it")
+	}
+	if !retried {
+		t.Error("the volatile guard read fails the reconcile on a single API error")
 	}
 }
