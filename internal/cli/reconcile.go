@@ -227,6 +227,7 @@ func newRequestVerificationCommand() *cobra.Command {
 	command.Flags().StringVar(&key, "private-key", "", "GitHub App private key file")
 	command.Flags().StringVar(&token, "heartbeat-token", "", "Gatus external endpoint token file")
 	command.Flags().StringVar(&request.Gatus, "gatus", platformops.GatusURL, "Gatus URL")
+	command.Flags().StringVar(&request.Heartbeat, "heartbeat", "reconciliation_verification", "Gatus external endpoint key as GROUP_NAME")
 	command.Flags().StringVar(&request.Repository, "repository", "fredrir/infra", "Repository as OWNER/NAME")
 	command.Flags().StringVar(&request.Workflow, "workflow", "reconcile.yml", "Workflow file name")
 	command.Flags().StringVar(&request.Ref, "ref", "main", "Workflow revision")

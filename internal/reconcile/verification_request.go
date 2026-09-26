@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -28,16 +29,16 @@ type VerificationRequest struct {
 	Ref            string
 	API            string
 	Gatus          string
+	Heartbeat      string
 	HeartbeatToken string
 	Poll           time.Duration
 	Deadline       time.Duration
 	Log            io.Writer
 }
 
-const (
-	verificationHeartbeat = "reconciliation_verification"
-	dispatchTimeout       = time.Minute
-)
+const dispatchTimeout = time.Minute
+
+var heartbeatEndpoint = regexp.MustCompile(`^[a-z0-9-]+_[a-z0-9-]+$`)
 
 type verificationRun struct {
 	ID      int64  `json:"workflow_run_id"`
@@ -63,6 +64,8 @@ func RequestVerification(ctx context.Context, request VerificationRequest) error
 		return errors.New("GitHub App and installation IDs are required")
 	case request.Workflow == "" || request.Ref == "":
 		return errors.New("workflow and ref are required")
+	case !heartbeatEndpoint.MatchString(request.Heartbeat):
+		return fmt.Errorf("heartbeat endpoint %q is not GROUP_NAME", request.Heartbeat)
 	case !platformops.ValidHeartbeatToken(request.HeartbeatToken):
 		return errors.New("invalid verification heartbeat token")
 	case request.Poll <= 0 || request.Deadline <= 0:
@@ -100,7 +103,7 @@ func RequestVerification(ctx context.Context, request VerificationRequest) error
 	default:
 		fmt.Fprintln(log, "Verification succeeded:", run.HTMLURL)
 	}
-	return errors.Join(failure, platformops.ReportHeartbeat(ctx, request.Gatus, verificationHeartbeat, request.HeartbeatToken, failure))
+	return errors.Join(failure, platformops.ReportHeartbeat(ctx, request.Gatus, request.Heartbeat, request.HeartbeatToken, failure))
 }
 
 func (c *verificationClient) dispatch(ctx context.Context, endpoint string, request VerificationRequest) (verificationRun, error) {

@@ -108,7 +108,7 @@ type gatusServer struct {
 func (g *gatusServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if r.Method != http.MethodPost || r.URL.Path != "/api/v1/endpoints/reconciliation_verification/external" || r.Header.Get("Authorization") != "Bearer "+heartbeatToken {
+	if r.Method != http.MethodPost || r.URL.Path != "/api/v1/endpoints/reconciliation_deep/external" || r.Header.Get("Authorization") != "Bearer "+heartbeatToken {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -134,7 +134,7 @@ func verificationFixture(t *testing.T, runs ...runState) (*githubAppServer, *gat
 	githubServer, gatusServer := httptest.NewServer(github), httptest.NewServer(gatus)
 	t.Cleanup(githubServer.Close)
 	t.Cleanup(gatusServer.Close)
-	return github, gatus, VerificationRequest{AppID: 42, InstallationID: 43, PrivateKey: encoded, Repository: "fredrir/infra", Workflow: "reconcile.yml", Ref: "main", API: githubServer.URL, Gatus: gatusServer.URL, HeartbeatToken: heartbeatToken, Poll: time.Millisecond, Deadline: time.Minute}
+	return github, gatus, VerificationRequest{AppID: 42, InstallationID: 43, PrivateKey: encoded, Repository: "fredrir/infra", Workflow: "reconcile.yml", Ref: "main", API: githubServer.URL, Gatus: gatusServer.URL, Heartbeat: "reconciliation_deep", HeartbeatToken: heartbeatToken, Poll: time.Millisecond, Deadline: time.Minute}
 }
 
 func TestVerificationRequestDispatchesWithARestrictedInstallationToken(t *testing.T) {
@@ -243,6 +243,8 @@ func TestVerificationRequestFailures(t *testing.T) {
 		{name: "nested repository", change: func(_ *githubAppServer, request *VerificationRequest) { request.Repository = "fredrir/infra/extra" }, want: "is not OWNER/NAME"},
 		{name: "missing workflow", change: func(_ *githubAppServer, request *VerificationRequest) { request.Workflow = "" }, want: "workflow and ref are required"},
 		{name: "missing ref", change: func(_ *githubAppServer, request *VerificationRequest) { request.Ref = "" }, want: "workflow and ref are required"},
+		{name: "missing heartbeat endpoint", change: func(_ *githubAppServer, request *VerificationRequest) { request.Heartbeat = "" }, want: `heartbeat endpoint "" is not GROUP_NAME`},
+		{name: "heartbeat endpoint path", change: func(_ *githubAppServer, request *VerificationRequest) { request.Heartbeat = "reconciliation/deep" }, want: `heartbeat endpoint "reconciliation/deep" is not GROUP_NAME`},
 		{name: "invalid heartbeat token", change: func(_ *githubAppServer, request *VerificationRequest) { request.HeartbeatToken = "short" }, want: "invalid verification heartbeat token"},
 		{name: "missing deadline", change: func(_ *githubAppServer, request *VerificationRequest) { request.Deadline = 0 }, want: "poll interval and deadline must be positive"},
 	} {
