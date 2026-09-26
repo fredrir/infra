@@ -80,6 +80,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Permission preflight | Up to four read-only workload permission checks run concurrently before mutation |
 | Scheduled work | Hourly deep verification requested by the `fredrir-06` timer reads live state and the recorded reconciliation status and compares OpenTofu and each host playbook concurrently in check mode; merges run the selected `infra reconcile apply`; a full reconciliation runs when a verification report lists differences, including an incomplete or superseded apply |
 | Deployment selection | Explicit CI-only paths skip deployment; supported project changes select the union of their dependency chains; tooling inputs never widen scope; shared and unknown inputs retain full fallback |
+| K3s service installation | The upstream installer reruns only when its recorded file hashes differ; check mode reports the difference |
 | Tooling changes | `cmd/`, `internal/`, `.github/`, Go and Bazel modules and listed `build/` inputs run read-only drift verification of the applied revision: generated artifacts, `tofu plan -detailed-exitcode`, workloads and hosts; failure forces full recovery |
 | Workload verification | Each verification poll lists workloads once per kind and namespace; expected ownership, images, readiness and generations remain required |
 | Transport installation | Pinned archive content is compared with extracted and installed binaries before extraction or copy; missing or corrupted files are repaired |

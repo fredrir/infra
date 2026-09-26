@@ -120,6 +120,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"roles/tailscale/tasks/install.yml: Find unloaded tunnel support",
 		"roles/k3s/tasks/main.yml: Find unloaded kernel modules",
 		"roles/k3s/tasks/main.yml: Compare the upstream service with its declared command",
+		"roles/k3s/tasks/upstream-service.yml: Compare the upstream service with its recorded installation",
 		"roles/k3s/tasks/main.yml: Read declared worker taints through the administrator API",
 		"roles/k3s/tasks/main.yml: Read the flannel backend of the node through the administrator API",
 		"roles/k3s/tasks/main.yml: Search volatile state for the shared join token",
@@ -137,7 +138,6 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"roles/k3s/tasks/main.yml: Advertise CI job slots through the administrator API",
 	}
 	unverifiable := []string{
-		"roles/k3s/tasks/main.yml: Install the upstream systemd service",
 		"roles/ci_runtime/tasks/main.yml: Extract the runtime under opt",
 	}
 	seen := map[string]bool{}
@@ -252,6 +252,22 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 	}
 	if len(seen) == 0 {
 		t.Fatal("no host play tasks compared")
+	}
+}
+
+func TestHostPlaysReportChangesOnlyAfterObservedChanges(t *testing.T) {
+	root := filepath.Join("..", "..", "ansible")
+	walked := 0
+	for _, playbook := range append(slices.Clone(comparedPlaybooks), volatilePlaybook) {
+		walkComparedPlays(t, root, playbook, func(ansiblePlay) {}, func(task ansibleTask) {
+			walked++
+			if task.Definition["changed_when"] == true && !slices.ContainsFunc(task.When, func(gate string) bool { return strings.HasSuffix(strings.TrimSpace(gate), ".changed") }) {
+				t.Errorf("%s reports a change on every run", task.Key)
+			}
+		})
+	}
+	if walked == 0 {
+		t.Fatal("no host play tasks walked")
 	}
 }
 

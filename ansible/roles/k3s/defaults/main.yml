@@ -23,6 +23,13 @@ k3s_flannel_devices:
   vxlan: flannel.1
   wireguard-native: flannel-wg
 k3s_service: "{{ 'k3s' if k3s_role == 'server' else 'k3s-agent' }}"
+k3s_upstream_record: /etc/rancher/k3s/upstream-installation.sha256
+k3s_upstream_files:
+  - /usr/local/sbin/k3s-install.sh
+  - "/etc/systemd/system/{{ k3s_service }}.service"
+  - "/etc/systemd/system/{{ k3s_service }}.service.env"
+  - /usr/local/bin/k3s-killall.sh
+  - "/usr/local/bin/{{ k3s_service }}-uninstall.sh"
 k3s_ci_slot_resource: infra.fredrir.com/ci-slot
 k3s_ci_slots: 0
 k3s_node_labels:

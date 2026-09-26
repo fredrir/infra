@@ -1,0 +1,35 @@
+- name: Download the pinned official installer
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/k3s-io/k3s/{{ k3s_version }}/install.sh"
+    dest: /usr/local/sbin/k3s-install.sh
+    checksum: "sha256:{{ k3s_install_sha256 }}"
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Compare the upstream service with its recorded installation
+  ansible.builtin.shell: |
+    set -eu
+    sha256sum {{ k3s_upstream_files | map('quote') | join(' ') }} 2>/dev/null | cmp -s - {{ k3s_upstream_record | quote }} || echo differs
+  register: k3s_upstream_installation
+  changed_when: k3s_upstream_installation.stdout != ''
+  check_mode: false
+
+- name: Install the upstream systemd service
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/env
+      - -i
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - INSTALL_K3S_SKIP_DOWNLOAD=true
+      - INSTALL_K3S_SKIP_START=true
+      - INSTALL_K3S_SKIP_ENABLE=true
+      - "INSTALL_K3S_EXEC={{ k3s_role }}"
+      - /usr/local/sbin/k3s-install.sh
+  when: k3s_upstream_installation.changed
+
+- name: Record the upstream service installation
+  ansible.builtin.shell: |
+    set -eu
+    sha256sum {{ k3s_upstream_files | map('quote') | join(' ') }} > {{ k3s_upstream_record | quote }}
+  when: k3s_upstream_installation.changed
