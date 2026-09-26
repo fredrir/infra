@@ -9,7 +9,6 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -36,6 +35,7 @@ import (
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/dev"
 	"github.com/fredrir/infra/internal/objectstore"
+	"github.com/fredrir/infra/internal/reconcile"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/klauspost/compress/zstd"
 	"go.yaml.in/yaml/v3"
@@ -45,9 +45,10 @@ const (
 	qualificationNode   = "dev-reconciler-1"
 	qualificationBucket = "qualification"
 	qualificationRegion = "eu-north-1"
-	minioModule         = "github.com/minio/minio@v0.0.0-20260212201848-7aac2a2c5b7c"
 	guestHost           = "10.0.2.2"
 )
+
+var seaweedfs = ci.ToolAsset{URL: "https://github.com/seaweedfs/seaweedfs/releases/download/4.47/linux_amd64.tar.gz", Digest: "31fb804858885f9e7f18b6d3b1da09e824baac3e6a55b5a62c3c4c77e6ed6d7d", Member: "weed"}
 
 type qualification struct {
 	t        *testing.T
@@ -149,49 +150,105 @@ func (q *qualification) origin() int {
 	return port
 }
 
-func (q *qualification) minio() int {
+func (q *qualification) seaweedfs() int {
 	q.t.Helper()
-	binary := filepath.Join(q.cache, "minio")
-	if _, err := os.Stat(binary); errors.Is(err, os.ErrNotExist) {
-		command := exec.CommandContext(q.ctx, "go", "install", "-trimpath", minioModule)
-		command.Env = append(os.Environ(), "GOBIN="+q.cache, "CGO_ENABLED=0")
-		if output, err := command.CombinedOutput(); err != nil {
-			q.t.Fatalf("build MinIO: %v\n%s", err, output)
-		}
+	binary := filepath.Join(q.cache, "weed")
+	if err := ci.InstallTool(q.ctx, ci.NewToolClient(), seaweedfs, binary, ""); err != nil {
+		q.t.Fatalf("install SeaweedFS: %v", err)
 	}
-	port := freePort(q.t)
 	user, password := "qualification", randomHex(q.t, 20)
-	encryption := make([]byte, 32)
-	if _, err := rand.Read(encryption); err != nil {
+	identities, err := json.Marshal(map[string]any{"identities": []map[string]any{{"name": user, "credentials": []map[string]string{{"accessKey": user, "secretKey": password}}, "actions": []string{"Admin", "Read", "List", "Tagging", "Write"}}}})
+	if err != nil {
 		q.t.Fatal(err)
 	}
-	q.start(binary, []string{"MINIO_ROOT_USER=" + user, "MINIO_ROOT_PASSWORD=" + password, "MINIO_SITE_REGION=" + qualificationRegion, "MINIO_KMS_SECRET_KEY=qualification:" + base64.StdEncoding.EncodeToString(encryption)}, "server", filepath.Join(q.work, "objects"), "--quiet", "--address", fmt.Sprintf("127.0.0.1:%d", port), "--console-address", fmt.Sprintf("127.0.0.1:%d", freePort(q.t)))
+	config, objects := filepath.Join(q.work, "s3.json"), filepath.Join(q.work, "objects")
+	if err := os.WriteFile(config, identities, 0o600); err != nil {
+		q.t.Fatal(err)
+	}
+	if err := os.Mkdir(objects, 0o700); err != nil {
+		q.t.Fatal(err)
+	}
+	port := freePort(q.t)
+	args := []string{"server", "-dir=" + objects, "-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-s3", "-s3.config=" + config, "-s3.port=" + strconv.Itoa(port), "-s3.port.iceberg=0", "-s3.port.lance=0", "-master.telemetry=false", "-master.volumeSizeLimitMB=64", "-volume.max=0"}
+	for _, listener := range []string{"master.port", "master.port.grpc", "volume.port", "volume.port.grpc", "filer.port", "filer.port.grpc", "s3.port.grpc"} {
+		args = append(args, "-"+listener+"="+strconv.Itoa(freePort(q.t)))
+	}
+	q.start(binary, []string{"WEED_S3_SSE_KEY=" + randomHex(q.t, 32)}, args...)
 	q.s3 = objectstore.Client{Endpoint: fmt.Sprintf("http://127.0.0.1:%d", port), Region: qualificationRegion, AccessKey: user, SecretKey: password}
-	q.await("MinIO", time.Minute, func() error {
-		response, err := http.Get(q.s3.Endpoint + "/minio/health/live")
+	q.await("SeaweedFS", time.Minute, func() error {
+		response, err := q.signed(http.MethodPut, "/"+qualificationBucket, nil, nil)
 		if err != nil {
 			return err
 		}
 		response.Body.Close()
 		if response.StatusCode != http.StatusOK {
-			return fmt.Errorf("HTTP %d", response.StatusCode)
+			return fmt.Errorf("create bucket: HTTP %d", response.StatusCode)
 		}
 		return nil
 	})
-	if response, err := q.signed(http.MethodPut, "/"+qualificationBucket, nil); err != nil || response.StatusCode != http.StatusOK {
-		q.t.Fatalf("create bucket: %v %v", response, err)
+	versioning := []byte(`<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Status>Enabled</Status></VersioningConfiguration>`)
+	if response, err := q.signed(http.MethodPut, "/"+qualificationBucket, url.Values{"versioning": {""}}, versioning); err != nil || response.StatusCode != http.StatusOK {
+		q.t.Fatalf("enable bucket versioning: %v %v", response, err)
 	}
 	return port
 }
 
-func (q *qualification) signed(method, path string, query url.Values) (*http.Response, error) {
-	request, err := http.NewRequestWithContext(q.ctx, method, q.s3.Endpoint+path+"?"+query.Encode(), nil)
+func (q *qualification) leaseOwnership() {
+	q.t.Helper()
+	store := reconcile.S3Store{Bucket: qualificationBucket, Prefix: "reconciliation/lease", Client: &q.s3}
+	type attempt struct {
+		unlock func() error
+		err    error
+	}
+	attempts := make(chan attempt, 16)
+	var contenders sync.WaitGroup
+	for range cap(attempts) {
+		contenders.Go(func() {
+			_, unlock, err := store.Lock(q.ctx)
+			attempts <- attempt{unlock, err}
+		})
+	}
+	contenders.Wait()
+	close(attempts)
+	var held []func() error
+	for attempt := range attempts {
+		switch {
+		case attempt.err == nil:
+			held = append(held, attempt.unlock)
+		case !errors.As(attempt.err, new(reconcile.ErrLocked)):
+			q.t.Errorf("contended lock failed: %v", attempt.err)
+		}
+	}
+	if len(held) != 1 {
+		q.t.Fatalf("%d of %d concurrent contenders hold the lease", len(held), cap(attempts))
+	}
+	thief, err := json.Marshal(map[string]any{"owner": "thief", "expires": time.Now().Add(time.Hour)})
+	if err != nil {
+		q.t.Fatal(err)
+	}
+	response, err := q.s3.RequestHeaders(q.ctx, http.MethodPut, qualificationBucket, "reconciliation/lease/lock.json", bytes.NewReader(thief), http.Header{"X-Amz-Server-Side-Encryption": {"AES256"}})
+	if err != nil {
+		q.t.Fatalf("take over the lease: %v", err)
+	}
+	response.Body.Close()
+	if err := held[0](); err == nil {
+		q.t.Error("a displaced owner released the lease")
+	}
+	var current bytes.Buffer
+	if err := q.s3.Download(q.ctx, qualificationBucket, "reconciliation/lease/lock.json", &current); err != nil || !bytes.Equal(current.Bytes(), thief) {
+		q.t.Errorf("a displaced owner's release left %q: %v", current.String(), err)
+	}
+}
+
+func (q *qualification) signed(method, path string, query url.Values, body []byte) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(q.ctx, method, q.s3.Endpoint+path+"?"+query.Encode(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	const empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-	request.Header.Set("X-Amz-Content-Sha256", empty)
-	if err := v4.NewSigner().SignHTTP(q.ctx, aws.Credentials{AccessKeyID: q.s3.AccessKey, SecretAccessKey: q.s3.SecretKey}, request, empty, "s3", qualificationRegion, time.Now()); err != nil {
+	digest := sha256.Sum256(body)
+	payload := hex.EncodeToString(digest[:])
+	request.Header.Set("X-Amz-Content-Sha256", payload)
+	if err := v4.NewSigner().SignHTTP(q.ctx, aws.Credentials{AccessKeyID: q.s3.AccessKey, SecretAccessKey: q.s3.SecretKey}, request, payload, "s3", qualificationRegion, time.Now()); err != nil {
 		return nil, err
 	}
 	return http.DefaultClient.Do(request)
@@ -199,7 +256,7 @@ func (q *qualification) signed(method, path string, query url.Values) (*http.Res
 
 func (q *qualification) runKeys() []string {
 	q.t.Helper()
-	response, err := q.signed(http.MethodGet, "/"+qualificationBucket, url.Values{"list-type": {"2"}, "prefix": {"reconciliation/production/runs/"}})
+	response, err := q.signed(http.MethodGet, "/"+qualificationBucket, url.Values{"list-type": {"2"}, "prefix": {"reconciliation/production/runs/"}}, nil)
 	if err != nil {
 		q.t.Fatal(err)
 	}
@@ -354,7 +411,8 @@ func TestReconcilerQualification(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(work) })
 	q.work = work
-	gitPort, minioPort, gatusPort := q.origin(), q.minio(), q.startGatus()
+	gitPort, storePort, gatusPort := q.origin(), q.seaweedfs(), q.startGatus()
+	q.leaseOwnership()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
@@ -438,7 +496,7 @@ func TestReconcilerQualification(t *testing.T) {
 			Bucket:     qualificationBucket,
 			Prefix:     "reconciliation/production",
 			Region:     qualificationRegion,
-			Endpoint:   fmt.Sprintf("http://%s:%d", guestHost, minioPort),
+			Endpoint:   fmt.Sprintf("http://%s:%d", guestHost, storePort),
 			Gatus:      fmt.Sprintf("http://%s:%d", guestHost, gatusPort),
 			Heartbeat:  "reconciliation_verification",
 			Kubernetes: Kubernetes{Server: fmt.Sprintf("https://%s:%d", guestHost, freePort(t)), CertificateAuthority: "/etc/infra-reconcile/kubernetes-ca.crt"},
@@ -498,6 +556,11 @@ func TestReconcilerQualification(t *testing.T) {
 	decoder.Close()
 	if err != nil || !bytes.Contains(log, []byte("Verifying production at "+q.revision)) {
 		t.Errorf("run log: %v\n%s", err, log)
+	}
+	if head, err := q.s3.Request(ctx, http.MethodHead, qualificationBucket, reportKey, nil); err != nil || head.Header.Get("X-Amz-Server-Side-Encryption") != "AES256" {
+		t.Errorf("report stored without SSE-S3: %v", err)
+	} else {
+		head.Body.Close()
 	}
 	for set, values := range credentials {
 		for name, value := range values {

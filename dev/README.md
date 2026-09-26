@@ -15,7 +15,7 @@
 | `.cache/dev/cluster` | Kubeconfig, dev age key, pushed artifact, generated `root.yaml` |
 | `dev/hosts/hosts.yaml` | Guest nodes, pinned Ubuntu cloud image, multicast segment |
 | `.cache/dev/hosts` | Base image, guest disks, seeds, serial logs, SSH key, inventory, known hosts |
-| `.cache/dev/reconciler` | MinIO and Gatus binaries and per-run scratch of the `reconciler` suite |
+| `.cache/dev/reconciler` | SeaweedFS and Gatus binaries and per-run scratch of the `reconciler` suite |
 | `dev/bench/scenarios.yaml` | Commands, optional setup, runs, warmups and budgets sampled by hyperfine; `{infra}` is the built binary |
 | `.cache/dev/bench` | Timestamped samples, `latest.json`, `go-baseline.txt` |
 
@@ -69,7 +69,7 @@ infra dev clean --all
 | `kustomize` | `INFRA_KUSTOMIZE_QUALIFY=1` | kubectl |
 | `packages` | `INFRA_PACKAGE_QUALIFY=1` | nfpm, gpg, openssl, go, engine, binary |
 | `kata` | `INFRA_KATA_ENGINE_TEST=1` | kata engine profile, binary |
-| `reconciler` | `INFRA_RECONCILER_QUALIFY=1` | `dev-reconciler-1`, started by the suite; binary; Git daemon; Go; MinIO built from its pinned module and Gatus from the role's pinned layer, both on loopback |
+| `reconciler` | `INFRA_RECONCILER_QUALIFY=1` | `dev-reconciler-1`, started by the suite; binary; Git daemon; Go; SeaweedFS from its pinned release archive with versioning and SSE-S3, and Gatus from the role's pinned layer, both on loopback |
 
 | Platform | Support |
 | --- | --- |
