@@ -96,6 +96,32 @@ run "dedicated_host_without_inbound_access" {
     error_message = "The Cloudflare token may only read zones, DNS and tunnels of the managed account."
   }
 
+  assert {
+    condition     = aws_iam_access_key.apply.user == "infra-reconciliation-apply"
+    error_message = "The apply access key belongs to the apply identity."
+  }
+
+  assert {
+    condition     = cloudflare_account_token.apply.condition.request_ip.in == tolist(["203.0.113.10/32"]) && cloudflare_account_token.apply.condition.request_ip.not_in == null
+    error_message = "The Cloudflare apply token must be usable only from the reconciler's address."
+  }
+
+  assert {
+    condition = (
+      cloudflare_account_token.apply.account_id == "8786559b30fcebd08d0c594b6e899eef" &&
+      [for policy in cloudflare_account_token.apply.policies : [for group in policy.permission_groups : group.id]] == [["zone-read", "dns-write"], ["tunnel-write"]] &&
+      [for policy in cloudflare_account_token.apply.policies : jsondecode(policy.resources)] == [
+        { "com.cloudflare.api.account.8786559b30fcebd08d0c594b6e899eef" = {
+          "com.cloudflare.api.account.zone.6a5d7959f34aa2fb76d2d5c7509b32ff" = "*"
+          "com.cloudflare.api.account.zone.4ae54b24fc4140d4d1c450491645f1c8" = "*"
+          "com.cloudflare.api.account.zone.1bfde4d22f052143ea46926366e50fca" = "*"
+        } },
+        { "com.cloudflare.api.account.8786559b30fcebd08d0c594b6e899eef" = "*" },
+      ] &&
+      alltrue([for policy in cloudflare_account_token.apply.policies : policy.effect == "allow"])
+    )
+    error_message = "The Cloudflare apply token may only edit DNS in the managed zones and the account's tunnels."
+  }
 }
 
 run "bootstrap_ssh_from_administrators" {

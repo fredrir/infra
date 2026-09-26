@@ -90,6 +90,16 @@ filegroup(
 )
 
 filegroup(
+    name = "managed_zone_data",
+    srcs = [
+        "tofu/cloudflare.tf",
+        "tofu/production.tfvars.json",
+        "tofu/reconciler/credentials.tf",
+    ],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "renovate_pin_data",
     srcs = glob(["images/*/Containerfile"]) + [
         "renovate.json",

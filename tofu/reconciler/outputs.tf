@@ -19,3 +19,17 @@ output "verify_cloudflare_api_token" {
   value     = cloudflare_account_token.verify.value
   sensitive = true
 }
+
+output "apply_aws_access_key_id" {
+  value = aws_iam_access_key.apply.id
+}
+
+output "apply_aws_secret_access_key" {
+  value     = aws_iam_access_key.apply.secret
+  sensitive = true
+}
+
+output "apply_cloudflare_api_token" {
+  value     = cloudflare_account_token.apply.value
+  sensitive = true
+}
