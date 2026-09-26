@@ -210,10 +210,13 @@ func TestSharedFlannelIdentityWritesOnlyItsOwnNodeNetwork(t *testing.T) {
 		"k3s.io/hostname":        "fredrir-09",
 	}, "metadata", "annotations")
 	base["status"] = object{
-		"addresses":   []any{object{"type": "InternalIP", "address": "100.87.168.66"}, object{"type": "ExternalIP", "address": "100.87.168.66"}},
-		"capacity":    object{"cpu": "4", "infra.fredrir.com/ci-slot": "2"},
-		"allocatable": object{"cpu": "3750m", "infra.fredrir.com/ci-slot": "2"},
-		"conditions":  []any{object{"type": "Ready", "status": "True"}},
+		"addresses":       []any{object{"type": "InternalIP", "address": "100.87.168.66"}, object{"type": "ExternalIP", "address": "100.87.168.66"}},
+		"capacity":        object{"cpu": "4", "infra.fredrir.com/ci-slot": "2"},
+		"allocatable":     object{"cpu": "3750m", "infra.fredrir.com/ci-slot": "2"},
+		"conditions":      []any{object{"type": "Ready", "status": "True"}},
+		"nodeInfo":        object{"kubeletVersion": "v1.36.3+k3s1", "osImage": "Ubuntu 26.04"},
+		"daemonEndpoints": object{"kubeletEndpoint": object{"Port": int64(10250)}},
+		"images":          []any{object{"names": []any{"registry.k8s.io/pause:3.10"}, "sizeBytes": int64(1000)}},
 	}
 	change := func(mutate func(object)) object {
 		next := clone(base).(object)
@@ -246,6 +249,13 @@ func TestSharedFlannelIdentityWritesOnlyItsOwnNodeNetwork(t *testing.T) {
 		{name: "public address of another node", node: annotate(flannel+"public-ip", "100.66.14.60"), user: controller},
 		{name: "public address override to another node", node: annotate(flannel+"public-ip-overwrite", "100.66.14.60"), user: controller},
 		{name: "public address override to its own address", node: annotate(flannel+"public-ip-overwrite", "100.87.168.66"), user: controller, admitted: true},
+		{name: "remove a public address", node: change(func(n object) { delete(at(n, "metadata", "annotations").(object), flannel+"public-ip") }), user: controller},
+		{name: "change a public address to its own address", node: annotate(flannel+"public-ip", "100.87.168.66"), user: controller, admitted: true},
+		{name: "forged node info", node: change(func(n object) { set(n, "v0.0.0", "status", "nodeInfo", "kubeletVersion") }), user: controller},
+		{name: "forged daemon endpoint", node: change(func(n object) { set(n, int64(1), "status", "daemonEndpoints", "kubeletEndpoint", "Port") }), user: controller},
+		{name: "forged images", node: change(func(n object) { set(n, int64(9), "status", "images", 0, "sizeBytes") }), user: controller},
+		{name: "forged runtime handlers", node: change(func(n object) { set(n, []any{object{"name": "gvisor"}}, "status", "runtimeHandlers") }), user: controller},
+		{name: "forged features", node: change(func(n object) { set(n, object{"supplementalGroupsPolicy": true}, "status", "features") }), user: controller},
 		{name: "network unavailable condition", node: change(func(n object) {
 			set(n, append(at(n, "status", "conditions").([]any), object{"type": "NetworkUnavailable", "status": "False"}), "status", "conditions")
 		}), user: controller, admitted: true},

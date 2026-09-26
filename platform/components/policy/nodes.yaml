@@ -96,15 +96,23 @@ spec:
       variables.writeOnce.all(k, !(k in variables.oldAnnotations) || (k in variables.annotations && variables.annotations[k] == variables.oldAnnotations[k]))
     message: Flannel backend annotations are write-once for the shared identity; an administrator clears them to change the backend or key
   - expression: >-
-      variables.ownAddress.all(k, !(k in variables.annotations) || (k in variables.oldAnnotations && variables.annotations[k] == variables.oldAnnotations[k])
-      || variables.annotations[k] in variables.addresses)
-    message: Flannel public addresses must be one of the node's own addresses
+      variables.ownAddress.all(k, (k in variables.oldAnnotations)
+      ? (k in variables.annotations && (variables.annotations[k] == variables.oldAnnotations[k] || variables.annotations[k] in variables.addresses))
+      : (!(k in variables.annotations) || variables.annotations[k] in variables.addresses))
+    message: Flannel public addresses must be one of the node's own addresses and may not be removed once set
   - expression: >-
       (has(object.status.addresses) ? object.status.addresses : []) == (has(oldObject.status.addresses) ? oldObject.status.addresses : [])
       && (has(dyn(object.status).capacity) ? dyn(object.status).capacity : {}) == (has(dyn(oldObject.status).capacity) ? dyn(oldObject.status).capacity : {})
       && (has(dyn(object.status).allocatable) ? dyn(object.status).allocatable : {}) == (has(dyn(oldObject.status).allocatable) ? dyn(oldObject.status).allocatable : {})
       && variables.conditions == variables.oldConditions
     message: The shared flannel identity may change only the NetworkUnavailable condition of the node status
+  - expression: >-
+      (has(dyn(object.status).daemonEndpoints) ? dyn(object.status).daemonEndpoints : {}) == (has(dyn(oldObject.status).daemonEndpoints) ? dyn(oldObject.status).daemonEndpoints : {})
+      && (has(dyn(object.status).nodeInfo) ? dyn(object.status).nodeInfo : {}) == (has(dyn(oldObject.status).nodeInfo) ? dyn(oldObject.status).nodeInfo : {})
+      && (has(dyn(object.status).images) ? dyn(object.status).images : []) == (has(dyn(oldObject.status).images) ? dyn(oldObject.status).images : [])
+      && (has(dyn(object.status).runtimeHandlers) ? dyn(object.status).runtimeHandlers : []) == (has(dyn(oldObject.status).runtimeHandlers) ? dyn(oldObject.status).runtimeHandlers : [])
+      && (has(dyn(object.status).features) ? dyn(object.status).features : {}) == (has(dyn(oldObject.status).features) ? dyn(oldObject.status).features : {})
+    message: The shared flannel identity may not change node info, daemon endpoints, images, runtime handlers or features
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding

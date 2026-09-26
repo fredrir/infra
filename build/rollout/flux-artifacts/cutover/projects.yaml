@@ -10,7 +10,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/projects/llunde
   postBuild:
@@ -38,7 +38,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/projects/portfolio
   postBuild:
@@ -66,7 +66,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/projects/y
   postBuild:
@@ -94,7 +94,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   healthChecks:
     - apiVersion: apps/v1
       kind: StatefulSet

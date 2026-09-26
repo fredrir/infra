@@ -30,7 +30,7 @@ patches:
         path: /spec/sourceRef
         value:
           kind: ExternalArtifact
-          name: platform-policy-91105fe706448332b42d438a04446a91d33f0456
+          name: platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65
     target:
       group: kustomize.toolkit.fluxcd.io
       kind: Kustomization
@@ -39,7 +39,7 @@ patches:
   - patch: |
       - op: add
         path: /spec/dependsOn/0/readyExpr
-        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     target:
       group: kustomize.toolkit.fluxcd.io
       kind: Kustomization
@@ -48,7 +48,7 @@ patches:
   - patch: |
       - op: add
         path: /spec/dependsOn/0/readyExpr
-        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     target:
       group: kustomize.toolkit.fluxcd.io
       kind: Kustomization
@@ -57,7 +57,7 @@ patches:
   - patch: |
       - op: add
         path: /spec/dependsOn/0/readyExpr
-        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     target:
       group: kustomize.toolkit.fluxcd.io
       kind: Kustomization
@@ -66,7 +66,7 @@ patches:
   - patch: |
       - op: add
         path: /spec/dependsOn/1/readyExpr
-        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     target:
       group: kustomize.toolkit.fluxcd.io
       kind: Kustomization
@@ -75,7 +75,7 @@ patches:
   - patch: |
       - op: add
         path: /spec/dependsOn/0/readyExpr
-        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     target:
       group: kustomize.toolkit.fluxcd.io
       kind: Kustomization
@@ -84,7 +84,7 @@ patches:
   - patch: |
       - op: add
         path: /spec/dependsOn/0/readyExpr
-        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     target:
       group: kustomize.toolkit.fluxcd.io
       kind: Kustomization
@@ -93,7 +93,7 @@ patches:
   - patch: |
       - op: add
         path: /spec/dependsOn/0/readyExpr
-        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     target:
       group: kustomize.toolkit.fluxcd.io
       kind: Kustomization
@@ -102,7 +102,7 @@ patches:
   - patch: |
       - op: add
         path: /spec/dependsOn/0/readyExpr
-        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-91105fe706448332b42d438a04446a91d33f0456' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+        value: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c213db22ae40630908488d28aeab4dbdc5bcdd65' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     target:
       group: kustomize.toolkit.fluxcd.io
       kind: Kustomization
