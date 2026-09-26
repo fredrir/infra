@@ -105,7 +105,7 @@ func TestHostSecretsWithSystemdContainer(t *testing.T) {
 	t.Log("the host generates a root-only age key once and keeps its recipient across runs and check mode")
 
 	must("docker", "exec", name, "rm", "/etc/age/host.key")
-	if output := play(true, "/fixture/host.yml", "--check"); !slices.Equal(changed(output), []string{"host_secrets : Generate the host age key"}) {
+	if output := play(false, "/fixture/host.yml", "--check"); !slices.Equal(changed(output), []string{"host_secrets : Generate the host age key"}) || !strings.Contains(output, "TASK [host_secrets : Read the host age recipient]") {
 		t.Fatalf("missing host key reported as %q", changed(output))
 	}
 	if _, err := guest("test ! -e /etc/age/host.key"); err != nil {
@@ -115,5 +115,5 @@ func TestHostSecretsWithSystemdContainer(t *testing.T) {
 	if recipient() == enrolled {
 		t.Fatal("a regenerated host key kept the lost recipient")
 	}
-	t.Log("check mode reports a missing host key without creating one, and a lost key is replaced by a new recipient")
+	t.Log("check mode reports a missing host key as a difference and fails to read its recipient without creating one, and a lost key is replaced by a new recipient")
 }
