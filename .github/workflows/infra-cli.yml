@@ -56,7 +56,8 @@ jobs:
           if [ -f "$bundle/inputs" ] && [ "$(cat "$bundle/inputs")" = "$INPUT_DIGEST" ] && printf '%s  %s\n' "$(cat "$bundle/sha256")" "$bundle/infra" | sha256sum --check --strict --status; then
             printf 'hit=true\n' >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        id: bazel-cache
         if: steps.cached.outputs.hit != 'true'
         with:
           path: |
@@ -78,6 +79,13 @@ jobs:
         if: steps.cached.outputs.hit != 'true'
         run: |
           "$RUNNER_TEMP/bazel" --batch build --config=ci --platforms=@rules_go//go/toolchain:linux_amd64 --disk_cache="$HOME/.cache/infra-bazel-actions" --repository_cache="$HOME/.cache/infra-bazel-repository" --@rules_go//go/config:pure //cmd/infra:infra
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: steps.cached.outputs.hit != 'true' && steps.bazel-cache.outputs.cache-matched-key == ''
+        with:
+          path: |
+            ~/.cache/infra-bazel-actions
+            ~/.cache/infra-bazel-repository
+          key: ${{ steps.bazel-cache.outputs.cache-primary-key }}
       - name: Store binary identity
         if: steps.cached.outputs.hit != 'true'
         env:
