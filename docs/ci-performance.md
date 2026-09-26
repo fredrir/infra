@@ -29,6 +29,8 @@
 | CLI cache saves | About 800 MB `-cli-` entries were saved after every rebuild (10 s p50 post-step) and never restored; the repository cache held 10.6 GB of its 10 GB limit | [CLI workflow](../.github/workflows/infra-cli.yml) |
 | Test-only CLI inputs | 40 of 180 commits since 2026-09-24T17:30Z changed only `_test.go` CLI inputs and rebuilt the CLI | [CLI inputs](../.github/actions/cli-inputs/action.yml) |
 | Reconciler isolation test, Linux | 4.25 → 0.57 seconds; slowest `reconcile_test` shard under Bazel on four CPUs 5.8 → 1.9 seconds; all 21 uncached tests 7.87 → 4.49 seconds | [Test](../internal/reconcile/reconciler_isolation_test.go) |
+| Test execution in infra-fast, hosted runners | Runs 36265704002 and 36266658385 spent 8.7 and 9.0 seconds executing changed tests, not compiling; the heaviest `reconcile_test` shard ran 919 git and ssh-keygen processes at about 5–6 ms each; relative test speed of hosted runners p10 0.48, p50 0.94, p90 1.40 over 35 jobs | [Test data](../platform/BUILD.bazel), [provenance fixtures](../internal/reconcile/provenance_test.go) |
+| Changed-test replay, two cores and four threads | Platform-and-test change shaped like 2045019: infra-fast 1.80 → 0.75 seconds without `reconcile_test`; ansible change: 1.70 → 1.68 seconds locally with the heaviest shard at 919 → 528 process spawns; medians of three samples | [Check pipeline](../internal/pipeline/run.go) |
 | Check replay, four CPUs, declarations under gVisor | Ansible template change: infra-fast 9.32 s and declarations killed at 0.69 s → 2.21 + 0.72 s; OpenTofu module change 0.76 + 2.03 → 0.25 + 1.50 s; reconciler root change initializes one root instead of two; declaration medians of three samples | [Check workflow](../.github/workflows/check.yml) |
 | Historical workflow sample | Includes earlier qualification runs and failures; not an ordinary-traffic deployment percentile | [Baseline](../build/evidence/ci-optimization-baseline.json) |
 | Frontend deployment below 15 seconds | Unqualified | [Previous observed timeline](../build/rollout/flux-artifacts/rollout.json) |
@@ -64,7 +66,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Full host reconciliation | [Task spans](../build/evidence/reconciliation-host-overhead.json): 435 task starts and 637.174 seconds total in one historical run; smart gathering already caches facts within a run | Profile remaining role work and preserve drift detection and registration checks |
 | Production revision publication | Full infrastructure convergence still serializes application publication; a concurrent frontend change exceeded its original serving deadline during qualification | Keep publication queueing visible and bounded; isolate application delivery further only with an equivalent infrastructure and artifact baseline |
 | OpenTofu validation on the check pool | `tofu validate` 4.2–9.7 seconds and 6.7–18.8 CPU seconds in runs 36249739111, 36249858108 and 36258989806; 1.0 seconds native and 1.5 seconds under local gVisor with warm providers; provider download 11–80 seconds per run | Rely on the plan gate's `tofu validate`, or keep a lock-verified provider cache on the check pool |
-| Check cache save | 10 s p50 on every main push; 827 MB entries | Save only when Bazel executed actions |
+| Check cache save | 10 s p50 on every main push; 827 MB entries; a failed check saves nothing, so the next push reruns its changed tests too (runs 36265704002 → 36266658385) | Save after failed checks; save only when Bazel executed actions |
 | Bazel install extraction | 4.3 seconds per hosted job | Cache the install base with the Bazel caches |
 
 | Scanner rollout constraint | Requirement |
@@ -85,7 +87,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | CLI build cache | Restored from check caches; saved only when no cache of the current family exists |
 | CI repository rules | `--config=ci` pins the repository rule `PATH` to `/usr/bin:/bin` |
 | Check budget | The Bazel check and declaration validation run concurrently, each measured against ten seconds; the `budget` job sums both receipts against the ten-second ceiling |
-| Generated BUILD check | Runs for Go, BUILD, `.bzl`, Go module and `MODULE.bazel` changes and for files below Go package directories |
+| Generated BUILD check | `//:gazelle_test` joins the fast check's test invocation for Go, BUILD, `.bzl`, Go module and `MODULE.bazel` changes and for files below Go package directories |
 | Production validation | Apply validates declarations and live preflight before mutation; checks run alongside reconciliation; production application is serialized |
 | Application setup | Durable applied state selects tools; application-only changes skip host tooling, SSH and runner-registration credentials; recovery retains full setup |
 | State operations | Signed S3 requests reuse HTTP connections with conditional lease ownership, encryption and durable status updates |
