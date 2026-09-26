@@ -143,6 +143,100 @@
         "prometheus_job_independent_monitor_up": 1,
         "prometheus_job_build_vm_up": 1
       }
+    },
+    {
+      "change": "Resize the build VM to 8 vCPU and 16 GiB, run several runners per repository and move k3s CI slots from fredrir-09 to fredrir-04",
+      "run": "https://github.com/fredrir/infra/actions/runs/36198371300",
+      "drain": "INFRA_VM_POOL_QUALIFIED false in 7 routed repositories 22:46-23:04 UTC; the idle check runner moved to fredrir-04 before the k3s agent restart",
+      "stage_seconds": {
+        "plan": 11.3,
+        "hosts": 635.0,
+        "publish": 1.8,
+        "kubernetes": 82.3,
+        "monitor": 23.0,
+        "verify": 59.2
+      },
+      "runners_after": {
+        "infra": 3,
+        "Y": 2,
+        "portfolio": 2,
+        "llunde-frontend": 1,
+        "llunde-backend": 1,
+        "llunde-pyparser": 1,
+        "packages": 1,
+        "state": "online, idle"
+      },
+      "fredrir_09_allocatable_after": {
+        "cpu": "7500m",
+        "memory": "13197260Ki",
+        "ci_slots": 0
+      },
+      "fredrir_04_ci_slots_after": 2,
+      "check_lane": {
+        "first_attempt": "declarations and infra-fast used 10.01 s of the 10 s aggregate budget with every Go test target re-run",
+        "rerun_seconds": 4.26
+      }
+    },
+    {
+      "change": "Publish production through the publisher App behind the production and production-history rulesets",
+      "first_app_publish": {
+        "run": "https://github.com/fredrir/infra/actions/runs/36201076054",
+        "actor": "fredrir-infra-publisher[bot]",
+        "revision": "e1fd6b7",
+        "timestamp": "2026-09-25T23:32:29Z"
+      },
+      "qualification": {
+        "seconds": 44.9,
+        "rulesets": {
+          "production": 24024709,
+          "production-history": 24024710
+        },
+        "rejected": [
+          "administrator push",
+          "workflow token push",
+          "publisher force-push",
+          "publisher deletion"
+        ],
+        "accepted": "publisher fast-forward",
+        "workflow_token_probe": "https://github.com/fredrir/infra/actions/runs/36202138217",
+        "first_attempt": "failure: the probe checkout lacked the canary base, so git rejected the push locally before the ruleset; fixed in 6accfe7"
+      }
+    },
+    {
+      "change": "Bound workload IAM users with a permissions boundary, move PyParser to platform-dataset-parser and retire leploy and the llunde host restic users",
+      "admin_applies": [
+        {
+          "revision": "cbce2c2",
+          "timestamp": "2026-09-25T22:16Z",
+          "result": "4 added, 11 changed, 0 destroyed"
+        },
+        {
+          "revision": "31d68dd",
+          "timestamp": "2026-09-25T23:50Z",
+          "result": "0 added, 2 changed, 8 destroyed"
+        }
+      ],
+      "drift_window": {
+        "detected_by": "https://github.com/fredrir/infra/actions/runs/36199310643",
+        "declared_differences": "11 to change, 4 to destroy",
+        "repair": "withheld because push run 36198371300 had not completed its apply",
+        "closed_by": "merging the applied commits as e1fd6b7; the push apply planned no changes"
+      },
+      "retirement_checks": {
+        "leploy_key_last_used": "2026-09-18",
+        "restic_llunde_keys_last_used": "2026-09-12",
+        "pyparser_pods_on_platform_dataset_parser": 3,
+        "backup_repository_key_owner": "platform-restic-parser (retained)",
+        "deleted": [
+          "4 access keys",
+          "leploy-s3 group membership, policy attachment and group"
+        ]
+      },
+      "merge_run": "https://github.com/fredrir/infra/actions/runs/36202539887",
+      "merge_apply": "OpenTofu planned no changes; complete at 6acf717",
+      "limitations": [
+        "check / validate exceeded the 10 s aggregate budget (12.03 s) once tofu test joined the declarations stage"
+      ]
     }
   ]
 }
