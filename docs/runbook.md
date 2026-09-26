@@ -237,7 +237,7 @@ These activation steps provision external credentials once; merge, verification 
 | AWS identity policies | `tofu/reconciliation.tf`; attached managed policies; deployment identities cannot change their own grants |
 | AWS verify identity | `/automation/infra-reconciliation-verify`: the plan policy without the OpenTofu lock, plus `s3:PutObject` on `reconciliation/production/runs/*`; every request from an address other than `reconciler_ipv4` is denied; declared only while `reconciler_ipv4` is set in `tofu/production.tfvars.json` |
 | Run report retention | `reconciliation/production/runs/` objects expire after 30 days; noncurrent versions under `reconciliation/production/` after 7 days |
-| AWS workload boundary | `policy/boundary/infra-workload-boundary` on every OpenTofu-managed IAM user outside `/automation/`; dataset S3 objects except `tofu-state/`, `tf-state-backups/` and `reconciliation/`, SES from the alert sender; the apply identity cannot edit, remove or bypass it |
+| AWS workload boundary | `policy/boundary/infra-workload-boundary` on every OpenTofu-managed IAM user outside `/automation/`; dataset S3 objects except `tofu-state/` and `reconciliation/`, SES from the alert sender; the apply identity cannot edit, remove or bypass it |
 | Kubernetes identities | `platform/components/policy/reconciliation.yaml` |
 | Kubernetes tokens | Controller-populated `infrastructure-plan-credentials`, `infrastructure-apply-credentials` and `infrastructure-verify-credentials` Secrets in `flux-system` |
 | Kubernetes API address | Reachable control-plane Tailnet address with a matching certificate; include its CA in each kubeconfig |

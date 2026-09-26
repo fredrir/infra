@@ -57,7 +57,7 @@ run "workload_boundary" {
       ]) &&
       contains([
         for statement in jsondecode(aws_iam_policy.workload_boundary.policy).Statement : statement.Resource if statement.Effect == "Deny" && statement.Action == ["s3:*"]
-      ], ["arn:aws:s3:::dataset/tofu-state/*", "arn:aws:s3:::dataset/tf-state-backups/*", "arn:aws:s3:::dataset/reconciliation/*"])
+      ], ["arn:aws:s3:::dataset/tofu-state/*", "arn:aws:s3:::dataset/reconciliation/*"])
     )
     error_message = "The workload boundary must grant only named dataset S3 and SES actions and keep OpenTofu state out of reach."
   }
@@ -150,9 +150,10 @@ run "workload_boundary" {
       for rule in aws_s3_bucket_lifecycle_configuration.dataset.rule : length(rule.filter) == 1 && (
         startswith(rule.filter[0].prefix, "restic/llunde-") ||
         (rule.filter[0].prefix == "reconciliation/production/runs/" && rule.expiration[0].days == 30 && length(rule.noncurrent_version_expiration) == 0) ||
-        (rule.filter[0].prefix == "reconciliation/production/" && rule.noncurrent_version_expiration[0].noncurrent_days == 7 && rule.expiration[0].expired_object_delete_marker && coalesce(rule.expiration[0].days, 0) == 0)
+        (rule.filter[0].prefix == "reconciliation/production/" && rule.noncurrent_version_expiration[0].noncurrent_days == 7 && rule.expiration[0].expired_object_delete_marker && coalesce(rule.expiration[0].days, 0) == 0) ||
+        (rule.filter[0].prefix == "restic/platform/" && rule.noncurrent_version_expiration[0].noncurrent_days >= 90 && rule.expiration[0].expired_object_delete_marker && coalesce(rule.expiration[0].days, 0) == 0)
       )
     ])
-    error_message = "Lifecycle expiration must stay scoped to the retired host repositories, reconciliation run reports and superseded reconciliation state."
+    error_message = "Lifecycle expiration must stay scoped to the retired host repositories, reconciliation run reports, superseded reconciliation state and pruned platform backup versions older than 90 days."
   }
 }

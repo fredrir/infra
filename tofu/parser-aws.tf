@@ -46,6 +46,20 @@ resource "aws_s3_bucket_lifecycle_configuration" "dataset" {
   }
 
   rule {
+    id     = "expire-pruned-platform-restic"
+    status = "Enabled"
+    filter {
+      prefix = "restic/platform/"
+    }
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
+
+  rule {
     id     = "remove-retired-host-restic-delete-markers"
     status = "Enabled"
     filter {

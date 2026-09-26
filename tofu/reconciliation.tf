@@ -48,7 +48,7 @@ resource "aws_iam_policy" "workload_boundary" {
       {
         Effect   = "Deny"
         Action   = ["s3:*"]
-        Resource = [for prefix in ["tofu-state", "tf-state-backups", "reconciliation"] : "${data.aws_s3_bucket.dataset.arn}/${prefix}/*"]
+        Resource = [for prefix in ["tofu-state", "reconciliation"] : "${data.aws_s3_bucket.dataset.arn}/${prefix}/*"]
       },
       ], var.platform_mail == null ? [] : [
       {

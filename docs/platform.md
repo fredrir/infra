@@ -229,6 +229,7 @@ kubectl get cronjobs --all-namespaces
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Backup storage     | Encrypted Restic repositories outside the cluster; interchangeable backend tooling                                                                                           |
 | Retired host repos | `restic/llunde-*` expire 2026-12-25; versions deleted 90 days later; lifecycle changes require an administrator apply                                                        |
+| Pruned versions    | Noncurrent `restic/platform/` versions expire after 90 days; writers cannot delete versions; lifecycle changes require an administrator apply |
 | Credentials        | Separate project prefixes and separate maintenance authority; SOPS recovery available from Macie or Archie                                                                   |
 | Independent copies | Verified migration archives on Macie and Archie                                                                                                                              |
 | Volume policy      | Retained local volumes; important application data currently resides on `fredrir-09`                                                                                         |
