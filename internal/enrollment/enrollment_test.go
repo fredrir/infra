@@ -21,13 +21,20 @@ type fakeAPI struct {
 	calls                         []Request
 }
 
+func tailscaleDescription(description any) any {
+	if text, ok := description.(string); ok && len(text) > 50 {
+		return text[:50]
+	}
+	return description
+}
+
 func (f *fakeAPI) call(_ context.Context, r Request) (map[string]any, error) {
 	f.calls = append(f.calls, r)
 	if r.Path == "/oauth/token" {
 		return map[string]any{"access_token": "private-token", "token_type": "Bearer", "scope": "auth_keys", "expires_in": json.Number("3600")}, nil
 	}
 	if r.Method == "POST" {
-		result := copyDocument(map[string]any{"id": "kFixture123", "key": fixtureKey, "created": fixtureNow.Format(time.RFC3339), "expires": fixtureNow.Add(600 * time.Second).Format(time.RFC3339), "description": r.Document["description"], "capabilities": r.Document["capabilities"], "invalid": false})
+		result := copyDocument(map[string]any{"id": "kFixture123", "key": fixtureKey, "created": fixtureNow.Format(time.RFC3339), "expires": fixtureNow.Add(600 * time.Second).Format(time.RFC3339), "description": tailscaleDescription(r.Document["description"]), "capabilities": r.Document["capabilities"], "invalid": false})
 		if f.mutate != nil {
 			f.mutate(result)
 		}

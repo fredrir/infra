@@ -128,7 +128,7 @@ func (c Client) CreateDeliver(ctx context.Context, target Target) (result map[st
 	if err != nil {
 		return nil, err
 	}
-	var random [12]byte
+	var random [10]byte
 	if _, err := rand.Read(random[:]); err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func (c Client) RevokeUnused(ctx context.Context, target Target) (map[string]any
 			return nil, fmt.Errorf("key response identity differs")
 		}
 		description, _ := document["description"].(string)
-		if !regexp.MustCompile(`^enroll-` + regexp.QuoteMeta(target.Node) + `-` + target.Role + `-[a-f0-9]{24}$`).MatchString(description) {
+		if !regexp.MustCompile(`^enroll-` + regexp.QuoteMeta(target.Node) + `-` + target.Role + `-[a-f0-9]{20}$`).MatchString(description) {
 			return nil, fmt.Errorf("key does not belong to bootstrap target")
 		}
 		if _, err := validateMetadata(document, target.Role, description, c.now(), false); err != nil {
