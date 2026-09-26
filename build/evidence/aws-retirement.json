@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "date": "2026-09-26",
+  "approval": "Owner confirmed the exact deletion list",
+  "deleted": [
+    {"resource": "s3://hansteen-portfolio-backups-prod", "contents": "0 current objects; 3,408 noncurrent WAL versions (57.097 GB) and 3,423 delete markers; last write 2026-08-09", "result": "all versions removed, bucket deleted"},
+    {"resource": "s3://llunde-pyparser-bucket/openclaw-backups/", "contents": "30 current objects (14.939 GB), 7 noncurrent (0.409 GB)", "result": "44 versions and markers removed"},
+    {"resource": "s3://llunde-pyparser-bucket/openclaw/", "contents": "2 current, 32 noncurrent, 26 delete markers", "result": "60 versions and markers removed"},
+    {"resource": "s3://llunde-pyparser-bucket/pg-backups/", "contents": "66 objects (0.127 GB); last write 2026-08-08", "result": "removed"},
+    {"resource": "s3://llunde-pyparser-bucket/cutover-20260809/", "contents": "2 objects (0.307 GB)", "result": "removed"},
+    {"resource": "s3://llunde-pyparser-bucket/tf-state-backups/", "contents": "2 objects; last write 2026-06-14", "result": "removed; prefix dropped from the workload boundary"},
+    {"resource": "rds us-east-1 aurora-postgresql 17.7 database-1 and database-1-instance-1", "contents": "Serverless v2, not public, 0 client connections 2026-09-23..26; daily maintenance resume only", "result": "deleted without final snapshot; automated backups deleted"},
+    {"resource": "rds us-east-1 aurora-postgresql 17.7 database-2", "contents": "no instances", "result": "deleted without final snapshot; automated backups deleted"},
+    {"resource": "rds eu-north-1 snapshot pyparser-prod-snapshot", "contents": "20 GB, 2026-06-14", "result": "deleted"}
+  ],
+  "administrator_apply": {
+    "commit": "45686a243353bac21c60a82b90e5d119dc8834f6",
+    "changes": ["aws_s3_bucket_lifecycle_configuration.dataset: expire-pruned-platform-restic (noncurrent 90 days, expired delete markers)", "aws_iam_policy.workload_boundary: tf-state-backups removed"],
+    "result": "Apply complete: 0 added, 2 changed, 0 destroyed; follow-up plan found no differences"
+  },
+  "limitations": ["Monthly cost effect not yet observed in Cost Explorer"]
+}
