@@ -320,13 +320,13 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 
 | Order | Owner action | Value |
 | --- | --- | --- |
-| 1 | Roll out nsql | Pin an infra revision whose `rust-auto-tag.yml` runs on `rust-tag-amd64`; allow it in `auto-tag.sts.yaml` |
-| 2 | Attach the OpenStack volume | Up to 512 GB; highest IOPS class offered; note `ls -l /dev/disk/by-id` |
+| 1 | Roll out nsql | Pin an infra revision whose `rust-auto-tag.yml` runs on `rust-tag-amd64`. Every SHA in nsql's `auto-tag.sts.yaml` allowlist (current and previous) must be such a revision: drop the pre-split `a57b0e1` and `d9016b2` even if one entry remains. Check each with `git show <sha>:.github/workflows/rust-auto-tag.yml \| grep runs-on` |
+| 2 | Attach the OpenStack volume | The volume whose `/dev/disk/by-id` path is `data_volume_device` |
 | 3 | Apply `tailscale/policy.hujson` | Adds `tag:platform-volatile` |
 | 4 | Install the verified `infra` release at `/usr/local/bin/infra` over `ssh ntnu` | Release SHA-256 from the trusted build |
 | 5 | Deliver the enrollment key | `infra operations enrollment create-deliver --node fredrir-10 --role volatile --host ntnu --sudo` |
 | 6 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
-| 7 | Set inventory values | `tailscale_ip`, `data_volume_device` |
+| 7 | Set inventory values | `tailscale_ip` |
 | 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in Doppler `SSH_KNOWN_HOSTS` and the admin `known_hosts` |
 | 9 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 11 |
 | 10 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 30m --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
