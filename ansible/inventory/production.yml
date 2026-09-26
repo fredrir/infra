@@ -86,7 +86,7 @@ all:
                   ansible_host: "{{ tailscale_ip }}"
                   ansible_user: ubuntu
                   ansible_ssh_common_args: -o HostKeyAlias=fredrir-10 -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ForwardAgent=no
-                  tailscale_ip: null
+                  tailscale_ip: 100.115.32.87
                   provider: ntnu
                   machine_type: sx3.16c64r
                   architecture: amd64
