@@ -51,6 +51,16 @@ filegroup(
 )
 
 filegroup(
+    name = "host_firewall_data",
+    srcs = [
+        "ansible/roles/firewall/defaults/main.yml",
+        "ansible/roles/firewall/templates/platform-host.nft.j2",
+        "ansible/roles/k3s/defaults/main.yml",
+    ],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "node_registration_data",
     srcs = ["ansible/inventory/production.yml"],
     visibility = ["//internal/policy:__pkg__"],

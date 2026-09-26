@@ -6,6 +6,7 @@ go_test(
         "arc_test.go",
         "build_vm_test.go",
         "cancellation_test.go",
+        "firewall_test.go",
         "host_secrets_test.go",
         "images_test.go",
         "kustomize_test.go",
@@ -14,6 +15,7 @@ go_test(
     ],
     data = [
         "//:build_vm_metrics_data",
+        "//:host_firewall_data",
         "//:host_secret_data",
         "//:image_contract_data",
         "//:renovate_pin_data",

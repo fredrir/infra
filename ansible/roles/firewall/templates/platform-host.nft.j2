@@ -24,4 +24,9 @@ table inet platform_host {
 {% endfor %}
 {% endif %}
   }
+
+  chain output {
+    type filter hook output priority -5; policy accept;
+    meta mark and 0xff0000 == 0x80000 ip daddr {{ firewall_pod_cidr }} drop
+  }
 }
