@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"iter"
 	"maps"
+	"net"
+	"net/http"
 	"slices"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/fredrir/infra/internal/ci"
 	"github.com/google/go-github/v88/github"
 	"github.com/hmarr/codeowners"
 )
@@ -36,20 +39,39 @@ type GitHubPullRequests struct {
 }
 
 func (p GitHubPullRequests) WithCommit(ctx context.Context, commit string) ([]*github.PullRequest, error) {
-	return collect(p.Client.PullRequests.ListPullRequestsWithCommitIter(ctx, p.Owner, p.Name, commit, &github.ListOptions{PerPage: 100}))
+	pulls, err := collect(p.Client.PullRequests.ListPullRequestsWithCommitIter(ctx, p.Owner, p.Name, commit, &github.ListOptions{PerPage: 100}))
+	return pulls, apiUnavailable(err)
 }
 
 func (p GitHubPullRequests) Get(ctx context.Context, number int) (*github.PullRequest, error) {
 	pull, _, err := p.Client.PullRequests.Get(ctx, p.Owner, p.Name, number)
-	return pull, err
+	return pull, apiUnavailable(err)
 }
 
 func (p GitHubPullRequests) Reviews(ctx context.Context, number int) ([]*github.PullRequestReview, error) {
-	return collect(p.Client.PullRequests.ListReviewsIter(ctx, p.Owner, p.Name, number, &github.ListOptions{PerPage: 100}))
+	reviews, err := collect(p.Client.PullRequests.ListReviewsIter(ctx, p.Owner, p.Name, number, &github.ListOptions{PerPage: 100}))
+	return reviews, apiUnavailable(err)
 }
 
 func (p GitHubPullRequests) Commits(ctx context.Context, number int) ([]*github.RepositoryCommit, error) {
-	return collect(p.Client.PullRequests.ListCommitsIter(ctx, p.Owner, p.Name, number, &github.ListOptions{PerPage: 100}))
+	commits, err := collect(p.Client.PullRequests.ListCommitsIter(ctx, p.Owner, p.Name, number, &github.ListOptions{PerPage: 100}))
+	return commits, apiUnavailable(err)
+}
+
+func apiUnavailable(err error) error {
+	var response *github.ErrorResponse
+	var rate *github.RateLimitError
+	var abuse *github.AbuseRateLimitError
+	var network net.Error
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &rate), errors.As(err, &abuse), errors.As(err, &network):
+	case errors.As(err, &response) && response.Response != nil && (response.Response.StatusCode >= http.StatusInternalServerError || response.Response.StatusCode == http.StatusTooManyRequests):
+	default:
+		return err
+	}
+	return ci.Unavailable(err)
 }
 
 func collect[T any](items iter.Seq2[T, error]) ([]T, error) {
@@ -264,7 +286,11 @@ func (r *reviewGate) present(ctx context.Context, head string) error {
 		return nil
 	}
 	if _, err := r.commands.git(ctx, nil, "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "origin", head); err != nil {
-		return fmt.Errorf("fetch the head %s: %w", head[:12], err)
+		err = fmt.Errorf("fetch the head %s: %w", head[:12], err)
+		if ci.UnavailableOutput(err.Error()) {
+			return ci.Unavailable(err)
+		}
+		return err
 	}
 	return nil
 }

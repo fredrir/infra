@@ -3,8 +3,10 @@ package reconcile
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +19,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	"github.com/fredrir/infra/internal/ci"
 	"github.com/google/go-github/v88/github"
 )
 
@@ -209,9 +212,10 @@ func approval(login, commit string) *github.PullRequestReview {
 }
 
 type reviewedMergeCase struct {
-	name       string
-	build      func(f *provenanceFixture) string
-	unverified []string
+	unavailable bool
+	name        string
+	build       func(f *provenanceFixture) string
+	unverified  []string
 }
 
 func TestReviewedMergesFirstQuarter(t *testing.T) { testReviewedMergesQuarter(t, 0) }
@@ -246,6 +250,9 @@ func testReviewedMergesQuarter(t *testing.T, quarter int) {
 				if !regexp.MustCompile(want).MatchString(err.Error()) {
 					t.Errorf("got %v, want a match of %q", err, want)
 				}
+			}
+			if ProvenanceUnavailable(err) != test.unavailable {
+				t.Errorf("unavailable = %v for %v, want %v", ProvenanceUnavailable(err), err, test.unavailable)
 			}
 		})
 	}
@@ -388,21 +395,21 @@ func reviewedMergeCases(base string) []reviewedMergeCase {
 			f.merged(22, renovate, head, merge, 1, approval(owner, head))
 			f.api.unavailable = "/commits/"
 			return merge
-		}, unverified: []string{"list its pull requests", "502"}},
+		}, unverified: []string{"list its pull requests", "502"}, unavailable: true},
 		{name: "pull request API error", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(23, platform)
 			merge := f.sign(f.squash(23, head), f.webFlow)
 			f.merged(23, renovate, head, merge, 1, approval(owner, head))
 			f.api.unavailable = "/pulls/23"
 			return merge
-		}, unverified: []string{"pull request #23: GET", "502"}},
+		}, unverified: []string{"pull request #23: source unavailable: GET", "502"}, unavailable: true},
 		{name: "review API error", build: func(f *provenanceFixture) string {
 			head, _ := f.pullRequest(24, platform)
 			merge := f.sign(f.squash(24, head), f.webFlow)
 			f.merged(24, renovate, head, merge, 1, approval(owner, head))
 			f.api.unavailable = "/reviews"
 			return merge
-		}, unverified: []string{"pull request #24: list reviews", "502"}},
+		}, unverified: []string{"pull request #24: list reviews", "502"}, unavailable: true},
 		{name: "merge of another head", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(25, platform, release)
 			advance(f)
@@ -516,7 +523,7 @@ func reviewedMergeCases(base string) []reviewedMergeCase {
 			f.merged(46, renovate, head, merge, 1, approval(owner, head))
 			f.api.unavailable = "/pulls/46/commits"
 			return merge
-		}, unverified: []string{"pull request #46: list commits: GET", "502"}},
+		}, unverified: []string{"pull request #46: list commits: source unavailable: GET", "502"}, unavailable: true},
 		{name: "truncated pull request commits", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(47, platform, release)
 			merge := f.rebase(commits...)
@@ -631,3 +638,28 @@ const githubMerge = "tree 1a1ac29e2a41f304d5812e719432ce26050bca24\n" +
 	"Merge pull request #149 from fredrir/bump-node\n" +
 	"\n" +
 	"bump node to 24"
+
+func TestPullRequestAPIOutagesAreUnavailable(t *testing.T) {
+	response := func(status int) error {
+		return &github.ErrorResponse{Response: &http.Response{StatusCode: status, Request: &http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/repos/fredrir/infra/pulls/1"}}}}
+	}
+	for name, test := range map[string]struct {
+		err  error
+		want bool
+	}{
+		"server error":  {err: response(http.StatusBadGateway), want: true},
+		"throttled":     {err: response(http.StatusTooManyRequests), want: true},
+		"rate limit":    {err: &github.RateLimitError{Response: &http.Response{StatusCode: http.StatusForbidden}}, want: true},
+		"network":       {err: &url.Error{Op: "Get", URL: "https://api.github.com", Err: errors.New("dial tcp: connection refused")}, want: true},
+		"not found":     {err: response(http.StatusNotFound)},
+		"forbidden":     {err: response(http.StatusForbidden)},
+		"plain failure": {err: errors.New("decode pull request")},
+	} {
+		if got := errors.Is(apiUnavailable(test.err), ci.ErrSourceUnavailable); got != test.want {
+			t.Errorf("%s: unavailable = %v, want %v", name, got, test.want)
+		}
+	}
+	if apiUnavailable(nil) != nil {
+		t.Error("no error became an error")
+	}
+}

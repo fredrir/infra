@@ -181,14 +181,9 @@ func githubCredentials() (string, []string, func(), error) {
 }
 
 func verifyProvenance(cmd *cobra.Command, store reconcile.S3Store, ops *reconcile.Commands, override, report string) (err error) {
-	var outcome struct {
-		reconcile.ProvenanceRange
-		Error string `json:"error,omitempty"`
-	}
+	var checked reconcile.ProvenanceRange
 	defer func() {
-		if err != nil {
-			outcome.Error = err.Error()
-		}
+		outcome := reconcile.NewProvenanceOutcome(checked, err)
 		err = errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(outcome))
 		if report != "" {
 			err = errors.Join(err, writeReport(report, outcome))
@@ -202,10 +197,10 @@ func verifyProvenance(cmd *cobra.Command, store reconcile.S3Store, ops *reconcil
 	if err != nil {
 		return err
 	}
-	if outcome.ProvenanceRange, err = reconcile.NewProvenanceRange(status.Applied, override, revision); err != nil {
+	if checked, err = reconcile.NewProvenanceRange(status.Applied, override, revision); err != nil {
 		return err
 	}
-	return ops.Provenance(cmd.Context(), outcome.ProvenanceRange)
+	return ops.Provenance(cmd.Context(), checked)
 }
 
 func newRequestVerificationCommand() *cobra.Command {

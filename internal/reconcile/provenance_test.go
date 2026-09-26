@@ -2,6 +2,7 @@ package reconcile
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ type provenanceFixture struct {
 	root, remote, owner, visitor string
 	base                         string
 	attested                     map[string][]int
+	attestationOutage            string
 	verifications                []process.Options
 	webFlow, impostor            *openpgp.Entity
 	api                          *pullRequestAPI
@@ -252,6 +254,9 @@ func (f *provenanceFixture) attestation(ctx context.Context, options process.Opt
 	f.verifications = append(f.verifications, options)
 	subject := strings.TrimPrefix(options.Args[slices.IndexFunc(options.Args, func(arg string) bool { return strings.Contains(arg, "ghcr.io/") })], "oci://")
 	runs := f.attested[subject]
+	if f.attestationOutage != "" {
+		return process.Result{ExitCode: 1, Stderr: []byte(f.attestationOutage + "\n")}, errors.New(options.Name + " failed: exit status 1")
+	}
 	if len(runs) == 0 || (options.Name == "cosign" && !strings.Contains(strings.Join(options.Args, " "), "workflow-revision="+strings.Repeat("e", 40))) {
 		return process.Result{ExitCode: 1, Stderr: []byte("Error: no matching attestations found\n")}, errors.New(options.Name + " failed: exit status 1")
 	}
@@ -284,9 +289,10 @@ func (f *provenanceFixture) verify(base, head string) error {
 }
 
 type provenanceGateCase struct {
-	name       string
-	build      func(f *provenanceFixture) string
-	unverified string
+	name        string
+	build       func(f *provenanceFixture) string
+	unverified  string
+	unavailable bool
 }
 
 func TestProvenanceGateFirstQuarter(t *testing.T) { testProvenanceGateQuarter(t, 0) }
@@ -311,6 +317,9 @@ func testProvenanceGateQuarter(t *testing.T, quarter int) {
 			}
 			if test.unverified != "" && (err == nil || !strings.Contains(err.Error(), "unverified commits: ") || !strings.Contains(err.Error(), test.unverified)) {
 				t.Fatalf("got %v, want an unverified commit with %q", err, test.unverified)
+			}
+			if test.unverified != "" && ProvenanceUnavailable(err) != test.unavailable {
+				t.Fatalf("unavailable = %v for %v, want %v", ProvenanceUnavailable(err), err, test.unavailable)
 			}
 		})
 	}
@@ -371,6 +380,17 @@ func provenanceGateCases() []provenanceGateCase {
 			clear(f.attested)
 			return deployed
 		}, unverified: "image provenance did not match an approved workflow revision: gh at workflow dddddddddddd: Error: no matching attestations found"},
+		{name: "attestation registry outage", build: func(f *provenanceFixture) string {
+			deployed := f.deploy(deployedImage, 101)
+			f.attestationOutage = "Error: failed to fetch attestations: HTTP 502: Bad Gateway (https://api.github.com/repos/fredrir/example/attestations)"
+			return deployed
+		}, unverified: "source unavailable: image provenance did not match an approved workflow revision", unavailable: true},
+		{name: "outage beside a genuinely unsigned change", build: func(f *provenanceFixture) string {
+			f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
+			deployed := f.deploy(deployedImage, 101)
+			f.attestationOutage = "Error: GET https://ghcr.io/v2/fredrir/example/manifests/sha256-0: unexpected status code 503 Service Unavailable"
+			return deployed
+		}, unverified: "unsigned; not a deployment"},
 		{name: "deployment of another run's attestation", build: func(f *provenanceFixture) string {
 			deployed := f.deploy(releasedImage, 101)
 			f.attested[fmt.Sprintf("%s@sha256:%064x", releasedImage, 101)] = []int{102}
@@ -513,5 +533,22 @@ func TestProvenanceGatesApplyBeforeAnyCheckoutTooling(t *testing.T) {
 	ops := &fakeOps{selection: All()}
 	if err := (Reconciler{Store: &memoryStore{}, Ops: ops}).Apply(context.Background(), false); !errors.Is(err, ErrNoProvenanceBase) || len(ops.provenance) != 0 || len(ops.calls) != 0 {
 		t.Fatalf("first reconciliation without a base returned %v after %v", err, ops.calls)
+	}
+}
+
+func TestProvenanceOutcomeReportsOutagesSeparately(t *testing.T) {
+	checked := ProvenanceRange{Base: strings.Repeat("a", 40), Revision: strings.Repeat("b", 40)}
+	for name, test := range map[string]struct {
+		err  error
+		want string
+	}{
+		"verified": {want: `{"base":"` + checked.Base + `","revision":"` + checked.Revision + `"}`},
+		"rejected": {err: unverifiedCommits{message: "unverified commits: unsigned"}, want: `{"base":"` + checked.Base + `","revision":"` + checked.Revision + `","error":"unverified commits: unsigned"}`},
+		"outage":   {err: unverifiedCommits{message: "unverified commits: HTTP 502", unavailable: true}, want: `{"base":"` + checked.Base + `","revision":"` + checked.Revision + `","error":"unverified commits: HTTP 502","unavailable":true}`},
+	} {
+		data, err := json.Marshal(NewProvenanceOutcome(checked, test.err))
+		if err != nil || string(data) != test.want {
+			t.Errorf("%s: %s, %v; want %s", name, data, err, test.want)
+		}
 	}
 }

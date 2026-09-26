@@ -172,6 +172,7 @@ func VerifyDeploymentProvenance(ctx context.Context, runner Runner, root fs.FS, 
 	environment := append(os.Environ(), runner.Env...)
 	var attested []DeploymentOrder
 	failure := errors.New("no attestation names a deployment run")
+	unavailable := false
 	for _, workflowRevision := range revisions {
 		name, arguments, err := ProvenanceCommand(mapping.Visibility, mapping.Repository, workflowRevision, revision, image+"@"+digest)
 		if err != nil {
@@ -186,6 +187,7 @@ func VerifyDeploymentProvenance(ctx context.Context, runner Runner, root fs.FS, 
 		}
 		if err != nil {
 			failure = fmt.Errorf("%s at workflow %s: %s", name, workflowRevision[:12], redacted(cmp.Or(lastLine(result.Stderr), err.Error()), environment))
+			unavailable = unavailable || UnavailableOutput(string(result.Stderr)) || result.ExitCode < 0
 			continue
 		}
 		orders, err := attestedDeploymentOrders(result.Stdout, mapping.Visibility, mapping.Repository, image, digest, revision)
@@ -195,7 +197,11 @@ func VerifyDeploymentProvenance(ctx context.Context, runner Runner, root fs.FS, 
 		attested = append(attested, orders...)
 	}
 	if len(attested) == 0 {
-		return nil, fmt.Errorf("image provenance did not match an approved workflow revision: %w", failure)
+		failure = fmt.Errorf("image provenance did not match an approved workflow revision: %w", failure)
+		if unavailable {
+			return nil, Unavailable(failure)
+		}
+		return nil, failure
 	}
 	slices.SortFunc(attested, compareDeploymentRuns)
 	return slices.Compact(attested), nil

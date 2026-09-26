@@ -130,15 +130,46 @@ func (g provenanceGate) verify(ctx context.Context, commits []provenanceCommit) 
 	}
 	g.reviewed(ctx, commits, pending)
 	var unverified []string
+	unavailable := true
 	for _, commit := range commits {
 		if reason, ok := pending[commit.hash]; ok {
 			unverified = append(unverified, fmt.Sprintf("%s %q: %s", commit.hash[:12], commit.subject, strings.ReplaceAll(reason.Error(), "\n", "; ")))
+			unavailable = unavailable && errors.Is(reason, ci.ErrSourceUnavailable)
 		}
 	}
 	if len(unverified) > 0 {
-		return fmt.Errorf("unverified commits: %s; accept them with a %s trailer in an owner-signed commit, or push the change as owner-signed commits", strings.Join(unverified, " | "), acknowledgementTrailer)
+		return unverifiedCommits{message: fmt.Sprintf("unverified commits: %s; accept them with a %s trailer in an owner-signed commit, or push the change as owner-signed commits", strings.Join(unverified, " | "), acknowledgementTrailer), unavailable: unavailable}
 	}
 	return nil
+}
+
+type unverifiedCommits struct {
+	message     string
+	unavailable bool
+}
+
+func (u unverifiedCommits) Error() string { return u.message }
+
+func (u unverifiedCommits) Is(target error) bool {
+	return u.unavailable && target == ci.ErrSourceUnavailable
+}
+
+func ProvenanceUnavailable(err error) bool {
+	return errors.Is(err, ci.ErrSourceUnavailable)
+}
+
+type ProvenanceOutcome struct {
+	ProvenanceRange
+	Error       string `json:"error,omitempty"`
+	Unavailable bool   `json:"unavailable,omitempty"`
+}
+
+func NewProvenanceOutcome(checked ProvenanceRange, err error) ProvenanceOutcome {
+	outcome := ProvenanceOutcome{ProvenanceRange: checked}
+	if err != nil {
+		outcome.Error, outcome.Unavailable = err.Error(), ProvenanceUnavailable(err)
+	}
+	return outcome
 }
 
 func (g provenanceGate) withoutOwner(ctx context.Context, commit provenanceCommit, signature error) error {
