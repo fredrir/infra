@@ -1,0 +1,160 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns-upstream
+  namespace: kube-system
+spec:
+  selector:
+    k8s-app: kube-dns
+  trafficDistribution: PreferSameNode
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+    targetPort: 53
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+    targetPort: 53
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: node-local-dns
+  namespace: kube-system
+data:
+  Corefile: |
+    cluster.local:53 {
+        errors
+        cache {
+            success 9984 30
+            denial 9984 5
+        }
+        reload
+        loop
+        bind 169.254.20.10 10.43.0.10
+        forward . __PILLAR__CLUSTER__DNS__ {
+            force_tcp
+        }
+        prometheus :9253
+        health 169.254.20.10:8080
+    }
+    in-addr.arpa:53 {
+        errors
+        cache 30
+        reload
+        loop
+        bind 169.254.20.10 10.43.0.10
+        forward . __PILLAR__CLUSTER__DNS__ {
+            force_tcp
+        }
+        prometheus :9253
+    }
+    ip6.arpa:53 {
+        errors
+        cache 30
+        reload
+        loop
+        bind 169.254.20.10 10.43.0.10
+        forward . __PILLAR__CLUSTER__DNS__ {
+            force_tcp
+        }
+        prometheus :9253
+    }
+    .:53 {
+        errors
+        cache 30
+        reload
+        loop
+        bind 169.254.20.10 10.43.0.10
+        forward . __PILLAR__UPSTREAM__SERVERS__
+        prometheus :9253
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-local-dns
+  namespace: kube-system
+  labels:
+    k8s-app: node-local-dns
+spec:
+  selector:
+    matchLabels:
+      k8s-app: node-local-dns
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        k8s-app: node-local-dns
+    spec:
+      priorityClassName: system-node-critical
+      hostNetwork: true
+      dnsPolicy: Default
+      automountServiceAccountToken: false
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: node-cache
+        image: registry.k8s.io/dns/k8s-dns-node-cache:1.26.8@sha256:bc6e64e2c85956af2fcc0aa720086410d41b4f31f378c9a92646fecc85cd4739
+        args:
+        - -localip=169.254.20.10,10.43.0.10
+        - -conf=/etc/Corefile
+        - -pidfile=/run/coredns.pid
+        - -upstreamsvc=kube-dns-upstream
+        - -metrics-listen-address=127.0.0.1:9353
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_ADMIN
+            - NET_BIND_SERVICE
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
+        ports:
+        - name: dns
+          containerPort: 53
+          protocol: UDP
+        - name: dns-tcp
+          containerPort: 53
+          protocol: TCP
+        - name: metrics
+          containerPort: 9253
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            host: 169.254.20.10
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: xtables-lock
+          mountPath: /run/xtables.lock
+        - name: config
+          mountPath: /etc/coredns
+      volumes:
+      - name: xtables-lock
+        hostPath:
+          path: /run/xtables.lock
+          type: FileOrCreate
+      - name: config
+        configMap:
+          name: node-local-dns
+          items:
+          - key: Corefile
+            path: Corefile.base

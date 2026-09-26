@@ -42,6 +42,7 @@ images:
   otel: docker.io/otel/opentelemetry-collector-contrib:0.160.0@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6
   blackbox: docker.io/prom/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc
   attic: ghcr.io/zhaofengli/attic:9eda345a@sha256:325036ce0776ed6e2705819c6bd1ebd1635b0422723110116adf56edf8ea12bd
+  node-local-dns: registry.k8s.io/dns/k8s-dns-node-cache:1.26.8@sha256:bc6e64e2c85956af2fcc0aa720086410d41b4f31f378c9a92646fecc85cd4739
 sources:
 - https://grafana.github.io/helm-charts/index.yaml
 - https://prometheus-community.github.io/helm-charts/index.yaml
@@ -50,6 +51,7 @@ sources:
 - https://github.com/grafana/tempo/releases/tag/v3.0.3
 - https://github.com/grafana/loki/releases/tag/v3.7.7
 - https://github.com/cloudflare/cloudflared/releases/tag/2026.9.1
+- https://github.com/kubernetes-sigs/node-local-dns/tree/1.26.8
 fluxManifest:
   url: https://github.com/fluxcd/flux2/releases/download/v2.9.5/install.yaml
   sha256: cc3dcd743af16215838b6937e1fce83745bf24c0dcc6c59737c59df15429caaf

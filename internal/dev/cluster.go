@@ -36,7 +36,7 @@ var ErrClusterNotReady = errors.New("cluster kustomizations are not ready")
 
 var ClusterProfiles = map[string][]string{
 	"minimal":  {"platform-policy", "platform-projects"},
-	"platform": {"platform-policy", "platform-projects", "platform-sources", "platform-ingress", "platform-observability", "platform-cache", "platform-build-cache", "platform-backups"},
+	"platform": {"platform-policy", "platform-projects", "platform-sources", "platform-ingress", "platform-observability", "platform-cache", "platform-build-cache", "platform-backups", "platform-dns"},
 }
 
 var devSettings = map[string]string{"STORAGE_CLASS": "local-path"}
