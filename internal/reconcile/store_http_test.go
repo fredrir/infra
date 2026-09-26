@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -21,15 +22,17 @@ import (
 )
 
 type leaseServer struct {
-	t        *testing.T
-	mu       sync.Mutex
-	etag     string
-	body     []byte
-	versions int
-	writes   int
-	deletes  int
-	failPuts int
-	hang     chan struct{}
+	t         *testing.T
+	mu        sync.Mutex
+	etag      string
+	body      []byte
+	versions  int
+	writes    int
+	deletes   int
+	failPuts  int
+	hang      chan struct{}
+	conflicts int
+	winner    *lease
 }
 
 func (s *leaseServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +67,10 @@ func (s *leaseServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("If-None-Match") == "" && r.Header.Get("If-Match") == "" {
 			s.t.Error("unconditional lease write")
 		}
+		if s.conflicted() {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
 		if s.failPuts != 0 {
 			w.WriteHeader(s.failPuts)
 			return
@@ -76,6 +83,10 @@ func (s *leaseServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.writes++
 		w.Header().Set("ETag", s.etag)
 	case http.MethodDelete:
+		if s.conflicted() {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
 		if r.Header.Get("If-Match") != s.etag {
 			w.WriteHeader(http.StatusPreconditionFailed)
 			return
@@ -84,6 +95,24 @@ func (s *leaseServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.deletes++
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func (s *leaseServer) conflicted() bool {
+	if s.conflicts == 0 {
+		return false
+	}
+	s.conflicts--
+	if s.winner != nil {
+		s.store(json.Marshal(*s.winner))
+		s.winner = nil
+	}
+	return true
+}
+
+func (s *leaseServer) conflict(times int, winner *lease) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.conflicts, s.winner = times, winner
 }
 
 func (s *leaseServer) store(body []byte, err error) {
@@ -259,6 +288,8 @@ func TestLostLeaseCancelsTheRun(t *testing.T) {
 		deadline time.Duration
 	}{
 		{name: "taken over", lose: func(s *leaseServer) { s.set(lease{Owner: "thief", Expires: time.Now().Add(time.Hour)}) }, deadline: leaseRenewal},
+		{name: "taken over during a renewal", lose: func(s *leaseServer) { s.conflict(1, &lease{Owner: "thief", Expires: time.Now().Add(time.Hour)}) }, deadline: leaseRenewal},
+		{name: "renewals keep conflicting", lose: func(s *leaseServer) { s.conflict(2, nil) }, deadline: leaseRenewal},
 		{name: "renewals fail", lose: func(s *leaseServer) { s.failWrites(http.StatusServiceUnavailable) }, deadline: leaseTTL},
 		{name: "renewals denied", lose: func(s *leaseServer) { s.failWrites(http.StatusForbidden) }, deadline: leaseTTL},
 		{name: "renewals hang", lose: func(s *leaseServer) { s.hangWrites() }, deadline: leaseTTL},
@@ -283,7 +314,7 @@ func TestLostLeaseCancelsTheRun(t *testing.T) {
 					t.Errorf("cancellation cause %v", cause)
 				}
 				released := unlock()
-				if owner := server.lease().Owner; test.name == "taken over" && (released == nil || owner != "thief") {
+				if owner := server.lease().Owner; strings.HasPrefix(test.name, "taken over") && (released == nil || owner != "thief") {
 					t.Errorf("release of a taken-over lease returned %v and left owner %q", released, owner)
 				}
 				server.resume()
@@ -312,33 +343,158 @@ func TestReleaseOutwaitsOnlyOneBoundedRenewal(t *testing.T) {
 	})
 }
 
+func awsFailure(code, operation string) (process.Result, error) {
+	return process.Result{ExitCode: 254, Stderr: []byte("\nAn error occurred (" + code + ") when calling the " + operation + " operation: rejected\n")}, errors.New("aws failed: exit status 254")
+}
+
 func TestCLILeaseRenewalDetectsTakeover(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		puts := 0
-		runner := ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
-			switch o.Args[1] {
-			case "get-object":
-				return process.Result{ExitCode: 254}, errors.New("missing")
-			case "list-objects-v2":
-				return process.Result{Stdout: []byte(`{"Contents":[]}`)}, nil
-			case "put-object":
-				if puts++; puts > 1 {
-					return process.Result{ExitCode: 254, Stderr: []byte("\nAn error occurred (PreconditionFailed) when calling the PutObject operation: At least one of the pre-conditions you specified did not hold\n")}, errors.New("aws failed: exit status 254")
+	for _, test := range []struct {
+		name     string
+		renewals []string
+	}{
+		{name: "precondition failed", renewals: []string{"PreconditionFailed"}},
+		{name: "conflict then precondition failed", renewals: []string{"ConditionalRequestConflict", "PreconditionFailed"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				puts := 0
+				runner := ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+					switch o.Args[1] {
+					case "get-object":
+						return process.Result{ExitCode: 254}, errors.New("missing")
+					case "list-objects-v2":
+						return process.Result{Stdout: []byte(`{"Contents":[]}`)}, nil
+					case "put-object":
+						if puts++; puts > 1 {
+							return awsFailure(test.renewals[min(puts-2, len(test.renewals)-1)], "PutObject")
+						}
+						return process.Result{Stdout: []byte(`{"ETag":"owner"}`)}, nil
+					}
+					return process.Result{}, nil
+				}}
+				held, unlock, err := (S3Store{Runner: runner, Bucket: "bucket", Prefix: "production"}).Lock(t.Context())
+				if err != nil {
+					t.Fatal(err)
 				}
-				return process.Result{Stdout: []byte(`{"ETag":"owner"}`)}, nil
+				acquired := time.Now()
+				<-held.Done()
+				if lost := time.Since(acquired); lost != leaseRenewal || !errors.Is(context.Cause(held), errLeaseLost) {
+					t.Errorf("taken-over lease lost after %s: %v", lost, context.Cause(held))
+				}
+				unlock()
+			})
+		})
+	}
+}
+
+func TestCLILeaseReleaseReissuesAConflictedDelete(t *testing.T) {
+	deletes := 0
+	runner := ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+		switch o.Args[1] {
+		case "get-object":
+			return process.Result{ExitCode: 254}, errors.New("missing")
+		case "list-objects-v2":
+			return process.Result{Stdout: []byte(`{"Contents":[]}`)}, nil
+		case "put-object":
+			return process.Result{Stdout: []byte(`{"ETag":"owner"}`)}, nil
+		case "delete-object":
+			if deletes++; deletes == 1 {
+				return awsFailure("ConditionalRequestConflict", "DeleteObject")
+			}
+			if !slices.Equal(o.Args[len(o.Args)-2:], []string{"--if-match", "owner"}) {
+				t.Errorf("unconditional release %q", o.Args)
 			}
 			return process.Result{}, nil
-		}}
-		held, unlock, err := (S3Store{Runner: runner, Bucket: "bucket", Prefix: "production"}).Lock(t.Context())
+		}
+		return process.Result{}, nil
+	}}
+	_, unlock, err := (S3Store{Runner: runner, Bucket: "bucket", Prefix: "production"}).Lock(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := unlock(); err != nil || deletes != 2 {
+		t.Fatalf("release after a conflict returned %v after %d deletes", err, deletes)
+	}
+}
+
+func TestConflictedLeaseRequestsAreReissuedOnce(t *testing.T) {
+	thief := &lease{Owner: "thief", Expires: time.Now().Add(time.Hour)}
+	for _, test := range []struct {
+		name      string
+		existing  *lease
+		winner    *lease
+		wantOwner string
+	}{
+		{name: "free lease", wantOwner: "pid"},
+		{name: "expired lease", existing: &lease{Owner: "crashed", Expires: time.Now().Add(-time.Hour)}, wantOwner: "pid"},
+		{name: "free lease won by another writer", winner: thief, wantOwner: "thief"},
+		{name: "expired lease won by another writer", existing: &lease{Owner: "crashed", Expires: time.Now().Add(-time.Hour)}, winner: thief, wantOwner: "thief"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := &leaseServer{t: t}
+			if test.existing != nil {
+				server.set(*test.existing)
+			}
+			server.conflict(1, test.winner)
+			_, unlock, err := leaseStore(server).Lock(t.Context())
+			if owner := server.lease().Owner; !strings.Contains(owner, test.wantOwner) {
+				t.Fatalf("lease owned by %q after a conflicted acquisition returned %v", owner, err)
+			}
+			if test.winner != nil {
+				var locked ErrLocked
+				if !errors.As(err, &locked) || locked.Owner != "thief" {
+					t.Fatalf("acquisition lost to another writer returned %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("acquisition after a conflict: %v", err)
+			}
+			server.conflict(1, nil)
+			if err := unlock(); err != nil {
+				t.Fatalf("release after a conflict: %v", err)
+			}
+			if _, deletes := server.counts(); deletes != 1 || server.lease().Owner != "" {
+				t.Fatalf("release after a conflict deleted %d times and left %+v", deletes, server.lease())
+			}
+		})
+	}
+}
+
+func TestReleaseConflictedByATakeoverKeepsTheNewOwner(t *testing.T) {
+	server := &leaseServer{t: t}
+	_, unlock, err := leaseStore(server).Lock(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.conflict(1, &lease{Owner: "thief", Expires: time.Now().Add(time.Hour)})
+	if err := unlock(); err == nil || !leaseTaken(err) {
+		t.Fatalf("release of a taken-over lease returned %v", err)
+	}
+	if _, deletes := server.counts(); deletes != 0 || server.lease().Owner != "thief" {
+		t.Fatalf("release deleted %d times and left %+v", deletes, server.lease())
+	}
+}
+
+func TestRenewalConflictKeepsAnOwnedLease(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		server := &leaseServer{t: t}
+		held, unlock, err := leaseStore(server).Lock(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
 		acquired := time.Now()
-		<-held.Done()
-		if lost := time.Since(acquired); lost != leaseRenewal || !errors.Is(context.Cause(held), errLeaseLost) {
-			t.Errorf("taken-over lease lost after %s: %v", lost, context.Cause(held))
+		server.conflict(1, nil)
+		time.Sleep(leaseRenewal + time.Second)
+		if held.Err() != nil {
+			t.Fatalf("conflicted renewal cancelled the run: %v", context.Cause(held))
 		}
-		unlock()
+		if expires := server.lease().Expires; !expires.After(acquired.Add(leaseTTL)) {
+			t.Fatalf("conflicted renewal was not reissued; lease still expires at %s", expires)
+		}
+		if err := unlock(); err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 

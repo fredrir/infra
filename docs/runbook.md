@@ -110,7 +110,7 @@ jq -Rs . < NEW_KEY.pem | sops set --value-stdin ansible/roles/verification_trigg
 | Merge selection | Diff against the last successfully applied revision; incomplete attempts force all systems |
 | Hostname-only deployment | Skip unrelated host configuration; run the Gatus role |
 | State | `s3://llunde-pyparser-bucket/reconciliation/production/status.json` |
-| Cross-client lease | Conditional S3 writes to `reconciliation/production/lock.json` |
+| Cross-client lease | Conditional S3 writes and deletes of `reconciliation/production/lock.json`; a 409 is reissued once; 412 or a second 409 means taken over |
 | Lease TTL / renewal | 10 minutes / every 3 minutes, each attempt bounded to 30 seconds; a taken-over or unrenewable lease cancels the run, interrupting its current step, and records no further status |
 | Lease wait | `infra reconcile apply --wait DURATION`; default fails fast; CI waits 11 minutes to outlast an abandoned lease |
 | Run deadline / apply job timeout | 90 minutes / 120 minutes |
