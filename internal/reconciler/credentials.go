@@ -25,12 +25,16 @@ const (
 	PlatformMailRecipient = "platform-mail-recipient"
 	KubernetesToken       = "kubernetes-token"
 	ObserverAppKey        = "observer-app-key"
+	RunnerAppKey          = "runner-app-key"
+	PublisherAppKey       = "publisher-app-key"
+	ProvenanceToken       = "provenance-token"
 	GatusToken            = "gatus-token"
 )
 
 var (
 	VerifyCredentials = []string{AWSAccessKeyID, AWSSecretAccessKey, CloudflareAPIToken, HcloudToken, PlatformMailRecipient, KubernetesToken, ObserverAppKey, GatusToken}
-	privateKeys       = []string{ObserverAppKey}
+	ApplyCredentials  = []string{AWSAccessKeyID, AWSSecretAccessKey, CloudflareAPIToken, HcloudToken, PlatformMailRecipient, KubernetesToken, RunnerAppKey, PublisherAppKey, ProvenanceToken, GatusToken}
+	privateKeys       = []string{ObserverAppKey, RunnerAppKey, PublisherAppKey}
 )
 
 const credentialsLimit = 256 << 10

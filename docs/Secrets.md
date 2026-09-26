@@ -13,7 +13,7 @@
 | AWS workload access keys              | Created outside OpenTofu per `/platform/` IAM user; the consuming project's `*.secret.sops.yaml`                                                                                       |
 | Independent monitoring                | Settings `ansible/roles/gatus/templates/config.yaml.j2`; secrets `ansible/roles/gatus/files/secrets.sops.yaml`; Macie, Archie and `fredrir-06` |
 | Publisher App key                     | Doppler `infra → prd_reconciliation_apply` `PUBLISHER_APP_PRIVATE_KEY`; apply engine, as a consumed `0600` file, and administrators only; [publishing](runbook.md#publishing) |
-| Reconciler credentials | `ansible/roles/reconciler/files/credentials.sops.yaml`; Macie, Archie and `fredrir-11`; [reconciler host](runbook.md#reconciler-host) |
+| Reconciler credentials | `ansible/roles/reconciler/files/credentials.sops.yaml`, maps `verify` and `apply`; Macie, Archie and `fredrir-11`; [reconciler host](runbook.md#reconciler-host) |
 | Verification trigger credentials      | `ansible/roles/verification_trigger/files/credentials.sops.yaml`; Macie, Archie and `fredrir-06` |
 | Control-plane backup credentials      | `ansible/roles/control_backup/files/control.sops.yaml`; Macie, Archie and `fredrir-07`; cluster maintenance copy `platform/components/backups/backup.secret.sops.yaml` |
 | Decryption                            | Macie, Archie `~/.config/age/keys.txt`; Flux `flux-system/sops-age`; hosts `/etc/age/host.key` |
@@ -78,6 +78,17 @@ jq -Rs 'rtrimstr("\n")' < NEW_PASSWORD | sops set --value-stdin ansible/roles/co
 | Control repository password | `control.sops.yaml` and `platform/components/backups/backup.secret.sops.yaml` `RESTIC_PASSWORD` | Repository access with the current password | `restic key add`; control backup and `repository-maintenance` job succeed with the new password; then `restic key remove` the previous key | Revert until the previous key is removed |
 
 `restic key add` and `restic key remove` replace the password that unlocks the repository master key, not the master key; replacing that requires a new repository and is only needed after a suspected compromise.
+
+## Provenance token
+
+| Name | Value |
+| --- | --- |
+| Kind | Personal access token (classic), scope `read:packages` only; GitHub Packages accepts neither fine-grained tokens nor App installation tokens outside Actions |
+| Use | `PROVENANCE_TOKEN` of the fredrir-11 gate and engine: public pull request reads, `gh attestation verify`, `cosign verify` of private GHCR deployment images |
+| Location | `ansible/roles/reconciler/files/credentials.sops.yaml` `["apply"]["provenance-token"]` |
+| Lifetime | One year; expiry `<YYYY-MM-DD>`, set when the token is created |
+| Alert | Gatus `reconciliation_apply` fails daily from 30 days before expiry, and for a token without expiry |
+| Rotate | Generate a replacement with the same scope and a one-year expiry; `sops set`; `ansible-playbook ansible/reconciler.yml`; confirm the next readiness check or apply; revoke the previous token |
 
 ## Retire a recipient
 

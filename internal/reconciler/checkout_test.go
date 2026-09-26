@@ -73,6 +73,28 @@ func TestCheckoutRefusesProductionOffMain(t *testing.T) {
 	}
 }
 
+func TestCheckoutMainChecksOutTheMainTip(t *testing.T) {
+	ctx := context.Background()
+	origin, _ := originRepository(t)
+	main := gitCommand(t, origin, "rev-parse", "main")
+	source := filepath.Join(t.TempDir(), "source")
+	hardened := hardenedExecutor(t)
+	if revision, err := hardened.checkoutMain(ctx, source, "file://"+origin); err != nil || revision != main {
+		t.Fatalf("main checkout resolved %s, %v; want %s", revision, err, main)
+	}
+	if head := gitCommand(t, source, "rev-parse", "HEAD"); head != main {
+		t.Fatalf("checkout at %s, want %s", head, main)
+	}
+	if tip, err := hardened.remoteMain(ctx, "file://"+origin); err != nil || tip != main {
+		t.Fatalf("remote main %s, %v; want %s", tip, err, main)
+	}
+	gitCommand(t, origin, "checkout", "--quiet", "--detach", "production")
+	gitCommand(t, origin, "branch", "-D", "main")
+	if _, err := hardened.remoteMain(ctx, "file://"+origin); err == nil {
+		t.Fatal("a missing main resolved")
+	}
+}
+
 func TestHardenedGitIgnoresPlantedHooksAndReplacements(t *testing.T) {
 	ctx := context.Background()
 	origin, published := originRepository(t)

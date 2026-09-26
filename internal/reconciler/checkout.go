@@ -106,6 +106,17 @@ func (e executor) checkoutPublished(ctx context.Context, source, repository stri
 	return publication{Revision: revision, Main: main, OnMain: true}, nil
 }
 
+func (e executor) checkoutMain(ctx context.Context, source, repository string) (string, error) {
+	revisions, err := e.clone(ctx, source, repository, reviewedBranch)
+	if err != nil {
+		return "", err
+	}
+	if _, err := e.output(ctx, "", "git", "-C", source, "checkout", "--quiet", "--detach", revisions[reviewedBranch]); err != nil {
+		return "", err
+	}
+	return revisions[reviewedBranch], nil
+}
+
 func (e executor) ancestor(ctx context.Context, source, revision, descendant string) (bool, error) {
 	quiet := e
 	quiet.log = nil
@@ -118,6 +129,18 @@ func (e executor) ancestor(ctx context.Context, source, revision, descendant str
 	default:
 		return false, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(result.Stderr)))
 	}
+}
+
+func (e executor) remoteMain(ctx context.Context, repository string) (string, error) {
+	output, err := e.output(ctx, "", "git", "ls-remote", "--exit-code", repository, "refs/heads/"+reviewedBranch)
+	if err != nil {
+		return "", err
+	}
+	revision, _, _ := strings.Cut(output, "\t")
+	if !revisionPattern.MatchString(revision) {
+		return "", fmt.Errorf("%s resolved to an invalid revision", reviewedBranch)
+	}
+	return revision, nil
 }
 
 func offMain(revision string) *reconcile.Verification {

@@ -289,14 +289,14 @@ func (c *Commands) currentMain(ctx context.Context, revision string) error {
 		return err
 	}
 	for path := range strings.SplitSeq(string(changed), "\x00") {
-		if path != "" && !pushIgnored(path) {
+		if path != "" && !PushIgnored(path) {
 			return ErrSuperseded
 		}
 	}
 	return nil
 }
 
-func pushIgnored(path string) bool {
+func PushIgnored(path string) bool {
 	return slices.ContainsFunc(pushIgnoredPaths, func(pattern string) bool { return doublestar.MatchUnvalidated(pattern, path) })
 }
 

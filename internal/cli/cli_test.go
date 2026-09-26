@@ -74,13 +74,13 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 }
 
 func TestCommandValidation(t *testing.T) {
-	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "verify", "--wait=1m"}, {"reconcile", "provenance", "--full"}, {"reconcile", "provenance", "--wait=1m"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}, {"reconcile", "run"}, {"reconcile", "run", "verify", "extra"}, {"reconcile", "run", "verify", "--config", "/nonexistent/verify.json"}} {
+	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "verify", "--wait=1m"}, {"reconcile", "provenance", "--full"}, {"reconcile", "provenance", "--wait=1m"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}, {"reconcile", "run"}, {"reconcile", "run", "verify", "extra"}, {"reconcile", "run", "verify", "--config", "/nonexistent/verify.json"}, {"reconcile", "run", "apply", "--credentials=/run/credentials.json"}, {"reconcile", "run", "apply", "--ssh-identity=/run/ssh"}, {"reconcile", "run", "apply", "extra"}, {"reconcile", "run", "pending", "--config", "/nonexistent/apply.json"}, {"reconcile", "run", "request", "--config", "/nonexistent/apply.json"}, {"reconcile", "run", "request", "--revision=main"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err == nil {
 			t.Errorf("accepted invalid command %q", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--scope=cloud", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "provenance", "--provenance-base=" + strings.Repeat("a", 40), "--help"}, {"reconcile", "request-verification", "--help"}, {"reconcile", "run", "verify", "--help"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--scope=cloud", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "provenance", "--provenance-base=" + strings.Repeat("a", 40), "--help"}, {"reconcile", "request-verification", "--help"}, {"reconcile", "run", "verify", "--help"}, {"reconcile", "run", "apply", "--help"}, {"reconcile", "run", "pending", "--help"}, {"reconcile", "run", "request", "--full", "--help"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
 			t.Errorf("command %q: %v, output=%q", args, err, &output)
@@ -276,5 +276,58 @@ func TestVerificationRequestReadsItsCredentialFiles(t *testing.T) {
 	}
 	if err := cli.Run(context.Background(), request[:4], &output, &output); err == nil || !strings.Contains(err.Error(), `required flag(s) "heartbeat-token", "private-key" not set`) {
 		t.Fatalf("request without credential files returned %v", err)
+	}
+}
+
+func TestApplyUnitConditionAndOperatorRequest(t *testing.T) {
+	origin := t.TempDir()
+	for _, args := range [][]string{{"init", "--quiet", "--initial-branch=main"}, {"commit", "--quiet", "--allow-empty", "--message", "fixture"}} {
+		command := exec.Command("git", append([]string{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, args...)...)
+		command.Dir = origin
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git: %v\n%s", err, output)
+		}
+	}
+	shared, state := t.TempDir(), t.TempDir()
+	if err := os.Mkdir(filepath.Join(shared, "requests"), 0o770); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(t.TempDir(), "apply.json")
+	data, err := json.Marshal(map[string]any{
+		"repository": "file://" + origin, "state": state, "cache": t.TempDir(), "shared": shared, "bucket": "llunde-pyparser-bucket", "prefix": "reconciliation/production", "region": "eu-north-1",
+		"gatus": "http://100.86.241.75:8080", "heartbeat": "reconciliation_apply", "known_hosts": "/etc/infra-reconcile/known_hosts",
+		"kubernetes": map[string]any{"server": "https://100.115.121.9:6443", "certificate_authority": "/etc/infra-reconcile/kubernetes-ca.crt"},
+		"runner":     map[string]any{"app_id": 4924976, "installation_id": 1, "api": "https://api.github.com"},
+		"publisher":  map[string]any{"app_id": 5079532, "installation_id": 164968284, "api": "https://api.github.com", "repository": "fredrir/infra"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(config, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := cli.Run(context.Background(), []string{"reconcile", "run", "pending", "--config", config}, &output, &output); err != nil || !strings.HasPrefix(output.String(), "main at ") {
+		t.Fatalf("a new main tip is not pending: %v %q", err, &output)
+	}
+	tip := strings.TrimSpace(strings.TrimPrefix(output.String(), "main at "))
+	ledger, err := json.Marshal(map[string]any{"revision": tip, "outcome": "applied", "checked_at": time.Now().UTC()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(state, "ledger.json"), ledger, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	err = cli.Run(context.Background(), []string{"reconcile", "run", "pending", "--config", config}, &output, &output)
+	if err == nil || cli.ExitCode(err) != 1 {
+		t.Fatalf("an applied tip is pending: %v %q", err, &output)
+	}
+	if err := cli.Run(context.Background(), []string{"reconcile", "run", "request", "--full", "--config", config}, &output, &output); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if err := cli.Run(context.Background(), []string{"reconcile", "run", "pending", "--config", config}, &output, &output); err != nil || output.String() != "requested: operator\n" {
+		t.Fatalf("an operator request is not pending: %v %q", err, &output)
 	}
 }

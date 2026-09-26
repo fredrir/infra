@@ -29,7 +29,11 @@ type Run struct {
 	Stage        string                  `json:"stage"`
 	Outcome      string                  `json:"outcome"`
 	Error        string                  `json:"error,omitempty"`
+	Reason       string                  `json:"reason,omitempty"`
+	Full         bool                    `json:"full,omitempty"`
 	Verification *reconcile.Verification `json:"verification,omitempty"`
+	Provenance   json.RawMessage         `json:"provenance,omitempty"`
+	Status       json.RawMessage         `json:"status,omitempty"`
 }
 
 func (r Run) ID() string {

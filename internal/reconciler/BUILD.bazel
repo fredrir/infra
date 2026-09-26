@@ -3,12 +3,15 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "reconciler",
     srcs = [
+        "apply.go",
         "apps.go",
         "build.go",
         "cache.go",
         "checkout.go",
+        "checks.go",
         "config.go",
         "credentials.go",
+        "ledger.go",
         "lock.go",
         "report.go",
         "requests.go",
@@ -31,10 +34,12 @@ go_library(
 go_test(
     name = "reconciler_test",
     srcs = [
+        "apply_test.go",
         "checkout_test.go",
         "config_test.go",
         "credentials_test.go",
         "host_access_test.go",
+        "ledger_test.go",
         "qualification_test.go",
         "requests_test.go",
         "role_test.go",

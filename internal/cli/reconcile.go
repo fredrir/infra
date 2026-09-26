@@ -238,8 +238,11 @@ func newRequestVerificationCommand() *cobra.Command {
 	return command
 }
 
+var errNothingPending = errors.New("nothing to reconcile")
+
 func newRunCommand() *cobra.Command {
 	var config, credentials, identity string
+	var full bool
 	run := &cobra.Command{Use: "run", Short: "Run a reconciler host unit", RunE: missingCommand}
 	verify := &cobra.Command{Use: "verify", Short: "Build the published engine, verify its declared scope, report to S3 and Gatus, and request repairs", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		loaded, err := reconciler.LoadConfig(config)
@@ -248,11 +251,47 @@ func newRunCommand() *cobra.Command {
 		}
 		return reconciler.Supervisor{Config: loaded, Credentials: credentials, Identity: identity, Log: cmd.OutOrStdout()}.Verify(cmd.Context())
 	}}
+	apply := &cobra.Command{Use: "apply", Short: "Gate and apply the main tip, and report to GitHub, S3 and Gatus", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		loaded, err := reconciler.LoadApplyConfig(config)
+		if err != nil {
+			return err
+		}
+		return reconciler.Applier{Config: loaded, Credentials: credentials, Identity: identity, Log: cmd.OutOrStdout()}.Apply(cmd.Context())
+	}}
+	pending := &cobra.Command{Use: "pending", Short: "Exit 0 when the apply unit has work, without credentials", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		loaded, err := reconciler.LoadApplyConfig(config)
+		if err != nil {
+			return err
+		}
+		decision, err := reconciler.Applier{Config: loaded}.Pending(cmd.Context())
+		if err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), "infra:", err)
+		}
+		if !decision.Run {
+			return errNothingPending
+		}
+		fmt.Fprintln(cmd.OutOrStdout(), decision.Reason)
+		return nil
+	}}
+	request := &cobra.Command{Use: "request", Short: "Queue an apply of the main tip for the apply unit", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		loaded, err := reconciler.LoadApplyConfig(config)
+		if err != nil {
+			return err
+		}
+		return reconciler.WriteRequest(loaded.Shared, reconciler.Request{Kind: reconciler.RequestApply, Full: full, Reason: "operator", Requested: time.Now().UTC()})
+	}}
+	for _, command := range []*cobra.Command{verify, apply} {
+		command.Flags().StringVar(&credentials, "credentials", "", "Decrypted credentials as a JSON object; removed once read")
+		command.Flags().StringVar(&identity, "ssh-identity", "", "SSH private key for host access")
+		_ = command.MarkFlagRequired("credentials")
+	}
+	_ = apply.MarkFlagRequired("ssh-identity")
 	verify.Flags().StringVar(&config, "config", "/etc/infra-reconcile/verify.json", "Reconciler configuration")
-	verify.Flags().StringVar(&credentials, "credentials", "", "Decrypted credentials as a JSON object; removed once read")
-	verify.Flags().StringVar(&identity, "ssh-identity", "", "SSH private key for host access")
-	_ = verify.MarkFlagRequired("credentials")
-	run.AddCommand(verify)
+	for _, command := range []*cobra.Command{apply, pending, request} {
+		command.Flags().StringVar(&config, "config", "/etc/infra-reconcile/apply.json", "Apply configuration")
+	}
+	request.Flags().BoolVar(&full, "full", false, "Reconcile all systems, including external drift")
+	run.AddCommand(verify, apply, pending, request)
 	return run
 }
 

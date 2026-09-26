@@ -37,6 +37,12 @@ type Config struct {
 	Observer App             `json:"observer"`
 }
 
+type ApplyConfig struct {
+	Site
+	Runner    App       `json:"runner"`
+	Publisher Publisher `json:"publisher"`
+}
+
 type Kubernetes struct {
 	Server               string `json:"server"`
 	CertificateAuthority string `json:"certificate_authority"`
@@ -48,15 +54,26 @@ type App struct {
 	API            string `json:"api"`
 }
 
+type Publisher struct {
+	App
+	Repository string `json:"repository"`
+}
+
 var (
-	bucketPattern    = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
-	prefixPattern    = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$`)
-	regionPattern    = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-[0-9]$`)
-	heartbeatPattern = regexp.MustCompile(`^[a-z0-9-]+_[a-z0-9-]+$`)
+	bucketPattern     = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
+	prefixPattern     = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$`)
+	regionPattern     = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-[0-9]$`)
+	heartbeatPattern  = regexp.MustCompile(`^[a-z0-9-]+_[a-z0-9-]+$`)
+	repositoryPattern = regexp.MustCompile(`^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$`)
 )
 
 func LoadConfig(path string) (Config, error) {
 	var config Config
+	return config, load(path, &config, func() error { return config.validate() })
+}
+
+func LoadApplyConfig(path string) (ApplyConfig, error) {
+	var config ApplyConfig
 	return config, load(path, &config, func() error { return config.validate() })
 }
 
@@ -90,6 +107,19 @@ func (c Config) validate() error {
 		return fmt.Errorf("full scope requires a clean absolute known_hosts, not %q", c.KnownHosts)
 	}
 	return c.Observer.validate("observer")
+}
+
+func (c ApplyConfig) validate() error {
+	if err := c.Site.validate(); err != nil {
+		return err
+	}
+	if !cleanAbsolute(c.KnownHosts) {
+		return fmt.Errorf("known_hosts %q is not a clean absolute path", c.KnownHosts)
+	}
+	if !repositoryPattern.MatchString(c.Publisher.Repository) {
+		return fmt.Errorf("publisher repository %q is not OWNER/NAME", c.Publisher.Repository)
+	}
+	return errors.Join(c.Runner.validate("runner"), c.Publisher.App.validate("publisher"))
 }
 
 func (s Site) validate() error {

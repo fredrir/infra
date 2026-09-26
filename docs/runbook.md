@@ -402,6 +402,32 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | Host age key | `/etc/age/host.key` from `host_secrets`; `reconciler.yml --tags host_key` generates it and prints its recipient; [host-scoped secrets](Secrets.md#host-scoped-secrets) |
 | SSH identity | Root `0600` `/etc/infra-reconcile/ssh/id_ed25519`, generated on the host and never copied; `reconciler.yml --tags ssh_identity` generates it and prints its public key |
 
+| Apply supervisor | Value |
+| --- | --- |
+| Commands | `infra reconcile run pending`: credential-free, exit 0 when there is work; `run apply --credentials FILE --ssh-identity FILE`; `run request [--full]` queues an apply of the `main` tip |
+| Configuration | `apply.json`: `verify.json`'s site settings with `heartbeat: reconciliation_apply`, required `known_hosts`, and `runner` and `publisher` Apps; `publisher.repository` names the Check Run repository |
+| Decision | New `main` tip; the same tip after `deferred` or `superseded`; `requests/apply.json`; `requests/repair.json` for the current, already handled tip, at most once per revision every 6 hours and never after a failed repair of it; otherwise a readiness check every 24 hours |
+| Ledger | `<state>/ledger.json`: handled `main` tip, outcome, failure, last repair, last check; runs live under `<state>/runs`, emptied before and after each run |
+| Push-ignored commits | Only root Markdown, `docs/**/*.md` or `build/evidence/*.json` since a settled tip: recorded without a gate, build or report |
+| Gate | The supervisor's own `infra reconcile provenance` with its pinned `gh` and `cosign`, before any checkout build; `PROVENANCE_TOKEN` and state credentials only |
+| Engine | Built from the gated checkout; `ci prepare-validation` and `ci validate` against the applied revision; `reconcile apply --wait=11m [--full]` with the runner App token, the publisher key as a consumed `0600` file, the provenance token, `INFRA_RECONCILE_TAILNET=true` and the host identity |
+| Outcomes | `applied`, `evaluated`; exit 75 is `superseded` when `main` moved and `deferred` otherwise; `failed` is not retried until a new tip, repair or request |
+| Check Run | `reconcile / apply` on the tip, publisher App token with `checks: write`; success, failure, or skipped for `deferred` and `superseded`; summary: revision, reason, outcome, stage, S3 run key, provenance and status |
+| Reports | `s3://llunde-pyparser-bucket/reconciliation/production/runs/<utc>-apply-<rev12>/`: `report.json`, `log.txt.zst` |
+| Heartbeat | Gatus `reconciliation_apply` after `applied`, `evaluated`, `failed` and readiness checks: failure for a failed tip, an unreadable state bucket, or a provenance token without expiry or expiring within 30 days |
+
+| Apply credential | Source |
+| --- | --- |
+| `aws-access-key-id`, `aws-secret-access-key` | `tofu -chdir=tofu/reconciler output -raw apply_aws_access_key_id`, `apply_aws_secret_access_key` |
+| `cloudflare-api-token` | `tofu -chdir=tofu/reconciler output -raw apply_cloudflare_api_token` |
+| `hcloud-token` | Read/write token of the fleet Hetzner project |
+| `platform-mail-recipient` | Same value as `verify` |
+| `kubernetes-token` | `flux-system/infrastructure-apply-credentials` |
+| `runner-app-key` | Runner App private key |
+| `publisher-app-key` | [Publisher App](#publishing) private key |
+| `provenance-token` | [Provenance token](Secrets.md#provenance-token) |
+| `gatus-token` | Equal to `GATUS_TOKEN_RECONCILIATION_APPLY` in `ansible/roles/gatus/files/secrets.sops.yaml` |
+
 | Verify credential | Source |
 | --- | --- |
 | `aws-access-key-id`, `aws-secret-access-key` | `tofu -chdir=tofu/reconciler output -raw verify_aws_access_key_id`, `verify_aws_secret_access_key` |

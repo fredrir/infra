@@ -470,7 +470,7 @@ func TestSupersessionIgnoresExactlyThePushIgnoredPaths(t *testing.T) {
 		}
 	}
 	for path, ignored := range map[string]bool{"README.md": true, "SECURITY.md": true, "docs/runbook.md": true, "docs/a/b.md": true, "build/evidence/run.json": true, "docs/diagram.svg": false, "platform/README.md": false, "build/evidence/a/run.json": false, "tofu/main.tf": false} {
-		if pushIgnored(path) != ignored {
+		if PushIgnored(path) != ignored {
 			t.Errorf("%s ignored=%t", path, !ignored)
 		}
 		if selected := Affected([]string{path}); ignored && (selected.Tofu || selected.Kubernetes || selected.Ansible || selected.Tooling) {
