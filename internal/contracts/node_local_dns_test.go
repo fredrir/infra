@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -297,5 +298,46 @@ func TestNodeLocalDNSCacheImageIsPinnedAndRecorded(t *testing.T) {
 	}
 	if !regexp.MustCompile(`^registry\.k8s\.io/dns/k8s-dns-node-cache:[0-9.]+@sha256:[a-f0-9]{64}$`).MatchString(image) || versions.Images["node-local-dns"] != image {
 		t.Errorf("cache image %q is not the digest-pinned release recorded in platform/versions.yaml (%q)", image, versions.Images["node-local-dns"])
+	}
+}
+
+func TestRenovateUpdatesTheNodeLocalDNSImageEverywhereItIsPinned(t *testing.T) {
+	repository := root(t)
+	image := loadNodeLocalDNS(t).Cache.Spec.Template.Spec.Containers[0].Image
+	var config struct {
+		CustomManagers []struct {
+			ManagerFilePatterns []string `json:"managerFilePatterns"`
+			MatchStrings        []string `json:"matchStrings"`
+			DatasourceTemplate  string   `json:"datasourceTemplate"`
+		} `json:"customManagers"`
+	}
+	if err := json.Unmarshal(read(t, filepath.Join(repository, "renovate.json")), &config); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"platform/components/dns/node-local-dns.yaml", "platform/versions.yaml"} {
+		content := string(read(t, filepath.Join(repository, path)))
+		tracked := 0
+		for _, manager := range config.CustomManagers {
+			if manager.DatasourceTemplate != "docker" || !slices.ContainsFunc(manager.ManagerFilePatterns, func(pattern string) bool {
+				return regexp.MustCompile(strings.Trim(pattern, "/")).MatchString(path)
+			}) {
+				continue
+			}
+			for _, matchString := range manager.MatchStrings {
+				expression := regexp.MustCompile(matchString)
+				for _, match := range expression.FindAllStringSubmatch(content, -1) {
+					groups := map[string]string{}
+					for index, name := range expression.SubexpNames() {
+						groups[name] = match[index]
+					}
+					if groups["depName"]+":"+groups["currentValue"]+"@"+groups["currentDigest"] == image {
+						tracked++
+					}
+				}
+			}
+		}
+		if pinned := strings.Count(content, image); tracked == 0 || tracked != pinned {
+			t.Errorf("%s pins %s %d times; Renovate tracks %d of them with their digest", path, image, pinned, tracked)
+		}
 	}
 }

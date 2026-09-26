@@ -20,6 +20,14 @@
     },
     {
       "customType": "regex",
+      "managerFilePatterns": ["/^platform/components/dns/node-local-dns\\.yaml$/", "/^platform/versions\\.yaml$/"],
+      "matchStrings": [
+        "(?<depName>registry\\.k8s\\.io/dns/k8s-dns-node-cache):(?<currentValue>[0-9][0-9.]*)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
       "managerFilePatterns": ["/^build/runners\\.json$/"],
       "matchStrings": [
         "\"version\": \"(?<currentValue>[^\"]+)\",\\n\\s*\"sha256\": \"(?<currentDigest>[a-f0-9]{64})\""
