@@ -100,8 +100,9 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		}
 		return nil
 	}
+	completed := false
 	defer func() {
-		if err != nil && !errors.Is(context.Cause(held), errLeaseLost) {
+		if err != nil && !completed && !errors.Is(context.Cause(held), errLeaseLost) {
 			status.Failure = err.Error()
 			failureContext, failureCancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer failureCancel()
@@ -208,20 +209,6 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 			return err
 		}
 	}
-	if convergedHosts && convergesPlaybook(selected, volatilePlaybook) {
-		status.Stage = "volatile"
-		if err = save(ctx); err != nil {
-			return err
-		}
-		started := time.Now()
-		if failure := r.Ops.Volatile(ctx, plan); failure != nil {
-			if err = ctx.Err(); err != nil {
-				return err
-			}
-			status.VolatileFailure = failure.Error()
-		}
-		status.Durations["volatile"] = time.Since(started).Seconds()
-	}
 	previous, previousFull, previousFullTime := status.Applied, status.LastFullRevision, status.LastFullVerified
 	if selected.Tofu && selected.Kubernetes && effectiveHostScope(selected) == HostScopeFull && len(selected.HostPlaybooks) == 0 && len(selected.Projects) == 0 {
 		status.LastFullRevision, status.LastFullVerified = revision, time.Now().UTC()
@@ -231,7 +218,20 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		status.Applied, status.LastFullRevision, status.LastFullVerified = previous, previousFull, previousFullTime
 		return err
 	}
-	return nil
+	completed = true
+	if !convergedHosts || !convergesPlaybook(selected, volatilePlaybook) {
+		return nil
+	}
+	started := time.Now()
+	failure := r.Ops.Volatile(ctx, plan)
+	status.Durations["volatile"] = time.Since(started).Seconds()
+	if failure != nil {
+		if cause := context.Cause(held); cause != nil {
+			return cause
+		}
+		status.VolatileFailure = failure.Error()
+	}
+	return save(held)
 }
 
 func (r Reconciler) lock(ctx context.Context) (context.Context, func() error, error) {

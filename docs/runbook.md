@@ -304,8 +304,8 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Setting | Value |
 | --- | --- |
 | Hosts | Inventory group `volatile`, also in `agent`: `fredrir-10` |
-| Reconciliation | `ansible/volatile.yml`, linear strategy, run separately after the fleet is verified; fleet plays target `…:!volatile` |
-| Failing or unreachable host | Recorded as `volatile_failure` in the reconciliation status; the run completes and requests no recovery |
+| Reconciliation | `ansible/volatile.yml`, linear strategy with SSH pipelining over a persistent master, run after the apply records `complete` and before its lease is released; fleet plays target `…:!volatile` |
+| Failing or unreachable host | Recorded as `volatile_failure` in the completed reconciliation status; requests no recovery |
 | Deep verification | `volatile.yml --check` beside the fleet; results under `degraded`; outcome and exit status unchanged |
 | Unenrolled host | `tailscale_ip: null`; skipped |
 | Node admission | `node-registration` policy: kubelets register only inventory nodes; volatile nodes must carry the taint; nodes cannot remove taints |
