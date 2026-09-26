@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/platformops"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ func newPlatformCommand() *cobra.Command {
 		return platformops.CheckRunnerJob(platformops.RunnerJob{Pool: os.Getenv("CI_POOL"), Event: os.Getenv("GITHUB_EVENT_NAME"), Ref: os.Getenv("GITHUB_REF"), Protected: os.Getenv("GITHUB_REF_PROTECTED") == "true", Repository: os.Getenv("GITHUB_REPOSITORY"), OwnerID: os.Getenv("GITHUB_REPOSITORY_OWNER_ID")}, event)
 	}}, &cobra.Command{Use: "heartbeat PROJECT", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return platformops.Heartbeat(cmd.Context(), os.Getenv("BACKUP_HEARTBEAT_URL"), args[0], os.Getenv("BACKUP_HEARTBEAT_TOKEN"))
-	}}, newCacheProvisionCommand(), newBackupCommand(), newControlBackupCommand(), &cobra.Command{Use: "repository-maintenance", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	}}, newCacheProvisionCommand(), newObjectStoreProvisionCommand(), newBackupCommand(), newControlBackupCommand(), &cobra.Command{Use: "repository-maintenance", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		for _, args := range [][]string{{"--retry-lock", "10m", "check", "--read-data-subset=10%"}, {"--retry-lock", "10m", "forget", "--group-by", "host,tags", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune"}} {
 			if _, err := process.Run(cmd.Context(), process.Options{Name: "restic", Args: args, Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}); err != nil {
 				return err
@@ -141,6 +142,29 @@ func newCacheProvisionCommand() *cobra.Command {
 			return fmt.Errorf("Garage admin URL and token required")
 		}
 		return platformops.ProvisionCache(cmd.Context(), platformops.CacheConfig{Admin: platformops.API{URL: adminURL, Token: func() (string, error) { return token, nil }}, Kubernetes: api, Namespace: namespace, KeyID: os.Getenv("PROVISIONER_KEY_ID"), KeySecret: os.Getenv("PROVISIONER_KEY_SECRET"), Capacity: values["LAYOUT_CAPACITY_BYTES"], MainQuota: values["MAIN_QUOTA_BYTES"], ReleaseQuota: values["RELEASE_QUOTA_BYTES"], ToolchainQuota: values["TOOLCHAINS_QUOTA_BYTES"], ExpirationDays: int(values["EXPIRATION_DAYS"]), AlertPercent: int(values["QUOTA_ALERT_PERCENT"]), WaitAttempts: int(values["WAIT_ATTEMPTS"]), WaitInterval: time.Duration(values["WAIT_SECONDS"]) * time.Second, Log: cmd.ErrOrStderr()})
+	}}
+}
+
+func newObjectStoreProvisionCommand() *cobra.Command {
+	return &cobra.Command{Use: "provision-object-store", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		data, err := os.ReadFile(envDefault("OBJECT_STORE_SPEC", "/etc/object-store/buckets.yaml"))
+		if err != nil {
+			return err
+		}
+		spec, err := platformops.ParseObjectStoreSpec(data)
+		if err != nil {
+			return err
+		}
+		clients := map[string]objectstore.Client{}
+		for _, cell := range spec.Cells {
+			trusted, err := objectstore.TrustingHTTP(envDefault("OBJECT_STORE_CA_FILE", "/etc/object-store/ca.crt"), "")
+			if err != nil {
+				return err
+			}
+			prefix := strings.ToUpper(cell.Name) + "_"
+			clients[cell.Name] = objectstore.Client{Region: cell.Name, AccessKey: os.Getenv(prefix + "ACCESS_KEY_ID"), SecretKey: os.Getenv(prefix + "SECRET_ACCESS_KEY"), HTTP: trusted}
+		}
+		return platformops.ProvisionObjectStore(cmd.Context(), platformops.ObjectStoreConfig{Spec: spec, Clients: clients, WaitAttempts: 60, WaitInterval: 5 * time.Second, Log: cmd.ErrOrStderr()})
 	}}
 }
 

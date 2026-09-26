@@ -3,8 +3,9 @@ filegroup(
     srcs = glob([
         "clusters/production/flux-system/*.yaml",
         "components/**/*.yaml",
+        "components/object-store/**",
         "projects/**/*.yaml",
-    ]),
+    ]) + ["versions.yaml"],
     visibility = ["//internal/policy:__pkg__"],
 )
 
@@ -38,4 +39,10 @@ filegroup(
     name = "sops_data",
     srcs = glob(["**/*.sops.yaml"]),
     visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
+    name = "renovate_pin_data",
+    srcs = ["versions.yaml"] + glob(["components/object-store/*.yaml"]),
+    visibility = ["//:__pkg__"],
 )

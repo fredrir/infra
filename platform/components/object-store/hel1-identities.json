@@ -1,0 +1,73 @@
+{
+  "identities": [
+    {
+      "actions": [
+        "Admin"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${PROVISIONER_ACCESS_KEY_ID}",
+          "secretKey": "${PROVISIONER_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "provisioner"
+    },
+    {
+      "actions": [
+        "Read:toolchains",
+        "Write:toolchains/*",
+        "List:toolchains"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${TOOLCHAINS_UPLOAD_ACCESS_KEY_ID}",
+          "secretKey": "${TOOLCHAINS_UPLOAD_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "toolchains-upload"
+    },
+    {
+      "actions": [
+        "Read:ci-nsql-main",
+        "List:ci-nsql-main"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${CI_NSQL_RO_ACCESS_KEY_ID}",
+          "secretKey": "${CI_NSQL_RO_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "ci-nsql-ro"
+    },
+    {
+      "actions": [
+        "Read:ci-nsql-main",
+        "Write:ci-nsql-main/*",
+        "List:ci-nsql-main"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${CI_NSQL_RW_ACCESS_KEY_ID}",
+          "secretKey": "${CI_NSQL_RW_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "ci-nsql-rw"
+    },
+    {
+      "actions": [
+        "Read:ci-nsql-release",
+        "Write:ci-nsql-release/*",
+        "List:ci-nsql-release",
+        "Read:toolchains",
+        "List:toolchains"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${CI_NSQL_RELEASE_ACCESS_KEY_ID}",
+          "secretKey": "${CI_NSQL_RELEASE_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "ci-nsql-release"
+    }
+  ]
+}

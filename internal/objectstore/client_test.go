@@ -2,13 +2,26 @@ package objectstore
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/md5"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,13 +45,17 @@ func TestObjectUploadSignsPayloadAndKeepsCredentialsOutOfURL(t *testing.T) {
 		if r.Header.Get("X-Amz-Content-Sha256") != fmt.Sprintf("%x", sha256.Sum256(data)) {
 			t.Error("payload hash mismatch")
 		}
+		checksum := md5.Sum(data)
+		if r.Header.Get("Content-MD5") != base64.StdEncoding.EncodeToString(checksum[:]) {
+			t.Error("payload checksum mismatch")
+		}
 		if !strings.HasPrefix(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256 Credential=access/") {
 			t.Error("missing signature")
 		}
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
-	client := Client{Endpoint: server.URL, Region: "garage", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}
+	client := Client{Endpoint: server.URL, Region: "hel1", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}
 	if err := client.Upload(context.Background(), "bucket", "target/file", strings.NewReader("artifact")); err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +89,7 @@ func TestOnlyUnconditionalWritesReplayOnStaleConnection(t *testing.T) {
 				w.WriteHeader(200)
 			}))
 			defer server.Close()
-			client := Client{Endpoint: server.URL, Region: "garage", AccessKey: "access", SecretKey: "secret", HTTP: server.Client(), Backoff: immediately}
+			client := Client{Endpoint: server.URL, Region: "hel1", AccessKey: "access", SecretKey: "secret", HTTP: server.Client(), Backoff: immediately}
 			if err := client.Download(context.Background(), "bucket", "warm", io.Discard); err != nil {
 				t.Fatal(err)
 			}
@@ -90,7 +107,7 @@ func TestOnlyUnconditionalWritesReplayOnStaleConnection(t *testing.T) {
 func TestObjectStoreErrorsDoNotExposeResponseSecrets(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(403); io.WriteString(w, "secret-token") }))
 	defer server.Close()
-	client := Client{Endpoint: server.URL, Region: "garage", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}
+	client := Client{Endpoint: server.URL, Region: "hel1", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}
 	err := client.Download(context.Background(), "bucket", "object", io.Discard)
 	if err == nil || strings.Contains(err.Error(), "secret") {
 		t.Fatalf("unsafe error: %v", err)
@@ -276,5 +293,76 @@ func TestCancellationInterruptsBackoff(t *testing.T) {
 	var status *StatusError
 	if waited := time.Since(started); !errors.As(err, &status) || status.Code != "SlowDown" || waited > 10*time.Second || store.attempts.Load() != 1 {
 		t.Fatalf("cancelled backoff returned %v after %s and %d attempts", err, waited, store.attempts.Load())
+	}
+}
+
+func TestBucketRequestsSignTheirSubresource(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/bucket" || r.URL.RawQuery != "seaweedfs-quota=" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL)
+		}
+		if !strings.Contains(r.Header.Get("Authorization"), ";content-md5;") {
+			t.Errorf("checksum is not signed: %s", r.Header.Get("Authorization"))
+		}
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+	client := Client{Endpoint: server.URL, Region: "hel1", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}
+	response, err := client.BucketRequest(context.Background(), http.MethodPut, "bucket", url.Values{"seaweedfs-quota": {""}}, strings.NewReader("{}"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if _, err := client.BucketRequest(context.Background(), http.MethodPut, "Bucket/../x", nil, nil, nil); err == nil {
+		t.Fatal("invalid bucket accepted")
+	}
+}
+
+func TestTrustingHTTPVerifiesTheObjectStoreAuthority(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	defer server.Close()
+	authority := filepath.Join(t.TempDir(), "ca.crt")
+	if err := os.WriteFile(authority, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	trusted, err := TrustingHTTP(authority, "example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := Client{Endpoint: server.URL, Region: "hel1", AccessKey: "access", SecretKey: "secret", HTTP: trusted}
+	if err := client.Download(context.Background(), "bucket", "object", io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	untrusted := Client{Endpoint: server.URL, Region: "hel1", AccessKey: "access", SecretKey: "secret", Backoff: immediately}
+	if err := untrusted.Download(context.Background(), "bucket", "object", io.Discard); err == nil {
+		t.Fatal("unknown authority accepted")
+	}
+	if _, err := TrustingHTTP(filepath.Join(t.TempDir(), "missing.crt"), "example.com"); err == nil {
+		t.Fatal("missing authority accepted")
+	}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "example.com"}, DNSNames: []string{"example.com"}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	foreignCertificate, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreign := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	foreign.TLS = &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{foreignCertificate}, PrivateKey: key}}}
+	foreign.StartTLS()
+	defer foreign.Close()
+	impostor := Client{Endpoint: foreign.URL, Region: "hel1", AccessKey: "access", SecretKey: "secret", HTTP: trusted, Backoff: immediately}
+	if err := impostor.Download(context.Background(), "bucket", "object", io.Discard); err == nil || !strings.Contains(err.Error(), "certificate") {
+		t.Fatalf("foreign authority accepted: %v", err)
+	}
+	misnamed, err := TrustingHTTP(authority, "seaweedfs-hel1.object-store.svc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongName := Client{Endpoint: server.URL, Region: "hel1", AccessKey: "access", SecretKey: "secret", HTTP: misnamed, Backoff: immediately}
+	if err := wrongName.Download(context.Background(), "bucket", "object", io.Discard); err == nil {
+		t.Fatal("certificate for another name accepted")
 	}
 }

@@ -31,6 +31,12 @@ creation_rules:
       - age:
           - *admin
           - *llunde-01
+  - path_regex: platform/components/object-store/pki/ca\.sops\.yaml$
+    encrypted_regex: ^ca\.key$
+    key_groups:
+      - age:
+          - *macie
+          - *archie
   - path_regex: ansible/roles/reconciler/files/credentials\.sops\.yaml$
     key_groups:
       - age:

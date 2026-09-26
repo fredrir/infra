@@ -1,0 +1,12 @@
+cells:
+  - name: hel1
+    endpoint: https://seaweedfs-hel1.object-store.svc.cluster.local:8333
+    buckets:
+      - name: ci-nsql-main
+        quotaGiB: 20
+        expireDays: 14
+      - name: ci-nsql-release
+        quotaGiB: 10
+        expireDays: 14
+      - name: toolchains
+        quotaGiB: 5

@@ -3,7 +3,11 @@ package objectstore
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
@@ -12,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -50,11 +55,7 @@ func (client Client) Request(ctx context.Context, method, bucket, key string, bo
 
 // RequestHeaders retries transport failures and 5xx responses with jittered backoff, except that a conditional request which may have been applied returns ErrUnconfirmed instead.
 func (client Client) RequestHeaders(ctx context.Context, method, bucket, key string, body io.ReadSeeker, headers http.Header) (*http.Response, error) {
-	base, err := url.Parse(client.Endpoint)
-	if err != nil || base.Host == "" || (base.Scheme != "http" && base.Scheme != "https") || base.User != nil || base.RawQuery != "" || base.Fragment != "" || client.Region == "" || client.AccessKey == "" || client.SecretKey == "" {
-		return nil, fmt.Errorf("invalid object store configuration")
-	}
-	if !bucketPattern.MatchString(bucket) || key == "" || strings.HasPrefix(key, "/") || strings.ContainsAny(key, "\x00\r\n") {
+	if key == "" || strings.HasPrefix(key, "/") || strings.ContainsAny(key, "\x00\r\n") {
 		return nil, fmt.Errorf("invalid object store path")
 	}
 	for _, component := range strings.Split(key, "/") {
@@ -62,16 +63,32 @@ func (client Client) RequestHeaders(ctx context.Context, method, bucket, key str
 			return nil, fmt.Errorf("invalid object store key")
 		}
 	}
-	base.Path = strings.TrimRight(base.Path, "/") + "/" + bucket + "/" + key
+	return client.retried(ctx, method, bucket, "/"+key, nil, body, headers)
+}
+
+func (client Client) BucketRequest(ctx context.Context, method, bucket string, query url.Values, body io.ReadSeeker, headers http.Header) (*http.Response, error) {
+	return client.retried(ctx, method, bucket, "", query, body, headers)
+}
+
+func (client Client) retried(ctx context.Context, method, bucket, path string, query url.Values, body io.ReadSeeker, headers http.Header) (*http.Response, error) {
+	base, err := url.Parse(client.Endpoint)
+	if err != nil || base.Host == "" || (base.Scheme != "http" && base.Scheme != "https") || base.User != nil || base.RawQuery != "" || base.Fragment != "" || client.Region == "" || client.AccessKey == "" || client.SecretKey == "" {
+		return nil, fmt.Errorf("invalid object store configuration")
+	}
+	if !bucketPattern.MatchString(bucket) {
+		return nil, fmt.Errorf("invalid object store path")
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + "/" + bucket + path
+	base.RawQuery = query.Encode()
 	if body == nil {
 		body = bytes.NewReader(nil)
 	}
-	digest := sha256.New()
-	size, err := io.Copy(digest, body)
+	digest, checksum := sha256.New(), md5.New()
+	size, err := io.Copy(io.MultiWriter(digest, checksum), body)
 	if err != nil {
 		return nil, err
 	}
-	payload := request{method: method, target: base.String(), body: body, size: size, hash: hex.EncodeToString(digest.Sum(nil)), headers: headers}
+	payload := request{method: method, target: base.String(), body: body, size: size, hash: hex.EncodeToString(digest.Sum(nil)), checksum: base64.StdEncoding.EncodeToString(checksum.Sum(nil)), headers: headers}
 	conditional := headers.Get("If-Match") != "" || headers.Get("If-None-Match") != ""
 	retryer := retry.NewStandard(func(options *retry.StandardOptions) {
 		options.Retryables = append(options.Retryables, endOfStream)
@@ -113,10 +130,10 @@ func (client Client) RequestHeaders(ctx context.Context, method, bucket, key str
 }
 
 type request struct {
-	method, target, hash string
-	body                 io.ReadSeeker
-	size                 int64
-	headers              http.Header
+	method, target, hash, checksum string
+	body                           io.ReadSeeker
+	size                           int64
+	headers                        http.Header
 }
 
 type attemptBody struct {
@@ -149,6 +166,9 @@ func (client Client) send(ctx context.Context, payload request) (*http.Response,
 	for name, values := range payload.headers {
 		request.Header[name] = append([]string(nil), values...)
 	}
+	if payload.size > 0 {
+		request.Header.Set("Content-MD5", payload.checksum)
+	}
 	request.Header.Set("X-Amz-Content-Sha256", payload.hash)
 	if err := v4.NewSigner().SignHTTP(ctx, aws.Credentials{AccessKeyID: client.AccessKey, SecretAccessKey: client.SecretKey, SessionToken: client.SessionToken}, request, payload.hash, "s3", client.Region, time.Now().UTC()); err != nil {
 		return nil, false, nil, fmt.Errorf("sign object store request: %w", err)
@@ -159,7 +179,7 @@ func (client Client) send(ctx context.Context, payload request) (*http.Response,
 	}
 	httpClient := client.HTTP
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 10 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		httpClient = &http.Client{Timeout: 10 * time.Minute, CheckRedirect: noRedirects}
 	}
 	response, err := httpClient.Do(request)
 	if err != nil {
@@ -174,6 +194,25 @@ func (client Client) send(ctx context.Context, payload request) (*http.Response,
 		return nil, true, released, &StatusError{Status: response.StatusCode, Code: failure.Code}
 	}
 	return response, true, released, nil
+}
+
+func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+
+func TrustingHTTP(caFile, serverName string) (*http.Client, error) {
+	roots, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+	authority, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	if !roots.AppendCertsFromPEM(authority) {
+		return nil, fmt.Errorf("object store CA file holds no certificate")
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{RootCAs: roots, ServerName: serverName, MinVersion: tls.VersionTLS12}
+	return &http.Client{Timeout: 10 * time.Minute, Transport: transport, CheckRedirect: noRedirects}, nil
 }
 
 type StatusError struct {

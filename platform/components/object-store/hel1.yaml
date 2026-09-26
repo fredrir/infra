@@ -1,0 +1,392 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-hel1
+  namespace: object-store
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/instance: hel1
+spec:
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/instance: hel1
+  ports:
+    - name: s3
+      port: 8333
+      targetPort: s3
+    - name: metrics
+      port: 9327
+      targetPort: metrics
+    - name: worker-metrics
+      port: 9328
+      targetPort: worker-metrics
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: seaweedfs-hel1
+  namespace: object-store
+spec:
+  serviceName: seaweedfs-hel1
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/instance: hel1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/instance: hel1
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-04
+        node-restriction.kubernetes.io/stateful: 'true'
+      priorityClassName: production
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: server
+          image: docker.io/chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+          command:
+            - /bin/sh
+            - /etc/seaweedfs/entrypoint/weed.sh
+          args:
+            - -logtostderr=true
+            - server
+            - -ip=127.0.0.1
+            - -ip.bind=127.0.0.1
+            - -dataCenter=hel1
+            - -rack=fredrir-04
+            - -dir=/data
+            - -master.dir=/data
+            - -master.volumeSizeLimitMB=1024
+            - -master.defaultReplication=000
+            - -master.telemetry=false
+            - -volume.max=60
+            - -volume.minFreeSpace=15
+            - -volume.index=memory
+            - -filer
+            - -s3
+            - -s3.ip.bind=0.0.0.0
+            - -s3.port=8333
+            - -s3.cert.file=/etc/seaweedfs/tls/s3.crt
+            - -s3.key.file=/etc/seaweedfs/tls/s3.key
+            - -s3.config=/etc/seaweedfs/identities/identities.json
+            - -s3.port.iceberg=0
+            - -s3.port.lance=0
+            - -metricsIp=0.0.0.0
+            - -metricsPort=9327
+          envFrom:
+            - configMapRef:
+                name: seaweedfs-server
+            - configMapRef:
+                name: seaweedfs-internal-tls
+            - secretRef:
+                name: seaweedfs-hel1-identities
+          env:
+            - name: GOMEMLIMIT
+              value: 512MiB
+            - name: WEED_GRPC_COMPONENTS
+              value: MASTER VOLUME FILER S3 CLIENT
+            - name: WEED_GRPC_SERVED
+              value: MASTER VOLUME FILER S3
+            - name: WEED_GRPC_MASTER_ALLOWED_COMMONNAMES
+              value: seaweedfs-hel1-internal
+            - name: WEED_GRPC_VOLUME_ALLOWED_COMMONNAMES
+              value: seaweedfs-hel1-internal
+            - name: WEED_GRPC_FILER_ALLOWED_COMMONNAMES
+              value: seaweedfs-hel1-internal
+            - name: WEED_GRPC_S3_ALLOWED_COMMONNAMES
+              value: seaweedfs-hel1-internal
+            - name: WEED_JWT_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-hel1
+                  key: WEED_JWT_SIGNING_KEY
+            - name: WEED_JWT_SIGNING_READ_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-hel1
+                  key: WEED_JWT_SIGNING_READ_KEY
+            - name: WEED_JWT_FILER_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-hel1
+                  key: WEED_JWT_FILER_SIGNING_KEY
+            - name: WEED_S3_SSE_KEK
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-hel1
+                  key: WEED_S3_SSE_KEK
+            - name: WEED_S3_SSE_KEK_PASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-hel1
+                  key: WEED_S3_SSE_KEK_PASSPHRASE
+          ports:
+            - name: s3
+              containerPort: 8333
+            - name: metrics
+              containerPort: 9327
+          resources:
+            requests:
+              cpu: 100m
+              memory: 384Mi
+            limits:
+              cpu: '2'
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: entrypoint
+              mountPath: /etc/seaweedfs/entrypoint
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tls
+              mountPath: /etc/seaweedfs/tls
+              readOnly: true
+            - name: identities
+              mountPath: /etc/seaweedfs/identities
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - for attempt in $(seq 120); do nc -z 127.0.0.1 18888 && exit 0; sleep 1; done; exit 1
+          startupProbe:
+            tcpSocket:
+              port: s3
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: s3
+              scheme: HTTPS
+            periodSeconds: 10
+        - name: admin
+          image: docker.io/chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+          command:
+            - /bin/sh
+            - /etc/seaweedfs/entrypoint/weed.sh
+          args:
+            - -logtostderr=true
+            - admin
+            - -ip=127.0.0.1
+            - -port=23646
+            - -master=127.0.0.1:9333
+            - -dataDir=/admin
+            - -iceberg.port=0
+            - -lance.port=0
+          envFrom:
+            - configMapRef:
+                name: seaweedfs-internal-tls
+          env:
+            - name: GOMEMLIMIT
+              value: 144MiB
+            - name: WEED_GRPC_COMPONENTS
+              value: ADMIN CLIENT
+            - name: WEED_GRPC_SERVED
+              value: ADMIN
+            - name: WEED_GRPC_ADMIN_ALLOWED_COMMONNAMES
+              value: seaweedfs-hel1-internal
+            - name: WEED_ADMIN_USER
+              value: admin
+            - name: WEED_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-hel1
+                  key: WEED_ADMIN_PASSWORD
+          resources:
+            requests:
+              cpu: 10m
+              memory: 48Mi
+            limits:
+              cpu: 250m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: entrypoint
+              mountPath: /etc/seaweedfs/entrypoint
+              readOnly: true
+            - name: tls
+              mountPath: /etc/seaweedfs/tls
+              readOnly: true
+            - name: admin
+              mountPath: /admin
+        - name: worker
+          image: docker.io/chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+          command:
+            - /bin/sh
+            - /etc/seaweedfs/entrypoint/weed.sh
+          args:
+            - -logtostderr=true
+            - worker
+            - -admin=127.0.0.1:23646
+            - -workingDir=/work
+            - -jobType=s3_lifecycle,admin_script
+            - -metricsIp=0.0.0.0
+            - -metricsPort=9328
+          envFrom:
+            - configMapRef:
+                name: seaweedfs-internal-tls
+          env:
+            - name: GOMEMLIMIT
+              value: 144MiB
+            - name: WEED_GRPC_COMPONENTS
+              value: WORKER CLIENT
+            - name: WEED_GRPC_SERVED
+              value: ''
+          ports:
+            - name: worker-metrics
+              containerPort: 9328
+          resources:
+            requests:
+              cpu: 10m
+              memory: 48Mi
+            limits:
+              cpu: 500m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: entrypoint
+              mountPath: /etc/seaweedfs/entrypoint
+              readOnly: true
+            - name: tls
+              mountPath: /etc/seaweedfs/tls
+              readOnly: true
+            - name: worker
+              mountPath: /work
+        - name: meta-backup
+          image: docker.io/chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+          command:
+            - /bin/sh
+            - /etc/seaweedfs/entrypoint/weed.sh
+          args:
+            - -logtostderr=true
+            - filer.meta.backup
+            - -filer=127.0.0.1:8888
+            - -config=/etc/seaweedfs/meta-backup/backup_filer.toml
+          envFrom:
+            - configMapRef:
+                name: seaweedfs-internal-tls
+          env:
+            - name: GOMEMLIMIT
+              value: 96MiB
+            - name: WEED_GRPC_COMPONENTS
+              value: CLIENT
+            - name: WEED_GRPC_SERVED
+              value: ''
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: entrypoint
+              mountPath: /etc/seaweedfs/entrypoint
+              readOnly: true
+            - name: tls
+              mountPath: /etc/seaweedfs/tls
+              readOnly: true
+            - name: meta-backup-config
+              mountPath: /etc/seaweedfs/meta-backup
+              readOnly: true
+            - name: meta
+              mountPath: /meta
+      volumes:
+        - name: entrypoint
+          configMap:
+            name: seaweedfs-entrypoint
+        - name: tls
+          projected:
+            defaultMode: 0440
+            sources:
+              - configMap:
+                  name: seaweedfs-pki
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                    - key: hel1-s3.crt
+                      path: s3.crt
+                    - key: hel1-internal.crt
+                      path: internal.crt
+              - secret:
+                  name: seaweedfs-hel1
+                  items:
+                    - key: s3.key
+                      path: s3.key
+                    - key: internal.key
+                      path: internal.key
+        - name: identities
+          configMap:
+            name: seaweedfs-hel1-identities
+        - name: meta-backup-config
+          configMap:
+            name: seaweedfs-meta-backup
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        - name: admin
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: worker
+          emptyDir:
+            sizeLimit: 256Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: local-retain
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 80Gi
+    - metadata:
+        name: meta
+      spec:
+        storageClassName: local-retain
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi

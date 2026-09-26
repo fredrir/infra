@@ -105,6 +105,7 @@ filegroup(
     srcs = glob(["images/*/Containerfile"]) + [
         "renovate.json",
         "//build:runners.json",
+        "//platform:renovate_pin_data",
     ],
     visibility = ["//internal/contracts:__pkg__"],
 )

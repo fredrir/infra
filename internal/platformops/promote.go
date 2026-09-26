@@ -36,6 +36,7 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 	paths := []struct{ path, command string }{
 		{"platform/components/controllers/ci-slots.yaml", "ci-slots"},
 		{"platform/components/build-cache/provisioner.yaml", "provision-cache"},
+		{"platform/components/object-store/provisioner.yaml", "provision-object-store"},
 		{"platform/components/repository-maintenance/maintenance.yaml", "repository-maintenance"},
 		{"platform/projects/y/backup.yaml", "backup"},
 		{"platform/projects/llunde-pyparser/backup.yaml", "backup"},

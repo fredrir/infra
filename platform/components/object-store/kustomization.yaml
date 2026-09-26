@@ -1,0 +1,57 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: object-store
+namespace: object-store
+resources:
+- hel1.yaml
+- hel1.secret.sops.yaml
+- hel1-identities.secret.sops.yaml
+- provisioner.yaml
+- network.yaml
+- monitoring.yaml
+configMapGenerator:
+- name: seaweedfs-pki
+  files:
+  - pki/ca.crt
+  - pki/hel1-s3.crt
+  - pki/hel1-internal.crt
+- name: seaweedfs-hel1-identities
+  files:
+  - identities.json=hel1-identities.json
+- name: seaweedfs-meta-backup
+  files:
+  - backup_filer.toml
+- name: seaweedfs-entrypoint
+  files:
+  - weed.sh
+- name: object-store-buckets
+  files:
+  - buckets.yaml
+- name: seaweedfs-server
+  literals:
+  - WEED_LEVELDB_ENABLED=true
+  - WEED_LEVELDB_DIR=/data/filerldb
+  - WEED_LEVELDB2_ENABLED=false
+  - WEED_MASTER_VOLUME_GROWTH_COPY_1=1
+  - WEED_MASTER_MAINTENANCE_SCRIPTS=fs.log.purge -daysAgo=7; volume.deleteEmpty -quietFor=24h -apply; s3.clean.uploads -timeAgo=24h
+- name: seaweedfs-internal-tls
+  literals:
+  - WEED_GRPC_CA=/etc/seaweedfs/tls/ca.crt
+  - WEED_GRPC_MASTER_CERT=/etc/seaweedfs/tls/internal.crt
+  - WEED_GRPC_MASTER_KEY=/etc/seaweedfs/tls/internal.key
+  - WEED_GRPC_VOLUME_CERT=/etc/seaweedfs/tls/internal.crt
+  - WEED_GRPC_VOLUME_KEY=/etc/seaweedfs/tls/internal.key
+  - WEED_GRPC_FILER_CERT=/etc/seaweedfs/tls/internal.crt
+  - WEED_GRPC_FILER_KEY=/etc/seaweedfs/tls/internal.key
+  - WEED_GRPC_S3_CERT=/etc/seaweedfs/tls/internal.crt
+  - WEED_GRPC_S3_KEY=/etc/seaweedfs/tls/internal.key
+  - WEED_GRPC_ADMIN_CERT=/etc/seaweedfs/tls/internal.crt
+  - WEED_GRPC_ADMIN_KEY=/etc/seaweedfs/tls/internal.key
+  - WEED_GRPC_WORKER_CERT=/etc/seaweedfs/tls/internal.crt
+  - WEED_GRPC_WORKER_KEY=/etc/seaweedfs/tls/internal.key
+  - WEED_GRPC_CLIENT_CERT=/etc/seaweedfs/tls/internal.crt
+  - WEED_GRPC_CLIENT_KEY=/etc/seaweedfs/tls/internal.key
+generatorOptions:
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled

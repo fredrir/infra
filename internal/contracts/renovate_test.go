@@ -66,11 +66,17 @@ func TestRenovateUpdatesEveryPinWithItsDigest(t *testing.T) {
 							pin.groups[name] = content[match[2*index]:match[2*index+1]]
 						}
 					}
-					if _, ok := config.CustomDatasources[strings.TrimPrefix(pin.groups["datasource"], "custom.")]; !ok || !strings.HasPrefix(pin.groups["datasource"], "custom.") {
-						t.Errorf("%s pins %s through %q, which is not a declared custom datasource", path, pin.groups["currentValue"], pin.groups["datasource"])
-					}
-					if !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(pin.groups["currentDigest"]) {
-						t.Errorf("%s pins %s without a sha256 digest", path, pin.groups["currentValue"])
+					if pin.groups["datasource"] == "docker" {
+						if !regexp.MustCompile(`^sha256:[a-f0-9]{64}$`).MatchString(pin.groups["currentDigest"]) {
+							t.Errorf("%s pins image %s without a sha256 digest", path, pin.groups["currentValue"])
+						}
+					} else {
+						if _, ok := config.CustomDatasources[strings.TrimPrefix(pin.groups["datasource"], "custom.")]; !ok || !strings.HasPrefix(pin.groups["datasource"], "custom.") {
+							t.Errorf("%s pins %s through %q, which is not a declared custom datasource", path, pin.groups["currentValue"], pin.groups["datasource"])
+						}
+						if !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(pin.groups["currentDigest"]) {
+							t.Errorf("%s pins %s without a sha256 digest", path, pin.groups["currentValue"])
+						}
 					}
 					found = append(found, pin)
 				}
@@ -127,6 +133,38 @@ func TestRenovateUpdatesEveryPinWithItsDigest(t *testing.T) {
 			if checked == nil || !strings.Contains(downloads[checked[1]], version) {
 				t.Errorf("%s: %s does not check the download of %s", relative, name, version)
 			}
+		}
+	}
+	var seaweedfs []renovatePin
+	cells, err := filepath.Glob(filepath.Join(repository, "platform/components/object-store/*.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifests := []string{"platform/versions.yaml"}
+	for _, cell := range cells {
+		if strings.Contains(string(read(t, cell)), "docker.io/chrislusf/seaweedfs:") {
+			relative, err := filepath.Rel(repository, cell)
+			if err != nil {
+				t.Fatal(err)
+			}
+			manifests = append(manifests, relative)
+		}
+	}
+	if len(manifests) < 2 {
+		t.Fatal("no object store manifests pin SeaweedFS")
+	}
+	for _, path := range manifests {
+		content, found := pins(path)
+		found = slices.DeleteFunc(found, func(pin renovatePin) bool { return pin.groups["depName"] != "docker.io/chrislusf/seaweedfs" })
+		references := strings.Count(content, "docker.io/chrislusf/seaweedfs:")
+		if references == 0 || len(found) != references {
+			t.Errorf("%s: Renovate updates %d of %d SeaweedFS image references", path, len(found), references)
+		}
+		seaweedfs = append(seaweedfs, found...)
+	}
+	for _, pin := range seaweedfs {
+		if pin.groups["currentValue"] != seaweedfs[0].groups["currentValue"] || pin.groups["currentDigest"] != seaweedfs[0].groups["currentDigest"] {
+			t.Errorf("SeaweedFS pins disagree: %s@%s and %s@%s", pin.groups["currentValue"], pin.groups["currentDigest"], seaweedfs[0].groups["currentValue"], seaweedfs[0].groups["currentDigest"])
 		}
 	}
 }

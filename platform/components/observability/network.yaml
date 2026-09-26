@@ -46,6 +46,16 @@ spec:
     ports:
     - port: 9090
       protocol: TCP
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: object-store
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: seaweedfs
+    ports:
+    - port: 9327
+      protocol: TCP
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

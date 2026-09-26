@@ -1,0 +1,111 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seaweedfs
+  namespace: object-store
+spec:
+  sampleLimit: 20000
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+  endpoints:
+    - port: metrics
+      interval: 60s
+    - port: worker-metrics
+      interval: 60s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: object-store
+  namespace: object-store
+spec:
+  groups:
+    - name: object-store
+      rules:
+        - alert: ObjectStoreDown
+          expr: |
+            up{namespace="object-store",service=~"seaweedfs-.+",endpoint="metrics"} == 0
+            or absent(up{namespace="object-store",service="seaweedfs-hel1",endpoint="metrics"})
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: A SeaweedFS object store cell is down
+        - alert: ObjectStoreWorkerDown
+          expr: |
+            up{namespace="object-store",service=~"seaweedfs-.+",endpoint="worker-metrics"} == 0
+            or absent(up{namespace="object-store",service="seaweedfs-hel1",endpoint="worker-metrics"})
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: The object store lifecycle worker is not reporting; expiry and upload cleanup stop while it is down
+        - alert: ObjectStoreS3Errors
+          expr: |
+            sum by (service) (rate(SeaweedFS_s3_request_total{namespace="object-store",code=~"5.."}[15m]))
+            / sum by (service) (rate(SeaweedFS_s3_request_total{namespace="object-store"}[15m])) > 0.05
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: More than 5% of S3 requests to an object store cell fail
+        - alert: ObjectStoreBucketNearQuota
+          expr: |
+            max by (service, bucket) (SeaweedFS_s3_bucket_size_bytes{namespace="object-store"})
+            / max by (service, bucket) (SeaweedFS_s3_bucket_quota_bytes{namespace="object-store"}) > 0.9
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: An object store bucket is above 90% of its quota
+        - alert: ObjectStoreBucketReadOnly
+          expr: max by (service, bucket) (SeaweedFS_s3_bucket_read_only{namespace="object-store"}) == 1
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: An object store bucket rejects writes, usually after exceeding its quota
+        - alert: ObjectStoreDiskLow
+          expr: |
+            min by (service) (SeaweedFS_volumeServer_resource{namespace="object-store",type="avail"}
+            / ignoring(type) SeaweedFS_volumeServer_resource{namespace="object-store",type="all"}) < 0.2
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: An object store cell's node has less than 20% free disk; volumes turn read-only at 15%
+        - alert: ObjectStoreProvisionerFailing
+          expr: |
+            (time() - kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="object-store-provisioner"} > 7200)
+            and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Object store provisioner is failing; its log names the bucket and setting
+        - alert: ObjectStoreProvisionerNeverSucceeded
+          expr: |
+            (kube_cronjob_info{namespace="object-store",cronjob="object-store-provisioner"}
+            unless on(namespace,cronjob) kube_cronjob_status_last_successful_time)
+            and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
+          for: 90m
+          labels:
+            severity: warning
+          annotations:
+            summary: Object store provisioner has no successful run; buckets may lack encryption, lifecycle or quota
+        - alert: ObjectStoreLifecycleStalled
+          expr: |
+            time() - min by (service) (SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store"}) / 1e9 > 172800
+            or absent_over_time(SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store",service="seaweedfs-hel1"}[2d])
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: Object store lifecycle has not walked its buckets for two days; expiry and cleanup are stalled
+        - alert: ObjectStoreCertificateExpiring
+          expr: vector(time()) > 1882558140
+          labels:
+            severity: warning
+          annotations:
+            summary: Object store TLS certificates expire within 30 days; reissue them from the object store CA

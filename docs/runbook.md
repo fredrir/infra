@@ -508,3 +508,103 @@ A successful recovery rerun against an already-serving revision does not replace
 Frontend deployment records `publication-wait` until `production` contains the promoted infrastructure commit, then starts the 60-second exact served-revision check.
 Publication has an eight-minute budget within the existing ten-minute deployment job; total delivery latency includes both stages, and divergent production history fails immediately.
 Measured results and scope limits are recorded in [CI performance](ci-performance.md#execution-measurements).
+
+## Object store
+
+| Setting | Value |
+| --- | --- |
+| Cells | `seaweedfs-hel1` on `fredrir-04`; namespace `object-store`; one `weed server` per node, no cross-node cluster |
+| Endpoint | `https://seaweedfs-<cell>.object-store.svc.cluster.local:8333`, region `<cell>` |
+| Listeners | Pod IP: S3 8333 (TLS), metrics 9327, worker metrics 9328, S3 gRPC 18333 and admin gRPC 33646 (mTLS, client name allow-list); NetworkPolicy admits only 8333, 9327 and 9328; master, volume, filer and admin HTTP on loopback |
+| Trust | CA `platform/components/object-store/pki/ca.crt`, name-constrained to `object-store.svc`, `object-store.svc.cluster.local`, `localhost`, `127.0.0.1`; CA key `pki/ca.sops.yaml` (Macie, Archie) |
+| In-cell security | gRPC mTLS per cell certificate; `weed.sh` refuses to start a process without its gRPC CA, certificates, keys and client name allow-list; JWT-signed volume writes; bucket-default SSE-S3 with `WEED_S3_SSE_KEK` |
+| Identities | Actions `<cell>-identities.json`; credentials `<cell>-identities.secret.sops.yaml`, referenced as `${NAME}`; writers hold `Write:<bucket>/*` |
+| Buckets | `buckets.yaml`; `object-store-provisioner` hourly: create, then write versioning, COMPLIANCE lock, SSE, lifecycle and quota only where they drift; never deletes |
+| Configuration drift | Versioning or a lock on a bucket that declares neither fails the provisioner; SeaweedFS 4.47 still authorizes bucket subresource writes that carry `?prefix=` as object writes |
+| Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
+| Logs | stderr only (`-logtostderr=true`) |
+| Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
+| Disk guard | 1 GiB volumes; `hel1` `-volume.max=60` (60 GiB); read-only below 15% free node disk |
+| Certificates expire | 2029-09-26; `ObjectStoreCertificateExpiring` from 2029-08-27 |
+
+| Alert | Fires |
+| --- | --- |
+| `ObjectStoreProvisionerFailing` | No successful provisioner run for 2 h |
+| `ObjectStoreProvisionerNeverSucceeded` | Enabled provisioner without any successful run for 90 min |
+| `ObjectStoreWorkerDown` | Lifecycle worker metrics unreachable for 15 min |
+| `ObjectStoreLifecycleStalled` | Any shard without a lifecycle walk, or no lifecycle metrics, for 2 days |
+
+| Operation | Steps |
+| --- | --- |
+| Add an identity | Entry in `<cell>-identities.json`; credentials through `sops set`; merge; the identity ConfigMap hash restarts the cell |
+| Rotate a credential | `sops set` the cell credential and its consumer copy; merge; `kubectl -n object-store rollout restart statefulset/seaweedfs-<cell>` |
+| Add a bucket | Entry in `buckets.yaml`; merge; provisioner applies within an hour |
+| Restore the filer store | Commands below: scale to 0, copy `/meta/filerldb` over `/data/filerldb` in a helper pod that mounts both PVCs, scale to 1 |
+| Reissue certificates | Decrypt the CA key on Macie or Archie; issue each cell's two leaves with the SANs below; replace `pki/<cell>-*.crt` and the `s3.key`/`internal.key` values; update the alert threshold |
+| Resolve versioning or lock drift | Cache buckets only: remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |
+
+| Leaf | Subject | SAN | Usage |
+| --- | --- | --- | --- |
+| `<cell>-s3.crt` | `seaweedfs-<cell>.object-store.svc` | `seaweedfs-<cell>.object-store.svc`, `….svc.cluster.local` | serverAuth |
+| `<cell>-internal.crt` | `seaweedfs-<cell>-internal` | `localhost`, `127.0.0.1` | serverAuth, clientAuth |
+
+```sh
+openssl rand -hex 10 | tr a-f A-F | jq -R . | sops set --value-stdin platform/components/object-store/hel1-identities.secret.sops.yaml '["stringData"]["NAME_ACCESS_KEY_ID"]'
+openssl rand -hex 32 | jq -R . | sops set --value-stdin platform/components/object-store/hel1-identities.secret.sops.yaml '["stringData"]["NAME_SECRET_ACCESS_KEY"]'
+kubectl -n object-store create job --from=cronjob/object-store-provisioner provision-now
+kubectl -n object-store exec -i seaweedfs-hel1-0 -c server -- /usr/bin/weed shell -master=127.0.0.1:9333 <<<'s3.bucket.list'
+```
+
+Remove a drifted cache bucket, for example `ci-nsql-main`, even while it holds locked objects:
+
+```sh
+kubectl -n object-store exec -i seaweedfs-hel1-0 -c server -- /usr/bin/weed shell -master=127.0.0.1:9333 <<'EOF'
+lock
+collection.delete -collection=ci-nsql-main -apply
+fs.rm -r /buckets/ci-nsql-main
+unlock
+EOF
+kubectl -n object-store create job --from=cronjob/object-store-provisioner provision-now
+```
+
+Restore the filer store of `seaweedfs-hel1` from its metadata replica:
+
+```sh
+image=$(yq '.images.seaweedfs' platform/versions.yaml)
+kubectl -n object-store scale statefulset/seaweedfs-hel1 --replicas=0
+kubectl -n object-store wait --for=delete pod/seaweedfs-hel1-0 --timeout=180s
+kubectl -n object-store apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: meta-restore
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    kubernetes.io/hostname: fredrir-04
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: restore
+    image: $image
+    command: [/bin/sh, -c, "mv /data/filerldb /data/filerldb.corrupt && cp -a /meta/filerldb /data/filerldb"]
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: [ALL]
+    volumeMounts:
+    - {name: data, mountPath: /data}
+    - {name: meta, mountPath: /meta}
+  volumes:
+  - {name: data, persistentVolumeClaim: {claimName: data-seaweedfs-hel1-0}}
+  - {name: meta, persistentVolumeClaim: {claimName: meta-seaweedfs-hel1-0}}
+EOF
+kubectl -n object-store wait --for=jsonpath='{.status.phase}'=Succeeded pod/meta-restore --timeout=300s
+kubectl -n object-store delete pod meta-restore
+kubectl -n object-store scale statefulset/seaweedfs-hel1 --replicas=1
+```
