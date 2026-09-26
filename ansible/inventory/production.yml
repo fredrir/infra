@@ -125,7 +125,16 @@ all:
       hosts:
         fredrir-10: {}
     reconcilers:
-      hosts: {}
+      hosts:
+        fredrir-11:
+          ansible_host: 100.120.198.17
+          tailscale_ip: 100.120.198.17
+          ansible_ssh_common_args: -o HostKeyAlias=fredrir-11 -o StrictHostKeyChecking=yes -o ConnectTimeout=10
+          provider: hetzner
+          provider_id: '167533908'
+          machine_type: cx33
+          architecture: amd64
+          public_ipv4: 46.62.238.38
     build_vm_hosts:
       hosts:
         fredrir-09:

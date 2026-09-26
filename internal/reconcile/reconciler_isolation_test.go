@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -120,17 +121,22 @@ func TestFleetPlaybooksNeverListADeclaredReconciler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(root, "inventory", "production.yml"))
+	inventory := filepath.Join(root, "inventory", "production.yml")
+	listing := exec.Command(filepath.Join(filepath.Dir(playbook), "ansible-inventory"), "-i", inventory, "--list")
+	listing.Dir, listing.Env = root, append(os.Environ(), "ANSIBLE_CONFIG="+filepath.Join(root, "ansible.cfg"))
+	groups, err := listing.Output()
 	if err != nil {
 		t.Fatal(err)
 	}
-	declared := strings.Replace(string(data), "    reconcilers:\n      hosts: {}\n", "    reconcilers:\n      hosts:\n        fredrir-99:\n          ansible_host: 192.0.2.99\n", 1)
-	if declared == string(data) {
-		t.Fatal("inventory declares no empty reconcilers group to extend")
+	var parsed map[string]struct {
+		Hosts []string `json:"hosts"`
 	}
-	inventory := filepath.Join(t.TempDir(), "production.yml")
-	if err := os.WriteFile(inventory, []byte(declared), 0o600); err != nil {
+	if err := json.Unmarshal(groups, &parsed); err != nil {
 		t.Fatal(err)
+	}
+	reconcilers := parsed[reconcilerGroup].Hosts
+	if len(reconcilers) == 0 {
+		t.Fatal("inventory declares no reconciler host")
 	}
 	playbooks, err := filepath.Glob(filepath.Join(root, "*.yml"))
 	if err != nil {
@@ -143,9 +149,11 @@ func TestFleetPlaybooksNeverListADeclaredReconciler(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v\n%s", filepath.Base(path), err, output)
 		}
-		listed := regexp.MustCompile(`(?m)^\s+fredrir-99$`).Match(output)
-		if listed != (filepath.Base(path) == "reconciler.yml") {
-			t.Errorf("%s lists the reconciler: %t\n%s", filepath.Base(path), listed, output)
+		for _, host := range reconcilers {
+			listed := regexp.MustCompile(`(?m)^\s+` + regexp.QuoteMeta(host) + `$`).Match(output)
+			if listed != (filepath.Base(path) == "reconciler.yml") {
+				t.Errorf("%s lists reconciler %s: %t\n%s", filepath.Base(path), host, listed, output)
+			}
 		}
 	}
 }
