@@ -397,6 +397,7 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | Credentials | `ansible/roles/reconciler/files/credentials.sops.yaml`, maps `verify` and `apply`; installed as ciphertext through `host_secrets`; a root `ExecStartPre` decrypts only `verify` into the unit's runtime directory, and the supervisor deletes it once read |
 | Cluster API | `https://<fredrir-07 tailnet address>:6443`; certificate authority `ansible/roles/reconciler/files/kubernetes-ca.crt` |
 | Host age key | `/etc/age/host.key` from `host_secrets`; `reconciler.yml --tags host_key` generates it and prints its recipient; [host-scoped secrets](Secrets.md#host-scoped-secrets) |
+| SSH identity | Root `0600` `/etc/infra-reconcile/ssh/id_ed25519`, generated on the host and never copied; `reconciler.yml --tags ssh_identity` generates it and prints its public key |
 
 | Verify credential | Source |
 | --- | --- |
@@ -420,7 +421,7 @@ aws s3 ls s3://llunde-pyparser-bucket/reconciliation/production/runs/ | tail -n 
 
 | Operation | Steps |
 | --- | --- |
-| Rebuild | `tofu -chdir=tofu/reconciler apply`; enroll; `ansible-playbook ansible/reconciler.yml --tags host_key`; set the new recipient as `.sops.yaml` anchor `fredrir-11`; `sops updatekeys -y ansible/roles/reconciler/files/credentials.sops.yaml`; `ansible-playbook ansible/reconciler.yml` |
+| Rebuild | `tofu -chdir=tofu/reconciler apply`; enroll; `ansible-playbook ansible/reconciler.yml --tags host_key,ssh_identity`; set the new recipient as `.sops.yaml` anchor `fredrir-11`; `sops updatekeys -y ansible/roles/reconciler/files/credentials.sops.yaml`; `ansible-playbook ansible/reconciler.yml` |
 | Rotation | `tofu -chdir=tofu/reconciler apply -replace=aws_iam_access_key.verify` or `-replace=cloudflare_account_token.verify`; set the new value; `ansible-playbook ansible/reconciler.yml` |
 | Kubernetes token rotation | The token Secret never expires; `kubectl -n flux-system delete secret infrastructure-verify-credentials`; `flux reconcile kustomization platform-policy` recreates it with a new token; set `kubernetes-token`; `ansible-playbook ansible/reconciler.yml` |
 | Cache reset | `systemctl clean --what=cache infra-reconcile-verify.service` |

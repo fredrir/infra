@@ -1,5 +1,6 @@
 reconciler_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
 reconciler_kubernetes_ca_file: kubernetes-ca.crt
+reconciler_ssh_identity: /etc/infra-reconcile/ssh/id_ed25519
 reconciler_packages: [ca-certificates, git, golang-go]
 reconciler_verify_credentials:
   - aws-access-key-id

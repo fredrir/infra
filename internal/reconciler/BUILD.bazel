@@ -31,6 +31,7 @@ go_test(
         "checkout_test.go",
         "config_test.go",
         "credentials_test.go",
+        "identity_test.go",
         "qualification_test.go",
         "role_test.go",
         "run_test.go",
