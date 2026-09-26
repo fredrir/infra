@@ -212,3 +212,22 @@ func TestVolatileEnrollmentRequiresWireGuardFleet(t *testing.T) {
 		t.Error("volatile.yml does not refuse to enroll onto a non-WireGuard fleet")
 	}
 }
+
+func TestFlannelClearRefusesWhileVolatileWorkersAreEnrolled(t *testing.T) {
+	root := filepath.Join("..", "..", "ansible")
+	guarded := false
+	walkAnsibleFile(t, root, "roles/k3s/tasks/main.yml", ansibleTask{}, func(task ansibleTask) {
+		if task.Module != "ansible.builtin.assert" {
+			return
+		}
+		condition := fmt.Sprint(task.Definition[task.Module])
+		if strings.Contains(condition, "k3s_volatile_nodes.stdout == ''") &&
+			strings.Contains(condition, "k3s_flannel_state.changed") &&
+			strings.Contains(condition, "k3s_flannel_state.stdout == ''") {
+			guarded = true
+		}
+	})
+	if !guarded {
+		t.Error("the k3s role clears or first-sets flannel without failing closed on enrolled volatile workers")
+	}
+}

@@ -101,6 +101,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"roles/k3s/tasks/main.yml: Verify the selected registration server API and datastore",
 		"roles/k3s/tasks/main.yml: Wait for the node to become ready",
 		"roles/k3s/tasks/main.yml: Read the registration server state",
+		"roles/k3s/tasks/main.yml: Read enrolled volatile workers through the administrator API",
 		"roles/k3s/tasks/main.yml: Derive the public WireGuard key from the persisted flannel key",
 		"roles/k3s/tasks/main.yml: Wait for the node to publish the cluster flannel backend",
 		"roles/k3s/tasks/main.yml: Wait for the kubelet to publish the CI job slots",

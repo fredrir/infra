@@ -245,6 +245,32 @@
     k3s_flannel_state.stdout != '' and (k3s_flannel_state.stdout != k3s_flannel_backend_types[k3s_flannel_backend]
     or (k3s_flannel_backend == 'wireguard-native' and not k3s_flannel_key.stat.exists))
 
+- name: Read enrolled volatile workers through the administrator API
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - get
+      - nodes
+      - -l
+      - node-restriction.kubernetes.io/volatile
+      - -o=name
+      - --request-timeout=10s
+  delegate_to: "{{ k3s_registration_server }}"
+  check_mode: false
+  changed_when: false
+  when: k3s_flannel_state is not skipped and inventory_hostname not in groups.get('volatile', [])
+  register: k3s_volatile_nodes
+
+- name: Refuse to clear or first-register flannel while a volatile worker can race the API
+  ansible.builtin.assert:
+    that: k3s_volatile_nodes.stdout == '' or not (k3s_flannel_state.changed or k3s_flannel_state.stdout == '')
+    fail_msg: >-
+      A volatile worker is enrolled and this run would clear or first-set {{ inventory_hostname }}'s flannel backend,
+      reopening the write-once race; cut every volatile worker off the API first (remove tag:platform-volatile's 6443
+      grant or deauthorize its tailnet node, then delete its Node object) — see docs/runbook.md.
+  when: k3s_volatile_nodes is not skipped
+
 - name: Release the previous flannel backend through the administrator API
   ansible.builtin.command:
     argv:
@@ -336,8 +362,9 @@
   ansible.builtin.assert:
     that: (k3s_flannel_published.stdout_lines | last | from_json).PublicKey == k3s_flannel_public_key.stdout
     fail_msg: >-
-      {{ inventory_hostname }} publishes a WireGuard key that is not its own; an administrator clears the flannel
-      backend annotations and restarts {{ k3s_service }}
+      {{ inventory_hostname }} publishes a WireGuard key that is not its own; cut fredrir-10 off the API first
+      (remove tag:platform-volatile's 6443 grant or deauthorize its tailnet node), then an administrator clears the
+      flannel backend annotations and restarts {{ k3s_service }}
   when: k3s_flannel_backend == 'wireguard-native'
 
 - name: Read declared worker taints through the administrator API
