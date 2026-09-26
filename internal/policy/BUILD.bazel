@@ -6,6 +6,7 @@ go_test(
         "helpers_test.go",
         "listener_test.go",
         "node_test.go",
+        "priority_test.go",
         "project_test.go",
         "quota_test.go",
         "runner_test.go",
