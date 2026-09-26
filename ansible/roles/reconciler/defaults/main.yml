@@ -15,6 +15,7 @@ reconciler_verify_randomized_delay: 5min
 reconciler_verify:
   repository: https://github.com/fredrir/infra.git
   state: /var/lib/infra-verify
+  cache: /var/cache/infra-verify
   bucket: llunde-pyparser-bucket
   prefix: reconciliation/production
   region: eu-north-1

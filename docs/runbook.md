@@ -387,10 +387,11 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | Provider | Dedicated Hetzner project; `tofu/reconciler/`, state `tofu-state/reconciler.tfstate`, applied only by an administrator |
 | Network | Primary IPv4; IPv6 disabled; no inbound Hetzner rules outside enrollment; tailnet `tag:infra-reconciler` |
 | Timer | `infra-reconcile-verify.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |
-| Service | `infra-reconcile-verify.service`: oneshot `infra reconcile run verify` as `infra-verify`; state `/var/lib/infra-verify`; the verification trigger's sandbox plus `AF_UNIX`; `TimeoutStartSec=100min`, `MemoryMax=6G` |
+| Service | `infra-reconcile-verify.service`: oneshot `infra reconcile run verify` as `infra-verify`; state `/var/lib/infra-verify`; cache `/var/cache/infra-verify`; the verification trigger's sandbox plus `AF_UNIX`; `TimeoutStartSec=100min`, `MemoryMax=6G` |
 | Supervisor | `/usr/local/bin/infra` from `build/cli-release.json` |
 | Run | Fresh clone of `production`, the revision the provenance gate admitted and the publisher App published, never `main`; a `production` revision that is not an ancestor of `main`, or a failed `main` fetch, stops the run before any build, and the former is reported as a `revision` difference; `go build` with the Go version in `build/toolchain.json`; `infra ci install-tools flux gh kubectl tofu`; observer App token for the runner repositories, revoked after the run; `infra reconcile verify --scope=cloud` |
-| Run isolation | Checkout, Go caches, tools, OpenTofu providers and `HOME` live in a per-run directory; the state directory is emptied before and after each run; every Git process ignores hooks, `core.fsmonitor` and replace refs |
+| Run isolation | Checkout, `GOMODCACHE`, `GOCACHE`, extracted tools and `HOME` live in a per-run directory; the state directory is emptied before and after each run; every Git process ignores hooks, `core.fsmonitor` and replace refs |
+| Cache | `go/`: `GOPROXY` mirror of the last successful build's module and toolchain zips, verified against `go.sum` and `sum.golang.org` on every run; `tools/<sha256>`: pinned tool archives, rehashed on every install; `tofu/<sha256 of tofu/.terraform.lock.hcl>`: `TF_PLUGIN_CACHE_DIR`, verified against the lock hashes; a mismatch fails the run |
 | Reports | `s3://llunde-pyparser-bucket/reconciliation/production/runs/<utc>-verify-<rev12>/`: `report.json`, `log.txt.zst`; journal bounded to 2 GB |
 | Heartbeat | Gatus `reconciliation_verification`: `success=true` when the verification matches; otherwise the differences or the failing stage; none while a reconciliation holds the lease |
 | Credentials | `ansible/roles/reconciler/files/credentials.sops.yaml`, maps `verify` and `apply`; installed as ciphertext through `host_secrets`; a root `ExecStartPre` decrypts only `verify` into the unit's runtime directory, and the supervisor deletes it once read |
@@ -422,6 +423,7 @@ aws s3 ls s3://llunde-pyparser-bucket/reconciliation/production/runs/ | tail -n 
 | Rebuild | `tofu -chdir=tofu/reconciler apply`; enroll; `ansible-playbook ansible/reconciler.yml --tags host_key`; set the new recipient as `.sops.yaml` anchor `fredrir-11`; `sops updatekeys -y ansible/roles/reconciler/files/credentials.sops.yaml`; `ansible-playbook ansible/reconciler.yml` |
 | Rotation | `tofu -chdir=tofu/reconciler apply -replace=aws_iam_access_key.verify` or `-replace=cloudflare_account_token.verify`; set the new value; `ansible-playbook ansible/reconciler.yml` |
 | Kubernetes token rotation | The token Secret never expires; `kubectl -n flux-system delete secret infrastructure-verify-credentials`; `flux reconcile kustomization platform-policy` recreates it with a new token; set `kubernetes-token`; `ansible-playbook ansible/reconciler.yml` |
+| Cache reset | `systemctl clean --what=cache infra-reconcile-verify.service` |
 | Rollback | `systemctl disable --now infra-reconcile-verify.timer`; no other system depends on the host |
 
 ## CI execution and runner admission

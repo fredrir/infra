@@ -46,7 +46,7 @@ func TestVerifyUnitDecryptsOnlyTheVerifyCredentials(t *testing.T) {
 		t.Fatalf("verify unit decrypts %q", decrypts)
 	}
 	for _, directive := range []string{
-		"User=infra-verify", "RuntimeDirectory=infra-reconcile-verify", "RuntimeDirectoryMode=0700", "UMask=0077", "NoNewPrivileges=yes", "ProtectSystem=strict", "PrivateTmp=yes", "CapabilityBoundingSet=\n",
+		"User=infra-verify", "RuntimeDirectory=infra-reconcile-verify", "RuntimeDirectoryMode=0700", "StateDirectory=infra-verify\n", "CacheDirectory=infra-verify\n", "CacheDirectoryMode=0700", "UMask=0077", "NoNewPrivileges=yes", "ProtectSystem=strict", "PrivateTmp=yes", "CapabilityBoundingSet=\n",
 		"ExecStartPre=+/usr/bin/chown infra-verify:infra-verify " + credentials + "\n",
 		"ExecStart=/usr/local/bin/infra reconcile run verify --config=/etc/infra-reconcile/verify.json --credentials=" + credentials + "\n",
 	} {
@@ -87,7 +87,7 @@ func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("role configuration: %v", err)
 	}
-	if config.Heartbeat != "reconciliation_verification" || config.Repository != "https://github.com/fredrir/infra.git" || config.State != "/var/lib/infra-verify" {
+	if config.Heartbeat != "reconciliation_verification" || config.Repository != "https://github.com/fredrir/infra.git" || config.State != "/var/lib/infra-verify" || config.Cache != "/var/cache/infra-verify" {
 		t.Fatalf("role configuration %+v", config)
 	}
 }

@@ -128,11 +128,15 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 	fmt.Fprintf(log, "Verifying %s at %s\n", publishedBranch, run.Revision)
 	run.Stage = "build"
 	engine := filepath.Join(work, "infra")
-	if err := commands.buildEngine(ctx, work, source, engine); err != nil {
+	if err := commands.buildEngine(ctx, work, s.Config.Cache, source, engine); err != nil {
 		return fail("build", err)
 	}
 	run.Stage = "tools"
-	if err := commands.installTools(ctx, engine, work); err != nil {
+	if err := commands.installTools(ctx, engine, work, s.Config.Cache); err != nil {
+		return fail("tools", err)
+	}
+	plugins, err := pluginCache(s.Config.Cache, source)
+	if err != nil {
 		return fail("tools", err)
 	}
 	run.Stage = "credentials"
@@ -159,7 +163,7 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 	}
 	run.Stage = "verify"
 	report := filepath.Join(work, "verification.json")
-	result, verifyErr := commands.run(ctx, source, credentials.engineEnvironment(s.Config, kubeconfig, token), engine, "reconcile", "verify", "--scope=cloud", "--root="+source, "--state-bucket="+s.Config.Bucket, "--state-prefix="+s.Config.Prefix, "--report="+report)
+	result, verifyErr := commands.run(ctx, source, append(credentials.engineEnvironment(s.Config, kubeconfig, token), "TF_PLUGIN_CACHE_DIR="+plugins), engine, "reconcile", "verify", "--scope=cloud", "--root="+source, "--state-bucket="+s.Config.Bucket, "--state-prefix="+s.Config.Prefix, "--report="+report)
 	data, readErr := os.ReadFile(report)
 	if readErr != nil {
 		return fail("verify", errors.Join(verifyErr, readErr))

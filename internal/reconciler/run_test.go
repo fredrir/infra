@@ -5,11 +5,14 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"net/http"
 	"net/http/httptest"
@@ -46,8 +49,9 @@ func originRepository(t *testing.T) (string, string) {
 	t.Helper()
 	origin := t.TempDir()
 	for path, content := range map[string]string{
-		"build/toolchain.json": `{"go": "1.27.1"}`,
-		"build/runners.json":   `{"schema": 2, "owner": "fredrir", "host": "infra-build-09", "version": "2.337.0", "sha256": "` + strings.Repeat("a", 64) + `", "labels": ["dagger-amd64"], "repositories": {"infra": 3, "Y": 2}}`,
+		"build/toolchain.json":     `{"go": "1.27.1"}`,
+		"build/runners.json":       `{"schema": 2, "owner": "fredrir", "host": "infra-build-09", "version": "2.337.0", "sha256": "` + strings.Repeat("a", 64) + `", "labels": ["dagger-amd64"], "repositories": {"infra": 3, "Y": 2}}`,
+		"tofu/.terraform.lock.hcl": providerLock,
 	} {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(origin, path)), 0o755); err != nil {
 			t.Fatal(err)
@@ -67,6 +71,52 @@ func originRepository(t *testing.T) (string, string) {
 	gitCommand(t, origin, "add", ".")
 	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "unpublished")
 	return origin, published
+}
+
+const providerLock = `provider "registry.opentofu.org/hashicorp/aws" {
+  version = "5.100.0"
+}
+`
+
+var moduleDownloads = map[string]bool{
+	"golang.org/toolchain/@v/v0.0.1-go1.27.1.linux-amd64.zip":     true,
+	"golang.org/toolchain/@v/v0.0.1-go1.27.1.linux-amd64.ziphash": false,
+	"golang.org/toolchain/@v/v0.0.1-go1.27.1.linux-amd64.lock":    false,
+	"github.com/spf13/cobra/@v/list":                              true,
+	"github.com/spf13/cobra/@v/v1.10.2.info":                      true,
+	"github.com/spf13/cobra/@v/v1.10.2.mod":                       true,
+	"github.com/spf13/cobra/@v/v1.10.2.zip":                       true,
+	"github.com/spf13/cobra/@v/v1.10.2.zip123.tmp":                false,
+	"sumdb/sum.golang.org/latest":                                 false,
+}
+
+func downloadModules(t *testing.T, directory string) {
+	t.Helper()
+	for path := range moduleDownloads {
+		if err := os.MkdirAll(filepath.Join(directory, filepath.Dir(path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, path), []byte(path), 0o444); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func cachedFiles(t *testing.T, directory string) []string {
+	t.Helper()
+	var files []string
+	err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, err error) error {
+		if err == nil && !entry.IsDir() {
+			relative, _ := filepath.Rel(directory, path)
+			files = append(files, relative)
+		}
+		return err
+	})
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		t.Fatal(err)
+	}
+	slices.Sort(files)
+	return files
 }
 
 type objects struct {
@@ -162,7 +212,7 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 		t.Fatal(err)
 	}
 	config := validConfig()
-	config.Repository, config.State, config.Endpoint, config.Gatus, config.Observer.API, config.Kubernetes.CertificateAuthority = "file://"+origin, t.TempDir(), urls["s3"], urls["gatus"], urls["github"], authority
+	config.Repository, config.State, config.Cache, config.Endpoint, config.Gatus, config.Observer.API, config.Kubernetes.CertificateAuthority = "file://"+origin, t.TempDir(), t.TempDir(), urls["s3"], urls["gatus"], urls["github"], authority
 	var mu sync.Mutex
 	h.supervisor = Supervisor{Config: config, Credentials: writeCredentials(t, anyValues(credentials)), Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
 		mu.Lock()
@@ -193,16 +243,19 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 			return process.Run(ctx, options)
 		case "go":
 			run := runDirectory(t, config.State, options.Env)
-			if !slices.Contains(options.Env, "GOTOOLCHAIN=go1.27.1") || !slices.Contains(options.Env, "GOFLAGS=-mod=readonly -modcacherw") || !slices.Contains(options.Env, "GOMODCACHE="+filepath.Join(run, "go", "mod")) || !slices.Contains(options.Env, "GOCACHE="+filepath.Join(run, "go", "cache")) {
-				t.Errorf("engine built with %q", options.Env)
+			for _, variable := range []string{"GOTOOLCHAIN=go1.27.1", "GOFLAGS=-mod=readonly -modcacherw", "GOMODCACHE=" + filepath.Join(run, "go", "mod"), "GOCACHE=" + filepath.Join(run, "go", "cache"), "GOPROXY=file://" + filepath.Join(config.Cache, "go") + ",https://proxy.golang.org,direct"} {
+				if !slices.Contains(options.Env, variable) {
+					t.Errorf("engine built without %s in %q", variable, options.Env)
+				}
 			}
+			downloadModules(t, filepath.Join(run, "go", "mod", "cache", "download"))
 			if build != nil {
 				return process.Result{ExitCode: 1}, build
 			}
 			return process.Result{}, os.WriteFile(options.Args[3], []byte("engine"), 0o755)
 		case "infra":
 			if options.Args[0] == "ci" {
-				if !slices.Contains(options.Env, "INFRA_TOOL_CACHE="+filepath.Join(runDirectory(t, config.State, options.Env), "tools")) || !reflect.DeepEqual(options.Args[4:], cloudTools) {
+				if !slices.Contains(options.Env, "INFRA_TOOL_CACHE="+filepath.Join(runDirectory(t, config.State, options.Env), "tools")) || !slices.Contains(options.Env, "INFRA_TOOL_DOWNLOADS="+filepath.Join(config.Cache, "tools")) || !reflect.DeepEqual(options.Args[4:], cloudTools) {
 					t.Errorf("tools installed with %q %q", options.Args, options.Env)
 				}
 				return process.Result{}, nil
@@ -314,7 +367,8 @@ func TestVerifyBuildsThePublishedEngineAndReportsItsOutcome(t *testing.T) {
 			if want := []string{"reconcile", "verify", "--scope=cloud", "--root=" + source, "--state-bucket=llunde-pyparser-bucket", "--state-prefix=reconciliation/production", "--report=" + filepath.Join(filepath.Dir(source), "verification.json")}; !slices.Equal(engineArgs, want) {
 				t.Errorf("engine ran %q, want %q", engineArgs, want)
 			}
-			for _, variable := range []string{"GH_TOKEN=ghs_observer", "AWS_ACCESS_KEY_ID=AKIAVERIFY", "AWS_ENDPOINT_URL_S3=" + h.supervisor.Config.Endpoint, "TF_VAR_hcloud_token=hcloud-secret-value"} {
+			plugins := filepath.Join(h.supervisor.Config.Cache, "tofu", fmt.Sprintf("%x", sha256.Sum256([]byte(providerLock))))
+			for _, variable := range []string{"GH_TOKEN=ghs_observer", "AWS_ACCESS_KEY_ID=AKIAVERIFY", "AWS_ENDPOINT_URL_S3=" + h.supervisor.Config.Endpoint, "TF_VAR_hcloud_token=hcloud-secret-value", "TF_PLUGIN_CACHE_DIR=" + plugins} {
 				if !slices.Contains(engineEnv, variable) {
 					t.Errorf("engine environment lacks %s", strings.SplitN(variable, "=", 2)[0])
 				}
@@ -379,7 +433,52 @@ func TestVerifyReportsFailuresBeforeTheEngineRuns(t *testing.T) {
 			if run.Stage != test.wantStage || run.Outcome != "failed" || run.Verification != nil {
 				t.Fatalf("uploaded run %+v", run)
 			}
+			if cached := cachedFiles(t, h.supervisor.Config.Cache); len(cached) != 0 {
+				t.Fatalf("unverified run cached %q", cached)
+			}
 		})
+	}
+}
+
+func TestVerifyKeepsOnlyReverifiedCachesAcrossRuns(t *testing.T) {
+	h := newHarness(t, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
+		return 0, verification("matches", []reconcile.Difference{}, []string{})
+	}, nil)
+	cache := h.supervisor.Config.Cache
+	plantPoison(t, h.supervisor.Config.State)
+	stale := []string{"go/example.com/retired/@v/v0.1.0.zip", "go/github.com/spf13/cobra/@v/.mirror-123", "tofu/" + strings.Repeat("0", 64) + "/registry.opentofu.org/hashicorp/aws/5.99.0/linux_amd64/terraform-provider-aws"}
+	for _, path := range append(stale, "go/github.com/spf13/cobra/@v/v1.10.2.zip") {
+		if err := os.MkdirAll(filepath.Join(cache, filepath.Dir(path)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(cache, path), []byte("mirrored earlier"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := h.supervisor.Verify(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for path, proxied := range moduleDownloads {
+		if proxied {
+			want = append(want, path)
+		}
+	}
+	slices.Sort(want)
+	if got := cachedFiles(t, filepath.Join(cache, "go")); !slices.Equal(got, want) {
+		t.Errorf("module mirror holds %q, want %q", got, want)
+	}
+	if kept, err := os.ReadFile(filepath.Join(cache, "go/github.com/spf13/cobra/@v/v1.10.2.zip")); err != nil || string(kept) != "mirrored earlier" {
+		t.Errorf("mirrored download rewritten: %q %v", kept, err)
+	}
+	if providers, err := os.ReadDir(filepath.Join(cache, "tofu")); err != nil || len(providers) != 1 || providers[0].Name() != fmt.Sprintf("%x", sha256.Sum256([]byte(providerLock))) {
+		t.Errorf("provider cache kept %v: %v", providers, err)
+	}
+	if _, err := os.Stat(filepath.Join(cache, "go/example.com")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("retired module directory kept: %v", err)
+	}
+	if entries, err := os.ReadDir(h.supervisor.Config.State); err != nil || len(entries) != 0 {
+		t.Errorf("state kept %v across the run: %v", entries, err)
 	}
 }
 

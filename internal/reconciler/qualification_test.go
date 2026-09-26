@@ -431,6 +431,9 @@ func TestReconcilerQualification(t *testing.T) {
 	if err := dev.HostsSSH(ctx, dev.SSHOptions{Hosts: q.hosts, Node: qualificationNode, Args: []string{"sudo sh -c 'install -m 0755 /dev/stdin /usr/local/bin/.infra.new && mv -f /usr/local/bin/.infra.new /usr/local/bin/infra'"}, Stdin: executable, Stdout: &installed, Stderr: &installed}); err != nil {
 		t.Fatalf("install the supervisor: %v\n%s", err, installed.String())
 	}
+	if output, err := q.guest("sudo sh -c 'systemctl stop infra-reconcile-verify.timer infra-reconcile-verify.service 2>/dev/null; rm -rf /var/cache/infra-verify'"); err != nil {
+		t.Fatalf("start from an empty verification cache: %v\n%s", err, output)
+	}
 	authority := filepath.Join(work, "kubernetes-ca.crt")
 	if err := os.WriteFile(authority, testAuthority(t), 0o644); err != nil {
 		t.Fatal(err)
@@ -493,6 +496,7 @@ func TestReconcilerQualification(t *testing.T) {
 		"reconciler_verify": Config{
 			Repository: fmt.Sprintf("git://%s:%d/infra.git", guestHost, gitPort),
 			State:      "/var/lib/infra-verify",
+			Cache:      "/var/cache/infra-verify",
 			Bucket:     qualificationBucket,
 			Prefix:     "reconciliation/production",
 			Region:     qualificationRegion,
@@ -605,6 +609,59 @@ func TestReconcilerQualification(t *testing.T) {
 		t.Errorf("observer tokens minted %d, revoked %d", app.minted, app.revoked)
 	}
 	app.mu.Unlock()
+
+	var warmKey string
+	q.await("a second timer-started verification report", 15*time.Minute, func() error {
+		for _, key := range q.runKeys() {
+			if strings.Contains(key, suffix) && strings.HasSuffix(key, "/report.json") && key != reportKey {
+				warmKey = key
+				return nil
+			}
+		}
+		return errors.New("no second report yet")
+	})
+	if output, err := q.guest("sudo", "systemctl", "stop", "infra-reconcile-verify.timer"); err != nil {
+		t.Fatalf("stop the verification timer: %v\n%s", err, output)
+	}
+	q.await("the verification to finish", 10*time.Minute, func() error {
+		if state, _ := q.guest("systemctl", "show", "infra-reconcile-verify.service", "-p", "ActiveState", "--value"); state != "inactive" && state != "failed" {
+			return fmt.Errorf("service %s", state)
+		}
+		return nil
+	})
+	var warm bytes.Buffer
+	if err := q.s3.Download(ctx, qualificationBucket, warmKey, &warm); err != nil {
+		t.Fatal(err)
+	}
+	var warmRun Run
+	if err := json.Unmarshal(warm.Bytes(), &warmRun); err != nil {
+		t.Fatal(err)
+	}
+	cold, reused := run.Finished.Sub(run.Started), warmRun.Finished.Sub(warmRun.Started)
+	t.Logf("cold-cache run %s at stage %s, warm-cache run %s at stage %s", cold.Round(time.Second), run.Stage, reused.Round(time.Second), warmRun.Stage)
+	if warmRun.Stage != run.Stage || reused >= cold {
+		t.Errorf("warm-cache run took %s to stage %s after a %s cold-cache run to stage %s", reused, warmRun.Stage, cold, run.Stage)
+	}
+	toolchain, err := goToolchain(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cached := []string{"/var/cache/infra-verify/go/golang.org/toolchain/@v/v0.0.1-" + toolchain + ".linux-amd64.zip"}
+	for _, name := range cloudTools {
+		asset, _ := ci.Tool(name)
+		cached = append(cached, "/var/cache/infra-verify/tools/"+asset.Digest)
+	}
+	for _, path := range cached {
+		if output, err := q.guest("sudo", "-u", "infra-verify", "test", "-f", path); err != nil {
+			t.Errorf("verified cache lacks %s: %v %s", path, err, output)
+		}
+	}
+	if owner, err := q.guest("sudo", "stat", "-c", "%U:%a", "/var/cache/infra-verify"); err != nil || owner != "infra-verify:700" {
+		t.Errorf("verification cache is %q: %v", owner, err)
+	}
+	if providers, err := q.guest("sudo", "find", "/var/cache/infra-verify/tofu", "-mindepth", "1", "-maxdepth", "1"); err != nil || len(strings.Fields(providers)) != 1 {
+		t.Errorf("provider cache holds %q: %v", providers, err)
+	}
 
 	if trigger, err := q.guest("systemctl", "show", "infra-reconcile-verify.timer", "-p", "LastTriggerUSec", "--value"); err != nil || trigger == "" || trigger == "n/a" {
 		t.Errorf("timer never fired: %q %v", trigger, err)

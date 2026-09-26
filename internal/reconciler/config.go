@@ -10,11 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 type Config struct {
 	Repository string     `json:"repository"`
 	State      string     `json:"state"`
+	Cache      string     `json:"cache"`
 	Bucket     string     `json:"bucket"`
 	Prefix     string     `json:"prefix"`
 	Region     string     `json:"region"`
@@ -69,6 +71,8 @@ func (c Config) validate() error {
 		return fmt.Errorf("repository %q is not a URL", c.Repository)
 	case !filepath.IsAbs(c.State) || filepath.Clean(c.State) != c.State:
 		return fmt.Errorf("state %q is not a clean absolute path", c.State)
+	case !filepath.IsAbs(c.Cache) || filepath.Clean(c.Cache) != c.Cache || contains(c.State, c.Cache) || contains(c.Cache, c.State):
+		return fmt.Errorf("cache %q is not a clean absolute path outside state", c.Cache)
 	case !bucketPattern.MatchString(c.Bucket):
 		return fmt.Errorf("bucket %q is invalid", c.Bucket)
 	case !prefixPattern.MatchString(c.Prefix):
@@ -91,6 +95,11 @@ func (c Config) validate() error {
 		return fmt.Errorf("observer api %q is not a URL", c.Observer.API)
 	}
 	return nil
+}
+
+func contains(directory, path string) bool {
+	relative, err := filepath.Rel(directory, path)
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, "../")
 }
 
 func validURL(value string, schemes ...string) bool {

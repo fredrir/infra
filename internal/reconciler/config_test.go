@@ -12,6 +12,7 @@ func validConfig() Config {
 	return Config{
 		Repository: "https://github.com/fredrir/infra.git",
 		State:      "/var/lib/infra-verify",
+		Cache:      "/var/cache/infra-verify",
 		Bucket:     "llunde-pyparser-bucket",
 		Prefix:     "reconciliation/production",
 		Region:     "eu-north-1",
@@ -54,6 +55,10 @@ func TestLoadConfigRejectsInvalidSettings(t *testing.T) {
 		"repository scheme":       func(c *Config) { c.Repository = "ssh://github.com/fredrir/infra.git" },
 		"relative state":          func(c *Config) { c.State = "var/lib/infra-verify" },
 		"unclean state":           func(c *Config) { c.State = "/var/lib/../infra-verify" },
+		"relative cache":          func(c *Config) { c.Cache = "var/cache/infra-verify" },
+		"cache is state":          func(c *Config) { c.Cache = c.State },
+		"cache inside state":      func(c *Config) { c.Cache = c.State + "/cache" },
+		"state inside cache":      func(c *Config) { c.Cache = "/var/lib" },
 		"bucket":                  func(c *Config) { c.Bucket = "Bucket_Name" },
 		"prefix":                  func(c *Config) { c.Prefix = "/reconciliation" },
 		"region":                  func(c *Config) { c.Region = "north" },

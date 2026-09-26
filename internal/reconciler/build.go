@@ -29,9 +29,10 @@ func goToolchain(source string) (string, error) {
 	return "go" + toolchain.Go, nil
 }
 
-func goEnvironment(work, toolchain string) []string {
+func goEnvironment(work, cache, toolchain string) []string {
 	return []string{
 		"GOTOOLCHAIN=" + toolchain,
+		"GOPROXY=" + moduleProxy(cache) + ",https://proxy.golang.org,direct",
 		"GOCACHE=" + filepath.Join(work, "go", "cache"),
 		"GOMODCACHE=" + filepath.Join(work, "go", "mod"),
 		"GOPATH=" + filepath.Join(work, "go", "path"),
@@ -40,19 +41,23 @@ func goEnvironment(work, toolchain string) []string {
 	}
 }
 
-func (e executor) buildEngine(ctx context.Context, work, source, output string) error {
+func (e executor) buildEngine(ctx context.Context, work, cache, source, output string) error {
 	toolchain, err := goToolchain(source)
 	if err != nil {
 		return err
 	}
-	if _, err := e.run(ctx, source, goEnvironment(work, toolchain), "go", "build", "-trimpath", "-o", output, "./cmd/infra"); err != nil {
+	if _, err := e.run(ctx, source, goEnvironment(work, cache, toolchain), "go", "build", "-trimpath", "-o", output, "./cmd/infra"); err != nil {
 		return fmt.Errorf("build engine with %s: %w", toolchain, err)
+	}
+	if err := mirrorModuleDownloads(filepath.Join(work, "go", "mod", "cache", "download"), cache); err != nil {
+		return fmt.Errorf("cache verified module downloads: %w", err)
 	}
 	return nil
 }
 
-func (e executor) installTools(ctx context.Context, engine, work string) error {
-	if _, err := e.run(ctx, work, []string{"INFRA_TOOL_CACHE=" + filepath.Join(work, "tools")}, engine, append([]string{"ci", "install-tools", "--temporary", work}, cloudTools...)...); err != nil {
+func (e executor) installTools(ctx context.Context, engine, work, cache string) error {
+	environment := []string{"INFRA_TOOL_CACHE=" + filepath.Join(work, "tools"), "INFRA_TOOL_DOWNLOADS=" + filepath.Join(cache, "tools")}
+	if _, err := e.run(ctx, work, environment, engine, append([]string{"ci", "install-tools", "--temporary", work}, cloudTools...)...); err != nil {
 		return fmt.Errorf("install tools: %w", err)
 	}
 	return nil

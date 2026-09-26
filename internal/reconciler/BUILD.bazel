@@ -4,6 +4,7 @@ go_library(
     name = "reconciler",
     srcs = [
         "build.go",
+        "cache.go",
         "checkout.go",
         "config.go",
         "credentials.go",
