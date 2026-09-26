@@ -5,11 +5,13 @@ go 1.27.1
 require (
 	cel.dev/cel-go v0.32.0
 	dagger.io/dagger v0.21.9
+	github.com/ProtonMail/go-crypto v1.5.1
 	github.com/aws/aws-sdk-go-v2 v1.47.0
 	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-github/v88 v88.0.0
+	github.com/hmarr/codeowners v1.2.1
 	github.com/itchyny/gojq v0.12.19
 	github.com/kdomanski/iso9660 v0.4.0
 	github.com/klauspost/compress v1.20.0
@@ -31,6 +33,7 @@ require (
 	github.com/aws/smithy-go v1.28.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/cloudflare/circl v1.6.5 // indirect
 	github.com/dagger/querybuilder v0.0.0-20260402040506-574a5e81cb59 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
@@ -68,8 +71,9 @@ require (
 	go.opentelemetry.io/otel/metric v1.41.0 // indirect
 	go.opentelemetry.io/otel/trace v1.41.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20240823005443-9b4947da3948 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240826202546-f6391c0de4c7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240826202546-f6391c0de4c7 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect

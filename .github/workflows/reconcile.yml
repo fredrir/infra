@@ -41,6 +41,7 @@ jobs:
       id-token: write
       actions: write
       packages: read
+      pull-requests: read
     uses: ./.github/workflows/reconcile-job.yml
     secrets: inherit
     with:

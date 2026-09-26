@@ -56,6 +56,7 @@ type provenanceCommit struct {
 
 type provenanceGate struct {
 	commands *Commands
+	base     string
 	signers  string
 }
 
@@ -80,7 +81,7 @@ func (c *Commands) Provenance(ctx context.Context, checked ProvenanceRange) erro
 		return err
 	}
 	defer os.RemoveAll(directory)
-	gate := provenanceGate{commands: c, signers: filepath.Join(directory, "allowed_signers")}
+	gate := provenanceGate{commands: c, base: base, signers: filepath.Join(directory, "allowed_signers")}
 	if err := gate.trust(ctx, base); err != nil {
 		return err
 	}
@@ -121,14 +122,21 @@ func (g provenanceGate) verify(ctx context.Context, commits []provenanceCommit) 
 			rejected[commit.hash] = reason
 		}
 	}
+	pending := map[string]error{}
+	for hash, reason := range rejected {
+		if !g.acknowledged(ctx, hash, acknowledgers[hash]) {
+			pending[hash] = reason
+		}
+	}
+	g.reviewed(ctx, commits, pending)
 	var unverified []string
 	for _, commit := range commits {
-		if reason, ok := rejected[commit.hash]; ok && !g.acknowledged(ctx, commit.hash, acknowledgers[commit.hash]) {
+		if reason, ok := pending[commit.hash]; ok {
 			unverified = append(unverified, fmt.Sprintf("%s %q: %s", commit.hash[:12], commit.subject, strings.ReplaceAll(reason.Error(), "\n", "; ")))
 		}
 	}
 	if len(unverified) > 0 {
-		return fmt.Errorf("unverified commits: %s", strings.Join(unverified, " | "))
+		return fmt.Errorf("unverified commits: %s; accept them with a %s trailer in an owner-signed commit, or push the change as owner-signed commits", strings.Join(unverified, " | "), acknowledgementTrailer)
 	}
 	return nil
 }
@@ -155,29 +163,62 @@ func (g provenanceGate) acknowledged(ctx context.Context, commit string, acknowl
 }
 
 func (g provenanceGate) ownerSigned(ctx context.Context, commit provenanceCommit) error {
-	object, err := g.commands.git(ctx, nil, "cat-file", "commit", commit.hash)
+	signature, err := g.signature(ctx, commit.hash)
 	if err != nil {
 		return err
 	}
-	header, _, _ := bytes.Cut(object.Stdout, []byte("\n\n"))
-	var signatures []string
-	for line := range strings.Lines(string(header)) {
-		if name, value, _ := strings.Cut(line, " "); strings.HasPrefix(name, "gpgsig") {
-			signatures = append(signatures, name+" "+strings.TrimSpace(value))
-		}
-	}
-	switch {
-	case len(signatures) == 0:
-		return errors.New("unsigned")
-	case len(signatures) > 1:
-		return fmt.Errorf("%d signature headers", len(signatures))
-	case signatures[0] != "gpgsig -----BEGIN SSH SIGNATURE-----":
+	if signature.header != "gpgsig" || !bytes.HasPrefix(signature.armor, []byte("-----BEGIN SSH SIGNATURE-----\n")) {
 		return errors.New("not an SSH signature")
 	}
 	if _, err := g.commands.git(ctx, nil, "-c", "gpg.program=false", "-c", "gpg.openpgp.program=false", "-c", "gpg.x509.program=false", "-c", "gpg.ssh.program=ssh-keygen", "-c", "gpg.ssh.allowedSignersFile="+g.signers, "verify-commit", commit.hash); err != nil {
 		return fmt.Errorf("SSH signature not by a key in %s at the base revision: %w", adminKeys, err)
 	}
 	return nil
+}
+
+var errUnsigned = errors.New("unsigned")
+
+type commitSignature struct {
+	header         string
+	armor, payload []byte
+}
+
+func (g provenanceGate) signature(ctx context.Context, commit string) (commitSignature, error) {
+	object, err := g.commands.git(ctx, nil, "cat-file", "commit", commit)
+	if err != nil {
+		return commitSignature{}, err
+	}
+	return parseCommitSignature(object.Stdout)
+}
+
+func parseCommitSignature(object []byte) (commitSignature, error) {
+	header, message, found := bytes.Cut(object, []byte("\n\n"))
+	if !found {
+		return commitSignature{}, errors.New("malformed commit object")
+	}
+	var parsed commitSignature
+	headers, continued := 0, false
+	for line := range strings.Lines(string(header) + "\n") {
+		if continued && strings.HasPrefix(line, " ") {
+			parsed.armor = append(parsed.armor, line[1:]...)
+			continue
+		}
+		name, value, _ := strings.Cut(line, " ")
+		if continued = strings.HasPrefix(name, "gpgsig"); continued {
+			headers++
+			parsed.header, parsed.armor = name, append(parsed.armor, value...)
+			continue
+		}
+		parsed.payload = append(parsed.payload, line...)
+	}
+	parsed.payload = append(append(parsed.payload, '\n'), message...)
+	switch headers {
+	case 0:
+		return parsed, errUnsigned
+	case 1:
+		return parsed, nil
+	}
+	return parsed, fmt.Errorf("%d signature headers", headers)
 }
 
 func (g provenanceGate) deployment(ctx context.Context, commit provenanceCommit) error {

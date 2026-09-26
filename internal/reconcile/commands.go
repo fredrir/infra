@@ -28,6 +28,7 @@ type Commands struct {
 	ProvenanceEnv []string
 	Publisher     *Publisher
 	GitHub        *github.Client
+	PullRequests  PullRequests
 	RunnerToken   string
 	kubernetes    *kubernetesState
 }

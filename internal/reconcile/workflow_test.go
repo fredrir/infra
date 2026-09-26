@@ -637,7 +637,7 @@ func TestPublisherKeyReachesTheEngineOnlyAsAFile(t *testing.T) {
 		}
 	}
 	apply := workflow.Jobs["apply"]
-	if !reflect.DeepEqual(apply.Permissions, map[string]string{"contents": "read", "id-token": "write", "actions": "read", "packages": "read"}) {
+	if !reflect.DeepEqual(apply.Permissions, map[string]string{"contents": "read", "id-token": "write", "actions": "read", "packages": "read", "pull-requests": "read"}) {
 		t.Errorf("apply permissions %v", apply.Permissions)
 	}
 	writer := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.Name == publisherKeyStep })

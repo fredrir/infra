@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
@@ -27,6 +29,9 @@ type provenanceFixture struct {
 	base                         string
 	attested                     map[string][]int
 	verifications                []process.Options
+	webFlow, impostor            *openpgp.Entity
+	api                          *pullRequestAPI
+	pullRequests                 PullRequests
 }
 
 func newProvenanceFixture(t *testing.T) *provenanceFixture {
@@ -45,12 +50,23 @@ func newProvenanceFixture(t *testing.T) *provenanceFixture {
 		f.git(append([]string{"config"}, setting...)...)
 	}
 	f.git("remote", "add", "origin", "https://github.com/fredrir/infra")
+	f.webFlow, f.impostor = openPGPKey(t, "GitHub"), openPGPKey(t, "Impostor")
+	f.api = &pullRequestAPI{}
+	server := httptest.NewServer(f.api)
+	t.Cleanup(server.Close)
+	client, err := GitHubClient(server.URL, "provenance-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.pullRequests = GitHubPullRequests{Client: client, Owner: "fredrir", Name: "infra"}
 	deployment := func(stage string) string {
 		return fmt.Sprintf("apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: %s\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n      - name: web\n        image: %s:latest\n", stage, deployedImage)
 	}
 	pinned := fmt.Sprintf("apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n- application.yaml\nimages:\n- name: %[1]s\n  newName: %[1]s\n  digest: sha256:%[2]s\n", deployedImage, strings.Repeat("c", 64))
 	f.base = f.commit(f.owner, "Declare deployments", map[string]string{
 		adminKeys:                                                  f.publicKey(f.owner),
+		webFlowKey:                                                 armoredPublicKey(t, f.webFlow),
+		codeOwners:                                                 "/platform/ @fredrir @helper\n/tofu/ @fredrir\n",
 		".github/deployments/1.yaml":                               fmt.Sprintf("repository: fredrir/example\nvisibility: public\nimages:\n  %s:\n    path: platform/projects/example\n    mode: kustomize\n", deployedImage),
 		".github/deployments/2.yaml":                               fmt.Sprintf("repository: fredrir/web\nvisibility: private\nimages:\n  %s:\n    path: platform/projects/web\n    mode: helmrelease\n    workload: web\n", releasedImage),
 		".github/chainguard/deploy-1.sts.yaml":                     "claim_pattern:\n  job_workflow_sha: '^" + strings.Repeat("d", 40) + "$'\n",
@@ -183,7 +199,7 @@ func (f *provenanceFixture) deploy(image string, run int) string {
 func (f *provenanceFixture) verify(base, head string) error {
 	f.t.Helper()
 	f.verifications = nil
-	return (&Commands{Runner: ci.Runner{Dir: f.root, Stderr: io.Discard, Execute: f.attestation}, Work: f.t.TempDir()}).Provenance(context.Background(), ProvenanceRange{Base: base, Revision: head})
+	return (&Commands{Runner: ci.Runner{Dir: f.root, Stderr: io.Discard, Execute: f.attestation}, Work: f.t.TempDir(), PullRequests: f.pullRequests}).Provenance(context.Background(), ProvenanceRange{Base: base, Revision: head})
 }
 
 func TestProvenanceGate(t *testing.T) {

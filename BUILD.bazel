@@ -87,6 +87,12 @@ filegroup(
 )
 
 filegroup(
+    name = "web_flow_key",
+    srcs = ["keys/github-web-flow.asc"],
+    visibility = ["//internal/reconcile:__pkg__"],
+)
+
+filegroup(
     name = "host_play_data",
     srcs = glob([
         "ansible/*.yml",

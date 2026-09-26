@@ -91,8 +91,13 @@ func newReconcileCommand() *cobra.Command {
 				return err
 			}
 			defer removeCredentials()
+			client, err := reconcile.GitHubClient(reconcile.GitHubAPI, token)
+			if err != nil {
+				return err
+			}
+			pullRequests := reconcile.GitHubPullRequests{Client: client, Owner: "fredrir", Name: "infra"}
 			if action == "provenance" {
-				return verifyProvenance(cmd, store, &reconcile.Commands{Runner: runner, ProvenanceEnv: attestations}, provenanceBase, report)
+				return verifyProvenance(cmd, store, &reconcile.Commands{Runner: runner, ProvenanceEnv: attestations, PullRequests: pullRequests}, provenanceBase, report)
 			}
 			if action == "requirements" {
 				status, err := store.Read(cmd.Context())
@@ -115,10 +120,7 @@ func newReconcileCommand() *cobra.Command {
 				return err
 			}
 			defer os.RemoveAll(work)
-			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ProvenanceEnv: attestations, RunnerToken: runnerToken}
-			if ops.GitHub, err = reconcile.GitHubClient(reconcile.GitHubAPI, token); err != nil {
-				return err
-			}
+			ops := &reconcile.Commands{Runner: runner, Work: work, RequireMain: action == "apply", ProvenanceEnv: attestations, GitHub: client, PullRequests: pullRequests, RunnerToken: runnerToken}
 			if action == "apply" {
 				publisher, err := reconcile.ReadPublisher(absolute)
 				if err != nil {

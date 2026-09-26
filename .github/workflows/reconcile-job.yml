@@ -103,6 +103,7 @@ jobs:
       id-token: write
       actions: read
       packages: read
+      pull-requests: read
     env:
       VERIFICATION: ${{ inputs.verify }}
     outputs:
