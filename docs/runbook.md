@@ -34,9 +34,11 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | Stage | Entry point | Result |
 | --- | --- | --- |
 | Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu tests, expansion and final-state plans, Flux rendering, Ansible task lists |
-| Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout, gated on OpenTofu tests; apply against the last successful revision |
-| Hourly verification | `infra-verification-request.timer` on `fredrir-06` → `reconcile.yml` with `verify=true`, `repair=true` → `infra reconcile verify --scope=full --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and each host playbook; a report listing differences dispatches one full reconciliation of `main` |
-| On-demand verification | `gh workflow run reconcile.yml --ref main -f verify=true` | The hourly verification on demand; differences are reported without dispatching a reconciliation unless `-f repair=true` |
+| Merge to `main` | `infra-reconcile-apply.timer` on `fredrir-11` → `infra reconcile run apply` → `infra reconcile apply` | Within 30 s of the push: gate, then a fresh plan for the exact checkout, gated on OpenTofu tests; apply against the last successful revision; [apply supervisor](#reconciler-host) |
+| Hourly verification | `infra-reconcile-verify.timer` on `fredrir-11` → `infra reconcile verify --scope=full` of `production` | Read-only verification and check-mode comparison of OpenTofu and each host playbook; differences outside `rulesets` request one capped full reconciliation of `main` |
+| Hosted deep verification | `infra-verification-request.timer` on `fredrir-06` → `reconcile.yml` with `verify=true` → `infra reconcile verify --scope=full --report REPORT` | The same comparison from a hosted runner with the Doppler apply configuration, kept beside fredrir-11's for the bake; it requests no repair |
+| On-demand verification | `ssh root@fredrir-11 systemctl start infra-reconcile-verify.service`; hosted: `gh workflow run reconcile.yml --ref main -f verify=true` | The hourly verification on demand |
+| On-demand reconciliation | `ssh root@fredrir-11 'infra reconcile run request --full && systemctl start infra-reconcile-apply.service'` | A full apply of the `main` tip |
 | Cloud verification | `infra reconcile verify --scope=cloud` | Reconciliation lock and recorded status, rulesets, exact Flux revision, observed generations, Helm readiness, runner listeners and registrations, Grafana configuration and HTTP health, frontend revision, OpenTofu plan comparison; no host access; every comparison runs when another fails |
 | Full verification | `infra reconcile verify --scope=full` | Cloud verification plus host checks and each host playbook compared in check mode; root-equivalent on every host |
 | Status | `infra reconcile status` | Desired revision, successfully applied revision, failing stage and stage durations |
@@ -49,7 +51,7 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | No state bucket access | Error; comparisons skipped |
 | Ten-minute budget exceeded | Error; comparisons discarded; report and log written |
 | Unpublished deploying changes | Difference; comparisons skipped |
-| Repair not dispatched | `repair=false`; only `rulesets` differences; push reconciliation on `main` with an incomplete `reconcile / apply` job; latest `github-actions[bot]` dispatch for the commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled |
+| Repair not requested | Only `rulesets` differences; the apply supervisor skips a repair of a revision whose last repair failed or started within six hours |
 | Repair cap reset | New commit on `main` |
 
 | Verification trigger | Value |
@@ -61,7 +63,7 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | Pinned CLI | Must accept `request-verification --heartbeat`; a unit change that passes a new flag lands together with a `build/cli-release.json` pin of a release that has it |
 | Credentials | Root `0600` ciphertext `/etc/infra-verification/credentials.sops.yaml`; decrypted at start into the unit's runtime directory with the [host key](Secrets.md#host-scoped-secrets) |
 | Token | Installation token restricted to `infra` with `actions: write` |
-| Dispatch | `reconcile.yml` at `main`, `verify=true`, `repair=true`, actor `fredrir-infra-verification[bot]` |
+| Dispatch | `reconcile.yml` at `main`, `verify=true`, `repair=true`, actor `fredrir-infra-verification[bot]`; the workflow declares `repair` for this binary and runs no repair |
 | Wait | Polls the dispatched run every 30 s with ETag revalidation; honors `Retry-After` and `X-RateLimit-Reset`; deadline 150 minutes |
 | Heartbeat | Gatus `reconciliation_deep` (`--heartbeat=reconciliation_deep`): `success=true` for `success`; `success=false` with the run URL and conclusion for `failure`, `timed_out`, `startup_failure` or the deadline; none for `cancelled` or a stopped unit |
 | Failed dispatch | Unit `failed`; journal `infra: dispatch reconcile.yml in fredrir/infra at main: ERROR`; no run and no heartbeat; the next hour retries |
@@ -113,28 +115,28 @@ jq -Rs . < NEW_KEY.pem | sops set --value-stdin ansible/roles/verification_trigg
 | Cross-client lease | Conditional S3 writes and deletes of `reconciliation/production/lock.json`; after a 409, 412, 5xx or lost response the lease is read back: its own body, or its absence after release, confirms the request, an unchanged lease is reissued once, anything else counts as taken over |
 | S3 retries | Dial, TLS, reset, EOF, 5xx and `SlowDown` failures: 3 attempts with jittered exponential backoff; a conditional request that may have reached S3 is settled instead of replayed |
 | Lease TTL / renewal | 10 minutes / every 3 minutes, each attempt bounded to 30 seconds; a taken-over or unrenewable lease cancels the run, interrupting its current step, and records no further status |
-| Lease wait | `infra reconcile apply --wait DURATION`; default fails fast; CI waits 11 minutes to outlast an abandoned lease |
-| Run deadline / apply job timeout | 90 minutes / 120 minutes |
+| Lease wait | `infra reconcile apply --wait DURATION`; default fails fast; the fredrir-11 supervisor waits 11 minutes to outlast an abandoned lease |
+| Run deadline / supervisor deadline | 90 minutes / 2 hours after the host lock |
 | Exit codes | 0 success; 75 retry: lease held (`apply`, `verify`), or `main` advanced beyond root Markdown, `docs/**/*.md` and `build/evidence/*.json`; 1 failure |
-| Retry in CI | Succeeds only while a newer push reconciliation of `main` has not completed its apply job |
 | Provenance gate | Before any checkout tooling runs, including drift verification, each commit after the applied revision is SSH-signed by a key in `keys/admin_keys` at the applied revision, is a deployment, belongs to a reviewed merge, or is named by a later owner-signed `Provenance-Acknowledged: SHA` trailer |
 | Deployment commit | Reproduces the `infra ci deploy` rewrite of its parent byte for byte, and its image digest is attested for the receipt's revision, run and attempt by the mapped repository's approved `build-image.yml` revision |
 | Reviewed merge | A pull request merged into `main` whose head was approved before the merge by a person other than its author who is a `@user` owner of every landed path in `.github/CODEOWNERS` at the applied revision |
 | Reviewed merge commits | Merge or squash commit: signed by `keys/github-web-flow.asc` at the applied revision; a merge commit also covers the pull request's commits. Rebase merge: unsigned; the linear chain ending at its merge commit is as long as the pull request's non-merge, non-empty commits |
 | Reviewed merge content | The landed tree equals `merge-tree` of the approved head onto the commit below the merge, squash or rebased chain; the head is fetched by SHA when absent |
-| Reviewed merge failures | Any API, fetch or merge failure leaves the commit unverified; owner-authored pull requests have no approval and need an acknowledgement or an owner-signed push |
+| Reviewed merge failures | Any API, fetch or merge failure leaves the commit unverified; outages are reported as `unavailable`; owner-authored pull requests have no approval and need an acknowledgement or an owner-signed push |
 | Attestation tools | `gh attestation verify` for public repositories, `cosign verify` for private ones; both on `PATH` |
 | Attestation credentials | `PROVENANCE_TOKEN`, a GitHub token with `packages: read` and `pull-requests: read`; unset uses the ambient `gh` login and Docker configuration; removed from the environment before any child process; also reads pull requests and, during verification, rulesets, anonymously when unset |
 | Owner-signed | Authenticates the owner's workstation key: any process on that workstation can sign; the gate blocks remote writers (Octo STS, stolen deploy tokens, other machines), not a compromised workstation |
 | Provenance base | Applied revision; none or not an ancestor refuses; `--provenance-base SHA` overrides and must precede `HEAD`; base, revision and override are recorded in `status.json` |
 | Standalone gate | `infra reconcile provenance [--provenance-base SHA] [--report PATH]`; reads the applied revision without the lease |
-| CI gate | The `Verify commit provenance` step in `reconcile-job.yml` runs a release CLI pinned in that workflow before any composite action, checkout-built CLI or checkout tooling, for apply, drift verification and verification; workflow files need the `workflows` permission, which Octo STS lacks |
+| Reconciler gate | The fredrir-11 apply supervisor is the release pinned in `build/cli-release.json` and runs `infra reconcile provenance` itself before building the checkout |
+| CI gate | The `Verify commit provenance` step of the hosted `verify` job in `reconcile-job.yml` runs a release CLI pinned in that workflow before any composite action, checkout-built CLI or checkout tooling; workflow files need the `workflows` permission, which Octo STS lacks |
 | CI gate release | `GATE_RELEASE` and `GATE_SHA256` in `reconcile-job.yml`; a changed pin is a workflow change |
 | Workstation apply | Run `infra reconcile provenance` with an installed release CLI before building or running anything from the checkout; a CLI built from an unverified checkout can skip its own gate |
 | OpenTofu locking | S3 lockfile retained; acquisition timeout 5 minutes |
 | Failed verification | Old routes retained; applied revision unchanged |
 | Failed retirement | Applied revision unchanged; the next attempt reads actual OpenTofu state |
-| Reports | GitHub job summary and `reconciliation-RUN_ID-ATTEMPT` artifact |
+| Reports | fredrir-11: `s3://llunde-pyparser-bucket/reconciliation/production/runs/`, Gatus `reconciliation_apply` and `production`; hosted verification: job summary and `reconciliation-RUN_ID-ATTEMPT` artifact |
 | Sensitive plans | Private temporary directory; never uploaded as workflow artifacts |
 | Fork pull requests | Declaration validation only; live-plan check fails until changes are on a trusted repository branch |
 
@@ -142,7 +144,7 @@ jq -Rs . < NEW_KEY.pem | sops set --value-stdin ansible/roles/verification_trigg
 infra reconcile provenance
 go build -o .infra/bin/infra ./cmd/infra
 .infra/bin/infra reconcile plan --base BASE_SHA
-publisher_key() { key="$(mktemp)" && doppler secrets get PUBLISHER_APP_PRIVATE_KEY --project infra --config prd_reconciliation_apply --plain > "$key" && printf '%s\n' "$key"; }
+publisher_key() { key="$(mktemp)" && sops decrypt --extract '["apply"]["publisher-app-key"]' ansible/roles/reconciler/files/credentials.sops.yaml > "$key" && printf '%s\n' "$key"; }
 PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" .infra/bin/infra reconcile apply --report .infra/reconciliation/status.json
 .infra/bin/infra reconcile status
 .infra/bin/infra reconcile verify --scope=full
@@ -154,20 +156,19 @@ PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" .infra/bin/infra reconcile app
 | Publishing | Value |
 | --- | --- |
 | Identity | GitHub App `fredrir-infra-publisher`: `contents: write`, `metadata: read`; `fredrir/infra` only; no webhook; App and installation IDs in `build/publisher.json` |
-| Private key | `PUBLISHER_APP_PRIVATE_KEY`, Doppler `prd_reconciliation_apply`; never in a process environment |
-| Key delivery | `PUBLISHER_APP_PRIVATE_KEY_FILE`: a regular file readable only by its owner; the CLI reads and deletes it before any child process; `apply` fails without it; CI writes `$RUNNER_TEMP/publisher/key.pem` with `umask 077` in a separate step for apply runs only, never for the gate or verification; session cleanup removes it |
-| Key rotation | Generate a key in the App settings; `doppler secrets set PUBLISHER_APP_PRIVATE_KEY --project infra --config prd_reconciliation_apply < NEW_KEY.pem`; delete the previous key |
+| Private key | `ansible/roles/reconciler/files/credentials.sops.yaml` `["apply"]["publisher-app-key"]`; never in a process environment |
+| Key delivery | `PUBLISHER_APP_PRIVATE_KEY_FILE`: a regular file readable only by its owner; the CLI reads and deletes it before any child process; `apply` fails without it; the fredrir-11 supervisor writes it `0600` in the run's tmpfs secrets directory for the engine only, never for the gate or verification, and removes it after the run |
+| Key rotation | Generate a key in the App settings; `jq -Rs . < NEW_KEY.pem \| sops set --value-stdin ansible/roles/reconciler/files/credentials.sops.yaml '["apply"]["publisher-app-key"]'`; `ansible-playbook ansible/reconciler.yml`; after the next apply, delete the previous key |
 | Token | Minted after the `main` checks; repository `infra`, `contents: write`; revoked after the push |
 | Push | `git push --no-verify https://github.com/fredrir/infra.git REVISION:refs/heads/production`; never forced; token only in the push child's environment through an inline credential helper; never argv, `.git/config` or logs; global, system and other helper configuration ignored; `GIT_TRACE*` and `GIT_CURL_VERBOSE` removed, `GIT_TRACE_REDACT=1`; `::add-mask::` under GitHub Actions |
-| Apply job token | `contents: read`; checkout persists no credentials |
-| Runner token | `GH_TOKEN` of the runner App (repository administration on `build/runners.json` repositories, `infra` included); removed from the CLI's environment at start; passed only to runner-fleet API calls and `build-runners.yml` and `reconcile.yml` runs; OpenTofu, Kubernetes tools, other playbooks and check-mode runs never receive it |
+| Runner token | `GH_TOKEN` of the runner App (repository administration on `build/runners.json` repositories, `infra` included), minted by the fredrir-11 supervisor only when `reconcile requirements` selects Ansible or tooling; removed from the CLI's environment at start; passed only to runner-fleet API calls and `build-runners.yml` and `reconcile.yml` runs; OpenTofu, Kubernetes tools, other playbooks and check-mode runs never receive it |
 | [`production`](../.github/production-ruleset.json) ruleset | Creation and update of `refs/heads/production`; bypass: publisher App only |
 | [`production-history`](../.github/production-history-ruleset.json) ruleset | Deletion and non-fast-forward of `refs/heads/production`; no bypass |
 | Two rulesets | A bypass actor skips every rule of the ruleset listing it; the history ruleset holds the publisher to fast-forwards |
 | Administrators | Not bypass actors; their pushes to `production` are rejected |
 | Drift | Hourly verification: a published revision not on `main` is a `revision` difference; live rulesets that differ from their declaration are `rulesets` differences and dispatch no repair |
 | Ruleset read | `metadata: read` (`github.token`); bypass actors are returned only with write access to the ruleset (repository administration: write); the verification runner token (`administration: read`) receives none either, so verification compares them only in administrator runs and the qualification |
-| Break-glass | An administrator publishes as the App with the Doppler key through `PUBLISHER_APP_PRIVATE_KEY_FILE`; no administrator bypass |
+| Break-glass | An administrator publishes as the App with the SOPS key through `PUBLISHER_APP_PRIVATE_KEY_FILE`; no administrator bypass |
 | Rollback | Disable both rulesets |
 
 | `infra dev qualify publishing` | Value |
@@ -181,7 +182,7 @@ PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" .infra/bin/infra reconcile app
 
 ```sh
 gh auth refresh --scopes workflow
-publisher_key() { key="$(mktemp)" && doppler secrets get PUBLISHER_APP_PRIVATE_KEY --project infra --config prd_reconciliation_apply --plain > "$key" && printf '%s\n' "$key"; }
+publisher_key() { key="$(mktemp)" && sops decrypt --extract '["apply"]["publisher-app-key"]' ansible/roles/reconciler/files/credentials.sops.yaml > "$key" && printf '%s\n' "$key"; }
 GH_TOKEN="$(gh auth token)" PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" go run ./cmd/infra dev qualify publishing -- -timeout=30m
 ```
 
@@ -194,30 +195,26 @@ GH_TOKEN="$(gh auth token)" PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" go
 | 3 | Apply the IAM policies from `tofu/reconciliation.tf` using an administrator OpenTofu session; let Flux install the Kubernetes identities |
 | 4 | Confirm the IAM users, managed policy attachments and Kubernetes service accounts exist; point Flux at `production` |
 | 5 | Create GitHub environments `infrastructure-plan` and `infrastructure-apply`; restrict `infrastructure-apply` to `main` without deployment reviewers |
-| 6 | Populate the scoped Doppler configurations below; install their read-only service tokens as `DOPPLER_TOKEN` in the matching GitHub environments |
+| 6 | Set the plan secrets in `infrastructure-plan`; install the read-only `prd_reconciliation_apply` service token as `DOPPLER_TOKEN` in `infrastructure-apply` for hosted verification |
 | 7 | Run `ansible-playbook reconciliation-identity.yml` with administrator SSH access; retain existing administrator keys |
 | 8 | Apply `tailscale/policy.hujson`; create the environment-bound OIDC identities below |
-| 9 | Run the workflow manually and confirm `desired_revision == applied_revision` with `stage == complete` |
+| 9 | Provision fredrir-11 ([reconciler host](#reconciler-host)) and confirm `desired_revision == applied_revision` with `stage == complete` |
 
-These activation steps provision external credentials once; merge, verification and dispatched reconciliation runs fetch credentials from Doppler.
+Pull request plans read their environment secrets; hosted verification fetches the Doppler apply configuration; fredrir-11 decrypts its host-scoped credentials.
 
-| GitHub environment | Doppler project / config | GitHub secret |
-| --- | --- | --- |
-| `infrastructure-plan` | `infra / prd_reconciliation_plan` | `DOPPLER_TOKEN`, read-only access to this config |
-| `infrastructure-apply` | `infra / prd_reconciliation_apply` | `DOPPLER_TOKEN`, read-only access to this config |
+| GitHub environment | Secrets |
+| --- | --- |
+| `infrastructure-plan` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (`/automation/infra-reconciliation-plan`), `CLOUDFLARE_API_TOKEN` (read managed DNS zones and account tunnels), `HCLOUD_TOKEN` (read the fleet Hetzner project), `KUBE_CONFIG` (`flux-system/infrastructure-plan`), `PLATFORM_MAIL_RECIPIENT` |
+| `infrastructure-apply` | `DOPPLER_TOKEN`, read-only access to `infra / prd_reconciliation_apply` for hosted verification |
 
-| Doppler secret | `prd_reconciliation_plan` | `prd_reconciliation_apply` |
-| --- | --- | --- |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Keys for `/automation/infra-reconciliation-plan` | Keys for `/automation/infra-reconciliation-apply` |
-| `CLOUDFLARE_API_TOKEN` | Read managed DNS zones and account tunnels | Edit managed DNS zones and account tunnels |
-| `HCLOUD_TOKEN` | Read managed Hetzner project | Read/write managed Hetzner project |
-| `KUBE_CONFIG` | `flux-system/infrastructure-plan` identity | `flux-system/infrastructure-apply` identity |
-| `PLATFORM_MAIL_RECIPIENT` | Private OpenTofu mail recipient | Same recipient |
-| `SSH_PRIVATE_KEY` | Unset | Dedicated key for managed hosts and build guest |
-| `SSH_KNOWN_HOSTS` | Unset | Verified Tailnet host keys, `fredrir-06` and `infra-build-09` aliases |
-| `RUNNER_APP_ID`, `RUNNER_APP_PRIVATE_KEY` | Unset | Runner GitHub App; applies mint a short-lived installation token with repository administration write |
-| `OBSERVER_APP_ID`, `OBSERVER_APP_PRIVATE_KEY` | Unset | Observer GitHub App; verifications mint a short-lived installation token with repository administration read |
-| `PUBLISHER_APP_PRIVATE_KEY` | Unset | [Publisher App](#publishing) private key; delivered to the engine as a file |
+| Doppler `prd_reconciliation_apply` | Hosted verification use |
+| --- | --- |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Keys for `/automation/infra-reconciliation-apply` |
+| `CLOUDFLARE_API_TOKEN`, `HCLOUD_TOKEN` | OpenTofu plan comparison |
+| `KUBE_CONFIG` | `flux-system/infrastructure-apply` identity |
+| `PLATFORM_MAIL_RECIPIENT` | Private OpenTofu mail recipient |
+| `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS` | Check-mode host comparison |
+| `OBSERVER_APP_ID`, `OBSERVER_APP_PRIVATE_KEY` | Observer GitHub App; a short-lived installation token with repository administration read |
 
 | OIDC setting | `infrastructure-plan` | `infrastructure-apply` |
 | --- | --- | --- |
@@ -232,8 +229,8 @@ These activation steps provision external credentials once; merge, verification 
 
 | Credential boundary | Value |
 | --- | --- |
-| Secret source | Doppler; operational credentials are fetched per job and are not duplicated in GitHub environment secrets |
-| Doppler scope | Separate config-scoped read tokens; neither token can edit secrets or read `infra/ops` |
+| Secret source | Plans: `infrastructure-plan` environment secrets; hosted verification: Doppler `prd_reconciliation_apply`; fredrir-11: host-scoped SOPS |
+| Doppler scope | One config-scoped read token; it can neither edit secrets nor read `infra/ops` |
 | Doppler parent config | `infra/prd` contains no credentials; reconciliation configs contain only their scoped identities |
 | AWS identity policies | `tofu/reconciliation.tf`; attached managed policies; deployment identities cannot change their own grants |
 | AWS verify identity | `/automation/infra-reconciliation-verify`: the plan policy without the OpenTofu lock, plus `s3:PutObject` on `reconciliation/production/runs/*`; every request from an address other than `reconciler_ipv4` is denied; declared only while `reconciler_ipv4` is set in `tofu/production.tfvars.json` |
@@ -247,13 +244,16 @@ These activation steps provision external credentials once; merge, verification 
 | Tailnet plan scope | Control-plane API only |
 | Tailnet apply scope | Control-plane API and SSH to managed hosts |
 | Tailnet reconciler scope | `tag:infra-reconciler`: control-plane API, Gatus heartbeats and SSH to managed hosts and `fredrir-06`; reached only by Macie and Archie on SSH |
-| Host SSH key | `ansible/files/reconciliation.pub`; maintained by `ansible/reconciliation-identity.yml` |
+| Host SSH key | `ansible/files/reconciliation.pub`, fredrir-11's public key; maintained by `ansible/reconciliation-identity.yml` and `ansible/volatile.yml`, which add it beside existing keys |
 | Provider-policy, workload-boundary or bucket-lifecycle changes, revoked credentials | Administrator repair required |
 
 ```sh
-doppler configs tokens create github-reconciliation-plan --project infra --config prd_reconciliation_plan --access read --plain | gh secret set DOPPLER_TOKEN --env infrastructure-plan
-doppler configs tokens create github-reconciliation-apply --project infra --config prd_reconciliation_apply --access read --plain | gh secret set DOPPLER_TOKEN --env infrastructure-apply
-gh workflow run reconcile.yml --ref main
+gh secret set AWS_ACCESS_KEY_ID --env infrastructure-plan
+gh secret set AWS_SECRET_ACCESS_KEY --env infrastructure-plan
+gh secret set CLOUDFLARE_API_TOKEN --env infrastructure-plan
+gh secret set HCLOUD_TOKEN --env infrastructure-plan
+gh secret set KUBE_CONFIG --env infrastructure-plan < PLAN_KUBECONFIG
+gh secret set PLATFORM_MAIL_RECIPIENT --env infrastructure-plan
 ```
 
 ### CI SOPS key retirement
@@ -366,7 +366,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | 5 | Deliver the enrollment key | `infra operations enrollment create-deliver --node fredrir-10 --role volatile --host ntnu --sudo` |
 | 6 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
 | 7 | Set inventory values | `tailscale_ip` |
-| 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in Doppler `SSH_KNOWN_HOSTS` and the admin `known_hosts` |
+| 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in `ansible/files/reconciliation_known_hosts`, Doppler `SSH_KNOWN_HOSTS` and the admin `known_hosts` |
 | 9 | Confirm the fleet runs WireGuard (hard gate) | Every fleet node publishes `backend-type=wireguard` with its own verified key before fredrir-10 joins. `volatile.yml` refuses to enroll otherwise, and VXLAN or an unset backend must never coexist with an enrolled fredrir-10 |
 | 10 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 12 |
 | 11 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 30m --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
@@ -388,10 +388,12 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | Provider | Dedicated Hetzner project; `tofu/reconciler/`, state `tofu-state/reconciler.tfstate`, applied only by an administrator; the reconcile plan gate runs its mock `tofu test` for full selections and when it or `keys/admin_keys` change |
 | Network | Primary IPv4; IPv6 disabled; no inbound Hetzner rules outside enrollment; tailnet `tag:infra-reconciler` |
 | Trust | Root-equivalent SSH to every managed host, `fredrir-06` and `fredrir-10`: a compromised reconciler is a compromised fleet, and checks on `fredrir-06` then catch supervisor faults, not tampering; `fredrir-10` is reached with strict host keys, no agent forwarding and no jump host |
-| Timer | `infra-reconcile-verify.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |
-| Service | `infra-reconcile-verify.service`: oneshot `infra reconcile run verify` as `infra-verify` in group `infra-reconcile`; state `/var/lib/infra-verify`; cache `/var/cache/infra-verify`; writable `/var/lib/infra-reconcile/repairs` only; the verification trigger's sandbox plus `AF_UNIX`; `TimeoutStartSec=100min`, `MemoryMax=6G` |
+| Verify timer | `infra-reconcile-verify.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |
+| Verify service | `infra-reconcile-verify.service`: oneshot `infra reconcile run verify` as `infra-verify` in group `infra-reconcile`; state `/var/lib/infra-verify`; cache `/var/cache/infra-verify`; writable `/var/lib/infra-reconcile/repairs` only; the verification trigger's sandbox plus `AF_UNIX`; `TimeoutStartSec=100min`, `MemoryMax=6G` |
+| Apply timer | `infra-reconcile-apply.timer`: `OnCalendar=*:*:0/30`, `AccuracySec=1s`, no catch-up; a tick while the service runs is dropped |
+| Apply service | `infra-reconcile-apply.service`: oneshot as `infra-apply` in group `infra-reconcile`; `ExecCondition` `run pending` without credentials, then a root `ExecStartPre` decrypts only `apply`; state `/var/lib/infra-apply`; cache `/var/cache/infra-apply`; the verify unit's sandbox and no other writable path; `TimeoutStartSec=225min` covers a 100-minute lock wait, the 2-hour deadline and the 2-minute finish |
 | Supervisor | `/usr/local/bin/infra` from `build/cli-release.json` |
-| Run | Fresh clone of `production`, the revision the provenance gate admitted and the publisher App published, never `main`; a `production` revision that is not an ancestor of `main`, or a failed `main` fetch, stops the run before any build, and the former is reported as a `revision` difference; `go build` with the Go version in `build/toolchain.json`; `infra ci install-tools flux gh kubectl tofu`; observer App token for the runner repositories, revoked after the run; `infra reconcile verify --scope=<scope>` with `scope` from `verify.json` |
+| Run | Fresh clone of `production`, the revision the provenance gate admitted and the publisher App published, never `main`; a `production` revision that is not an ancestor of `main`, or a failed `main` fetch, stops the run before any build, and the former is reported as a `revision` difference; `go build` with the Go version in `build/toolchain.json`; `infra ci install-tools flux gh kubectl tofu`; observer App token for the runner repositories, revoked after the run; `infra reconcile verify --scope=<scope>` with `scope` from `verify.json`, `full` in the role |
 | Full scope | `uv` and `uv sync --frozen --group ci` into the run's `venv`; tailnet host addresses; `ANSIBLE_SSH_EXTRA_ARGS=-F <run SSH configuration>` |
 | Run SSH configuration | `Host *`: `IdentityFile` = `--ssh-identity` in place, `IdentitiesOnly yes`, `UserKnownHostsFile` = `known_hosts`, `GlobalKnownHostsFile /dev/null`, `StrictHostKeyChecking yes`, `UpdateHostKeys no`, `ForwardAgent no`, `BatchMode yes`; `-F` also reaches `ProxyJump` children; inventory `ansible_ssh_common_args` (`HostKeyAlias`, `ProxyJump`) still apply; OpenSSH reads `~/.ssh` from the passwd home, never `$HOME` |
 | Host access check | `check.yml` job `host-access`, outside the check budget, when `//internal/reconciler:reconciler_test` is affected: `uv sync --frozen --group ci`, OpenSSH server, then `INFRA_HOST_ACCESS_TEST=required bazel run @rules_go//go -- test ./internal/reconciler/ -run '^TestHostAccessReachesHostsThroughARealSSHHopAndProxyJump$'`; mitogen reaches an unprivileged `sshd` directly and through `ProxyJump` with `HOME` unlike the passwd home; when `//internal/reconcile:reconcile_test` is affected, `TestFleetPlaybooksNeverListADeclaredReconciler` runs with the same Ansible environment, which the Bazel sandbox lacks; `required` turns a missing prerequisite into a failure |
@@ -403,10 +405,12 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | Cache | `go/`: `GOPROXY` mirror of the last successful build's module and toolchain zips, verified against `go.sum` and `sum.golang.org` on every run; `tools/<sha256>`: pinned tool archives, rehashed on every install; `tofu/<sha256 of tofu/.terraform.lock.hcl>`: `TF_PLUGIN_CACHE_DIR`, verified against the lock hashes; a mismatch fails the run |
 | Reports | `s3://llunde-pyparser-bucket/reconciliation/production/runs/<utc>-verify-<rev12>/`: `report.json`, `log.txt.zst`; journal bounded to 2 GB |
 | Heartbeat | Gatus `reconciliation_verification`: `success=true` when the verification matches; otherwise the differences or the failing stage; none while a reconciliation holds the lease |
-| Credentials | `ansible/roles/reconciler/files/credentials.sops.yaml`, maps `verify` and `apply`; installed as ciphertext through `host_secrets`; a root `ExecStartPre` decrypts only `verify` into the unit's runtime directory, and the supervisor deletes it once read |
+| Credentials | `ansible/roles/reconciler/files/credentials.sops.yaml`, maps `verify` and `apply`; installed as ciphertext through `host_secrets`; each unit's root `ExecStartPre` decrypts only its own map into the unit's runtime directory, and the supervisor deletes it once read; the role refuses a map missing any credential |
 | Cluster API | `https://<fredrir-07 tailnet address>:6443`; certificate authority `ansible/roles/reconciler/files/kubernetes-ca.crt` |
 | Host age key | `/etc/age/host.key` from `host_secrets`; `reconciler.yml --tags host_key` generates it and prints its recipient; [host-scoped secrets](Secrets.md#host-scoped-secrets) |
-| SSH identity | Root `0600` `/etc/infra-reconcile/ssh/id_ed25519`, generated on the host and never copied; `reconciler.yml --tags ssh_identity` generates it and prints its public key |
+| SSH identity | Root `0600` `/etc/infra-reconcile/ssh/id_ed25519`, generated on the host and never copied; `reconciler.yml --tags ssh_identity` generates it and prints its public key; each unit reads it through `LoadCredential=ssh-identity` |
+| Host keys | `/etc/infra-reconcile/known_hosts` from `ansible/files/reconciliation_known_hosts`: verified tailnet host keys with the `fredrir-06`, `fredrir-10` and `infra-build-09` aliases and `fredrir-09`'s tailnet address for `ProxyJump`; the role refuses a file without host keys |
+| Authorized key | `ansible/files/reconciliation.pub`, installed for `root` on managed hosts by `reconciliation-identity.yml` and on `fredrir-10` by `volatile.yml`; both refuse a file that is not an Ed25519 public key |
 
 | Apply supervisor | Value |
 | --- | --- |
@@ -448,9 +452,10 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 credential() { jq -Rs 'rtrimstr("\n")' | sops set --value-stdin ansible/roles/reconciler/files/credentials.sops.yaml "[\"verify\"][\"$1\"]"; }
 tofu -chdir=tofu/reconciler output -raw verify_aws_secret_access_key | credential aws-secret-access-key
 kubectl -n flux-system get secret infrastructure-verify-credentials -o jsonpath='{.data.token}' | base64 -d | credential kubernetes-token
-ssh root@fredrir-11 systemctl list-timers infra-reconcile-verify.timer --no-pager
-ssh root@fredrir-11 journalctl -u infra-reconcile-verify.service --no-pager -n 50
+ssh root@fredrir-11 systemctl list-timers 'infra-reconcile-*' --no-pager
+ssh root@fredrir-11 journalctl -u infra-reconcile-verify.service -u infra-reconcile-apply.service --no-pager -n 50
 ssh root@fredrir-11 systemctl start infra-reconcile-verify.service
+ssh root@fredrir-11 jq . /var/lib/infra-apply/ledger.json
 aws s3 ls s3://llunde-pyparser-bucket/reconciliation/production/runs/ | tail -n 5
 ```
 
@@ -459,8 +464,31 @@ aws s3 ls s3://llunde-pyparser-bucket/reconciliation/production/runs/ | tail -n 
 | Rebuild | `tofu -chdir=tofu/reconciler apply`; enroll; `ansible-playbook ansible/reconciler.yml --tags host_key,ssh_identity`; set the new recipient as `.sops.yaml` anchor `fredrir-11`; `sops updatekeys -y ansible/roles/reconciler/files/credentials.sops.yaml`; `ansible-playbook ansible/reconciler.yml` |
 | Rotation | `tofu -chdir=tofu/reconciler apply -replace=aws_iam_access_key.verify` or `-replace=cloudflare_account_token.verify`; set the new value; `ansible-playbook ansible/reconciler.yml` |
 | Kubernetes token rotation | The token Secret never expires; `kubectl -n flux-system delete secret infrastructure-verify-credentials`; `flux reconcile kustomization platform-policy` recreates it with a new token; set `kubernetes-token`; `ansible-playbook ansible/reconciler.yml` |
-| Cache reset | `systemctl clean --what=cache infra-reconcile-verify.service` |
-| Rollback | `systemctl disable --now infra-reconcile-verify.timer`; no other system depends on the host |
+| On-demand apply | `infra reconcile run request [--full]`; `systemctl start infra-reconcile-apply.service`, or the next tick |
+| Pause applies | `systemctl disable --now infra-reconcile-apply.timer`; the ledger keeps the last tip, and the next start applies the `main` tip |
+| Quarantined request | Journal `quarantined FINGERPRINT: REASON`; fix or remove `requests/apply.json` or `repairs/repair.json` |
+| Cache reset | `systemctl clean --what=cache infra-reconcile-verify.service infra-reconcile-apply.service` |
+| Rollback | `systemctl disable --now infra-reconcile-apply.timer infra-reconcile-verify.timer`; no other system depends on the host |
+
+| Provisioned value | File | Source | Guard |
+| --- | --- | --- | --- |
+| Runner App installation ID | `ansible/roles/reconciler/defaults/main.yml` `reconciler_apply.runner.installation_id` | `GET /repos/fredrir/infra/installation` with a runner App JWT | Role assertion; `TestProvisionedValuesAreSet` |
+| Verified host keys | `ansible/files/reconciliation_known_hosts` | Tailnet host keys checked against an administrator's `known_hosts`, with the inventory's `HostKeyAlias` names and `ProxyJump` addresses | Role assertion; `TestProvisionedValuesAreSet` names every SSH target without a key |
+| Reconciler public key | `ansible/files/reconciliation.pub` | `ansible-playbook ansible/reconciler.yml --tags ssh_identity` | `reconciliation-identity.yml` and `volatile.yml` assertions; `TestProvisionedValuesAreSet` |
+| Apply heartbeat token | `GATUS_TOKEN_RECONCILIATION_APPLY` in `ansible/roles/gatus/files/secrets.sops.yaml`, equal to `["apply"]["gatus-token"]` | Random 32-byte hex | `TestMonitorPlaceholdersAreEncryptedSecrets` |
+
+The apply qualification runs one real full apply inside `infra-reconcile-apply.service` once the provisioned values are set and `ansible/reconciler.yml` has converged.
+
+| Qualification step | Command on `fredrir-11` | Pass |
+| --- | --- | --- |
+| 1. Hold the timer | `systemctl stop infra-reconcile-apply.timer`; `systemctl is-active infra-reconcile-apply.service` | `inactive`; `infra reconcile status` on a workstation shows no running stage |
+| 2. Queue | `infra reconcile run request --full` | `/var/lib/infra-reconcile/requests/apply.json` names the `main` tip |
+| 3. Start | `systemctl start --no-block infra-reconcile-apply.service`; `journalctl -fu infra-reconcile-apply.service` | `Reconciling main at REVISION`, the gate, the checkout build and `reconcile apply --full`; no credential values |
+| 4. Watch temporary space | Every minute: `df -h /run`; `systemctl show -P MemoryCurrent infra-reconcile-apply.service` | `/run` below 80 % and memory below `MemoryHigh`; no `Permission denied` from an executable under `/run`, no `No space left on device`, no `oom-kill` |
+| 5. Outcome | `jq '{revision, outcome, failure}' /var/lib/infra-apply/ledger.json`; `infra reconcile status` on a workstation | `applied` at the tip; `stage == complete`; `desired_revision == applied_revision` |
+| 6. Evidence | Journal `Consumed ... memory peak`; `git ls-remote https://github.com/fredrir/infra.git refs/heads/production`; `aws s3 ls s3://llunde-pyparser-bucket/reconciliation/production/runs/ \| grep apply`; Gatus `reconciliation_apply` | Peak below 5 GB; `production` at the tip; `report.json` with `full: true` and `log.txt.zst`; a successful heartbeat |
+| 7. Cleanup | `test ! -e /run/infra-reconcile-apply`; `systemctl start infra-reconcile-apply.timer` | Runtime directory removed; timer `active (waiting)` |
+| Failure | `systemctl disable --now infra-reconcile-apply.timer`; the journal and the S3 report name the stage | Workstation applies ([reconciliation](#reconciliation)) until the unit is fixed and requalified |
 
 ## CI execution and runner admission
 

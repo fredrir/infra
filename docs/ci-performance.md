@@ -103,7 +103,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Application setup | Durable applied state selects tools; application-only changes skip host tooling, SSH and runner-registration credentials; recovery retains full setup |
 | State operations | Signed S3 requests reuse HTTP connections with conditional lease ownership, encryption and durable status updates |
 | Permission preflight | Up to four read-only workload permission checks run concurrently before mutation |
-| Scheduled work | Hourly deep verification requested by the `fredrir-06` timer reads live state and the recorded reconciliation status and compares OpenTofu and each host playbook concurrently in check mode; merges run the selected `infra reconcile apply`; a full reconciliation runs when a verification report lists differences, including an incomplete or superseded apply |
+| Scheduled work | Hourly deep verification on `fredrir-11`, and hosted from the `fredrir-06` timer, reads live state and the recorded reconciliation status and compares OpenTofu and each host playbook concurrently in check mode; `fredrir-11` runs the selected `infra reconcile apply` within 30 seconds of a merge; a full reconciliation runs when a `fredrir-11` verification lists differences, including an incomplete or superseded apply |
 | Deployment selection | Explicit CI-only paths skip deployment; supported project changes select the union of their dependency chains; tooling inputs never widen scope; shared and unknown inputs retain full fallback |
 | Host playbook selection | Role and playbook changes converge only the `reconcile.yml`, `external.yml` and `volatile.yml` playbooks whose role closure changed, after `facts.yml`; inventory, configuration, plugins, shared files, `tofu/`, `secrets/`, shared, unknown, full and recovery inputs converge every playbook |
 | Scoped runner convergence | Runner play and `verify-runners.yml` run only when selected or when GitHub reports runners offline, missing or at another version or label set; registrations are always verified |
@@ -120,7 +120,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Frontend deadlines | Publication queueing has a separate eight-minute measurement; the subsequent exact served-revision check retains its 60-second budget within the existing ten-minute job |
 
 VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; production admits four jobs on the 16 GiB build VM.
-An hourly verification report that lists differences dispatches one full reconciliation of `main` unless a push reconciliation on `main` has not completed its apply or the latest bot dispatch for the same commit ended in `failure`, `timed_out` or `startup_failure`, or started within six hours and was not cancelled; a new commit on `main` lifts the cap; `verify=true` without `repair=true` never dispatches.
+A `fredrir-11` verification that lists differences outside `rulesets` requests one full reconciliation of the `main` tip it fetched, at most once per revision every six hours and never after a failed repair of it; a new commit on `main` lifts the cap; hosted verification never repairs.
 These controls do not establish an ordinary-traffic latency percentile; compare the completion observer's post-rollout samples with equivalent workloads.
 
 ## Execution measurements
