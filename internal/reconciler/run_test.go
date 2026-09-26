@@ -59,6 +59,38 @@ func originRepository(t *testing.T) (string, string) {
 	return origin, originTemplate.published
 }
 
+func TestOriginTemplateStartsNoBackgroundGitMaintenance(t *testing.T) {
+	events := filepath.Join(t.TempDir(), "trace2.json")
+	t.Setenv("GIT_TRACE2_EVENT", events)
+	directory, _ := buildOriginRepository(t)
+	t.Cleanup(func() { os.RemoveAll(directory) })
+	if started := gitMaintenanceStarts(t, events); len(started) != 0 {
+		t.Fatalf("building the origin template started %q", started)
+	}
+}
+
+func gitMaintenanceStarts(t *testing.T, events string) []string {
+	t.Helper()
+	data, err := os.ReadFile(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var started []string
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var event struct {
+			Event string   `json:"event"`
+			Argv  []string `json:"argv"`
+		}
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatal(err)
+		}
+		if event.Event == "child_start" && len(event.Argv) > 1 && (event.Argv[1] == "maintenance" || event.Argv[1] == "gc") {
+			started = append(started, strings.Join(event.Argv, " "))
+		}
+	}
+	return started
+}
+
 func buildOriginRepository(t *testing.T) (string, string) {
 	t.Helper()
 	origin, err := os.MkdirTemp("", "reconciler-origin-")
@@ -78,6 +110,8 @@ func buildOriginRepository(t *testing.T) (string, string) {
 		}
 	}
 	gitCommand(t, origin, "init", "--quiet", "--initial-branch=main")
+	gitCommand(t, origin, "config", "maintenance.auto", "false")
+	gitCommand(t, origin, "config", "gc.auto", "0")
 	gitCommand(t, origin, "add", ".")
 	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "declare")
 	gitCommand(t, origin, "branch", "production")

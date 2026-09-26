@@ -123,6 +123,31 @@ func copyTree(t *testing.T, source, destination string) {
 	}
 }
 
+func TestProvenanceTemplateStartsNoBackgroundGitMaintenance(t *testing.T) {
+	events := filepath.Join(t.TempDir(), "trace2.json")
+	t.Setenv("GIT_TRACE2_EVENT", events)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	template := buildProvenanceTemplate(t)
+	t.Cleanup(func() { os.RemoveAll(template.area) })
+	data, err := os.ReadFile(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var event struct {
+			Event string   `json:"event"`
+			Argv  []string `json:"argv"`
+		}
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatal(err)
+		}
+		if event.Event == "child_start" && len(event.Argv) > 1 && (event.Argv[1] == "maintenance" || event.Argv[1] == "gc") {
+			t.Errorf("building the provenance template started %q", strings.Join(event.Argv, " "))
+		}
+	}
+}
+
 func buildProvenanceTemplate(t *testing.T) *provenanceTemplate {
 	t.Helper()
 	area, err := os.MkdirTemp("", "provenance-template-")
@@ -137,7 +162,10 @@ func buildProvenanceTemplate(t *testing.T) *provenanceTemplate {
 	}
 	f.run(area, "init", "--quiet", "--bare", "--initial-branch=main", f.remote)
 	f.run(area, "init", "--quiet", "--initial-branch=main", f.root)
-	for _, setting := range [][]string{{"user.name", "Owner"}, {"user.email", "owner@example.invalid"}, {"gpg.format", "ssh"}, {"url." + f.remote + ".insteadOf", "https://github.com/fredrir/infra"}} {
+	for _, setting := range [][]string{{"maintenance.auto", "false"}, {"gc.auto", "0"}} {
+		f.run(f.remote, append([]string{"config"}, setting...)...)
+	}
+	for _, setting := range [][]string{{"maintenance.auto", "false"}, {"gc.auto", "0"}, {"user.name", "Owner"}, {"user.email", "owner@example.invalid"}, {"gpg.format", "ssh"}, {"url." + f.remote + ".insteadOf", "https://github.com/fredrir/infra"}} {
 		f.git(append([]string{"config"}, setting...)...)
 	}
 	f.git("remote", "add", "origin", "https://github.com/fredrir/infra")
