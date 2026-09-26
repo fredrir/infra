@@ -15,29 +15,67 @@ func AffectedExpression(ctx context.Context, root, base string) (string, error) 
 	if base == "" {
 		return "//...", nil
 	}
+	paths, err := ChangedPaths(ctx, root, base)
+	if err != nil {
+		return "", err
+	}
+	return ExpressionForPaths(root, paths), nil
+}
+
+func ChangedPaths(ctx context.Context, root, base string) ([]string, error) {
 	cmd := exec.CommandContext(ctx, "git", "diff", "--name-only", "--no-renames", "-z", base, "--")
 	cmd.Dir = root
 	data, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("read changed paths: %w", err)
+		return nil, fmt.Errorf("read changed paths: %w", err)
 	}
 	cmd = exec.CommandContext(ctx, "git", "ls-files", "--others", "--exclude-standard", "-z")
 	cmd.Dir = root
 	extra, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("read untracked paths: %w", err)
+		return nil, fmt.Errorf("read untracked paths: %w", err)
 	}
-	return ExpressionForPaths(root, strings.Split(string(append(data, extra...)), "\x00")), nil
+	return strings.Split(string(append(data, extra...)), "\x00"), nil
 }
 
-func ExpressionForPaths(root string, paths []string) string {
-	var labels []string
-	valid := regexp.MustCompile(`^[a-zA-Z0-9_./-]+$`)
+var canonicalPathCharacters = regexp.MustCompile(`^[a-zA-Z0-9_./-]+$`)
+
+func canonicalPath(path string) bool {
+	return canonicalPathCharacters.MatchString(path) && filepath.IsLocal(path) && filepath.ToSlash(filepath.Clean(path)) == path
+}
+
+func GeneratedBuildInputsChanged(root string, paths []string) bool {
 	for _, path := range paths {
 		if path == "" {
 			continue
 		}
-		if !valid.MatchString(path) || !filepath.IsLocal(path) || filepath.ToSlash(filepath.Clean(path)) != path {
+		if !canonicalPath(path) || buildGeneratorInput(filepath.Base(path)) {
+			return true
+		}
+		for directory := filepath.Dir(path); directory != "."; directory = filepath.Dir(directory) {
+			if sources, _ := filepath.Glob(filepath.Join(root, directory, "*.go")); len(sources) != 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func buildGeneratorInput(name string) bool {
+	switch name {
+	case "BUILD", "BUILD.bazel", "MODULE.bazel", "go.mod", "go.sum", ".bazelignore":
+		return true
+	}
+	return strings.HasSuffix(name, ".go") || strings.HasSuffix(name, ".bzl")
+}
+
+func ExpressionForPaths(root string, paths []string) string {
+	var labels []string
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		if !canonicalPath(path) {
 			return "//..."
 		}
 		if filepath.Base(path) == "BUILD.bazel" || filepath.Base(path) == "BUILD" || strings.HasSuffix(path, ".bzl") {

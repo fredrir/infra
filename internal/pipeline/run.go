@@ -93,15 +93,18 @@ func Run(ctx context.Context, opts Options) (report Report, err error) {
 	if err != nil {
 		return report, err
 	}
-	expression, err := AffectedExpression(ctx, opts.Root, opts.Base)
-	if err != nil {
-		return report, err
+	expression, paths := "//...", []string(nil)
+	if opts.Base != "" {
+		if paths, err = ChangedPaths(ctx, opts.Root, opts.Base); err != nil {
+			return report, err
+		}
+		expression = ExpressionForPaths(opts.Root, paths)
 	}
 	if expression == "set()" && len(opts.Targets) == 0 {
 		return report, nil
 	}
 	if opts.Operation == "generate-check" {
-		if opts.Base != "" && expression != "//..." && !strings.Contains(expression, "//internal/") && !strings.Contains(expression, "//cmd/") && !strings.Contains(expression, "//integration/") {
+		if opts.Base != "" && !GeneratedBuildInputsChanged(opts.Root, paths) {
 			return report, nil
 		}
 		opts.Targets = []string{"//:gazelle", "--", "-mode=diff"}
