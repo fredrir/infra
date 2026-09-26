@@ -27,6 +27,7 @@ type PullRequests interface {
 	WithCommit(ctx context.Context, commit string) ([]*github.PullRequest, error)
 	Get(ctx context.Context, number int) (*github.PullRequest, error)
 	Reviews(ctx context.Context, number int) ([]*github.PullRequestReview, error)
+	Commits(ctx context.Context, number int) ([]*github.RepositoryCommit, error)
 }
 
 type GitHubPullRequests struct {
@@ -45,6 +46,10 @@ func (p GitHubPullRequests) Get(ctx context.Context, number int) (*github.PullRe
 
 func (p GitHubPullRequests) Reviews(ctx context.Context, number int) ([]*github.PullRequestReview, error) {
 	return collect(p.Client.PullRequests.ListReviewsIter(ctx, p.Owner, p.Name, number, &github.ListOptions{PerPage: 100}))
+}
+
+func (p GitHubPullRequests) Commits(ctx context.Context, number int) ([]*github.RepositoryCommit, error) {
+	return collect(p.Client.PullRequests.ListCommitsIter(ctx, p.Owner, p.Name, number, &github.ListOptions{PerPage: 100}))
 }
 
 func collect[T any](items iter.Seq2[T, error]) ([]T, error) {
@@ -187,10 +192,13 @@ func (r *reviewGate) landed(ctx context.Context, pull *github.PullRequest) (stri
 		if commit.parents[1] != head {
 			return "", nil, fmt.Errorf("merge commit %s merges %s, not the head %s", merge[:12], commit.parents[1][:12], head[:12])
 		}
+		if err := r.reproduces(ctx, commit.parents[0], head, merge); err != nil {
+			return "", nil, err
+		}
 		merged, err := r.commands.git(ctx, nil, "rev-list", head, "^"+commit.parents[0])
 		return commit.parents[0], append([]string{merge}, strings.Fields(string(merged.Stdout))...), err
 	case signature == nil && len(commit.parents) == 1:
-		return commit.parents[0], []string{merge}, nil
+		return commit.parents[0], []string{merge}, r.reproduces(ctx, commit.parents[0], head, merge)
 	case signature == nil:
 		return "", nil, fmt.Errorf("merge commit %s has %d parents", merge[:12], len(commit.parents))
 	case errors.Is(signature, errUnsigned) && len(commit.parents) == 1:
@@ -200,7 +208,14 @@ func (r *reviewGate) landed(ctx context.Context, pull *github.PullRequest) (stri
 }
 
 func (r *reviewGate) rebased(ctx context.Context, pull *github.PullRequest) (string, []string, error) {
-	head, merge, count := pull.GetHead().GetSHA(), pull.GetMergeCommitSHA(), pull.GetCommits()
+	head, merge := pull.GetHead().GetSHA(), pull.GetMergeCommitSHA()
+	if err := r.present(ctx, head); err != nil {
+		return "", nil, err
+	}
+	count, err := r.rebasedCommits(ctx, pull)
+	if err != nil {
+		return "", nil, err
+	}
 	chain, cursor := []string{}, merge
 	for len(chain) < count {
 		commit := r.commits[cursor]
@@ -209,23 +224,67 @@ func (r *reviewGate) rebased(ctx context.Context, pull *github.PullRequest) (str
 		}
 		chain, cursor = append(chain, cursor), commit.parents[0]
 	}
-	if _, err := r.commands.git(ctx, nil, "cat-file", "-e", head+"^{commit}"); err != nil {
-		if _, err := r.commands.git(ctx, nil, "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "origin", head); err != nil {
-			return "", nil, fmt.Errorf("fetch the head %s: %w", head[:12], err)
+	return cursor, chain, r.reproduces(ctx, cursor, head, merge)
+}
+
+func (r *reviewGate) rebasedCommits(ctx context.Context, pull *github.PullRequest) (int, error) {
+	listed, err := r.api.Commits(ctx, pull.GetNumber())
+	if err != nil {
+		return 0, fmt.Errorf("list commits: %w", err)
+	}
+	if len(listed) != pull.GetCommits() {
+		return 0, fmt.Errorf("lists %d of %d commits", len(listed), pull.GetCommits())
+	}
+	count := 0
+	for _, commit := range listed {
+		if !revisionPattern.MatchString(commit.GetSHA()) {
+			return 0, fmt.Errorf("commit %q is not a revision", commit.GetSHA())
+		}
+		parents, err := r.commands.git(ctx, nil, "rev-list", "--no-walk", "--parents", commit.GetSHA())
+		if err != nil {
+			return 0, err
+		}
+		revisions := strings.Fields(string(parents.Stdout))
+		if len(revisions) != 2 {
+			continue
+		}
+		changed, err := r.commands.git(ctx, nil, "diff-tree", "--name-only", "-r", revisions[1], revisions[0])
+		if err != nil {
+			return 0, err
+		}
+		if len(changed.Stdout) > 0 {
+			count++
 		}
 	}
-	rebased, err := r.commands.git(ctx, nil, "merge-tree", "--write-tree", "--no-messages", cursor, head)
+	return count, nil
+}
+
+func (r *reviewGate) present(ctx context.Context, head string) error {
+	if _, err := r.commands.git(ctx, nil, "cat-file", "-e", head+"^{commit}"); err == nil {
+		return nil
+	}
+	if _, err := r.commands.git(ctx, nil, "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "origin", head); err != nil {
+		return fmt.Errorf("fetch the head %s: %w", head[:12], err)
+	}
+	return nil
+}
+
+func (r *reviewGate) reproduces(ctx context.Context, base, head, landed string) error {
+	if err := r.present(ctx, head); err != nil {
+		return err
+	}
+	merged, err := r.commands.git(ctx, nil, "merge-tree", "--write-tree", "--no-messages", base, head)
 	if err != nil {
-		return "", nil, fmt.Errorf("merge the head %s onto %s: %w", head[:12], cursor[:12], err)
+		return fmt.Errorf("merge the head %s onto %s: %w", head[:12], base[:12], err)
 	}
-	landed, err := r.commands.git(ctx, nil, "rev-parse", merge+"^{tree}")
+	tree, err := r.commands.git(ctx, nil, "rev-parse", landed+"^{tree}")
 	if err != nil {
-		return "", nil, err
+		return err
 	}
-	if !bytes.Equal(bytes.TrimSpace(rebased.Stdout), bytes.TrimSpace(landed.Stdout)) {
-		return "", nil, fmt.Errorf("rebased commits ending at %s differ from the head %s merged onto %s", merge[:12], head[:12], cursor[:12])
+	if !bytes.Equal(bytes.TrimSpace(merged.Stdout), bytes.TrimSpace(tree.Stdout)) {
+		return fmt.Errorf("%s differs from the head %s merged onto %s", landed[:12], head[:12], base[:12])
 	}
-	return cursor, chain, nil
+	return nil
 }
 
 func (r *reviewGate) webFlowSigned(ctx context.Context, commit string) error {

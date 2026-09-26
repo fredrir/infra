@@ -31,12 +31,13 @@ var mergedAt = time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
 type pullRequestAPI struct {
 	pulls        map[int]*github.PullRequest
 	reviews      map[int][]*github.PullRequestReview
+	commits      map[int][]string
 	associations map[string][]int
 	unavailable  string
 }
 
 func (a *pullRequestAPI) reset() {
-	a.pulls, a.reviews, a.associations, a.unavailable = map[int]*github.PullRequest{}, map[int][]*github.PullRequestReview{}, map[string][]int{}, ""
+	a.pulls, a.reviews, a.commits, a.associations, a.unavailable = map[int]*github.PullRequest{}, map[int][]*github.PullRequestReview{}, map[int][]string{}, map[string][]int{}, ""
 }
 
 func (a *pullRequestAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +59,13 @@ func (a *pullRequestAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		body = a.pulls[number]
 		if len(parts) == 3 && parts[2] == "reviews" {
 			body = append([]*github.PullRequestReview{}, a.reviews[number]...)
+		}
+		if len(parts) == 3 && parts[2] == "commits" {
+			listed := []*github.RepositoryCommit{}
+			for _, commit := range a.commits[number] {
+				listed = append(listed, &github.RepositoryCommit{SHA: github.Ptr(commit)})
+			}
+			body = listed
 		}
 	}
 	if body == nil || body == (*github.PullRequest)(nil) {
@@ -133,6 +141,7 @@ func (f *provenanceFixture) pullRequest(number int, changes ...map[string]string
 	}
 	f.git("push", "--quiet", "origin", fmt.Sprintf("HEAD:refs/pull/%d/head", number))
 	f.git("checkout", "--quiet", "main")
+	f.api.commits[number] = commits
 	return commits[len(commits)-1], commits
 }
 
@@ -223,6 +232,7 @@ func TestReviewedMerges(t *testing.T) {
 			head, _ := f.pullRequest(8, infrastructure, platform)
 			advance()
 			merge := f.sign(f.squash(8, head), f.webFlow)
+			f.forget(8)
 			f.merged(8, renovate, head, merge, 2, approval(owner, head))
 			return merge
 		}},
@@ -412,12 +422,14 @@ func TestReviewedMerges(t *testing.T) {
 			f.merged(32, renovate, head, merge, 3, approval(owner, head))
 			f.associate(32, f.git("rev-parse", merge+"~1"), f.git("rev-parse", merge+"~2"), f.git("rev-parse", merge+"~3"))
 			return merge
-		}, unverified: []string{"differ from the head", `"Change infrastructure": unsigned`}},
+		}, unverified: []string{"pull request #32: [0-9a-f]{12} differs from the head", `"Change infrastructure": unsigned`}},
 		{name: "rebase chain through a merge commit", build: func() string {
-			head, commits := f.pullRequest(33, platform, release)
+			head, commits := f.pullRequest(33, platform, release, infrastructure)
 			first := f.rebase(commits[0])
 			f.git("reset", "--quiet", "--hard", f.git("commit-tree", first+"^{tree}", "-p", first, "-p", f.base, "-m", "Merge applied history"))
-			merge := f.rebase(commits[1])
+			f.git("cherry-pick", "--no-commit", commits[1], commits[2])
+			f.git("commit", "--quiet", "--no-gpg-sign", "--message", "Changes 2 and 3 of #33")
+			merge := f.git("rev-parse", "HEAD")
 			f.merged(33, renovate, head, merge, 3, approval(owner, head))
 			return merge
 		}, unverified: []string{"rebase merge of 3 commits is not a linear chain in the verified range"}},
@@ -428,7 +440,7 @@ func TestReviewedMerges(t *testing.T) {
 			f.merged(34, renovate, head, merge, 2, approval(owner, head))
 			f.associate(34, f.git("rev-parse", merge+"~1"))
 			return merge
-		}, unverified: []string{"differ from the head"}},
+		}, unverified: []string{"pull request #34: [0-9a-f]{12} differs from the head"}},
 		{name: "rebase merge with a conflict", build: func() string {
 			head, _ := f.pullRequest(35, map[string]string{"platform/projects/web/release.yaml": "# renovate\n"})
 			main := f.commit(f.owner, "Change the release", map[string]string{"platform/projects/web/release.yaml": "# owner\n"})
@@ -439,6 +451,48 @@ func TestReviewedMerges(t *testing.T) {
 			f.merged(35, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"merge the head"}},
+		{name: "merge commit with content beyond the head", build: func() string {
+			head, _ := f.pullRequest(42, platform)
+			advance()
+			f.mergeCommit(42, head)
+			merge := f.sign(f.amend(infrastructure), f.webFlow)
+			f.merged(42, renovate, head, merge, 1, approval(owner, head))
+			return merge
+		}, unverified: []string{"pull request #42: [0-9a-f]{12} differs from the head [0-9a-f]{12} merged onto"}},
+		{name: "squash with content beyond the head", build: func() string {
+			head, _ := f.pullRequest(43, platform)
+			f.squash(43, head)
+			merge := f.sign(f.amend(infrastructure), f.webFlow)
+			f.merged(43, renovate, head, merge, 1, approval(owner, head))
+			return merge
+		}, unverified: []string{"pull request #43: [0-9a-f]{12} differs from the head [0-9a-f]{12} merged onto"}},
+		{name: "rebase merge of a pull request updated from main", build: func() string {
+			return f.updatedRebase(44, false)
+		}, unverified: []string{`^unverified commits: [0-9a-f]{12} "Change infrastructure": [^|]*$`}},
+		{name: "rebase merge of a pull request with an empty commit updated from main", build: func() string {
+			return f.updatedRebase(45, true)
+		}, unverified: []string{`^unverified commits: [0-9a-f]{12} "Change infrastructure": [^|]*$`}},
+		{name: "pull request commits API error", build: func() string {
+			head, commits := f.pullRequest(46, platform)
+			merge := f.rebase(commits...)
+			f.merged(46, renovate, head, merge, 1, approval(owner, head))
+			f.api.unavailable = "/pulls/46/commits"
+			return merge
+		}, unverified: []string{"pull request #46: list commits: GET", "502"}},
+		{name: "truncated pull request commits", build: func() string {
+			head, commits := f.pullRequest(47, platform, release)
+			merge := f.rebase(commits...)
+			f.merged(47, renovate, head, merge, 2, approval(owner, head))
+			f.api.commits[47] = commits[1:]
+			return merge
+		}, unverified: []string{"pull request #47: lists 1 of 2 commits"}},
+		{name: "pull request commit that is not a revision", build: func() string {
+			head, commits := f.pullRequest(48, platform)
+			merge := f.rebase(commits...)
+			f.merged(48, renovate, head, merge, 1, approval(owner, head))
+			f.api.commits[48] = []string{"HEAD"}
+			return merge
+		}, unverified: []string{`pull request #48: commit "HEAD" is not a revision`}},
 		{name: "rebase merge of a head that cannot be fetched", build: func() string {
 			head, commits := f.pullRequest(36, platform)
 			merge := f.rebase(commits...)
@@ -472,6 +526,28 @@ func TestReviewedMerges(t *testing.T) {
 			}
 		})
 	}
+}
+
+func (f *provenanceFixture) updatedRebase(number int, empty bool) string {
+	f.t.Helper()
+	f.git("checkout", "--quiet", "-b", fmt.Sprintf("pull/%d", number))
+	commits := []string{f.commit("", fmt.Sprintf("Change 1 of #%d", number), map[string]string{"platform/projects/example/namespace.yaml": "# renovate\n"})}
+	if empty {
+		commits = append(commits, f.commit("", fmt.Sprintf("Empty change of #%d", number), nil))
+	}
+	f.git("checkout", "--quiet", "main")
+	f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# unreviewed\n"})
+	f.git("checkout", "--quiet", fmt.Sprintf("pull/%d", number))
+	f.git("merge", "--quiet", "--no-ff", "--no-gpg-sign", "--message", "Merge branch 'main'", "main")
+	commits = append(commits, f.git("rev-parse", "HEAD"))
+	head := f.commit("", fmt.Sprintf("Change 2 of #%d", number), map[string]string{"platform/projects/web/release.yaml": "# renovate\n"})
+	commits = append(commits, head)
+	f.git("checkout", "--quiet", "main")
+	merge := f.rebase(commits[0], head)
+	f.api.commits[number] = commits
+	f.merged(number, renovate, head, merge, len(commits), approval(owner, head))
+	f.associate(number, f.git("rev-parse", merge+"~1"))
+	return merge
 }
 
 func (f *provenanceFixture) try(args ...string) (string, error) {
