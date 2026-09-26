@@ -116,6 +116,9 @@ func TestFleetPlaybooksNeverListADeclaredReconciler(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := os.Stat(playbook); err != nil {
+			if os.Getenv("INFRA_HOST_ACCESS_TEST") == "required" {
+				t.Fatal("requires ansible-playbook")
+			}
 			t.Skip("requires ansible-playbook")
 		}
 	}

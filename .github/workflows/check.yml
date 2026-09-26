@@ -143,7 +143,7 @@ jobs:
           printf '%s  %s\n' "$checksum" "$RUNNER_TEMP/bazel/bin/bazel" | sha256sum --check --strict
           chmod 755 "$RUNNER_TEMP/bazel/bin/bazel"
           printf '%s\n' "$RUNNER_TEMP/bazel/bin" >> "$GITHUB_PATH"
-      - name: Select the reconciler host access check
+      - name: Select the Ansible checks
         id: affected
         env:
           PUSH_BASE: ${{ github.event.before }}
@@ -157,27 +157,37 @@ jobs:
             base=''
           fi
           expression=$(infra pipeline affected --base "$base")
-          selected=false
-          if [ "$expression" != 'set()' ] && [ -n "$(bazel query --repository_cache="$HOME/.cache/infra-bazel-repository" "($expression) intersect //internal/reconciler:reconciler_test" --output=label)" ]; then
-            selected=true
+          affected=''
+          if [ "$expression" != 'set()' ]; then
+            affected=$(bazel query --repository_cache="$HOME/.cache/infra-bazel-repository" "($expression) intersect set(//internal/reconciler:reconciler_test //internal/reconcile:reconcile_test)" --output=label)
           fi
-          printf 'selected=%s\n' "$selected" >> "$GITHUB_OUTPUT"
+          hosts=false
+          playbooks=false
+          if grep -qx '//internal/reconciler:reconciler_test' <<< "$affected"; then hosts=true; fi
+          if grep -qx '//internal/reconcile:reconcile_test' <<< "$affected"; then playbooks=true; fi
+          printf 'hosts=%s\nplaybooks=%s\n' "$hosts" "$playbooks" >> "$GITHUB_OUTPUT"
       - name: Install the Ansible environment and an OpenSSH server
-        if: steps.affected.outputs.selected == 'true'
+        if: steps.affected.outputs.hosts == 'true' || steps.affected.outputs.playbooks == 'true'
         env:
           UV_PYTHON_DOWNLOADS: never
+          HOSTS: ${{ steps.affected.outputs.hosts }}
         run: |
           infra ci install-tools uv
           "$RUNNER_TEMP/tools/uv" sync --frozen --group ci --no-install-project
-          if ! test -x /usr/sbin/sshd; then
+          if [ "$HOSTS" = true ] && ! test -x /usr/sbin/sshd; then
             sudo apt-get update -o APT::Update::Error-Mode=any
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server
           fi
       - name: Reach hosts through a real SSH hop and ProxyJump
-        if: steps.affected.outputs.selected == 'true'
+        if: steps.affected.outputs.hosts == 'true'
         env:
           INFRA_HOST_ACCESS_TEST: required
         run: bazel run --repository_cache="$HOME/.cache/infra-bazel-repository" @rules_go//go -- test ./internal/reconciler/ -run '^TestHostAccessReachesHostsThroughARealSSHHopAndProxyJump$' -count=1 -v
+      - name: Keep the reconciler out of fleet playbooks as Ansible lists them
+        if: steps.affected.outputs.playbooks == 'true'
+        env:
+          INFRA_HOST_ACCESS_TEST: required
+        run: bazel run --repository_cache="$HOME/.cache/infra-bazel-repository" @rules_go//go -- test ./internal/reconcile/ -run '^TestFleetPlaybooksNeverListADeclaredReconciler$' -count=1 -v
   validate:
     needs: cli
     if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]' && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
