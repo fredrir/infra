@@ -23,6 +23,7 @@ func roleFile(t *testing.T, path string) []byte {
 
 type reconcilerDefaults struct {
 	Credentials []string       `yaml:"reconciler_verify_credentials"`
+	Shared      string         `yaml:"reconciler_shared"`
 	Verify      map[string]any `yaml:"reconciler_verify"`
 }
 
@@ -60,7 +61,8 @@ func TestVerifyUnitDecryptsOnlyTheVerifyCredentials(t *testing.T) {
 }
 
 func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
-	declared := roleDefaults(t).Verify
+	defaults := roleDefaults(t)
+	declared := defaults.Verify
 	templated := regexp.MustCompile(`\{\{.*\}\}`)
 	var resolve func(any) any
 	resolve = func(value any) any {
@@ -70,7 +72,7 @@ func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 				value[key] = resolve(item)
 			}
 		case string:
-			return templated.ReplaceAllString(value, "100.64.0.1")
+			return templated.ReplaceAllString(strings.ReplaceAll(value, "{{ reconciler_shared }}", defaults.Shared), "100.64.0.1")
 		}
 		return value
 	}

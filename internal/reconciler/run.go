@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -31,10 +32,12 @@ const (
 type Supervisor struct {
 	Config      Config
 	Credentials string
+	Identity    string
 	Execute     func(context.Context, process.Options) (process.Result, error)
 	HTTP        *http.Client
 	Now         func() time.Time
 	Log         io.Writer
+	LockPoll    time.Duration
 }
 
 type runLog struct {
@@ -90,35 +93,31 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, runDeadline)
 	defer cancel()
+	run.Stage = "lock"
+	release, err := acquireHostLock(ctx, s.Config.Shared, cmp.Or(s.LockPoll, lockPoll))
+	if err != nil {
+		return fail("lock", err)
+	}
+	defer release()
+	run.Started = s.now()
 	run.Stage = "checkout"
-	state := s.Config.State
-	if err := os.MkdirAll(state, 0o700); err != nil {
-		return fail("checkout", err)
-	}
-	if err := clearDirectory(state); err != nil {
-		return fail("checkout", err)
-	}
-	work, err := os.MkdirTemp(state, "run-")
+	hosts := s.Config.Scope == reconcile.ScopeFull
+	current, cleanup, err := openSession(s.Config.State, s.Execute, log, hosts)
 	if err != nil {
 		return fail("checkout", err)
 	}
 	defer func() {
-		if removeErr := removeTree(work); removeErr != nil {
+		if removeErr := cleanup(); removeErr != nil {
 			fmt.Fprintf(log, "remove run directory: %v\n", removeErr)
 		}
 	}()
-	home := filepath.Join(work, "home")
-	if err := os.Mkdir(home, 0o700); err != nil {
-		return fail("checkout", err)
-	}
-	environment := append([]string{"PATH=" + filepath.Join(work, "tools") + ":/usr/local/bin:/usr/bin:/bin", "HOME=" + home, "LANG=C.UTF-8", "TF_IN_AUTOMATION=true"}, hardenedGit...)
-	commands := executor{execute: s.Execute, env: environment, log: log}
-	source := filepath.Join(work, "source")
+	commands, source, work := current.commands, current.source, current.work
 	published, err := commands.checkoutPublished(ctx, source, s.Config.Repository)
 	if err != nil {
 		return fail("checkout", err)
 	}
 	run.Revision = published.Revision
+	defer func() { s.requestRepair(run, published.Main, log) }()
 	if !published.OnMain {
 		run.Verification = offMain(published.Revision)
 		run.Outcome = run.Verification.Outcome
@@ -132,15 +131,29 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 		return fail("build", err)
 	}
 	run.Stage = "tools"
-	if err := commands.installTools(ctx, engine, work, s.Config.Cache); err != nil {
+	tools := cloudTools
+	if hosts {
+		tools = append(slices.Clone(cloudTools), "uv")
+	}
+	if err := commands.installTools(ctx, engine, work, s.Config.Cache, tools); err != nil {
 		return fail("tools", err)
 	}
 	plugins, err := pluginCache(s.Config.Cache, source)
 	if err != nil {
 		return fail("tools", err)
 	}
+	environment := []string{"TF_PLUGIN_CACHE_DIR=" + plugins}
+	if hosts {
+		if err := current.pythonEnvironment(ctx, s.Config.Cache); err != nil {
+			return fail("tools", err)
+		}
+		if err := current.hostAccess(s.Identity, s.Config.KnownHosts); err != nil {
+			return fail("credentials", err)
+		}
+		environment = append(environment, "INFRA_RECONCILE_TAILNET=true")
+	}
 	run.Stage = "credentials"
-	token, revoke, err := observerToken(ctx, s.Config.Observer, []byte(credentials[ObserverAppKey]), source)
+	token, revoke, err := runnerFleetToken(ctx, s.Config.Observer, []byte(credentials[ObserverAppKey]), source, "read")
 	if err != nil {
 		return fail("credentials", err)
 	}
@@ -149,21 +162,13 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 			fmt.Fprintf(log, "revoke observer token: %v\n", revokeErr)
 		}
 	}()
-	authority, err := os.ReadFile(s.Config.Kubernetes.CertificateAuthority)
+	kubeconfig, err := current.kubeconfig(s.Config.Kubernetes, "infrastructure-verify", credentials[KubernetesToken])
 	if err != nil {
-		return fail("credentials", err)
-	}
-	config, err := Kubeconfig(s.Config.Kubernetes.Server, authority, credentials[KubernetesToken])
-	if err != nil {
-		return fail("credentials", err)
-	}
-	kubeconfig := filepath.Join(work, "kubeconfig")
-	if err := os.WriteFile(kubeconfig, config, 0o600); err != nil {
 		return fail("credentials", err)
 	}
 	run.Stage = "verify"
 	report := filepath.Join(work, "verification.json")
-	result, verifyErr := commands.run(ctx, source, append(credentials.engineEnvironment(s.Config, kubeconfig, token), "TF_PLUGIN_CACHE_DIR="+plugins), engine, "reconcile", "verify", "--scope=cloud", "--root="+source, "--state-bucket="+s.Config.Bucket, "--state-prefix="+s.Config.Prefix, "--report="+report)
+	result, verifyErr := commands.run(ctx, source, append(credentials.engineEnvironment(s.Config.Site, kubeconfig, token), environment...), engine, "reconcile", "verify", "--scope="+string(s.Config.Scope), "--root="+source, "--state-bucket="+s.Config.Bucket, "--state-prefix="+s.Config.Prefix, "--report="+report)
 	data, readErr := os.ReadFile(report)
 	if readErr != nil {
 		return fail("verify", errors.Join(verifyErr, readErr))
@@ -177,6 +182,18 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 		run.Outcome = OutcomeSkipped
 	}
 	return nil
+}
+
+func (s Supervisor) requestRepair(run Run, main string, log io.Writer) {
+	if run.Outcome != reconcile.OutcomeDiffers || !slices.ContainsFunc(run.Verification.Differences, func(difference reconcile.Difference) bool { return difference.System != "rulesets" }) {
+		return
+	}
+	request := Request{Kind: RequestRepair, Revision: main, Full: true, Reason: truncate(run.failure().Error()), Requested: s.now()}
+	if err := WriteRequest(s.Config.Shared, request); err != nil {
+		fmt.Fprintf(log, "request repair: %v\n", err)
+		return
+	}
+	fmt.Fprintf(log, "Requested a full reconciliation of %s at %s\n", reviewedBranch, main)
 }
 
 func (s Supervisor) finish(ctx context.Context, run Run, credentials Credentials, log *runLog) error {

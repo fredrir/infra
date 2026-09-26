@@ -1,6 +1,8 @@
 package reconciler
 
 import (
+	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -67,4 +69,35 @@ func yamlString(t *testing.T, value any) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+func TestVerificationSharesOnlyTheReconciliationDirectory(t *testing.T) {
+	var tasks []struct {
+		Name  string         `yaml:"name"`
+		Group map[string]any `yaml:"ansible.builtin.group"`
+		User  map[string]any `yaml:"ansible.builtin.user"`
+		File  map[string]any `yaml:"ansible.builtin.file"`
+		Loop  any            `yaml:"loop"`
+	}
+	if err := yaml.Unmarshal(roleFile(t, "tasks/main.yml"), &tasks); err != nil {
+		t.Fatal(err)
+	}
+	var group, member, shared bool
+	for _, task := range tasks {
+		switch {
+		case task.Group != nil:
+			group = task.Group["name"] == "infra-reconcile" && task.Group["system"] == true
+		case task.User != nil && task.User["name"] == "infra-verify":
+			member = reflect.DeepEqual(task.User["groups"], []any{"infra-reconcile"}) && task.User["append"] == false
+		case task.File != nil && reflect.DeepEqual(task.Loop, []any{"{{ reconciler_shared }}", "{{ reconciler_shared }}/requests"}):
+			shared = task.File["owner"] == "root" && task.File["group"] == "infra-reconcile" && task.File["mode"] == "2770"
+		}
+	}
+	if !group || !member || !shared {
+		t.Errorf("group %v, membership %v, shared directories %v", group, member, shared)
+	}
+	service := string(roleFile(t, "templates/infra-reconcile-verify.service.j2"))
+	if writable := regexp.MustCompile(`(?m)^ReadWritePaths=.*$`).FindAllString(service, -1); !slices.Equal(writable, []string{"ReadWritePaths={{ reconciler_shared }}"}) {
+		t.Errorf("verify unit writes %q", writable)
+	}
 }

@@ -17,12 +17,13 @@ func hardenedExecutor(t *testing.T) executor {
 func TestCheckoutBuildsOnlyThePublishedRevision(t *testing.T) {
 	ctx := context.Background()
 	origin, published := originRepository(t)
-	if main := gitCommand(t, origin, "rev-parse", "main"); main == published {
+	main := gitCommand(t, origin, "rev-parse", "main")
+	if main == published {
 		t.Fatal("fixture main does not advance past production")
 	}
 	source := filepath.Join(t.TempDir(), "source")
 	checked, err := hardenedExecutor(t).checkoutPublished(ctx, source, "file://"+origin)
-	if err != nil || checked != (publication{Revision: published, OnMain: true}) {
+	if err != nil || checked != (publication{Revision: published, Main: main, OnMain: true}) {
 		t.Fatalf("checkout resolved %+v, %v; want production %s on main", checked, err, published)
 	}
 	if head := gitCommand(t, source, "rev-parse", "HEAD"); head != published {
@@ -59,7 +60,7 @@ func TestCheckoutRefusesProductionOffMain(t *testing.T) {
 	origin, forged := offMainOrigin(t)
 	source := filepath.Join(t.TempDir(), "source")
 	checked, err := hardenedExecutor(t).checkoutPublished(ctx, source, "file://"+origin)
-	if err != nil || checked != (publication{Revision: forged}) {
+	if err != nil || checked != (publication{Revision: forged, Main: gitCommand(t, origin, "rev-parse", "main")}) {
 		t.Fatalf("off-main production resolved %+v, %v; want %s refused", checked, err, forged)
 	}
 	if entries, err := os.ReadDir(source); err != nil || len(entries) != 1 || entries[0].Name() != ".git" {

@@ -13,6 +13,11 @@
     infra_binary_sha256: "{{ reconciler_cli.sha256 }}"
   tags: [infra_binary]
 
+- name: Create the reconciliation group
+  ansible.builtin.group:
+    name: infra-reconcile
+    system: true
+
 - name: Create the verification user
   ansible.builtin.user:
     name: infra-verify
@@ -21,6 +26,19 @@
     home: /var/lib/infra-verify
     create_home: false
     password: "!"
+    groups: [infra-reconcile]
+    append: false
+
+- name: Create the shared reconciliation directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: infra-reconcile
+    mode: "2770"
+  loop:
+    - "{{ reconciler_shared }}"
+    - "{{ reconciler_shared }}/requests"
 
 - name: Create the reconciler configuration directory
   ansible.builtin.file:

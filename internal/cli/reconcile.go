@@ -239,17 +239,18 @@ func newRequestVerificationCommand() *cobra.Command {
 }
 
 func newRunCommand() *cobra.Command {
-	var config, credentials string
-	run := &cobra.Command{Use: "run", Short: "Run a reconciler host unit at the current main revision", RunE: missingCommand}
-	verify := &cobra.Command{Use: "verify", Short: "Build the engine at main, verify its cloud scope, and report to S3 and Gatus", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	var config, credentials, identity string
+	run := &cobra.Command{Use: "run", Short: "Run a reconciler host unit", RunE: missingCommand}
+	verify := &cobra.Command{Use: "verify", Short: "Build the published engine, verify its declared scope, report to S3 and Gatus, and request repairs", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		loaded, err := reconciler.LoadConfig(config)
 		if err != nil {
 			return err
 		}
-		return reconciler.Supervisor{Config: loaded, Credentials: credentials, Log: cmd.OutOrStdout()}.Verify(cmd.Context())
+		return reconciler.Supervisor{Config: loaded, Credentials: credentials, Identity: identity, Log: cmd.OutOrStdout()}.Verify(cmd.Context())
 	}}
 	verify.Flags().StringVar(&config, "config", "/etc/infra-reconcile/verify.json", "Reconciler configuration")
-	verify.Flags().StringVar(&credentials, "credentials", "", "Decrypted verify credentials as a JSON object; removed once read")
+	verify.Flags().StringVar(&credentials, "credentials", "", "Decrypted credentials as a JSON object; removed once read")
+	verify.Flags().StringVar(&identity, "ssh-identity", "", "SSH private key for host access")
 	_ = verify.MarkFlagRequired("credentials")
 	run.AddCommand(verify)
 	return run

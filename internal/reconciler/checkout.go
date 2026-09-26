@@ -58,41 +58,66 @@ const reviewedBranch = "main"
 
 type publication struct {
 	Revision string
+	Main     string
 	OnMain   bool
 }
 
-func (e executor) checkoutPublished(ctx context.Context, source, repository string) (publication, error) {
-	published, reviewed := "refs/remotes/origin/"+publishedBranch, "refs/remotes/origin/"+reviewedBranch
-	for _, step := range [][]string{
-		{"init", "--quiet", "--template=", source},
-		{"-C", source, "remote", "add", "origin", repository},
-		{"-C", source, "fetch", "--quiet", "--no-tags", "origin", "+refs/heads/" + publishedBranch + ":" + published, "+refs/heads/" + reviewedBranch + ":" + reviewed},
-	} {
+func (e executor) clone(ctx context.Context, source, repository string, branches ...string) (map[string]string, error) {
+	steps := [][]string{{"init", "--quiet", "--template=", source}, {"-C", source, "remote", "add", "origin", repository}}
+	fetch := []string{"-C", source, "fetch", "--quiet", "--no-tags", "origin"}
+	for _, branch := range branches {
+		fetch = append(fetch, "+refs/heads/"+branch+":refs/remotes/origin/"+branch)
+	}
+	for _, step := range append(steps, fetch) {
 		if _, err := e.output(ctx, "", "git", step...); err != nil {
-			return publication{}, err
+			return nil, err
 		}
 	}
-	revision, err := e.output(ctx, "", "git", "-C", source, "rev-parse", "--verify", published+"^{commit}")
+	revisions := map[string]string{}
+	for _, branch := range branches {
+		revision, err := e.output(ctx, "", "git", "-C", source, "rev-parse", "--verify", "refs/remotes/origin/"+branch+"^{commit}")
+		if err != nil {
+			return nil, err
+		}
+		if !revisionPattern.MatchString(revision) {
+			return nil, fmt.Errorf("%s resolved to an invalid revision", branch)
+		}
+		revisions[branch] = revision
+	}
+	return revisions, nil
+}
+
+func (e executor) checkoutPublished(ctx context.Context, source, repository string) (publication, error) {
+	revisions, err := e.clone(ctx, source, repository, publishedBranch, reviewedBranch)
 	if err != nil {
 		return publication{}, err
 	}
-	if !revisionPattern.MatchString(revision) {
-		return publication{}, fmt.Errorf("%s resolved to an invalid revision", publishedBranch)
-	}
-	quiet := e
-	quiet.log = nil
-	result, err := quiet.run(ctx, "", nil, "git", "-C", source, "merge-base", "--is-ancestor", revision, reviewed)
+	revision, main := revisions[publishedBranch], revisions[reviewedBranch]
+	contained, err := e.ancestor(ctx, source, revision, main)
 	switch {
-	case err == nil:
-	case result.ExitCode == 1:
-		return publication{Revision: revision}, nil
-	default:
-		return publication{}, fmt.Errorf("%s ancestry: %w: %s", publishedBranch, err, strings.TrimSpace(string(result.Stderr)))
+	case err != nil:
+		return publication{}, fmt.Errorf("%s ancestry: %w", publishedBranch, err)
+	case !contained:
+		return publication{Revision: revision, Main: main}, nil
 	}
 	if _, err := e.output(ctx, "", "git", "-C", source, "checkout", "--quiet", "--detach", revision); err != nil {
 		return publication{}, err
 	}
-	return publication{Revision: revision, OnMain: true}, nil
+	return publication{Revision: revision, Main: main, OnMain: true}, nil
+}
+
+func (e executor) ancestor(ctx context.Context, source, revision, descendant string) (bool, error) {
+	quiet := e
+	quiet.log = nil
+	result, err := quiet.run(ctx, "", nil, "git", "-C", source, "merge-base", "--is-ancestor", revision, descendant)
+	switch {
+	case err == nil:
+		return true, nil
+	case result.ExitCode == 1:
+		return false, nil
+	default:
+		return false, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(result.Stderr)))
+	}
 }
 
 func offMain(revision string) *reconcile.Verification {

@@ -176,6 +176,7 @@ func (a *observerApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type harness struct {
+	mu         sync.Mutex
 	supervisor Supervisor
 	revision   string
 	objects    *objects
@@ -213,11 +214,11 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 	}
 	config := validConfig()
 	config.Repository, config.State, config.Cache, config.Endpoint, config.Gatus, config.Observer.API, config.Kubernetes.CertificateAuthority = "file://"+origin, t.TempDir(), t.TempDir(), urls["s3"], urls["gatus"], urls["github"], authority
-	var mu sync.Mutex
+	config.Shared = sharedDirectory(t)
 	h.supervisor = Supervisor{Config: config, Credentials: writeCredentials(t, anyValues(credentials)), Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
-		mu.Lock()
+		h.mu.Lock()
 		h.commands = append(h.commands, filepath.Base(options.Name)+" "+strings.Join(options.Args, " "))
-		mu.Unlock()
+		h.mu.Unlock()
 		if name := filepath.Base(options.Name); name == "git" || name == "infra" {
 			for _, variable := range hardenedGit {
 				if !slices.Contains(options.Env, variable) {
@@ -226,7 +227,11 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 			}
 		}
 		run := runDirectory(t, config.State, options.Env)
-		if !slices.Contains(options.Env, "PATH="+filepath.Join(run, "tools")+":/usr/local/bin:/usr/bin:/bin") || !slices.Contains(options.Env, "HOME="+filepath.Join(run, "home")) {
+		path := filepath.Join(run, "tools") + ":/usr/local/bin:/usr/bin:/bin"
+		if h.supervisor.Config.Scope == reconcile.ScopeFull {
+			path = filepath.Join(run, "venv", "bin") + ":" + path
+		}
+		if !slices.Contains(options.Env, "PATH="+path) || !slices.Contains(options.Env, "HOME="+filepath.Join(run, "home")) {
 			t.Errorf("%s runs with %q", options.Name, options.Env)
 		}
 		verifying := filepath.Base(options.Name) == "infra" && slices.Contains(options.Args, "verify")
@@ -241,6 +246,8 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 		switch filepath.Base(options.Name) {
 		case "git":
 			return process.Run(ctx, options)
+		case "uv":
+			return process.Result{}, nil
 		case "go":
 			run := runDirectory(t, config.State, options.Env)
 			for _, variable := range []string{"GOTOOLCHAIN=go1.27.1", "GOFLAGS=-mod=readonly -modcacherw", "GOMODCACHE=" + filepath.Join(run, "go", "mod"), "GOCACHE=" + filepath.Join(run, "go", "cache"), "GOPROXY=file://" + filepath.Join(config.Cache, "go") + ",https://proxy.golang.org,direct"} {
@@ -255,7 +262,11 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 			return process.Result{}, os.WriteFile(options.Args[3], []byte("engine"), 0o755)
 		case "infra":
 			if options.Args[0] == "ci" {
-				if !slices.Contains(options.Env, "INFRA_TOOL_CACHE="+filepath.Join(runDirectory(t, config.State, options.Env), "tools")) || !slices.Contains(options.Env, "INFRA_TOOL_DOWNLOADS="+filepath.Join(config.Cache, "tools")) || !reflect.DeepEqual(options.Args[4:], cloudTools) {
+				tools := cloudTools
+				if h.supervisor.Config.Scope == reconcile.ScopeFull {
+					tools = append(slices.Clone(cloudTools), "uv")
+				}
+				if !slices.Contains(options.Env, "INFRA_TOOL_CACHE="+filepath.Join(runDirectory(t, config.State, options.Env), "tools")) || !slices.Contains(options.Env, "INFRA_TOOL_DOWNLOADS="+filepath.Join(config.Cache, "tools")) || !reflect.DeepEqual(options.Args[4:], tools) {
 					t.Errorf("tools installed with %q %q", options.Args, options.Env)
 				}
 				return process.Result{}, nil
@@ -276,6 +287,15 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 		return process.Result{}, errors.New("unexpected command")
 	}}
 	return h
+}
+
+func sharedDirectory(t *testing.T) string {
+	t.Helper()
+	shared := t.TempDir()
+	if err := os.Mkdir(filepath.Join(shared, "requests"), 0o770); err != nil {
+		t.Fatal(err)
+	}
+	return shared
 }
 
 func runDirectory(t *testing.T, state string, env []string) string {

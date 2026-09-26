@@ -55,9 +55,9 @@ func (e executor) buildEngine(ctx context.Context, work, cache, source, output s
 	return nil
 }
 
-func (e executor) installTools(ctx context.Context, engine, work, cache string) error {
+func (e executor) installTools(ctx context.Context, engine, work, cache string, tools []string) error {
 	environment := []string{"INFRA_TOOL_CACHE=" + filepath.Join(work, "tools"), "INFRA_TOOL_DOWNLOADS=" + filepath.Join(cache, "tools")}
-	if _, err := e.run(ctx, work, environment, engine, append([]string{"ci", "install-tools", "--temporary", work}, cloudTools...)...); err != nil {
+	if _, err := e.run(ctx, work, environment, engine, append([]string{"ci", "install-tools", "--temporary", work}, tools...)...); err != nil {
 		return fmt.Errorf("install tools: %w", err)
 	}
 	return nil

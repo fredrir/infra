@@ -158,18 +158,18 @@ func TestEngineEnvironmentMapsOnlyEngineCredentials(t *testing.T) {
 		"KUBECONFIG=/run/kubeconfig",
 		"GH_TOKEN=observer-installation-token",
 	}
-	if got := credentials.engineEnvironment(config, "/run/kubeconfig", "observer-installation-token"); !slices.Equal(got, want) {
+	if got := credentials.engineEnvironment(config.Site, "/run/kubeconfig", "observer-installation-token"); !slices.Equal(got, want) {
 		t.Fatalf("engine environment %q, want %q", got, want)
 	}
 	config.Endpoint = "http://10.0.2.2:9000"
-	if got := credentials.engineEnvironment(config, "/run/kubeconfig", "token"); !slices.Contains(got, "AWS_ENDPOINT_URL_S3=http://10.0.2.2:9000") {
+	if got := credentials.engineEnvironment(config.Site, "/run/kubeconfig", "token"); !slices.Contains(got, "AWS_ENDPOINT_URL_S3=http://10.0.2.2:9000") {
 		t.Fatalf("engine environment %q ignores the endpoint", got)
 	}
 }
 
 func TestKubeconfigCarriesTheDeclaredServerAuthorityAndToken(t *testing.T) {
 	authority := testAuthority(t)
-	data, err := Kubeconfig("https://100.115.121.9:6443", authority, "kubernetes-secret-value")
+	data, err := Kubeconfig("https://100.115.121.9:6443", authority, "infrastructure-verify", "kubernetes-secret-value")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,16 +185,22 @@ func TestKubeconfigCarriesTheDeclaredServerAuthorityAndToken(t *testing.T) {
 		t.Fatalf("kubeconfig %s", data)
 	}
 	for name, build := range map[string]func() ([]byte, error){
-		"plain server":   func() ([]byte, error) { return Kubeconfig("http://100.115.121.9:6443", authority, "token") },
-		"missing server": func() ([]byte, error) { return Kubeconfig("", authority, "token") },
+		"plain server": func() ([]byte, error) {
+			return Kubeconfig("http://100.115.121.9:6443", authority, "infrastructure-verify", "token")
+		},
+		"missing server": func() ([]byte, error) { return Kubeconfig("", authority, "infrastructure-verify", "token") },
 		"no certificate": func() ([]byte, error) {
-			return Kubeconfig("https://100.115.121.9:6443", []byte("not a certificate"), "token")
+			return Kubeconfig("https://100.115.121.9:6443", []byte("not a certificate"), "infrastructure-verify", "token")
 		},
 		"private key": func() ([]byte, error) {
-			return Kubeconfig("https://100.115.121.9:6443", []byte("-----BEGIN PRIVATE KEY-----\nAA==\n-----END PRIVATE KEY-----\n"), "token")
+			return Kubeconfig("https://100.115.121.9:6443", []byte("-----BEGIN PRIVATE KEY-----\nAA==\n-----END PRIVATE KEY-----\n"), "infrastructure-verify", "token")
 		},
-		"token whitespace": func() ([]byte, error) { return Kubeconfig("https://100.115.121.9:6443", authority, "two words") },
-		"missing token":    func() ([]byte, error) { return Kubeconfig("https://100.115.121.9:6443", authority, "") },
+		"token whitespace": func() ([]byte, error) {
+			return Kubeconfig("https://100.115.121.9:6443", authority, "infrastructure-verify", "two words")
+		},
+		"missing token": func() ([]byte, error) {
+			return Kubeconfig("https://100.115.121.9:6443", authority, "infrastructure-verify", "")
+		},
 	} {
 		if _, err := build(); err == nil {
 			t.Errorf("%s accepted", name)

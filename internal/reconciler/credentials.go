@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"unicode"
@@ -27,7 +28,10 @@ const (
 	GatusToken            = "gatus-token"
 )
 
-var VerifyCredentials = []string{AWSAccessKeyID, AWSSecretAccessKey, CloudflareAPIToken, HcloudToken, PlatformMailRecipient, KubernetesToken, ObserverAppKey, GatusToken}
+var (
+	VerifyCredentials = []string{AWSAccessKeyID, AWSSecretAccessKey, CloudflareAPIToken, HcloudToken, PlatformMailRecipient, KubernetesToken, ObserverAppKey, GatusToken}
+	privateKeys       = []string{ObserverAppKey}
+)
 
 const credentialsLimit = 256 << 10
 
@@ -91,7 +95,7 @@ func credential(raw json.RawMessage, name string) (string, error) {
 	if value == "" {
 		return "", errors.New("empty")
 	}
-	if name != ObserverAppKey && strings.ContainsFunc(value, unicode.IsSpace) {
+	if !slices.Contains(privateKeys, name) && strings.ContainsFunc(value, unicode.IsSpace) {
 		return "", errors.New("contains whitespace")
 	}
 	return value, nil
@@ -129,7 +133,7 @@ type kubeconfigContext struct {
 	} `json:"context"`
 }
 
-func Kubeconfig(server string, authority []byte, token string) ([]byte, error) {
+func Kubeconfig(server string, authority []byte, account, token string) ([]byte, error) {
 	if !validURL(server, "https") {
 		return nil, fmt.Errorf("kubernetes server %q is not an HTTPS URL", server)
 	}
@@ -143,7 +147,7 @@ func Kubeconfig(server string, authority []byte, token string) ([]byte, error) {
 	config := kubeconfig{APIVersion: "v1", Kind: "Config", CurrentContext: name}
 	cluster := kubeconfigCluster{Name: name}
 	cluster.Cluster.Server, cluster.Cluster.CertificateAuthorityData = server, base64.StdEncoding.EncodeToString(authority)
-	user := kubeconfigUser{Name: "infrastructure-verify"}
+	user := kubeconfigUser{Name: account}
 	user.User.Token = token
 	context := kubeconfigContext{Name: name}
 	context.Context.Cluster, context.Context.User = name, user.Name
@@ -170,20 +174,25 @@ func certificates(data []byte) error {
 	return nil
 }
 
-func (c Credentials) engineEnvironment(config Config, kubeconfig, runnerToken string) []string {
+func (c Credentials) engineEnvironment(site Site, kubeconfig, githubToken string) []string {
+	return append(c.stateEnvironment(site),
+		"CLOUDFLARE_API_TOKEN="+c[CloudflareAPIToken],
+		"TF_VAR_hcloud_token="+c[HcloudToken],
+		"TF_VAR_platform_mail_recipient="+c[PlatformMailRecipient],
+		"KUBECONFIG="+kubeconfig,
+		"GH_TOKEN="+githubToken,
+	)
+}
+
+func (c Credentials) stateEnvironment(site Site) []string {
 	environment := []string{
 		"AWS_ACCESS_KEY_ID=" + c[AWSAccessKeyID],
 		"AWS_SECRET_ACCESS_KEY=" + c[AWSSecretAccessKey],
-		"AWS_REGION=" + config.Region,
-		"AWS_DEFAULT_REGION=" + config.Region,
-		"CLOUDFLARE_API_TOKEN=" + c[CloudflareAPIToken],
-		"TF_VAR_hcloud_token=" + c[HcloudToken],
-		"TF_VAR_platform_mail_recipient=" + c[PlatformMailRecipient],
-		"KUBECONFIG=" + kubeconfig,
-		"GH_TOKEN=" + runnerToken,
+		"AWS_REGION=" + site.Region,
+		"AWS_DEFAULT_REGION=" + site.Region,
 	}
-	if config.Endpoint != "" {
-		environment = append(environment, "AWS_ENDPOINT_URL_S3="+config.Endpoint)
+	if site.Endpoint != "" {
+		environment = append(environment, "AWS_ENDPOINT_URL_S3="+site.Endpoint)
 	}
 	return environment
 }

@@ -6,20 +6,26 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/fredrir/infra/internal/reconcile"
 )
 
 func validConfig() Config {
 	return Config{
-		Repository: "https://github.com/fredrir/infra.git",
-		State:      "/var/lib/infra-verify",
-		Cache:      "/var/cache/infra-verify",
-		Bucket:     "llunde-pyparser-bucket",
-		Prefix:     "reconciliation/production",
-		Region:     "eu-north-1",
-		Gatus:      "http://100.86.241.75:8080",
-		Heartbeat:  "reconciliation_verification",
-		Kubernetes: Kubernetes{Server: "https://100.115.121.9:6443", CertificateAuthority: "/etc/infra-reconcile/kubernetes-ca.crt"},
-		Observer:   Observer{AppID: 5080610, InstallationID: 164992211, API: "https://api.github.com"},
+		Site: Site{
+			Repository: "https://github.com/fredrir/infra.git",
+			State:      "/var/lib/infra-verify",
+			Cache:      "/var/cache/infra-verify",
+			Shared:     "/var/lib/infra-reconcile",
+			Bucket:     "llunde-pyparser-bucket",
+			Prefix:     "reconciliation/production",
+			Region:     "eu-north-1",
+			Gatus:      "http://100.86.241.75:8080",
+			Heartbeat:  "reconciliation_verification",
+			Kubernetes: Kubernetes{Server: "https://100.115.121.9:6443", CertificateAuthority: "/etc/infra-reconcile/kubernetes-ca.crt"},
+		},
+		Scope:    reconcile.ScopeCloud,
+		Observer: App{AppID: 5080610, InstallationID: 164992211, API: "https://api.github.com"},
 	}
 }
 
@@ -51,25 +57,31 @@ func TestLoadConfigAcceptsTheDeclaredShape(t *testing.T) {
 
 func TestLoadConfigRejectsInvalidSettings(t *testing.T) {
 	for name, change := range map[string]func(*Config){
-		"repository credentials":  func(c *Config) { c.Repository = "https://token@github.com/fredrir/infra.git" },
-		"repository scheme":       func(c *Config) { c.Repository = "ssh://github.com/fredrir/infra.git" },
-		"relative state":          func(c *Config) { c.State = "var/lib/infra-verify" },
-		"unclean state":           func(c *Config) { c.State = "/var/lib/../infra-verify" },
-		"relative cache":          func(c *Config) { c.Cache = "var/cache/infra-verify" },
-		"cache is state":          func(c *Config) { c.Cache = c.State },
-		"cache inside state":      func(c *Config) { c.Cache = c.State + "/cache" },
-		"state inside cache":      func(c *Config) { c.Cache = "/var/lib" },
-		"bucket":                  func(c *Config) { c.Bucket = "Bucket_Name" },
-		"prefix":                  func(c *Config) { c.Prefix = "/reconciliation" },
-		"region":                  func(c *Config) { c.Region = "north" },
-		"endpoint":                func(c *Config) { c.Endpoint = "s3.local" },
-		"gatus":                   func(c *Config) { c.Gatus = "" },
-		"heartbeat":               func(c *Config) { c.Heartbeat = "reconciliation/verification" },
-		"plain kubernetes server": func(c *Config) { c.Kubernetes.Server = "http://100.115.121.9:6443" },
-		"relative authority":      func(c *Config) { c.Kubernetes.CertificateAuthority = "kubernetes-ca.crt" },
-		"observer app":            func(c *Config) { c.Observer.AppID = 0 },
-		"observer installation":   func(c *Config) { c.Observer.InstallationID = -1 },
-		"observer api":            func(c *Config) { c.Observer.API = "api.github.com" },
+		"repository credentials":   func(c *Config) { c.Repository = "https://token@github.com/fredrir/infra.git" },
+		"repository scheme":        func(c *Config) { c.Repository = "ssh://github.com/fredrir/infra.git" },
+		"relative state":           func(c *Config) { c.State = "var/lib/infra-verify" },
+		"unclean state":            func(c *Config) { c.State = "/var/lib/../infra-verify" },
+		"relative cache":           func(c *Config) { c.Cache = "var/cache/infra-verify" },
+		"cache is state":           func(c *Config) { c.Cache = c.State },
+		"cache inside state":       func(c *Config) { c.Cache = c.State + "/cache" },
+		"state inside cache":       func(c *Config) { c.Cache = "/var/lib" },
+		"bucket":                   func(c *Config) { c.Bucket = "Bucket_Name" },
+		"prefix":                   func(c *Config) { c.Prefix = "/reconciliation" },
+		"region":                   func(c *Config) { c.Region = "north" },
+		"endpoint":                 func(c *Config) { c.Endpoint = "s3.local" },
+		"gatus":                    func(c *Config) { c.Gatus = "" },
+		"heartbeat":                func(c *Config) { c.Heartbeat = "reconciliation/verification" },
+		"plain kubernetes server":  func(c *Config) { c.Kubernetes.Server = "http://100.115.121.9:6443" },
+		"relative authority":       func(c *Config) { c.Kubernetes.CertificateAuthority = "kubernetes-ca.crt" },
+		"shared is state":          func(c *Config) { c.Shared = c.State },
+		"shared inside cache":      func(c *Config) { c.Shared = c.Cache + "/shared" },
+		"relative shared":          func(c *Config) { c.Shared = "var/lib/infra-reconcile" },
+		"scope":                    func(c *Config) { c.Scope = "deep" },
+		"full without known hosts": func(c *Config) { c.Scope = reconcile.ScopeFull },
+		"relative known hosts":     func(c *Config) { c.Scope, c.KnownHosts = reconcile.ScopeFull, "known_hosts" },
+		"observer app":             func(c *Config) { c.Observer.AppID = 0 },
+		"observer installation":    func(c *Config) { c.Observer.InstallationID = -1 },
+		"observer api":             func(c *Config) { c.Observer.API = "api.github.com" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			config := validConfig()
