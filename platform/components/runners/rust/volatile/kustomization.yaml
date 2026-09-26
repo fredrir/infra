@@ -32,9 +32,3 @@ patches:
                 operator: In
                 values:
                 - 'true'
-    - op: replace
-      path: /spec/values/template/spec/containers/0/resources/limits/cpu
-      value: '8'
-    - op: replace
-      path: /spec/values/template/spec/containers/0/resources/limits/memory
-      value: 16Gi
