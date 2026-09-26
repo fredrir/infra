@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -56,6 +57,7 @@ type HostsSpec struct {
 
 type HostsOptions struct {
 	State   State
+	Nodes   []string
 	Runner  ci.Runner
 	Client  *http.Client
 	Timeout time.Duration
@@ -119,8 +121,8 @@ func readHostsSpec(root string) (HostsSpec, error) {
 		switch {
 		case !hostNamePattern.MatchString(node.Name) || names[node.Name]:
 			return spec, fmt.Errorf("%s: invalid or duplicate node name %q", hostsSpecFile, node.Name)
-		case node.Role != "server" && node.Role != "agent":
-			return spec, fmt.Errorf("%s: node %s role must be server or agent", hostsSpecFile, node.Name)
+		case node.Role != "server" && node.Role != "agent" && node.Role != "reconciler":
+			return spec, fmt.Errorf("%s: node %s role must be server, agent or reconciler", hostsSpecFile, node.Name)
 		case node.CPUs < 1 || node.MemoryMiB < 512 || node.DiskGiB < 8:
 			return spec, fmt.Errorf("%s: node %s needs at least 1 CPU, 512 MiB and 8 GiB", hostsSpecFile, node.Name)
 		case node.PrivateIP == "" || node.TailscaleIP == "":
@@ -174,8 +176,13 @@ func HostsUp(ctx context.Context, opts HostsOptions) (HostsStatus, error) {
 	if err != nil {
 		return HostsStatus{}, err
 	}
+	for _, name := range opts.Nodes {
+		if !slices.ContainsFunc(spec.Nodes, func(node HostSpec) bool { return node.Name == name }) {
+			return HostsStatus{}, fmt.Errorf("unknown node %q", name)
+		}
+	}
 	for index, node := range spec.Nodes {
-		if _, running := opts.pid(node.Name); running {
+		if _, running := opts.pid(node.Name); running || (len(opts.Nodes) > 0 && !slices.Contains(opts.Nodes, node.Name)) {
 			continue
 		}
 		if err := opts.launch(ctx, spec, node, index, image, public, tokens); err != nil {
@@ -186,7 +193,12 @@ func HostsUp(ctx context.Context, opts HostsOptions) (HostsStatus, error) {
 	if err := opts.writeInventory(spec, key); err != nil {
 		return HostsStatus{}, err
 	}
-	if err := opts.awaitSSH(ctx, spec); err != nil {
+	running := spec
+	running.Nodes = slices.DeleteFunc(slices.Clone(spec.Nodes), func(node HostSpec) bool {
+		_, alive := opts.pid(node.Name)
+		return !alive
+	})
+	if err := opts.awaitSSH(ctx, running); err != nil {
 		return HostsStatus{}, err
 	}
 	return opts.status(spec), nil
@@ -331,10 +343,7 @@ func writeSeed(path string, node HostSpec, index int, public string, tokens map[
 	}
 	defer writer.Cleanup()
 	userData := fmt.Sprintf("#cloud-config\nhostname: %s\nmanage_etc_hosts: true\nssh_pwauth: false\npackage_update: true\nusers:\n- name: %s\n  sudo: ALL=(ALL) NOPASSWD:ALL\n  shell: /bin/bash\n  lock_passwd: true\n  ssh_authorized_keys:\n  - %s\nwrite_files:\n", node.Name, hostsUser, public)
-	roles := []string{"agent"}
-	if node.Role == "server" {
-		roles = []string{"server", "agent"}
-	}
+	roles := map[string][]string{"server": {"server", "agent"}, "agent": {"agent"}}[node.Role]
 	for _, role := range roles {
 		userData += fmt.Sprintf("- path: /etc/rancher/k3s/%s-token\n  owner: root:root\n  permissions: '0600'\n  content: %s\n", role, tokens[role])
 	}
@@ -364,14 +373,9 @@ func (opts HostsOptions) writeInventory(spec HostsSpec, key string) error {
 	if err != nil {
 		return err
 	}
-	servers, agents := map[string]any{}, map[string]any{}
+	groups := map[string]map[string]any{"server": {}, "agent": {}, "reconciler": {}}
 	for _, node := range spec.Nodes {
-		host := map[string]any{"ansible_host": "127.0.0.1", "ansible_port": node.SSHPort, "private_ip": node.PrivateIP, "tailscale_ip": node.TailscaleIP, "provider": "dev", "architecture": "amd64", "public_ipv4": node.PrivateIP}
-		if node.Role == "server" {
-			servers[node.Name] = host
-		} else {
-			agents[node.Name] = host
-		}
+		groups[node.Role][node.Name] = map[string]any{"ansible_host": "127.0.0.1", "ansible_port": node.SSHPort, "private_ip": node.PrivateIP, "tailscale_ip": node.TailscaleIP, "provider": "dev", "architecture": "amd64", "public_ipv4": node.PrivateIP}
 	}
 	inventory := map[string]any{"all": map[string]any{
 		"vars": map[string]any{
@@ -380,9 +384,12 @@ func (opts HostsOptions) writeInventory(spec HostsSpec, key string) error {
 			"ubuntu_release": release, "firewall_admin_ipv4_cidrs": []string{"10.0.2.0/24", "10.60.0.0/24", "100.64.0.0/24"},
 			"infra_reconcile_tailnet": false, "admin_machines": map[string]any{}, "planned_nodes": map[string]any{},
 		},
-		"children": map[string]any{"ubuntu": map[string]any{"children": map[string]any{"k3s_cluster": map[string]any{"children": map[string]any{
-			"server": map[string]any{"hosts": servers}, "agent": map[string]any{"hosts": agents},
-		}}}}},
+		"children": map[string]any{
+			"ubuntu": map[string]any{"children": map[string]any{"k3s_cluster": map[string]any{"children": map[string]any{
+				"server": map[string]any{"hosts": groups["server"]}, "agent": map[string]any{"hosts": groups["agent"]},
+			}}}},
+			"reconcilers": map[string]any{"hosts": groups["reconciler"]},
+		},
 	}}
 	data, err := yaml.Marshal(inventory)
 	if err != nil {

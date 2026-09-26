@@ -21,6 +21,7 @@ type Suite struct {
 	RootVariable   string
 	BinaryVariable string
 	Engine         string
+	Hosts          []string
 }
 
 var Suites = []Suite{
@@ -31,6 +32,7 @@ var Suites = []Suite{
 	{Name: "kustomize", Package: "./internal/kustomize", Test: "^TestBuildMatchesKubectlOnRepositoryOverlays$", Tools: []string{"kubectl"}, Env: []string{"INFRA_KUSTOMIZE_QUALIFY=1"}, RootVariable: "INFRA_TEST_SOURCE_ROOT"},
 	{Name: "packages", Package: "./internal/packages", Test: "Qualification$", Tools: []string{"nfpm", "gpg", "openssl", "go"}, Env: []string{"INFRA_PACKAGE_QUALIFY=1"}, BinaryVariable: "INFRA_QUALIFICATION_BINARY", Engine: "build"},
 	{Name: "kata", Package: "./internal/kata", Test: "^TestDaggerExecutesBoundedWorker$", Env: []string{"INFRA_KATA_ENGINE_TEST=1"}, BinaryVariable: "INFRA_KATA_BINARY", Engine: "kata"},
+	{Name: "reconciler", Package: "./internal/reconciler", Test: "^TestReconcilerQualification$", Tools: []string{"sops"}, Env: []string{"INFRA_RECONCILER_QUALIFY=1"}, RootVariable: "INFRA_TEST_SOURCE_ROOT", BinaryVariable: "INFRA_QUALIFICATION_BINARY", Hosts: []string{"dev-reconciler-1"}},
 }
 
 func SuiteNames() []string {
@@ -111,6 +113,11 @@ func Qualify(ctx context.Context, opts QualifyOptions) error {
 			return err
 		}
 		env = append(env, "_EXPERIMENTAL_DAGGER_RUNNER_HOST="+status.RunnerHost)
+	}
+	if len(suite.Hosts) > 0 {
+		if _, err := HostsUp(ctx, HostsOptions{State: opts.State, Nodes: suite.Hosts, Runner: opts.Runner, Log: opts.Log}); err != nil {
+			return err
+		}
 	}
 	arguments := append([]string{"test", "-count=1", "-v", "-run", suite.Test, suite.Package}, opts.Args...)
 	fmt.Fprintln(opts.Log, "Suite:", suite.Name, strings.Join(arguments, " "))

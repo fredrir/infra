@@ -132,3 +132,9 @@ filegroup(
     srcs = glob(["ansible/roles/reconciler/**"]),
     visibility = ["//internal/reconciler:__pkg__"],
 )
+
+filegroup(
+    name = "dev_hosts_data",
+    srcs = ["dev/hosts/hosts.yaml"],
+    visibility = ["//internal/dev:__pkg__"],
+)

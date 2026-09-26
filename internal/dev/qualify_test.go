@@ -88,3 +88,20 @@ func TestQualifyRunsGatedSuitesWithTheirPrerequisites(t *testing.T) {
 		t.Fatalf("failed suites ran tests: %d", len(tests))
 	}
 }
+
+func TestSuiteHostsAreDeclaredGuests(t *testing.T) {
+	spec, err := readHostsSpec(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, suite := range Suites {
+		for _, host := range suite.Hosts {
+			if !slices.ContainsFunc(spec.Nodes, func(node HostSpec) bool { return node.Name == host }) {
+				t.Errorf("suite %s needs undeclared guest %s", suite.Name, host)
+			}
+		}
+	}
+	if suite := Suites[slices.IndexFunc(Suites, func(suite Suite) bool { return suite.Name == "reconciler" })]; !slices.Equal(suite.Hosts, []string{"dev-reconciler-1"}) || suite.BinaryVariable == "" {
+		t.Fatalf("reconciler suite %+v", suite)
+	}
+}

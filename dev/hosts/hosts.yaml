@@ -20,3 +20,11 @@ nodes:
   private_ip: 10.60.0.21
   tailscale_ip: 100.64.0.21
   ssh_port: 2221
+- name: dev-reconciler-1
+  role: reconciler
+  cpus: 4
+  memory_mib: 4096
+  disk_gib: 30
+  private_ip: 10.60.0.31
+  tailscale_ip: 100.64.0.31
+  ssh_port: 2231

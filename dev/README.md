@@ -15,6 +15,7 @@
 | `.cache/dev/cluster` | Kubeconfig, dev age key, pushed artifact, generated `root.yaml` |
 | `dev/hosts/hosts.yaml` | Guest nodes, pinned Ubuntu cloud image, multicast segment |
 | `.cache/dev/hosts` | Base image, guest disks, seeds, serial logs, SSH key, inventory, known hosts |
+| `.cache/dev/reconciler` | MinIO and Gatus binaries and per-run scratch of the `reconciler` suite |
 | `dev/bench/scenarios.yaml` | Commands, optional setup, runs, warmups and budgets sampled by hyperfine; `{infra}` is the built binary |
 | `.cache/dev/bench` | Timestamped samples, `latest.json`, `go-baseline.txt` |
 
@@ -33,6 +34,8 @@ infra dev cluster sync --profile platform
 KUBECONFIG=.cache/dev/cluster/kubeconfig kubectl get kustomizations -A
 infra dev cluster down
 infra dev hosts up
+infra dev hosts up dev-reconciler-1
+infra dev qualify reconciler -- -timeout=60m
 infra dev hosts check site.yml
 infra dev hosts play site.yml
 infra dev hosts ssh dev-server-1 -- sudo k3s kubectl get nodes
@@ -47,6 +50,7 @@ infra dev clean --all
 | Role | Guests |
 | --- | --- |
 | `ubuntu`, `firewall`, `k3s` | `site.yml` runs against `dev-server-1` and `dev-agent-1` |
+| `reconciler` | `reconciler.yml` runs against `dev-reconciler-1`, in `reconcilers` outside `ubuntu`, with `--skip-tags=transport,infra_binary` |
 | `tailscale` | Skipped; `tailscale0` is a renamed multicast NIC carrying the fake tailnet address at MTU 1280, and a stub `tailscaled.service` satisfies the K3s unit dependency |
 | `build_vm`, `build_engine`, `build_runner`, `ci_runtime`, `gatus`, `control_backup` | Need nested KVM, GitHub credentials or secrets encrypted to the guest host key |
 
@@ -65,6 +69,7 @@ infra dev clean --all
 | `kustomize` | `INFRA_KUSTOMIZE_QUALIFY=1` | kubectl |
 | `packages` | `INFRA_PACKAGE_QUALIFY=1` | nfpm, gpg, openssl, go, engine, binary |
 | `kata` | `INFRA_KATA_ENGINE_TEST=1` | kata engine profile, binary |
+| `reconciler` | `INFRA_RECONCILER_QUALIFY=1` | `dev-reconciler-1`, started by the suite; binary; Git daemon; Go; MinIO built from its pinned module and Gatus from the role's pinned layer, both on loopback |
 
 | Platform | Support |
 | --- | --- |

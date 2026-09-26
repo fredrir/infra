@@ -365,3 +365,82 @@ func TestHostsSpecValidation(t *testing.T) {
 		t.Fatalf("valid spec rejected: %v %+v", err, spec)
 	}
 }
+
+func TestHostsUpStartsSelectedNodesAndKeepsTheReconcilerOutsideTheCluster(t *testing.T) {
+	root, server := hostsRoot(t)
+	spec, err := os.ReadFile(filepath.Join(root, hostsSpecFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, hostsSpecFile), string(spec)+"- name: dev-reconciler-1\n  role: reconciler\n  cpus: 4\n  memory_mib: 4096\n  disk_gib: 30\n  private_ip: 10.60.0.31\n  tailscale_ip: 100.64.0.31\n  ssh_port: 2231\n")
+	fake := newHostsFake(t, root)
+	opts := HostsOptions{State: NewState(root), Runner: fake.runner(), Client: server.Client(), Signal: fake.signal, Log: io.Discard}
+	opts.Nodes = []string{"dev-missing-1"}
+	if _, err := HostsUp(context.Background(), opts); err == nil || !strings.Contains(err.Error(), `unknown node "dev-missing-1"`) {
+		t.Fatalf("unknown node returned %v", err)
+	}
+	opts.Nodes = []string{"dev-reconciler-1"}
+	if _, err := HostsUp(context.Background(), opts); err != nil {
+		t.Fatal(err)
+	}
+	if fake.count("qemu-system-x86_64") != 1 || fake.count("qemu-system-x86_64 -name dev-reconciler-1") != 1 || fake.count("ssh-keyscan") != 1 {
+		t.Fatalf("selection launched %v", fake.commands)
+	}
+	seed, err := os.Open(filepath.Join(root, ".cache/dev/hosts/dev-reconciler-1/seed.iso"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer seed.Close()
+	iso, err := iso9660.OpenImage(seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory, err := iso.RootDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	children, err := directory.GetChildren()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range children {
+		if strings.ToLower(entry.Name()) != "user-data" {
+			continue
+		}
+		data, err := io.ReadAll(entry.Reader())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), "/etc/rancher/k3s/") || !strings.Contains(string(data), "path: /etc/systemd/system/tailscaled.service") {
+			t.Fatalf("reconciler seed:\n%s", data)
+		}
+	}
+	data, err := os.ReadFile(opts.State.Inventory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inventory struct {
+		All struct {
+			Children struct {
+				Ubuntu      map[string]any `yaml:"ubuntu"`
+				Reconcilers struct {
+					Hosts map[string]map[string]any `yaml:"hosts"`
+				} `yaml:"reconcilers"`
+			} `yaml:"children"`
+		} `yaml:"all"`
+	}
+	if err := yaml.Unmarshal(data, &inventory); err != nil {
+		t.Fatal(err)
+	}
+	if host := inventory.All.Children.Reconcilers.Hosts["dev-reconciler-1"]; host["ansible_port"] != 2231 || host["tailscale_ip"] != "100.64.0.31" || strings.Contains(fmt.Sprint(inventory.All.Children.Ubuntu), "dev-reconciler-1") {
+		t.Fatalf("reconciler inventory:\n%s", data)
+	}
+	fake.commands = nil
+	opts.Nodes = nil
+	if _, err := HostsUp(context.Background(), opts); err != nil {
+		t.Fatal(err)
+	}
+	if fake.count("qemu-system-x86_64") != 2 || fake.count("qemu-system-x86_64 -name dev-reconciler-1") != 0 || fake.count("ssh-keyscan") != 3 {
+		t.Fatalf("remaining guests launched with %v", fake.commands)
+	}
+}

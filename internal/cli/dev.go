@@ -159,9 +159,11 @@ func newDevCommand() *cobra.Command {
 	hostsOptions := func(cmd *cobra.Command) dev.HostsOptions {
 		return dev.HostsOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: cmd.ErrOrStderr()}, Timeout: hostsTimeout, Log: cmd.ErrOrStderr()}
 	}
-	hostsUp := &cobra.Command{Use: "up", Short: "Download the pinned image, boot the guests and write the dev inventory", Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			status, err := dev.HostsUp(cmd.Context(), hostsOptions(cmd))
+	hostsUp := &cobra.Command{Use: "up [NODE...]", Short: "Download the pinned image, boot the guests and write the dev inventory", Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, nodes []string) error {
+			options := hostsOptions(cmd)
+			options.Nodes = nodes
+			status, err := dev.HostsUp(cmd.Context(), options)
 			return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(status))
 		}}
 	hostsStatus := &cobra.Command{Use: "status", Short: "Print guest state", Args: cobra.NoArgs,
