@@ -1,7 +1,25 @@
 data "aws_caller_identity" "reconciliation" {}
 
+variable "reconciler_ipv4" {
+  type    = string
+  default = null
+
+  validation {
+    condition = var.reconciler_ipv4 == null ? true : (
+      can(regex("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", var.reconciler_ipv4)) &&
+      try(cidrhost("${var.reconciler_ipv4}/32", 0) == var.reconciler_ipv4, false) &&
+      try(!anytrue([
+        for range in ["0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16", "224.0.0.0/4", "240.0.0.0/4"] :
+        cidrcontains(range, var.reconciler_ipv4)
+      ]), false)
+    )
+    error_message = "The reconciler address must be a single public IPv4 address."
+  }
+}
+
 locals {
-  reconciliation_identities = toset(["plan", "apply"])
+  reconciliation_identities = toset(concat(["plan", "apply"], var.reconciler_ipv4 == null ? [] : ["verify"]))
+  reconciler_source         = var.reconciler_ipv4 == null ? [] : ["${var.reconciler_ipv4}/32"]
   reconciliation_iam        = "arn:aws:iam::${data.aws_caller_identity.reconciliation.account_id}"
   reconciliation_users      = ["${local.reconciliation_iam}:user/platform/*"]
   reconciliation_policies   = [for policy in ["platform/*", "pyparser-dataset-*"] : "${local.reconciliation_iam}:policy/${policy}"]
@@ -70,11 +88,13 @@ resource "aws_iam_policy" "reconciliation" {
         Action   = ["s3:GetObject"]
         Resource = ["${data.aws_s3_bucket.dataset.arn}/tofu-state/infra.tfstate", "${data.aws_s3_bucket.dataset.arn}/reconciliation/production/*"]
       },
-      {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-        Resource = ["${data.aws_s3_bucket.dataset.arn}/tofu-state/infra.tfstate.tflock"]
-      },
+      ], [for statement in [
+        {
+          Effect   = "Allow"
+          Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+          Resource = ["${data.aws_s3_bucket.dataset.arn}/tofu-state/infra.tfstate.tflock"]
+        },
+      ] : statement if each.key != "verify"], [
       {
         Effect = "Allow"
         Action = [
@@ -149,7 +169,23 @@ resource "aws_iam_policy" "reconciliation" {
           Action   = local.iam_policy_writes
           Resource = [aws_iam_policy.workload_boundary.arn]
         },
-    ] : statement if each.key == "apply"])
+        ] : statement if each.key == "apply"], [for statement in [
+        {
+          Effect   = "Allow"
+          Action   = ["s3:PutObject"]
+          Resource = ["${data.aws_s3_bucket.dataset.arn}/reconciliation/production/runs/*"]
+        },
+        {
+          Sid      = "RequireReconcilerAddress"
+          Effect   = "Deny"
+          Action   = ["*"]
+          Resource = ["*"]
+          Condition = {
+            NotIpAddress = { "aws:SourceIp" = local.reconciler_source }
+            Bool         = { "aws:ViaAWSService" = "false" }
+          }
+        },
+    ] : statement if each.key == "verify"])
   })
 }
 

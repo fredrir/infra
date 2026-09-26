@@ -55,6 +55,31 @@ resource "aws_s3_bucket_lifecycle_configuration" "dataset" {
       expired_object_delete_marker = true
     }
   }
+
+  rule {
+    id     = "expire-reconciliation-runs"
+    status = "Enabled"
+    filter {
+      prefix = "reconciliation/production/runs/"
+    }
+    expiration {
+      days = 30
+    }
+  }
+
+  rule {
+    id     = "expire-noncurrent-reconciliation-state"
+    status = "Enabled"
+    filter {
+      prefix = "reconciliation/production/"
+    }
+    noncurrent_version_expiration {
+      noncurrent_days = 7
+    }
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
 }
 
 # ---- IAM ----
