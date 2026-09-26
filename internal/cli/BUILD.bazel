@@ -46,6 +46,7 @@ go_library(
 go_test(
     name = "cli_test",
     srcs = ["cli_test.go"],
+    data = ["//:workflows"],
     deps = [
         ":cli",
         "//internal/reconcile",

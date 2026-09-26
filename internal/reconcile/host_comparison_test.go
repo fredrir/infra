@@ -115,7 +115,7 @@ func TestHostComparisonClassifiesCheckModeResults(t *testing.T) {
 				}
 				return map[string]fakePlaybooks{"reconcile.yml": test.reconcile, "external.yml": test.external}[playbookArgument(options)].execute(t, options)
 			}}}
-			outcome := VerificationOutcome("", true, commands.compareHosts(context.Background()))
+			outcome := VerificationOutcome("", ScopeFull, commands.compareHosts(context.Background()))
 			slices.SortFunc(calls, slices.Compare)
 			if want := [][]string{{"-i", "inventory/production.yml", "external.yml", "--check", "--skip-tags=runners"}, {"-i", "inventory/production.yml", "reconcile.yml", "--check", "--skip-tags=runners"}}; !slices.EqualFunc(calls, want, slices.Equal) {
 				t.Fatalf("host comparison ran %q, want %q", calls, want)
@@ -200,7 +200,7 @@ func TestRunnerVerificationReportsRunnerPlayDifferences(t *testing.T) {
 				}
 				return process.Result{}, fmt.Errorf("unexpected command %s", options.Name)
 			}}}
-			outcome := VerificationOutcome("", false, commands.VerifyHosts(context.Background(), Plan{Affected: All()}))
+			outcome := VerificationOutcome("", ScopeCloud, commands.VerifyHosts(context.Background(), Plan{Affected: All()}))
 			if !reflect.DeepEqual(outcome.Differences, append([]Difference{}, test.differences...)) || !reflect.DeepEqual(outcome.Errors, append([]string{}, test.errors...)) {
 				t.Fatalf("runner verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
 			}
@@ -226,9 +226,9 @@ func TestVerificationOutcomeSeparatesDifferencesFromErrors(t *testing.T) {
 		{name: "both", err: errors.Join(errors.New("flux-system is not ready"), hosts), want: Verification{Outcome: OutcomeDiffers, Differences: hosts, Errors: []string{"flux-system is not ready"}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			got := VerificationOutcome("abc", true, test.err)
+			got := VerificationOutcome("abc", ScopeFull, test.err)
 			want := test.want
-			want.Revision, want.Deep = "abc", true
+			want.Revision, want.Scope = "abc", ScopeFull
 			want.Differences = append([]Difference{}, want.Differences...)
 			want.Errors = append([]string{}, want.Errors...)
 			if !reflect.DeepEqual(got, want) {
@@ -292,9 +292,9 @@ func TestDeclarationComparisonCombinesOpenTofuAndHosts(t *testing.T) {
 				t.Errorf("unexpected command %s", command)
 				return process.Result{}, errors.New("unexpected command")
 			}}}
-			got := VerificationOutcome("", true, commands.compareDeclarations(context.Background()))
+			got := VerificationOutcome("", ScopeFull, commands.compareDeclarations(context.Background()))
 			want := test.want
-			want.Deep = true
+			want.Scope = ScopeFull
 			want.Differences = append([]Difference{}, want.Differences...)
 			want.Errors = append([]string{}, want.Errors...)
 			if !reflect.DeepEqual(got, want) {
@@ -386,8 +386,8 @@ func TestDeepVerificationComparesDeclarationsDuringLiveChecks(t *testing.T) {
 		return process.Result{}, errors.New("unexpected command")
 	}}}
 	plan := Plan{Revision: strings.Repeat("a", 40), Affected: Selection{Kubernetes: true, Ansible: true, HostScope: HostScopeRunners, Projects: []string{"portfolio"}}}
-	got := VerificationOutcome("", true, commands.VerifyDeep(ctx, plan))
-	want := Verification{Deep: true, Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"kubectl failed: connection refused"}}
+	got := VerificationOutcome("", ScopeFull, commands.VerifyFull(ctx, plan))
+	want := Verification{Scope: ScopeFull, Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"kubectl failed: connection refused"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("deep verification reported %+v, want %+v", got, want)
 	}

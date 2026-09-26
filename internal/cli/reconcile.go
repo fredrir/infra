@@ -19,8 +19,8 @@ import (
 )
 
 func newReconcileCommand() *cobra.Command {
-	var root, bucket, prefix, base, report, provenanceBase string
-	var full, deep bool
+	var root, bucket, prefix, base, report, provenanceBase, scope string
+	var full bool
 	var wait time.Duration
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
 	command.AddCommand(newRequestVerificationCommand())
@@ -43,7 +43,8 @@ func newReconcileCommand() *cobra.Command {
 			child.Flags().StringVar(&provenanceBase, "provenance-base", "", "Verify commit provenance from this revision instead of the applied one")
 		}
 		if action == "verify" {
-			child.Flags().BoolVar(&deep, "deep", false, "Also compare OpenTofu and every host play with production in check mode")
+			child.Flags().StringVar(&scope, "scope", "", "cloud: without host access; full: also host plays in check mode")
+			child.MarkFlagRequired("scope")
 		}
 		child.RunE = func(cmd *cobra.Command, _ []string) (err error) {
 			runnerToken, publisherKeyFile := os.Getenv("GH_TOKEN"), os.Getenv("PUBLISHER_APP_PRIVATE_KEY_FILE")
@@ -61,10 +62,16 @@ func newReconcileCommand() *cobra.Command {
 			}
 			var verified string
 			var compared error
-			if action == "verify" && report != "" {
-				defer func() {
-					err = errors.Join(err, writeReport(report, reconcile.VerificationOutcome(verified, deep, errors.Join(compared, err))))
-				}()
+			var verification reconcile.Scope
+			if action == "verify" {
+				if verification, err = reconcile.ParseScope(scope); err != nil {
+					return err
+				}
+				if report != "" {
+					defer func() {
+						err = errors.Join(err, writeReport(report, reconcile.VerificationOutcome(verified, verification, errors.Join(compared, err))))
+					}()
+				}
 			}
 			absolute, err := filepath.Abs(root)
 			if err != nil {
@@ -138,7 +145,7 @@ func newReconcileCommand() *cobra.Command {
 				return engine.Apply(cmd.Context(), full)
 			}
 			if action == "verify" {
-				verified, compared = reconcile.Verifier{Store: store, Ops: ops, Host: host, Deep: deep}.Verify(cmd.Context())
+				verified, compared = reconcile.Verifier{Store: store, Ops: ops, Host: host, Scope: verification}.Verify(cmd.Context())
 				return reconcile.WithoutDegraded(compared)
 			}
 			revision, err := ops.Revision(cmd.Context())

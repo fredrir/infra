@@ -35,17 +35,33 @@ const (
 	OutcomeFailed  = "failed"
 )
 
+type Scope string
+
+const (
+	ScopeCloud Scope = "cloud"
+	ScopeFull  Scope = "full"
+)
+
+func ParseScope(value string) (Scope, error) {
+	switch scope := Scope(value); scope {
+	case ScopeCloud, ScopeFull:
+		return scope, nil
+	default:
+		return "", fmt.Errorf("verification scope %q is not %s or %s", value, ScopeCloud, ScopeFull)
+	}
+}
+
 type Verification struct {
 	Revision    string       `json:"revision,omitempty"`
-	Deep        bool         `json:"deep"`
+	Scope       Scope        `json:"scope"`
 	Outcome     string       `json:"outcome"`
 	Differences []Difference `json:"differences"`
 	Errors      []string     `json:"errors"`
 	Degraded    []string     `json:"degraded,omitempty"`
 }
 
-func VerificationOutcome(revision string, deep bool, err error) Verification {
-	verification := Verification{Revision: revision, Deep: deep, Differences: []Difference{}, Errors: []string{}}
+func VerificationOutcome(revision string, scope Scope, err error) Verification {
+	verification := Verification{Revision: revision, Scope: scope, Differences: []Difference{}, Errors: []string{}}
 	var degrade func(error)
 	degrade = func(err error) {
 		switch err := err.(type) {
@@ -102,8 +118,8 @@ type VerificationOperations interface {
 	OnMain(context.Context, string) (bool, error)
 	VerifyRulesets(context.Context) error
 	Select(context.Context, string, bool) (Selection, error)
-	VerifyLive(context.Context, Plan) error
-	VerifyDeep(context.Context, Plan) error
+	VerifyCloud(context.Context, Plan) error
+	VerifyFull(context.Context, Plan) error
 }
 
 type VerificationStore interface {
@@ -115,10 +131,13 @@ type Verifier struct {
 	Store VerificationStore
 	Ops   VerificationOperations
 	Host  string
-	Deep  bool
+	Scope Scope
 }
 
 func (v Verifier) Verify(ctx context.Context) (string, error) {
+	if _, err := ParseScope(string(v.Scope)); err != nil {
+		return "", err
+	}
 	if err := v.Store.Unlocked(ctx); err != nil {
 		return "", fmt.Errorf("comparisons skipped: %w", err)
 	}
@@ -157,9 +176,9 @@ func (v Verifier) compare(ctx context.Context) (string, error) {
 		revision = published
 	}
 	plan := Plan{Revision: revision, Affected: All(), Host: v.Host}
-	verify := v.Ops.VerifyLive
-	if v.Deep {
-		verify = v.Ops.VerifyDeep
+	verify := v.Ops.VerifyCloud
+	if v.Scope == ScopeFull {
+		verify = v.Ops.VerifyFull
 	}
 	return revision, errors.Join(standing, verify(ctx, plan))
 }

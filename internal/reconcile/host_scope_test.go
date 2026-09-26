@@ -157,7 +157,7 @@ func TestHostVerificationReportsEveryFailure(t *testing.T) {
 		return process.Result{}, failure
 	}}}
 	err := commands.VerifyHosts(context.Background(), Plan{Affected: All()})
-	if want := []string{"verify.yml was not compared: verification failed", "verify-runners.yml was not compared: verification failed"}; !errors.Is(err, failure) || !reflect.DeepEqual(VerificationOutcome("", false, err).Errors, want) || int(queried.Load()) != len(fleet.Repositories) {
+	if want := []string{"verify.yml was not compared: verification failed", "verify-runners.yml was not compared: verification failed"}; !errors.Is(err, failure) || !reflect.DeepEqual(VerificationOutcome("", ScopeCloud, err).Errors, want) || int(queried.Load()) != len(fleet.Repositories) {
 		t.Fatalf("host verification hid a failing part: fleet queries=%d, error=%v", queried.Load(), err)
 	}
 	calls.Store(0)

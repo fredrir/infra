@@ -39,7 +39,7 @@ func TestReplicaCountDiffersOnlyWhenDeclared(t *testing.T) {
 		{name: "undeclared", expected: `{"kind":"Deployment","spec":{"template":{"spec":{"containers":[{"name":"api","image":"example@sha256:desired"}]}}}}`, want: Verification{Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"Deployment y/api runs 3 replicas, want the default 1"}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if got := VerificationOutcome("", false, workloadReady(artifactFixture(t, test.expected), actual)); !reflect.DeepEqual(got, test.want) {
+			if got := VerificationOutcome("", "", workloadReady(artifactFixture(t, test.expected), actual)); !reflect.DeepEqual(got, test.want) {
 				t.Fatalf("scaled workload reported %+v, want %+v", got, test.want)
 			}
 		})

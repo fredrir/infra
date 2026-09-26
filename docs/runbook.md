@@ -35,9 +35,10 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | --- | --- | --- |
 | Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu tests, expansion and final-state plans, Flux rendering, Ansible task lists |
 | Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout, gated on OpenTofu tests; apply against the last successful revision |
-| Hourly verification | `infra-verification-request.timer` on `fredrir-06` → `reconcile.yml` with `verify=true`, `repair=true` → `infra reconcile verify --deep --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and each host playbook; a report listing differences dispatches one full reconciliation of `main` |
+| Hourly verification | `infra-verification-request.timer` on `fredrir-06` → `reconcile.yml` with `verify=true`, `repair=true` → `infra reconcile verify --scope=full --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and each host playbook; a report listing differences dispatches one full reconciliation of `main` |
 | On-demand verification | `gh workflow run reconcile.yml --ref main -f verify=true` | The hourly verification on demand; differences are reported without dispatching a reconciliation unless `-f repair=true` |
-| Verification | `infra reconcile verify` | Reconciliation lock and recorded status, exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision; every comparison runs when another fails |
+| Cloud verification | `infra reconcile verify --scope=cloud` | Reconciliation lock and recorded status, rulesets, exact Flux revision, observed generations, Helm readiness, runner listeners and registrations, Grafana configuration and HTTP health, frontend revision, OpenTofu plan comparison; no host access; every comparison runs when another fails |
+| Full verification | `infra reconcile verify --scope=full` | Cloud verification plus host checks and each host playbook compared in check mode; root-equivalent on every host |
 | Status | `infra reconcile status` | Desired revision, successfully applied revision, failing stage and stage durations |
 
 | Verification report | Value |
@@ -142,7 +143,7 @@ go build -o .infra/bin/infra ./cmd/infra
 publisher_key() { key="$(mktemp)" && doppler secrets get PUBLISHER_APP_PRIVATE_KEY --project infra --config prd_reconciliation_apply --plain > "$key" && printf '%s\n' "$key"; }
 PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" .infra/bin/infra reconcile apply --report .infra/reconciliation/status.json
 .infra/bin/infra reconcile status
-.infra/bin/infra reconcile verify
+.infra/bin/infra reconcile verify --scope=full
 PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" .infra/bin/infra reconcile apply --full
 ```
 

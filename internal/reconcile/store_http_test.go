@@ -428,9 +428,9 @@ func TestVerificationDefersToHeldReconciliationLock(t *testing.T) {
 		want         Verification
 	}{
 		{name: "held", lease: &lease{Owner: "local", Expires: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)}, want: Verification{Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"comparisons skipped: reconciliation locked by local until 2099-01-01 00:00:00 +0000 UTC"}}},
-		{name: "expired", lease: &lease{Owner: "orphaned", Expires: time.Now().Add(-time.Minute)}, wantCompared: []string{"deep c"}, want: Verification{Revision: "c", Outcome: OutcomeDiffers, Differences: recovery, Errors: []string{}}},
-		{name: "absent", wantCompared: []string{"deep c"}, want: Verification{Revision: "c", Outcome: OutcomeDiffers, Differences: recovery, Errors: []string{}}},
-		{name: "taken during comparison", taken: &lease{Owner: "local", Expires: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)}, wantCompared: []string{"deep c"}, want: Verification{Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"comparisons discarded: reconciliation locked by local until 2099-01-01 00:00:00 +0000 UTC"}}},
+		{name: "expired", lease: &lease{Owner: "orphaned", Expires: time.Now().Add(-time.Minute)}, wantCompared: []string{"full c"}, want: Verification{Revision: "c", Outcome: OutcomeDiffers, Differences: recovery, Errors: []string{}}},
+		{name: "absent", wantCompared: []string{"full c"}, want: Verification{Revision: "c", Outcome: OutcomeDiffers, Differences: recovery, Errors: []string{}}},
+		{name: "taken during comparison", taken: &lease{Owner: "local", Expires: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)}, wantCompared: []string{"full c"}, want: Verification{Outcome: OutcomeFailed, Differences: []Difference{}, Errors: []string{"comparisons discarded: reconciliation locked by local until 2099-01-01 00:00:00 +0000 UTC"}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			lockReads := 0
@@ -464,13 +464,13 @@ func TestVerificationDefersToHeldReconciliationLock(t *testing.T) {
 			defer server.Close()
 			store := S3Store{Bucket: "bucket", Prefix: "production", Client: &objectstore.Client{Endpoint: server.URL, Region: "eu-north-1", AccessKey: "access", SecretKey: "secret", HTTP: server.Client()}}
 			ops := &verificationOps{revision: "c", published: "c"}
-			verified, err := Verifier{Store: store, Ops: ops, Host: "logs.fredrir.com", Deep: true}.Verify(context.Background())
+			verified, err := Verifier{Store: store, Ops: ops, Host: "logs.fredrir.com", Scope: ScopeFull}.Verify(context.Background())
 			if !reflect.DeepEqual(ops.compared, test.wantCompared) {
 				t.Errorf("compared %q, want %q", ops.compared, test.wantCompared)
 			}
 			want := test.want
-			want.Deep = true
-			if got := VerificationOutcome(verified, true, err); !reflect.DeepEqual(got, want) {
+			want.Scope = ScopeFull
+			if got := VerificationOutcome(verified, ScopeFull, err); !reflect.DeepEqual(got, want) {
 				t.Fatalf("outcome %+v, want %+v", got, want)
 			}
 		})

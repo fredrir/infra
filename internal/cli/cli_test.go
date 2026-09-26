@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -76,7 +78,7 @@ func TestCommandValidation(t *testing.T) {
 			t.Errorf("accepted invalid command %q", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--deep", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "provenance", "--provenance-base=" + strings.Repeat("a", 40), "--help"}, {"reconcile", "request-verification", "--help"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--scope=cloud", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "provenance", "--provenance-base=" + strings.Repeat("a", 40), "--help"}, {"reconcile", "request-verification", "--help"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
 			t.Errorf("command %q: %v, output=%q", args, err, &output)
@@ -143,7 +145,11 @@ func TestReconcileConsumesThePublisherKeyFileAndRunnerToken(t *testing.T) {
 		t.Setenv("PUBLISHER_APP_PRIVATE_KEY_FILE", key)
 		t.Setenv("GH_TOKEN", "runner-secret")
 		output.Reset()
-		cli.Run(context.Background(), []string{"reconcile", action, "--root", t.TempDir()}, &output, &output)
+		args := []string{"reconcile", action, "--root", t.TempDir()}
+		if action == "verify" {
+			args = append(args, "--scope=cloud")
+		}
+		cli.Run(context.Background(), args, &output, &output)
 		if _, err := os.Stat(key); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("%s left the publisher key file: %v", action, err)
 		}
@@ -170,26 +176,62 @@ func TestReconcileConsumesThePublisherKeyFileAndRunnerToken(t *testing.T) {
 }
 
 func TestVerificationWritesItsOutcomeReport(t *testing.T) {
-	report := filepath.Join(t.TempDir(), "reports", "verification.json")
-	var output bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"reconcile", "verify", "--deep", "--root", t.TempDir(), "--report", report}, &output, &output); err == nil {
-		t.Fatal("verification without declarations succeeded")
+	for _, scope := range []string{"cloud", "full"} {
+		t.Run(scope, func(t *testing.T) {
+			report := filepath.Join(t.TempDir(), "reports", "verification.json")
+			var output bytes.Buffer
+			if err := cli.Run(context.Background(), []string{"reconcile", "verify", "--scope=" + scope, "--root", t.TempDir(), "--report", report}, &output, &output); err == nil {
+				t.Fatal("verification without declarations succeeded")
+			}
+			data, err := os.ReadFile(report)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var outcome struct {
+				Scope       string
+				Outcome     string
+				Differences []any
+				Errors      []string
+			}
+			if err := json.Unmarshal(data, &outcome); err != nil {
+				t.Fatal(err)
+			}
+			if outcome.Scope != scope || outcome.Outcome != "failed" || outcome.Differences == nil || len(outcome.Differences) != 0 || len(outcome.Errors) != 1 || !strings.Contains(outcome.Errors[0], "settings.yaml") {
+				t.Fatalf("verification error reported as %s", data)
+			}
+		})
 	}
-	data, err := os.ReadFile(report)
+}
+
+func TestWorkflowVerificationFlagsParseAtThisRevision(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "reconcile-job.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var outcome struct {
-		Deep        bool
-		Outcome     string
-		Differences []any
-		Errors      []string
+	invocations := regexp.MustCompile(`-- infra (reconcile verify [^\n]*)`).FindAllSubmatch(data, -1)
+	if len(invocations) != 1 {
+		t.Fatalf("workflow invokes verification %d times, want once", len(invocations))
 	}
-	if err := json.Unmarshal(data, &outcome); err != nil {
-		t.Fatal(err)
+	args := strings.Fields(string(invocations[0][1]))
+	if !slices.Contains(args, "--scope=full") {
+		t.Fatalf("workflow verification runs %q, want the full scope", args)
 	}
-	if !outcome.Deep || outcome.Outcome != "failed" || outcome.Differences == nil || len(outcome.Differences) != 0 || len(outcome.Errors) != 1 || !strings.Contains(outcome.Errors[0], "settings.yaml") {
-		t.Fatalf("verification error reported as %s", data)
+	var output bytes.Buffer
+	if err := cli.Run(context.Background(), append(args, "--help"), &output, &output); err != nil {
+		t.Fatalf("workflow verification flags %q: %v", args, err)
+	}
+}
+
+func TestVerificationRequiresAKnownScope(t *testing.T) {
+	for _, args := range [][]string{{"reconcile", "verify"}, {"reconcile", "verify", "--scope=deep"}, {"reconcile", "verify", "--deep"}} {
+		report := filepath.Join(t.TempDir(), "verification.json")
+		var output bytes.Buffer
+		if err := cli.Run(context.Background(), append(args, "--root", t.TempDir(), "--report", report), &output, &output); err == nil || !strings.Contains(err.Error(), "scope") && !strings.Contains(err.Error(), "unknown flag") {
+			t.Errorf("%q returned %v", args, err)
+		}
+		if _, err := os.Stat(report); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("%q wrote a report for an unknown scope", args)
+		}
 	}
 }
 

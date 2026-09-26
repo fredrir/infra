@@ -45,14 +45,14 @@ func TestVolatileConvergenceNeverFailsTheFleet(t *testing.T) {
 
 func TestVolatileOutcomesAreDegradedNotFailed(t *testing.T) {
 	degraded := Degraded{errors.Join(Differences{{System: "volatile", Host: "fredrir-10", Item: "Mount the data volume"}}, errors.New("volatile.yml comparison incomplete: unreachable hosts: fredrir-10"))}
-	verification := VerificationOutcome("r", true, errors.Join(errors.New("flux-system is not ready"), degraded))
+	verification := VerificationOutcome("r", ScopeFull, errors.Join(errors.New("flux-system is not ready"), degraded))
 	if verification.Outcome != OutcomeFailed || !slices.Equal(verification.Errors, []string{"flux-system is not ready"}) || len(verification.Differences) != 0 {
 		t.Fatalf("degraded outcome leaked into the fleet: %+v", verification)
 	}
 	if want := []string{"production differs from its declaration: volatile: fredrir-10: Mount the data volume", "volatile.yml comparison incomplete: unreachable hosts: fredrir-10"}; !slices.Equal(verification.Degraded, want) {
 		t.Fatalf("degraded %q, want %q", verification.Degraded, want)
 	}
-	if only := VerificationOutcome("r", true, errors.Join(nil, degraded)); only.Outcome != OutcomeMatches || len(only.Degraded) != 2 {
+	if only := VerificationOutcome("r", ScopeFull, errors.Join(nil, degraded)); only.Outcome != OutcomeMatches || len(only.Degraded) != 2 {
 		t.Fatalf("degraded-only verification %+v", only)
 	}
 	if err := WithoutDegraded(errors.Join(degraded, errors.Join(degraded))); err != nil {
@@ -88,7 +88,7 @@ func TestVolatilePlaybookResultsSummarizeTheWorker(t *testing.T) {
 			if (applied == nil) != (test.apply == "") || (applied != nil && applied.Error() != test.apply) {
 				t.Fatalf("convergence reported %v, want %q", applied, test.apply)
 			}
-			compared := VerificationOutcome("", true, commands.compareVolatile(context.Background()))
+			compared := VerificationOutcome("", ScopeFull, commands.compareVolatile(context.Background()))
 			if compared.Outcome != OutcomeMatches || !slices.Equal(compared.Degraded, test.compare) {
 				t.Fatalf("comparison reported %+v, want degraded %q", compared, test.compare)
 			}

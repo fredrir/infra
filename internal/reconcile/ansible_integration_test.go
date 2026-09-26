@@ -809,7 +809,7 @@ func TestHostComparisonWithLocalContainer(t *testing.T) {
 	}
 	compare := func(differences []Difference, errors []string) {
 		t.Helper()
-		outcome := VerificationOutcome("", true, commands.compareHosts(ctx))
+		outcome := VerificationOutcome("", ScopeFull, commands.compareHosts(ctx))
 		if !reflect.DeepEqual(outcome.Differences, append([]Difference{}, differences...)) || !reflect.DeepEqual(outcome.Errors, append([]string{}, errors...)) {
 			t.Fatalf("comparison reported %+v, want differences %+v and errors %q\n%s", outcome, differences, errors, output.String())
 		}

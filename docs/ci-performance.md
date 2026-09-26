@@ -102,7 +102,7 @@ Failed attempts remain part of the evidence, including the frontend serving dead
 | --- | --- | --- |
 | Scheduled full reconciliation | 48 → 0 runs/day, plus 24 read-only deep verifications/day | Configured frequency; repairs run only for listed differences; daily resource savings are not yet measured |
 | Workload API reads | 49 → 16 kubectl calls; median 6.21 → 2.08 seconds; client CPU 2.10 → 0.67 seconds | Three alternating samples per mode, 49 matching resources over the local tailnet; excludes rollout waiting |
-| Read-only live verification | 36.76 seconds; 5.26 client CPU seconds; no Ansible changes | Local tailnet execution of `infra reconcile verify` without `--deep`; excludes the OpenTofu and host check-mode comparisons of the hourly deep verification |
+| Read-only live verification | 36.76 seconds; 5.26 client CPU seconds; no Ansible changes | Local tailnet execution of the live checks without the OpenTofu and host check-mode comparisons of the hourly `--scope=full` verification |
 | Whole-job admission | One active lease; a second worker timed out without displacing the owner | Installed production CLI; live acquire and release hooks verified |
 | Active build memory | Runner slice 1.81 GiB peak; engine 3.62 GiB peak; no OOM event increase | Twenty-second sample at four samples/second; includes page cache |
 | External frontend observation, raw | 195.33 seconds from workflow creation to local observation | Clocks were not calibrated; use the hosted comparison below for percentages; the initial 60-second serving wait failed |

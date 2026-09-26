@@ -221,7 +221,7 @@ jobs:
       run: |
         if [ -n "$STRATEGY_OVERRIDE" ]; then export ANSIBLE_STRATEGY="$STRATEGY_OVERRIDE"; fi
         if [ "$VERIFICATION" = true ]; then
-          infra ci measure --stage drift-verification --budget 10m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --deep --report="$RUNNER_TEMP/reconciliation/verification.json"
+          infra ci measure --stage drift-verification --budget 10m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --scope=full --report="$RUNNER_TEMP/reconciliation/verification.json"
         else
           code=0
           infra reconcile apply --wait=11m --full="$FULL" --report="$RUNNER_TEMP/reconciliation/status.json" || code=$?

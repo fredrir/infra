@@ -157,7 +157,7 @@ func TestHelmReleaseMismatchesAreDifferences(t *testing.T) {
 			commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				return fake.execute(t, options)
 			}}}
-			outcome := VerificationOutcome("", false, commands.verifyHelm(context.Background(), "", "logs.fredrir.com"))
+			outcome := VerificationOutcome("", ScopeCloud, commands.verifyHelm(context.Background(), "", "logs.fredrir.com"))
 			if !reflect.DeepEqual(outcome.Differences, append([]Difference{}, test.differences...)) || !reflect.DeepEqual(outcome.Errors, append([]string{}, test.errors...)) {
 				t.Fatalf("release verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
 			}
@@ -259,7 +259,7 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 				defer mu.Unlock()
 				return fake.execute(t, options)
 			}}}
-			outcome := VerificationOutcome("", false, commands.verifyDeployment(context.Background(), Plan{Revision: revision, Affected: All(), Host: "logs.fredrir.com"}))
+			outcome := VerificationOutcome("", ScopeCloud, commands.verifyDeployment(context.Background(), Plan{Revision: revision, Affected: All(), Host: "logs.fredrir.com"}))
 			if !reflect.DeepEqual(outcome.Differences, append([]Difference{}, test.differences...)) || !reflect.DeepEqual(outcome.Errors, append([]string{}, test.errors...)) {
 				t.Fatalf("deployment verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
 			}
@@ -329,7 +329,7 @@ func TestVerificationCollectsEveryPart(t *testing.T) {
 			} else {
 				commands.kubernetes = declared
 			}
-			outcome := VerificationOutcome("", false, verify(context.Background(), plan))
+			outcome := VerificationOutcome("", ScopeCloud, verify(context.Background(), plan))
 			if !reflect.DeepEqual(outcome.Differences, test.differences) || !reflect.DeepEqual(outcome.Errors, test.errors) {
 				t.Fatalf("verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
 			}
