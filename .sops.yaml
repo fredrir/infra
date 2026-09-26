@@ -8,6 +8,7 @@ keys:
   - &archie age1mxszcn7gs8gnvhpq8ku748szqe8u6raferefg986slu83r3zkcmswe29zs
   - &fredrir-06 age1xru5rv42fzmnm4uhv9rwz5gf5ynf7v7qr2e68epcjsq9l33zdulqq53v9j
   - &fredrir-07 age1aw6w4ttxk62pxjgcgv27nqetekjxmrw538j8cqmmql4wa0577ynqxvs52d
+  - &fredrir-11 age18m3q9z44kx40rw93ddrtvf97a672pz2c4gxjxe954x2zeymxuuvsqpma3g
 creation_rules:
   - path_regex: secrets/gitops-llunde-parser\.yaml$
     key_groups:
@@ -35,6 +36,7 @@ creation_rules:
       - age:
           - *macie
           - *archie
+          - *fredrir-11
   - path_regex: ansible/roles/control_backup/files/control\.sops\.yaml$
     key_groups:
       - age:
