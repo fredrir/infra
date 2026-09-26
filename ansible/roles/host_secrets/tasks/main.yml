@@ -16,3 +16,15 @@
   ansible.builtin.command:
     argv: [age-keygen, -o, "{{ host_secrets_key }}"]
     creates: "{{ host_secrets_key }}"
+
+- name: Read the host age recipient
+  ansible.builtin.command:
+    argv: [age-keygen, -y, "{{ host_secrets_key }}"]
+  register: host_secrets_recipient
+  changed_when: false
+  check_mode: false
+
+- name: Report the host age recipient
+  ansible.builtin.assert:
+    that: host_secrets_recipient.stdout is match('^age1[0-9a-z]{58}$')
+    success_msg: "{{ inventory_hostname }} {{ host_secrets_recipient.stdout }}"

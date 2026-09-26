@@ -95,6 +95,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"roles/ubuntu/tasks/main.yml: Validate the complete SSH configuration",
 		"roles/ubuntu/tasks/main.yml: Inspect effective SSH authentication",
 		"roles/host_packages/tasks/main.yml: Check declared packages",
+		"roles/host_secrets/tasks/main.yml: Read the host age recipient",
 		"roles/firewall/tasks/main.yml: Require the enrolled management interface",
 		"roles/firewall/tasks/main.yml: Confirm management access",
 		"roles/k3s/tasks/main.yml: Verify the selected registration server API and datastore",
