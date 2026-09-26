@@ -102,6 +102,41 @@ func TestVolatileHostsStayUntrusted(t *testing.T) {
 	}
 }
 
+func TestVolatileInvocationPipelinesOverAMultiplexedConnection(t *testing.T) {
+	root := filepath.Join("..", "..", "ansible")
+	data, err := os.ReadFile(filepath.Join(root, "ansible.cfg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	section, settings := "", map[string]string{}
+	for line := range strings.Lines(string(data)) {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "[") {
+			section = strings.Trim(line, "[]")
+			continue
+		}
+		if key, value, ok := strings.Cut(line, "="); ok {
+			settings[section+"."+strings.TrimSpace(key)] = strings.TrimSpace(value)
+		}
+	}
+	if settings["ssh_connection.pipelining"] != "True" {
+		t.Error("linear volatile convergence runs without SSH pipelining")
+	}
+	for key, value := range settings {
+		if strings.HasSuffix(key, ".ssh_args") && !strings.Contains(value, "ControlPersist=") {
+			t.Errorf("%s = %q drops the persistent SSH master", key, value)
+		}
+	}
+	fleet := loadInventory(t, root)
+	for _, host := range fleet.groups["volatile"] {
+		for _, variable := range []string{"ansible_pipelining", "ansible_ssh_pipelining", "ansible_ssh_args", "ansible_connection"} {
+			if value, ok := fleet.vars[host][variable]; ok {
+				t.Errorf("%s overrides %s with %v", host, variable, value)
+			}
+		}
+	}
+}
+
 func TestVolatileHostsConvergeInTheirOwnLinearInvocation(t *testing.T) {
 	root := filepath.Join("..", "..", "ansible")
 	fleet := loadInventory(t, root)

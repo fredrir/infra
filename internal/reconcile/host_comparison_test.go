@@ -355,6 +355,33 @@ echo 'fredrir-04 : ok=1 changed=0 unreachable=0 failed=0 skipped=0'
 	}
 }
 
+func TestVolatileComparisonRunsDuringFleetComparison(t *testing.T) {
+	var started sync.WaitGroup
+	started.Add(2)
+	overlapping := make(chan struct{})
+	go func() {
+		started.Wait()
+		close(overlapping)
+	}()
+	commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		switch playbook := playbookArgument(options); {
+		case options.Name == "tofu":
+			return process.Result{Stdout: []byte(`{"@level":"info","@message":"No changes.","type":"change_summary"}` + "\n")}, nil
+		case playbook == volatilePlaybook || playbook == "reconcile.yml":
+			started.Done()
+			select {
+			case <-overlapping:
+			case <-time.After(5 * time.Second):
+				return process.Result{ExitCode: 1}, fmt.Errorf("%s compared alone", playbook)
+			}
+		}
+		return fakePlaybooks{reports: []string{junitReport(strings.TrimSuffix(playbookArgument(options), ".yml"))}}.execute(t, options)
+	}}}
+	if err := commands.compareDeclarations(context.Background()); err != nil {
+		t.Fatalf("volatile and fleet comparisons ran one after another: %v", err)
+	}
+}
+
 func TestDeepVerificationComparesDeclarationsDuringLiveChecks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

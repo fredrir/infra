@@ -146,6 +146,7 @@ filegroup(
     name = "host_play_data",
     srcs = glob([
         "ansible/*.yml",
+        "ansible/ansible.cfg",
         "ansible/inventory/*.yml",
         "ansible/roles/*/defaults/*.yml",
         "ansible/roles/*/handlers/*.yml",
