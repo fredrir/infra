@@ -28,8 +28,8 @@ func TestMeasureBudgetFailureWritesReport(t *testing.T) {
 
 func TestMeasureBudgetLetsTheCommandFinishItsReport(t *testing.T) {
 	reported := filepath.Join(t.TempDir(), "report")
-	script := `trap 'sleep 0.5; echo done > "$0"; exit 1' TERM; while :; do sleep 0.1; done`
-	report, err := Measure(context.Background(), Runner{}, "drift-verification", time.Second, "", []string{"sh", "-c", script, reported})
+	script := `trap 'sleep 0.2; echo done > "$0"; exit 1' TERM; while :; do sleep 0.05; done`
+	report, err := Measure(context.Background(), Runner{}, "drift-verification", 300*time.Millisecond, "", []string{"sh", "-c", script, reported})
 	if err == nil || !report.BudgetExceeded {
 		t.Fatalf("deadline passed: %+v %v", report, err)
 	}
