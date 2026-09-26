@@ -112,7 +112,7 @@ spec:
             preStop:
               sleep: {seconds: 5}
           resources:
-            requests: {cpu: 100m, memory: 128Mi}
+            requests: {cpu: 100m, memory: 192Mi}
             limits: {cpu: "1", memory: 512Mi}
           volumeMounts: [{name: tmp, mountPath: /tmp}]
           readinessProbe:

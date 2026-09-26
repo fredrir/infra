@@ -58,7 +58,7 @@ spec:
       resources:
         requests:
           cpu: 100m
-          memory: 768Mi
+          memory: 864Mi
         limits:
           cpu: '1'
           memory: 1536Mi
@@ -103,7 +103,7 @@ spec:
         resources:
           requests:
             cpu: 20m
-            memory: 64Mi
+            memory: 96Mi
           limits:
             cpu: 200m
             memory: 256Mi
@@ -129,10 +129,10 @@ spec:
         resources:
           requests:
             cpu: 300m
-            memory: 2560Mi
+            memory: 3584Mi
           limits:
             cpu: '2'
-            memory: 4Gi
+            memory: 6Gi
         nodeSelector:
           node-restriction.kubernetes.io/critical: 'true'
           kubernetes.io/hostname: fredrir-09
@@ -168,8 +168,8 @@ spec:
           node-restriction.kubernetes.io/critical: 'true'
         resources:
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 25m
+            memory: 64Mi
           limits:
             cpu: '1'
             memory: 512Mi
@@ -187,11 +187,19 @@ spec:
     prometheusOperator:
       resources:
         requests:
-          cpu: 100m
+          cpu: 25m
           memory: 128Mi
         limits:
           cpu: '1'
           memory: 512Mi
+      prometheusConfigReloader:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
       admissionWebhooks:
         patch:
           resources:
@@ -209,7 +217,7 @@ spec:
       - nodes=[infra.fredrir.com/ci-slots]
       resources:
         requests:
-          cpu: 100m
+          cpu: 25m
           memory: 128Mi
         limits:
           cpu: '1'

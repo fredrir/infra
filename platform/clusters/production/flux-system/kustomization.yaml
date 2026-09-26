@@ -52,4 +52,4 @@ patches:
   patch: |
     - op: replace
       path: /spec/template/spec/containers/0/resources/requests
-      value: {cpu: 25m, memory: 192Mi}
+      value: {cpu: 25m, memory: 256Mi}
