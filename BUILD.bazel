@@ -179,7 +179,10 @@ filegroup(
 
 filegroup(
     name = "reconciler_role_data",
-    srcs = glob(["ansible/roles/reconciler/**"]) + ["//build:cli-release.json"],
+    srcs = glob(["ansible/roles/reconciler/**"]) + [
+        "ansible/roles/gatus/templates/config.yaml.j2",
+        "//build:cli-release.json",
+    ],
     visibility = ["//internal/reconciler:__pkg__"],
 )
 

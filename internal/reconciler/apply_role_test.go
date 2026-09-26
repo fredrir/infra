@@ -127,3 +127,45 @@ func TestApplyRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 		t.Error("the role installs apply.json without a runner installation")
 	}
 }
+
+type gatusAlert struct {
+	FailureThreshold int `yaml:"failure-threshold"`
+}
+
+type gatusExternalEndpoint struct {
+	Name      string `yaml:"name"`
+	Group     string `yaml:"group"`
+	Heartbeat struct {
+		Interval string `yaml:"interval"`
+	} `yaml:"heartbeat"`
+	Alerts []gatusAlert `yaml:"alerts"`
+}
+
+func TestApplyHeartbeatOutlastsReadinessAndToleratesOneRetry(t *testing.T) {
+	template, err := os.ReadFile(filepath.Join("..", "..", "ansible", "roles", "gatus", "templates", "config.yaml.j2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config struct {
+		External []gatusExternalEndpoint `yaml:"external-endpoints"`
+	}
+	if err := yaml.Unmarshal(regexp.MustCompile(`\{\{.*?\}\}`).ReplaceAll(template, []byte("templated")), &config); err != nil {
+		t.Fatal(err)
+	}
+	heartbeat := roleDefaults(t).Apply["heartbeat"]
+	index := slices.IndexFunc(config.External, func(endpoint gatusExternalEndpoint) bool {
+		return endpoint.Group+"_"+endpoint.Name == heartbeat
+	})
+	if index < 0 {
+		t.Fatalf("Gatus has no endpoint for heartbeat %v", heartbeat)
+	}
+	endpoint := config.External[index]
+	interval, err := time.ParseDuration(endpoint.Heartbeat.Interval)
+	lockWait := unitDuration(t, string(roleFile(t, "templates/infra-reconcile-verify.service.j2")), "TimeoutStartSec")
+	if err != nil || interval <= readinessInterval+lockWait {
+		t.Errorf("heartbeat interval %q does not outlast the %s readiness check behind a %s lock wait", endpoint.Heartbeat.Interval, readinessInterval, lockWait)
+	}
+	if len(endpoint.Alerts) == 0 || slices.ContainsFunc(endpoint.Alerts, func(alert gatusAlert) bool { return alert.FailureThreshold < 2 }) {
+		t.Errorf("apply alerts %+v page on a single retry", endpoint.Alerts)
+	}
+}

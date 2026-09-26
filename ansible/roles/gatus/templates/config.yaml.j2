@@ -157,6 +157,23 @@ endpoints:
         - '[STATUS] == 302'
       alerts:
         - type: email
+    - name: production-on-main
+      group: reconciliation
+      url: https://api.github.com/repos/fredrir/infra/compare/main...production
+      interval: 5m
+      client:
+        timeout: 10s
+      headers:
+        Accept: application/vnd.github+json
+      conditions:
+        - '[STATUS] == 200'
+        - '[BODY].status == any(behind, identical)'
+      alerts:
+        - type: email
+          failure-threshold: 2
+          success-threshold: 1
+          send-on-resolved: true
+          description: production is not an ancestor of main; Flux may be serving a revision outside main
 external-endpoints:
     - name: parser
       group: backups
@@ -230,4 +247,15 @@ external-endpoints:
           success-threshold: 1
           send-on-resolved: true
           description: Reconciler verification failed twice in a row or stopped reporting; the Gatus result names the stage
+    - name: apply
+      group: reconciliation
+      token: "${GATUS_TOKEN_RECONCILIATION_APPLY}"
+      heartbeat:
+        interval: 26h
+      alerts:
+        - type: email
+          failure-threshold: 2
+          success-threshold: 1
+          send-on-resolved: true
+          description: Reconciliation on fredrir-11 failed or retried twice in a row, or its daily readiness check stopped reporting; the Gatus result names the revision and stage
 metrics: true
