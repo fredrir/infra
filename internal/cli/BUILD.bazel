@@ -38,6 +38,7 @@ go_library(
         "//internal/process",
         "//internal/projects",
         "//internal/reconcile",
+        "//internal/reconciler",
         "//internal/release",
         "@com_github_spf13_cobra//:cobra",
     ],

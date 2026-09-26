@@ -15,6 +15,7 @@ import (
 	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/platformops"
 	"github.com/fredrir/infra/internal/reconcile"
+	"github.com/fredrir/infra/internal/reconciler"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +24,7 @@ func newReconcileCommand() *cobra.Command {
 	var full bool
 	var wait time.Duration
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
-	command.AddCommand(newRequestVerificationCommand())
+	command.AddCommand(newRequestVerificationCommand(), newRunCommand())
 	for _, action := range []string{"plan", "apply", "verify", "status", "requirements", "provenance"} {
 		child := &cobra.Command{Use: action, Args: cobra.NoArgs}
 		child.Flags().StringVar(&root, "root", ".", "Source checkout")
@@ -84,7 +85,7 @@ func newReconcileCommand() *cobra.Command {
 				region = os.Getenv("AWS_DEFAULT_REGION")
 			}
 			if region != "" && os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "" {
-				store.Client = &objectstore.Client{Endpoint: "https://s3." + region + ".amazonaws.com", Region: region, AccessKey: os.Getenv("AWS_ACCESS_KEY_ID"), SecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY"), SessionToken: os.Getenv("AWS_SESSION_TOKEN"), HTTP: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+				store.Client = &objectstore.Client{Endpoint: cmp.Or(os.Getenv("AWS_ENDPOINT_URL_S3"), "https://s3."+region+".amazonaws.com"), Region: region, AccessKey: os.Getenv("AWS_ACCESS_KEY_ID"), SecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY"), SessionToken: os.Getenv("AWS_SESSION_TOKEN"), HTTP: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 			}
 			if action == "status" {
 				status, err := store.Read(cmd.Context())
@@ -235,6 +236,23 @@ func newRequestVerificationCommand() *cobra.Command {
 		_ = command.MarkFlagRequired(name)
 	}
 	return command
+}
+
+func newRunCommand() *cobra.Command {
+	var config, credentials string
+	run := &cobra.Command{Use: "run", Short: "Run a reconciler host unit at the current main revision", RunE: missingCommand}
+	verify := &cobra.Command{Use: "verify", Short: "Build the engine at main, verify its cloud scope, and report to S3 and Gatus", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		loaded, err := reconciler.LoadConfig(config)
+		if err != nil {
+			return err
+		}
+		return reconciler.Supervisor{Config: loaded, Credentials: credentials, Log: cmd.OutOrStdout()}.Verify(cmd.Context())
+	}}
+	verify.Flags().StringVar(&config, "config", "/etc/infra-reconcile/verify.json", "Reconciler configuration")
+	verify.Flags().StringVar(&credentials, "credentials", "", "Decrypted verify credentials as a JSON object; removed once read")
+	_ = verify.MarkFlagRequired("credentials")
+	run.AddCommand(verify)
+	return run
 }
 
 func writeReport(path string, value any) error {

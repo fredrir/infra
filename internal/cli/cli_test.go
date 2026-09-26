@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,13 +74,13 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 }
 
 func TestCommandValidation(t *testing.T) {
-	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "verify", "--wait=1m"}, {"reconcile", "provenance", "--full"}, {"reconcile", "provenance", "--wait=1m"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}} {
+	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "verify", "--wait=1m"}, {"reconcile", "provenance", "--full"}, {"reconcile", "provenance", "--wait=1m"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}, {"reconcile", "run"}, {"reconcile", "run", "verify", "extra"}, {"reconcile", "run", "verify", "--config", "/nonexistent/verify.json"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err == nil {
 			t.Errorf("accepted invalid command %q", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--scope=cloud", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "provenance", "--provenance-base=" + strings.Repeat("a", 40), "--help"}, {"reconcile", "request-verification", "--help"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--scope=cloud", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "provenance", "--provenance-base=" + strings.Repeat("a", 40), "--help"}, {"reconcile", "request-verification", "--help"}, {"reconcile", "run", "verify", "--help"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
 			t.Errorf("command %q: %v, output=%q", args, err, &output)
@@ -200,6 +202,27 @@ func TestVerificationWritesItsOutcomeReport(t *testing.T) {
 				t.Fatalf("verification error reported as %s", data)
 			}
 		})
+	}
+}
+
+func TestReconciliationStateHonorsTheS3EndpointOverride(t *testing.T) {
+	var requested []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requested = append(requested, r.Method+" "+r.URL.Path)
+		w.Header().Set("ETag", `"status"`)
+		fmt.Fprint(w, `{"desired_revision":"a","applied_revision":"a","stage":"complete"}`)
+	}))
+	defer server.Close()
+	t.Setenv("AWS_REGION", "eu-north-1")
+	t.Setenv("AWS_ACCESS_KEY_ID", "AKIALOCAL")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "local-secret")
+	t.Setenv("AWS_ENDPOINT_URL_S3", server.URL)
+	var output bytes.Buffer
+	if err := cli.Run(context.Background(), []string{"reconcile", "status", "--root", t.TempDir()}, &output, &output); err != nil {
+		t.Fatalf("status returned %v\n%s", err, &output)
+	}
+	if !slices.Equal(requested, []string{"GET /llunde-pyparser-bucket/reconciliation/production/status.json"}) || !strings.Contains(output.String(), `"applied_revision":"a"`) {
+		t.Fatalf("requested %q and printed %s", requested, &output)
 	}
 }
 
