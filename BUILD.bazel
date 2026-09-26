@@ -1,10 +1,16 @@
-load("@gazelle//:def.bzl", "gazelle")
+load("@gazelle//:def.bzl", "gazelle", "gazelle_test")
 
 # gazelle:prefix github.com/fredrir/infra
 # gazelle:exclude dist
 # gazelle:exclude .infra
 
 gazelle(name = "gazelle")
+
+gazelle_test(
+    name = "gazelle_test",
+    tags = ["manual"],
+    workspace = "//:BUILD.bazel",
+)
 
 exports_files([
     "go.mod",

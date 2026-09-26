@@ -18,7 +18,7 @@ func newCheckCommand() *cobra.Command { return newBuildCommand("check", "test") 
 
 func newPipelineCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "pipeline", Short: "Execute reproducible builds", RunE: missingCommand}
-	cmd.AddCommand(newBuildCommand("build", "build"), newBuildCommand("check", "test"), newBuildCommand("check-fast", "fast-check"), newBuildCommand("check-deep", "test"), newBuildCommand("prepare-check", "prepare-check"), newBuildCommand("generate-check", "generate-check"), newImageCommand())
+	cmd.AddCommand(newBuildCommand("build", "build"), newBuildCommand("check", "test"), newBuildCommand("check-fast", "fast-check"), newBuildCommand("check-deep", "test"), newBuildCommand("prepare-check", "prepare-check"), newImageCommand())
 	var root, base string
 	affected := &cobra.Command{Use: "affected", Short: "Print a conservative Bazel query for changed targets", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -58,8 +58,8 @@ func newBuildCommand(name, operation string) *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
 			if operation == "fast-check" {
-				reports, err := pipeline.CheckFast(ctx, opts)
-				return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(reports))
+				report, err := pipeline.CheckFast(ctx, opts)
+				return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(report))
 			}
 			report, err := pipeline.Run(ctx, opts)
 			printErr := json.NewEncoder(cmd.OutOrStdout()).Encode(report)

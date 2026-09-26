@@ -67,13 +67,20 @@ func TestGeneratedBuildFilesAreCheckedForEveryGazelleInput(t *testing.T) {
 	}
 }
 
-func TestGeneratedBuildCheckSkipsChangesOutsideGoPackages(t *testing.T) {
+func TestGeneratedBuildCheckRunsWithTheTestsOnlyForGazelleInputs(t *testing.T) {
 	root := t.TempDir()
 	digest := strings.Repeat("a", 64)
 	writeFile(t, filepath.Join(root, ".bazelversion"), "9.2.0\n")
 	writeFile(t, filepath.Join(root, "build", "toolchain.json"), `{"bazel":"9.2.0","go":"1.27.1","dagger":"0.21.9","image":"golang@sha256:`+digest+`","bazel_sha256":"`+digest+`","engine_image":"registry.dagger.io/engine:v0.21.9@sha256:`+digest+`"}`)
+	writeFile(t, filepath.Join(root, "internal", "example", "BUILD.bazel"), "")
 	writeFile(t, filepath.Join(root, "internal", "example", "example.go"), "package example\n")
 	writeFile(t, filepath.Join(root, "ansible", "site.yml"), "[]\n")
+	tools := t.TempDir()
+	calls, bazel := filepath.Join(tools, "calls"), filepath.Join(tools, "bazel")
+	writeFile(t, bazel, "#!/bin/sh\ncase \"$1\" in\n--version) echo 'bazel 9.2.0' ;;\nquery) echo //internal/example:example_test ;;\n*) echo \"$*\" >> '"+calls+"' ;;\nesac\n")
+	if err := os.Chmod(bazel, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	git := func(arguments ...string) string {
 		command := exec.Command("git", append([]string{"-c", "user.name=check", "-c", "user.email=check@example.com", "-c", "commit.gpgsign=false"}, arguments...)...)
 		command.Dir, command.Env = root, append(os.Environ(), "HOME="+t.TempDir(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
@@ -87,17 +94,39 @@ func TestGeneratedBuildCheckSkipsChangesOutsideGoPackages(t *testing.T) {
 	git("add", ".")
 	git("commit", "--quiet", "--message", "base")
 	base := git("rev-parse", "HEAD")
-	check := func() error {
-		_, err := pipeline.Run(context.Background(), pipeline.Options{Root: root, Local: true, Bazel: filepath.Join(root, "missing-bazel"), Operation: "generate-check", Base: base})
+	invocations := func(run func() error) []string {
+		t.Helper()
+		if err := os.RemoveAll(calls); err != nil {
+			t.Fatal(err)
+		}
+		if err := run(); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(calls)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.Split(strings.TrimSpace(string(data)), "\n")
+	}
+	fast := func() error {
+		_, err := pipeline.CheckFast(context.Background(), pipeline.Options{Root: root, Local: true, Bazel: bazel, Base: base, ReportDir: t.TempDir()})
 		return err
 	}
 	writeFile(t, filepath.Join(root, "ansible", "site.yml"), "- hosts: all\n")
-	if err := check(); err != nil {
-		t.Fatalf("playbook change ran the generated BUILD check: %v", err)
+	if got := invocations(fast); len(got) != 1 || !strings.HasPrefix(got[0], "test ") || strings.Contains(got[0], "//:gazelle_test") {
+		t.Fatalf("playbook change ran %q", got)
 	}
+	git("checkout", "--quiet", "--", "ansible")
 	writeFile(t, filepath.Join(root, "internal", "example", "example.go"), "package example\n\nconst changed = true\n")
-	if err := check(); err == nil || !strings.Contains(err.Error(), "read Bazel version") {
-		t.Fatalf("Go change skipped the generated BUILD check: %v", err)
+	if got := invocations(fast); len(got) != 1 || !strings.HasPrefix(got[0], "test ") || !strings.HasSuffix(got[0], " //internal/example:example_test //:gazelle_test") {
+		t.Fatalf("Go change ran %q, want one test invocation that includes the generated BUILD check", got)
+	}
+	prepare := func() error {
+		_, err := pipeline.Run(context.Background(), pipeline.Options{Root: root, Local: true, Bazel: bazel, Base: base, Operation: "prepare-check", ReportDir: t.TempDir()})
+		return err
+	}
+	if got := invocations(prepare); len(got) != 1 || !strings.HasPrefix(got[0], "build ") || !strings.HasSuffix(got[0], " //internal/example:example_test //:gazelle_test") {
+		t.Fatalf("preparation ran %q", got)
 	}
 }
 
@@ -172,8 +201,8 @@ func TestNonGoInputsSelectOnlyDeclaredDataDependents(t *testing.T) {
 func TestFastChecksNeverReportCancellationAsSuccess(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	reports, err := pipeline.CheckFast(ctx, pipeline.Options{Root: t.TempDir(), Local: true})
-	if !errors.Is(err, context.Canceled) || len(reports) != 1 || reports[0].Success {
-		t.Fatalf("cancelled checks passed: reports=%+v error=%v", reports, err)
+	report, err := pipeline.CheckFast(ctx, pipeline.Options{Root: t.TempDir(), Local: true})
+	if !errors.Is(err, context.Canceled) || report.Success {
+		t.Fatalf("cancelled checks passed: report=%+v error=%v", report, err)
 	}
 }
