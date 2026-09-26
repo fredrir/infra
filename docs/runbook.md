@@ -384,7 +384,7 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | --- | --- |
 | Host / group | `fredrir-11` / `reconcilers`, outside `ubuntu` and every group a fleet play selects |
 | Playbook | `ansible/reconciler.yml`, run only by an administrator; reconciliation selects nothing for it |
-| Provider | Dedicated Hetzner project; `tofu/reconciler/`, state `tofu-state/reconciler.tfstate`, applied only by an administrator |
+| Provider | Dedicated Hetzner project; `tofu/reconciler/`, state `tofu-state/reconciler.tfstate`, applied only by an administrator; the reconcile plan gate runs its mock `tofu test` for full selections and when it or `keys/admin_keys` change |
 | Network | Primary IPv4; IPv6 disabled; no inbound Hetzner rules outside enrollment; tailnet `tag:infra-reconciler` |
 | Trust | Root-equivalent SSH to every managed host, `fredrir-06` and `fredrir-10`: a compromised reconciler is a compromised fleet, and checks on `fredrir-06` then catch supervisor faults, not tampering; `fredrir-10` is reached with strict host keys, no agent forwarding and no jump host |
 | Timer | `infra-reconcile-verify.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |

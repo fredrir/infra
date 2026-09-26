@@ -98,6 +98,14 @@ func (c *Commands) Plan(ctx context.Context, plan Plan) error {
 			return err
 		}
 	}
+	if plan.Affected.ReconcilerTofu {
+		if err := c.Runner.Run(ctx, "tofu", "-chdir=tofu/reconciler", "init", "-backend=false", "-lockfile=readonly", "-input=false"); err != nil {
+			return err
+		}
+		if err := c.Runner.Run(ctx, "tofu", "-chdir=tofu/reconciler", "test"); err != nil {
+			return err
+		}
+	}
 	if plan.Affected.Tofu {
 		if err := c.tofuInit(ctx); err != nil {
 			return err

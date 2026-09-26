@@ -139,6 +139,12 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		return err
 	}
 	if skip {
+		if selected.ReconcilerTofu {
+			administrator := Plan{Revision: revision, Base: status.Applied, Affected: Selection{ReconcilerTofu: true, HostScope: HostScopeNone}, Host: r.Host}
+			if err = stage("plan", func() error { return r.Ops.Plan(ctx, administrator) }); err != nil {
+				return err
+			}
+		}
 		if selected.Tooling {
 			deployed := Plan{Revision: status.Applied, Base: status.Applied, Affected: All(), Host: r.Host}
 			if err = stage("drift-verification", func() error { return r.Ops.VerifyDrift(ctx, deployed) }); err != nil {

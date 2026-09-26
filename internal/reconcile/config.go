@@ -12,16 +12,17 @@ import (
 )
 
 type Selection struct {
-	Tofu          bool     `json:"tofu"`
-	Kubernetes    bool     `json:"kubernetes"`
-	Ansible       bool     `json:"ansible"`
-	MonitorOnly   bool     `json:"monitor_only"`
-	Tooling       bool     `json:"tooling"`
-	Projects      []string `json:"projects,omitempty"`
-	HostScope     string   `json:"host_scope"`
-	HostPlaybooks []string `json:"host_playbooks,omitempty"`
-	RunnerInputs  []string `json:"runner_inputs,omitempty"`
-	Reasons       []string `json:"reasons,omitempty"`
+	Tofu           bool     `json:"tofu"`
+	Kubernetes     bool     `json:"kubernetes"`
+	Ansible        bool     `json:"ansible"`
+	MonitorOnly    bool     `json:"monitor_only"`
+	Tooling        bool     `json:"tooling"`
+	ReconcilerTofu bool     `json:"reconciler_tofu,omitempty"`
+	Projects       []string `json:"projects,omitempty"`
+	HostScope      string   `json:"host_scope"`
+	HostPlaybooks  []string `json:"host_playbooks,omitempty"`
+	RunnerInputs   []string `json:"runner_inputs,omitempty"`
+	Reasons        []string `json:"reasons,omitempty"`
 }
 
 var projectNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
@@ -34,10 +35,20 @@ const (
 )
 
 func All() Selection {
-	return Selection{Tofu: true, Kubernetes: true, Ansible: true, HostScope: HostScopeFull, Reasons: []string{"full reconciliation"}}
+	return Selection{Tofu: true, Kubernetes: true, Ansible: true, ReconcilerTofu: true, HostScope: HostScopeFull, Reasons: []string{"full reconciliation"}}
 }
 
 func Affected(paths []string) Selection {
+	selected := affectedDeployment(paths)
+	selected.ReconcilerTofu = selected.ReconcilerTofu || slices.ContainsFunc(paths, reconcilerTofuInput)
+	return selected
+}
+
+func reconcilerTofuInput(path string) bool {
+	return canonicalPath(path) && (strings.HasPrefix(path, "tofu/reconciler/") || path == "keys/admin_keys")
+}
+
+func affectedDeployment(paths []string) Selection {
 	selected := Selection{HostScope: HostScopeNone}
 	var deploymentPaths []string
 	for _, path := range paths {

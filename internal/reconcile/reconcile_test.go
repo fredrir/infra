@@ -50,6 +50,7 @@ type fakeOps struct {
 	full            bool
 	selection       Selection
 	drift           []Plan
+	plans           []Plan
 	provenance      []ProvenanceRange
 	volatile        int
 	volatileFailure error
@@ -76,15 +77,18 @@ func (o *fakeOps) Provenance(_ context.Context, checked ProvenanceRange) error {
 	return nil
 }
 func (o *fakeOps) Preflight(_ context.Context, plan Plan) (Plan, error) { return plan, nil }
-func (o *fakeOps) Plan(context.Context, Plan) error                     { return o.call("plan") }
-func (o *fakeOps) Expand(context.Context, Plan) error                   { return o.call("expand") }
-func (o *fakeOps) Hosts(context.Context, Plan) error                    { return o.call("hosts") }
-func (o *fakeOps) ExpansionUnchanged(context.Context) (bool, error)     { return false, nil }
-func (o *fakeOps) Publish(context.Context, string) error                { return o.call("publish") }
-func (o *fakeOps) Kubernetes(context.Context, Plan) error               { return o.call("kubernetes") }
-func (o *fakeOps) Monitor(context.Context, Plan) error                  { return o.call("monitor") }
-func (o *fakeOps) Verify(context.Context, Plan) error                   { return o.call("verify") }
-func (o *fakeOps) Retire(context.Context, Plan) error                   { return o.call("retire") }
+func (o *fakeOps) Plan(_ context.Context, plan Plan) error {
+	o.plans = append(o.plans, plan)
+	return o.call("plan")
+}
+func (o *fakeOps) Expand(context.Context, Plan) error               { return o.call("expand") }
+func (o *fakeOps) Hosts(context.Context, Plan) error                { return o.call("hosts") }
+func (o *fakeOps) ExpansionUnchanged(context.Context) (bool, error) { return false, nil }
+func (o *fakeOps) Publish(context.Context, string) error            { return o.call("publish") }
+func (o *fakeOps) Kubernetes(context.Context, Plan) error           { return o.call("kubernetes") }
+func (o *fakeOps) Monitor(context.Context, Plan) error              { return o.call("monitor") }
+func (o *fakeOps) Verify(context.Context, Plan) error               { return o.call("verify") }
+func (o *fakeOps) Retire(context.Context, Plan) error               { return o.call("retire") }
 func (o *fakeOps) Volatile(context.Context, Plan) error {
 	o.volatile++
 	return o.volatileFailure
@@ -327,7 +331,8 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 		{"platform/components/policy/kustomization.yaml", All()},
 		{"internal/../tofu/main.tf", All()},
 		{"README.md", Selection{}},
-		{"tofu/reconciler/server.tf", Selection{}},
+		{"tofu/reconciler/server.tf", Selection{ReconcilerTofu: true}},
+		{"keys/admin_keys", Selection{Kubernetes: true, ReconcilerTofu: true}},
 		{"ansible/reconciler.yml", Selection{}},
 		{"ansible/roles/reconciler/tasks/main.yml", Selection{}},
 		{"ansible/roles/tailscale/tasks/enrolled.yml", Selection{Ansible: true}},

@@ -132,6 +132,9 @@ func TestFullAndRecoveryCannotSkipIndependentChange(t *testing.T) {
 			if !reflect.DeepEqual(ops.calls, []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}) {
 				t.Fatalf("full convergence skipped: %v", ops.calls)
 			}
+			if !ops.plans[0].Affected.ReconcilerTofu {
+				t.Fatalf("full convergence skipped the reconciler root: %+v", ops.plans[0].Affected)
+			}
 		})
 	}
 }
@@ -268,5 +271,55 @@ func TestApplyChecksGeneratedConfigurationWithoutKubernetesSelection(t *testing.
 	}}}
 	if err := commands.Plan(context.Background(), Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners}}); err == nil {
 		t.Fatal("apply accepted missing generated configuration")
+	}
+}
+
+func TestReconcilerRootChangesRunOnlyItsPlanGate(t *testing.T) {
+	for _, failure := range []string{"", "plan"} {
+		store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}
+		ops := &fakeOps{selection: Affected([]string{"tofu/reconciler/server.tf"}), fail: failure}
+		err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false)
+		if (failure != "") != (err != nil) {
+			t.Fatalf("failing %q: %v", failure, err)
+		}
+		if !reflect.DeepEqual(ops.calls, []string{"plan"}) || len(ops.plans) != 1 || !reflect.DeepEqual(ops.plans[0].Affected, Selection{ReconcilerTofu: true, HostScope: HostScopeNone}) {
+			t.Fatalf("reconciler root change ran %v with %+v", ops.calls, ops.plans)
+		}
+		if store.status.Applied != "old" || store.status.Desired != "old" || (failure == "" && store.status.Stage != "evaluated") {
+			t.Fatalf("reconciler root change deployed: %+v", store.status)
+		}
+	}
+}
+
+func TestReconcilerRootInputsSurviveFullSelections(t *testing.T) {
+	for _, paths := range [][]string{{"tofu/reconciler/server.tf", "tailscale/policy.hujson"}, {"keys/admin_keys"}, {"tofu/reconciler/tests/reconciler.tftest.hcl", "ansible/site.yml"}} {
+		if !Affected(paths).ReconcilerTofu {
+			t.Errorf("%v does not test the reconciler root", paths)
+		}
+	}
+	for _, paths := range [][]string{{"tofu/main.tf"}, {"keys/github-web-flow.asc"}, {"ansible/reconciler.yml"}} {
+		if Affected(paths).ReconcilerTofu {
+			t.Errorf("%v tests the reconciler root", paths)
+		}
+	}
+}
+
+func TestPlanTestsTheReconcilerRootOnlyWhenItsInputsChange(t *testing.T) {
+	for _, selected := range []bool{true, false} {
+		var calls []string
+		commands := &Commands{Runner: ci.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			calls = append(calls, options.Name+" "+strings.Join(options.Args, " "))
+			return process.Result{}, nil
+		}}}
+		if err := commands.Plan(context.Background(), Plan{Affected: Selection{ReconcilerTofu: selected, HostScope: HostScopeNone}}); err != nil {
+			t.Fatal(err)
+		}
+		var want []string
+		if selected {
+			want = []string{"tofu -chdir=tofu/reconciler init -backend=false -lockfile=readonly -input=false", "tofu -chdir=tofu/reconciler test"}
+		}
+		if !reflect.DeepEqual(calls, want) {
+			t.Fatalf("reconciler root selected %t ran %q", selected, calls)
+		}
 	}
 }

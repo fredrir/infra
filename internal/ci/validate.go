@@ -53,8 +53,6 @@ func matching(pattern string) func(string) bool {
 	return regexp.MustCompile(pattern).MatchString
 }
 
-var reconcilerTofuInputs = matching(`^(tofu/reconciler/|keys/admin_keys$)`)
-
 var renderedTrees = matching(`^(platform/|charts/|build/rollout/flux-artifacts/)`)
 
 func kustomizationInputs(path string) bool {
@@ -71,18 +69,10 @@ func PrepareValidation(ctx context.Context, runner Runner, before string) error 
 	if err != nil {
 		return err
 	}
-	for _, root := range []struct {
-		directory string
-		inputs    func(string) bool
-	}{{"tofu", rootTofuInputs}, {"tofu/reconciler", reconcilerTofuInputs}} {
-		if !declarationChanged(files, root.inputs) {
-			continue
-		}
-		if err := runner.Run(ctx, "tofu", "-chdir="+root.directory, "init", "-backend=false", "-lockfile=readonly", "-input=false"); err != nil {
-			return err
-		}
+	if !declarationChanged(files, rootTofuInputs) {
+		return nil
 	}
-	return nil
+	return runner.Run(ctx, "tofu", "-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false")
 }
 
 type declarationCheck func(context.Context, Runner) error
@@ -109,9 +99,6 @@ func declarationChecks(root string, changed func(func(string) bool) bool) ([]dec
 	}
 	if changed(matching(`^tofu/`)) {
 		checks = append(checks, command("tofu", "-chdir=tofu", "fmt", "-check", "-recursive"))
-	}
-	if changed(reconcilerTofuInputs) {
-		checks = append(checks, command("tofu", "-chdir=tofu/reconciler", "test"))
 	}
 	if changed(matching(`^ansible/`)) {
 		playbooks, err := filepath.Glob(filepath.Join(root, "ansible", "*.yml"))

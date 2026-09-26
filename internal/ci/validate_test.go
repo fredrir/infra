@@ -270,10 +270,8 @@ func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
 
 var (
 	rootTofuInit       = []string{"-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false"}
-	reconcilerTofuInit = []string{"-chdir=tofu/reconciler", "init", "-backend=false", "-lockfile=readonly", "-input=false"}
 	tofuFormat         = []string{"-chdir=tofu", "fmt", "-check", "-recursive"}
 	rootTofuValidation = []string{"-chdir=tofu", "validate", "-no-tests"}
-	reconcilerTofuTest = []string{"-chdir=tofu/reconciler", "test"}
 )
 
 func recordTofu(t *testing.T, changed string) (Runner, func() [][]string) {
@@ -308,9 +306,9 @@ func TestOpenTofuRootsArePreparedAndValidatedOnlyForTheirInputs(t *testing.T) {
 		changed             string
 		prepared, validated [][]string
 	}{
-		{"tofu/reconciler/server.tf", [][]string{reconcilerTofuInit}, [][]string{tofuFormat, reconcilerTofuTest}},
-		{"tofu/reconciler/tests/reconciler.tftest.hcl", [][]string{reconcilerTofuInit}, [][]string{tofuFormat, reconcilerTofuTest}},
-		{"keys/admin_keys", [][]string{reconcilerTofuInit}, [][]string{reconcilerTofuTest}},
+		{"tofu/reconciler/server.tf", nil, [][]string{tofuFormat}},
+		{"tofu/reconciler/tests/reconciler.tftest.hcl", nil, [][]string{tofuFormat}},
+		{"keys/admin_keys", nil, nil},
 		{"tofu/reconciliation.tf", [][]string{rootTofuInit}, [][]string{tofuFormat, rootTofuValidation}},
 		{"tofu/modules/hetzner/main.tf", [][]string{rootTofuInit}, [][]string{tofuFormat, rootTofuValidation}},
 		{"tofu/.terraform.lock.hcl", [][]string{rootTofuInit}, [][]string{tofuFormat, rootTofuValidation}},
@@ -350,12 +348,12 @@ func TestProductionSettingsReadByTheRootModuleValidateIt(t *testing.T) {
 	}
 }
 
-func TestReconcilerTofuPreparationFailureStopsPreparation(t *testing.T) {
+func TestOpenTofuPreparationFailureStopsPreparation(t *testing.T) {
 	failure := errors.New("provider lock mismatch")
 	var calls [][]string
 	runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		if options.Name == "git" {
-			return process.Result{Stdout: []byte("tofu/reconciler/server.tf\n")}, nil
+			return process.Result{Stdout: []byte("tofu/main.tf\n")}, nil
 		}
 		calls = append(calls, options.Args)
 		return process.Result{}, failure
