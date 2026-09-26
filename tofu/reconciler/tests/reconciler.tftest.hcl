@@ -24,6 +24,8 @@ override_data {
       { id = "dns-write", name = "DNS Write", scopes = ["com.cloudflare.api.account.zone"] },
       { id = "tunnel-read", name = "Cloudflare Tunnel Read", scopes = ["com.cloudflare.api.account"] },
       { id = "tunnel-write", name = "Cloudflare Tunnel Write", scopes = ["com.cloudflare.api.account"] },
+      { id = "logs-read-account", name = "Logs Read", scopes = ["com.cloudflare.api.account"] },
+      { id = "logs-read-zone", name = "Logs Read", scopes = ["com.cloudflare.api.account.zone"] },
     ]
   }
 }
