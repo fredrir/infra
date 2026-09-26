@@ -69,15 +69,42 @@ spec:
     expression: "has(object.metadata.annotations) ? object.metadata.annotations : {}"
   - name: oldAnnotations
     expression: "has(oldObject.metadata.annotations) ? oldObject.metadata.annotations : {}"
+  - name: addresses
+    expression: "has(object.status.addresses) ? object.status.addresses.map(a, a.address) : []"
+  - name: writeOnce
+    expression: "['flannel.alpha.coreos.com/backend-type', 'flannel.alpha.coreos.com/backend-data', 'flannel.alpha.coreos.com/backend-v6-data']"
+  - name: ownAddress
+    expression: "['flannel.alpha.coreos.com/public-ip', 'flannel.alpha.coreos.com/public-ip-overwrite', 'flannel.alpha.coreos.com/public-ipv6', 'flannel.alpha.coreos.com/public-ipv6-overwrite']"
+  - name: conditions
+    expression: "has(object.status.conditions) ? object.status.conditions.filter(c, c.type != 'NetworkUnavailable') : []"
+  - name: oldConditions
+    expression: "has(oldObject.status.conditions) ? oldObject.status.conditions.filter(c, c.type != 'NetworkUnavailable') : []"
   validations:
   - expression: variables.labels == variables.oldLabels
     message: The shared flannel identity may not change node labels
+  - expression: >-
+      (has(object.metadata.ownerReferences) ? object.metadata.ownerReferences : []) == (has(oldObject.metadata.ownerReferences) ? oldObject.metadata.ownerReferences : [])
+      && (has(object.metadata.finalizers) ? object.metadata.finalizers : []) == (has(oldObject.metadata.finalizers) ? oldObject.metadata.finalizers : [])
+    message: The shared flannel identity may not change node owners or finalizers
   - expression: object.spec == oldObject.spec
     message: The shared flannel identity may not change the node spec
   - expression: >-
       variables.annotations.all(k, k.startsWith('flannel.alpha.coreos.com/') || (k in variables.oldAnnotations && variables.annotations[k] == variables.oldAnnotations[k]))
       && variables.oldAnnotations.all(k, k in variables.annotations || k.startsWith('flannel.alpha.coreos.com/'))
     message: The shared flannel identity may change only flannel annotations
+  - expression: >-
+      variables.writeOnce.all(k, !(k in variables.oldAnnotations) || (k in variables.annotations && variables.annotations[k] == variables.oldAnnotations[k]))
+    message: Flannel backend annotations are write-once for the shared identity; an administrator clears them to change the backend or key
+  - expression: >-
+      variables.ownAddress.all(k, !(k in variables.annotations) || (k in variables.oldAnnotations && variables.annotations[k] == variables.oldAnnotations[k])
+      || variables.annotations[k] in variables.addresses)
+    message: Flannel public addresses must be one of the node's own addresses
+  - expression: >-
+      (has(object.status.addresses) ? object.status.addresses : []) == (has(oldObject.status.addresses) ? oldObject.status.addresses : [])
+      && (has(dyn(object.status).capacity) ? dyn(object.status).capacity : {}) == (has(dyn(oldObject.status).capacity) ? dyn(oldObject.status).capacity : {})
+      && (has(dyn(object.status).allocatable) ? dyn(object.status).allocatable : {}) == (has(dyn(oldObject.status).allocatable) ? dyn(oldObject.status).allocatable : {})
+      && variables.conditions == variables.oldConditions
+    message: The shared flannel identity may change only the NetworkUnavailable condition of the node status
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding

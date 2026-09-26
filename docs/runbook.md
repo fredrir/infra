@@ -287,12 +287,14 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Deep verification | `volatile.yml --check` beside the fleet; results under `degraded`; outcome and exit status unchanged |
 | Unenrolled host | `tailscale_ip: null`; skipped |
 | Node admission | `node-registration` policy: kubelets register only inventory nodes; volatile nodes must carry the taint; nodes cannot remove taints |
+| Shared flannel identity | Every agent holds the `system:k3s-controller` certificate, which may patch any node's status. `node-flannel-writer` lets it change only flannel annotations and the `NetworkUnavailable` condition: backend type and data are write-once, public addresses must be the node's own, and labels, spec, owners, finalizers, addresses, capacity, allocatable and other conditions are pinned |
+| Kubelet pod writes | `node-no-static-pods` denies pod creation by nodes; NodeRestriction already refuses label changes through `pods/status` and status writes to another node's pods |
 | Join credential | Per-node `k3s token create --ttl 30m`, deleted after join; the k3s role refuses the shared agent token and fails if any file under `/var/lib/rancher` matches its checksum; a joined agent keeps working across restarts and token deletion |
 | Scheduling | Taint `node-restriction.kubernetes.io/volatile=true:NoSchedule`, applied before labels `gvisor`, `volatile`, `infra.fredrir.com/ci-slots=3`; no `critical` or `stateful` |
 | Critical controllers | Flux, ARC controller and listeners, ci-slots: required `node-restriction.kubernetes.io/critical=true` |
 | CI pools | `check-amd64`, `rust-amd64` and `rust-pr-amd64` tolerate and prefer it and leave 30 s after not-ready or unreachable; `rust-release-amd64` and `rust-tag-amd64` never run there |
 | Monitoring | node-exporter only; Alloy stays off because pod-log reads cannot be scoped to one node |
-| Readiness waits | `verify.yml` and `maintenance.yml` exclude `node-restriction.kubernetes.io/volatile` |
+| Readiness waits | `verify.yml` and `maintenance.yml` exclude `node-restriction.kubernetes.io/volatile`; `maintenance.yml` never targets volatile hosts, which take unattended patching |
 | Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100 and 10250; SSH from Macie, Archie and `tag:infra-apply` |
 | Inbound access | Tailnet; NTNU VPN (`~/ntnu-proxy`, `10.50.0.0/16`) is owner-only break-glass SSH with keys only, never used by the fleet |
 | Container engines | Docker, containerd.io, Podman and Buildah removed at takeover; only the k3s agent runs |

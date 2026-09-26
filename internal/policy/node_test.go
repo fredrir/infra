@@ -84,7 +84,11 @@ func (p nodePolicy) admits(t *testing.T, input map[string]any) bool {
 		}
 	}
 	for _, validation := range p.validations {
-		if value, _, err := validation.Eval(input); err != nil || value != types.True {
+		value, _, err := validation.Eval(input)
+		if err != nil {
+			t.Fatalf("validation: %v", err)
+		}
+		if value != types.True {
 			return false
 		}
 	}
@@ -195,32 +199,74 @@ func TestNodeRegistrationDeclaresTheInventory(t *testing.T) {
 	}
 }
 
-func TestSharedFlannelIdentityChangesOnlyFlannelAnnotations(t *testing.T) {
+func TestSharedFlannelIdentityWritesOnlyItsOwnNodeNetwork(t *testing.T) {
 	policy := loadNodePolicy(t, "node-flannel-writer")
+	const flannel = "flannel.alpha.coreos.com/"
 	base := node("fredrir-09")
-	set(base, object{"flannel.alpha.coreos.com/backend-data": "{}", "k3s.io/hostname": "fredrir-09"}, "metadata", "annotations")
-	rotate := func(mutate func(object)) object {
+	set(base, object{
+		flannel + "backend-type": "wireguard",
+		flannel + "backend-data": `{"PublicKey":"own"}`,
+		flannel + "public-ip":    "100.87.168.66",
+		"k3s.io/hostname":        "fredrir-09",
+	}, "metadata", "annotations")
+	base["status"] = object{
+		"addresses":   []any{object{"type": "InternalIP", "address": "100.87.168.66"}, object{"type": "ExternalIP", "address": "100.87.168.66"}},
+		"capacity":    object{"cpu": "4", "infra.fredrir.com/ci-slot": "2"},
+		"allocatable": object{"cpu": "3750m", "infra.fredrir.com/ci-slot": "2"},
+		"conditions":  []any{object{"type": "Ready", "status": "True"}},
+	}
+	change := func(mutate func(object)) object {
 		next := clone(base).(object)
 		mutate(next)
 		return next
 	}
+	annotate := func(key string, value any) object {
+		return change(func(n object) { set(n, value, "metadata", "annotations", key) })
+	}
+	fresh := change(func(n object) {
+		annotations := at(n, "metadata", "annotations").(object)
+		delete(annotations, flannel+"backend-type")
+		delete(annotations, flannel+"backend-data")
+	})
+	withKey := clone(fresh).(object)
+	set(withKey, object{flannel + "backend-type": "wireguard", flannel + "backend-data": `{"PublicKey":"own"}`, flannel + "public-ip": "100.87.168.66", "k3s.io/hostname": "fredrir-09"}, "metadata", "annotations")
 	controller := "system:k3s-controller"
 	for _, test := range []struct {
 		name     string
 		node     object
+		old      object
 		user     string
 		admitted bool
 	}{
-		{name: "rotate flannel key", node: rotate(func(n object) { set(n, "{\"PublicKey\":\"new\"}", "metadata", "annotations", "flannel.alpha.coreos.com/backend-data") }), user: controller, admitted: true},
-		{name: "set a new flannel annotation", node: rotate(func(n object) { set(n, "1.2.3.4", "metadata", "annotations", "flannel.alpha.coreos.com/public-ip") }), user: controller, admitted: true},
-		{name: "unchanged", node: rotate(func(object) {}), user: controller, admitted: true},
-		{name: "add a label", node: rotate(func(n object) { set(n, object{"node-restriction.kubernetes.io/critical": "true"}, "metadata", "labels") }), user: controller},
-		{name: "change a foreign annotation", node: rotate(func(n object) { set(n, "evil", "metadata", "annotations", "k3s.io/hostname") }), user: controller},
-		{name: "add a taint", node: rotate(func(n object) { set(n, []any{object{"key": "x", "effect": "NoSchedule"}}, "spec", "taints") }), user: controller},
-		{name: "another identity is not constrained here", node: rotate(func(n object) { set(n, object{"x": "y"}, "metadata", "labels") }), user: "system:node:fredrir-09", admitted: true},
+		{name: "unchanged", node: change(func(object) {}), user: controller, admitted: true},
+		{name: "publish a backend on a node without one", node: withKey, old: fresh, user: controller, admitted: true},
+		{name: "rewrite the backend key", node: annotate(flannel+"backend-data", `{"PublicKey":"other"}`), user: controller},
+		{name: "rewrite the backend type", node: annotate(flannel+"backend-type", "vxlan"), user: controller},
+		{name: "remove the backend key", node: change(func(n object) { delete(at(n, "metadata", "annotations").(object), flannel+"backend-data") }), user: controller},
+		{name: "public address of another node", node: annotate(flannel+"public-ip", "100.66.14.60"), user: controller},
+		{name: "public address override to another node", node: annotate(flannel+"public-ip-overwrite", "100.66.14.60"), user: controller},
+		{name: "public address override to its own address", node: annotate(flannel+"public-ip-overwrite", "100.87.168.66"), user: controller, admitted: true},
+		{name: "network unavailable condition", node: change(func(n object) {
+			set(n, append(at(n, "status", "conditions").([]any), object{"type": "NetworkUnavailable", "status": "False"}), "status", "conditions")
+		}), user: controller, admitted: true},
+		{name: "forged ready condition", node: change(func(n object) { set(n, "False", "status", "conditions", 0, "status") }), user: controller},
+		{name: "forged addresses", node: change(func(n object) { set(n, "100.66.14.60", "status", "addresses", 1, "address") }), user: controller},
+		{name: "forged allocatable", node: change(func(n object) { set(n, "40", "status", "allocatable", "infra.fredrir.com/ci-slot") }), user: controller},
+		{name: "forged capacity", node: change(func(n object) { set(n, "64", "status", "capacity", "cpu") }), user: controller},
+		{name: "add a label", node: change(func(n object) {
+			set(n, object{"node-restriction.kubernetes.io/critical": "true"}, "metadata", "labels")
+		}), user: controller},
+		{name: "add an owner", node: change(func(n object) { set(n, []any{object{"kind": "Namespace", "name": "x"}}, "metadata", "ownerReferences") }), user: controller},
+		{name: "change a foreign annotation", node: annotate("k3s.io/hostname", "evil"), user: controller},
+		{name: "add a taint", node: change(func(n object) { set(n, []any{object{"key": "x", "effect": "NoSchedule"}}, "spec", "taints") }), user: controller},
+		{name: "administrator repairs the backend", node: annotate(flannel+"backend-data", `{"PublicKey":"repaired"}`), user: "system:admin", admitted: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if policy.admits(t, nodeRequest(test.node, base, test.user)) != test.admitted {
+			old := test.old
+			if old == nil {
+				old = base
+			}
+			if policy.admits(t, nodeRequest(test.node, old, test.user)) != test.admitted {
 				t.Fatalf("admitted %t, want %t", !test.admitted, test.admitted)
 			}
 		})
