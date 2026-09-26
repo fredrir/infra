@@ -15,6 +15,7 @@ go_test(
         "kustomize_test.go",
         "managed_zones_test.go",
         "node_local_dns_test.go",
+        "provisioned_test.go",
         "renovate_test.go",
         "runner_rust_test.go",
         "tailnet_test.go",

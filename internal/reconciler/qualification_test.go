@@ -36,6 +36,7 @@ import (
 	"github.com/fredrir/infra/internal/dev"
 	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/process"
+	"github.com/fredrir/infra/internal/provenance"
 	"github.com/fredrir/infra/internal/reconcile"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/klauspost/compress/zstd"
@@ -345,7 +346,7 @@ func (q *qualification) startGatus() int {
 	port := freePort(q.t)
 	q.token = randomHex(q.t, 24)
 	config := filepath.Join(q.work, "gatus.yaml")
-	content := fmt.Sprintf("web:\n  address: 127.0.0.1\n  port: %[1]d\nstorage:\n  type: memory\nendpoints:\n  - name: gatus\n    url: http://127.0.0.1:%[1]d/health\n    interval: 1h\n    conditions:\n      - '[STATUS] == 200'\nexternal-endpoints:\n  - name: verification\n    group: reconciliation\n    token: %[2]s\n", port, q.token)
+	content := fmt.Sprintf("web:\n  address: 127.0.0.1\n  port: %[1]d\nstorage:\n  type: memory\nendpoints:\n  - name: gatus\n    url: http://127.0.0.1:%[1]d/health\n    interval: 1h\n    conditions:\n      - '[STATUS] == 200'\nexternal-endpoints:\n  - name: verification\n    group: reconciliation\n    token: %[2]s\n  - name: apply\n    group: reconciliation\n    token: %[2]s\n", port, q.token)
 	if err := os.WriteFile(config, []byte(content), 0o600); err != nil {
 		q.t.Fatal(err)
 	}
@@ -475,7 +476,18 @@ func TestReconcilerQualification(t *testing.T) {
 			ObserverAppKey:        string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})),
 			GatusToken:            q.token,
 		},
-		"apply": {AWSAccessKeyID: apply},
+		"apply": {
+			AWSAccessKeyID:        q.s3.AccessKey,
+			AWSSecretAccessKey:    q.s3.SecretKey,
+			CloudflareAPIToken:    apply,
+			HcloudToken:           "qualification-" + randomHex(t, 8),
+			PlatformMailRecipient: "operator@example.net",
+			KubernetesToken:       "qualification-" + randomHex(t, 8),
+			RunnerAppKey:          string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})),
+			PublisherAppKey:       string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})),
+			ProvenanceToken:       "ghp_" + randomHex(t, 18),
+			GatusToken:            q.token,
+		},
 	}
 	plaintext, err := json.Marshal(credentials)
 	if err != nil {
@@ -490,27 +502,30 @@ func TestReconcilerQualification(t *testing.T) {
 	if output, err := encrypt.CombinedOutput(); err != nil {
 		t.Fatalf("encrypt the credentials to %s: %v\n%s", recipient, err, output)
 	}
+	if err := os.WriteFile(filepath.Join(tree, "ansible/files/reconciliation_known_hosts"), []byte("fredrir-06 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPTgrD9pOVoAiRQ0N7i3LCcFGDbv3WIMY9j5mqGGSYDo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	site := Site{
+		Repository: fmt.Sprintf("git://%s:%d/infra.git", guestHost, gitPort),
+		Shared:     "/var/lib/infra-reconcile",
+		Bucket:     qualificationBucket,
+		Prefix:     "reconciliation/production",
+		Region:     qualificationRegion,
+		Endpoint:   fmt.Sprintf("http://%s:%d", guestHost, storePort),
+		Gatus:      fmt.Sprintf("http://%s:%d", guestHost, gatusPort),
+		KnownHosts: "/etc/infra-reconcile/known_hosts",
+		Kubernetes: Kubernetes{Server: fmt.Sprintf("https://%s:%d", guestHost, freePort(t)), CertificateAuthority: "/etc/infra-reconcile/kubernetes-ca.crt"},
+	}
+	verifySite, applySite := site, site
+	verifySite.State, verifySite.Cache, verifySite.Heartbeat = "/var/lib/infra-verify", "/var/cache/infra-verify", "reconciliation_verification"
+	applySite.State, applySite.Cache, applySite.Heartbeat = "/var/lib/infra-apply", "/var/cache/infra-apply", "reconciliation_apply"
+	fakeApp := App{AppID: 1, InstallationID: 2, API: fmt.Sprintf("http://%s:%d", guestHost, githubPort)}
 	variables := map[string]any{
+		"reconciler_apply":                   ApplyConfig{Site: applySite, Runner: fakeApp},
 		"reconciler_kubernetes_ca_file":      authority,
 		"reconciler_verify_schedule":         "*:0/2",
 		"reconciler_verify_randomized_delay": "0",
-		"reconciler_verify": Config{
-			Site: Site{
-				Repository: fmt.Sprintf("git://%s:%d/infra.git", guestHost, gitPort),
-				State:      "/var/lib/infra-verify",
-				Cache:      "/var/cache/infra-verify",
-				Shared:     "/var/lib/infra-reconcile",
-				Bucket:     qualificationBucket,
-				Prefix:     "reconciliation/production",
-				Region:     qualificationRegion,
-				Endpoint:   fmt.Sprintf("http://%s:%d", guestHost, storePort),
-				Gatus:      fmt.Sprintf("http://%s:%d", guestHost, gatusPort),
-				Heartbeat:  "reconciliation_verification",
-				Kubernetes: Kubernetes{Server: fmt.Sprintf("https://%s:%d", guestHost, freePort(t)), CertificateAuthority: "/etc/infra-reconcile/kubernetes-ca.crt"},
-			},
-			Scope:    reconcile.ScopeCloud,
-			Observer: App{AppID: 1, InstallationID: 2, API: fmt.Sprintf("http://%s:%d", guestHost, githubPort)},
-		},
+		"reconciler_verify":                  Config{Site: verifySite, Scope: reconcile.ScopeCloud, Observer: fakeApp},
 	}
 	data, err := json.Marshal(variables)
 	if err != nil {
@@ -690,6 +705,53 @@ func TestReconcilerQualification(t *testing.T) {
 	}
 	if journal, err := q.guest("sudo", "journalctl", "--no-pager", "-o", "cat", "-u", "infra-reconcile-verify.service"); err != nil || strings.Contains(journal, apply) || strings.Contains(journal, q.token) {
 		t.Errorf("verify journal holds a credential or is unreadable: %v", err)
+	}
+	var applyKey string
+	q.await("a timer-started apply report", 20*time.Minute, func() error {
+		for _, key := range q.runKeys() {
+			if strings.Contains(key, "-apply-"+q.revision[:12]+"/") && strings.HasSuffix(key, "/report.json") {
+				applyKey = key
+				return nil
+			}
+		}
+		status, _ := q.guest("systemctl", "show", "infra-reconcile-apply.service", "-p", "ActiveState", "-p", "Result", "--value")
+		return fmt.Errorf("no apply report yet; service %q", strings.ReplaceAll(status, "\n", " "))
+	})
+	var applied bytes.Buffer
+	if err := q.s3.Download(ctx, qualificationBucket, applyKey, &applied); err != nil {
+		t.Fatal(err)
+	}
+	var applyRun Run
+	if err := json.Unmarshal(applied.Bytes(), &applyRun); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("apply run %s", applied.String())
+	if applyRun.Kind != "apply" || applyRun.Revision != q.revision || applyRun.Stage != "provenance" || applyRun.Outcome != OutcomeRetry || !strings.Contains(applyRun.Error, provenance.ErrNoProvenanceBase.Error()) {
+		t.Errorf("apply report %+v", applyRun)
+	}
+	if ledger, err := q.guest("sudo", "cat", "/var/lib/infra-apply/ledger.json"); err != nil || !strings.Contains(ledger, `"outcome": "retry"`) {
+		t.Errorf("apply ledger %q: %v", ledger, err)
+	}
+	if output, err := q.guest("sudo", "systemctl", "stop", "infra-reconcile-apply.timer"); err != nil {
+		t.Fatalf("stop the apply timer: %v\n%s", err, output)
+	}
+	q.await("the apply to finish", 10*time.Minute, func() error {
+		if state, _ := q.guest("systemctl", "show", "infra-reconcile-apply.service", "-p", "ActiveState", "--value"); state != "inactive" && state != "failed" {
+			return fmt.Errorf("service %s", state)
+		}
+		return nil
+	})
+	for _, path := range []string{"/etc/infra-reconcile/credentials.sops.yaml", "/etc/age/host.key", "/etc/infra-reconcile/ssh/id_ed25519"} {
+		output, err := q.guest("sudo", "-u", "infra-apply", "cat", path)
+		if err == nil || !strings.Contains(output, "Permission denied") {
+			t.Errorf("infra-apply read %s: %v", path, err)
+		}
+	}
+	if output, err := q.guest("sudo", "ls", "/run/infra-reconcile-apply"); err == nil {
+		t.Errorf("decrypted apply credentials or secrets outlived the run: %q", output)
+	}
+	if journal, err := q.guest("sudo", "journalctl", "--no-pager", "-o", "cat", "-u", "infra-reconcile-apply.service"); err != nil || strings.Contains(journal, apply) || strings.Contains(journal, q.token) || !strings.Contains(journal, "Reconciling main at "+q.revision) {
+		t.Errorf("apply journal lacks the run or holds a credential: %v", err)
 	}
 	if exposure, err := q.guest("sudo", "systemd-analyze", "security", "--no-pager", "infra-reconcile-verify.service"); err == nil {
 		lines := strings.Split(exposure, "\n")

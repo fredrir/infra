@@ -2,7 +2,9 @@ reconciler_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli
 reconciler_kubernetes_ca_file: kubernetes-ca.crt
 reconciler_ssh_identity: /etc/infra-reconcile/ssh/id_ed25519
 reconciler_shared: /var/lib/infra-reconcile
-reconciler_packages: [ca-certificates, git, golang-go]
+reconciler_known_hosts: /etc/infra-reconcile/known_hosts
+reconciler_known_hosts_file: "{{ playbook_dir }}/files/reconciliation_known_hosts"
+reconciler_packages: [ca-certificates, git, golang-go, openssh-client, python3]
 reconciler_verify_credentials:
   - aws-access-key-id
   - aws-secret-access-key
@@ -24,11 +26,43 @@ reconciler_verify:
   region: eu-north-1
   gatus: "http://{{ hostvars['fredrir-06'].tailscale_ip }}:8080"
   heartbeat: reconciliation_verification
-  scope: cloud
+  scope: full
+  known_hosts: "{{ reconciler_known_hosts }}"
   kubernetes:
     server: "https://{{ hostvars[groups['server'][0]].tailscale_ip }}:6443"
     certificate_authority: /etc/infra-reconcile/kubernetes-ca.crt
   observer:
     app_id: 5080610
     installation_id: 164992211
+    api: https://api.github.com
+reconciler_apply_credentials:
+  - aws-access-key-id
+  - aws-secret-access-key
+  - cloudflare-api-token
+  - hcloud-token
+  - platform-mail-recipient
+  - kubernetes-token
+  - runner-app-key
+  - publisher-app-key
+  - provenance-token
+  - gatus-token
+reconciler_apply_schedule: "*:*:0/30"
+reconciler_apply:
+  repository: https://github.com/fredrir/infra.git
+  state: /var/lib/infra-apply
+  cache: /var/cache/infra-apply
+  shared: "{{ reconciler_shared }}"
+  bucket: llunde-pyparser-bucket
+  prefix: reconciliation/production
+  region: eu-north-1
+  gatus: "http://{{ hostvars['fredrir-06'].tailscale_ip }}:8080"
+  heartbeat: reconciliation_apply
+  known_hosts: "{{ reconciler_known_hosts }}"
+  kubernetes:
+    server: "https://{{ hostvars[groups['server'][0]].tailscale_ip }}:6443"
+    certificate_authority: /etc/infra-reconcile/kubernetes-ca.crt
+  runner:
+    app_id: 4924976
+    # PLACEHOLDER: the runner App's installation ID for fredrir/infra.
+    installation_id: null
     api: https://api.github.com

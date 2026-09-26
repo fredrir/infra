@@ -22,9 +22,13 @@ func roleFile(t *testing.T, path string) []byte {
 }
 
 type reconcilerDefaults struct {
-	Credentials []string       `yaml:"reconciler_verify_credentials"`
-	Shared      string         `yaml:"reconciler_shared"`
-	Verify      map[string]any `yaml:"reconciler_verify"`
+	Credentials      []string       `yaml:"reconciler_verify_credentials"`
+	ApplyCredentials []string       `yaml:"reconciler_apply_credentials"`
+	Shared           string         `yaml:"reconciler_shared"`
+	KnownHosts       string         `yaml:"reconciler_known_hosts"`
+	ApplySchedule    string         `yaml:"reconciler_apply_schedule"`
+	Verify           map[string]any `yaml:"reconciler_verify"`
+	Apply            map[string]any `yaml:"reconciler_apply"`
 }
 
 func roleDefaults(t *testing.T) reconcilerDefaults {
@@ -49,14 +53,17 @@ func TestVerifyUnitDecryptsOnlyTheVerifyCredentials(t *testing.T) {
 	for _, directive := range []string{
 		"User=infra-verify", "RuntimeDirectory=infra-reconcile-verify", "RuntimeDirectoryMode=0700", "StateDirectory=infra-verify\n", "CacheDirectory=infra-verify\n", "CacheDirectoryMode=0700", "UMask=0077", "NoNewPrivileges=yes", "ProtectSystem=strict", "PrivateTmp=yes", "CapabilityBoundingSet=\n",
 		"ExecStartPre=+/usr/bin/chown infra-verify:infra-verify " + credentials + "\n",
-		"ExecStart=/usr/local/bin/infra reconcile run verify --config=/etc/infra-reconcile/verify.json --credentials=" + credentials + "\n",
+		"ExecStart=/usr/local/bin/infra reconcile run verify --config=/etc/infra-reconcile/verify.json --credentials=" + credentials + " --ssh-identity=%d/ssh-identity\n",
 	} {
 		if !strings.Contains(service, directive) {
 			t.Errorf("verify unit lacks %q", directive)
 		}
 	}
-	if strings.Contains(service, "apply") || strings.Contains(service, "LoadCredential") {
-		t.Error("verify unit reaches beyond the verify credentials")
+	if loaded := regexp.MustCompile(`(?m)^LoadCredential=.*$`).FindAllString(service, -1); !slices.Equal(loaded, []string{"LoadCredential=ssh-identity:{{ reconciler_ssh_identity }}"}) {
+		t.Errorf("verify unit loads %q", loaded)
+	}
+	if strings.Contains(service, "apply") {
+		t.Error("verify unit reaches the apply credentials")
 	}
 }
 
@@ -72,7 +79,7 @@ func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 				value[key] = resolve(item)
 			}
 		case string:
-			return templated.ReplaceAllString(strings.ReplaceAll(value, "{{ reconciler_shared }}", defaults.Shared), "100.64.0.1")
+			return templated.ReplaceAllString(strings.NewReplacer("{{ reconciler_shared }}", defaults.Shared, "{{ reconciler_known_hosts }}", defaults.KnownHosts).Replace(value), "100.64.0.1")
 		}
 		return value
 	}
@@ -89,7 +96,7 @@ func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("role configuration: %v", err)
 	}
-	if config.Heartbeat != "reconciliation_verification" || config.Repository != "https://github.com/fredrir/infra.git" || config.State != "/var/lib/infra-verify" || config.Cache != "/var/cache/infra-verify" || config.Shared != defaults.Shared {
+	if config.Heartbeat != "reconciliation_verification" || config.Repository != "https://github.com/fredrir/infra.git" || config.State != "/var/lib/infra-verify" || config.Cache != "/var/cache/infra-verify" || config.Shared != defaults.Shared || config.Scope != "full" || config.KnownHosts != "/etc/infra-reconcile/known_hosts" {
 		t.Fatalf("role configuration %+v", config)
 	}
 }

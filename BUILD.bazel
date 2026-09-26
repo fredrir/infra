@@ -93,6 +93,8 @@ filegroup(
 filegroup(
     name = "reconciler_access_data",
     srcs = [
+        "ansible/files/reconciliation.pub",
+        "ansible/files/reconciliation_known_hosts",
         "ansible/inventory/production.yml",
         "tofu/cloudflare.tf",
         "tofu/production.tfvars.json",

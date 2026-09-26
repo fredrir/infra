@@ -41,6 +41,10 @@
       state: directory
       owner: '{{ ansible_user }}'
       mode: '0700'
+  - name: Require the reconciler public key
+    ansible.builtin.assert:
+      that: lookup('ansible.builtin.file', 'files/reconciliation.pub') is match('^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$')
+      fail_msg: ansible/files/reconciliation.pub must hold fredrir-11's public key
   - name: Install reconciliation identity
     ansible.builtin.lineinfile:
       path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh/authorized_keys'

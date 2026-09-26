@@ -34,6 +34,7 @@ go_library(
 go_test(
     name = "reconciler_test",
     srcs = [
+        "apply_role_test.go",
         "apply_test.go",
         "checkout_test.go",
         "config_test.go",
@@ -55,6 +56,7 @@ go_test(
         "//internal/dev",
         "//internal/objectstore",
         "//internal/process",
+        "//internal/provenance",
         "//internal/reconcile",
         "@com_github_aws_aws_sdk_go_v2//aws",
         "@com_github_aws_aws_sdk_go_v2//aws/signer/v4:signer",
