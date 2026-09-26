@@ -1,0 +1,108 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kubelet-volatile
+  namespace: observability
+  labels:
+    release: monitoring
+spec:
+  sampleLimit: 5000
+  labelLimit: 40
+  labelNameLengthLimit: 63
+  labelValueLengthLimit: 1024
+  jobLabel: k8s-app
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubelet
+      k8s-app: kubelet
+  endpoints:
+  - port: https-metrics
+    scheme: https
+    honorLabels: true
+    honorTimestamps: true
+    tlsConfig:
+      insecureSkipVerify: true
+    authorization:
+      type: Bearer
+      credentials:
+        name: monitoring-prometheus-token
+        key: token
+    relabelings:
+    - sourceLabels:
+      - __metrics_path__
+      targetLabel: metrics_path
+      action: replace
+    - sourceLabels:
+      - __meta_kubernetes_endpoint_node_name
+      regex: fredrir-10
+      action: keep
+  - port: https-metrics
+    scheme: https
+    path: /metrics/cadvisor
+    honorLabels: true
+    honorTimestamps: true
+    tlsConfig:
+      insecureSkipVerify: true
+    authorization:
+      type: Bearer
+      credentials:
+        name: monitoring-prometheus-token
+        key: token
+    relabelings:
+    - sourceLabels:
+      - __metrics_path__
+      targetLabel: metrics_path
+      action: replace
+    - sourceLabels:
+      - __meta_kubernetes_endpoint_node_name
+      regex: fredrir-10
+      action: keep
+    metricRelabelings:
+    - sourceLabels:
+      - __name__
+      - container
+      regex: container_.+;.+
+      action: drop
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: node-exporter-volatile
+  namespace: observability
+  labels:
+    release: monitoring
+spec:
+  sampleLimit: 3000
+  labelLimit: 40
+  labelNameLengthLimit: 63
+  labelValueLengthLimit: 1024
+  jobLabel: jobLabel
+  namespaceSelector:
+    matchNames:
+    - node-exporter
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-node-exporter
+  endpoints:
+  - port: http-metrics
+    scheme: http
+    relabelings:
+    - sourceLabels:
+      - __meta_kubernetes_pod_node_name
+      regex: fredrir-10
+      action: keep
+    - sourceLabels:
+      - __meta_kubernetes_pod_node_name
+      targetLabel: node
+    - sourceLabels:
+      - __meta_kubernetes_pod_node_name
+      targetLabel: instance
+    metricRelabelings:
+    - sourceLabels:
+      - __name__
+      - mountpoint
+      regex: node_filesystem_.+;/var/lib/kubelet/.+
+      action: drop

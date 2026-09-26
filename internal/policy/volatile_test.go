@@ -203,3 +203,34 @@ func TestVolatileToleranceKeepsSharedWorkerLimits(t *testing.T) {
 		}
 	}
 }
+
+func TestKubeletScrapesKeepTheMetricsPathLabel(t *testing.T) {
+	keeps := func(relabelings any) bool {
+		items, _ := relabelings.([]any)
+		return slices.ContainsFunc(items, func(item any) bool {
+			rule, _ := item.(object)
+			sources, _ := rule["sourceLabels"].([]any)
+			return rule["action"] == "replace" && rule["targetLabel"] == "metrics_path" && slices.Equal(sources, []any{"__metrics_path__"})
+		})
+	}
+	kubelet := at(load(t, "platform/components/observability/monitoring.yaml"), "spec", "values", "kubelet", "serviceMonitor").(object)
+	for _, key := range []string{"relabelings", "cAdvisorRelabelings", "probesRelabelings"} {
+		if list, set := kubelet[key]; set && !keeps(list) {
+			t.Errorf("kubelet %s replaces the chart default without the metrics_path label", key)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), "platform/components/observability/volatile-metrics.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, monitor := range yamlObjects(t, data) {
+		if at(monitor, "metadata", "name") != "kubelet-volatile" {
+			continue
+		}
+		for index, endpoint := range at(monitor, "spec", "endpoints").([]any) {
+			if !keeps(at(endpoint, "relabelings")) {
+				t.Errorf("kubelet-volatile endpoint %d lacks the metrics_path label", index)
+			}
+		}
+	}
+}

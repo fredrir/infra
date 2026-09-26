@@ -4,6 +4,7 @@ metadata:
   name: observability
 resources:
 - monitoring.yaml
+- volatile-metrics.yaml
 - loki.yaml
 - tempo.yaml
 - alloy.yaml

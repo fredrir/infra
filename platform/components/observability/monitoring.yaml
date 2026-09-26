@@ -250,6 +250,33 @@ spec:
         labelLimit: 40
         labelNameLengthLimit: 63
         labelValueLengthLimit: 1024
+        relabelings:
+        - sourceLabels:
+          - __metrics_path__
+          targetLabel: metrics_path
+          action: replace
+        - sourceLabels:
+          - __meta_kubernetes_endpoint_node_name
+          regex: fredrir-10
+          action: drop
+        cAdvisorRelabelings:
+        - sourceLabels:
+          - __metrics_path__
+          targetLabel: metrics_path
+          action: replace
+        - sourceLabels:
+          - __meta_kubernetes_endpoint_node_name
+          regex: fredrir-10
+          action: drop
+        probesRelabelings:
+        - sourceLabels:
+          - __metrics_path__
+          targetLabel: metrics_path
+          action: replace
+        - sourceLabels:
+          - __meta_kubernetes_endpoint_node_name
+          regex: fredrir-10
+          action: drop
     prometheus-node-exporter:
       namespaceOverride: node-exporter
       serviceAccount:
@@ -290,6 +317,10 @@ spec:
           labelNameLengthLimit: 63
           labelValueLengthLimit: 1024
           relabelings:
+          - sourceLabels:
+            - __meta_kubernetes_pod_node_name
+            regex: fredrir-10
+            action: drop
           - sourceLabels:
             - __meta_kubernetes_pod_node_name
             targetLabel: node

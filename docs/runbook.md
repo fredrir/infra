@@ -298,7 +298,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Scheduling | Taint `node-restriction.kubernetes.io/volatile=true:NoSchedule`, applied before labels `gvisor`, `volatile`, `infra.fredrir.com/ci-slots=3`; no `critical` or `stateful` |
 | Critical controllers | Flux, ARC controller and listeners, ci-slots: required `node-restriction.kubernetes.io/critical=true` |
 | CI pools | `check-amd64`, `rust-amd64` and `rust-pr-amd64` tolerate and prefer it and leave 30 s after not-ready or unreachable; `rust-release-amd64` and `rust-tag-amd64` never run there |
-| Monitoring | node-exporter only; Alloy stays off because pod-log reads cannot be scoped to one node |
+| Monitoring | node-exporter only; Alloy stays off because pod-log reads cannot be scoped to one node. fredrir-10 is dropped from the fleet kubelet and node-exporter ServiceMonitors and scraped by its own `kubelet-volatile` (sampleLimit 5000, per-container cAdvisor series dropped) and `node-exporter-volatile` (sampleLimit 3000) monitors, so it cannot grow the Prometheus head |
 | Readiness waits | `verify.yml` and `maintenance.yml` exclude `node-restriction.kubernetes.io/volatile`; `maintenance.yml` never targets volatile hosts, which take unattended patching |
 | Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100 and 10250; SSH from Macie, Archie and `tag:infra-apply` |
 | Inbound access | Tailnet; NTNU VPN (`~/ntnu-proxy`, `10.50.0.0/16`) is owner-only break-glass SSH with keys only, never used by the fleet |
