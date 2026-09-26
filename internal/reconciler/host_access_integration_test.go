@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+func unavailable(t *testing.T, reason string) {
+	t.Helper()
+	if os.Getenv("INFRA_HOST_ACCESS_TEST") == "required" {
+		t.Fatal(reason)
+	}
+	t.Skip(reason)
+}
+
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 	directory, err := os.Getwd()
@@ -25,7 +33,7 @@ func repositoryRoot(t *testing.T) string {
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
-			t.Skip("requires the repository's Ansible configuration")
+			unavailable(t, "requires the repository's Ansible configuration")
 		}
 		directory = parent
 	}
@@ -45,7 +53,7 @@ func hopTools(t *testing.T, root string) (string, string) {
 	}
 	_, keygen := exec.LookPath("ssh-keygen")
 	if _, err := os.Stat(playbook); sshd == "" || err != nil || keygen != nil {
-		t.Skip("requires sshd, ssh-keygen and the repository's Ansible environment")
+		unavailable(t, "requires sshd, ssh-keygen and the repository's Ansible environment")
 	}
 	return sshd, playbook
 }
@@ -142,7 +150,16 @@ func TestHostAccessReachesHostsThroughARealSSHHopAndProxyJump(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	credentials := filepath.Join(t.TempDir(), "credentials.json")
+	runtime := t.TempDir()
+	if memoryBackedFilesystem("/dev/shm") == nil {
+		shared, err := os.MkdirTemp("/dev/shm", "infra-host-access-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.RemoveAll(shared) })
+		runtime = shared
+	}
+	credentials := filepath.Join(runtime, "credentials.json")
 	current, cleanup, err := openSession(filepath.Join(work, "runs"), credentials, nil, nil, true)
 	if err != nil {
 		t.Fatal(err)
