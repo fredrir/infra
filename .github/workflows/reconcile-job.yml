@@ -117,8 +117,8 @@ jobs:
         persist-credentials: false
     - name: Install provenance gate
       env:
-        GATE_RELEASE: infra-v0.2.11
-        GATE_SHA256: a2ed770151bcca5feb94b0f85341be202a454e6c894aa4aeb9110f89048bfb9f
+        GATE_RELEASE: infra-v0.2.12
+        GATE_SHA256: 6597c59d9cae6754879e77c81d33efb633c548586e27954ef66243cdf9ec359e
       run: |
         gate="$RUNNER_TEMP/provenance-gate/infra"
         mkdir -p "$(dirname "$gate")"
