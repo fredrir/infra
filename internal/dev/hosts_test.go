@@ -375,6 +375,16 @@ func TestHostsUpStartsSelectedNodesAndKeepsTheReconcilerOutsideTheCluster(t *tes
 	writeFile(t, filepath.Join(root, hostsSpecFile), string(spec)+"- name: dev-reconciler-1\n  role: reconciler\n  cpus: 4\n  memory_mib: 4096\n  disk_gib: 30\n  private_ip: 10.60.0.31\n  tailscale_ip: 100.64.0.31\n  ssh_port: 2231\n")
 	fake := newHostsFake(t, root)
 	opts := HostsOptions{State: NewState(root), Runner: fake.runner(), Client: server.Client(), Signal: fake.signal, Log: io.Discard}
+	if _, err := HostsUp(context.Background(), opts); err != nil {
+		t.Fatal(err)
+	}
+	if fake.count("qemu-system-x86_64") != 2 || fake.count("qemu-system-x86_64 -name dev-reconciler-1") != 0 {
+		t.Fatalf("default selection launched %v", fake.commands)
+	}
+	if err := HostsDown(context.Background(), opts, false); err != nil {
+		t.Fatal(err)
+	}
+	fake.commands = nil
 	opts.Nodes = []string{"dev-missing-1"}
 	if _, err := HostsUp(context.Background(), opts); err == nil || !strings.Contains(err.Error(), `unknown node "dev-missing-1"`) {
 		t.Fatalf("unknown node returned %v", err)

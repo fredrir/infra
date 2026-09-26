@@ -143,6 +143,13 @@ func readHostsSpec(root string) (HostsSpec, error) {
 
 func (opts HostsOptions) dir(name string) string { return filepath.Join(opts.State.Hosts(), name) }
 
+func (opts HostsOptions) selected(node HostSpec) bool {
+	if len(opts.Nodes) == 0 {
+		return node.Role != "reconciler"
+	}
+	return slices.Contains(opts.Nodes, node.Name)
+}
+
 func (opts HostsOptions) pid(name string) (int, bool) {
 	data, err := os.ReadFile(filepath.Join(opts.dir(name), "qemu.pid"))
 	if err != nil {
@@ -182,7 +189,7 @@ func HostsUp(ctx context.Context, opts HostsOptions) (HostsStatus, error) {
 		}
 	}
 	for index, node := range spec.Nodes {
-		if _, running := opts.pid(node.Name); running || (len(opts.Nodes) > 0 && !slices.Contains(opts.Nodes, node.Name)) {
+		if _, running := opts.pid(node.Name); running || !opts.selected(node) {
 			continue
 		}
 		if err := opts.launch(ctx, spec, node, index, image, public, tokens); err != nil {

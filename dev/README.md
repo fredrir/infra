@@ -50,7 +50,7 @@ infra dev clean --all
 | Role | Guests |
 | --- | --- |
 | `ubuntu`, `firewall`, `k3s` | `site.yml` runs against `dev-server-1` and `dev-agent-1` |
-| `reconciler` | `reconciler.yml` runs against `dev-reconciler-1`, in `reconcilers` outside `ubuntu`, with `--skip-tags=transport,infra_binary` |
+| `reconciler` | `reconciler.yml` runs against `dev-reconciler-1`, in `reconcilers` outside `ubuntu`, with `--skip-tags=transport,infra_binary`; `hosts up` starts it only when named |
 | `tailscale` | Skipped; `tailscale0` is a renamed multicast NIC carrying the fake tailnet address at MTU 1280, and a stub `tailscaled.service` satisfies the K3s unit dependency |
 | `build_vm`, `build_engine`, `build_runner`, `ci_runtime`, `gatus`, `control_backup` | Need nested KVM, GitHub credentials or secrets encrypted to the guest host key |
 
