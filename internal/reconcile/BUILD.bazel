@@ -95,6 +95,7 @@ go_test(
         "//internal/ci",
         "//internal/objectstore",
         "//internal/process",
+        "@com_github_aws_aws_sdk_go_v2//aws/retry",
         "@com_github_bmatcuk_doublestar_v4//:doublestar",
         "@com_github_golang_jwt_jwt_v4//:jwt",
         "@com_github_google_go_github_v88//github",

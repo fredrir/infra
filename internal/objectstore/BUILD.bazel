@@ -7,6 +7,7 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "@com_github_aws_aws_sdk_go_v2//aws",
+        "@com_github_aws_aws_sdk_go_v2//aws/retry",
         "@com_github_aws_aws_sdk_go_v2//aws/signer/v4:signer",
     ],
 )
@@ -15,4 +16,5 @@ go_test(
     name = "objectstore_test",
     srcs = ["client_test.go"],
     embed = [":objectstore"],
+    deps = ["@com_github_aws_aws_sdk_go_v2//aws/retry"],
 )

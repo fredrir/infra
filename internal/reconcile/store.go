@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -68,6 +69,8 @@ var (
 	errRequestConflict    = errors.New("lease request conflicted with a concurrent write")
 )
 
+var awsErrorCode = regexp.MustCompile(`An error occurred \(([A-Za-z]+)\)`)
+
 type ErrLocked struct {
 	Owner   string
 	Expires time.Time
@@ -82,7 +85,7 @@ func (s S3Store) object(ctx context.Context, key string) ([]byte, string, error)
 		response, err := s.Client.Request(ctx, http.MethodGet, s.Bucket, s.Prefix+"/"+key, nil)
 		if err != nil {
 			var status *objectstore.StatusError
-			if errors.As(err, &status) && status.Code == http.StatusNotFound {
+			if errors.As(err, &status) && status.Status == http.StatusNotFound {
 				return nil, "", nil
 			}
 			return nil, "", err
@@ -132,12 +135,8 @@ func (s S3Store) object(ctx context.Context, key string) ([]byte, string, error)
 	return body, metadata.ETag, err
 }
 
-func (s S3Store) put(ctx context.Context, key string, value any, match string) (string, error) {
+func (s S3Store) put(ctx context.Context, key string, body []byte, match string) (string, error) {
 	if s.Client != nil {
-		body, err := json.Marshal(value)
-		if err != nil {
-			return "", err
-		}
 		headers := http.Header{"X-Amz-Server-Side-Encryption": {"AES256"}, "Content-Type": {"application/json"}}
 		if match == "*" {
 			headers.Set("If-None-Match", "*")
@@ -164,10 +163,6 @@ func (s S3Store) put(ctx context.Context, key string, value any, match string) (
 	}
 	defer os.RemoveAll(dir)
 	path := filepath.Join(dir, "object")
-	body, err := json.Marshal(value)
-	if err != nil {
-		return "", err
-	}
 	if err := os.WriteFile(path, body, 0600); err != nil {
 		return "", err
 	}
@@ -197,12 +192,16 @@ func (s S3Store) aws(ctx context.Context, args ...string) ([]byte, error) {
 		execute = process.Run
 	}
 	result, err := execute(ctx, process.Options{Name: "aws", Args: args, Dir: s.Runner.Dir, Env: append(os.Environ(), s.Runner.Env...), Stderr: s.Runner.Stderr})
-	switch {
-	case err == nil:
+	if err == nil {
 		return result.Stdout, nil
-	case bytes.Contains(result.Stderr, []byte("(PreconditionFailed)")):
+	}
+	code := awsErrorCode.FindSubmatch(result.Stderr)
+	switch {
+	case code == nil:
+		return nil, fmt.Errorf("%w: %w", objectstore.ErrUnconfirmed, err)
+	case string(code[1]) == "PreconditionFailed":
 		return nil, fmt.Errorf("%w: %w", errPreconditionFailed, err)
-	case bytes.Contains(result.Stderr, []byte("(ConditionalRequestConflict)")):
+	case string(code[1]) == "ConditionalRequestConflict":
 		return nil, fmt.Errorf("%w: %w", errRequestConflict, err)
 	}
 	return nil, err
@@ -219,7 +218,11 @@ func (s S3Store) Read(ctx context.Context) (Status, error) {
 }
 
 func (s S3Store) Write(ctx context.Context, status Status) error {
-	_, err := s.put(ctx, "status.json", status, "")
+	body, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+	_, err = s.put(ctx, "status.json", body, "")
 	return err
 }
 
@@ -315,45 +318,61 @@ func (l *heldLease) release() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	s := l.store
-	return reissuedOnConflict(func() error {
+	_, err := s.settleLeaseRequest(ctx, nil, l.token, func() (string, error) {
 		if s.Client == nil {
 			_, err := s.aws(ctx, "s3api", "delete-object", "--bucket", s.Bucket, "--key", s.Prefix+"/lock.json", "--if-match", l.token)
-			return err
+			return "", err
 		}
 		response, err := s.Client.RequestHeaders(ctx, http.MethodDelete, s.Bucket, s.Prefix+"/lock.json", nil, http.Header{"If-Match": {l.token}})
 		if err != nil {
-			return err
+			return "", err
 		}
 		defer response.Body.Close()
 		_, err = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
-		return err
+		return "", err
 	})
+	return err
 }
 
-func (s S3Store) putLease(ctx context.Context, value lease, match string) (token string, err error) {
-	err = reissuedOnConflict(func() error {
-		token, err = s.put(ctx, "lock.json", value, match)
-		return err
-	})
-	return token, err
-}
-
-// S3 answers 409 to a conditional request that races another write, so it is reissued once for a 412 or 2xx verdict.
-func reissuedOnConflict(request func() error) error {
-	if err := request(); !requestConflicted(err) {
-		return err
+func (s S3Store) putLease(ctx context.Context, value lease, match string) (string, error) {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return "", err
 	}
-	return request()
+	return s.settleLeaseRequest(ctx, body, match, func() (string, error) { return s.put(ctx, "lock.json", body, match) })
 }
 
-func requestConflicted(err error) bool {
+// settleLeaseRequest reads the lease back after a refused, conflicted or unconfirmed conditional request, whose intended result is the lease body or, when nil, its absence.
+func (s S3Store) settleLeaseRequest(ctx context.Context, intended []byte, match string, request func() (string, error)) (string, error) {
+	for attempt := 1; ; attempt++ {
+		token, err := request()
+		if err == nil || !leaseUnsettled(err) {
+			return token, err
+		}
+		current, etag, readErr := s.object(ctx, "lock.json")
+		unchanged := etag == match || current == nil && match == "*"
+		switch {
+		case readErr != nil:
+			return "", errors.Join(err, fmt.Errorf("read reconciliation lock: %w", readErr))
+		case intended == nil && current == nil, intended != nil && bytes.Equal(current, intended):
+			return etag, nil
+		case unchanged && attempt == 1:
+			continue
+		case unchanged && errors.Is(err, objectstore.ErrUnconfirmed), errors.Is(err, errPreconditionFailed):
+			return "", err
+		}
+		return "", fmt.Errorf("%w: %w", errPreconditionFailed, err)
+	}
+}
+
+func leaseUnsettled(err error) bool {
 	var status *objectstore.StatusError
-	return errors.Is(err, errRequestConflict) || (errors.As(err, &status) && status.Code == http.StatusConflict)
+	return errors.Is(err, errPreconditionFailed) || errors.Is(err, errRequestConflict) || errors.Is(err, objectstore.ErrUnconfirmed) ||
+		errors.As(err, &status) && (status.Status == http.StatusPreconditionFailed || status.Status == http.StatusConflict)
 }
 
 func leaseTaken(err error) bool {
-	var status *objectstore.StatusError
-	return errors.Is(err, errPreconditionFailed) || requestConflicted(err) || (errors.As(err, &status) && status.Code == http.StatusPreconditionFailed)
+	return errors.Is(err, errPreconditionFailed)
 }
 
 func leaseOwner() string {
