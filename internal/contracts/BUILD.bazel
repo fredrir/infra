@@ -7,6 +7,7 @@ go_test(
         "bazel_test.go",
         "build_vm_test.go",
         "cancellation_test.go",
+        "cli_inputs_test.go",
         "firewall_test.go",
         "host_secrets_test.go",
         "images_test.go",
@@ -17,6 +18,7 @@ go_test(
     ],
     data = [
         "//:build_vm_metrics_data",
+        "//:cli_input_data",
         "//:host_firewall_data",
         "//:host_secret_data",
         "//:image_contract_data",

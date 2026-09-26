@@ -114,6 +114,12 @@ filegroup(
 )
 
 filegroup(
+    name = "cli_input_data",
+    srcs = [".github/actions/cli-inputs/action.yml"],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "reconciliation_action_data",
     srcs = [
         ".github/actions/setup-reconciliation-cli/action.yml",

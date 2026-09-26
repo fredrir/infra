@@ -23,7 +23,7 @@ runs:
             *) sources=(.); break ;;
           esac
         done < <(git ls-files -- '*.go')
-        digest=$(git ls-tree -r HEAD -- "${sources[@]}" | sha256sum | cut -d' ' -f1)
+        digest=$(git ls-tree -r HEAD -- "${sources[@]}" | sed '/_test\.go$/d' | sha256sum | cut -d' ' -f1)
         printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
         if [ "$digest" = "$(jq -r '.inputs_sha256 // ""' build/cli-release.json)" ]; then
           printf 'released=true\n' >> "$GITHUB_OUTPUT"
