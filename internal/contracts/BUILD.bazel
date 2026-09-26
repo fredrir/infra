@@ -19,6 +19,7 @@ go_test(
         "//:renovate_pin_data",
         "//:tailnet_policy_data",
         "//platform:arc_chart_data",
+        "//platform:sops_data",
     ],
     deps = [
         "//internal/ci",

@@ -212,7 +212,6 @@ jobs:
         CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
         TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
-        SOPS_AGE_KEY: ${{ steps.doppler.outputs.SOPS_AGE_KEY }}
         GH_TOKEN: ${{ steps.runner-token.outputs.token || steps.observer-token.outputs.token }}
         PROVENANCE_TOKEN: ${{ github.token }}
         PUBLISHER_APP_PRIVATE_KEY_FILE: ${{ env.VERIFICATION != 'true' && format('{0}/publisher/key.pem', runner.temp) || '' }}

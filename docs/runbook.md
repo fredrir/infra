@@ -213,7 +213,6 @@ These activation steps provision external credentials once; merge, verification 
 | `PLATFORM_MAIL_RECIPIENT` | Private OpenTofu mail recipient | Same recipient |
 | `SSH_PRIVATE_KEY` | Unset | Dedicated key for managed hosts and build guest |
 | `SSH_KNOWN_HOSTS` | Unset | Verified Tailnet host keys, `fredrir-06` and `infra-build-09` aliases |
-| `SOPS_AGE_KEY` | Unset | Decrypt host monitoring, verification trigger and backup credentials |
 | `RUNNER_APP_ID`, `RUNNER_APP_PRIVATE_KEY` | Unset | Runner GitHub App; applies mint a short-lived installation token with repository administration write |
 | `OBSERVER_APP_ID`, `OBSERVER_APP_PRIVATE_KEY` | Unset | Observer GitHub App; verifications mint a short-lived installation token with repository administration read |
 | `PUBLISHER_APP_PRIVATE_KEY` | Unset | [Publisher App](#publishing) private key; delivered to the engine as a file |
@@ -245,7 +244,6 @@ These activation steps provision external credentials once; merge, verification 
 | Tailnet apply scope | Control-plane API and SSH to managed hosts |
 | Tailnet reconciler scope | `tag:infra-reconciler`: control-plane API and Gatus heartbeats; reached only by Macie and Archie on SSH |
 | Host SSH key | `ansible/files/reconciliation.pub`; maintained by `ansible/reconciliation-identity.yml` |
-| CI SOPS recipient | Added only to host monitoring, verification trigger and backup secret files |
 | Provider-policy, workload-boundary or bucket-lifecycle changes, revoked credentials | Administrator repair required |
 
 ```sh
@@ -253,6 +251,19 @@ doppler configs tokens create github-reconciliation-plan --project infra --confi
 doppler configs tokens create github-reconciliation-apply --project infra --config prd_reconciliation_apply --access read --plain | gh secret set DOPPLER_TOKEN --env infrastructure-apply
 gh workflow run reconcile.yml --ref main
 ```
+
+### CI SOPS key retirement
+
+The retired CI apply recipient `age1jm6xj8qlmfjlhw0vdseaaqkpt3mqj3yl0upx3smwutsaghcq6pesvrka2t` still decrypts every earlier revision of `ansible/roles/gatus/files/config.sops.yaml`, `ansible/roles/verification_trigger/files/github-app.sops.yaml`, `ansible/roles/verification_trigger/files/heartbeat.sops.yaml` and `platform/components/backups/backup.secret.sops.yaml`.
+
+| Order | Action | Check |
+| --- | --- | --- |
+| 1 | After a green apply without it, delete `SOPS_AGE_KEY` from Doppler `infra/prd_reconciliation_apply` | `doppler secrets get SOPS_AGE_KEY --project infra --config prd_reconciliation_apply` fails; the next apply succeeds |
+| 2 | Verification heartbeat, then each backup heartbeat, one commit per token | [Rotate](Secrets.md#host-scoped-secrets) |
+| 3 | Verification App key | GitHub App settings |
+| 4 | SMTP | Administrator IAM |
+| 5 | Control backup access key | Administrator IAM |
+| 6 | Control repository password | `restic key remove` last |
 
 ### Recovery
 

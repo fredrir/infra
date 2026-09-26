@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -151,6 +152,45 @@ func TestHostSecretsComeFromTheImportingRole(t *testing.T) {
 	for _, file := range defaults {
 		if strings.Contains(string(read(t, file)), "role_path") {
 			t.Errorf("%s uses role_path, which resolves to the role of whichever task reads the default", file)
+		}
+	}
+}
+
+func TestSOPSFilesUseOnlyDeclaredRecipients(t *testing.T) {
+	repository := root(t)
+	var config struct {
+		Keys []string `yaml:"keys"`
+	}
+	if err := yaml.Unmarshal(read(t, filepath.Join(repository, ".sops.yaml")), &config); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]string{}
+	for _, pattern := range []string{"ansible/roles/*/files/*.sops.yaml", "secrets/*.yaml"} {
+		matches, err := filepath.Glob(filepath.Join(repository, pattern))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[pattern] = matches
+	}
+	if err := filepath.WalkDir(filepath.Join(repository, "platform"), func(path string, entry fs.DirEntry, err error) error {
+		if err == nil && strings.HasSuffix(path, ".sops.yaml") {
+			files["platform"] = append(files["platform"], path)
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for scope, paths := range files {
+		if len(paths) == 0 {
+			t.Fatalf("no SOPS files under %s", scope)
+		}
+		for _, path := range paths {
+			for _, recipient := range sopsRecipients(t, path) {
+				if !slices.Contains(config.Keys, recipient) {
+					relative, _ := filepath.Rel(repository, path)
+					t.Errorf("%s is encrypted to %s, which .sops.yaml does not declare; run sops rotate -i --rm-age %s %s", relative, recipient, recipient, relative)
+				}
+			}
 		}
 	}
 }

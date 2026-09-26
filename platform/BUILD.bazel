@@ -30,3 +30,9 @@ filegroup(
     srcs = glob(["components/**/*.yaml"]),
     visibility = ["//internal/contracts:__pkg__"],
 )
+
+filegroup(
+    name = "sops_data",
+    srcs = glob(["**/*.sops.yaml"]),
+    visibility = ["//internal/contracts:__pkg__"],
+)
