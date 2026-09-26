@@ -2,16 +2,46 @@
   "schema": 1,
   "commit": "65e4a713912eaf989d31a9efd90288c8174c5a48",
   "tailnet_policy": "Applied through the Tailscale API before the push; live policy matched main, validation returned no errors, If-Match on the prior ETag, post-apply policy equals the commit",
-  "rollout": "node-local-dns 1.26.8 ready 5/5 on fredrir-04, 05, 07, 08, 09; fredrir-10 excluded",
+  "rollout": "node-local-dns 1.26.8 ready 6/6 including fredrir-10 after 2045019",
   "lookup_ms_from_fredrir_09_pod": {
     "pod": "llunde-pyparser review",
     "method": "python getaddrinfo, 5 samples 0.3 s apart",
-    "s3.eu-north-1.amazonaws.com": [204.2, 2.5, 1.9, 2.8, 2.5],
-    "kubernetes.default": [82.0, 0.9, 0.9, 0.8, 0.8],
+    "s3.eu-north-1.amazonaws.com": [
+      204.2,
+      2.5,
+      1.9,
+      2.8,
+      2.5
+    ],
+    "kubernetes.default": [
+      82.0,
+      0.9,
+      0.9,
+      0.8,
+      0.8
+    ],
     "baseline": "about 240 ms per non-FQDN lookup and 245-300 ms for in-cluster names before the cache"
   },
   "limitations": [
-    "One pod, one sample series",
-    "First lookups still pay ndots:5 search expansion to CoreDNS"
-  ]
+    "One pod, one sample series per change",
+    "Single-label and service.namespace names still use the search list"
+  ],
+  "ndots_2": {
+    "commit": "2045019ccafc845447420186c632608441264842",
+    "pod": "llunde-pyparser review on fredrir-09",
+    "s3.eu-north-1.amazonaws.com": [
+      32.7,
+      0.8,
+      0.9,
+      1.1,
+      1.0
+    ],
+    "kubernetes.default": [
+      123.2,
+      1.1,
+      1.6,
+      1.2,
+      1.6
+    ]
+  }
 }
