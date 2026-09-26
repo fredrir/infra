@@ -421,6 +421,51 @@
         "the hcloud provider left the bootstrap SSH rule after emptying the rule list; removed with hcloud firewall replace-rules",
         "the verify unit denied setrlimit, which OpenTofu providers call at startup"
       ]
+    },
+    {
+      "change": "Activate fredrir-10 as a volatile WireGuard k3s worker",
+      "prerequisites": {
+        "flannel_backend": "wireguard on all five fleet nodes (669781e)",
+        "tailnet_policy": "live policy matches tailscale/policy.hujson",
+        "nsql_auto_tag": "fredrir/nsql 1a73eb3 pins infra 28d058b on rust-tag-amd64 and allows only that revision"
+      },
+      "cli": {
+        "release": "infra-v0.2.13",
+        "sha256": "22e924c12dd439357be0ea53aefc3286dbd11a6a585b0605ca2bfbdc528dce3c"
+      },
+      "enrollment_fix": {
+        "revision": "1468ba7",
+        "cause": "enroll-fredrir-10-volatile-<24 hex> is 51 characters and Tailscale truncates key descriptions to 50",
+        "change": "20-hex suffix; the test fake truncates like Tailscale"
+      },
+      "tailnet": {
+        "address": "100.115.32.87",
+        "tag": "tag:platform-volatile",
+        "auth_key": "single use, revoked and removed after enrollment"
+      },
+      "join": {
+        "token": "bootstrap token, 30 minute expiry, deleted after the node registered",
+        "converge_run": "https://github.com/fredrir/infra/actions/runs/36255133962",
+        "reason_for_ci_converge": "the administrator workstation reaches fredrir-10 but not fredrir-07, which the WireGuard gate reads"
+      },
+      "node": {
+        "ready": true,
+        "kubelet": "v1.36.3+k3s1",
+        "taint": "node-restriction.kubernetes.io/volatile=true:NoSchedule",
+        "flannel": "wireguard, public-ip 100.115.32.87",
+        "allocatable": {
+          "cpu": "7500m",
+          "memory": "33588500Ki",
+          "ci_slots": 3
+        },
+        "data_volume": "/dev/sdb1 ext4 492G at /var/lib/rancher",
+        "container_engines": "removed"
+      },
+      "monitoring": [
+        "kubelet-volatile/0 up",
+        "kubelet-volatile/1 up",
+        "node-exporter-volatile/0 up"
+      ]
     }
   ]
 }
