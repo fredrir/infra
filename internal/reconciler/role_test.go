@@ -60,24 +60,9 @@ func TestVerifyUnitDecryptsOnlyTheVerifyCredentials(t *testing.T) {
 	}
 }
 
-var settingsLandingWithThePin = map[string]any{"cache": "/var/cache/infra-verify", "shared": "/var/lib/infra-reconcile", "scope": "cloud"}
-
 func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 	defaults := roleDefaults(t)
 	declared := defaults.Verify
-	for name := range settingsLandingWithThePin {
-		if _, ok := declared[name]; ok {
-			t.Errorf("the role declares %s, which the pinned supervisor rejects; move settingsLandingWithThePin into the role with the pin", name)
-		}
-	}
-	var pin struct{ Tag string }
-	data, err := os.ReadFile(filepath.Join("..", "..", "build", "cli-release.json"))
-	if err == nil {
-		err = json.Unmarshal(data, &pin)
-	}
-	if err != nil || pin.Tag != "infra-v0.2.13" {
-		t.Fatalf("the pin moved to %q (%v): declare settingsLandingWithThePin in the role in the same change", pin.Tag, err)
-	}
 	templated := regexp.MustCompile(`\{\{.*\}\}`)
 	var resolve func(any) any
 	resolve = func(value any) any {
@@ -87,15 +72,12 @@ func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 				value[key] = resolve(item)
 			}
 		case string:
-			return templated.ReplaceAllString(value, "100.64.0.1")
+			return templated.ReplaceAllString(strings.ReplaceAll(value, "{{ reconciler_shared }}", defaults.Shared), "100.64.0.1")
 		}
 		return value
 	}
 	resolve(declared)
-	for name, value := range settingsLandingWithThePin {
-		declared[name] = value
-	}
-	data, err = json.Marshal(declared)
+	data, err := json.Marshal(declared)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +89,7 @@ func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("role configuration: %v", err)
 	}
-	if config.Heartbeat != "reconciliation_verification" || config.Repository != "https://github.com/fredrir/infra.git" || config.State != "/var/lib/infra-verify" || config.Shared != defaults.Shared {
+	if config.Heartbeat != "reconciliation_verification" || config.Repository != "https://github.com/fredrir/infra.git" || config.State != "/var/lib/infra-verify" || config.Cache != "/var/cache/infra-verify" || config.Shared != defaults.Shared {
 		t.Fatalf("role configuration %+v", config)
 	}
 }
