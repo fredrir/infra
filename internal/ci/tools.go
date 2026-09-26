@@ -2,11 +2,13 @@ package ci
 
 import (
 	"archive/tar"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -54,13 +56,19 @@ func InstallTools(ctx context.Context, temporary, pathOutput string, names []str
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return err
 	}
+	downloads := os.Getenv("INFRA_TOOL_DOWNLOADS")
+	if downloads != "" {
+		if err := pruneToolDownloads(downloads); err != nil {
+			return err
+		}
+	}
 	client := NewToolClient()
 	group, installContext := errgroup.WithContext(ctx)
 	group.SetLimit(4)
 	for _, name := range names {
 		asset, _ := toolAsset(name)
 		group.Go(func() error {
-			if err := InstallTool(installContext, client, asset, filepath.Join(directory, name)); err != nil {
+			if err := InstallTool(installContext, client, asset, filepath.Join(directory, name), downloads); err != nil {
 				return fmt.Errorf("install %s: %w", name, err)
 			}
 			return nil
@@ -84,7 +92,31 @@ func InstallTools(ctx context.Context, temporary, pathOutput string, names []str
 	return nil
 }
 
-func InstallTool(ctx context.Context, client *http.Client, asset ToolAsset, destination string) error {
+func pruneToolDownloads(directory string) error {
+	pinned := map[string]bool{}
+	for _, assets := range []map[string]ToolAsset{ToolAssets, checkToolAssets} {
+		for _, asset := range assets {
+			pinned[asset.Digest] = true
+		}
+	}
+	entries, err := os.ReadDir(directory)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !pinned[entry.Name()] {
+			if err := os.RemoveAll(filepath.Join(directory, entry.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func InstallTool(ctx context.Context, client *http.Client, asset ToolAsset, destination, downloads string) error {
 	if cachedToolMatches(destination, asset.Digest) {
 		return nil
 	}
@@ -93,80 +125,18 @@ func InstallTool(ctx context.Context, client *http.Client, asset ToolAsset, dest
 		return err
 	}
 	defer os.RemoveAll(work)
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.URL, nil)
+	download, err := downloadToolAsset(ctx, client, asset, cmp.Or(downloads, work))
 	if err != nil {
 		return err
 	}
-	response, err := client.Do(request)
+	path := filepath.Join(work, "binary")
+	if asset.Member == "" {
+		err = copyToolBinary(download, path)
+	} else {
+		err = extractToolBinary(download, asset.Member, path)
+	}
 	if err != nil {
 		return err
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("tool server returned HTTP %d", response.StatusCode)
-	}
-	download, err := os.Create(filepath.Join(work, "download"))
-	if err != nil {
-		return err
-	}
-	digest := sha256.New()
-	_, err = io.Copy(&limitedWriter{Writer: io.MultiWriter(download, digest), remaining: 512 << 20}, response.Body)
-	closeErr := download.Close()
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	if hex.EncodeToString(digest.Sum(nil)) != asset.Digest {
-		return fmt.Errorf("tool checksum mismatch")
-	}
-	path := filepath.Join(work, "download")
-	if asset.Member != "" {
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		compressed, err := gzip.NewReader(file)
-		if err != nil {
-			return err
-		}
-		defer compressed.Close()
-		archive := tar.NewReader(compressed)
-		path = filepath.Join(work, "binary")
-		found := false
-		for {
-			header, err := archive.Next()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return err
-			}
-			if header.Name != asset.Member && header.Name != "./"+asset.Member {
-				continue
-			}
-			if found || header.Typeflag != tar.TypeReg || header.Size < 0 || header.Size > 512<<20 {
-				return fmt.Errorf("invalid tool archive member")
-			}
-			found = true
-			output, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(output, archive)
-			closeErr := output.Close()
-			if err != nil {
-				return err
-			}
-			if closeErr != nil {
-				return closeErr
-			}
-		}
-		if !found {
-			return fmt.Errorf("tool archive has no %s", asset.Member)
-		}
 	}
 	if err := os.Chmod(path, 0755); err != nil {
 		return err
@@ -187,6 +157,116 @@ func InstallTool(ctx context.Context, client *http.Client, asset ToolAsset, dest
 		return err
 	}
 	return os.Rename(receipt, destination+".json")
+}
+
+func downloadToolAsset(ctx context.Context, client *http.Client, asset ToolAsset, directory string) (string, error) {
+	path := filepath.Join(directory, asset.Digest)
+	if digest, err := fileDigest(path); err == nil && digest == asset.Digest {
+		return path, nil
+	}
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		return "", err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.URL, nil)
+	if err != nil {
+		return "", err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("tool server returned HTTP %d", response.StatusCode)
+	}
+	download, err := os.CreateTemp(directory, ".download-")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(download.Name())
+	digest := sha256.New()
+	_, err = io.Copy(&limitedWriter{Writer: io.MultiWriter(download, digest), remaining: 512 << 20}, response.Body)
+	closeErr := download.Close()
+	if err != nil {
+		return "", err
+	}
+	if closeErr != nil {
+		return "", closeErr
+	}
+	if hex.EncodeToString(digest.Sum(nil)) != asset.Digest {
+		return "", fmt.Errorf("tool checksum mismatch")
+	}
+	return path, os.Rename(download.Name(), path)
+}
+
+func fileDigest(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func copyToolBinary(source, destination string) error {
+	input, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer input.Close()
+	output, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(output, input)
+	return errors.Join(err, output.Close())
+}
+
+func extractToolBinary(source, member, destination string) error {
+	file, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	compressed, err := gzip.NewReader(file)
+	if err != nil {
+		return err
+	}
+	defer compressed.Close()
+	archive := tar.NewReader(compressed)
+	found := false
+	for {
+		header, err := archive.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if header.Name != member && header.Name != "./"+member {
+			continue
+		}
+		if found || header.Typeflag != tar.TypeReg || header.Size < 0 || header.Size > 512<<20 {
+			return fmt.Errorf("invalid tool archive member")
+		}
+		found = true
+		output, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(output, archive)
+		if err = errors.Join(err, output.Close()); err != nil {
+			return err
+		}
+	}
+	if !found {
+		return fmt.Errorf("tool archive has no %s", member)
+	}
+	return nil
 }
 
 type toolReceipt struct{ Asset, Binary string }

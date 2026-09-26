@@ -69,7 +69,7 @@ func Setup(ctx context.Context, opts SetupOptions) error {
 		}
 		destination := filepath.Join(opts.State.Tools(), tool.Name)
 		group.Go(func() error {
-			if err := ci.InstallTool(installContext, opts.Client, asset, destination); err != nil {
+			if err := ci.InstallTool(installContext, opts.Client, asset, destination, ""); err != nil {
 				return fmt.Errorf("install %s: %w", tool.Name, err)
 			}
 			return nil
