@@ -50,7 +50,7 @@ func lookup(v any, path ...string) any {
 }
 
 func objectStoreResources(t *testing.T) []object {
-	return renderedTree(t, objectStore, objectStore)
+	return renderedTree(t, "platform/components", objectStore)
 }
 
 func TestObjectStoreCellsRunHardenedOnTheirDataNode(t *testing.T) {
@@ -352,7 +352,7 @@ func TestObjectStoreIdentitiesHoldExactlyTheirRoleActions(t *testing.T) {
 		}
 	}
 	reference := regexp.MustCompile(`^\$\{([A-Z0-9_]+)\}$`)
-	resources := renderedTree(t, objectStore, objectStore)
+	resources := objectStoreResources(t)
 	secrets := map[string]object{}
 	for _, resource := range resources {
 		if resource["kind"] == "Secret" {
@@ -443,7 +443,11 @@ func TestObjectStoreIdentitiesHoldExactlyTheirRoleActions(t *testing.T) {
 
 func objectStoreCertificate(t *testing.T, file string) *x509.Certificate {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(repoRoot(t), objectStore, "pki", file))
+	path := filepath.Join(objectStore, "pki", file)
+	if file == "ca.crt" {
+		path = "platform/components/object-store-trust/ca.crt"
+	}
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), path))
 	if err != nil {
 		t.Fatal(err)
 	}

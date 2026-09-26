@@ -4,6 +4,7 @@ filegroup(
         "clusters/production/flux-system/*.yaml",
         "components/**/*.yaml",
         "components/object-store/**",
+        "components/object-store-trust/**",
         "projects/**/*.yaml",
     ]) + ["versions.yaml"],
     visibility = ["//internal/policy:__pkg__"],
@@ -11,7 +12,7 @@ filegroup(
 
 exports_files([
     "components/backups/tools.Dockerfile",
-    "components/object-store/pki/ca.crt",
+    "components/object-store-trust/ca.crt",
     "components/observability/build-vm.yaml",
     "versions.yaml",
 ])

@@ -69,7 +69,7 @@ COPY --chmod=755 .infra-artifacts/infra /usr/local/bin/infra
 RUN ln -s /usr/local/bin/infra /usr/local/bin/nix-hash \
     && ln -s /usr/local/bin/infra /usr/local/bin/infra-runner-hook \
     && ln -s /usr/local/bin/infra /usr/local/bin/ci-job-started.sh
-COPY platform/components/object-store/pki/ca.crt /usr/local/share/object-store/ca.crt
+COPY platform/components/object-store-trust/ca.crt /usr/local/share/object-store/ca.crt
 RUN cat /etc/ssl/certs/ca-certificates.crt /usr/local/share/object-store/ca.crt > /usr/local/share/object-store/trust.pem
 COPY --chmod=755 images/runner-rust/sccache /usr/local/bin/sccache
 ENV HOME=/home/runner

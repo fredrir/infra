@@ -84,7 +84,7 @@ spec:
                         - key: buckets.yaml
                           path: buckets.yaml
                   - configMap:
-                      name: seaweedfs-pki
+                      name: object-store-ca
                       items:
                         - key: ca.crt
                           path: ca.crt

@@ -91,7 +91,7 @@ func UploadMacOSSDK(ctx context.Context, o SDKUploadOptions) (err error) {
 	}
 	trusted := o.HTTP
 	if trusted == nil {
-		if trusted, e = objectstore.TrustingHTTP(filepath.Join(o.Root, "platform/components/object-store/pki/ca.crt"), "seaweedfs-hel1.object-store.svc"); e != nil {
+		if trusted, e = objectstore.TrustingHTTP(filepath.Join(o.Root, "platform/components/object-store-trust/ca.crt"), "seaweedfs-hel1.object-store.svc"); e != nil {
 			return e
 		}
 	}

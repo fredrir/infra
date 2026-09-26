@@ -549,7 +549,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Cells | `seaweedfs-hel1` on `fredrir-04`; namespace `object-store`; one `weed server` per node, no cross-node cluster |
 | Endpoint | `https://seaweedfs-<cell>.object-store.svc.cluster.local:8333`, region `<cell>` |
 | Listeners | Pod IP: S3 8333 (TLS), metrics 9327, worker metrics 9328, S3 gRPC 18333 and admin gRPC 33646 (mTLS, client name allow-list); NetworkPolicy admits only 8333, 9327 and 9328; master, volume, filer and admin HTTP on loopback |
-| Trust | CA `platform/components/object-store/pki/ca.crt`, name-constrained to `object-store.svc`, `object-store.svc.cluster.local`, `localhost`, `127.0.0.1`; CA key `pki/ca.sops.yaml` (Macie, Archie) |
+| Trust | CA `platform/components/object-store-trust/ca.crt`, ConfigMap `object-store-ca` wherever the component is included, name-constrained to `object-store.svc`, `object-store.svc.cluster.local`, `localhost`, `127.0.0.1`; CA key `pki/ca.sops.yaml` (Macie, Archie) |
 | In-cell security | gRPC mTLS per cell certificate; `weed.sh` refuses to start a process without its gRPC CA, certificates, keys and client name allow-list; JWT-signed volume writes; bucket-default SSE-S3 with `WEED_S3_SSE_KEK` |
 | Identities | Actions `<cell>-identities.json`; credentials `<cell>-identities.secret.sops.yaml`, referenced as `${NAME}`; writers hold `Write:<bucket>/*` |
 | Buckets | `buckets.yaml`; `object-store-provisioner` hourly: create, then write versioning, COMPLIANCE lock, SSE, lifecycle and quota only where they drift; never deletes |

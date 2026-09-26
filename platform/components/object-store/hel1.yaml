@@ -342,10 +342,13 @@ spec:
             defaultMode: 0440
             sources:
               - configMap:
-                  name: seaweedfs-pki
+                  name: object-store-ca
                   items:
                     - key: ca.crt
                       path: ca.crt
+              - configMap:
+                  name: seaweedfs-pki
+                  items:
                     - key: hel1-s3.crt
                       path: s3.crt
                     - key: hel1-internal.crt

@@ -15,7 +15,7 @@
   cli: true
   inputs:
   - images/runner-rust
-  - platform/components/object-store/pki/ca.crt
+  - platform/components/object-store-trust/ca.crt
   check: >-
     /home/runner/run.sh --version | grep -x 2.337.0;
     rustc --version | grep '^rustc 1\.98\.1 ';

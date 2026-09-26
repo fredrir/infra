@@ -14,7 +14,6 @@ resources:
 configMapGenerator:
 - name: seaweedfs-pki
   files:
-  - pki/ca.crt
   - pki/hel1-s3.crt
   - pki/hel1-internal.crt
 - name: seaweedfs-hel1-identities
@@ -53,6 +52,8 @@ configMapGenerator:
   - WEED_GRPC_WORKER_KEY=/etc/seaweedfs/tls/internal.key
   - WEED_GRPC_CLIENT_CERT=/etc/seaweedfs/tls/internal.crt
   - WEED_GRPC_CLIENT_KEY=/etc/seaweedfs/tls/internal.key
+components:
+- ../object-store-trust
 generatorOptions:
   annotations:
     kustomize.toolkit.fluxcd.io/substitute: disabled
