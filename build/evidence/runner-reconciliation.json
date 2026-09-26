@@ -366,6 +366,61 @@
         "verify IAM identity: admin tofu apply",
         "Gatus reconciliation_deep with a CLI pin bump: before the host first runs"
       ]
+    },
+    {
+      "change": "Run flannel over WireGuard on every fleet node",
+      "revision": "669781e",
+      "run": "https://github.com/fredrir/infra/actions/runs/36248914272",
+      "preflight": "UDP 51820 between tailnet addresses passed control-control, worker-control, control-worker and worker-worker via host-network probes",
+      "order": [
+        "fredrir-07",
+        "fredrir-08",
+        "fredrir-05",
+        "fredrir-04",
+        "fredrir-09"
+      ],
+      "monitor": {
+        "samples": 31,
+        "interval_seconds": 15,
+        "application_failures": 0,
+        "nodes_not_ready": 0
+      },
+      "after": "every node has only flannel-wg; flannel.1 removed",
+      "incident": {
+        "symptom": "ARC controller TLS handshake timeouts to broker.actions.githubusercontent.com; a check job queued 28 minutes",
+        "cause": "pods created before the change kept MTU 1230 while cni0 on fredrir-04 took 1200",
+        "fix": "rolling restart of every pod-network workload, databases one at a time, applications green throughout",
+        "result": "all pod veths at 1200 on fredrir-04 and fredrir-09; no ARC TLS timeouts"
+      }
+    },
+    {
+      "change": "Deploy the reconciler host and run hourly read-only verification from it",
+      "host": {
+        "name": "fredrir-11",
+        "provider_id": 167533908,
+        "ipv4": "46.62.238.38",
+        "tailnet": "100.120.198.17",
+        "tag": "tag:infra-reconciler"
+      },
+      "revisions": [
+        "605a79b",
+        "fc05ee8",
+        "5e7a04c",
+        "bb612ca",
+        "dbaf1ec"
+      ],
+      "first_verification": {
+        "report": "runs/20260926T155722Z-verify-bb612ca6b4b1/",
+        "outcome": "matches",
+        "wall_seconds": 67,
+        "peak_memory_gib": 2.5,
+        "gatus_heartbeat": "2026-09-26T15:58:29Z"
+      },
+      "fixes_during_rollout": [
+        "Cloudflare permission groups repeat names across scopes",
+        "the hcloud provider left the bootstrap SSH rule after emptying the rule list; removed with hcloud firewall replace-rules",
+        "the verify unit denied setrlimit, which OpenTofu providers call at startup"
+      ]
     }
   ]
 }
