@@ -14,7 +14,7 @@ k3s_registration_server: "{{ groups['server'][0] }}"
 k3s_api_endpoint: "{{ hostvars[k3s_registration_server].private_ip }}"
 k3s_pod_cidr: 10.42.0.0/16
 k3s_service_cidr: 10.43.0.0/16
-k3s_flannel_backend: vxlan
+k3s_flannel_backend: wireguard-native
 k3s_flannel_key_file: /var/lib/rancher/k3s/agent/flannel-wireguard.key
 k3s_flannel_backend_types:
   vxlan: vxlan

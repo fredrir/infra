@@ -341,7 +341,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 
 | Flannel backend | Value |
 | --- | --- |
-| Declared | `k3s_flannel_backend`, default `vxlan`; `wireguard-native` only in an owner-approved window: `ansible-playbook ansible/k3s.yml -e k3s_flannel_backend=wireguard-native`, then `ansible/volatile.yml` with the same value |
+| Declared | `k3s_flannel_backend: wireguard-native` in `ansible/roles/k3s/defaults/main.yml`; peers reach each other over the Tailnet on 51820/udp. Rolling back is `vxlan` there, applied by the same serial servers-then-agents play |
 | Change | The k3s role clears a node's `backend-type`, `backend-data` and `backend-v6-data` annotations through the administrator API, then restarts it, when its published backend differs or its WireGuard key file is missing |
 | WireGuard key | `WIREGUARD_KEY_FILE=/var/lib/rancher/k3s/agent/flannel-wireguard.key` in the service's `flannel.conf` drop-in; it survives restarts and reboots, and every run fails when a node publishes a key not derived from its own file |
 | Cut fredrir-10 off before any clear | Every clear reopens the write-once first-value race, so before clearing any node's flannel annotations first cut fredrir-10 off the API: remove `tag:platform-volatile`'s 6443 grant in `tailscale/policy.hujson` and reapply, or deauthorize fredrir-10 in the Tailnet. For an automated clear (a role repair, rollback, or fleet-node re-registration) the k3s role also refuses while any node carries the volatile taint or label, and while fredrir-10 has a `tailscale_ip` in the inventory, so stop fredrir-10's agent, then cordon, drain and `kubectl delete node fredrir-10`, and run the fleet play with `-e volatile_api_cut_off=true` to assert the 6443 cut-off is in place. Clear, confirm keys, then re-enroll and restore access |
@@ -360,7 +360,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | 6 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
 | 7 | Set inventory values | `tailscale_ip` |
 | 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in Doppler `SSH_KNOWN_HOSTS` and the admin `known_hosts` |
-| 9 | Complete the flannel WireGuard cutover (hard gate) | `ansible-playbook ansible/k3s.yml -e k3s_flannel_backend=wireguard-native` in an owner-approved window; confirm every fleet node publishes `backend-type=wireguard` with its own verified key before fredrir-10 joins. `volatile.yml` refuses to enroll otherwise, and VXLAN or an unset backend must never coexist with an enrolled fredrir-10 |
+| 9 | Confirm the fleet runs WireGuard (hard gate) | Every fleet node publishes `backend-type=wireguard` with its own verified key before fredrir-10 joins. `volatile.yml` refuses to enroll otherwise, and VXLAN or an unset backend must never coexist with an enrolled fredrir-10 |
 | 10 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 12 |
 | 11 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 30m --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
 | 12 | First converge from Macie or Archie within the token lifetime | `ansible-playbook ansible/volatile.yml --limit fredrir-10`; installs the reconciliation key and sets the hostname |
