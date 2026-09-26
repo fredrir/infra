@@ -50,6 +50,13 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: parser-dataset-mirror
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: llunde-pyparser
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: llunde-pyparser
+              app.kubernetes.io/component: application
       ports:
         - port: 8333
           protocol: TCP

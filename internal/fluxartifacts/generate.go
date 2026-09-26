@@ -20,6 +20,12 @@ type object = map[string]any
 
 const directory = "build/rollout/flux-artifacts"
 
+var projectComponents = map[string][]string{
+	"portfolio":       {"backup-job", "repository-maintenance"},
+	"y":               {"backup-job", "repository-maintenance"},
+	"llunde-pyparser": {"backup-job", "repository-maintenance", "object-store-trust"},
+}
+
 func Run(root string, check bool) error {
 	if !check {
 		return generate(root, false)
@@ -85,19 +91,17 @@ func generate(root string, check bool) error {
 		roots = append(roots, root)
 	}
 	var artifacts []any
-	artifact := func(name, path string, backup bool) object {
+	artifact := func(name, path string, components []string) object {
 		copies := []any{object{"from": "@repo/" + path + "/**", "to": "@artifact/" + path + "/"}, object{"from": "@repo/platform/clusters/production/settings.yaml", "to": "@artifact/platform/clusters/production/settings.yaml"}}
-		if backup {
-			for _, component := range []string{"backup-job", "repository-maintenance"} {
-				path := "platform/components/" + component
-				copies = append(copies, object{"from": "@repo/" + path + "/**", "to": "@artifact/" + path + "/"})
-			}
+		for _, component := range components {
+			path := "platform/components/" + component
+			copies = append(copies, object{"from": "@repo/" + path + "/**", "to": "@artifact/" + path + "/"})
 		}
 		return object{"name": name, "originRevision": "@repo", "copy": copies}
 	}
-	artifacts = append(artifacts, artifact(policyName, "platform/components/policy", false))
+	artifacts = append(artifacts, artifact(policyName, "platform/components/policy", nil))
 	for _, project := range []string{"llunde", "portfolio", "y", "llunde-pyparser"} {
-		artifacts = append(artifacts, artifact("project-"+project, "platform/projects/"+project, project != "llunde"))
+		artifacts = append(artifacts, artifact("project-"+project, "platform/projects/"+project, projectComponents[project]))
 	}
 	sources := object{"apiVersion": "source.extensions.fluxcd.io/v1beta1", "kind": "ArtifactGenerator", "metadata": object{"name": "platform-artifacts", "namespace": "flux-system"}, "spec": object{"sources": []any{object{"alias": "repo", "kind": "GitRepository", "name": "flux-system"}}, "artifacts": artifacts}}
 	rootPatch := func(stage string) object {

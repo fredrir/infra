@@ -125,6 +125,7 @@ func TestArtifactCheckIncludesParserChildrenAndPropagatesRenderFailure(t *testin
 		"platform/components/policy/kustomization.yaml",
 		"platform/components/backup-job/kustomization.yaml",
 		"platform/components/repository-maintenance/kustomization.yaml",
+		"platform/components/object-store-trust/kustomization.yaml",
 		"platform/projects/llunde/kustomization.yaml",
 		"platform/projects/portfolio/kustomization.yaml",
 		"platform/projects/y/kustomization.yaml",

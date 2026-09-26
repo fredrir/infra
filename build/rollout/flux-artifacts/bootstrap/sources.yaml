@@ -10,7 +10,7 @@ spec:
           to: '@artifact/platform/components/policy/'
         - from: '@repo/platform/clusters/production/settings.yaml'
           to: '@artifact/platform/clusters/production/settings.yaml'
-      name: platform-policy-b1c3cc57067dda076fec2d097d1e43f040246d62
+      name: platform-policy-293c873012e64c3e7c82ab26f9be274a7b4007f4
       originRevision: '@repo'
     - copy:
         - from: '@repo/platform/projects/llunde/**'
@@ -50,6 +50,8 @@ spec:
           to: '@artifact/platform/components/backup-job/'
         - from: '@repo/platform/components/repository-maintenance/**'
           to: '@artifact/platform/components/repository-maintenance/'
+        - from: '@repo/platform/components/object-store-trust/**'
+          to: '@artifact/platform/components/object-store-trust/'
       name: project-llunde-pyparser
       originRevision: '@repo'
   sources:

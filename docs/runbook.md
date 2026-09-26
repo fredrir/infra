@@ -556,6 +556,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Configuration drift | Versioning or a lock on a bucket that declares neither fails the provisioner; SeaweedFS 4.47 still authorizes bucket subresource writes that carry `?prefix=` as object writes |
 | Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; `seaweedfs-nl` has no admin or worker and no lifecycle buckets; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
 | Logs | stderr only (`-logtostderr=true`) |
+| Parser dataset | `llunde-pyparser` application pods use `parser-dataset` on `seaweedfs-nl` via `AWS_ENDPOINT_URL_S3` and `AWS_CA_BUNDLE` (ConfigMap `object-store-ca`); stored `s3://` URLs keep their original bucket name, since the parser resolves objects by key |
 | Parser dataset copy | `parser-dataset-mirror` hourly at :23 on `fredrir-04`: `rclone sync` of `nl` `parser-dataset` to the versioned AWS bucket `llunde-pyparser-bucket`, prefixes `files/`, `extract/`, `assets/`, `convert/` only; at most 1000 deletions per run; `platform-dataset-parser` cannot delete versions |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
 | Disk guard | 1 GiB volumes; `hel1` `-volume.max=60` (60 GiB), `nl` `-volume.max=200` (200 GiB); read-only below 15% free node disk |

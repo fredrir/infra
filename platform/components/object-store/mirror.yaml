@@ -6,7 +6,7 @@ metadata:
 spec:
   schedule: '23 * * * *'
   timeZone: Etc/UTC
-  suspend: true
+  suspend: false
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 600
   successfulJobsHistoryLimit: 1

@@ -626,6 +626,7 @@ var objectStorePeers = map[string]map[string][]object{
 		"8333": {
 			{"podSelector": object{"matchLabels": object{"app.kubernetes.io/name": "object-store-provisioner"}}},
 			{"podSelector": object{"matchLabels": object{"app.kubernetes.io/name": "parser-dataset-mirror"}}},
+			{"namespaceSelector": object{"matchLabels": object{"kubernetes.io/metadata.name": "llunde-pyparser"}}, "podSelector": object{"matchLabels": object{"app.kubernetes.io/part-of": "llunde-pyparser", "app.kubernetes.io/component": "application"}}},
 		},
 		"9327": {prometheusPeer},
 		"9328": {prometheusPeer},

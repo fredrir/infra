@@ -76,6 +76,14 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
+        - name: AWS_ENDPOINT_URL_S3
+          value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
+        - name: AWS_CA_BUNDLE
+          value: /etc/object-store/ca.crt
+        - name: AWS_DEFAULT_REGION
+          value: nl
+        - name: PYPARSER_S3_DATASET_BUCKET
+          value: parser-dataset
         resources:
           requests:
             cpu: 50m
@@ -94,6 +102,9 @@ spec:
           mountPath: /app/.local/files
         - name: model-cache
           mountPath: /var/cache/pyparser
+        - name: object-store-ca
+          mountPath: /etc/object-store
+          readOnly: true
         ports:
         - name: http
           containerPort: 8081
@@ -121,6 +132,9 @@ spec:
       - name: model-cache
         persistentVolumeClaim:
           claimName: model-cache
+      - name: object-store-ca
+        configMap:
+          name: object-store-ca
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -202,6 +216,14 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
+        - name: AWS_ENDPOINT_URL_S3
+          value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
+        - name: AWS_CA_BUNDLE
+          value: /etc/object-store/ca.crt
+        - name: AWS_DEFAULT_REGION
+          value: nl
+        - name: PYPARSER_S3_DATASET_BUCKET
+          value: parser-dataset
         resources:
           requests:
             cpu: 250m
@@ -216,6 +238,9 @@ spec:
           mountPath: /app/.local/files
         - name: model-cache
           mountPath: /var/cache/pyparser
+        - name: object-store-ca
+          mountPath: /etc/object-store
+          readOnly: true
       volumes:
       - name: files
         persistentVolumeClaim:
@@ -223,6 +248,9 @@ spec:
       - name: model-cache
         persistentVolumeClaim:
           claimName: model-cache
+      - name: object-store-ca
+        configMap:
+          name: object-store-ca
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -298,6 +326,14 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
+        - name: AWS_ENDPOINT_URL_S3
+          value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
+        - name: AWS_CA_BUNDLE
+          value: /etc/object-store/ca.crt
+        - name: AWS_DEFAULT_REGION
+          value: nl
+        - name: PYPARSER_S3_DATASET_BUCKET
+          value: parser-dataset
         resources:
           requests:
             cpu: 100m
@@ -312,6 +348,9 @@ spec:
           mountPath: /app/.local/files
         - name: model-cache
           mountPath: /var/cache/pyparser
+        - name: object-store-ca
+          mountPath: /etc/object-store
+          readOnly: true
       volumes:
       - name: files
         persistentVolumeClaim:
@@ -319,6 +358,9 @@ spec:
       - name: model-cache
         persistentVolumeClaim:
           claimName: model-cache
+      - name: object-store-ca
+        configMap:
+          name: object-store-ca
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

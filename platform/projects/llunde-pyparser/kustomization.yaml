@@ -15,3 +15,4 @@ resources:
 - backup.secret.sops.yaml
 components:
 - ../../components/backup-job
+- ../../components/object-store-trust

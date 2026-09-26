@@ -258,6 +258,14 @@ spec:
       has(p.podSelector.matchLabels) && !has(p.podSelector.matchExpressions) && p.podSelector.matchLabels
       == {"app.kubernetes.io/name": "traefik"} && has(r.ports) && r.ports.size() ==
       1 && r.ports.all(port, has(port.port) && port.port == 8000 && !has(port.endPort)
+      && (!has(port.protocol) || port.protocol == "TCP"))) || (request.userInfo.username
+      == "system:serviceaccount:flux-system:platform-reconciler" && object.metadata.name
+      == "object-store-egress" && has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels)
+      && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels
+      == {"kubernetes.io/metadata.name": "object-store"} && has(p.podSelector) && has(p.podSelector.matchLabels)
+      && !has(p.podSelector.matchExpressions) && p.podSelector.matchLabels == {"app.kubernetes.io/name":
+      "seaweedfs", "app.kubernetes.io/instance": "nl"} && has(r.ports) && r.ports.size()
+      == 1 && r.ports.all(port, has(port.port) && port.port == 8333 && !has(port.endPort)
       && (!has(port.protocol) || port.protocol == "TCP"))) || (has(p.ipBlock) && p.ipBlock.cidr
       in ["198.41.192.0/24", "198.41.200.0/24"] && has(r.ports) && r.ports.size()
       > 0 && r.ports.all(port, has(port.port) && !has(port.endPort) && port.port ==
@@ -280,8 +288,8 @@ spec:
       in p.podSelector.matchLabels && p.podSelector.matchLabels["app.kubernetes.io/name"]
       == "alloy" && has(r.ports) && r.ports.all(port, has(port.port) && !has(port.endPort)
       && port.port in [4317,4318] && (!has(port.protocol) || port.protocol == "TCP")))))'
-    message: Project egress may reach its own pods, DNS, Alloy, public HTTPS or Cloudflare
-      Tunnel
+    message: Project egress may reach its own pods, DNS, Alloy, public HTTPS, Cloudflare
+      Tunnel or its object store cell
   - expression: '!has(object.spec.ingress) || object.spec.ingress.all(r, has(r.from)
       && r.from.all(p, (has(p.podSelector) && !has(p.namespaceSelector) && !has(p.ipBlock))
       || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
