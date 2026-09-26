@@ -7,6 +7,8 @@ keys:
   - &macie age1wflp6cynwm97wndq5zxmpaxwz59h62a7dku8qdyue5zm9g4djfnqwj9n0m
   - &ci-apply age1jm6xj8qlmfjlhw0vdseaaqkpt3mqj3yl0upx3smwutsaghcq6pesvrka2t
   - &archie age1mxszcn7gs8gnvhpq8ku748szqe8u6raferefg986slu83r3zkcmswe29zs
+  - &fredrir-06 age1xru5rv42fzmnm4uhv9rwz5gf5ynf7v7qr2e68epcjsq9l33zdulqq53v9j
+  - &fredrir-07 age1aw6w4ttxk62pxjgcgv27nqetekjxmrw538j8cqmmql4wa0577ynqxvs52d
 creation_rules:
   - path_regex: secrets/gitops-llunde-parser\.yaml$
     key_groups:
@@ -29,6 +31,18 @@ creation_rules:
       - age:
           - *admin
           - *llunde-01
+  - path_regex: ansible/roles/control_backup/files/control\.sops\.yaml$
+    key_groups:
+      - age:
+          - *macie
+          - *archie
+          - *fredrir-07
+  - path_regex: ansible/roles/(gatus/files/secrets|verification_trigger/files/credentials)\.sops\.yaml$
+    key_groups:
+      - age:
+          - *macie
+          - *archie
+          - *fredrir-06
   - path_regex: ansible/roles/gatus/files/config\.sops\.yaml$
     encrypted_regex: ^(username|password|token)$
     key_groups:
