@@ -30,12 +30,15 @@ go_test(
         "checkout_test.go",
         "config_test.go",
         "credentials_test.go",
+        "role_test.go",
         "run_test.go",
     ],
+    data = ["//:reconciler_role_data"],
     embed = [":reconciler"],
     deps = [
         "//internal/process",
         "//internal/reconcile",
         "@com_github_klauspost_compress//zstd",
+        "@in_yaml_go_yaml_v3//:yaml",
     ],
 )

@@ -64,6 +64,7 @@ go_test(
         "publishing_qualification_test.go",
         "publishing_test.go",
         "reconcile_test.go",
+        "reconciler_isolation_test.go",
         "rulesets_test.go",
         "run_scope_test.go",
         "runner_coverage_test.go",

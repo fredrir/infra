@@ -124,6 +124,8 @@ all:
     volatile:
       hosts:
         fredrir-10: {}
+    reconcilers:
+      hosts: {}
     build_vm_hosts:
       hosts:
         fredrir-09:

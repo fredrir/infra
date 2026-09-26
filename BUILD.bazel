@@ -126,3 +126,9 @@ filegroup(
     ]),
     visibility = ["//internal/reconcile:__pkg__"],
 )
+
+filegroup(
+    name = "reconciler_role_data",
+    srcs = glob(["ansible/roles/reconciler/**"]),
+    visibility = ["//internal/reconciler:__pkg__"],
+)

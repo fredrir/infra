@@ -1,0 +1,29 @@
+reconciler_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
+reconciler_kubernetes_ca_file: kubernetes-ca.crt
+reconciler_packages: [ca-certificates, git, golang-go]
+reconciler_verify_credentials:
+  - aws-access-key-id
+  - aws-secret-access-key
+  - cloudflare-api-token
+  - hcloud-token
+  - platform-mail-recipient
+  - kubernetes-token
+  - observer-app-key
+  - gatus-token
+reconciler_verify_schedule: hourly
+reconciler_verify_randomized_delay: 5min
+reconciler_verify:
+  repository: https://github.com/fredrir/infra.git
+  state: /var/lib/infra-verify
+  bucket: llunde-pyparser-bucket
+  prefix: reconciliation/production
+  region: eu-north-1
+  gatus: "http://{{ hostvars['fredrir-06'].tailscale_ip }}:8080"
+  heartbeat: reconciliation_verification
+  kubernetes:
+    server: "https://{{ hostvars[groups['server'][0]].tailscale_ip }}:6443"
+    certificate_authority: /etc/infra-reconcile/kubernetes-ca.crt
+  observer:
+    app_id: 5080610
+    installation_id: 164992211
+    api: https://api.github.com

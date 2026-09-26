@@ -1,0 +1,27 @@
+- name: Configure the infrastructure reconciler
+  hosts: reconcilers
+  become: true
+  gather_facts: true
+  vars:
+    platform_architecture: "{{ architecture }}"
+  roles:
+    - ubuntu
+  tasks:
+    - name: Preserve the enrolled transport
+      ansible.builtin.import_role:
+        name: tailscale
+        tasks_from: enrolled.yml
+      tags: [transport]
+
+    - name: Configure host network access
+      ansible.builtin.import_role:
+        name: firewall
+
+    - name: Configure host secret decryption
+      ansible.builtin.import_role:
+        name: host_secrets
+      tags: [host_key]
+
+    - name: Configure verification
+      ansible.builtin.import_role:
+        name: reconciler

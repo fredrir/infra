@@ -1,0 +1,102 @@
+- name: Install reconciler packages
+  ansible.builtin.import_role:
+    name: host_packages
+  vars:
+    host_packages_required: "{{ reconciler_packages }}"
+
+- name: Install the verified infrastructure binary
+  ansible.builtin.import_role:
+    name: infra_binary
+  vars:
+    infra_binary_url: "https://github.com/fredrir/infra/releases/download/{{ reconciler_cli.tag }}/infra-linux-amd64"
+    infra_binary_revision: "{{ reconciler_cli.revision }}"
+    infra_binary_sha256: "{{ reconciler_cli.sha256 }}"
+  tags: [infra_binary]
+
+- name: Create the verification user
+  ansible.builtin.user:
+    name: infra-verify
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/infra-verify
+    create_home: false
+    password: "!"
+
+- name: Create the reconciler configuration directory
+  ansible.builtin.file:
+    path: /etc/infra-reconcile
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the encrypted reconciler credentials
+  ansible.builtin.import_role:
+    name: host_secrets
+    tasks_from: install.yml
+  vars:
+    host_secrets_src: credentials.sops.yaml
+    host_secrets_dest: /etc/infra-reconcile/credentials.sops.yaml
+
+- name: Require every verification credential
+  ansible.builtin.command:
+    argv: [/usr/local/bin/sops, decrypt, --extract, '["verify"]["{{ item }}"]', --output, /dev/null, /etc/infra-reconcile/credentials.sops.yaml]
+  environment:
+    SOPS_AGE_KEY_FILE: "{{ host_secrets_key }}"
+  loop: "{{ reconciler_verify_credentials }}"
+  changed_when: false
+  check_mode: false
+
+- name: Install the cluster certificate authority
+  ansible.builtin.copy:
+    src: "{{ reconciler_kubernetes_ca_file }}"
+    dest: /etc/infra-reconcile/kubernetes-ca.crt
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install the verification configuration
+  ansible.builtin.copy:
+    content: "{{ reconciler_verify | to_nice_json }}\n"
+    dest: /etc/infra-reconcile/verify.json
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the journal configuration directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Bound the local journal
+  ansible.builtin.copy:
+    content: |
+      [Journal]
+      SystemMaxUse=2G
+      SystemKeepFree=4G
+      MaxRetentionSec=1month
+    dest: /etc/systemd/journald.conf.d/infra-reconcile.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the journal
+
+- name: Install the verification units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [infra-reconcile-verify.service, infra-reconcile-verify.timer]
+  notify: Restart the verification timer
+
+- name: Schedule verification
+  ansible.builtin.systemd_service:
+    name: infra-reconcile-verify.timer
+    state: started
+    enabled: true
+    daemon_reload: true

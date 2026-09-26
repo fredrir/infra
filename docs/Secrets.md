@@ -13,6 +13,7 @@
 | AWS workload access keys              | Created outside OpenTofu per `/platform/` IAM user; the consuming project's `*.secret.sops.yaml`                                                                                       |
 | Independent monitoring                | Settings `ansible/roles/gatus/templates/config.yaml.j2`; secrets `ansible/roles/gatus/files/secrets.sops.yaml`; Macie, Archie and `fredrir-06` |
 | Publisher App key                     | Doppler `infra → prd_reconciliation_apply` `PUBLISHER_APP_PRIVATE_KEY`; apply engine, as a consumed `0600` file, and administrators only; [publishing](runbook.md#publishing) |
+| Reconciler credentials | `ansible/roles/reconciler/files/credentials.sops.yaml`; Macie, Archie and `fredrir-11`; [reconciler host](runbook.md#reconciler-host) |
 | Verification trigger credentials      | `ansible/roles/verification_trigger/files/credentials.sops.yaml`; Macie, Archie and `fredrir-06` |
 | Control-plane backup credentials      | `ansible/roles/control_backup/files/control.sops.yaml`; Macie, Archie and `fredrir-07`; cluster maintenance copy `platform/components/backups/backup.secret.sops.yaml` |
 | Decryption                            | Macie, Archie `~/.config/age/keys.txt`; Flux `flux-system/sops-age`; hosts `/etc/age/host.key`; CI apply Doppler `prd_reconciliation_apply` `SOPS_AGE_KEY` |
@@ -45,6 +46,7 @@ sops rotate -i --add-age "$NEW" --rm-age "$OLD" platform/projects/<project>/<nam
 | `platform-control-backup.service` | `fredrir-07` | `ansible/roles/control_backup/files/control.sops.yaml` | Host key through `LoadCredential`; `sops exec-env` into the environment |
 | `gatus.service` | `fredrir-06` | `ansible/roles/gatus/files/secrets.sops.yaml` | Root `ExecStartPre` decrypts to an `EnvironmentFile` removed after start; Gatus substitutes `${NAME}` in its settings |
 | `infra-verification-request.service` | `fredrir-06` | `ansible/roles/verification_trigger/files/credentials.sops.yaml` | Root `ExecStartPre` decrypts into the unit's runtime directory |
+| `infra-reconcile-verify.service` | `fredrir-11` | `ansible/roles/reconciler/files/credentials.sops.yaml` | Root `ExecStartPre` decrypts only the `verify` map into the unit's runtime directory; the supervisor deletes it once read |
 
 | Name | Value |
 | --- | --- |

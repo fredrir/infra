@@ -8,7 +8,7 @@
       - ansible_facts.architecture == ('x86_64' if platform_architecture == 'amd64' else 'aarch64')
       - platform_tailscale_version == '1.102.4'
       - platform_node_name is match('^fredrir-[0-9]{2}$')
-      - platform_tailscale_bootstrap_tags in [['tag:platform-control'], ['tag:platform-worker'], ['tag:platform-volatile']]
+      - platform_tailscale_bootstrap_tags in [['tag:platform-control'], ['tag:platform-worker'], ['tag:platform-volatile'], ['tag:infra-reconciler']]
       - platform_tailscale_auth_key_file is match('^/run/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+$')
       - ansible_password is not defined and ansible_ssh_pass is not defined
     fail_msg: Supported host, reviewed role-tag authority and private runtime key path required

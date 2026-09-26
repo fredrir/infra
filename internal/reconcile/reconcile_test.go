@@ -328,6 +328,9 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 		{"internal/../tofu/main.tf", All()},
 		{"README.md", Selection{}},
 		{"tofu/reconciler/server.tf", Selection{}},
+		{"ansible/reconciler.yml", Selection{}},
+		{"ansible/roles/reconciler/tasks/main.yml", Selection{}},
+		{"ansible/roles/tailscale/tasks/enrolled.yml", Selection{Ansible: true}},
 		{"tofu/reconciler/../reconciliation.tf", Selection{Tofu: true, Ansible: true}},
 	} {
 		if got := Affected([]string{test.path}); !sameSelection(got, test.want) {

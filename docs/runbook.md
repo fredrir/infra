@@ -361,6 +361,51 @@ printf 'tailscale_bootstrap:\n  hosts:\n    fredrir-10:\n      ansible_host: ntn
 ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
   -e '{"platform_tailscale_bootstrap_approved": true, "platform_tailscale_bootstrap_tags": ["tag:platform-volatile"], "platform_tailscale_auth_key_file": "/run/secrets/tailscale-auth-key", "platform_architecture": "amd64"}'
 ```
+## Reconciler host
+
+| Reconciler host | Value |
+| --- | --- |
+| Host / group | `fredrir-11` / `reconcilers`, outside `ubuntu` and every group a fleet play selects |
+| Playbook | `ansible/reconciler.yml`, run only by an administrator; reconciliation selects nothing for it |
+| Provider | Dedicated Hetzner project; `tofu/reconciler/`, state `tofu-state/reconciler.tfstate`, applied only by an administrator |
+| Network | Primary IPv4; IPv6 disabled; no inbound Hetzner rules outside enrollment; tailnet `tag:infra-reconciler` |
+| Timer | `infra-reconcile-verify.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |
+| Service | `infra-reconcile-verify.service`: oneshot `infra reconcile run verify` as `infra-verify`; state `/var/lib/infra-verify`; the verification trigger's sandbox plus `AF_UNIX`; `TimeoutStartSec=100min`, `MemoryMax=6G` |
+| Supervisor | `/usr/local/bin/infra` from `build/cli-release.json` |
+| Run | Fresh clone of `production`, the revision the provenance gate admitted and the publisher App published, never `main`; `go build` with the Go version in `build/toolchain.json`; `infra ci install-tools flux gh kubectl tofu`; observer App token for the runner repositories, revoked after the run; `infra reconcile verify --scope=cloud` |
+| Run isolation | Checkout, Go caches, tools, OpenTofu providers and `HOME` live in a per-run directory; the state directory is emptied before and after each run; every Git process ignores hooks, `core.fsmonitor` and replace refs |
+| Reports | `s3://llunde-pyparser-bucket/reconciliation/production/runs/<utc>-verify-<rev12>/`: `report.json`, `log.txt.zst`; journal bounded to 2 GB |
+| Heartbeat | Gatus `reconciliation_verification`: `success=true` when the verification matches; otherwise the differences or the failing stage; none while a reconciliation holds the lease |
+| Credentials | `ansible/roles/reconciler/files/credentials.sops.yaml`, maps `verify` and `apply`; installed as ciphertext through `host_secrets`; a root `ExecStartPre` decrypts only `verify` into the unit's runtime directory, and the supervisor deletes it once read |
+| Cluster API | `https://<fredrir-07 tailnet address>:6443`; certificate authority `ansible/roles/reconciler/files/kubernetes-ca.crt` |
+| Host age key | `/etc/age/host.key` from `host_secrets`; `reconciler.yml --tags host_key` generates it and prints its recipient; [host-scoped secrets](Secrets.md#host-scoped-secrets) |
+
+| Verify credential | Source |
+| --- | --- |
+| `aws-access-key-id`, `aws-secret-access-key` | `tofu -chdir=tofu/reconciler output -raw verify_aws_access_key_id`, `verify_aws_secret_access_key` |
+| `cloudflare-api-token` | `tofu -chdir=tofu/reconciler output -raw verify_cloudflare_api_token` |
+| `hcloud-token` | Read-only token of the fleet Hetzner project |
+| `platform-mail-recipient` | `PLATFORM_MAIL_RECIPIENT` |
+| `kubernetes-token` | `flux-system/infrastructure-verify-credentials` |
+| `observer-app-key` | `OBSERVER_APP_PRIVATE_KEY` |
+| `gatus-token` | `GATUS_TOKEN_RECONCILIATION_VERIFICATION` in `ansible/roles/gatus/files/secrets.sops.yaml` |
+
+```sh
+credential() { jq -Rs 'rtrimstr("\n")' | sops set --value-stdin ansible/roles/reconciler/files/credentials.sops.yaml "[\"verify\"][\"$1\"]"; }
+tofu -chdir=tofu/reconciler output -raw verify_aws_secret_access_key | credential aws-secret-access-key
+kubectl -n flux-system get secret infrastructure-verify-credentials -o jsonpath='{.data.token}' | base64 -d | credential kubernetes-token
+ssh root@fredrir-11 systemctl list-timers infra-reconcile-verify.timer --no-pager
+ssh root@fredrir-11 journalctl -u infra-reconcile-verify.service --no-pager -n 50
+ssh root@fredrir-11 systemctl start infra-reconcile-verify.service
+aws s3 ls s3://llunde-pyparser-bucket/reconciliation/production/runs/ | tail -n 5
+```
+
+| Operation | Steps |
+| --- | --- |
+| Rebuild | `tofu -chdir=tofu/reconciler apply`; enroll; `ansible-playbook ansible/reconciler.yml --tags host_key`; set the new recipient as `.sops.yaml` anchor `fredrir-11`; `sops updatekeys -y ansible/roles/reconciler/files/credentials.sops.yaml`; `ansible-playbook ansible/reconciler.yml` |
+| Rotation | `tofu -chdir=tofu/reconciler apply -replace=aws_iam_access_key.verify` or `-replace=cloudflare_account_token.verify`; set the new value; `ansible-playbook ansible/reconciler.yml` |
+| Kubernetes token rotation | The token Secret never expires; `kubectl -n flux-system delete secret infrastructure-verify-credentials`; `flux reconcile kustomization platform-policy` recreates it with a new token; set `kubernetes-token`; `ansible-playbook ansible/reconciler.yml` |
+| Rollback | `systemctl disable --now infra-reconcile-verify.timer`; no other system depends on the host |
 
 ## CI execution and runner admission
 

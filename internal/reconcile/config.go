@@ -141,7 +141,7 @@ func deploymentIndependent(path string) bool {
 }
 
 func administratorApplied(path string) bool {
-	return canonicalPath(path) && strings.HasPrefix(path, "tofu/reconciler/")
+	return canonicalPath(path) && (path == "ansible/reconciler.yml" || strings.HasPrefix(path, "ansible/roles/reconciler/") || strings.HasPrefix(path, "tofu/reconciler/"))
 }
 
 func selectHosts(selected *Selection, scope string) {
