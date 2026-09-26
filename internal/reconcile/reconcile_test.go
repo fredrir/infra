@@ -323,7 +323,7 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 		{".github/actions/setup-reconciliation/action.yml", Selection{Tooling: true}},
 		{"MODULE.bazel.lock", Selection{Tooling: true}},
 		{"uv.lock", All()},
-		{".sops.yaml", All()},
+		{".sops.yaml", Selection{}},
 		{"platform/components/policy/kustomization.yaml", All()},
 		{"internal/../tofu/main.tf", All()},
 		{"README.md", Selection{}},

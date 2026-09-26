@@ -55,7 +55,8 @@ func TestHostPlaybooksFollowRoleClosures(t *testing.T) {
 		{"verification playbook", []string{"ansible/verify.yml"}, nil},
 		{"infrastructure", []string{"ansible/roles/k3s/tasks/main.yml", "tofu/main.tf"}, nil},
 		{"host secret", []string{"secrets/tailscale.yaml"}, nil},
-		{"shared input", []string{"ansible/roles/k3s/tasks/main.yml", ".sops.yaml"}, nil},
+		{"shared input", []string{"ansible/roles/k3s/tasks/main.yml", "uv.lock"}, nil},
+		{"recipient rules", []string{"ansible/roles/k3s/tasks/main.yml", ".sops.yaml"}, []string{"k3s.yml", "volatile.yml"}},
 		{"unclassified input", []string{"ansible/roles/k3s/tasks/main.yml", "new-input"}, nil},
 		{"undeclared role", []string{"ansible/roles/retired/tasks/main.yml"}, nil},
 	} {

@@ -95,7 +95,7 @@ func sharedDeploymentInput(path string) bool {
 		}
 	}
 	switch path {
-	case "platform/clusters/production/root.yaml", ".sops.yaml", "pyproject.toml", "uv.lock":
+	case "platform/clusters/production/root.yaml", "pyproject.toml", "uv.lock":
 		return true
 	default:
 		return false
@@ -131,7 +131,7 @@ func deploymentIndependent(path string) bool {
 		return false
 	}
 	switch path {
-	case ".github/workflows/performance.yml", ".github/workflows/check.yml", ".github/workflows/infra-cli.yml", ".github/workflows/images.yml", ".github/workflows/build-image.yml", ".github/workflows/test-image.yml", ".github/workflows/cli-release.yml", ".github/workflows/rust-ci.yml", ".github/workflows/rust-release.yml", ".github/workflows/rust-auto-tag.yml", ".github/workflows/packages-publish.yml", ".github/actionlint.yaml", ".github/CODEOWNERS", ".editorconfig", ".gitleaks.toml", ".gitleaksignore", ".taplo.toml", ".yamllint.yaml", "biome.json", "renovate.json", "ruff.toml":
+	case ".github/workflows/performance.yml", ".github/workflows/check.yml", ".github/workflows/infra-cli.yml", ".github/workflows/images.yml", ".github/workflows/build-image.yml", ".github/workflows/test-image.yml", ".github/workflows/cli-release.yml", ".github/workflows/rust-ci.yml", ".github/workflows/rust-release.yml", ".github/workflows/rust-auto-tag.yml", ".github/workflows/packages-publish.yml", ".github/actionlint.yaml", ".github/CODEOWNERS", ".editorconfig", ".gitleaks.toml", ".gitleaksignore", ".sops.yaml", ".taplo.toml", ".yamllint.yaml", "biome.json", "renovate.json", "ruff.toml":
 		return true
 	}
 	return strings.HasPrefix(path, "docs/") || strings.HasPrefix(path, "build/evidence/") ||

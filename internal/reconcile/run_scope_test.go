@@ -28,6 +28,21 @@ func TestIndependentChangePreservesDeployedBaseline(t *testing.T) {
 	}
 }
 
+func TestRecipientRulesChangeNoDeployedState(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}
+	ops := &fakeOps{selection: Affected([]string{".sops.yaml"})}
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if len(ops.calls) != 0 || store.status.Applied != "old" || store.status.Stage != "evaluated" {
+		t.Fatalf("recipient rules deployed: %v, %+v", ops.calls, store.status)
+	}
+	ciphertexts := []string{"ansible/roles/control_backup/files/control.sops.yaml", "platform/components/backups/backup.secret.sops.yaml"}
+	if got, want := Affected(append([]string{".sops.yaml"}, ciphertexts...)), Affected(ciphertexts); !sameSelection(got, want) {
+		t.Fatalf("recipient rules widened re-encrypted secrets to %+v, want %+v", got, want)
+	}
+}
+
 func TestToolingChangeVerifiesDeployedRevisionWithoutMutation(t *testing.T) {
 	verified := time.Now().Add(-time.Hour).UTC()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "old", LastFullVerified: verified}}
