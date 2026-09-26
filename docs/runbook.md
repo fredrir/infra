@@ -331,16 +331,16 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Performance | Per-volume QoS cap (same as root): ~1000 IOPS 4k random, ~500 MB/s sequential, p99 ~50 ms; SSD class does not raise IOPS |
 | Formatting | Only when `wipefs` finds no signature; foreign or whole-disk signatures fail closed |
 | Mount | `srv-data.mount` at `/srv/data`; `Options=nofail`; `WantedBy=local-fs.target` |
-| Layout | `data_volume_binds` (inventory-driven): `/srv/data/<name>` bound onto `/var/lib/rancher` (containerd images), `/var/lib/kubelet` (pod emptyDirs), `/var/lib/infra-build-vm` (nested VM qcow2 and Dagger cache) — large mostly-sequential caches |
+| Layout | `data_volume_binds` (inventory-driven): `/srv/data/<name>` bound onto `/var/lib/rancher` (containerd images), `/var/lib/kubelet` (pod emptyDirs) — large mostly-sequential caches |
 | Hot scratch | Latency-sensitive CI scratch (Rust `target`, sccache) belongs in a `medium: Memory` emptyDir counted against the pod's memory, not on the IOPS-capped volume; deferred until fio-on-real-volume and pod-limit headroom are confirmed (3 Rust pods at 10Gi limits vs 62 GiB RAM), so it is a measured follow-up, not yet applied |
 | Consumers | `data_volume_consumers` get `RequiresMountsFor=` on the layout; running consumers restart once when a mount activates |
 | Missing volume | Consumers stay stopped; nothing writes the 40 GB root |
 
 | Transport | Value |
 | --- | --- |
-| Path | DERP over TCP 443; NTNU blocks outbound UDP, so no direct WireGuard path |
-| Measure | On fredrir-10: `tailscale netcheck`; `tailscale ping --c 20 fredrir-07`; `iperf3` to fredrir-09 over the Tailnet; Rust job `rust-cache-restore` timings |
-| Add a relay | When DERP throughput or latency limits CI: self-hosted `derper` in hel1 with `--verify-clients`, a custom `derpMap` region and 443/tcp |
+| Path | Direct UDP to every fleet peer through NTNU's NAT; requires inbound UDP 41641 on each peer's provider firewall; Tailscale DERP is the fallback |
+| Overlay | Tailscale's bypass-marked packets never enter the pod CIDR (host firewall output chain), so tailscaled cannot pick pod addresses as endpoints |
+| Measure | On fredrir-10: `tailscale status` (`CurAddr` per peer); `tailscale ping --c 20 fredrir-07`; `iperf3` to fredrir-09 over the Tailnet; Rust job `rust-cache-restore` timings |
 
 | Flannel backend | Value |
 | --- | --- |

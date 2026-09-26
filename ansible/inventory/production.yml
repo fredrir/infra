@@ -91,8 +91,6 @@ all:
                   machine_type: sx3.16c64r
                   architecture: amd64
                   k3s_ci_slots: 3
-                  k3s_system_reserved_cpu: 8250m
-                  k3s_system_reserved_memory: 30Gi
                   k3s_node_labels:
                   - node-restriction.kubernetes.io/gvisor=true
                   - node-restriction.kubernetes.io/volatile=true
@@ -104,10 +102,8 @@ all:
                   data_volume_binds:
                   - /var/lib/rancher
                   - /var/lib/kubelet
-                  - /var/lib/infra-build-vm
                   data_volume_consumers:
                   - k3s-agent.service
-                  - infra-build-vm.service
         external:
           hosts:
             fredrir-06:
