@@ -54,6 +54,7 @@ go_test(
         "data_volume_integration_test.go",
         "host_comparison_test.go",
         "host_scope_test.go",
+        "host_secrets_integration_test.go",
         "outcome_test.go",
         "projects_test.go",
         "provenance_review_test.go",

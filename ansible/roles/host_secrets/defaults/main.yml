@@ -1,0 +1,2 @@
+host_secrets_packages: [age]
+host_secrets_key: /etc/age/host.key

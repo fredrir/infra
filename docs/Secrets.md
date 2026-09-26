@@ -16,6 +16,7 @@
 | Verification trigger credentials      | `ansible/roles/verification_trigger/files/github-app.sops.yaml` and `heartbeat.sops.yaml`; Macie, Archie and CI apply only                                                             |
 | Decryption                            | Macie, Archie `~/.config/age/keys.txt`; Flux `flux-system/sops-age`; CI apply Doppler `prd_reconciliation_apply` `SOPS_AGE_KEY`                                                        |
 | Host tokens                           | Private `/etc/rancher/k3s/server-token` and `agent-token`                                                                                                                              |
+| Host age keys                         | Root `0600` `/etc/age/host.key` on `fredrir-06` and `fredrir-07`; generated on the host by `ansible/roles/host_secrets`, never copied; [host-scoped secrets](#host-scoped-secrets) |
 | Recovery archives                     | Private `.infra/` on Macie and independent Archie copies                                                                                                                               |
 | Git                                   | Encrypted values only; private keys and decrypted files stay outside tracked paths                                                                                                     |
 
@@ -34,5 +35,13 @@
 sops platform/projects/<project>/<name>.secret.sops.yaml
 sops rotate -i --add-age "$NEW" --rm-age "$OLD" platform/projects/<project>/<name>.secret.sops.yaml
 ```
+
+## Host-scoped secrets
+
+| Step | Action |
+| --- | --- |
+| Generate | Reconcile the host; `host_secrets` creates the key once |
+| Read recipient | `ssh root@<host> age-keygen -y /etc/age/host.key` |
+| Lost key | The next reconcile generates a new key; enroll its recipient |
 
 [Platform operation](platform.md) · [Mail credentials](mail-alerts.md)

@@ -1,0 +1,18 @@
+- name: Install the age key generator
+  ansible.builtin.import_role:
+    name: host_packages
+  vars:
+    host_packages_required: "{{ host_secrets_packages }}"
+
+- name: Create the private host key directory
+  ansible.builtin.file:
+    path: "{{ host_secrets_key | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Generate the host age key
+  ansible.builtin.command:
+    argv: [age-keygen, -o, "{{ host_secrets_key }}"]
+    creates: "{{ host_secrets_key }}"

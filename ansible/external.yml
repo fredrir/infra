@@ -55,6 +55,11 @@
       ansible.builtin.import_role:
         name: firewall
 
+    - name: Configure host secret decryption
+      ansible.builtin.import_role:
+        name: host_secrets
+      tags: [gatus, verification_trigger]
+
     - name: Configure infrastructure checks
       ansible.builtin.import_role:
         name: gatus

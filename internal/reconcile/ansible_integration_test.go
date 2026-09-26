@@ -24,6 +24,18 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+func localAnsiblePackages(t *testing.T, root string) string {
+	t.Helper()
+	if packages := os.Getenv("INFRA_ANSIBLE_SITE_PACKAGES"); packages != "" {
+		return packages
+	}
+	matches, err := filepath.Glob(filepath.Join(root, ".venv/lib/python*/site-packages"))
+	if err != nil || len(matches) != 1 {
+		t.Fatal("set INFRA_ANSIBLE_SITE_PACKAGES to the local Ansible Python package directory")
+	}
+	return matches[0]
+}
+
 func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 	image := os.Getenv("INFRA_ANSIBLE_TEST_IMAGE")
 	if image == "" {
@@ -40,14 +52,7 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 		return output
 	}
 	root := strings.TrimSpace(string(command("git", "rev-parse", "--show-toplevel")))
-	packages := os.Getenv("INFRA_ANSIBLE_SITE_PACKAGES")
-	if packages == "" {
-		matches, err := filepath.Glob(filepath.Join(root, ".venv/lib/python*/site-packages"))
-		if err != nil || len(matches) != 1 {
-			t.Fatal("set INFRA_ANSIBLE_SITE_PACKAGES to the local Ansible Python package directory")
-		}
-		packages = matches[0]
-	}
+	packages := localAnsiblePackages(t, root)
 	fixture := t.TempDir()
 	write := func(path, data string, executable bool) {
 		t.Helper()
@@ -803,14 +808,7 @@ func TestHostComparisonWithLocalContainer(t *testing.T) {
 		return string(output)
 	}
 	root := strings.TrimSpace(command("git", "rev-parse", "--show-toplevel"))
-	packages := os.Getenv("INFRA_ANSIBLE_SITE_PACKAGES")
-	if packages == "" {
-		matches, err := filepath.Glob(filepath.Join(root, ".venv/lib/python*/site-packages"))
-		if err != nil || len(matches) != 1 {
-			t.Fatal("set INFRA_ANSIBLE_SITE_PACKAGES to the local Ansible Python package directory")
-		}
-		packages = matches[0]
-	}
+	packages := localAnsiblePackages(t, root)
 	fixture := t.TempDir()
 	for path, data := range map[string]string{
 		"ansible/ansible.cfg":              "[defaults]\nroles_path = /source/ansible/roles\nstrategy_plugins = /source/ansible/plugins/strategy\nstrategy = mitogen_linear\nretry_files_enabled = False\n",

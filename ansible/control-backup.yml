@@ -6,4 +6,5 @@
     backup_environment: "{{ (lookup('ansible.builtin.pipe', 'sops decrypt --output-type json ' ~ ((playbook_dir ~ '/../platform/components/backups/backup.secret.sops.yaml') | quote)) | from_json).stringData }}"
     backup_timer_enabled: true
   roles:
+  - host_secrets
   - control_backup
