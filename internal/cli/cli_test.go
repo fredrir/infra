@@ -193,11 +193,10 @@ func TestVerificationWritesItsOutcomeReport(t *testing.T) {
 	}
 }
 
-func TestVerificationRequestReadsTheSystemdCredentials(t *testing.T) {
+func TestVerificationRequestReadsItsCredentialFiles(t *testing.T) {
 	credentials := t.TempDir()
-	t.Setenv("CREDENTIALS_DIRECTORY", credentials)
-	request := []string{"reconcile", "request-verification", "--app-id=1", "--installation-id=2"}
-	for _, credential := range []string{"github-app-key", "gatus-token"} {
+	request := []string{"reconcile", "request-verification", "--app-id=1", "--installation-id=2", "--private-key=" + filepath.Join(credentials, "github-app.pem"), "--heartbeat-token=" + filepath.Join(credentials, "gatus-token")}
+	for _, credential := range []string{"github-app.pem", "gatus-token"} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), request, &output, &output); err == nil || !strings.Contains(err.Error(), filepath.Join(credentials, credential)) {
 			t.Fatalf("request without %s returned %v", credential, err)
@@ -210,8 +209,7 @@ func TestVerificationRequestReadsTheSystemdCredentials(t *testing.T) {
 	if err := cli.Run(context.Background(), request, &output, &output); err == nil || !strings.Contains(err.Error(), "invalid verification heartbeat token") {
 		t.Fatalf("request with an invalid heartbeat token returned %v", err)
 	}
-	t.Setenv("CREDENTIALS_DIRECTORY", "")
-	if err := cli.Run(context.Background(), request, &output, &output); err == nil || !strings.Contains(err.Error(), "--private-key and --heartbeat-token") {
-		t.Fatalf("request without a credential directory returned %v", err)
+	if err := cli.Run(context.Background(), request[:4], &output, &output); err == nil || !strings.Contains(err.Error(), `required flag(s) "heartbeat-token", "private-key" not set`) {
+		t.Fatalf("request without credential files returned %v", err)
 	}
 }

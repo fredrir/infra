@@ -48,7 +48,7 @@ infra dev clean --all
 | --- | --- |
 | `ubuntu`, `firewall`, `k3s` | `site.yml` runs against `dev-server-1` and `dev-agent-1` |
 | `tailscale` | Skipped; `tailscale0` is a renamed multicast NIC carrying the fake tailnet address at MTU 1280, and a stub `tailscaled.service` satisfies the K3s unit dependency |
-| `build_vm`, `build_engine`, `build_runner`, `ci_runtime`, `gatus`, `control_backup` | Need nested KVM, GitHub credentials or production SOPS keys |
+| `build_vm`, `build_engine`, `build_runner`, `ci_runtime`, `gatus`, `control_backup` | Need nested KVM, GitHub credentials or secrets encrypted to the guest host key |
 
 | Cluster profile | Kustomizations |
 | --- | --- |

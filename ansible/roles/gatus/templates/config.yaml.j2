@@ -1,6 +1,6 @@
 web:
-    address: 100.86.241.75
-    port: 8080
+    address: {{ gatus_address }}
+    port: {{ gatus_port }}
 concurrency: 2
 storage:
     type: sqlite
@@ -11,10 +11,10 @@ alerting:
     email:
         from: alerts@fredrir.com
         host: email-smtp.eu-north-1.amazonaws.com
-        password: ENC[AES256_GCM,data:isacc1fNhNATv8N1hL7AbCACeKuQchTpyCLFCc19wvcs/BWfe5H7TPP8qdA=,iv:m1k7Hsh5bCOVl2C8m+MNbFZhhBB4wUFVqpsSZD44z2s=,tag:77o77D/ruMbNCqacj7wEnA==,type:str]
+        password: "${GATUS_SMTP_PASSWORD}"
         port: 587
         to: fhansteen@gmail.com
-        username: ENC[AES256_GCM,data:y0BdkWdLWSCd5LXcy4v+P48J4a4=,iv:f3H+Ok2FrazHMqIspC0Nfx8eKsgHnIHfDCCyq84A9Ck=,tag:nBNFPNeDmAFDKNbvdBvEug==,type:str]
+        username: "${GATUS_SMTP_USERNAME}"
         client:
             insecure: false
         default-alert:
@@ -126,7 +126,7 @@ endpoints:
         x-apollo-operation-name: health
     - name: grafana-login
       group: applications
-      url: https://grafana.fredrir.com/login
+      url: https://{{ grafana_host }}/login
       interval: 1m
       client:
         timeout: 10s
@@ -137,7 +137,7 @@ endpoints:
         - type: email
     - name: grafana-auth
       group: applications
-      url: https://grafana.fredrir.com/api/user
+      url: https://{{ grafana_host }}/api/user
       interval: 1m
       client:
         timeout: 10s
@@ -160,7 +160,7 @@ endpoints:
 external-endpoints:
     - name: parser
       group: backups
-      token: ENC[AES256_GCM,data:N+7sCzJZplXkf1ijdvNl2AdRsp4zwued2eZDZfo2C8xeF44CqwFyzRSWrQ==,iv:jrcHiAwY0SS6JYv93bLs0JcWZl3bwIFtGmFQ35nHuR8=,tag:YU0IHQYfvJcTDVjcRci6uQ==,type:str]
+      token: "${GATUS_TOKEN_BACKUPS_PARSER}"
       heartbeat:
         interval: 8h
       alerts:
@@ -170,7 +170,7 @@ external-endpoints:
           send-on-resolved: true
     - name: "y"
       group: backups
-      token: ENC[AES256_GCM,data:g4wIcGL2+HLWVIjP3i/+/8ZdlnMsvwfryQUAtBWigMY3toaquC45uB71UA==,iv:TY+mIBQIp1heJt++gr197cXEHVP6prR6UmovtvdlbM8=,tag:iutrVEsnpaVWWmpxgR8ing==,type:str]
+      token: "${GATUS_TOKEN_BACKUPS_Y}"
       heartbeat:
         interval: 8h
       alerts:
@@ -180,7 +180,7 @@ external-endpoints:
           send-on-resolved: true
     - name: portfolio
       group: backups
-      token: ENC[AES256_GCM,data:sgYHtU3Hy8iBQ+jtlkFxxwf33l/EEsdTUmhKJd2IqjhqU9ZBw9YyyoHO1A==,iv:Y4/jtASmAUk9Xtx+w/3KCAlp/t1qf8qX3ylF6CHNhUQ=,tag:JZGdHgdH8VBbHz+R09QLlA==,type:str]
+      token: "${GATUS_TOKEN_BACKUPS_PORTFOLIO}"
       heartbeat:
         interval: 2h
       alerts:
@@ -190,7 +190,7 @@ external-endpoints:
           send-on-resolved: true
     - name: attic
       group: backups
-      token: ENC[AES256_GCM,data:rlMunpE60TBaVfsuvl2c7jwQ0Ntf98dGhbmSY8QyxWIhgeGwsc8Cj9CXMQ==,iv:RL5N90eyL+sC9JCJlOZpdpe4/YHvoicErNHcml1m8vs=,tag:LOxBWHdPd6rgIG5neZ0Xrw==,type:str]
+      token: "${GATUS_TOKEN_BACKUPS_ATTIC}"
       heartbeat:
         interval: 2h
       alerts:
@@ -200,7 +200,7 @@ external-endpoints:
           send-on-resolved: true
     - name: control
       group: backups
-      token: ENC[AES256_GCM,data:HPsPUkh7KRiSYiGXHWhrBxeTxVYBHAwS+6WxIFgtbln0z3pixA0wVZVNPQ==,iv:3o2h3te7WJ10DcR3nUGm7DiP/C+aRU23caH/S4Dax9g=,tag:U1kEMP4841nGLxRPX5I60A==,type:str]
+      token: "${GATUS_TOKEN_BACKUPS_CONTROL}"
       heartbeat:
         interval: 8h
       alerts:
@@ -210,7 +210,7 @@ external-endpoints:
           send-on-resolved: true
     - name: verification
       group: reconciliation
-      token: ENC[AES256_GCM,data:CLlXgpWbDC77uyqarC+NVTWenJA4lCcUXngQ8TqsmjaKBOneZPCj3KKimA==,iv:woRj3jb1bCZvr+Ay8j9I+ZmLcCNLX/SNn0O2dpz7HFs=,tag:N7wpXqXTZEWiI9/5uLIhZw==,type:str]
+      token: "${GATUS_TOKEN_RECONCILIATION_VERIFICATION}"
       heartbeat:
         interval: 3h
       alerts:
@@ -220,45 +220,3 @@ external-endpoints:
           send-on-resolved: true
           description: Hourly infrastructure verification failed or stopped reporting; the Gatus result names the run
 metrics: true
-sops:
-    age:
-        - enc: |
-            -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsTGdLb0hlQ2RRRm1jVjgv
-            Z1pBM245YldpQ2FvMjl1VUtOTGIyL3dDVkU0CkVnRW8yemdwNnl6UW5VbFprUm1q
-            YldHZGdDdTFpdCs4M2doZU96d2wvMHcKLS0tIEFXVlpZRC9rRm93S2FqaW9RaUQx
-            V2VocmJtSnRsZERmRW8rWUtuaFlDSGcKLWGZ0YQtrx5p9Z95wqC/vJp/BMlI8sq5
-            toKUAZ+rRbvFBM9nST9TyzWzXJuTTi2QeCX0a51p9WVrb3bRffaS2A==
-            -----END AGE ENCRYPTED FILE-----
-          recipient: age1eva47ddzjgmvrzjd8mxm7h0n6vvamw5xp94aqvlm2d3yf3uvracqypxu7x
-        - enc: |
-            -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2SHJFejZBZlJXQ3grWHU0
-            SllBakphaEhCWFJ1ZW9nRkJWOW5mVmZOWFZVCnFvUERaZ3g3SVVmaDdrV0hCK3VF
-            SW4zR2hXN1JQUEgyZExVTjhZenpERVkKLS0tIE5TRGxGOVRQbzJEZnB2Zy9ST0Rt
-            NDNycUowbDcvS04yUVkrMjRlOTNhVG8KP5fm6WxX04QdoyXrslxfS4bkGUcwmgqS
-            jgZ06GBgZYRoHnNabdafT0Tutss9BY2Q39bESOQ0M8yTeklq6BixHw==
-            -----END AGE ENCRYPTED FILE-----
-          recipient: age1wflp6cynwm97wndq5zxmpaxwz59h62a7dku8qdyue5zm9g4djfnqwj9n0m
-        - enc: |
-            -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqanBwMVRkajVOTGFlZVpZ
-            RGV6RjJoOVpHbWxuZWFhSjlOemt4WnMwUmpJClA4NlhIZkthOEdzWEtpaXUrZjlY
-            WDdWeHV5ZjJMcHpxU3FYL0ZRTXV1OEEKLS0tIEt4a3JkZEF5NWRneFlDU3VBbEJ1
-            bElydFlVazFIT2ExSTlNczZxR3crRVEKlJaopxIIDZrGSOMFxCmGNtDmLrBZemGb
-            vTf8Mi7iKQIiNjhlwizA6ZdXRN3B5ylVNKkueJ857PaDBSx3fwdOvw==
-            -----END AGE ENCRYPTED FILE-----
-          recipient: age1jm6xj8qlmfjlhw0vdseaaqkpt3mqj3yl0upx3smwutsaghcq6pesvrka2t
-        - enc: |
-            -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWaG1iRTliWkE5VnA2dnpr
-            Q2lYTmdmOEtjQkd5d29JeGdqREZac1ZWL2lFCndLWlB4bUhVL1hQeHpaUnlOayt3
-            N3VrcWlSOW1ROWlYRXJENWU4K25zM1UKLS0tIGdqajhGUXAweXNGZXUwREZhYWgx
-            ajU0TnltK2NiaDh1RTQ1NFU0YW5OMGsK7TrJ2HPyW1r/+R/mSIVbQ6Ucoq0r3+uq
-            LqvqIDOzdx6jQJ/oG7SpEBvWZzesdHMmCAR9KEqkwmKNefgCfomHtg==
-            -----END AGE ENCRYPTED FILE-----
-          recipient: age1mxszcn7gs8gnvhpq8ku748szqe8u6raferefg986slu83r3zkcmswe29zs
-    encrypted_regex: ^(username|password|token)$
-    lastmodified: "2026-09-25T19:46:58Z"
-    mac: ENC[AES256_GCM,data:A93RD12I5KdkFQXbhfuXW1mdxXmiB+jxtDxOVgPKGcdnYTDu2YEKu9b6aR4ZWsH55C4M5SPMuVaucoD1sF1u61l/B8Fl7grZsdQSmo1xTQO+jS/9cO+53arr85x6Ldlat7LqycGTuJmsoOcAMrgNkytityCgVEr1R/MGlJZH5L4=,iv:0obm1M6Y2Ss7CBUSwGW6NRcqVSm/FO6Y9ddR4pkehFE=,tag:sh39szfN5SbG2OwlRRR08Q==,type:str]
-    version: 3.13.3

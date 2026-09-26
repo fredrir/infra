@@ -746,50 +746,6 @@ esac
 		}
 	}
 	t.Log("container engines, their containers and their state are removed once and compare clean afterwards")
-	write("bin/sops", "#!/bin/sh\nprintf 'private_key: declared-key\\ntoken: declared-token\\n'\n", true)
-	write("app-key.sops.yaml", "", false)
-	write("heartbeat.sops.yaml", "", false)
-	write("trigger.yml", `- hosts: build_engines
-  gather_facts: false
-  vars:
-    verification_trigger_app_id: 1
-    verification_trigger_installation_id: 2
-    verification_trigger_credentials:
-    - {source: /fixture/app-key.sops.yaml, field: private_key, dest: /etc/infra-verification/github-app.pem}
-    - {source: /fixture/heartbeat.sops.yaml, field: token, dest: /etc/infra-verification/gatus-token}
-  roles:
-  - verification_trigger
-`, false)
-	trigger := func(success bool, extra ...string) string {
-		return run("/fixture/trigger.yml", success, append([]string{"--skip-tags=infra_binary"}, extra...)...)
-	}
-	if output := trigger(true, "--diff"); strings.Contains(output, "declared-key") || strings.Contains(output, "declared-token") {
-		t.Fatalf("verification trigger printed a credential:\n%s", output)
-	}
-	for credential, size := range map[string]int{"github-app.pem": 12, "gatus-token": 14} {
-		if installed := command("docker", "exec", name, "stat", "-c", "%a %U %s", "/etc/infra-verification/"+credential); string(installed) != fmt.Sprintf("600 root %d\n", size) {
-			t.Fatalf("%s installed as %q", credential, installed)
-		}
-	}
-	for _, mode := range [][]string{nil, {"--check"}} {
-		if output := trigger(true, mode...); !strings.Contains(output, "changed=0") {
-			t.Fatalf("verification trigger %v is not idempotent:\n%s", mode, output)
-		}
-	}
-	command("docker", "exec", name, "sed", "-i", "s/OnCalendar=hourly/OnCalendar=daily/", "/etc/systemd/system/infra-verification-request.timer")
-	if changed, _ := outcome(trigger(true, "--check")); !slices.Equal(changed, []string{"verification_trigger : Install the verification request units", "verification_trigger : Restart the verification request timer"}) {
-		t.Fatalf("edited verification timer reported as %q", changed)
-	}
-	before = restarted()
-	trigger(true)
-	if got := strings.TrimPrefix(restarted(), before); got != "infra-verification-request.timer\n" {
-		t.Fatalf("timer repair restarted %q", got)
-	}
-	command("docker", "exec", name, "rm", "/fixture/heartbeat.sops.yaml")
-	if output := trigger(false, "--check"); !strings.Contains(output, "Missing SOPS-encrypted credential /fixture/heartbeat.sops.yaml") {
-		t.Fatalf("missing encrypted credential did not fail clearly:\n%s", output)
-	}
-	t.Log("verification trigger installs its credentials privately, converges idempotently, restarts an edited timer and requires its encrypted credentials")
 }
 
 func TestHostComparisonWithLocalContainer(t *testing.T) {

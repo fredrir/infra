@@ -112,6 +112,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"roles/gatus/tasks/main.yml: Read the public upstream artifact token",
 		"roles/gatus/tasks/main.yml: Wait for the monitor listener",
 		"roles/gatus/tasks/main.yml: Verify monitor readiness",
+		"roles/host_secrets/tasks/install.yml: Verify the host decrypts the declared secrets",
 	}
 	driftProbes := []string{
 		"roles/tailscale/tasks/tailscale-install.yml: Compare installed transport binaries with verified archive",

@@ -69,9 +69,6 @@ func Affected(paths []string) Selection {
 			return full
 		case strings.HasPrefix(path, "platform/"), strings.HasPrefix(path, "charts/"), strings.HasPrefix(path, "keys/"):
 			selected.Kubernetes = true
-			if strings.HasPrefix(path, "platform/components/backups/") {
-				selectHosts(&selected, HostScopeFull)
-			}
 		case strings.HasPrefix(path, "ansible/"), strings.HasPrefix(path, "secrets/"):
 			selectHosts(&selected, HostScopeFull)
 		default:

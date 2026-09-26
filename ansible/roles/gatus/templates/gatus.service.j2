@@ -4,13 +4,18 @@ Wants=network-online.target
 Requires=tailscaled.service
 
 [Service]
-Type=simple
+Type=exec
+ExecStartPre=+/usr/bin/env SOPS_AGE_KEY_FILE={{ host_secrets_key }} /usr/local/bin/sops decrypt --output-type dotenv --output /run/gatus/secrets.env /etc/gatus/secrets.sops.yaml
+EnvironmentFile=-/run/gatus/secrets.env
 ExecStart=/usr/local/bin/gatus
+ExecStartPost=+/usr/bin/rm -f /run/gatus/secrets.env
 Environment=GATUS_CONFIG_PATH=%d/config.yaml
 Environment=GATUS_LOG_LEVEL=WARN
 Environment=GOMEMLIMIT=192MiB
 LoadCredential=config.yaml:/etc/gatus/config.yaml
 DynamicUser=yes
+RuntimeDirectory=gatus
+RuntimeDirectoryMode=0700
 StateDirectory=gatus
 StateDirectoryMode=0700
 WorkingDirectory=/var/lib/gatus

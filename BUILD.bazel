@@ -63,6 +63,19 @@ filegroup(
 )
 
 filegroup(
+    name = "host_secret_data",
+    srcs = glob([
+        "ansible/roles/*/defaults/*.yml",
+        "ansible/roles/*/files/*.sops.yaml",
+        "ansible/roles/*/tasks/*.yml",
+    ]) + [
+        ".sops.yaml",
+        "ansible/roles/gatus/templates/config.yaml.j2",
+    ],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "runner_routing_data",
     srcs = [
         ":workflows",

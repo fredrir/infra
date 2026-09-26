@@ -57,7 +57,7 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | Timer | `infra-verification-request.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |
 | Service | `infra-verification-request.service`: oneshot `infra reconcile request-verification`, `DynamicUser=yes`, IPv4/IPv6 sockets only, read-only system, `TimeoutStartSec=160min`; runs never overlap, and an hour that elapses during a run starts one run after it completes |
 | Binary | `/usr/local/bin/infra` from `build/cli-release.json`; a CLI release also runs `external.yml --tags=infra_binary` |
-| Credentials | Root `0600` `/etc/infra-verification/github-app.pem` and `gatus-token`, delivered through `LoadCredential=github-app-key` and `gatus-token` |
+| Credentials | Root `0600` ciphertext `/etc/infra-verification/credentials.sops.yaml`; decrypted at start into the unit's runtime directory with the [host key](Secrets.md#host-scoped-secrets) |
 | Token | Installation token restricted to `infra` with `actions: write` |
 | Dispatch | `reconcile.yml` at `main`, `verify=true`, `repair=true`, actor `fredrir-infra-verification[bot]` |
 | Wait | Polls the dispatched run every 30 s with ETag revalidation; honors `Retry-After` and `X-RateLimit-Reset`; deadline 150 minutes |
@@ -86,12 +86,12 @@ ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl start infra-verifica
 | Webhook | Disabled |
 | Installation | `fredrir/infra` only |
 | App / installation ID | `5077572` / `164918469`; `fredrir-06` in `ansible/inventory/production.yml` |
-| Private key | `ansible/roles/verification_trigger/files/github-app.sops.yaml`, field `private_key`; recipients in [Secrets](Secrets.md) |
+| Private key | `ansible/roles/verification_trigger/files/credentials.sops.yaml`, field `private_key`; recipients in [Secrets](Secrets.md) |
 | Rotation | Generate a key in the App settings; replace `private_key`; reconcile; delete the previous key |
-| Heartbeat token | `ansible/roles/verification_trigger/files/heartbeat.sops.yaml`, field `token`; equal to the `reconciliation/verification` token in `ansible/roles/gatus/files/config.sops.yaml` |
+| Heartbeat token | `ansible/roles/verification_trigger/files/credentials.sops.yaml`, field `token`; equal to `GATUS_TOKEN_RECONCILIATION_VERIFICATION` in `ansible/roles/gatus/files/secrets.sops.yaml` |
 
 ```sh
-sops set ansible/roles/verification_trigger/files/github-app.sops.yaml '["private_key"]' "$(jq -Rs . < NEW_KEY.pem)"
+jq -Rs . < NEW_KEY.pem | sops set --value-stdin ansible/roles/verification_trigger/files/credentials.sops.yaml '["private_key"]'
 ```
 
 | Owner | Managed state |

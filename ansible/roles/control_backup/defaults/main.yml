@@ -1,1 +1,3 @@
 control_backup_packages: [restic]
+control_backup_repository: s3:s3.eu-north-1.amazonaws.com/llunde-pyparser-bucket/restic/platform/control
+control_backup_region: eu-north-1

@@ -1,0 +1,33 @@
+- name: Locate the encrypted secrets of the importing role
+  ansible.builtin.set_fact:
+    host_secrets_source: "{{ [ansible_parent_role_paths | first, 'files', host_secrets_src] | path_join }}"
+
+- name: Require the encrypted secrets
+  ansible.builtin.assert:
+    that: host_secrets_source is file
+    fail_msg: "Missing SOPS-encrypted secrets {{ host_secrets_source }}"
+    quiet: true
+
+- name: Require secrets encrypted to the host
+  ansible.builtin.assert:
+    that: host_secrets_recipient.stdout in (lookup('ansible.builtin.file', host_secrets_source) | from_yaml).sops.age | map(attribute='recipient')
+    fail_msg: "{{ host_secrets_source }} is not encrypted to {{ inventory_hostname }} {{ host_secrets_recipient.stdout }}; enroll the recipient in .sops.yaml and run sops updatekeys"
+    quiet: true
+
+- name: Verify the host decrypts the declared secrets
+  ansible.builtin.command:
+    argv: [/usr/local/bin/sops, decrypt, --input-type, yaml, --output-type, yaml, --output, /dev/null]
+    stdin: "{{ lookup('ansible.builtin.file', host_secrets_source) }}"
+  environment:
+    SOPS_AGE_KEY_FILE: "{{ host_secrets_key }}"
+  changed_when: false
+  check_mode: false
+
+- name: Install the encrypted secrets
+  ansible.builtin.copy:
+    src: "{{ host_secrets_source }}"
+    dest: "{{ host_secrets_dest }}"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: "{{ host_secrets_handlers }}"

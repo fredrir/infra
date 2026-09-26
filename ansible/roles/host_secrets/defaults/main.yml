@@ -1,2 +1,5 @@
 host_secrets_packages: [age]
 host_secrets_key: /etc/age/host.key
+host_secrets_sops_url: https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.linux.amd64
+host_secrets_sops_sha256: e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
+host_secrets_handlers: []

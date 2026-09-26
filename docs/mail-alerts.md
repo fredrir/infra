@@ -9,8 +9,8 @@
 | Credentials          | Doppler `infra/ops/PLATFORM_WATCHDOG_SMTP_USERNAME` and `PLATFORM_WATCHDOG_SMTP_PASSWORD`         |
 | Cluster alerts       | Alertmanager; `platform/components/observability/alertmanager.secret.sops.yaml`                   |
 | Independent monitor  | Gatus on Ubuntu `fredrir-06`, outside Kubernetes                                                  |
-| Monitor settings     | `ansible/roles/gatus/files/config.sops.yaml`                                                      |
-| Native configuration | Root `0600` `/etc/gatus/config.yaml`, delivered through systemd `LoadCredential`                  |
+| Monitor settings     | `ansible/roles/gatus/templates/config.yaml.j2`; `${NAME}` secrets from `ansible/roles/gatus/files/secrets.sops.yaml` |
+| Native configuration | Root `0600` `/etc/gatus/config.yaml` through `LoadCredential`; secrets decrypted at start with the [host key](Secrets.md#host-scoped-secrets) |
 | Runtime              | `DynamicUser`, SQLite `/var/lib/gatus/gatus.db`, `MemoryMax=256M`                                 |
 | Listener             | Tailnet-only `100.86.241.75:8080`                                                                 |
 | Cross-check          | Cluster Prometheus scrapes `/metrics` each minute; `IndependentMonitorDown` after 10 minutes down |
@@ -35,7 +35,7 @@ Successful backup producers POST to `/api/v1/endpoints/backups_<name>/external?s
 export SOPS_AGE_KEY_FILE="$HOME/.config/age/keys.txt"
 export ANSIBLE_CONFIG=ansible/ansible.cfg
 uv run --frozen --group ci ansible-playbook ansible/external.yml --limit fredrir-06
-sops ansible/roles/gatus/files/config.sops.yaml
+sops ansible/roles/gatus/files/secrets.sops.yaml
 ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl status gatus --no-pager
 curl --fail http://100.86.241.75:8080/health
 ```

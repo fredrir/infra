@@ -6,14 +6,6 @@
       - verification_trigger_installation_id is integer
       - verification_trigger_installation_id > 0
 
-- name: Require the encrypted credentials
-  ansible.builtin.assert:
-    that: item.source is file
-    fail_msg: "Missing SOPS-encrypted credential {{ item.source }}"
-  loop: "{{ verification_trigger_credentials }}"
-  loop_control:
-    label: "{{ item.source }}"
-
 - name: Install the verified infrastructure binary
   ansible.builtin.import_role:
     name: infra_binary
@@ -31,16 +23,13 @@
     group: root
     mode: "0700"
 
-- name: Install the verification credentials
-  ansible.builtin.copy:
-    content: "{{ (lookup('ansible.builtin.pipe', 'sops --decrypt ' ~ (item.source | quote)) | from_yaml)[item.field] }}"
-    dest: "{{ item.dest }}"
-    owner: root
-    group: root
-    mode: "0600"
-  loop: "{{ verification_trigger_credentials }}"
-  no_log: true
-  diff: false
+- name: Install the encrypted verification credentials
+  ansible.builtin.import_role:
+    name: host_secrets
+    tasks_from: install.yml
+  vars:
+    host_secrets_src: credentials.sops.yaml
+    host_secrets_dest: /etc/infra-verification/credentials.sops.yaml
 
 - name: Install the verification request units
   ansible.builtin.template:
@@ -58,3 +47,9 @@
     state: started
     enabled: true
     daemon_reload: true
+
+- name: Remove plaintext verification credentials
+  ansible.builtin.file:
+    path: "/etc/infra-verification/{{ item }}"
+    state: absent
+  loop: [github-app.pem, gatus-token]

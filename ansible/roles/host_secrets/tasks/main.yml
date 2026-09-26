@@ -28,3 +28,13 @@
   ansible.builtin.assert:
     that: host_secrets_recipient.stdout is match('^age1[0-9a-z]{58}$')
     success_msg: "{{ inventory_hostname }} {{ host_secrets_recipient.stdout }}"
+
+- name: Install the pinned SOPS binary
+  ansible.builtin.get_url:
+    url: "{{ host_secrets_sops_url }}"
+    dest: /usr/local/bin/sops
+    checksum: "sha256:{{ host_secrets_sops_sha256 }}"
+    owner: root
+    group: root
+    mode: "0755"
+    timeout: 60
