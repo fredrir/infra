@@ -36,7 +36,7 @@ var objectStoreGRPC = map[string][2]string{
 	"meta-backup": {"CLIENT", ""},
 }
 
-var objectStorePorts = map[string]string{"server": "8333,9327", "worker": "9328"}
+var objectStorePorts = map[string]string{"server": "9327", "worker": "9328"}
 
 func lookup(v any, path ...string) any {
 	for _, key := range path {
@@ -53,9 +53,80 @@ func objectStoreResources(t *testing.T) []object {
 	return renderedTree(t, "platform/components", objectStore)
 }
 
+func platformCaddy(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), "platform/components/ingress/keys.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := regexp.MustCompile(`ghcr\.io/fredrir/platform-caddy@sha256:[0-9a-f]{64}`).FindString(string(data))
+	if pin == "" {
+		t.Fatal("ingress no longer pins platform-caddy")
+	}
+	return pin
+}
+
+func checkS3Filter(t *testing.T, cell string, container object, caddy string) {
+	t.Helper()
+	label := cell + "/s3-filter"
+	if container["image"] != caddy {
+		t.Errorf("%s runs %v instead of the ingress platform-caddy %s", label, container["image"], caddy)
+	}
+	if fmt.Sprint(container["command"]) != "[caddy run --config /etc/caddy/Caddyfile --adapter caddyfile]" {
+		t.Errorf("%s runs %v", label, container["command"])
+	}
+	if ports, _ := container["ports"].([]any); len(ports) != 1 || fmt.Sprint(at(ports[0], "containerPort")) != "8333" {
+		t.Errorf("%s does not serve exactly S3 on 8333", label)
+	}
+	provisioner := false
+	for _, env := range container["env"].([]any) {
+		if at(env, "name") == "PROVISIONER_ACCESS_KEY_ID" {
+			provisioner = lookup(env, "valueFrom", "secretKeyRef", "name") == "seaweedfs-"+cell+"-identities" && lookup(env, "valueFrom", "secretKeyRef", "key") == "PROVISIONER_ACCESS_KEY_ID"
+		}
+	}
+	if !provisioner {
+		t.Errorf("%s does not know the cell's provisioner", label)
+	}
+}
+
+func TestObjectStoreS3FilterGuardsBucketConfiguration(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), objectStore, "s3-filter.caddyfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := string(data)
+	for _, required := range []string{
+		"\tadmin off\n",
+		"tls /etc/seaweedfs/tls/s3.crt /etc/seaweedfs/tls/s3.key",
+		"\t\t@prefixed {\n\t\t\tnot method GET HEAD\n\t\t\tquery prefix=*\n\t\t}\n\t\trespond @prefixed",
+		"\t@{args[0]} {\n\t\tnot method GET HEAD\n\t\tquery {args[0]}=*\n\t\tnot header_regexp Authorization \"^AWS4-HMAC-SHA256 Credential={$PROVISIONER_ACCESS_KEY_ID}/\"\n\t}\n\trespond @{args[0]}",
+		"\t\treverse_proxy 127.0.0.1:8334 {",
+	} {
+		if !strings.Contains(config, required) {
+			t.Errorf("S3 filter lacks %q", required)
+		}
+	}
+	var keys []string
+	for _, match := range regexp.MustCompile(`(?m)^\t\timport provisioner_only (\S+)$`).FindAllStringSubmatch(config, -1) {
+		keys = append(keys, match[1])
+	}
+	for _, subresource := range []string{"versioning", "object-lock", "retention", "legal-hold", "lifecycle", "encryption", "policy", "acl", "cors", "tagging", "replication", "website", "notification", "logging", "ownershipControls", "publicAccessBlock", "accelerate", "requestPayment", "seaweedfs-quota"} {
+		if !slices.Contains(keys, subresource) {
+			t.Errorf("S3 filter lets writers change ?%s", subresource)
+		}
+	}
+	proxy := strings.Index(config, "reverse_proxy")
+	for _, rule := range []string{"respond @prefixed", "import provisioner_only"} {
+		if index := strings.Index(config, rule); index < 0 || index > proxy {
+			t.Errorf("%s does not run before the proxy", rule)
+		}
+	}
+}
+
 func TestObjectStoreCellsRunHardenedOnTheirDataNode(t *testing.T) {
 	t.Parallel()
 	image := at(load(t, "platform/versions.yaml"), "images", "seaweedfs")
+	caddy := platformCaddy(t)
 	resources := objectStoreResources(t)
 	literals := map[string]map[string]string{}
 	for _, resource := range resources {
@@ -101,14 +172,18 @@ func TestObjectStoreCellsRunHardenedOnTheirDataNode(t *testing.T) {
 			container := item.(object)
 			role := container["name"].(string)
 			label := name + "/" + role
-			if container["image"] != image {
-				t.Errorf("%s runs %v instead of the pinned %v", label, container["image"], image)
-			}
 			if at(container, "securityContext", "readOnlyRootFilesystem") != true || at(container, "securityContext", "allowPrivilegeEscalation") != false || fmt.Sprint(at(container, "securityContext", "capabilities", "drop")) != "[ALL]" {
 				t.Errorf("%s is not hardened", label)
 			}
 			if !memoryLimitAboveGoLimit(container) {
 				t.Errorf("%s needs GOMEMLIMIT below its memory limit", label)
+			}
+			if role == "s3-filter" {
+				checkS3Filter(t, name, container, caddy)
+				continue
+			}
+			if container["image"] != image {
+				t.Errorf("%s runs %v instead of the pinned %v", label, container["image"], image)
 			}
 			if fmt.Sprint(container["command"]) != "[/bin/sh /etc/seaweedfs/entrypoint/weed.sh]" {
 				t.Errorf("%s bypasses the gRPC security precheck: %v", label, container["command"])
@@ -197,7 +272,7 @@ func TestObjectStoreCellsRunHardenedOnTheirDataNode(t *testing.T) {
 						t.Errorf("%s takes %s from %q instead of its cell secret", label, key, secrets[key])
 					}
 				}
-				for _, required := range []string{"-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-master.telemetry=false", "-s3.port.iceberg=0", "-s3.port.lance=0", "-s3.cert.file=", "-s3.config=", "-dataCenter=" + name} {
+				for _, required := range []string{"-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-s3.ip.bind=127.0.0.1", "-s3.port=8334", "-master.telemetry=false", "-s3.port.iceberg=0", "-s3.port.lance=0", "-s3.config=", "-dataCenter=" + name} {
 					if !strings.Contains(args, required) {
 						t.Errorf("%s lacks %s", label, required)
 					}
@@ -723,5 +798,23 @@ func TestObjectStoreConfigMapsSkipFluxSubstitution(t *testing.T) {
 		if strings.Contains(string(data), "${") && lookup(resource, "metadata", "annotations", "kustomize.toolkit.fluxcd.io/substitute") != "disabled" {
 			t.Errorf("Flux would substitute the references in %s", at(resource, "metadata", "name"))
 		}
+	}
+}
+
+func TestObjectStoreProvisionerFailuresStayVisible(t *testing.T) {
+	retried, alerted := true, false
+	for _, resource := range objectStoreResources(t) {
+		switch {
+		case resource["kind"] == "CronJob" && at(resource, "metadata", "name") == "object-store-provisioner":
+			retried = at(resource, "spec", "jobTemplate", "spec", "backoffLimit") != 0
+		case resource["kind"] == "PrometheusRule":
+			for _, rule := range at(resource, "spec", "groups", 0, "rules").([]any) {
+				expression := fmt.Sprint(at(rule, "expr"))
+				alerted = alerted || (strings.Contains(expression, "kube_job_status_failed") && strings.Contains(expression, `job_name=~"object-store-provisioner-.+"`))
+			}
+		}
+	}
+	if retried || !alerted {
+		t.Fatalf("a restored drift can disappear: retried=%v alerted=%v", retried, alerted)
 	}
 }

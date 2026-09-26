@@ -213,21 +213,29 @@ func ensureObjectStoreBucket(ctx context.Context, client objectstore.Client, buc
 	if bucket.LockDays == 0 && locked && lock.ObjectLockEnabled != "" {
 		drift = append(drift, fmt.Errorf("object lock is enabled on an unlocked bucket"))
 	}
-	if err := applySetting(ctx, client, bucket.Name, "encryption", encryptionConfiguration{Algorithm: "AES256"}, log); err != nil {
+	if _, err := applySetting(ctx, client, bucket.Name, "encryption", encryptionConfiguration{Algorithm: "AES256"}, log); err != nil {
 		return err
 	}
 	if versioned {
-		if err := applySetting(ctx, client, bucket.Name, "versioning", versioningConfiguration{Status: "Enabled"}, log); err != nil {
+		if _, err := applySetting(ctx, client, bucket.Name, "versioning", versioningConfiguration{Status: "Enabled"}, log); err != nil {
 			return err
 		}
+	}
+	restored := map[string]bool{"versioning": versioned && versioning.Status == "Suspended"}
+	if bucket.LockDays > 0 {
+		if restored["object-lock"], err = applySetting(ctx, client, bucket.Name, "object-lock", objectLockConfiguration{ObjectLockEnabled: "Enabled", Mode: "COMPLIANCE", Days: bucket.LockDays}, log); err != nil {
+			return err
+		}
+	}
+	if restored["lifecycle"], err = applySetting(ctx, client, bucket.Name, "lifecycle", objectStoreLifecycle(bucket), log); err != nil {
+		return err
 	}
 	if bucket.LockDays > 0 {
-		if err := applySetting(ctx, client, bucket.Name, "object-lock", objectLockConfiguration{ObjectLockEnabled: "Enabled", Mode: "COMPLIANCE", Days: bucket.LockDays}, log); err != nil {
-			return err
+		for _, subresource := range []string{"versioning", "object-lock", "lifecycle"} {
+			if restored[subresource] {
+				drift = append(drift, fmt.Errorf("%s had drifted on a locked bucket and was restored", subresource))
+			}
 		}
-	}
-	if err := applySetting(ctx, client, bucket.Name, "lifecycle", objectStoreLifecycle(bucket), log); err != nil {
-		return err
 	}
 	if err := applyQuota(ctx, client, bucket, log); err != nil {
 		return err
@@ -262,23 +270,23 @@ func applyQuota(ctx context.Context, client objectstore.Client, bucket ObjectSto
 	return nil
 }
 
-func applySetting[T any](ctx context.Context, client objectstore.Client, bucket, subresource string, want T, log io.Writer) error {
+func applySetting[T any](ctx context.Context, client objectstore.Client, bucket, subresource string, want T, log io.Writer) (bool, error) {
 	current, found, err := currentSetting[T](ctx, client, bucket, subresource)
 	if err != nil {
-		return fmt.Errorf("%s: %w", subresource, err)
+		return false, fmt.Errorf("%s: %w", subresource, err)
 	}
 	if found && reflect.DeepEqual(current, want) {
-		return nil
+		return false, nil
 	}
 	body, err := xml.Marshal(want)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := bucketCall(ctx, client, bucket, url.Values{subresource: {""}}, body); err != nil {
-		return fmt.Errorf("%s: %w", subresource, err)
+		return false, fmt.Errorf("%s: %w", subresource, err)
 	}
 	fmt.Fprintf(log, "Set %s on %s\n", subresource, bucket)
-	return nil
+	return found, nil
 }
 
 func currentSetting[T any](ctx context.Context, client objectstore.Client, bucket, subresource string) (T, bool, error) {

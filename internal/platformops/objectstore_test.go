@@ -262,3 +262,37 @@ func TestProvisionObjectStoreRefusesUndeclaredVersioningAndLock(t *testing.T) {
 		t.Fatal("drift blocked the remaining settings")
 	}
 }
+
+func TestProvisionObjectStoreReportsRestoredDriftOnLockedBuckets(t *testing.T) {
+	hel1, hel1Server := newFakeObjectStore()
+	defer hel1Server.Close()
+	_, nlServer := newFakeObjectStore()
+	defer nlServer.Close()
+	spec, clients := provisionFixture(t, hel1Server, nlServer)
+	config := ObjectStoreConfig{Spec: spec, Clients: clients, WaitAttempts: 1}
+	if err := ProvisionObjectStore(context.Background(), config); err != nil {
+		t.Fatalf("first provisioning reported drift: %v", err)
+	}
+	for subresource, tampered := range map[string]string{
+		"object-lock": "<ObjectLockConfiguration><ObjectLockEnabled>Enabled</ObjectLockEnabled><Rule><DefaultRetention><Mode>COMPLIANCE</Mode><Days>1</Days></DefaultRetention></Rule></ObjectLockConfiguration>",
+		"lifecycle":   "<LifecycleConfiguration></LifecycleConfiguration>",
+		"versioning":  "<VersioningConfiguration><Status>Suspended</Status></VersioningConfiguration>",
+	} {
+		original := hel1.buckets["restic-example"][subresource]
+		hel1.buckets["restic-example"][subresource] = tampered
+		err := ProvisionObjectStore(context.Background(), config)
+		if err == nil || !strings.Contains(err.Error(), "bucket restic-example: "+subresource+" had drifted on a locked bucket and was restored") {
+			t.Errorf("%s drift on a locked bucket not reported: %v", subresource, err)
+		}
+		if hel1.buckets["restic-example"][subresource] != original {
+			t.Errorf("%s drift not restored", subresource)
+		}
+		if err := ProvisionObjectStore(context.Background(), config); err != nil {
+			t.Errorf("restored %s still reported: %v", subresource, err)
+		}
+	}
+	hel1.buckets["ci-example-main"]["lifecycle"] = "<LifecycleConfiguration></LifecycleConfiguration>"
+	if err := ProvisionObjectStore(context.Background(), config); err != nil {
+		t.Fatalf("cache lifecycle drift is not healed quietly: %v", err)
+	}
+}

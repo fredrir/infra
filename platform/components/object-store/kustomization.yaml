@@ -35,6 +35,9 @@ configMapGenerator:
 - name: seaweedfs-entrypoint
   files:
   - weed.sh
+- name: seaweedfs-s3-filter
+  files:
+  - s3-filter.caddyfile
 - name: object-store-buckets
   files:
   - buckets.yaml

@@ -548,12 +548,13 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | --- | --- |
 | Cells | `seaweedfs-hel1` on `fredrir-04` (CI caches), `seaweedfs-nl` on `fredrir-09` (`parser-dataset`); namespace `object-store`; one `weed server` per node, no cross-node cluster |
 | Endpoint | `https://seaweedfs-<cell>.object-store.svc.cluster.local:8333`, region `<cell>` |
-| Listeners | Pod IP: S3 8333 (TLS), metrics 9327, worker metrics 9328, S3 gRPC 18333 and admin gRPC 33646 (mTLS, client name allow-list); NetworkPolicy admits only 8333, 9327 and 9328; master, volume, filer and admin HTTP on loopback |
+| Listeners | Pod IP: S3 8333 (TLS, `s3-filter`), metrics 9327, worker metrics 9328, admin gRPC 33646 (mTLS, client name allow-list); NetworkPolicy admits only 8333, 9327 and 9328; SeaweedFS S3 on 127.0.0.1:8334 with its gRPC, master, volume, filer and admin HTTP on loopback |
 | Trust | CA `platform/components/object-store-trust/ca.crt`, ConfigMap `object-store-ca` wherever the component is included, name-constrained to `object-store.svc`, `object-store.svc.cluster.local`, `localhost`, `127.0.0.1`; CA key `pki/ca.sops.yaml` (Macie, Archie) |
 | In-cell security | gRPC mTLS per cell certificate; `weed.sh` refuses to start a process without its gRPC CA, certificates, keys and client name allow-list; JWT-signed volume writes; bucket-default SSE-S3 with `WEED_S3_SSE_KEK` |
 | Identities | Actions `<cell>-identities.json`; credentials `<cell>-identities.secret.sops.yaml`, referenced as `${NAME}`; writers hold `Write:<bucket>/*` |
 | Buckets | `buckets.yaml`; `object-store-provisioner` hourly: create, then write versioning, COMPLIANCE lock, SSE, lifecycle and quota only where they drift; never deletes |
-| Configuration drift | Versioning or a lock on a bucket that declares neither fails the provisioner; SeaweedFS 4.47 still authorizes bucket subresource writes that carry `?prefix=` as object writes |
+| S3 filter | `s3-filter` (platform-caddy, `s3-filter.caddyfile`) terminates TLS and rejects any write carrying `prefix`, and bucket configuration writes (versioning, object lock, retention, legal hold, lifecycle, encryption, policy, ACL, CORS, tagging, quota and the other bucket subresources) unless signed with the cell's provisioner key; SeaweedFS 4.47 would otherwise authorize `?prefix=` requests as object writes |
+| Configuration drift | Versioning or a lock on a bucket that declares neither fails the provisioner; on locked buckets the provisioner restores drifted versioning, lock or lifecycle and fails the run |
 | Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; `seaweedfs-nl` has no admin or worker and no lifecycle buckets; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
 | Logs | stderr only (`-logtostderr=true`) |
 | Parser dataset | `llunde-pyparser` application pods use `parser-dataset` on `seaweedfs-nl` via `AWS_ENDPOINT_URL_S3` and `AWS_CA_BUNDLE` (ConfigMap `object-store-ca`); stored `s3://` URLs keep their original bucket name, since the parser resolves objects by key |
@@ -567,6 +568,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | --- | --- |
 | `ObjectStoreProvisionerFailing` | No successful provisioner run for 2 h |
 | `ObjectStoreProvisionerNeverSucceeded` | Enabled provisioner without any successful run for 90 min |
+| `ObjectStoreProvisionerRunFailed` | Any failed provisioner Job; stays until the Job is deleted |
 | `ObjectStoreWorkerDown` | Lifecycle worker metrics unreachable for 15 min |
 | `ObjectStoreLifecycleStalled` | Any shard without a lifecycle walk, or no lifecycle metrics, for 2 days |
 | `ParserDatasetMirrorFailing` | Enabled mirror without a successful run for 3 h |
@@ -580,6 +582,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Restore the filer store | Commands below: scale to 0, copy `/meta/filerldb` over `/data/filerldb` in a helper pod that mounts both PVCs, scale to 1 |
 | Reissue certificates | Decrypt the CA key on Macie or Archie; issue each cell's two leaves with the SANs below; replace `pki/<cell>-*.crt` and the `s3.key`/`internal.key` values; update the alert threshold |
 | Resolve versioning or lock drift | Cache buckets only: remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |
+| Failed provisioner run | Read `kubectl -n object-store logs job/<job>`; for drift restored on a locked bucket, find who changed it, since the filter admits only the provisioner key; then `kubectl -n object-store delete job <job>` |
 | Restore the parser dataset | Commands below: suspend the mirror, copy AWS back into `parser-dataset` with the `PARSER_DATASET_*` credentials, resume |
 
 | Leaf | Subject | SAN | Usage |

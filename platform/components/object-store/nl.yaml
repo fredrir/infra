@@ -74,10 +74,8 @@ spec:
             - -volume.index=memory
             - -filer
             - -s3
-            - -s3.ip.bind=0.0.0.0
-            - -s3.port=8333
-            - -s3.cert.file=/etc/seaweedfs/tls/s3.crt
-            - -s3.key.file=/etc/seaweedfs/tls/s3.key
+            - -s3.ip.bind=127.0.0.1
+            - -s3.port=8334
             - -s3.config=/etc/seaweedfs/identities/identities.json
             - -s3.port.iceberg=0
             - -s3.port.lance=0
@@ -131,8 +129,6 @@ spec:
                   name: seaweedfs-nl
                   key: WEED_S3_SSE_KEK_PASSPHRASE
           ports:
-            - name: s3
-              containerPort: 8333
             - name: metrics
               containerPort: 9327
           resources:
@@ -170,10 +166,62 @@ spec:
                   - -c
                   - for attempt in $(seq 120); do nc -z 127.0.0.1 18888 && exit 0; sleep 1; done; exit 1
           startupProbe:
-            tcpSocket:
-              port: s3
+            exec:
+              command:
+                - nc
+                - -z
+                - 127.0.0.1
+                - '8334'
             periodSeconds: 5
             failureThreshold: 60
+        - name: s3-filter
+          image: ghcr.io/fredrir/platform-caddy@sha256:b03ceb80193dea33aa4812a190a08465dbe56f6a6aec364a47c15df1f56c8106
+          command:
+            - caddy
+            - run
+            - --config
+            - /etc/caddy/Caddyfile
+            - --adapter
+            - caddyfile
+          env:
+            - name: GOMEMLIMIT
+              value: 96MiB
+            - name: HOME
+              value: /caddy
+            - name: XDG_CONFIG_HOME
+              value: /caddy
+            - name: XDG_DATA_HOME
+              value: /caddy
+            - name: PROVISIONER_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-nl-identities
+                  key: PROVISIONER_ACCESS_KEY_ID
+          ports:
+            - name: s3
+              containerPort: 8333
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: '1'
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: s3-filter
+              mountPath: /etc/caddy
+              readOnly: true
+            - name: tls
+              mountPath: /etc/seaweedfs/tls
+              readOnly: true
+            - name: caddy
+              mountPath: /caddy
           readinessProbe:
             httpGet:
               path: /healthz
@@ -229,6 +277,16 @@ spec:
         - name: entrypoint
           configMap:
             name: seaweedfs-entrypoint
+        - name: s3-filter
+          configMap:
+            name: seaweedfs-s3-filter
+            items:
+              - key: s3-filter.caddyfile
+                path: Caddyfile
+        - name: caddy
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
         - name: tls
           projected:
             defaultMode: 0440

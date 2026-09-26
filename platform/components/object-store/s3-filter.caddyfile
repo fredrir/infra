@@ -1,0 +1,54 @@
+{
+	admin off
+	persist_config off
+	auto_https off
+	log {
+		output stderr
+		format json
+		level WARN
+	}
+}
+
+(provisioner_only) {
+	@{args[0]} {
+		not method GET HEAD
+		query {args[0]}=*
+		not header_regexp Authorization "^AWS4-HMAC-SHA256 Credential={$PROVISIONER_ACCESS_KEY_ID}/"
+	}
+	respond @{args[0]} "bucket configuration is reserved for the provisioner" 403
+}
+
+:8333 {
+	tls /etc/seaweedfs/tls/s3.crt /etc/seaweedfs/tls/s3.key {
+		protocols tls1.2
+	}
+	route {
+		@prefixed {
+			not method GET HEAD
+			query prefix=*
+		}
+		respond @prefixed "prefix is only accepted on reads" 403
+		import provisioner_only versioning
+		import provisioner_only object-lock
+		import provisioner_only retention
+		import provisioner_only legal-hold
+		import provisioner_only lifecycle
+		import provisioner_only encryption
+		import provisioner_only policy
+		import provisioner_only acl
+		import provisioner_only cors
+		import provisioner_only tagging
+		import provisioner_only replication
+		import provisioner_only website
+		import provisioner_only notification
+		import provisioner_only logging
+		import provisioner_only ownershipControls
+		import provisioner_only publicAccessBlock
+		import provisioner_only accelerate
+		import provisioner_only requestPayment
+		import provisioner_only seaweedfs-quota
+		reverse_proxy 127.0.0.1:8334 {
+			flush_interval -1
+		}
+	}
+}
