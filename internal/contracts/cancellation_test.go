@@ -1,15 +1,11 @@
 package contracts
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"cel.dev/cel-go/cel"
 	"cel.dev/cel-go/common/types"
-	"cel.dev/cel-go/common/types/ref"
-	"cel.dev/cel-go/common/types/traits"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -20,38 +16,10 @@ func TestImageBuildCancellationPreservesVerifiedArtifactReuse(t *testing.T) {
 	if err := yaml.Unmarshal(read(t, filepath.Join(root(t), ".github/workflows/build-image.yml")), &workflow); err != nil {
 		t.Fatal(err)
 	}
-	environment, err := cel.NewEnv(
-		cel.Variable("github", cel.DynType),
-		cel.Variable("inputs", cel.DynType),
-		cel.Variable("needs", cel.DynType),
-		cel.Variable("cancelledStatus", cel.BoolType),
-		cel.Function("fromJSON", cel.Overload("fromJSON_string", []*cel.Type{cel.StringType}, cel.DynType, cel.UnaryBinding(func(value ref.Val) ref.Val {
-			var decoded any
-			if err := json.Unmarshal([]byte(value.(types.String)), &decoded); err != nil {
-				return types.NewErr("invalid JSON: %v", err)
-			}
-			return types.DefaultTypeAdapter.NativeToValue(decoded)
-		}))),
-		cel.Function("contains", cel.Overload("contains_list", []*cel.Type{cel.ListType(cel.DynType), cel.DynType}, cel.BoolType, cel.BinaryBinding(func(values, value ref.Val) ref.Val {
-			return values.(traits.Container).Contains(value)
-		}))),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	condition := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(workflow.Jobs["build"].If, "${{"), "}}"))
-	if !strings.Contains(condition, "cancelled()") {
+	if !strings.Contains(workflow.Jobs["build"].If, "cancelled()") {
 		t.Fatal("build guard must explicitly handle cancellation and skipped bootstrap jobs")
 	}
-	condition = strings.NewReplacer("cancelled()", "cancelledStatus", "always()", "true", "inputs.cli-artifact", "inputs['cli-artifact']", "inputs.release-cli", "inputs['release-cli']").Replace(condition)
-	ast, issues := environment.Compile(condition)
-	if issues.Err() != nil {
-		t.Fatal(issues.Err())
-	}
-	program, err := environment.Program(ast)
-	if err != nil {
-		t.Fatal(err)
-	}
+	program := workflowCondition(t, workflow.Jobs["build"].If)
 	for _, test := range []struct {
 		name, repository, bootstrap, artifact, image string
 		cancelled, protected, released, allowed      bool

@@ -93,7 +93,7 @@ jobs:
           BASE: ${{ steps.affected.outputs.base }}
         run: infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ github.event_name == 'pull_request' }} --local
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: github.repository == 'fredrir/infra' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && steps.affected.outputs.expression != 'set()'
+        if: ${{ !cancelled() && github.repository == 'fredrir/infra' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && steps.affected.outputs.expression != 'set()' && steps.bazel-cache.outputs.cache-primary-key != '' }}
         with:
           path: |
             ~/.cache/infra-bazel-actions

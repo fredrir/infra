@@ -1,14 +1,18 @@
 package contracts
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
 	"cel.dev/cel-go/cel"
 	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/traits"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -69,23 +73,6 @@ func TestDeclarationsRunAlongsideTheBazelCheckWithinOneAggregateBudget(t *testin
 			t.Errorf("%s does not run %s", requirement.name, requirement.command)
 		}
 	}
-	environment, err := cel.NewEnv(cel.Variable("github", cel.DynType), cel.Variable("inputs", cel.DynType), cel.Variable("needs", cel.DynType), cel.Variable("cancelledStatus", cel.BoolType))
-	if err != nil {
-		t.Fatal(err)
-	}
-	condition := func(job checkJob) cel.Program {
-		expression := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(job.If, "${{"), "}}"))
-		expression = strings.NewReplacer("cancelled()", "cancelledStatus", "inputs.cli-artifact", "inputs['cli-artifact']").Replace(expression)
-		ast, issues := environment.Compile(expression)
-		if issues.Err() != nil {
-			t.Fatal(issues.Err())
-		}
-		program, err := environment.Program(ast)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return program
-	}
 	type scenario struct {
 		name, cli, artifact, check, validate, actor string
 		cancelled, protected, allowed               bool
@@ -105,7 +92,7 @@ func TestDeclarationsRunAlongsideTheBazelCheckWithinOneAggregateBudget(t *testin
 			t.Errorf("%s: allowed = %v, want %v", test.name, result, test.allowed)
 		}
 	}
-	validation := condition(validate)
+	validation := workflowCondition(t, validate.If)
 	for _, test := range []scenario{
 		{name: "built CLI while the Bazel check still runs", cli: "success", check: "", actor: "fredrir", protected: true, allowed: true},
 		{name: "reused CLI artifact", cli: "skipped", artifact: "infra-cli", actor: "fredrir", protected: true, allowed: true},
@@ -117,7 +104,7 @@ func TestDeclarationsRunAlongsideTheBazelCheckWithinOneAggregateBudget(t *testin
 	} {
 		evaluate(validation, test)
 	}
-	aggregate := condition(budget)
+	aggregate := workflowCondition(t, budget.If)
 	for _, test := range []scenario{
 		{name: "both stages passed", check: "success", validate: "success", allowed: true},
 		{name: "Bazel check failed", check: "failure", validate: "success"},
@@ -128,4 +115,100 @@ func TestDeclarationsRunAlongsideTheBazelCheckWithinOneAggregateBudget(t *testin
 	} {
 		evaluate(aggregate, test)
 	}
+}
+
+func TestBazelCacheIsSavedAfterFailedMainChecksButNeverFromPullRequests(t *testing.T) {
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Uses string `yaml:"uses"`
+				If   string `yaml:"if"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(read(t, filepath.Join(root(t), ".github/workflows/check.yml")), &workflow); err != nil {
+		t.Fatal(err)
+	}
+	var saves []string
+	for _, step := range workflow.Jobs["check"].Steps {
+		if strings.HasPrefix(step.Uses, "actions/cache/save@") {
+			saves = append(saves, step.If)
+		}
+	}
+	if len(saves) != 1 {
+		t.Fatalf("check job saves the Bazel cache %d times", len(saves))
+	}
+	save := workflowCondition(t, saves[0])
+	for _, test := range []struct {
+		name, event, ref, expression, key   string
+		protected, failed, cancelled, saved bool
+	}{
+		{name: "passing main push", event: "push", ref: "refs/heads/main", expression: "//...", key: "cache", protected: true, saved: true},
+		{name: "failed main push", event: "push", ref: "refs/heads/main", expression: "//...", key: "cache", protected: true, failed: true, saved: true},
+		{name: "manual main run", event: "workflow_dispatch", ref: "refs/heads/main", expression: "//...", key: "cache", protected: true, saved: true},
+		{name: "cancelled main push", event: "push", ref: "refs/heads/main", expression: "//...", key: "cache", protected: true, cancelled: true},
+		{name: "pull request", event: "pull_request", ref: "refs/pull/7/merge", expression: "//...", key: "cache"},
+		{name: "failed pull request", event: "pull_request", ref: "refs/pull/7/merge", expression: "//...", key: "cache", failed: true},
+		{name: "push to another branch", event: "push", ref: "refs/heads/feature", expression: "//...", key: "cache"},
+		{name: "no affected targets", event: "push", ref: "refs/heads/main", expression: "set()", key: "cache", protected: true},
+		{name: "failure before the cache restore", event: "push", ref: "refs/heads/main", expression: "//...", protected: true, failed: true},
+	} {
+		result, _, err := save.Eval(map[string]any{
+			"github":          map[string]any{"repository": "fredrir/infra", "event_name": test.event, "ref": test.ref, "ref_protected": test.protected},
+			"steps":           map[string]any{"affected": map[string]any{"outputs": map[string]any{"expression": test.expression}}, "bazel-cache": map[string]any{"outputs": map[string]any{"cache-primary-key": test.key}}},
+			"failedStatus":    test.failed,
+			"cancelledStatus": test.cancelled,
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", test.name, err)
+		}
+		if result != types.Bool(test.saved) {
+			t.Errorf("%s: saved = %v, want %v", test.name, result, test.saved)
+		}
+	}
+}
+
+var (
+	statusFunction     = regexp.MustCompile(`\b(success|failure|cancelled|always)\(\)`)
+	hyphenatedProperty = regexp.MustCompile(`\.([A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+)+)`)
+)
+
+func workflowCondition(t *testing.T, condition string) cel.Program {
+	t.Helper()
+	expression := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(condition), "${{"), "}}"))
+	if !statusFunction.MatchString(expression) {
+		expression = "success() && (" + expression + ")"
+	}
+	expression = strings.NewReplacer("success()", "(!failedStatus && !cancelledStatus)", "failure()", "failedStatus", "cancelled()", "cancelledStatus", "always()", "true").Replace(expression)
+	expression = hyphenatedProperty.ReplaceAllString(expression, "['$1']")
+	environment, err := cel.NewEnv(
+		cel.Variable("github", cel.DynType),
+		cel.Variable("inputs", cel.DynType),
+		cel.Variable("needs", cel.DynType),
+		cel.Variable("steps", cel.DynType),
+		cel.Variable("failedStatus", cel.BoolType),
+		cel.Variable("cancelledStatus", cel.BoolType),
+		cel.Function("fromJSON", cel.Overload("fromJSON_string", []*cel.Type{cel.StringType}, cel.DynType, cel.UnaryBinding(func(value ref.Val) ref.Val {
+			var decoded any
+			if err := json.Unmarshal([]byte(value.(types.String)), &decoded); err != nil {
+				return types.NewErr("invalid JSON: %v", err)
+			}
+			return types.DefaultTypeAdapter.NativeToValue(decoded)
+		}))),
+		cel.Function("contains", cel.Overload("contains_list", []*cel.Type{cel.ListType(cel.DynType), cel.DynType}, cel.BoolType, cel.BinaryBinding(func(values, value ref.Val) ref.Val {
+			return values.(traits.Container).Contains(value)
+		}))),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ast, issues := environment.Compile(expression)
+	if issues.Err() != nil {
+		t.Fatalf("%s: %v", expression, issues.Err())
+	}
+	program, err := environment.Program(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return program
 }

@@ -66,7 +66,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Full host reconciliation | [Task spans](../build/evidence/reconciliation-host-overhead.json): 435 task starts and 637.174 seconds total in one historical run; smart gathering already caches facts within a run | Profile remaining role work and preserve drift detection and registration checks |
 | Production revision publication | Full infrastructure convergence still serializes application publication; a concurrent frontend change exceeded its original serving deadline during qualification | Keep publication queueing visible and bounded; isolate application delivery further only with an equivalent infrastructure and artifact baseline |
 | OpenTofu validation on the check pool | `tofu validate` 4.2–9.7 seconds and 6.7–18.8 CPU seconds in runs 36249739111, 36249858108 and 36258989806; 1.0 seconds native and 1.5 seconds under local gVisor with warm providers; provider download 11–80 seconds per run | Rely on the plan gate's `tofu validate`, or keep a lock-verified provider cache on the check pool |
-| Check cache save | 10 s p50 on every main push; 827 MB entries; a failed check saves nothing, so the next push reruns its changed tests too (runs 36265704002 → 36266658385) | Save after failed checks; save only when Bazel executed actions |
+| Check cache save | 10 s p50 on every main push; 827 MB entries | Save only when Bazel executed actions |
 | Bazel install extraction | 4.3 seconds per hosted job | Cache the install base with the Bazel caches |
 
 | Scanner rollout constraint | Requirement |
@@ -85,6 +85,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | --- | --- |
 | Shared CLI | Checks and image planning consume one verified CLI artifact; reconciliation directly installs the matching pinned release or awaits the shared build when CLI inputs differ; `_test.go` files are not CLI inputs |
 | CLI build cache | Restored from check caches; saved only when no cache of the current family exists |
+| Check build cache | Main pushes and manual main runs save it after passing or failed checks; cancelled runs, pull requests and other branches never save; Bazel 9.2.0 stores only successful actions and passing test results, so failed, timed-out and interrupted tests re-execute |
 | CI repository rules | `--config=ci` pins the repository rule `PATH` to `/usr/bin:/bin` |
 | Check budget | The Bazel check and declaration validation run concurrently, each measured against ten seconds; the `budget` job sums both receipts against the ten-second ceiling |
 | Generated BUILD check | `//:gazelle_test` joins the fast check's test invocation for Go, BUILD, `.bzl`, Go module and `MODULE.bazel` changes and for files below Go package directories |
