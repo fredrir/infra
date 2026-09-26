@@ -66,7 +66,7 @@ git diff --exit-code -- '*BUILD.bazel'
 | Local state | `.cache/dev`; ignored by Git |
 | Linux amd64 | Full support; `hosts` needs `qemu-system-x86_64`, `qemu-img` and `/dev/kvm` |
 | macOS | `setup` builds the binary and then refuses tools; `doctor`, `clean`, `render`, `diff`, `engine`, `cluster`, `bench`; tools installed manually to the pinned versions; no `hosts` |
-| Image inputs | `images/catalog.yaml` `excludes`; `internal/dev` changes do not rebuild images |
+| Image inputs | `images/catalog.yaml` `inputs`, plus the injected `infra` binary digest for `cli: true`; CLI source, test and `internal/dev` changes that leave the binary identical do not rebuild images |
 
 [Local development layout](../dev/README.md)
 

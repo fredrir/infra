@@ -19,6 +19,7 @@ import (
 
 const catalog = `- image: ghcr.io/fredrir/one
   dockerfile: images/one/Containerfile
+  cli: true
   inputs: [images/one, pins.lock]
   check: one --version
   scan-skip-dirs: /nix
@@ -34,8 +35,8 @@ func repository(t *testing.T) string {
 	root := t.TempDir()
 	for path, content := range map[string]string{
 		"images/catalog.yaml": catalog, ".github/workflows/images.yml": "name: Images\n", ".github/workflows/build-image.yml": "name: Build\n", ".github/workflows/infra-cli.yml": "name: CLI\n",
-		".dockerignore": ".git\n", "pins.lock": "one\n",
-		"images/one/Containerfile": "FROM scratch\n", "images/two/Containerfile": "FROM scratch\n",
+		".dockerignore": ".git\n", "pins.lock": "one\n", "go.mod": "module example\n", "internal/cli/cli.go": "package cli\n", "internal/cli/cli_test.go": "package cli\n",
+		"images/one/Containerfile": "FROM scratch\nCOPY .infra-artifacts/infra /usr/local/bin/infra\n", "images/two/Containerfile": "FROM scratch\n",
 	} {
 		write(t, root, path, content)
 	}
@@ -74,7 +75,16 @@ func planner(t *testing.T, handler http.HandlerFunc) images.Planner {
 	t.Helper()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
-	return images.Planner{Root: repository(t), Registry: server.URL, Client: server.Client(), Log: io.Discard}
+	return images.Planner{Root: repository(t), Registry: server.URL, InfraBinary: infraBinary(t, "infra v1"), Client: server.Client(), Log: io.Discard}
+}
+
+func infraBinary(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "infra")
+	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func plan(t *testing.T, p images.Planner) []images.Image {
@@ -150,7 +160,7 @@ func TestTagsTrackOnlyDeclaredInputsAndSharedBuildConfiguration(t *testing.T) {
 	if after[0].Tag == before[0].Tag || after[1].Tag != before[1].Tag {
 		t.Fatal("input change did not selectively invalidate its image")
 	}
-	for _, path := range []string{".github/workflows/images.yml", ".github/workflows/build-image.yml", ".github/workflows/infra-cli.yml", ".dockerignore"} {
+	for _, path := range []string{".github/workflows/images.yml", ".github/workflows/build-image.yml", ".dockerignore"} {
 		before = after
 		write(t, p.Root, path, "changed\n")
 		commit(t, p.Root)
@@ -196,7 +206,7 @@ func TestRegistryFailuresPlanImages(t *testing.T) {
 	t.Run("connection-refused", func(t *testing.T) {
 		server := httptest.NewServer(http.NotFoundHandler())
 		server.Close()
-		p := images.Planner{Root: repository(t), Registry: server.URL, Client: server.Client(), Log: io.Discard}
+		p := images.Planner{Root: repository(t), Registry: server.URL, InfraBinary: infraBinary(t, "infra v1"), Client: server.Client(), Log: io.Discard}
 		if len(plan(t, p)) != 2 {
 			t.Fatal("connection failure did not plan all images")
 		}
@@ -220,9 +230,7 @@ func TestInvalidCatalogFailsBeforeRegistryRequests(t *testing.T) {
 		"multiple-documents": catalog + "---\n[]\n",
 		"escaping-input":     strings.Replace(catalog, "pins.lock", "../pins.lock", 1),
 		"missing-dockerfile": strings.Replace(catalog, "  dockerfile: images/one/Containerfile\n", "", 1),
-		"exclude-outside":    strings.Replace(catalog, "  inputs: [images/two]\n", "  inputs: [images/two]\n  excludes: [images/one/dev]\n", 1),
-		"exclude-is-input":   strings.Replace(catalog, "  inputs: [images/two]\n", "  inputs: [images/two]\n  excludes: [images/two]\n", 1),
-		"escaping-exclude":   strings.Replace(catalog, "  inputs: [images/two]\n", "  inputs: [images/two]\n  excludes: [images/two/../two]\n", 1),
+		"excludes":           strings.Replace(catalog, "  inputs: [images/two]\n", "  inputs: [images/two]\n  excludes: [images/two/dev]\n", 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			p := planner(t, func(w http.ResponseWriter, r *http.Request) { t.Error("invalid catalog contacted registry") })
@@ -246,35 +254,45 @@ func TestCancellationStopsPlanning(t *testing.T) {
 	}
 }
 
-func TestExcludedPathsDoNotInvalidateTags(t *testing.T) {
+func TestCLIImagesTrackTheInjectedBinaryInsteadOfItsSources(t *testing.T) {
 	p := planner(t, http.NotFound)
 	p.Refresh = true
-	write(t, p.Root, "images/catalog.yaml", strings.Replace(catalog, "  inputs: [images/one, pins.lock]\n", "  inputs: [images/one, pins.lock]\n  excludes: [images/one/dev]\n", 1))
-	write(t, p.Root, "images/one/dev/tool", "one\n")
-	write(t, p.Root, "images/one/entrypoint", "one\n")
-	commit(t, p.Root)
 	before := plan(t, p)
-	if before[0].Excludes != nil {
-		t.Fatalf("matrix exposed excludes: %+v", before[0])
+	for path, content := range map[string]string{"internal/cli/cli_test.go": "package cli\n\nfunc TestChanged() {}\n", ".github/workflows/infra-cli.yml": "name: Changed\n", "go.mod": "module example\n\ngo 1.27\n"} {
+		write(t, p.Root, path, content)
+		commit(t, p.Root)
+		if after := plan(t, p); !reflect.DeepEqual(before, after) {
+			t.Fatalf("%s changed image tags without changing the injected binary", path)
+		}
 	}
-	write(t, p.Root, "images/one/dev/tool", "changed\n")
-	write(t, p.Root, "images/one/dev/nested/tool", "added\n")
-	commit(t, p.Root)
+	p.InfraBinary = infraBinary(t, "infra v1")
 	if after := plan(t, p); !reflect.DeepEqual(before, after) {
-		t.Fatal("excluded change invalidated tags")
+		t.Fatal("an identical binary at another path changed image tags")
 	}
-	write(t, p.Root, "images/one/entrypoint", "changed\n")
-	commit(t, p.Root)
+	p.InfraBinary = infraBinary(t, "infra v2")
 	after := plan(t, p)
 	if after[0].Tag == before[0].Tag || after[1].Tag != before[1].Tag {
-		t.Fatal("retained input change did not selectively invalidate its image")
+		t.Fatal("binary change did not invalidate exactly the images that embed it")
 	}
-	before = after
-	if err := os.Chmod(filepath.Join(p.Root, "images/one/entrypoint"), 0o755); err != nil {
-		t.Fatal(err)
+}
+
+func TestCLIImagesRequireTheInjectedBinary(t *testing.T) {
+	for name, binary := range map[string]string{"unset": "", "missing": filepath.Join(t.TempDir(), "infra")} {
+		t.Run(name, func(t *testing.T) {
+			p := planner(t, func(w http.ResponseWriter, r *http.Request) {
+				t.Error("planning without the binary contacted the registry")
+			})
+			p.InfraBinary = binary
+			if _, err := p.Plan(context.Background(), "images/catalog.yaml"); err == nil {
+				t.Fatal("planned a cli image without its binary")
+			}
+		})
 	}
+	p := planner(t, http.NotFound)
+	p.InfraBinary = ""
+	write(t, p.Root, "images/catalog.yaml", strings.Replace(catalog, "  cli: true\n", "", 1))
 	commit(t, p.Root)
-	if after := plan(t, p); after[0].Tag == before[0].Tag {
-		t.Fatal("file mode change did not invalidate the image")
+	if got := len(plan(t, p)); got != 2 {
+		t.Fatalf("images without cli required the binary, planned %d", got)
 	}
 }

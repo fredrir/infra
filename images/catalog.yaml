@@ -1,23 +1,10 @@
 - image: ghcr.io/fredrir/infra-runner-check
   dockerfile: images/runner-check/Containerfile
+  cli: true
   inputs:
   - images/runner-check
-  - cmd
-  - internal
-  - go.mod
-  - go.sum
-  - build/toolchain.json
-  - build/dagger-embed.patch
-  - build/BUILD.bazel
-  - MODULE.bazel
-  - MODULE.bazel.lock
-  - .bazelversion
-  - .bazelrc
-  - BUILD.bazel
   - pyproject.toml
   - uv.lock
-  excludes:
-  - internal/dev
   check: >-
     /home/runner/run.sh --version | grep -x 2.337.0;
     kubectl version --client; kustomize version; helm version --short; actionlint -version; tofu version;
@@ -25,22 +12,9 @@
     /opt/venv/bin/python -c 'import ansible, jinja2, yaml'
 - image: ghcr.io/fredrir/infra-runner-rust
   dockerfile: images/runner-rust/Containerfile
+  cli: true
   inputs:
   - images/runner-rust
-  - cmd
-  - internal
-  - go.mod
-  - go.sum
-  - build/toolchain.json
-  - build/dagger-embed.patch
-  - build/BUILD.bazel
-  - MODULE.bazel
-  - MODULE.bazel.lock
-  - .bazelversion
-  - .bazelrc
-  - BUILD.bazel
-  excludes:
-  - internal/dev
   check: >-
     /home/runner/run.sh --version | grep -x 2.337.0;
     rustc --version | grep '^rustc 1\.98\.1 ';
@@ -62,20 +36,7 @@
   shell: '["/bin/sh", "-euc"]'
 - image: ghcr.io/fredrir/platform-backup-tools
   dockerfile: platform/components/backups/tools.Dockerfile
+  cli: true
   inputs:
   - platform/components/backups/tools.Dockerfile
-  - cmd
-  - internal
-  - go.mod
-  - go.sum
-  - build/toolchain.json
-  - build/dagger-embed.patch
-  - build/BUILD.bazel
-  - MODULE.bazel
-  - MODULE.bazel.lock
-  - .bazelversion
-  - .bazelrc
-  - BUILD.bazel
-  excludes:
-  - internal/dev
   check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version

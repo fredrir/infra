@@ -57,7 +57,7 @@ func missingCommand(cmd *cobra.Command, _ []string) error {
 }
 
 func newPlanImagesCommand() *cobra.Command {
-	var root, catalog, registry, output string
+	var root, catalog, registry, infraBinary, output string
 	var refresh bool
 	var timeout time.Duration
 	cmd := &cobra.Command{Use: "plan-images", Short: "Print the pending image build matrix", Args: cobra.NoArgs,
@@ -65,7 +65,7 @@ func newPlanImagesCommand() *cobra.Command {
 			if timeout <= 0 {
 				return errors.New("timeout must be positive")
 			}
-			planner := images.Planner{Root: root, Registry: registry, Refresh: refresh, Client: &http.Client{Timeout: timeout}, Log: cmd.ErrOrStderr()}
+			planner := images.Planner{Root: root, Registry: registry, InfraBinary: infraBinary, Refresh: refresh, Client: &http.Client{Timeout: timeout}, Log: cmd.ErrOrStderr()}
 			plan, err := planner.Plan(cmd.Context(), catalog)
 			if err != nil {
 				return err
@@ -90,6 +90,7 @@ func newPlanImagesCommand() *cobra.Command {
 	cmd.Flags().StringVar(&root, "root", ".", "Repository directory")
 	cmd.Flags().StringVar(&catalog, "catalog", "images/catalog.yaml", "Image catalog relative to repository")
 	cmd.Flags().StringVar(&registry, "registry", envDefault("REGISTRY_URL", "https://ghcr.io"), "Registry URL")
+	cmd.Flags().StringVar(&infraBinary, "infra-binary", "", "Infra binary injected into images that declare cli")
 	cmd.Flags().BoolVar(&refresh, "refresh", os.Getenv("REFRESH") == "true", "Build all images")
 	cmd.Flags().StringVar(&output, "github-output", os.Getenv("GITHUB_OUTPUT"), "GitHub Actions output file")
 	cmd.Flags().DurationVar(&timeout, "timeout", 30*time.Second, "Registry request timeout")

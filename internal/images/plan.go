@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -22,8 +21,8 @@ import (
 type Image struct {
 	Image        string   `yaml:"image" json:"image"`
 	Dockerfile   string   `yaml:"dockerfile" json:"dockerfile"`
+	CLI          bool     `yaml:"cli,omitempty" json:"-"`
 	Inputs       []string `yaml:"inputs" json:"inputs,omitempty"`
-	Excludes     []string `yaml:"excludes,omitempty" json:"excludes,omitempty"`
 	Check        string   `yaml:"check" json:"check"`
 	ScanSkipDirs string   `yaml:"scan-skip-dirs,omitempty" json:"scan-skip-dirs,omitempty"`
 	Shell        string   `yaml:"shell,omitempty" json:"shell,omitempty"`
@@ -31,11 +30,12 @@ type Image struct {
 }
 
 type Planner struct {
-	Root     string
-	Registry string
-	Refresh  bool
-	Client   *http.Client
-	Log      io.Writer
+	Root        string
+	Registry    string
+	InfraBinary string
+	Refresh     bool
+	Client      *http.Client
+	Log         io.Writer
 }
 
 var imageName = regexp.MustCompile(`^ghcr\.io/fredrir/[a-z0-9][a-z0-9._/-]*$`)
@@ -61,8 +61,9 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 		return nil, errors.New("catalog must contain one YAML document")
 	}
 	seen := make(map[string]bool)
-	sharedInputs := []string{".github/workflows/images.yml", ".github/workflows/build-image.yml", ".github/workflows/infra-cli.yml", ".dockerignore"}
+	sharedInputs := []string{".github/workflows/images.yml", ".github/workflows/build-image.yml", ".dockerignore"}
 	paths := append([]string(nil), sharedInputs...)
+	cliImages := false
 	for _, entry := range entries {
 		if !imageName.MatchString(entry.Image) || seen[entry.Image] {
 			return nil, fmt.Errorf("invalid or duplicate image: %q", entry.Image)
@@ -76,12 +77,14 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 				return nil, fmt.Errorf("%s has invalid input path %q", entry.Image, path)
 			}
 		}
-		for _, exclude := range entry.Excludes {
-			if !filepath.IsLocal(exclude) || filepath.Clean(exclude) != exclude || strings.ContainsAny(exclude, "\r\n") || !slices.ContainsFunc(entry.Inputs, func(input string) bool { return strings.HasPrefix(exclude, input+"/") }) {
-				return nil, fmt.Errorf("%s has exclude %q outside its inputs", entry.Image, exclude)
-			}
-		}
+		cliImages = cliImages || entry.CLI
 		paths = append(paths, entry.Inputs...)
+	}
+	var cli string
+	if cliImages {
+		if cli, err = fileDigest(p.InfraBinary); err != nil {
+			return nil, fmt.Errorf("read injected infra binary: %w", err)
+		}
 	}
 	objects, err := p.objects(ctx, paths)
 	if err != nil {
@@ -92,7 +95,6 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 		fmt.Fprintln(&shared, objects[path])
 	}
 	plan := make([]Image, 0, len(entries))
-	trees := make(map[string]string)
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -104,16 +106,10 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 		hash := sha256.New()
 		fmt.Fprintf(hash, "%s\n%s\n", data, shared.String())
 		for _, path := range entry.Inputs {
-			excluded := excludedUnder(entry.Excludes, path)
-			if len(excluded) == 0 {
-				fmt.Fprintln(hash, objects[path])
-				continue
-			}
-			listing, err := p.tree(ctx, path, excluded, trees)
-			if err != nil {
-				return nil, err
-			}
-			fmt.Fprintln(hash, listing)
+			fmt.Fprintln(hash, objects[path])
+		}
+		if entry.CLI {
+			fmt.Fprintln(hash, "infra", cli)
 		}
 		entry.Tag = fmt.Sprintf("inputs-%x", hash.Sum(nil))
 		if !p.Refresh && p.published(ctx, entry) {
@@ -124,10 +120,26 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 			return nil, err
 		}
 		fmt.Fprintln(p.Log, "Building:", entry.Image)
-		entry.Inputs, entry.Excludes = nil, nil
+		entry.Inputs = nil
 		plan = append(plan, entry)
 	}
 	return plan, nil
+}
+
+func fileDigest(path string) (string, error) {
+	if path == "" {
+		return "", errors.New("images that declare cli require the infra binary")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 func (p Planner) objects(ctx context.Context, paths []string) (map[string]string, error) {
@@ -188,41 +200,4 @@ func (p Planner) published(ctx context.Context, entry Image) bool {
 	}
 	response.Body.Close()
 	return response.StatusCode == http.StatusOK
-}
-
-func excludedUnder(excludes []string, input string) []string {
-	var matched []string
-	for _, exclude := range excludes {
-		if strings.HasPrefix(exclude, input+"/") {
-			matched = append(matched, exclude)
-		}
-	}
-	return matched
-}
-
-func (p Planner) tree(ctx context.Context, path string, excludes []string, cache map[string]string) (string, error) {
-	key := path + "\x00" + strings.Join(excludes, "\x00")
-	if listing, ok := cache[key]; ok {
-		return listing, nil
-	}
-	command := exec.CommandContext(ctx, "git", "ls-tree", "-r", "-z", "--full-tree", "HEAD", "--", path)
-	command.Dir = p.Root
-	output, err := command.Output()
-	if err != nil {
-		return "", fmt.Errorf("read Git build input tree %s: %w", path, err)
-	}
-	var listing strings.Builder
-	for _, line := range strings.Split(strings.TrimSuffix(string(output), "\x00"), "\x00") {
-		_, entryPath, ok := strings.Cut(line, "\t")
-		if !ok {
-			return "", fmt.Errorf("unexpected Git tree entry for %s", path)
-		}
-		if slices.ContainsFunc(excludes, func(exclude string) bool { return entryPath == exclude || strings.HasPrefix(entryPath, exclude+"/") }) {
-			continue
-		}
-		listing.WriteString(line)
-		listing.WriteByte('\n')
-	}
-	cache[key] = listing.String()
-	return cache[key], nil
 }

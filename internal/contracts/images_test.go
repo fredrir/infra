@@ -12,7 +12,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-var binaryInputs = []string{"cmd", "internal", "go.mod", "go.sum", "build/toolchain.json", "build/dagger-embed.patch", "build/BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelversion", ".bazelrc", "BUILD.bazel"}
+var cliSources = []string{"cmd", "internal", "go.mod", "go.sum", "build/toolchain.json", "build/dagger-embed.patch", "build/BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelversion", ".bazelrc", "BUILD.bazel", ".github/workflows/infra-cli.yml"}
 
 func root(t *testing.T) string {
 	t.Helper()
@@ -71,9 +71,6 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 			covered := func(path string) bool {
 				return slices.ContainsFunc(image.Inputs, func(input string) bool { return path == input || strings.HasPrefix(path, input+"/") })
 			}
-			if slices.Contains(image.Inputs, "internal") && !slices.Contains(image.Excludes, "internal/dev") {
-				t.Error("development tooling changes rebuild image")
-			}
 			for _, receipt := range []string{"build/evidence/production-rollout.json", "build/rollout/manifest.json", "build/consumers.json"} {
 				if covered(receipt) {
 					t.Errorf("rollout record %s unnecessarily rebuilds image", receipt)
@@ -84,56 +81,84 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 			}
 			for _, input := range image.Inputs {
 				candidate := input
-				switch input {
-				case "cmd", "internal", "build":
+				info, err := os.Stat(filepath.Join(repository, input))
+				if err != nil {
+					t.Fatalf("catalog input %s: %v", input, err)
+				}
+				if info.IsDir() {
 					candidate += "/probe"
-				default:
-					info, err := os.Stat(filepath.Join(repository, input))
-					if err != nil {
-						t.Fatalf("catalog input %s: %v", input, err)
-					}
-					if info.IsDir() {
-						candidate += "/probe"
-					}
 				}
 				if triggered(workflow.On.Push.PathsIgnore, candidate) {
 					t.Errorf("changes to %s do not trigger image workflow", input)
 				}
 			}
-			recipe := strings.ReplaceAll(string(read(t, filepath.Join(repository, image.Dockerfile))), "\\\n", " ")
-			for _, line := range strings.Split(recipe, "\n") {
-				fields := strings.Fields(line)
-				if len(fields) < 3 || (fields[0] != "COPY" && fields[0] != "ADD") || strings.Contains(line, "--from=") {
+			sources := recipeSources(t, read(t, filepath.Join(repository, image.Dockerfile)))
+			for _, source := range sources {
+				if strings.HasPrefix(source, "https://") || source == ".infra-artifacts/infra" {
 					continue
 				}
-				var sources []string
-				for _, field := range fields[1 : len(fields)-1] {
-					if !strings.HasPrefix(field, "--") {
-						sources = append(sources, field)
-					}
+				if !covered(source) {
+					t.Errorf("copied input %s does not invalidate tag", source)
 				}
-				for _, source := range sources {
-					if strings.HasPrefix(source, "https://") {
-						if !strings.Contains(line, "--checksum=sha256:") {
-							t.Errorf("remote image input lacks checksum: %s", source)
-						}
-						continue
-					}
-					if source == ".infra-artifacts/infra" {
-						for _, input := range binaryInputs {
-							if !slices.Contains(image.Inputs, input) {
-								t.Errorf("injected binary changes to %s do not invalidate tag", input)
-							}
-						}
-						continue
-					}
-					if !covered(source) {
-						t.Errorf("copied input %s does not invalidate tag", source)
+			}
+			for _, input := range image.Inputs {
+				consumed := input == image.Dockerfile || strings.HasPrefix(image.Dockerfile, input+"/") || slices.ContainsFunc(sources, func(source string) bool {
+					return source == input || strings.HasPrefix(source, input+"/") || strings.HasPrefix(input, source+"/")
+				})
+				if !consumed {
+					t.Errorf("input %s is not read by the recipe and rebuilds the image without changing it", input)
+				}
+			}
+			if embeds := slices.Contains(sources, ".infra-artifacts/infra"); embeds != image.CLI {
+				t.Errorf("recipe embeds the infra binary: %t, catalog declares cli: %t", embeds, image.CLI)
+			}
+			if image.CLI {
+				for _, input := range cliSources {
+					if triggered(workflow.On.Push.PathsIgnore, input+"/probe") || triggered(workflow.On.Push.PathsIgnore, input) {
+						t.Errorf("infra binary source %s does not trigger image workflow", input)
 					}
 				}
 			}
 		})
 	}
+}
+
+func recipeSources(t *testing.T, recipe []byte) []string {
+	t.Helper()
+	var sources []string
+	for _, line := range strings.Split(strings.ReplaceAll(string(recipe), "\\\n", " "), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		switch fields[0] {
+		case "COPY", "ADD":
+			if len(fields) < 3 || strings.Contains(line, "--from=") {
+				continue
+			}
+			for _, field := range fields[1 : len(fields)-1] {
+				if !strings.HasPrefix(field, "--") {
+					sources = append(sources, field)
+				}
+				if strings.HasPrefix(field, "https://") && !strings.Contains(line, "--checksum=sha256:") {
+					t.Errorf("remote image input lacks checksum: %s", field)
+				}
+			}
+		case "RUN":
+			for _, field := range fields[1:] {
+				mount, found := strings.CutPrefix(field, "--mount=")
+				if !found || !strings.Contains(mount, "type=bind") || strings.Contains(mount, "from=") {
+					continue
+				}
+				for _, option := range strings.Split(mount, ",") {
+					if source, found := strings.CutPrefix(option, "source="); found {
+						sources = append(sources, source)
+					}
+				}
+			}
+		}
+	}
+	return sources
 }
 
 func triggered(patterns []string, candidate string) bool {
