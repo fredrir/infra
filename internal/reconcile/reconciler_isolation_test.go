@@ -1,7 +1,9 @@
 package reconcile
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -121,39 +123,62 @@ func TestFleetPlaybooksNeverListADeclaredReconciler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inventory := filepath.Join(root, "inventory", "production.yml")
-	listing := exec.Command(filepath.Join(filepath.Dir(playbook), "ansible-inventory"), "-i", inventory, "--list")
-	listing.Dir, listing.Env = root, append(os.Environ(), "ANSIBLE_CONFIG="+filepath.Join(root, "ansible.cfg"))
-	groups, err := listing.Output()
+	playbooks, err := filepath.Glob(filepath.Join(root, "*.yml"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	names := make([]string, len(playbooks))
+	for index, path := range playbooks {
+		names[index] = filepath.Base(path)
+	}
+	inventory := filepath.Join(root, "inventory", "production.yml")
+	inventoryList := exec.Command(filepath.Join(filepath.Dir(playbook), "ansible-inventory"), "-i", inventory, "--list")
+	hosts := exec.Command(playbook, append([]string{"-i", inventory, "--list-hosts"}, names...)...)
+	var groups, listing, inventoryErrors, listingErrors bytes.Buffer
+	inventoryList.Stdout, inventoryList.Stderr, hosts.Stdout, hosts.Stderr = &groups, &inventoryErrors, &listing, &listingErrors
+	for _, command := range []*exec.Cmd{inventoryList, hosts} {
+		command.Dir, command.Env = root, append(os.Environ(), "ANSIBLE_CONFIG="+filepath.Join(root, "ansible.cfg"))
+		if err := command.Start(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := errors.Join(inventoryList.Wait(), hosts.Wait()); err != nil {
+		t.Fatalf("%v\n%s%s", err, inventoryErrors.String(), listingErrors.String())
 	}
 	var parsed map[string]struct {
 		Hosts []string `json:"hosts"`
 	}
-	if err := json.Unmarshal(groups, &parsed); err != nil {
+	if err := json.Unmarshal(groups.Bytes(), &parsed); err != nil {
 		t.Fatal(err)
 	}
 	reconcilers := parsed[reconcilerGroup].Hosts
 	if len(reconcilers) == 0 {
 		t.Fatal("inventory declares no reconciler host")
 	}
-	playbooks, err := filepath.Glob(filepath.Join(root, "*.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, path := range playbooks {
-		command := exec.Command(playbook, "-i", inventory, "--list-hosts", filepath.Base(path))
-		command.Dir, command.Env = root, append(os.Environ(), "ANSIBLE_CONFIG="+filepath.Join(root, "ansible.cfg"))
-		output, err := command.CombinedOutput()
-		if err != nil {
-			t.Fatalf("%s: %v\n%s", filepath.Base(path), err, output)
+	sections := playbookSections(listing.String())
+	for _, name := range names {
+		section, found := sections[name]
+		if !found {
+			t.Fatalf("%s is missing from the host listing\n%s", name, listing.String())
 		}
 		for _, host := range reconcilers {
-			listed := regexp.MustCompile(`(?m)^\s+` + regexp.QuoteMeta(host) + `$`).Match(output)
-			if listed != (filepath.Base(path) == "reconciler.yml") {
-				t.Errorf("%s lists reconciler %s: %t\n%s", filepath.Base(path), host, listed, output)
+			listed := regexp.MustCompile(`(?m)^\s+` + regexp.QuoteMeta(host) + `$`).MatchString(section)
+			if listed != (name == "reconciler.yml") {
+				t.Errorf("%s lists reconciler %s: %t\n%s", name, host, listed, section)
 			}
 		}
 	}
+}
+
+func playbookSections(listing string) map[string]string {
+	headers := regexp.MustCompile(`(?m)^playbook: (.+)$`).FindAllStringSubmatchIndex(listing, -1)
+	sections := make(map[string]string, len(headers))
+	for index, header := range headers {
+		end := len(listing)
+		if index+1 < len(headers) {
+			end = headers[index+1][0]
+		}
+		sections[listing[header[2]:header[3]]] = listing[header[1]:end]
+	}
+	return sections
 }
