@@ -239,53 +239,85 @@ func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
 	}
 }
 
-func TestReconcilerTofuRootIsPreparedAndTestedOnlyForItsInputs(t *testing.T) {
-	mainInit := []string{"-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false"}
-	reconcilerInit := []string{"-chdir=tofu/reconciler", "init", "-backend=false", "-lockfile=readonly", "-input=false"}
-	mainChecks := [][]string{{"-chdir=tofu", "fmt", "-check", "-recursive"}, {"-chdir=tofu", "validate", "-no-tests"}}
-	reconcilerTest := []string{"-chdir=tofu/reconciler", "test"}
+var (
+	rootTofuInit       = []string{"-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false"}
+	reconcilerTofuInit = []string{"-chdir=tofu/reconciler", "init", "-backend=false", "-lockfile=readonly", "-input=false"}
+	tofuFormat         = []string{"-chdir=tofu", "fmt", "-check", "-recursive"}
+	rootTofuValidation = []string{"-chdir=tofu", "validate", "-no-tests"}
+	reconcilerTofuTest = []string{"-chdir=tofu/reconciler", "test"}
+)
+
+func recordTofu(t *testing.T, changed string) (Runner, func() [][]string) {
+	var lock sync.Mutex
+	var calls [][]string
+	runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		switch options.Name {
+		case "git":
+			return process.Result{Stdout: []byte(changed + "\n")}, nil
+		case "tofu":
+			lock.Lock()
+			defer lock.Unlock()
+			calls = append(calls, options.Args)
+			return process.Result{}, nil
+		default:
+			t.Errorf("unexpected validator: %s", options.Name)
+			return process.Result{}, nil
+		}
+	}}
+	return runner, func() [][]string {
+		lock.Lock()
+		defer lock.Unlock()
+		recorded := calls
+		calls = nil
+		slices.SortFunc(recorded, func(a, b []string) int { return strings.Compare(strings.Join(a, " "), strings.Join(b, " ")) })
+		return recorded
+	}
+}
+
+func TestOpenTofuRootsArePreparedAndValidatedOnlyForTheirInputs(t *testing.T) {
 	for _, test := range []struct {
 		changed             string
 		prepared, validated [][]string
 	}{
-		{"tofu/reconciler/server.tf", [][]string{mainInit, reconcilerInit}, append(slices.Clone(mainChecks), reconcilerTest)},
-		{"tofu/reconciler/tests/reconciler.tftest.hcl", [][]string{mainInit, reconcilerInit}, append(slices.Clone(mainChecks), reconcilerTest)},
-		{"keys/admin_keys", [][]string{reconcilerInit}, [][]string{reconcilerTest}},
-		{"tofu/reconciliation.tf", [][]string{mainInit}, mainChecks},
+		{"tofu/reconciler/server.tf", [][]string{reconcilerTofuInit}, [][]string{tofuFormat, reconcilerTofuTest}},
+		{"tofu/reconciler/tests/reconciler.tftest.hcl", [][]string{reconcilerTofuInit}, [][]string{tofuFormat, reconcilerTofuTest}},
+		{"keys/admin_keys", [][]string{reconcilerTofuInit}, [][]string{reconcilerTofuTest}},
+		{"tofu/reconciliation.tf", [][]string{rootTofuInit}, [][]string{tofuFormat, rootTofuValidation}},
+		{"tofu/modules/hetzner/main.tf", [][]string{rootTofuInit}, [][]string{tofuFormat, rootTofuValidation}},
+		{"tofu/.terraform.lock.hcl", [][]string{rootTofuInit}, [][]string{tofuFormat, rootTofuValidation}},
+		{"tofu/production.tfvars.json", [][]string{rootTofuInit}, [][]string{tofuFormat, rootTofuValidation}},
+		{"tofu/tests/tailnet-firewalls.tftest.hcl", nil, [][]string{tofuFormat}},
 		{"docs/runbook.md", nil, nil},
 	} {
 		t.Run(test.changed, func(t *testing.T) {
-			var lock sync.Mutex
-			var calls [][]string
-			runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
-				switch options.Name {
-				case "git":
-					return process.Result{Stdout: []byte(test.changed + "\n")}, nil
-				case "tofu":
-					lock.Lock()
-					defer lock.Unlock()
-					calls = append(calls, options.Args)
-					return process.Result{}, nil
-				default:
-					t.Errorf("unexpected validator: %s", options.Name)
-					return process.Result{}, nil
-				}
-			}}
+			runner, calls := recordTofu(t, test.changed)
 			if err := PrepareValidation(context.Background(), runner, ""); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(calls, test.prepared) {
-				t.Fatalf("preparation commands: %v, want %v", calls, test.prepared)
+			if prepared := calls(); !reflect.DeepEqual(prepared, test.prepared) {
+				t.Fatalf("preparation commands: %v, want %v", prepared, test.prepared)
 			}
-			calls = nil
 			if err := Validate(context.Background(), runner, ""); err != nil {
 				t.Fatal(err)
 			}
-			slices.SortFunc(calls, func(a, b []string) int { return strings.Compare(strings.Join(a, " "), strings.Join(b, " ")) })
-			if !reflect.DeepEqual(calls, test.validated) {
-				t.Fatalf("validation commands: %v, want %v", calls, test.validated)
+			if validated := calls(); !reflect.DeepEqual(validated, test.validated) {
+				t.Fatalf("validation commands: %v, want %v", validated, test.validated)
 			}
 		})
+	}
+}
+
+func TestProductionSettingsReadByTheRootModuleValidateIt(t *testing.T) {
+	runner, calls := recordTofu(t, "platform/clusters/production/settings.yaml")
+	if err := PrepareValidation(context.Background(), runner, ""); err != nil {
+		t.Fatal(err)
+	}
+	if prepared := calls(); !reflect.DeepEqual(prepared, [][]string{rootTofuInit}) {
+		t.Fatalf("preparation commands: %v", prepared)
+	}
+	Validate(context.Background(), runner, "")
+	if validated := calls(); !reflect.DeepEqual(validated, [][]string{rootTofuValidation}) {
+		t.Fatalf("validation commands: %v", validated)
 	}
 }
 
@@ -317,7 +349,7 @@ func TestGeneratedOverlaysValidateOnEveryGeneratorInput(t *testing.T) {
 		"internal/ci/validate.go",
 	} {
 		t.Run(path, func(t *testing.T) {
-			runner := Runner{Dir: t.TempDir(), Execute: changedFiles(t, path)}
+			runner, _ := recordTofu(t, path)
 			if err := Validate(context.Background(), runner, ""); err == nil {
 				t.Fatal("missing generator inputs accepted")
 			}

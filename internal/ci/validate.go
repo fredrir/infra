@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 
@@ -44,24 +45,29 @@ func validationInputs(ctx context.Context, runner Runner, before string) ([]byte
 	return files, nil
 }
 
-func declarationChanged(files []byte, pattern string) bool {
-	expression := regexp.MustCompile(pattern)
-	for _, path := range strings.Split(string(files), "\n") {
-		if expression.MatchString(path) {
-			return true
-		}
-	}
-	return false
+func declarationChanged(files []byte, inputs func(string) bool) bool {
+	return slices.ContainsFunc(strings.Split(string(files), "\n"), inputs)
 }
 
-const reconcilerTofuInputs = `^(tofu/reconciler/|keys/admin_keys$)`
+func matching(pattern string) func(string) bool {
+	return regexp.MustCompile(pattern).MatchString
+}
+
+var reconcilerTofuInputs = matching(`^(tofu/reconciler/|keys/admin_keys$)`)
+
+func rootTofuInputs(path string) bool {
+	return path == "platform/clusters/production/settings.yaml" || strings.HasPrefix(path, "tofu/") && !strings.HasPrefix(path, "tofu/reconciler/") && !strings.HasSuffix(path, ".tftest.hcl")
+}
 
 func PrepareValidation(ctx context.Context, runner Runner, before string) error {
 	files, err := validationInputs(ctx, runner, before)
 	if err != nil {
 		return err
 	}
-	for _, root := range []struct{ directory, inputs string }{{"tofu", `^tofu/`}, {"tofu/reconciler", reconcilerTofuInputs}} {
+	for _, root := range []struct {
+		directory string
+		inputs    func(string) bool
+	}{{"tofu", rootTofuInputs}, {"tofu/reconciler", reconcilerTofuInputs}} {
 		if !declarationChanged(files, root.inputs) {
 			continue
 		}
@@ -79,25 +85,28 @@ func Validate(ctx context.Context, runner Runner, before string) error {
 	if err != nil {
 		return err
 	}
-	checks, err := declarationChecks(runner.Dir, func(pattern string) bool { return declarationChanged(files, pattern) })
+	checks, err := declarationChecks(runner.Dir, func(inputs func(string) bool) bool { return declarationChanged(files, inputs) })
 	if err != nil {
 		return err
 	}
 	return runChecks(ctx, runner, checks)
 }
 
-func declarationChecks(root string, changed func(string) bool) ([]declarationCheck, error) {
+func declarationChecks(root string, changed func(func(string) bool) bool) ([]declarationCheck, error) {
 	command := func(name string, arguments ...string) declarationCheck {
 		return func(ctx context.Context, runner Runner) error { return runner.Run(ctx, name, arguments...) }
 	}
 	var checks []declarationCheck
-	if changed(`^tofu/`) {
-		checks = append(checks, command("tofu", "-chdir=tofu", "validate", "-no-tests"), command("tofu", "-chdir=tofu", "fmt", "-check", "-recursive"))
+	if changed(rootTofuInputs) {
+		checks = append(checks, command("tofu", "-chdir=tofu", "validate", "-no-tests"))
+	}
+	if changed(matching(`^tofu/`)) {
+		checks = append(checks, command("tofu", "-chdir=tofu", "fmt", "-check", "-recursive"))
 	}
 	if changed(reconcilerTofuInputs) {
 		checks = append(checks, command("tofu", "-chdir=tofu/reconciler", "test"))
 	}
-	if changed(`^ansible/`) {
+	if changed(matching(`^ansible/`)) {
 		playbooks, err := filepath.Glob(filepath.Join(root, "ansible", "*.yml"))
 		if err != nil {
 			return nil, err
@@ -112,10 +121,10 @@ func declarationChecks(root string, changed func(string) bool) ([]declarationChe
 		}
 		checks = append(checks, command("ansible-playbook", arguments...))
 	}
-	if changed(`^(platform/projects/|platform/components/(policy|backup-job|repository-maintenance)/|platform/clusters/production/(root|settings)\.yaml$|build/rollout/flux-artifacts/|internal/fluxartifacts/|internal/ci/validate\.go$)`) {
+	if changed(matching(`^(platform/projects/|platform/components/(policy|backup-job|repository-maintenance)/|platform/clusters/production/(root|settings)\.yaml$|build/rollout/flux-artifacts/|internal/fluxartifacts/|internal/ci/validate\.go$)`)) {
 		checks = append(checks, func(context.Context, Runner) error { return fluxartifacts.Check(root, kustomize.Build) })
 	}
-	if changed(`^(platform/|charts/|build/rollout/flux-artifacts/)`) {
+	if changed(matching(`^(platform/|charts/|build/rollout/flux-artifacts/)`)) {
 		directories, err := kustomizations(root)
 		if err != nil {
 			return nil, err
@@ -132,10 +141,10 @@ func declarationChecks(root string, changed func(string) bool) ([]declarationChe
 			return errors.Join(append(failures, ctx.Err())...)
 		})
 	}
-	if changed(`^(charts/|tests/infra/fixtures/)`) {
+	if changed(matching(`^(charts/|tests/infra/fixtures/)`)) {
 		checks = append(checks, command("helm", "lint", "charts/project", "--strict", "-f", "tests/infra/fixtures/values.yaml"))
 	}
-	if changed(`^\.github/`) {
+	if changed(matching(`^\.github/`)) {
 		checks = append(checks, command("actionlint"))
 	}
 	return checks, nil
