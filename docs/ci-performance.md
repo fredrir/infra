@@ -84,6 +84,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Scoped runner convergence | Runner play and `verify-runners.yml` run only when selected or when GitHub reports runners offline, missing or at another version or label set; registrations are always verified |
 | Unchanged Kubernetes inputs | Every Kustomization is requested and must apply the revision with ready workloads and releases; HelmRelease reconciliation is requested only for changed Kubernetes inputs, full and recovery applies |
 | K3s service installation | The upstream installer reruns only when its recorded file hashes differ; check mode reports the difference |
+| Apply verification | Cluster, runner listener, host and served-revision checks run concurrently; runner registrations are read alongside the host playbooks |
 | Tooling changes | `cmd/`, `internal/`, `.github/`, Go and Bazel modules and listed `build/` inputs run read-only drift verification of the applied revision: generated artifacts, `tofu plan -detailed-exitcode`, workloads and hosts; failure forces full recovery |
 | Workload verification | Each verification poll lists workloads once per kind and namespace; expected ownership, images, readiness and generations remain required |
 | Transport installation | Pinned archive content is compared with extracted and installed binaries before extraction or copy; missing or corrupted files are repaired |

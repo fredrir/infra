@@ -119,6 +119,8 @@ func (c *Commands) verifyRunnerHosts(ctx context.Context, playbooks ...string) e
 	if err != nil {
 		return err
 	}
+	registrations := make(chan error, 1)
+	go func() { registrations <- c.verifyRunnerFleet(ctx, fleet) }()
 	var problems []error
 	for _, run := range c.recordPlaybooks(ctx, playbooks) {
 		var differences Differences
@@ -136,7 +138,7 @@ func (c *Commands) verifyRunnerHosts(ctx context.Context, playbooks ...string) e
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return errors.Join(append(problems, c.verifyRunnerFleet(ctx, fleet))...)
+	return errors.Join(append(problems, <-registrations)...)
 }
 
 func (c *Commands) Monitor(ctx context.Context, plan Plan) error {

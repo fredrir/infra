@@ -273,11 +273,26 @@ func (c *Commands) verifyHelm(ctx context.Context, token, host string) error {
 }
 
 func (c *Commands) Verify(ctx context.Context, plan Plan) error {
-	return c.verifyParts(ctx, plan, c.verifyDeployment(ctx, plan), c.VerifyHosts)
+	return c.verifyParts(ctx, plan, (*Commands).verifyDeployment, (*Commands).VerifyHosts)
 }
 
-func (c *Commands) verifyParts(ctx context.Context, plan Plan, cluster error, hosts func(context.Context, Plan) error) error {
-	return errors.Join(cluster, c.verifyRunnerListeners(ctx, plan), hosts(ctx, plan), c.verifyServed(ctx, plan))
+func (c *Commands) verifyParts(ctx context.Context, plan Plan, cluster, hosts func(*Commands, context.Context, Plan) error) error {
+	shared := *c
+	output := &sync.Mutex{}
+	if c.Runner.Stdout != nil {
+		shared.Runner.Stdout = &lockedWriter{mu: output, writer: c.Runner.Stdout}
+	}
+	if c.Runner.Stderr != nil {
+		shared.Runner.Stderr = &lockedWriter{mu: output, writer: c.Runner.Stderr}
+	}
+	parts := []func(*Commands, context.Context, Plan) error{cluster, (*Commands).verifyRunnerListeners, hosts, (*Commands).verifyServed}
+	results := make([]error, len(parts))
+	var group sync.WaitGroup
+	for index, part := range parts {
+		group.Go(func() { results[index] = part(&shared, ctx, plan) })
+	}
+	group.Wait()
+	return errors.Join(results...)
 }
 
 func (c *Commands) verifyRunnerRegistrations(ctx context.Context, _ Plan) error {
@@ -336,7 +351,7 @@ func (c *Commands) VerifyCloud(ctx context.Context, plan Plan) error {
 	log := &lockedWriter{mu: &sync.Mutex{}, writer: &output}
 	compared := make(chan error, 1)
 	go func() { compared <- c.compareTofu(ctx, log) }()
-	live := c.verifyParts(ctx, plan, c.verifyRenderedCluster(ctx, plan), c.verifyRunnerRegistrations)
+	live := c.verifyParts(ctx, plan, (*Commands).verifyRenderedCluster, (*Commands).verifyRunnerRegistrations)
 	infrastructure := <-compared
 	if c.Runner.Stdout != nil {
 		_, _ = c.Runner.Stdout.Write(output.Bytes())
@@ -447,7 +462,7 @@ func (c *Commands) compareTofu(ctx context.Context, log io.Writer) error {
 }
 
 func (c *Commands) VerifyLive(ctx context.Context, plan Plan) error {
-	return c.verifyParts(ctx, plan, c.verifyRenderedCluster(ctx, plan), c.VerifyHosts)
+	return c.verifyParts(ctx, plan, (*Commands).verifyRenderedCluster, (*Commands).VerifyHosts)
 }
 
 func (c *Commands) verifyRenderedCluster(ctx context.Context, plan Plan) error {

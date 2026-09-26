@@ -393,6 +393,29 @@ func TestUnchangedKubernetesInputsRequestOnlyKustomizations(t *testing.T) {
 	}
 }
 
+func TestVerificationPartsRunConcurrently(t *testing.T) {
+	var arrived sync.WaitGroup
+	arrived.Add(2)
+	together := make(chan struct{})
+	go func() {
+		arrived.Wait()
+		close(together)
+	}()
+	part := func(*Commands, context.Context, Plan) error {
+		arrived.Done()
+		select {
+		case <-together:
+			return nil
+		case <-time.After(5 * time.Second):
+			return errors.New("verification part ran alone")
+		}
+	}
+	var commands Commands
+	if err := commands.verifyParts(context.Background(), Plan{Affected: Selection{Projects: []string{"portfolio"}}}, part, part); err != nil {
+		t.Fatalf("verification parts ran sequentially: %v", err)
+	}
+}
+
 func runnerSet(t *testing.T, namespace, name, phase string) resource {
 	return artifactFixture(t, fmt.Sprintf(`{"kind":"AutoscalingRunnerSet","metadata":{"name":%q,"namespace":%q},"status":{"phase":%q}}`, name, namespace, phase))
 }
