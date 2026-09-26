@@ -34,7 +34,7 @@ tls-san:
 {% endfor %}
 write-kubeconfig-mode: "0600"
 secrets-encryption: true
-flannel-backend: {{ k3s_flannel_backend | to_json }}
+flannel-backend: {{ k3s_flannel_backend }}
 flannel-external-ip: true
 disable: [traefik, servicelb]
 node-taint: ["node-role.kubernetes.io/control-plane=true:NoSchedule"]
