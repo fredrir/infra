@@ -17,6 +17,13 @@ resource "hcloud_server" "this" {
 resource "hcloud_firewall" "this" {
   name = var.firewall_name
 
+  rule {
+    direction  = "in"
+    protocol   = "udp"
+    port       = "41641"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
+
   dynamic "rule" {
     for_each = var.inbound_rules
     content {

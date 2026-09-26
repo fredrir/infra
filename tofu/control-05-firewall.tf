@@ -1,5 +1,12 @@
 resource "hcloud_firewall" "control_05" {
   name = "fredrir-05-fw"
+
+  rule {
+    direction  = "in"
+    protocol   = "udp"
+    port       = "41641"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
 }
 
 resource "hcloud_firewall_attachment" "control_05" {
