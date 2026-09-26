@@ -91,3 +91,15 @@ func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 		t.Fatalf("role configuration %+v", config)
 	}
 }
+
+func TestVerifyUnitLetsOpenTofuProvidersAdjustTheirSoftLimits(t *testing.T) {
+	service := string(roleFile(t, "templates/infra-reconcile-verify.service.j2"))
+	for _, line := range strings.Split(service, "\n") {
+		if strings.HasPrefix(line, "SystemCallFilter=~") && strings.Contains(line, "@resources") {
+			t.Errorf("%q kills providers that call setrlimit at startup", line)
+		}
+	}
+	if !strings.Contains(service, "\nCapabilityBoundingSet=\n") {
+		t.Error("the verify unit may raise hard limits without an empty capability set")
+	}
+}
