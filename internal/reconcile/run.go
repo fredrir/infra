@@ -195,7 +195,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 	if err = stage("kubernetes", func() error { return r.Ops.Kubernetes(ctx, plan) }); err != nil {
 		return err
 	}
-	if selected.Ansible && (effectiveHostScope(selected) != HostScopeRunners || monitorCLIChanged(selected)) {
+	if monitorSelected(selected) {
 		if err = stage("monitor", func() error { return r.Ops.Monitor(ctx, plan) }); err != nil {
 			return err
 		}
@@ -208,7 +208,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 			return err
 		}
 	}
-	if convergedHosts && effectiveHostScope(selected) == HostScopeFull {
+	if convergedHosts && convergesPlaybook(selected, volatilePlaybook) {
 		status.Stage = "volatile"
 		if err = save(ctx); err != nil {
 			return err
@@ -223,7 +223,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		status.Durations["volatile"] = time.Since(started).Seconds()
 	}
 	previous, previousFull, previousFullTime := status.Applied, status.LastFullRevision, status.LastFullVerified
-	if selected.Tofu && selected.Kubernetes && effectiveHostScope(selected) == HostScopeFull && len(selected.Projects) == 0 {
+	if selected.Tofu && selected.Kubernetes && effectiveHostScope(selected) == HostScopeFull && len(selected.HostPlaybooks) == 0 && len(selected.Projects) == 0 {
 		status.LastFullRevision, status.LastFullVerified = revision, time.Now().UTC()
 	}
 	status.Applied, status.Stage = revision, "complete"

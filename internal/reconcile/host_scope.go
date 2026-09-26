@@ -15,6 +15,27 @@ func monitorCLIChanged(selected Selection) bool {
 	return effectiveHostScope(selected) == HostScopeRunners && slices.Contains(selected.RunnerInputs, "build/cli-release.json")
 }
 
+func convergesPlaybook(selected Selection, playbook string) bool {
+	return effectiveHostScope(selected) == HostScopeFull && (len(selected.HostPlaybooks) == 0 || slices.Contains(selected.HostPlaybooks, playbook))
+}
+
+func monitorSelected(selected Selection) bool {
+	return effectiveHostScope(selected) == HostScopeMonitor || monitorCLIChanged(selected) || convergesPlaybook(selected, monitorPlaybook)
+}
+
+func convergencePlaybooks(selected Selection) []string {
+	if len(selected.HostPlaybooks) == 0 {
+		return []string{convergencePlaybook}
+	}
+	playbooks := []string{factsPlaybook}
+	for _, playbook := range selected.HostPlaybooks {
+		if playbook != monitorPlaybook && playbook != volatilePlaybook {
+			playbooks = append(playbooks, playbook)
+		}
+	}
+	return playbooks
+}
+
 func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 	var playbooks [][]string
 	switch effectiveHostScope(plan.Affected) {
@@ -47,9 +68,9 @@ func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 func (c *Commands) Hosts(ctx context.Context, plan Plan) error {
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
-		return c.convergeRunners(ctx, plan, "reconcile.yml")
+		return c.convergeRunners(ctx, plan, convergencePlaybooks(plan.Affected))
 	case HostScopeRunners:
-		return c.convergeRunners(ctx, plan, "build-runners.yml")
+		return c.convergeRunners(ctx, plan, []string{runnerPlaybook})
 	default:
 		return nil
 	}
@@ -58,6 +79,9 @@ func (c *Commands) Hosts(ctx context.Context, plan Plan) error {
 func (c *Commands) VerifyHosts(ctx context.Context, plan Plan) error {
 	switch effectiveHostScope(plan.Affected) {
 	case HostScopeFull:
+		if !convergesPlaybook(plan.Affected, runnerPlaybook) && !c.repairedRunners {
+			return c.verifyRunnerHosts(ctx, "verify.yml")
+		}
 		return c.verifyRunnerHosts(ctx, "verify.yml", "verify-runners.yml")
 	case HostScopeRunners:
 		return c.verifyRunnerHosts(ctx, "verify-runners.yml")
@@ -118,6 +142,9 @@ func (c *Commands) verifyRunnerHosts(ctx context.Context, playbooks ...string) e
 func (c *Commands) Monitor(ctx context.Context, plan Plan) error {
 	switch {
 	case effectiveHostScope(plan.Affected) == HostScopeFull:
+		if !convergesPlaybook(plan.Affected, monitorPlaybook) {
+			return nil
+		}
 		return c.ansible(ctx, "external.yml")
 	case effectiveHostScope(plan.Affected) == HostScopeMonitor:
 		return c.ansible(ctx, "external.yml", monitorTags)

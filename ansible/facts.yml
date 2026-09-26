@@ -1,0 +1,4 @@
+- name: Gather host facts in parallel
+  hosts: ubuntu:!volatile
+  become: true
+  gather_facts: true

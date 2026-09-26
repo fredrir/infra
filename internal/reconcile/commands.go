@@ -31,6 +31,8 @@ type Commands struct {
 	PullRequests  PullRequests
 	RunnerToken   string
 	kubernetes    *kubernetesState
+
+	repairedRunners bool
 }
 
 func (c *Commands) Revision(ctx context.Context) (string, error) {
@@ -71,10 +73,21 @@ func (c *Commands) Select(ctx context.Context, base string, full bool) (Selectio
 	if err != nil {
 		return Selection{}, err
 	}
-	selection := Affected(strings.Fields(string(data)))
+	paths := strings.Fields(string(data))
+	selection := Affected(paths)
 	if len(selection.Projects) > 0 && !supportedProjects(selection.Projects) {
 		selection.Projects = nil
 		selection.Reasons = append(selection.Reasons, "full Kubernetes verification required")
+	}
+	if effectiveHostScope(selection) == HostScopeFull {
+		playbooks, err := scopedHostPlaybooks(c.Runner.Dir, paths)
+		switch {
+		case err != nil:
+			selection.Reasons = append(selection.Reasons, "every host playbook: "+err.Error())
+		case playbooks != nil:
+			selection.HostPlaybooks = playbooks
+			selection.Reasons = append(selection.Reasons, "host playbooks: "+strings.Join(playbooks, ", "))
+		}
 	}
 	return selection, nil
 }
@@ -227,9 +240,13 @@ func (c *Commands) runnerAPI() ci.Runner {
 }
 
 func ansiblePlaybook(ctx context.Context, runner ci.Runner, playbook string, extra ...string) error {
+	return ansiblePlaybooks(ctx, runner, []string{playbook}, extra...)
+}
+
+func ansiblePlaybooks(ctx context.Context, runner ci.Runner, playbooks []string, extra ...string) error {
 	runner.Dir = filepath.Join(runner.Dir, "ansible")
 	runner.Env = append(slices.Clone(runner.Env), "ANSIBLE_CONFIG="+filepath.Join(runner.Dir, "ansible.cfg"))
-	args := append([]string{"-i", "inventory/production.yml", playbook}, extra...)
+	args := slices.Concat([]string{"-i", "inventory/production.yml"}, playbooks, extra)
 	if os.Getenv("INFRA_RECONCILE_TAILNET") == "true" {
 		args = append(args, "--extra-vars", "infra_reconcile_tailnet=true")
 	}

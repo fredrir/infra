@@ -33,7 +33,7 @@ func WithoutDegraded(err error) error {
 }
 
 func (c *Commands) Volatile(ctx context.Context, plan Plan) error {
-	if effectiveHostScope(plan.Affected) != HostScopeFull {
+	if !convergesPlaybook(plan.Affected, volatilePlaybook) {
 		return nil
 	}
 	run := c.recordPlaybook(ctx, volatilePlaybook)

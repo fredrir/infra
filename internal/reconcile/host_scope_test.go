@@ -69,15 +69,20 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 	fleet := testRunnerFleet()
 	root := writeRunnerFleet(t, fleet)
 	cli := []string{"build/cli-release.json"}
+	full := []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml", "volatile.yml"}
 	for _, test := range []struct {
-		name    string
-		scope   string
-		inputs  []string
-		want    []string
-		planned []string
-		runners bool
+		name      string
+		scope     string
+		inputs    []string
+		playbooks []string
+		want      []string
+		planned   []string
+		runners   bool
 	}{
-		{name: HostScopeFull, scope: HostScopeFull, want: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml", "volatile.yml"}, planned: []string{"external.yml", "reconcile.yml", "verify-runners.yml", "verify.yml", "volatile.yml"}, runners: true},
+		{name: HostScopeFull, scope: HostScopeFull, want: full, planned: full, runners: true},
+		{name: "cluster role", scope: HostScopeFull, playbooks: []string{"k3s.yml", "volatile.yml"}, want: []string{"facts.yml k3s.yml", "verify.yml", "volatile.yml"}, planned: full, runners: true},
+		{name: "runner role in full scope", scope: HostScopeFull, playbooks: []string{"k3s.yml", "build-runners.yml"}, want: []string{"facts.yml k3s.yml build-runners.yml", "verify-runners.yml", "verify.yml"}, planned: full, runners: true},
+		{name: "monitor and volatile playbooks", scope: HostScopeFull, playbooks: []string{"external.yml", "volatile.yml"}, want: []string{"external.yml", "verify.yml", "volatile.yml"}, planned: full, runners: true},
 		{name: HostScopeRunners, scope: HostScopeRunners, want: []string{"build-runners.yml", "verify-runners.yml"}, planned: []string{"build-runners.yml", "verify-runners.yml"}, runners: true},
 		{name: "CLI release", scope: HostScopeRunners, inputs: cli, want: []string{"build-runners.yml --tags=infra_binary", "external.yml --tags=infra_binary", "verify-runners.yml"}, planned: []string{"build-runners.yml", "external.yml --tags=infra_binary", "verify-runners.yml"}, runners: true},
 		{name: HostScopeMonitor, scope: HostScopeMonitor, want: []string{"external.yml --tags=gatus,verification_trigger", "verify.yml --limit=external"}, planned: []string{"external.yml --tags=gatus,verification_trigger", "verify.yml --limit=external"}},
@@ -105,7 +110,7 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 				t.Errorf("unexpected command: %s", opts.Name)
 				return process.Result{}, errors.New("unexpected command")
 			}}}
-			plan := Plan{Affected: Selection{Ansible: test.scope != HostScopeNone, HostScope: test.scope, RunnerInputs: test.inputs}}
+			plan := Plan{Affected: Selection{Ansible: test.scope != HostScopeNone, HostScope: test.scope, HostPlaybooks: test.playbooks, RunnerInputs: test.inputs}}
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			if err := commands.PlanHosts(ctx, plan); err != nil {

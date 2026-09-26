@@ -369,6 +369,7 @@ func TestRunnerConvergenceArguments(t *testing.T) {
 	runners := func(inputs ...string) Plan {
 		return Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: inputs}}
 	}
+	cluster := Plan{Affected: Selection{Ansible: true, HostScope: HostScopeFull, HostPlaybooks: []string{"k3s.yml", "volatile.yml"}}}
 	for _, test := range []struct {
 		name   string
 		plan   Plan
@@ -389,6 +390,14 @@ func TestRunnerConvergenceArguments(t *testing.T) {
 				runner.Status = "offline"
 			}
 		}, `reconcile.yml --extra-vars {"build_runner_reregister":["Y-1"],"build_runner_restart":["infra-2"]}`},
+		{"scoped playbooks", cluster, nil, "facts.yml k3s.yml"},
+		{"scoped playbooks with offline runner", cluster, offlineY, `facts.yml k3s.yml build-runners.yml --extra-vars {"build_runner_restart":["Y-1"]}`},
+		{"scoped playbooks with missing registration", cluster, unregisteredY, `facts.yml k3s.yml build-runners.yml --extra-vars {"build_runner_reregister":["Y-1"]}`},
+		{"scoped playbooks with outdated runner", cluster, func(runner *registeredRunner) {
+			if runner.Name == "infra-build-09-infra-1" {
+				runner.Version = new("2.336.0")
+			}
+		}, "facts.yml k3s.yml build-runners.yml"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), change: test.change}
@@ -444,6 +453,7 @@ func TestUnreadableRunnerFleetDoesNotGateConvergence(t *testing.T) {
 	}{
 		{"CLI release", Plan{Affected: Selection{Ansible: true, HostScope: HostScopeRunners, RunnerInputs: []string{"build/cli-release.json"}}}, []string{"build-runners.yml"}},
 		{"full", Plan{Affected: All()}, []string{"reconcile.yml"}},
+		{"scoped playbooks", Plan{Affected: Selection{Ansible: true, HostScope: HostScopeFull, HostPlaybooks: []string{"external.yml"}}}, []string{"facts.yml build-runners.yml"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			harness := &fleetHarness{t: t, fleet: testRunnerFleet(), unreadable: func(int) bool { return true }}
@@ -456,6 +466,59 @@ func TestUnreadableRunnerFleetDoesNotGateConvergence(t *testing.T) {
 			}
 			if !strings.Contains(harness.stderr.String(), "warning: runner fleet state unavailable") {
 				t.Fatalf("unreadable fleet not reported: %q", harness.stderr.String())
+			}
+		})
+	}
+}
+
+func TestScopedHostPlaybooksConvergeRunnersOnlyOnDrift(t *testing.T) {
+	fastRunnerReads(t)
+	cluster := Plan{Affected: Selection{Ansible: true, HostScope: HostScopeFull, HostPlaybooks: []string{"k3s.yml", "volatile.yml"}}}
+	for _, test := range []struct {
+		name     string
+		change   func(*registeredRunner)
+		token    bool
+		verified []string
+	}{
+		{"healthy fleet", nil, false, []string{"verify.yml"}},
+		{"offline runner", offlineY, true, []string{"verify-runners.yml", "verify.yml"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fleet := testRunnerFleet()
+			var mu sync.Mutex
+			var token []bool
+			var verified []string
+			commands := &Commands{RunnerToken: "runner-token", Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				if opts.Name == "gh" {
+					runners := healthyRunners(fleet, queriedRepository(opts))
+					if test.change != nil {
+						for index := range runners {
+							test.change(&runners[index])
+						}
+					}
+					return runnerResponse(t, runners...), nil
+				}
+				if environment(opts, "JUNIT_OUTPUT_DIR") != "" {
+					verified = append(verified, opts.Args[2])
+					return fakePlaybooks{reports: []string{junitReport(strings.TrimSuffix(opts.Args[2], ".yml"))}}.execute(t, opts)
+				}
+				token = append(token, environment(opts, "GH_TOKEN") == "runner-token")
+				return process.Result{}, nil
+			}}}
+			if err := commands.Hosts(context.Background(), cluster); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(token, []bool{test.token}) {
+				t.Fatalf("runner token passed to host convergence %v, want %v", token, test.token)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			_ = commands.VerifyHosts(ctx, cluster)
+			slices.Sort(verified)
+			if !slices.Equal(verified, test.verified) {
+				t.Fatalf("verified %q, want %q", verified, test.verified)
 			}
 		})
 	}

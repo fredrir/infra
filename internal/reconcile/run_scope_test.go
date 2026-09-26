@@ -146,6 +146,46 @@ func TestRunnerSuccessDoesNotRefreshFullVerification(t *testing.T) {
 	}
 }
 
+func TestScopedHostPlaybooksSkipUnaffectedHostStages(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		selection Selection
+		calls     []string
+		volatile  int
+	}{
+		{"cluster role", Selection{Ansible: true, HostScope: HostScopeFull, HostPlaybooks: []string{"k3s.yml", "volatile.yml"}}, []string{"plan", "hosts", "publish", "kubernetes", "verify"}, 1},
+		{"secret decryption", Selection{Ansible: true, HostScope: HostScopeFull, HostPlaybooks: []string{"control-backup.yml", "external.yml"}}, []string{"plan", "hosts", "publish", "kubernetes", "monitor", "verify"}, 0},
+		{"every playbook", Selection{Ansible: true, HostScope: HostScopeFull}, []string{"plan", "hosts", "publish", "kubernetes", "monitor", "verify"}, 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}
+			ops := &fakeOps{selection: test.selection}
+			if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(ops.calls, test.calls) || ops.volatile != test.volatile {
+				t.Fatalf("stages %v with %d volatile runs, want %v with %d", ops.calls, ops.volatile, test.calls, test.volatile)
+			}
+			if store.status.HostScope != HostScopeFull || !reflect.DeepEqual(store.status.Selection.HostPlaybooks, test.selection.HostPlaybooks) {
+				t.Fatalf("scoped host convergence not recorded: %+v", store.status)
+			}
+		})
+	}
+}
+
+func TestScopedHostPlaybooksDoNotRefreshFullVerification(t *testing.T) {
+	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "older"}}
+	selection := All()
+	selection.HostPlaybooks = []string{"k3s.yml", "external.yml", "volatile.yml"}
+	ops := &fakeOps{selection: selection}
+	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if store.status.Applied != "new" || store.status.LastFullRevision != "older" {
+		t.Fatalf("scoped host convergence recorded as full: %+v", store.status)
+	}
+}
+
 func TestCLIReleaseConvergesTheMonitorBinary(t *testing.T) {
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
 	ops := &fakeOps{selection: Affected([]string{"build/cli-release.json"})}

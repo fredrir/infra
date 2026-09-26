@@ -309,18 +309,22 @@ func (c *Commands) convergeRunnerLabels(ctx context.Context, fleet RunnerFleet, 
 	}
 }
 
-func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook string) error {
+func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbooks []string) error {
 	fleet, err := LoadRunnerFleet(c.Runner.Dir)
 	if err != nil {
 		return err
 	}
+	converged := slices.Contains(playbooks, convergencePlaybook) || slices.Contains(playbooks, runnerPlaybook)
 	states, err := c.readRunnerStates(ctx, fleet)
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if err != nil {
 		c.warn("runner fleet state unavailable; converging runners without GitHub repairs: %v", err)
-		return ansiblePlaybook(ctx, c.runnerAPI(), playbook)
+		if !converged {
+			playbooks, c.repairedRunners = append(playbooks, runnerPlaybook), true
+		}
+		return ansiblePlaybooks(ctx, c.runnerAPI(), playbooks)
 	}
 	c.convergeRunnerLabels(ctx, fleet, states)
 	repairs := map[string][]string{}
@@ -330,6 +334,16 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 	if missing := c.unregisteredRunners(ctx, fleet, states); len(missing) > 0 {
 		repairs["build_runner_reregister"] = missing
 	}
+	drift := runnerDrift(fleet, states)
+	if !converged && (len(repairs) > 0 || len(drift) > 0) {
+		playbooks, c.repairedRunners, converged = append(playbooks, runnerPlaybook), true, true
+	}
+	if !converged {
+		if slices.Equal(playbooks, []string{factsPlaybook}) {
+			return nil
+		}
+		return ansiblePlaybooks(ctx, c.Runner, playbooks)
+	}
 	var args []string
 	if len(repairs) > 0 {
 		variables, err := json.Marshal(repairs)
@@ -338,10 +352,10 @@ func (c *Commands) convergeRunners(ctx context.Context, plan Plan, playbook stri
 		}
 		args = append(args, "--extra-vars", string(variables))
 	}
-	if len(runnerDrift(fleet, states)) == 0 && effectiveHostScope(plan.Affected) == HostScopeRunners && slices.Equal(plan.Affected.RunnerInputs, []string{"build/cli-release.json"}) {
+	if len(drift) == 0 && effectiveHostScope(plan.Affected) == HostScopeRunners && slices.Equal(plan.Affected.RunnerInputs, []string{"build/cli-release.json"}) {
 		args = append(args, "--tags=infra_binary")
 	}
-	return ansiblePlaybook(ctx, c.runnerAPI(), playbook, args...)
+	return ansiblePlaybooks(ctx, c.runnerAPI(), playbooks, args...)
 }
 
 func (c *Commands) warn(format string, args ...any) {

@@ -1,7 +1,4 @@
-- name: Gather host facts in parallel
-  hosts: ubuntu:!volatile
-  become: true
-  gather_facts: true
+- import_playbook: facts.yml
 - import_playbook: transport.yml
 - import_playbook: site.yml
 - import_playbook: ci-runtimes.yml

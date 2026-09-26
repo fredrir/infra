@@ -12,15 +12,16 @@ import (
 )
 
 type Selection struct {
-	Tofu         bool     `json:"tofu"`
-	Kubernetes   bool     `json:"kubernetes"`
-	Ansible      bool     `json:"ansible"`
-	MonitorOnly  bool     `json:"monitor_only"`
-	Tooling      bool     `json:"tooling"`
-	Projects     []string `json:"projects,omitempty"`
-	HostScope    string   `json:"host_scope"`
-	RunnerInputs []string `json:"runner_inputs,omitempty"`
-	Reasons      []string `json:"reasons,omitempty"`
+	Tofu          bool     `json:"tofu"`
+	Kubernetes    bool     `json:"kubernetes"`
+	Ansible       bool     `json:"ansible"`
+	MonitorOnly   bool     `json:"monitor_only"`
+	Tooling       bool     `json:"tooling"`
+	Projects      []string `json:"projects,omitempty"`
+	HostScope     string   `json:"host_scope"`
+	HostPlaybooks []string `json:"host_playbooks,omitempty"`
+	RunnerInputs  []string `json:"runner_inputs,omitempty"`
+	Reasons       []string `json:"reasons,omitempty"`
 }
 
 var projectNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
