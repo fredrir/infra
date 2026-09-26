@@ -8,13 +8,10 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/itchyny/gojq"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -30,6 +27,7 @@ type workflowStep struct {
 
 type workflowJob struct {
 	Name           string            `yaml:"name"`
+	Environment    string            `yaml:"environment"`
 	Uses           string            `yaml:"uses"`
 	With           map[string]string `yaml:"with"`
 	If             string            `yaml:"if"`
@@ -115,189 +113,151 @@ func conjunction(t *testing.T, condition string, facts map[string]bool) bool {
 	return true
 }
 
-func TestDriftRepairDispatchRequiresRequestedRepairOfVerification(t *testing.T) {
-	workflow := readWorkflow(t, "reconcile-job.yml")
-	repair, ok := workflow.Jobs["repair"]
-	if !ok || !reflect.DeepEqual(repair.Permissions, map[string]string{"actions": "write"}) {
-		t.Fatalf("repair job permissions are not exactly actions: write: %+v", repair.Permissions)
+func TestHostedWorkflowsNeitherApplyNorRepair(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join("..", "..", ".github/workflows", "*.yml"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	facts := func(verify, repair bool) map[string]bool {
-		return map[string]bool{"inputs.verify": verify, "inputs.repair": repair, "!cancelled()": true, "needs.apply.result == 'failure'": true, "needs.apply.outputs.reconciliation == 'failure'": true, "needs.apply.outputs.differences == 'true'": true}
-	}
-	for _, test := range []struct {
-		name           string
-		verify, repair bool
-		dispatch       bool
-	}{
-		{name: "push"},
-		{name: "on-demand verification", verify: true},
-		{name: "repair without verification", repair: true},
-		{name: "verification with repair", verify: true, repair: true, dispatch: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			if dispatch := conjunction(t, repair.If, facts(test.verify, test.repair)); dispatch != test.dispatch {
-				t.Fatalf("repair dispatched=%t for condition %q", dispatch, repair.If)
-			}
-		})
-	}
-	for _, requirement := range []string{"!cancelled()", "needs.apply.result == 'failure'", "needs.apply.outputs.reconciliation == 'failure'", "needs.apply.outputs.differences == 'true'"} {
-		scenario := facts(true, true)
-		scenario[requirement] = false
-		if conjunction(t, repair.If, scenario) {
-			t.Errorf("repair job condition %q does not require %s", repair.If, requirement)
-		}
-	}
-	for _, guard := range []string{"--workflow reconcile.yml", "--event workflow_dispatch", "--user 'github-actions[bot]'", `--commit "$GITHUB_SHA"`, "--limit 1", "--json conclusion,createdAt"} {
-		if !strings.Contains(repair.script(), guard) {
-			t.Errorf("repair dispatch lacks guard %s:\n%s", guard, repair.script())
-		}
-	}
-	for name, job := range workflow.Jobs {
-		if name != "repair" && job.Permissions["actions"] == "write" {
-			t.Errorf("job %s can dispatch workflows", name)
-		}
-	}
-	if verification := workflow.Jobs["apply"].Env["VERIFICATION"]; verification != "${{ inputs.verify }}" {
-		t.Errorf("dispatched verification selects %q", verification)
-	}
-	caller := readWorkflow(t, "reconcile.yml")
-	if forwarded := caller.Jobs["reconcile"].With; forwarded["verify"] != "${{ inputs.verify || false }}" || forwarded["repair"] != "${{ inputs.repair || false }}" {
-		t.Errorf("reconciliation forwards %v", forwarded)
-	}
-	triggers := slices.Sorted(maps.Keys(caller.On))
-	if !slices.Equal(triggers, []string{"pull_request", "push", "workflow_dispatch"}) {
-		t.Errorf("reconciliation triggers %v, want push, pull_request and workflow_dispatch only", triggers)
-	}
-	inputs := caller.inputs(t, "workflow_dispatch")
-	for name, want := range map[string]workflowInput{"full": {Type: "boolean", Default: true}, "verify": {Type: "boolean", Default: false}, "repair": {Type: "boolean", Default: false}} {
-		if inputs[name] != want {
-			t.Errorf("dispatch input %s is %+v, want %+v", name, inputs[name], want)
-		}
-	}
-	for name, input := range readWorkflow(t, "reconcile-job.yml").inputs(t, "workflow_call") {
-		if input != (workflowInput{Type: "boolean", Default: false}) {
-			t.Errorf("called input %s is %+v", name, input)
-		}
-	}
-	for _, name := range []string{"reconcile.yml", "reconcile-job.yml"} {
-		data, err := os.ReadFile(filepath.Join("..", "..", ".github/workflows", name))
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(data), "schedule") {
-			t.Errorf("%s still depends on a GitHub schedule", name)
-		}
-	}
-}
-
-func repairQuery(t *testing.T, listing string) *gojq.Code {
-	t.Helper()
-	return jobQuery(t, "repair", listing)
-}
-
-func jobQueryText(t *testing.T, job, listing string) string {
-	t.Helper()
-	script := readWorkflow(t, "reconcile-job.yml").Jobs[job].script()
-	for _, line := range strings.Split(script, "\n") {
-		if match := regexp.MustCompile(`--jq '([^']+)'`).FindStringSubmatch(line); match != nil && strings.Contains(line, listing) {
-			return match[1]
-		}
-	}
-	t.Fatalf("%s job has no query over %s runs:\n%s", job, listing, script)
-	return ""
-}
-
-func jobQuery(t *testing.T, job, listing string, options ...gojq.CompilerOption) *gojq.Code {
-	t.Helper()
-	query, err := gojq.Parse(jobQueryText(t, job, listing))
-	if err != nil {
-		t.Fatal(err)
-	}
-	program, err := gojq.Compile(query, options...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return program
-}
-
-func queryResults(t *testing.T, program *gojq.Code, input any) []any {
-	t.Helper()
-	var results []any
-	iterator := program.Run(input)
-	for {
-		result, ok := iterator.Next()
-		if !ok {
-			return results
-		}
-		if err, ok := result.(error); ok {
-			t.Fatal(err)
-		}
-		results = append(results, result)
-	}
-}
-
-func TestRepairWaitsForPendingPushApplies(t *testing.T) {
-	script := readWorkflow(t, "reconcile-job.yml").Jobs["repair"].script()
-	for _, guard := range []string{"--workflow reconcile.yml --event push --branch main", "--json databaseId,status", `gh api --paginate "repos/$GH_REPO/actions/runs/$run/jobs"`} {
-		if !strings.Contains(script, guard) {
-			t.Errorf("repair dispatch lacks push guard %s:\n%s", guard, script)
-		}
-	}
-	if strings.Contains(script, "--event push --commit") {
-		t.Errorf("repair dispatch only waits for push reconciliations of its own commit:\n%s", script)
-	}
-	if strings.Index(script, "/jobs") > strings.Index(script, "gh workflow run") {
-		t.Errorf("repair dispatches before checking pending push applies:\n%s", script)
-	}
-	pending := repairQuery(t, "--event push")
-	for _, test := range []struct {
-		statuses []string
-		want     []any
-	}{
-		{},
-		{statuses: []string{"completed", "completed"}},
-		{statuses: []string{"queued", "completed", "in_progress"}, want: []any{0, 2}},
-		{statuses: []string{"pending", "waiting", "requested"}, want: []any{0, 1, 2}},
-	} {
-		runs := []any{}
-		for id, status := range test.statuses {
-			runs = append(runs, map[string]any{"databaseId": id, "status": status})
-		}
-		if got := queryResults(t, pending, runs); !reflect.DeepEqual(got, test.want) {
-			t.Errorf("push runs %v awaited %v, want %v", test.statuses, got, test.want)
-		}
-	}
-	caller := readWorkflow(t, "reconcile.yml").Jobs["reconcile"]
-	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
-	if caller.Uses != "./.github/workflows/reconcile-job.yml" {
-		t.Fatalf("reconcile job calls %q", caller.Uses)
-	}
-	if name := cmp.Or(caller.Name, "reconcile") + " / " + cmp.Or(apply.Name, "apply"); !strings.Contains(script, `.name == "`+name+`"`) {
-		t.Errorf("repair dispatch does not wait for the %q job:\n%s", name, script)
-	}
-	applied := repairQuery(t, "/jobs")
-	for _, test := range []struct {
-		name     string
-		jobs     map[string]string
-		dispatch bool
-	}{
-		{name: "jobs not yet created"},
-		{name: "plan running", jobs: map[string]string{"reconcile / plan": "in_progress"}},
-		{name: "apply queued behind the production group", jobs: map[string]string{"reconcile / plan": "completed", "reconcile / apply": "pending"}},
-		{name: "apply waiting", jobs: map[string]string{"reconcile / apply": "waiting"}},
-		{name: "apply running", jobs: map[string]string{"reconcile / apply": "in_progress"}},
-		{name: "apply completed while an image build waits for its runner", jobs: map[string]string{"reconcile / apply": "completed", "images / image (runner) / build": "queued", "check / validate": "queued"}, dispatch: true},
-		{name: "apply superseded while images build", jobs: map[string]string{"reconcile / apply": "completed", "images / plan": "in_progress"}, dispatch: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			jobs := []any{}
-			for name, status := range test.jobs {
-				jobs = append(jobs, map[string]any{"name": name, "status": status})
+		for _, forbidden := range []string{"reconcile apply", "RUNNER_APP", "PUBLISHER_APP_PRIVATE_KEY", "gh workflow run reconcile.yml", "schedule:"} {
+			if strings.Contains(string(data), forbidden) && (forbidden != "schedule:" || strings.HasPrefix(filepath.Base(path), "reconcile")) {
+				t.Errorf("%s contains %q", filepath.Base(path), forbidden)
 			}
-			if completed := queryResults(t, applied, map[string]any{"jobs": jobs}); (len(completed) > 0) != test.dispatch {
-				t.Fatalf("jobs %v found completed applies %q, want dispatch %t", test.jobs, completed, test.dispatch)
+		}
+	}
+	job := readWorkflow(t, "reconcile-job.yml")
+	if jobs := slices.Sorted(maps.Keys(job.Jobs)); !slices.Equal(jobs, []string{"plan", "verify"}) {
+		t.Fatalf("reconcile-job.yml runs %v, want plan and verify only", jobs)
+	}
+	if inputs := job.inputs(t, "workflow_call"); !reflect.DeepEqual(inputs, map[string]workflowInput{"verify": {Type: "boolean", Default: false}}) {
+		t.Errorf("called inputs %+v", inputs)
+	}
+	caller := readWorkflow(t, "reconcile.yml")
+	if triggers := slices.Sorted(maps.Keys(caller.On)); !slices.Equal(triggers, []string{"pull_request", "push", "workflow_dispatch"}) {
+		t.Errorf("reconciliation triggers %v", triggers)
+	}
+	if inputs := caller.inputs(t, "workflow_dispatch"); !reflect.DeepEqual(inputs, map[string]workflowInput{"verify": {Type: "boolean", Default: false}, "repair": {Type: "boolean", Default: false}}) {
+		t.Errorf("dispatch inputs %+v, want verify and the dispatcher's repair", inputs)
+	}
+	reconcile := caller.Jobs["reconcile"]
+	if !reflect.DeepEqual(reconcile.With, map[string]string{"verify": "${{ inputs.verify || false }}"}) || !slices.Contains(topLevel(t, reconcile.If, "&&"), "github.event_name != 'push'") {
+		t.Errorf("reconcile job runs when %q with %v", reconcile.If, reconcile.With)
+	}
+	for _, name := range []string{"reconcile.yml", "reconcile-job.yml"} {
+		for jobName, definition := range readWorkflow(t, name).Jobs {
+			if definition.Permissions["contents"] == "write" || definition.Permissions["actions"] == "write" {
+				t.Errorf("%s job %s grants %v", name, jobName, definition.Permissions)
 			}
-		})
+		}
+	}
+}
+
+func TestVerificationRunsOnlyWhenRequestedOnProtectedMain(t *testing.T) {
+	verify := readWorkflow(t, "reconcile-job.yml").Jobs["verify"]
+	requirements := []string{"!cancelled()", "github.repository_id == '1328085692'", "github.repository_owner_id == '114402558'", "github.ref == 'refs/heads/main'", "github.ref_protected", "github.event_name == 'workflow_dispatch'", "inputs.verify"}
+	facts := map[string]bool{}
+	for _, requirement := range requirements {
+		facts[requirement] = true
+	}
+	if !conjunction(t, verify.If, facts) {
+		t.Fatalf("verification never runs: %q", verify.If)
+	}
+	for _, requirement := range requirements {
+		facts[requirement] = false
+		if conjunction(t, verify.If, facts) {
+			t.Errorf("verification runs without %s", requirement)
+		}
+		facts[requirement] = true
+	}
+	if verify.Environment != "infrastructure-apply" {
+		t.Errorf("verification environment %q", verify.Environment)
+	}
+}
+
+func TestPlanReadsOnlyItsEnvironmentSecrets(t *testing.T) {
+	workflow := readWorkflow(t, "reconcile-job.yml")
+	plan := workflow.Jobs["plan"]
+	if plan.Environment != "infrastructure-plan" {
+		t.Fatalf("plan environment %q", plan.Environment)
+	}
+	allowed := map[string]string{"AWS_ACCESS_KEY_ID": "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY", "CLOUDFLARE_API_TOKEN": "CLOUDFLARE_API_TOKEN", "TF_VAR_hcloud_token": "HCLOUD_TOKEN", "TF_VAR_platform_mail_recipient": "PLATFORM_MAIL_RECIPIENT", "KUBE_CONFIG": "KUBE_CONFIG"}
+	secret := regexp.MustCompile(`\$\{\{\s*secrets\.([A-Z_]+)\s*\}\}`)
+	read := map[string]bool{}
+	for _, step := range plan.Steps {
+		if strings.Contains(step.Uses, "doppler") || strings.Contains(step.Run, "doppler") {
+			t.Errorf("plan step %q reads Doppler", cmp.Or(step.Name, step.Uses))
+		}
+		for name, value := range step.Env {
+			if strings.Contains(value, "steps.doppler") {
+				t.Errorf("plan step %q reads %s from Doppler", cmp.Or(step.Name, step.Uses), name)
+			}
+			if match := secret.FindStringSubmatch(value); match != nil {
+				if allowed[name] != match[1] {
+					t.Errorf("plan step %q maps secret %s to %s", cmp.Or(step.Name, step.Uses), match[1], name)
+				}
+				read[match[1]] = true
+			}
+		}
+	}
+	if want := []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "CLOUDFLARE_API_TOKEN", "HCLOUD_TOKEN", "KUBE_CONFIG", "PLATFORM_MAIL_RECIPIENT"}; !slices.Equal(slices.Sorted(maps.Keys(read)), want) {
+		t.Errorf("plan reads secrets %v, want %v", slices.Sorted(maps.Keys(read)), want)
+	}
+	for name, job := range workflow.Jobs {
+		for _, step := range job.Steps {
+			if strings.Contains(step.Uses, "dopplerhq/") && name != "verify" {
+				t.Errorf("job %s fetches Doppler", name)
+			}
+		}
+	}
+}
+
+func TestVerificationRunsWithReadOnlyCredentials(t *testing.T) {
+	verify := readWorkflow(t, "reconcile-job.yml").Jobs["verify"]
+	checkout := verify.step(t, func(step workflowStep) bool { return strings.HasPrefix(step.Uses, "actions/checkout@") })
+	if persisted := checkout.With["persist-credentials"]; persisted != "false" {
+		t.Errorf("checkout persists credentials with %q", persisted)
+	}
+	setup := verify.step(t, func(step workflowStep) bool { return step.ID == "setup" })
+	if setup.With["full"] != "true" || setup.With["identity"] != "apply" {
+		t.Errorf("verification prepares tooling with %v", setup.With)
+	}
+	if check := readWorkflow(t, "reconcile.yml").Jobs["check"].If; !slices.Contains(topLevel(t, check, "&&"), "!inputs.verify") {
+		t.Errorf("verification runs repository checks with condition %q", check)
+	}
+	tokens := slices.DeleteFunc(slices.Clone(verify.Steps), func(step workflowStep) bool { return !strings.HasPrefix(step.Uses, "actions/create-github-app-token@") })
+	if len(tokens) != 1 || tokens[0].ID != "observer-token" || tokens[0].If != "" || tokens[0].With["app-id"] != "${{ steps.doppler.outputs.OBSERVER_APP_ID }}" || tokens[0].With["private-key"] != "${{ steps.doppler.outputs.OBSERVER_APP_PRIVATE_KEY }}" || tokens[0].With["permission-administration"] != "read" {
+		t.Fatalf("verification mints %+v", tokens)
+	}
+	for _, step := range verify.Steps {
+		token, ok := step.Env["GH_TOKEN"]
+		if reads := strings.Contains(token, "steps.observer-token"); reads != (step.Name == "Verify the published revision") || (reads && token != "${{ steps.observer-token.outputs.token }}") || (ok && !reads && token != "${{ github.token }}") {
+			t.Errorf("step %q receives GH_TOKEN %q", cmp.Or(step.Name, step.Uses), token)
+		}
+	}
+}
+
+func TestProvenanceCredentialsReachOnlyTheVerifier(t *testing.T) {
+	workflow := readWorkflow(t, "reconcile-job.yml")
+	if _, ok := workflow.Env["PROVENANCE_TOKEN"]; ok {
+		t.Error("every job receives the provenance token")
+	}
+	for name, job := range workflow.Jobs {
+		if packages := job.Permissions["packages"]; packages != map[bool]string{true: "read"}[name == "verify"] {
+			t.Errorf("job %s has packages permission %q", name, packages)
+		}
+		if _, ok := job.Env["PROVENANCE_TOKEN"]; ok {
+			t.Errorf("job %s passes the provenance token to every step", name)
+		}
+		for _, step := range job.Steps {
+			token, ok := step.Env["PROVENANCE_TOKEN"]
+			if verifier := name == "verify" && (step.Name == "Verify the published revision" || step.Name == provenanceGateStep); ok != verifier || (verifier && token != "${{ github.token }}") {
+				t.Errorf("job %s step %q receives provenance token %q", name, cmp.Or(step.Name, step.Uses, step.Run), token)
+			}
+		}
 	}
 }
 
@@ -310,80 +270,6 @@ func TestCalledReconciliationJobsRequestOnlyGrantedPermissions(t *testing.T) {
 				t.Errorf("job %s requests %s: %s beyond the caller's %q", name, scope, level, caller.Permissions[scope])
 			}
 		}
-	}
-}
-
-func TestApplyJobOutlivesTheApplyDeadline(t *testing.T) {
-	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
-	flag := regexp.MustCompile(`infra reconcile apply --wait=(\S+) `).FindStringSubmatch(apply.step(t, func(step workflowStep) bool { return step.ID == "reconcile" }).Run)
-	if flag == nil {
-		t.Fatal("apply does not wait for an abandoned lease")
-	}
-	wait, err := time.ParseDuration(flag[1])
-	if err != nil || wait <= leaseTTL {
-		t.Fatalf("apply waits %s for a lease that expires after %s", flag[1], leaseTTL)
-	}
-	action, err := os.ReadFile(filepath.Join("..", "..", ".github/actions/setup-reconciliation-cli/action.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	build := regexp.MustCompile(`deadline = time\.monotonic\(\) \+ (\d+)\n`).FindSubmatch(action)
-	if build == nil {
-		t.Fatal("shared CLI build wait is unbounded")
-	}
-	seconds, err := strconv.Atoi(string(build[1]))
-	if err != nil {
-		t.Fatal(err)
-	}
-	minutes, ok := apply.TimeoutMinutes.(int)
-	if margin := time.Duration(minutes)*time.Minute - time.Duration(seconds)*time.Second - wait - applyDeadline; !ok || margin < 3*time.Minute {
-		t.Fatalf("apply job timeout of %v minutes leaves %s beyond the shared CLI build wait, lease wait and apply deadline for setup and reporting", apply.TimeoutMinutes, margin)
-	}
-}
-
-func TestRepairCapFollowsLatestDispatchedReconciliation(t *testing.T) {
-	program := repairQuery(t, "--event workflow_dispatch")
-	for _, test := range []struct {
-		name       string
-		conclusion string
-		age        time.Duration
-		dispatch   bool
-	}{
-		{name: "failed a week ago", conclusion: "failure", age: 7 * 24 * time.Hour},
-		{name: "timed out a week ago", conclusion: "timed_out", age: 7 * 24 * time.Hour},
-		{name: "failed to start a week ago", conclusion: "startup_failure", age: 7 * 24 * time.Hour},
-		{name: "succeeded within six hours", conclusion: "success", age: time.Hour},
-		{name: "in progress", age: time.Hour},
-		{name: "succeeded over six hours ago", conclusion: "success", age: 7 * time.Hour, dispatch: true},
-		{name: "cancelled within six hours", conclusion: "cancelled", age: time.Hour, dispatch: true},
-		{name: "cancelled over six hours ago", conclusion: "cancelled", age: 7 * time.Hour, dispatch: true},
-		{name: "never dispatched", dispatch: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			runs := []any{}
-			if test.age > 0 {
-				runs = append(runs, map[string]any{"conclusion": test.conclusion, "createdAt": time.Now().Add(-test.age).UTC().Format(time.RFC3339)})
-			}
-			suppressed := queryResults(t, program, runs)
-			if (len(suppressed) == 0) != test.dispatch {
-				t.Fatalf("previous reconciliation %+v suppressed the repair with %q", runs, suppressed)
-			}
-		})
-	}
-}
-
-func TestVerificationRunsWithReadOnlyCredentials(t *testing.T) {
-	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
-	checkout := apply.step(t, func(step workflowStep) bool { return strings.HasPrefix(step.Uses, "actions/checkout@") })
-	if persisted := checkout.With["persist-credentials"]; persisted != "false" {
-		t.Errorf("checkout persists credentials with %q", persisted)
-	}
-	setup := apply.step(t, func(step workflowStep) bool { return step.ID == "setup" })
-	if full := setup.With["full"]; full != "${{ env.VERIFICATION == 'true' || inputs.full }}" {
-		t.Errorf("verification prepares tooling with full=%q", full)
-	}
-	if check := readWorkflow(t, "reconcile.yml").Jobs["check"].If; !slices.Contains(topLevel(t, check, "&&"), "!inputs.verify") {
-		t.Errorf("verification runs repository checks with condition %q", check)
 	}
 }
 
@@ -479,95 +365,13 @@ func TestSupersessionIgnoresExactlyThePushIgnoredPaths(t *testing.T) {
 	}
 }
 
-func TestRetriedApplyRequiresANewerPendingPushApply(t *testing.T) {
-	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
-	reconcile := apply.step(t, func(step workflowStep) bool { return step.ID == "reconcile" })
-	for _, mapping := range []string{`if [ "$code" -eq 75 ]; then`, `echo 'retry=true' >> "$GITHUB_OUTPUT"`, `exit "$code"`} {
-		if !strings.Contains(reconcile.Run, mapping) {
-			t.Errorf("apply step lacks %s:\n%s", mapping, reconcile.Run)
-		}
-	}
-	successor := apply.step(t, func(step workflowStep) bool { return strings.Contains(step.Run, "gh run list") })
-	for _, guard := range []string{"--workflow reconcile.yml --event push --branch main", "--json databaseId,status", `for run in $newer; do`, `gh api --paginate "repos/$GH_REPO/actions/runs/$run/jobs"`, `if [ -z "$applied" ]; then`} {
-		if !strings.Contains(successor.Run, guard) {
-			t.Errorf("successor check lacks %s:\n%s", guard, successor.Run)
-		}
-	}
-	if successor.If != "steps.reconcile.outputs.retry == 'true'" || strings.Index(successor.Run, "exit 0") > strings.Index(successor.Run, "exit 1") {
-		t.Errorf("successor check does not fail without a pending apply:\n%s", successor.Run)
-	}
-	if applied, repaired := jobQueryText(t, "apply", "/jobs"), jobQueryText(t, "repair", "/jobs"); applied != repaired {
-		t.Errorf("successor check reads apply jobs with %q, repair with %q", applied, repaired)
-	}
-	newer := jobQuery(t, "apply", "gh run list", gojq.WithEnvironLoader(func() []string { return []string{"GITHUB_RUN_ID=100"} }))
-	for _, test := range []struct {
-		runs map[int]string
-		want []any
-	}{
-		{},
-		{runs: map[int]string{100: "in_progress", 99: "queued"}},
-		{runs: map[int]string{101: "completed"}},
-		{runs: map[int]string{101: "queued"}, want: []any{101}},
-		{runs: map[int]string{101: "in_progress", 100: "in_progress"}, want: []any{101}},
-	} {
-		runs := []any{}
-		for id, status := range test.runs {
-			runs = append(runs, map[string]any{"databaseId": id, "status": status})
-		}
-		if got := queryResults(t, newer, runs); !reflect.DeepEqual(got, test.want) {
-			t.Errorf("runs %v deferred to %v, want %v", test.runs, got, test.want)
-		}
-	}
-}
-
-func TestProvenanceCredentialsReachOnlyTheApplyEngine(t *testing.T) {
-	workflow := readWorkflow(t, "reconcile-job.yml")
-	if _, ok := workflow.Env["PROVENANCE_TOKEN"]; ok {
-		t.Error("every job receives the provenance token")
-	}
-	for name, job := range workflow.Jobs {
-		if packages := job.Permissions["packages"]; packages != map[bool]string{true: "read"}[name == "apply"] {
-			t.Errorf("job %s has packages permission %q", name, packages)
-		}
-		if _, ok := job.Env["PROVENANCE_TOKEN"]; ok {
-			t.Errorf("job %s passes the provenance token to every step", name)
-		}
-		for _, step := range job.Steps {
-			token, ok := step.Env["PROVENANCE_TOKEN"]
-			if verifier := name == "apply" && (step.ID == "reconcile" || step.Name == provenanceGateStep); ok != verifier || (verifier && token != "${{ github.token }}") {
-				t.Errorf("job %s step %q receives provenance token %q", name, cmp.Or(step.ID, step.Uses, step.Run), token)
-			}
-		}
-	}
-	if setup := workflow.Jobs["apply"].step(t, func(step workflowStep) bool { return step.ID == "setup" }); setup.Uses != "./.github/actions/setup-reconciliation" || setup.With["identity"] != "apply" {
-		t.Fatalf("apply prepares tooling with %+v", setup)
-	}
-	data, err := os.ReadFile(filepath.Join("..", "..", ".github/actions/setup-reconciliation/action.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var action struct {
-		Runs struct {
-			Steps []workflowStep `yaml:"steps"`
-		} `yaml:"runs"`
-	}
-	if err := yaml.Unmarshal(data, &action); err != nil {
-		t.Fatal(err)
-	}
-	if !slices.ContainsFunc(action.Runs.Steps, func(step workflowStep) bool {
-		return step.Env["IDENTITY"] == "${{ inputs.identity }}" && strings.Contains(step.Run, `if [ "$IDENTITY" = apply ]; then infra ci install-tools gh cosign; fi`)
-	}) {
-		t.Error("apply tooling lacks the attestation verifiers")
-	}
-}
-
 const provenanceGateStep = "Verify commit provenance"
 
 func TestProvenanceGateRunsBeforeAnyCheckoutCode(t *testing.T) {
-	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
+	apply := readWorkflow(t, "reconcile-job.yml").Jobs["verify"]
 	gate := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.Name == provenanceGateStep })
 	if gate < 0 {
-		t.Fatal("apply has no provenance gate")
+		t.Fatal("verification has no provenance gate")
 	}
 	pinnedAction := regexp.MustCompile(`@[a-f0-9]{40}$`)
 	trusted := apply.Steps[:gate]
@@ -601,138 +405,5 @@ func TestProvenanceGateRunsBeforeAnyCheckoutCode(t *testing.T) {
 	}
 	if summary := apply.step(t, func(step workflowStep) bool { return step.Name == "Summarize reconciliation" }); !strings.Contains(summary.Run, "for report in provenance ") {
 		t.Errorf("provenance report is not summarized:\n%s", summary.Run)
-	}
-}
-
-const (
-	publisherKey      = "PUBLISHER_APP_PRIVATE_KEY"
-	publisherKeyStep  = "Write publisher key"
-	publisherKeyPath  = `"$RUNNER_TEMP/publisher/key.pem"`
-	publisherKeyInput = "${{ env.VERIFICATION != 'true' && format('{0}/publisher/key.pem', runner.temp) || '' }}"
-)
-
-func TestPublisherKeyReachesTheEngineOnlyAsAFile(t *testing.T) {
-	workflow := readWorkflow(t, "reconcile-job.yml")
-	if _, ok := workflow.Env[publisherKey]; ok {
-		t.Error("every job receives the publisher key")
-	}
-	for name, job := range workflow.Jobs {
-		if _, ok := job.Env[publisherKey]; ok {
-			t.Errorf("job %s passes the publisher key to every step", name)
-		}
-		if contents := job.Permissions["contents"]; contents == "write" {
-			t.Errorf("job %s can push with its workflow token", name)
-		}
-		for _, step := range job.Steps {
-			writer := name == "apply" && step.Name == publisherKeyStep
-			if key, ok := step.Env[publisherKey]; ok != writer || (writer && key != "${{ steps.doppler.outputs.PUBLISHER_APP_PRIVATE_KEY }}") {
-				t.Errorf("job %s step %q receives publisher key %q", name, cmp.Or(step.ID, step.Name, step.Uses), key)
-			}
-			if path, ok := step.Env[publisherKey+"_FILE"]; ok != (name == "apply" && step.ID == "reconcile") || (ok && path != publisherKeyInput) {
-				t.Errorf("job %s step %q receives publisher key file %q", name, cmp.Or(step.ID, step.Name, step.Uses), path)
-			}
-			if !writer && (strings.Contains(step.Run, publisherKey) || slices.ContainsFunc(slices.Collect(maps.Values(step.With)), func(value string) bool { return strings.Contains(value, publisherKey) })) {
-				t.Errorf("job %s step %q reads the publisher key outside the engine", name, cmp.Or(step.ID, step.Name, step.Uses))
-			}
-		}
-	}
-	apply := workflow.Jobs["apply"]
-	if !reflect.DeepEqual(apply.Permissions, map[string]string{"contents": "read", "id-token": "write", "actions": "read", "packages": "read", "pull-requests": "read"}) {
-		t.Errorf("apply permissions %v", apply.Permissions)
-	}
-	writer := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.Name == publisherKeyStep })
-	reconcile := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.ID == "reconcile" })
-	gate := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.Name == provenanceGateStep })
-	if writer < 0 || reconcile != writer+1 || gate > writer {
-		t.Fatalf("publisher key written at step %d, gate %d, reconcile %d", writer, gate, reconcile)
-	}
-	write := apply.Steps[writer]
-	if write.If != "env.VERIFICATION != 'true'" || !strings.HasPrefix(write.Run, "umask 077\n") || !strings.Contains(write.Run, `"$`+publisherKey+`" > `+publisherKeyPath) {
-		t.Errorf("publisher key written when %q by:\n%s", write.If, write.Run)
-	}
-	run := apply.Steps[reconcile].Run
-	if !strings.Contains(run, `if [ "$VERIFICATION" = true ]; then`) || !strings.Contains(run, "infra reconcile verify") || !strings.Contains(run, "infra reconcile apply") {
-		t.Errorf("reconcile step no longer separates verification from apply:\n%s", run)
-	}
-	cleanup := apply.step(t, func(step workflowStep) bool { return step.Name == "Remove session credentials" })
-	if cleanup.If != "always()" || !strings.Contains(cleanup.Run, publisherKeyPath) {
-		t.Errorf("session cleanup when %q does not remove the publisher key:\n%s", cleanup.If, cleanup.Run)
-	}
-	for _, name := range []string{"reconcile.yml", "reconcile-job.yml"} {
-		for job, definition := range readWorkflow(t, name).Jobs {
-			if definition.Permissions["contents"] == "write" {
-				t.Errorf("%s job %s grants contents: write", name, job)
-			}
-		}
-	}
-}
-
-func TestRunnerTokenReachesOnlyTheEngine(t *testing.T) {
-	for name, job := range readWorkflow(t, "reconcile-job.yml").Jobs {
-		for _, step := range job.Steps {
-			engine := name == "apply" && step.ID == "reconcile"
-			if token := step.Env["GH_TOKEN"]; (token == "${{ steps.runner-token.outputs.token || steps.observer-token.outputs.token }}") != engine {
-				t.Errorf("job %s step %q receives GH_TOKEN %q", name, cmp.Or(step.ID, step.Name, step.Uses), token)
-			}
-			readsToken := func(value string) bool {
-				return strings.Contains(value, "steps.runner-token") || strings.Contains(value, "steps.observer-token")
-			}
-			if readsToken(step.Run) || (!engine && slices.ContainsFunc(slices.Collect(maps.Values(step.Env)), readsToken)) {
-				t.Errorf("job %s step %q reads a fleet token", name, cmp.Or(step.ID, step.Name, step.Uses))
-			}
-		}
-	}
-}
-
-func TestVerificationMintsOnlyObserverTokens(t *testing.T) {
-	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
-	for id, want := range map[string]struct{ condition, app, permission string }{
-		"observer-token": {"env.VERIFICATION == 'true'", "OBSERVER_APP", "read"},
-		"runner-token":   {"env.VERIFICATION != 'true'", "RUNNER_APP", "write"},
-	} {
-		step := apply.step(t, func(step workflowStep) bool { return step.ID == id })
-		if !strings.Contains(step.If, want.condition) || step.With["app-id"] != "${{ steps.doppler.outputs."+want.app+"_ID }}" || step.With["private-key"] != "${{ steps.doppler.outputs."+want.app+"_PRIVATE_KEY }}" || step.With["permission-administration"] != want.permission {
-			t.Errorf("%s mints with %v when %q", id, step.With, step.If)
-		}
-	}
-	for _, step := range apply.Steps {
-		if step.ID != "runner-token" && slices.ContainsFunc(slices.Collect(maps.Values(step.With)), func(value string) bool { return strings.Contains(value, "RUNNER_APP_PRIVATE_KEY") }) {
-			t.Errorf("step %q reads the runner App key", cmp.Or(step.ID, step.Name, step.Uses))
-		}
-	}
-}
-
-func TestRulesetDifferencesDoNotDispatchRepair(t *testing.T) {
-	step := readWorkflow(t, "reconcile-job.yml").Jobs["apply"].step(t, func(step workflowStep) bool { return step.ID == "verification" })
-	match := regexp.MustCompile(`jq -e '([^']+)' "\$report"`).FindStringSubmatch(step.Run)
-	if match == nil {
-		t.Fatalf("difference selection not found:\n%s", step.Run)
-	}
-	query, err := gojq.Parse(match[1])
-	if err != nil {
-		t.Fatal(err)
-	}
-	program, err := gojq.Compile(query)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, test := range []struct {
-		systems []string
-		repair  bool
-	}{
-		{},
-		{systems: []string{"rulesets"}},
-		{systems: []string{"rulesets", "rulesets"}},
-		{systems: []string{"revision"}, repair: true},
-		{systems: []string{"rulesets", "hosts"}, repair: true},
-	} {
-		differences := []any{}
-		for _, system := range test.systems {
-			differences = append(differences, map[string]any{"system": system, "item": "x"})
-		}
-		results := queryResults(t, program, map[string]any{"differences": differences})
-		if len(results) != 1 || results[0] != test.repair {
-			t.Errorf("differences in %v select repair %v, want %t", test.systems, results, test.repair)
-		}
 	}
 }

@@ -1,14 +1,8 @@
-name: Apply infrastructure
+name: Plan and verify infrastructure
 on:
   workflow_call:
     inputs:
-      full:
-        type: boolean
-        default: false
       verify:
-        type: boolean
-        default: false
-      repair:
         type: boolean
         default: false
 permissions:
@@ -40,22 +34,17 @@ jobs:
         fetch-depth: 0
         persist-credentials: false
     - uses: ./.github/actions/setup-reconciliation-cli
-    - uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
-      if: github.event.pull_request.head.repo.full_name == github.repository
-      id: doppler
-      with:
-        doppler-token: ${{ secrets.DOPPLER_TOKEN }}
     - uses: ./.github/actions/setup-reconciliation
       with:
         network: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
       env:
-        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
-        KUBE_CONFIG: ${{ steps.doppler.outputs.KUBE_CONFIG }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
+        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
     - name: Validate affected declarations
       env:
         BEFORE: ${{ github.event.pull_request.base.sha }}
@@ -66,11 +55,11 @@ jobs:
       if: github.event.pull_request.head.repo.full_name == github.repository
       env:
         BASE: ${{ github.event.pull_request.base.sha }}
-        AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
-        CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
-        TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
-        TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+        TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
       run: |
         set -o pipefail
         infra reconcile plan --base "$BASE" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
@@ -93,22 +82,17 @@ jobs:
       if: always()
       run: |
         rm -f "$RUNNER_TEMP/reconcile-kubeconfig"
-  apply:
-    if: ${{ !cancelled() && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name != 'pull_request' }}
+  verify:
+    if: ${{ !cancelled() && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && github.event_name == 'workflow_dispatch' && inputs.verify }}
     runs-on: ubuntu-24.04
     environment: infrastructure-apply
-    timeout-minutes: 130
+    timeout-minutes: 40
     permissions:
       contents: read
       id-token: write
       actions: read
       packages: read
       pull-requests: read
-    env:
-      VERIFICATION: ${{ inputs.verify }}
-    outputs:
-      reconciliation: ${{ steps.reconcile.outcome }}
-      differences: ${{ steps.verification.outputs.differences }}
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
@@ -143,7 +127,7 @@ jobs:
       with:
         network: 'true'
         identity: apply
-        full: ${{ env.VERIFICATION == 'true' || inputs.full }}
+        full: 'true'
         tailscale-client-id: ${{ vars.TAILSCALE_CLIENT_ID }}
       env:
         AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
@@ -153,7 +137,6 @@ jobs:
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
         KUBE_CONFIG: ${{ steps.doppler.outputs.KUBE_CONFIG }}
     - name: Configure host identity
-      if: steps.setup.outputs.hosts == 'true'
       env:
         SSH_PRIVATE_KEY: ${{ steps.doppler.outputs.SSH_PRIVATE_KEY }}
         SSH_KNOWN_HOSTS: ${{ steps.doppler.outputs.SSH_KNOWN_HOSTS }}
@@ -171,7 +154,6 @@ jobs:
         infra ci prepare-validation
         infra ci validate
     - name: Read declared runner fleet
-      if: steps.setup.outputs.hosts == 'true'
       id: runner-fleet
       run: |
         owner=$(jq -r '.owner' build/runners.json)
@@ -179,7 +161,6 @@ jobs:
         test -n "$owner" && test "$owner" != null && test -n "$repositories"
         printf 'owner=%s\nrepositories=%s\n' "$owner" "$repositories" >> "$GITHUB_OUTPUT"
     - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
-      if: steps.setup.outputs.hosts == 'true' && env.VERIFICATION == 'true'
       id: observer-token
       with:
         app-id: ${{ steps.doppler.outputs.OBSERVER_APP_ID }}
@@ -187,76 +168,19 @@ jobs:
         owner: ${{ steps.runner-fleet.outputs.owner }}
         repositories: ${{ steps.runner-fleet.outputs.repositories }}
         permission-administration: read
-    - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
-      if: steps.setup.outputs.hosts == 'true' && env.VERIFICATION != 'true'
-      id: runner-token
-      with:
-        app-id: ${{ steps.doppler.outputs.RUNNER_APP_ID }}
-        private-key: ${{ steps.doppler.outputs.RUNNER_APP_PRIVATE_KEY }}
-        owner: ${{ steps.runner-fleet.outputs.owner }}
-        repositories: ${{ steps.runner-fleet.outputs.repositories }}
-        permission-administration: write
-    - name: Write publisher key
-      if: env.VERIFICATION != 'true'
-      env:
-        PUBLISHER_APP_PRIVATE_KEY: ${{ steps.doppler.outputs.PUBLISHER_APP_PRIVATE_KEY }}
-      run: |
-        umask 077
-        mkdir -p "$RUNNER_TEMP/publisher"
-        printf '%s\n' "$PUBLISHER_APP_PRIVATE_KEY" > "$RUNNER_TEMP/publisher/key.pem"
-    - name: Reconcile merged revision
-      id: reconcile
+    - name: Verify the published revision
       env:
         AWS_ACCESS_KEY_ID: ${{ steps.doppler.outputs.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ steps.doppler.outputs.AWS_SECRET_ACCESS_KEY }}
         CLOUDFLARE_API_TOKEN: ${{ steps.doppler.outputs.CLOUDFLARE_API_TOKEN }}
         TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
-        GH_TOKEN: ${{ steps.runner-token.outputs.token || steps.observer-token.outputs.token }}
+        GH_TOKEN: ${{ steps.observer-token.outputs.token }}
         PROVENANCE_TOKEN: ${{ github.token }}
-        PUBLISHER_APP_PRIVATE_KEY_FILE: ${{ env.VERIFICATION != 'true' && format('{0}/publisher/key.pem', runner.temp) || '' }}
-        FULL: ${{ inputs.full }}
         STRATEGY_OVERRIDE: ${{ vars.INFRA_ANSIBLE_STRATEGY }}
       run: |
         if [ -n "$STRATEGY_OVERRIDE" ]; then export ANSIBLE_STRATEGY="$STRATEGY_OVERRIDE"; fi
-        if [ "$VERIFICATION" = true ]; then
-          infra ci measure --stage drift-verification --budget 10m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --scope=full --report="$RUNNER_TEMP/reconciliation/verification.json"
-        else
-          code=0
-          infra reconcile apply --wait=11m --full="$FULL" --report="$RUNNER_TEMP/reconciliation/status.json" || code=$?
-          if [ "$code" -eq 75 ]; then
-            echo 'retry=true' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          exit "$code"
-        fi
-    - name: Require a newer reconciliation of main
-      if: steps.reconcile.outputs.retry == 'true'
-      env:
-        GH_TOKEN: ${{ github.token }}
-        GH_REPO: ${{ github.repository }}
-      run: |
-        # shellcheck disable=SC2016
-        newer=$(gh run list --workflow reconcile.yml --event push --branch main --json databaseId,status --jq '.[] | select(.databaseId > ($ENV.GITHUB_RUN_ID | tonumber) and .status != "completed") | .databaseId')
-        for run in $newer; do
-          applied=$(gh api --paginate "repos/$GH_REPO/actions/runs/$run/jobs" --jq '.jobs[] | select(.name == "reconcile / apply" and .status == "completed") | .status')
-          if [ -z "$applied" ]; then
-            echo "::notice::Reconciliation deferred to run $run"
-            exit 0
-          fi
-        done
-        echo "::error::Reconciliation must be retried and no newer push reconciliation of main has a pending apply"
-        exit 1
-    - name: Read declared differences
-      id: verification
-      if: always() && inputs.verify && inputs.repair
-      run: |
-        report="$RUNNER_TEMP/reconciliation/verification.json"
-        differences=false
-        if [ -f "$report" ] && jq -e 'any(.differences[]; .system != "rulesets")' "$report" >/dev/null; then
-          differences=true
-        fi
-        printf 'differences=%s\n' "$differences" >> "$GITHUB_OUTPUT"
+        infra ci measure --stage drift-verification --budget 10m --report-dir "$RUNNER_TEMP/reconciliation" -- infra reconcile verify --scope=full --report="$RUNNER_TEMP/reconciliation/verification.json"
     - name: Record workflow timing
       if: always()
       env:
@@ -268,7 +192,7 @@ jobs:
     - name: Summarize reconciliation
       if: always()
       run: |
-        for report in provenance status verification; do
+        for report in provenance verification; do
           if [ -f "$RUNNER_TEMP/reconciliation/$report.json" ]; then
             {
               printf '```json\n'
@@ -287,31 +211,4 @@ jobs:
     - name: Remove session credentials
       if: always()
       run: |
-        rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$RUNNER_TEMP/publisher/key.pem" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"
-  repair:
-    needs: apply
-    if: ${{ !cancelled() && needs.apply.result == 'failure' && inputs.verify && inputs.repair && needs.apply.outputs.reconciliation == 'failure' && needs.apply.outputs.differences == 'true' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      actions: write
-    steps:
-    - name: Request full reconciliation
-      env:
-        GH_TOKEN: ${{ github.token }}
-        GH_REPO: ${{ github.repository }}
-      run: |
-        pushed=$(gh run list --workflow reconcile.yml --event push --branch main --json databaseId,status --jq '.[] | select(.status != "completed") | .databaseId')
-        for run in $pushed; do
-          applied=$(gh api --paginate "repos/$GH_REPO/actions/runs/$run/jobs" --jq '.jobs[] | select(.name == "reconcile / apply" and .status == "completed") | .status')
-          if [ -z "$applied" ]; then
-            echo "::warning::Push reconciliation run $run has not completed its apply; not dispatching a repair"
-            exit 0
-          fi
-        done
-        previous=$(gh run list --workflow reconcile.yml --event workflow_dispatch --user 'github-actions[bot]' --commit "$GITHUB_SHA" --limit 1 --json conclusion,createdAt --jq '.[] | if (.conclusion | IN("failure", "timed_out", "startup_failure")) then "ended in \(.conclusion)" elif .conclusion != "cancelled" and now - (.createdAt | fromdateiso8601) < 21600 then "started within six hours" else empty end')
-        if [ -n "$previous" ]; then
-          echo "::warning::The dispatched full reconciliation of $GITHUB_SHA $previous; not dispatching another"
-          exit 0
-        fi
-        gh workflow run reconcile.yml --ref main -f full=true
+        rm -f "$RUNNER_TEMP/reconcile-kubeconfig" "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/known_hosts"
