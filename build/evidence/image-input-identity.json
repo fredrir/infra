@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-26T18:21:18+00:00",
+  "image_rebuilds": {
+    "revisions": 72,
+    "window": "71 reconcile.yml push revisions 2026-09-24T17:31Z..2026-09-26T16:40Z and 4fc2c41",
+    "method": "A rebuild is an input identity not seen at an earlier revision. Source identity: catalog inputs at each revision, internal/dev excluded. Binary identity: shared workflows, recipe inputs and the sha256 of go build -trimpath -buildvcs=false ./cmd/infra at each revision.",
+    "observed_production_rebuilds": {
+      "pushes": 70,
+      "infra-runner-check": 54,
+      "infra-runner-rust": 52,
+      "platform-backup-tools": 52
+    },
+    "rebuilds": {
+      "infra-runner-check": {
+        "source_identity": 50,
+        "binary_identity": 28
+      },
+      "infra-runner-rust": {
+        "source_identity": 51,
+        "binary_identity": 29
+      },
+      "platform-backup-tools": {
+        "source_identity": 50,
+        "binary_identity": 27
+      }
+    },
+    "revisions_without_cli_image_builds": {
+      "source_identity": 21,
+      "binary_identity": 42
+    },
+    "cli_binary_changes_between_revisions": 26,
+    "pinned_cli_releases": 5,
+    "cli_image_build_vm_seconds": {
+      "observed": 16575,
+      "avoidable": 5903
+    }
+  },
+  "binary_reproducibility": {
+    "command": "bazel --batch build --config=ci --platforms=@rules_go//go/toolchain:linux_amd64 --@rules_go//go/config:pure //cmd/infra:infra",
+    "test_only_revisions": {
+      "revisions": [
+        "e1fd6b7",
+        "6accfe7"
+      ],
+      "changed_paths": [
+        "internal/reconcile/publishing_qualification_test.go",
+        "internal/reconcile/runners_test.go"
+      ],
+      "sha256": "f13310ab11a2b8c8b8e34a23fec5a7082edec9a76a597c6a073f5bc443e13cac",
+      "identical": true
+    },
+    "release_rebuild": {
+      "tag": "infra-v0.2.13",
+      "revision": "875fdeb0034894efce998b127fc30639fa9d0c36",
+      "released_sha256": "22e924c12dd439357be0ea53aefc3286dbd11a6a585b0605ca2bfbdc528dce3c",
+      "local_sha256": "22e924c12dd439357be0ea53aefc3286dbd11a6a585b0605ca2bfbdc528dce3c",
+      "identical": true
+    }
+  },
+  "plan_simulation": {
+    "registry": "local stub publishing every planned tag",
+    "source_identity": {
+      "test-only": [
+        "infra-runner-check",
+        "infra-runner-rust",
+        "platform-backup-tools"
+      ],
+      "runner-rust recipe": [
+        "infra-runner-rust"
+      ],
+      "CLI code": [
+        "infra-runner-check",
+        "infra-runner-rust",
+        "platform-backup-tools"
+      ]
+    },
+    "binary_identity": {
+      "test-only": [],
+      "runner-rust recipe": [
+        "infra-runner-rust"
+      ],
+      "CLI code": [
+        "infra-runner-check",
+        "infra-runner-rust",
+        "platform-backup-tools"
+      ]
+    }
+  }
+}
