@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_test")
 go_test(
     name = "policy_test",
     srcs = [
+        "dns_test.go",
         "helpers_test.go",
         "listener_test.go",
         "node_test.go",

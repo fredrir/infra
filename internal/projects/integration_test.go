@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -110,6 +111,9 @@ func TestNativeOnboardingQualification(t *testing.T) {
 			container := nested(document, "spec", "template", "spec", "containers").([]any)[0].(map[string]any)
 			if nested(container, "securityContext", "allowPrivilegeEscalation") != false || nested(container, "lifecycle", "preStop", "sleep", "seconds") != 5 || container["image"] != projectOptions.Image {
 				t.Fatal("workload security or shutdown contract changed")
+			}
+			if options := nested(document, "spec", "template", "spec", "dnsConfig", "options"); !reflect.DeepEqual(options, []any{map[string]any{"name": "ndots", "value": "2"}}) {
+				t.Fatalf("workload resolves with DNS options %v, want ndots:2", options)
 			}
 		case "Ingress":
 			foundIngress = nested(document, "spec", "ingressClassName") == "platform"

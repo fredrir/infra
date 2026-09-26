@@ -15,6 +15,8 @@ spec:
     - name: project-registry
   automountServiceAccountToken: false
   enableServiceLinks: false
+  dnsConfig:
+    options: [{name: ndots, value: "2"}]
   priorityClassName: production
   terminationGracePeriodSeconds: {{ default 30 $workload.terminationGracePeriodSeconds }}
   {{- if eq $workload.kind "cron" }}

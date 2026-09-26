@@ -25,6 +25,17 @@ spec:
   install:
     remediation:
       retries: 3
+  postRenderers:
+  - kustomize:
+      patches:
+      - target:
+          kind: Deployment
+          name: valkey
+        patch: |
+          - op: add
+            path: /spec/template/spec/dnsConfig
+            value:
+              options: [{name: ndots, value: "2"}]
   values:
     fullnameOverride: valkey
     image:

@@ -17,6 +17,8 @@ spec:
         app.kubernetes.io/component: application
     spec:
       automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
       nodeSelector:
         kubernetes.io/hostname: fredrir-09
         kubernetes.io/arch: amd64

@@ -65,6 +65,8 @@ spec:
       labels: {app: caddy}
     spec:
       automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -119,6 +121,8 @@ spec:
       labels: {app: cloudflared}
     spec:
       automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532

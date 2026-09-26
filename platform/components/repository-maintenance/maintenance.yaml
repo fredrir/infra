@@ -21,6 +21,8 @@ spec:
         spec:
           restartPolicy: Never
           automountServiceAccountToken: false
+          dnsConfig:
+            options: [{name: ndots, value: "2"}]
           priorityClassName: batch
           nodeSelector:
             kubernetes.io/hostname: fredrir-09

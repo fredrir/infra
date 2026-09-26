@@ -38,6 +38,8 @@ spec:
         app: api
     spec:
       automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
       imagePullSecrets: [{name: ghcr}]
       securityContext:
         runAsNonRoot: true
@@ -92,6 +94,8 @@ spec:
       labels: {app: web}
     spec:
       automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
       imagePullSecrets: [{name: ghcr}]
       securityContext:
         runAsNonRoot: true
@@ -141,6 +145,8 @@ spec:
       labels: {app: worker}
     spec:
       automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
       imagePullSecrets: [{name: ghcr}]
       terminationGracePeriodSeconds: 120
       securityContext:

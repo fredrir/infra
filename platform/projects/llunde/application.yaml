@@ -40,6 +40,8 @@ spec:
         app: api
     spec:
       automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
       imagePullSecrets:
       - name: ghcr
       securityContext:
@@ -118,6 +120,8 @@ spec:
         app: web
     spec:
       automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
       imagePullSecrets:
       - name: ghcr
       securityContext:
