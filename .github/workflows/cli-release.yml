@@ -32,6 +32,7 @@ jobs:
             ~/.cache/infra-bazel-repository
           key: infra-release-bazel9.2.0-go1.27.1-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: |
+            ${{ matrix.platform == 'linux_amd64' && format('infra-bazel-linux-amd64-v1-{0}-check-{1}-', hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc'), github.sha) || '' }}
             infra-release-bazel9.2.0-go1.27.1-${{ matrix.platform }}-
             ${{ matrix.platform == 'linux_amd64' && format('infra-bazel-linux-amd64-v1-{0}-check-', hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc')) || '' }}
             ${{ matrix.platform == 'linux_amd64' && format('infra-bazel-linux-amd64-v1-{0}-', hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc')) || '' }}

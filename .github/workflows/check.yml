@@ -65,7 +65,7 @@ jobs:
           path: |
             ~/.cache/infra-bazel-actions
             ~/.cache/infra-bazel-repository
-          key: infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-check-${{ github.run_id }}-${{ github.run_attempt }}
+          key: infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-check-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-check-
             infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-

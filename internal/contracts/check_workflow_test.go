@@ -168,6 +168,44 @@ func TestBazelCacheIsSavedAfterFailedMainChecksButNeverFromPullRequests(t *testi
 	}
 }
 
+func TestReleaseChecksRestoreTheTaggedCommitsMainCheckFirst(t *testing.T) {
+	type cacheStep struct {
+		Uses string `yaml:"uses"`
+		With struct {
+			Key         string `yaml:"key"`
+			RestoreKeys string `yaml:"restore-keys"`
+		} `yaml:"with"`
+	}
+	var check, release struct {
+		Jobs map[string]struct {
+			Steps []cacheStep `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	for path, workflow := range map[string]any{".github/workflows/check.yml": &check, ".github/workflows/cli-release.yml": &release} {
+		if err := yaml.Unmarshal(read(t, filepath.Join(root(t), path)), workflow); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cache := func(steps []cacheStep, action string) cacheStep {
+		t.Helper()
+		for _, step := range steps {
+			if strings.HasPrefix(step.Uses, action) {
+				return step
+			}
+		}
+		t.Fatalf("no %s step", action)
+		return cacheStep{}
+	}
+	restored := cache(check.Jobs["check"].Steps, "actions/cache/restore@")
+	if !strings.HasSuffix(restored.With.Key, "-check-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}") {
+		t.Fatalf("check cache key %q does not name the checked commit", restored.With.Key)
+	}
+	restoreKeys := strings.Split(strings.TrimSpace(cache(release.Jobs["build"].Steps, "actions/cache@").With.RestoreKeys), "\n")
+	if !strings.Contains(restoreKeys[0], "format('infra-bazel-linux-amd64-v1-{0}-check-{1}-'") || !strings.Contains(restoreKeys[0], "github.sha") {
+		t.Fatalf("release restores %q before the tagged commit's main check cache", restoreKeys[0])
+	}
+}
+
 var (
 	statusFunction     = regexp.MustCompile(`\b(success|failure|cancelled|always)\(\)`)
 	hyphenatedProperty = regexp.MustCompile(`\.([A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+)+)`)
