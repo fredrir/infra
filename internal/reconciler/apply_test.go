@@ -153,13 +153,24 @@ type applyHarness struct {
 	applies     []engineCall
 }
 
-func privateKey(t *testing.T) string {
+var testKeys = struct {
+	sync.Mutex
+	byRole map[string]string
+}{byRole: map[string]string{}}
+
+func privateKey(t *testing.T, role string) string {
 	t.Helper()
+	testKeys.Lock()
+	defer testKeys.Unlock()
+	if key, found := testKeys.byRole[role]; found {
+		return key
+	}
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+	testKeys.byRole[role] = string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+	return testKeys.byRole[role]
 }
 
 func applyCredentialValues(t *testing.T) map[string]string {
@@ -170,8 +181,8 @@ func applyCredentialValues(t *testing.T) map[string]string {
 		HcloudToken:           "hcloud-apply-secret",
 		PlatformMailRecipient: "operator@example.net",
 		KubernetesToken:       "kubernetes-apply-secret",
-		RunnerAppKey:          privateKey(t),
-		PublisherAppKey:       privateKey(t),
+		RunnerAppKey:          privateKey(t, "runner"),
+		PublisherAppKey:       privateKey(t, "publisher"),
 		ProvenanceToken:       provenanceSecret,
 		GatusToken:            strings.Repeat("apply-gatus-", 3),
 	}

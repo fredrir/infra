@@ -3,12 +3,8 @@ package reconciler
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -45,9 +41,30 @@ func gitCommand(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(output))
 }
 
+var originTemplate struct {
+	once                 sync.Once
+	directory, published string
+}
+
 func originRepository(t *testing.T) (string, string) {
 	t.Helper()
+	originTemplate.once.Do(func() { originTemplate.directory, originTemplate.published = buildOriginRepository(t) })
+	if originTemplate.directory == "" {
+		t.Fatal("origin repository template unavailable")
+	}
 	origin := t.TempDir()
+	if err := os.CopyFS(origin, os.DirFS(originTemplate.directory)); err != nil {
+		t.Fatal(err)
+	}
+	return origin, originTemplate.published
+}
+
+func buildOriginRepository(t *testing.T) (string, string) {
+	t.Helper()
+	origin, err := os.MkdirTemp("", "reconciler-origin-")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for path, content := range map[string]string{
 		"build/toolchain.json":     `{"go": "1.27.1"}`,
 		"build/runners.json":       `{"schema": 2, "owner": "fredrir", "host": "infra-build-09", "version": "2.337.0", "sha256": "` + strings.Repeat("a", 64) + `", "labels": ["dagger-amd64"], "repositories": {"infra": 3, "Y": 2}}`,
@@ -193,12 +210,8 @@ func newHarness(t *testing.T, credentials map[string]string, engine func(t *test
 
 func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]string, engine func(t *testing.T, args []string, env []string) (int, string), build error) *harness {
 	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if _, ok := credentials[ObserverAppKey]; ok {
-		credentials[ObserverAppKey] = string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+		credentials[ObserverAppKey] = privateKey(t, "observer")
 	}
 	h := &harness{revision: revision, objects: &objects{puts: map[string][]byte{}}, heartbeats: &heartbeats{}, app: &observerApp{}}
 	servers := map[string]http.Handler{"s3": h.objects, "gatus": h.heartbeats, "github": h.app}
@@ -291,7 +304,11 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 
 func TestMain(m *testing.M) {
 	memoryBacked = func(string) error { return nil }
-	os.Exit(m.Run())
+	code := m.Run()
+	if originTemplate.directory != "" {
+		os.RemoveAll(originTemplate.directory)
+	}
+	os.Exit(code)
 }
 
 func sharedDirectory(t *testing.T) string {
