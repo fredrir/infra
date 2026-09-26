@@ -192,3 +192,23 @@ func TestFleetTemplatesNeverReadVolatileHosts(t *testing.T) {
 		t.Fatal("no Ansible files scanned")
 	}
 }
+
+func TestVolatileEnrollmentRequiresWireGuardFleet(t *testing.T) {
+	root := filepath.Join("..", "..", "ansible")
+	gated := false
+	for _, play := range loadAnsible[[]ansiblePlay](t, root, volatilePlaybook) {
+		for _, task := range play.PreTasks {
+			assertion, ok := task["ansible.builtin.assert"].(map[string]any)
+			if !ok {
+				continue
+			}
+			conditions := fmt.Sprint(assertion["that"])
+			if strings.Contains(conditions, "k3s_flannel_backend == 'wireguard-native'") && strings.Contains(conditions, "wireguard") {
+				gated = true
+			}
+		}
+	}
+	if !gated {
+		t.Error("volatile.yml does not refuse to enroll onto a non-WireGuard fleet")
+	}
+}

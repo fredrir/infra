@@ -292,6 +292,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Unenrolled host | `tailscale_ip: null`; skipped |
 | Node admission | `node-registration` policy: kubelets register only inventory nodes; volatile nodes must carry the taint; nodes cannot remove taints |
 | Shared flannel identity | Every agent holds the `system:k3s-controller` certificate, which may patch any node's status (k3s writes flannel annotations with it, not the kubelet identity). `node-flannel-writer` lets it change only flannel annotations and the `NetworkUnavailable` condition: backend type and data are write-once, public addresses must be the node's own and may not be removed, and labels, spec, owners, finalizers, addresses, capacity, allocatable, node info, daemon endpoints, images, runtime handlers, features and other conditions are pinned |
+| First-value race | `node-flannel-writer` accepts any first backend value while it is unset, which is the state at every registration and after every admin clear; the shared identity could win that race. Mitigation is operational, not in-policy: fredrir-10 is enrolled only after the fleet is on verified WireGuard (`volatile.yml` gate), and every later clear cuts fredrir-10 off the API first |
 | Kubelet pod writes | `node-no-static-pods` denies pod creation by nodes; NodeRestriction already refuses label changes through `pods/status` and status writes to another node's pods |
 | Join credential | Per-node `k3s token create --ttl 30m`, deleted after join; the k3s role refuses the shared agent token and fails if any file under `/var/lib/rancher` matches its checksum; a joined agent keeps working across restarts and token deletion |
 | Scheduling | Taint `node-restriction.kubernetes.io/volatile=true:NoSchedule`, applied before labels `gvisor`, `volatile`, `infra.fredrir.com/ci-slots=3`; no `critical` or `stateful` |
@@ -327,8 +328,9 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Declared | `k3s_flannel_backend`, default `vxlan`; `wireguard-native` only in an owner-approved window: `ansible-playbook ansible/k3s.yml -e k3s_flannel_backend=wireguard-native`, then `ansible/volatile.yml` with the same value |
 | Change | The k3s role clears a node's `backend-type`, `backend-data` and `backend-v6-data` annotations through the administrator API, then restarts it, when its published backend differs or its WireGuard key file is missing |
 | WireGuard key | `WIREGUARD_KEY_FILE=/var/lib/rancher/k3s/agent/flannel-wireguard.key` in the service's `flannel.conf` drop-in; it survives restarts and reboots, and every run fails when a node publishes a key not derived from its own file |
-| Repair | On a server: `k3s kubectl annotate node <node> flannel.alpha.coreos.com/backend-type- flannel.alpha.coreos.com/backend-data- flannel.alpha.coreos.com/backend-v6-data-`, then restart `k3s` or `k3s-agent` on `<node>`. If the foreign key belonged to another node, restart every other node one at a time as well: peers keep the forged peer entry until their flannel restarts |
-| Rotate a key or rebuild a node | Delete the key file or rejoin without it, then reconcile; the role clears the annotations and restarts the node |
+| Cut fredrir-10 off before any clear | Every clear reopens the write-once first-value race, so before clearing any node's flannel annotations first cut fredrir-10 off the API: remove `tag:platform-volatile`'s 6443 grant in `tailscale/policy.hujson` and reapply, or deauthorize fredrir-10 in the Tailnet. Clear, confirm keys, then restore access |
+| Repair | With fredrir-10 cut off, on a server: `k3s kubectl annotate node <node> flannel.alpha.coreos.com/backend-type- flannel.alpha.coreos.com/backend-data- flannel.alpha.coreos.com/backend-v6-data-`, then restart `k3s` or `k3s-agent` on `<node>`. If the foreign key belonged to another node, restart every other node one at a time as well: peers keep the forged peer entry until their flannel restarts |
+| Rotate a key or rebuild a node | With fredrir-10 cut off, delete the key file or rejoin without it, then reconcile; the role clears the annotations and restarts the node |
 
 ### fredrir-10 activation
 
@@ -342,10 +344,11 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | 6 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
 | 7 | Set inventory values | `tailscale_ip` |
 | 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in Doppler `SSH_KNOWN_HOSTS` and the admin `known_hosts` |
-| 9 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 11 |
-| 10 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 30m --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
-| 11 | First converge from Macie or Archie within the token lifetime | `ansible-playbook ansible/volatile.yml --limit fredrir-10`; installs the reconciliation key and sets the hostname |
-| 12 | Delete the join token | On fredrir-07: `k3s token delete <id>`; the agent keeps its client cert and reconnects across restarts after the token is gone (verified) |
+| 9 | Complete the flannel WireGuard cutover (hard gate) | `ansible-playbook ansible/k3s.yml -e k3s_flannel_backend=wireguard-native` in an owner-approved window; confirm every fleet node publishes `backend-type=wireguard` with its own verified key before fredrir-10 joins. `volatile.yml` refuses to enroll otherwise, and VXLAN or an unset backend must never coexist with an enrolled fredrir-10 |
+| 10 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 12 |
+| 11 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 30m --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
+| 12 | First converge from Macie or Archie within the token lifetime | `ansible-playbook ansible/volatile.yml --limit fredrir-10`; installs the reconciliation key and sets the hostname |
+| 13 | Delete the join token | On fredrir-07: `k3s token delete <id>`; the agent keeps its client cert and reconnects across restarts after the token is gone (verified) |
 
 ```sh
 inventory=$(mktemp)

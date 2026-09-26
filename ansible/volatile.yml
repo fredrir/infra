@@ -48,6 +48,31 @@
       create: true
       owner: '{{ ansible_user }}'
       mode: '0600'
+  - name: Read the fleet flannel backends through the administrator API
+    ansible.builtin.command:
+      argv:
+        - /usr/local/bin/k3s
+        - kubectl
+        - get
+        - nodes
+        - -l
+        - '!node-restriction.kubernetes.io/volatile'
+        - '-o=jsonpath={range .items[*]}{.metadata.annotations.flannel\.alpha\.coreos\.com/backend-type}{";"}{.metadata.annotations.flannel\.alpha\.coreos\.com/backend-data}{"\n"}{end}'
+        - --request-timeout=10s
+    delegate_to: "{{ k3s_registration_server }}"
+    changed_when: false
+    check_mode: false
+    register: volatile_fleet_backends
+  - name: Require the fleet on verified WireGuard before enrolling a volatile worker
+    ansible.builtin.assert:
+      that:
+        - k3s_flannel_backend == 'wireguard-native'
+        - volatile_fleet_backends.stdout_lines | length > 0
+        - (volatile_fleet_backends.stdout_lines | select('search', '^wireguard;.*\"PublicKey\":\"[^\"]+\"') | list | length) == (volatile_fleet_backends.stdout_lines | length)
+      fail_msg: >-
+        Every fleet node must publish a verified wireguard-native key before fredrir-10 joins;
+        complete the flannel WireGuard cutover first, and for any later flannel clear cut fredrir-10
+        off the API before clearing (docs/runbook.md).
   roles:
   - ubuntu
   - firewall

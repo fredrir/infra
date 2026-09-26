@@ -104,6 +104,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"roles/k3s/tasks/main.yml: Derive the public WireGuard key from the persisted flannel key",
 		"roles/k3s/tasks/main.yml: Wait for the node to publish the cluster flannel backend",
 		"roles/k3s/tasks/main.yml: Wait for the kubelet to publish the CI job slots",
+		"volatile.yml: Read the fleet flannel backends through the administrator API",
 		"roles/ci_runtime/tasks/main.yml: Require the pinned runtime and sidecar binaries",
 		"roles/data_volume/tasks/main.yml: Read data volume consumer states",
 		"roles/build_vm/tasks/main.yml: Wait for guest SSH",
