@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-26T18:24:00+00:00",
+  "fixture": {
+    "runners": {"infra": 3, "Y": 2, "portfolio": 2, "llunde-frontend": 1, "llunde-backend": 1, "llunde-pyparser": 1, "packages": 1},
+    "state": "every runner registered, at the pinned version, on its own service, no replacement pending",
+    "environment": "local connection in reviewer-bazel-ansible:26.04; ansible-core 2.21.4; systemctl stub",
+    "tasks": "build_runner repository convergence only"
+  },
+  "per_runner_loop": {"source": "45686a2", "task_results": 165, "seconds": [4.6, 4.4, 5.5]},
+  "batched_probe": {"task_results": 8, "seconds": [1.4, 1.6, 1.7]},
+  "production_reference": "About 3.6 s per runner in the 57-65 s runner play over SSH (11 runners, about 40 s)",
+  "unchanged_behaviour": [
+    "Unregistered, pending, other-version, other-service and re-registration runners take the per-runner replacement path",
+    "build_runner_restart restarts only the named converged runners",
+    "TestAnsibleScopeWithLocalContainers passes, including a converged fleet that never enters repository.yml"
+  ]
+}

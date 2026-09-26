@@ -35,6 +35,7 @@
 | Release check uncached set, two cores and four threads | Targets left without results by the killed 055d5b6 main check (`reconciler_test`, `reconcile_test`, `ci_test`, `release_test`, `gazelle_test`): 6.62 → 2.75 seconds under Bazel, median of three; release run 36269988938 restored that commit's check cache and re-ran exactly those targets | [Release workflow](../.github/workflows/cli-release.yml) |
 | Check replay, four CPUs, declarations under gVisor | Ansible template change: infra-fast 9.32 s and declarations killed at 0.69 s → 2.21 + 0.72 s; OpenTofu module change 0.76 + 2.03 → 0.25 + 1.50 s; declaration medians of three samples | [Check workflow](../.github/workflows/check.yml) |
 | Historical workflow sample | Includes earlier qualification runs and failures; not an ordinary-traffic deployment percentile | [Baseline](../build/evidence/ci-optimization-baseline.json) |
+| Build-VM runner convergence, 11 converged runners | Task results 165 → 8; 4.6 → 1.5 seconds over a local connection; only differing runners enter the per-runner replacement path | [Runner probe](../build/evidence/build-runner-probe.json) |
 | Frontend deployment below 15 seconds | Unqualified | [Previous observed timeline](../build/rollout/flux-artifacts/rollout.json) |
 
 | Accounting | Rule |

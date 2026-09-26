@@ -1,0 +1,52 @@
+- name: Probe repository runners
+  ansible.builtin.shell: |
+    set -eu
+    cd /home/runner
+    for name in {{ build_runner_instances | map(attribute='name') | map('quote') | join(' ') }}; do
+      (
+        version=$("./$name/bin/Runner.Listener" --version 2>/dev/null) || version=-
+        service=$(head -n 1 "$name/.service" 2>/dev/null) || service=-
+        registration=unregistered
+        if [ -e "$name/.runner" ]; then registration=registered; fi
+        replacement=complete
+        if [ -e "$name/.infra-runner-pending" ]; then replacement=pending; fi
+        printf '%s %s %s %s %s\n' "$name" "$registration" "$replacement" "${version:--}" "${service:--}"
+      ) &
+    done
+    wait
+  register: build_runner_instance_probe
+  changed_when: false
+  check_mode: false
+
+- name: Select converged repository runners
+  ansible.builtin.set_fact:
+    build_runner_converged: >-
+      {%- set converged = [] -%}
+      {%- for line in build_runner_instance_probe.stdout_lines -%}
+      {%- set name, registration, replacement, version, service = line.split() -%}
+      {%- set repository = build_runner_instances | selectattr('name', 'equalto', name) | map(attribute='repository') | first -%}
+      {%- if registration == 'registered' and replacement == 'complete' and version == build_runner_version
+            and service == 'actions.runner.' ~ build_runner_owner ~ '-' ~ repository ~ '.' ~ inventory_hostname ~ '-' ~ name ~ '.service'
+            and name not in build_runner_reregister | default([]) -%}
+      {%- set _ = converged.append({'name': name, 'service': service}) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ converged }}
+
+- name: Declare converged repository runner directories
+  ansible.builtin.import_tasks: repository-directories.yml
+  vars:
+    build_runner_state_repositories: "{{ build_runner_converged | map(attribute='name') | list }}"
+
+- name: Declare converged repository runner services
+  ansible.builtin.import_tasks: repository-services.yml
+  vars:
+    build_runner_state_services: "{{ build_runner_converged | map(attribute='service') | list }}"
+    build_runner_state_restarts: "{{ build_runner_converged | selectattr('name', 'in', build_runner_restart | default([])) | map(attribute='service') | list }}"
+
+- name: Replace or register repository runners
+  ansible.builtin.include_tasks: repository.yml
+  loop: "{{ build_runner_instances | rejectattr('name', 'in', build_runner_converged | map(attribute='name') | list) | list }}"
+  loop_control:
+    loop_var: build_runner_instance
+    label: '{{ build_runner_instance.name }}'

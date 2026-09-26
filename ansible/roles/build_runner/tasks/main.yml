@@ -65,11 +65,7 @@
   when: build_runner_archive.changed
 
 - name: Configure repository runners
-  ansible.builtin.include_tasks: repository.yml
-  loop: '{{ build_runner_instances }}'
-  loop_control:
-    loop_var: build_runner_instance
-    label: '{{ build_runner_instance.name }}'
+  ansible.builtin.import_tasks: repositories.yml
 
 - name: Find repository runner registrations
   ansible.builtin.find:

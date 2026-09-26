@@ -142,10 +142,7 @@ esac
       tasks_from: state.yml
   - ansible.builtin.include_role:
       name: build_runner
-      tasks_from: repository.yml
-    loop: '{{ build_runner_instances }}'
-    loop_control:
-      loop_var: build_runner_instance
+      tasks_from: repositories.yml
   - ansible.builtin.import_role:
       name: build_engine
       tasks_from: state.yml
@@ -248,8 +245,10 @@ esac
 	steady := restarted()
 	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") || restarted() != steady {
 		t.Fatalf("declared runner state does not converge without restarts:\n%s", output)
+	} else if strings.Contains(output, "tasks/repository.yml") {
+		t.Fatalf("converged runners entered the per-runner replacement path:\n%s", output)
 	}
-	t.Log("declared runner state converges idempotently without restarting services")
+	t.Log("declared runner state converges idempotently without restarting services or per-runner replacement")
 	if output := run("/fixture/converge.yml", true, "--extra-vars", `{"build_runner_restart":["Y-1"]}`); restarted() != steady+runnerUnit("Y")+"\n" {
 		t.Fatalf("requested runner restart restarted %q, want only %s:\n%s", strings.TrimPrefix(restarted(), steady), runnerUnit("Y"), output)
 	}
