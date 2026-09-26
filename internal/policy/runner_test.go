@@ -2,6 +2,7 @@ package policy
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -190,6 +191,33 @@ func TestLegacyBuildkitCacheCredentialsStayWithinPool(t *testing.T) {
 	}
 }
 
+const gvisorWorker = "node-restriction.kubernetes.io/gvisor"
+
+func placementScore(nodeAffinity object, labels ...string) int {
+	score := 0
+	preferences, _ := nodeAffinity["preferredDuringSchedulingIgnoredDuringExecution"].([]any)
+	for _, item := range preferences {
+		matches := true
+		for _, expression := range at(item, "preference", "matchExpressions").([]any) {
+			present := slices.Contains(labels, at(expression, "key").(string))
+			switch at(expression, "operator") {
+			case "Exists":
+				matches = matches && present
+			case "DoesNotExist":
+				matches = matches && !present
+			case "In":
+				matches = matches && present && fmt.Sprint(at(expression, "values")) == "[true]"
+			default:
+				matches = false
+			}
+		}
+		if matches {
+			score += at(item, "weight").(int)
+		}
+	}
+	return score
+}
+
 func TestOnlyUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
 	const volatile = "node-restriction.kubernetes.io/volatile"
 	tolerating := map[string]bool{"check-amd64": true, "rust-amd64": true, "rust-pr-amd64": true}
@@ -235,17 +263,12 @@ func TestOnlyUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
 			if _, required := nodeAffinity["requiredDuringSchedulingIgnoredDuringExecution"]; required {
 				t.Errorf("%s requires a node selection instead of preferring volatile workers", name)
 			}
-			preferred := false
-			preferences, _ := nodeAffinity["preferredDuringSchedulingIgnoredDuringExecution"].([]any)
-			for _, item := range preferences {
-				for _, expression := range at(item, "preference", "matchExpressions").([]any) {
-					if at(expression, "key") == volatile && at(expression, "operator") == "In" && fmt.Sprint(at(expression, "values")) == "[true]" {
-						preferred = true
-					}
-				}
+			shared, volatileWorker, kata := placementScore(nodeAffinity, gvisorWorker), placementScore(nodeAffinity, gvisorWorker, volatile), placementScore(nodeAffinity, gvisorWorker, "node-restriction.kubernetes.io/kata")
+			if name == "check-amd64" && (shared <= volatileWorker || volatileWorker <= kata) {
+				t.Errorf("%s scores shared %d, volatile %d and kata %d workers; want shared first and volatile as the fallback", name, shared, volatileWorker, kata)
 			}
-			if !preferred {
-				t.Errorf("%s does not prefer volatile workers", name)
+			if name != "check-amd64" && (volatileWorker <= shared || volatileWorker <= kata) {
+				t.Errorf("%s does not prefer volatile workers: shared %d, volatile %d, kata %d", name, shared, volatileWorker, kata)
 			}
 			for _, container := range spec["containers"].([]any) {
 				if _, ok := at(container, "resources", "requests").(object)["ephemeral-storage"]; !ok {

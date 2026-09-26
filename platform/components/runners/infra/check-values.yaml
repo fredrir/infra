@@ -112,13 +112,11 @@ spec:
         affinity:
           nodeAffinity:
             preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
+            - weight: 50
               preference:
                 matchExpressions:
                 - key: node-restriction.kubernetes.io/volatile
-                  operator: In
-                  values:
-                  - 'true'
+                  operator: DoesNotExist
             - weight: 100
               preference:
                 matchExpressions:
