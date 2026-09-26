@@ -1,4 +1,6 @@
 firewall_admin_ipv4_cidrs: []
 firewall_pod_cidr: 10.42.0.0/16
 firewall_tailscale_port: 41641
+firewall_node_local_dns_addresses: [169.254.20.10, 10.43.0.10]
+firewall_node_local_dns_metrics_port: 9253
 firewall_packages: [nftables]
