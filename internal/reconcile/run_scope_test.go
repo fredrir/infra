@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
+	"github.com/fredrir/infra/internal/provenance"
 )
 
 func TestIndependentChangePreservesDeployedBaseline(t *testing.T) {
@@ -321,5 +323,47 @@ func TestPlanTestsTheReconcilerRootOnlyWhenItsInputsChange(t *testing.T) {
 		if !reflect.DeepEqual(calls, want) {
 			t.Fatalf("reconciler root selected %t ran %q", selected, calls)
 		}
+	}
+}
+
+func TestProvenanceGatesApplyBeforeAnyCheckoutTooling(t *testing.T) {
+	for _, test := range []struct {
+		name, override string
+		selection      Selection
+		want           provenance.ProvenanceRange
+		fail           bool
+	}{
+		{name: "applied base", selection: All(), want: provenance.ProvenanceRange{Base: "old", Revision: "new"}},
+		{name: "override", override: "admin", selection: All(), want: provenance.ProvenanceRange{Base: "admin", Revision: "new", Override: true}},
+		{name: "unverified", selection: All(), want: provenance.ProvenanceRange{Base: "old", Revision: "new"}, fail: true},
+		{name: "unverified tooling change", selection: Selection{Tooling: true}, want: provenance.ProvenanceRange{Base: "old", Revision: "new"}, fail: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
+			ops := &fakeOps{selection: test.selection}
+			if test.fail {
+				ops.fail = "provenance"
+			}
+			err := (Reconciler{Store: store, Ops: ops, ProvenanceBase: test.override}).Apply(context.Background(), false)
+			if len(ops.provenance) != 1 || ops.provenance[0] != test.want {
+				t.Fatalf("provenance verified %v, want %+v", ops.provenance, test.want)
+			}
+			if store.status.Provenance == nil || *store.status.Provenance != test.want {
+				t.Fatalf("status records provenance %+v", store.status.Provenance)
+			}
+			if !test.fail {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if !strings.HasPrefix(fmt.Sprint(err), "provenance: unverified commits") || len(ops.calls) != 0 || len(ops.drift) != 0 || store.status.Stage != "provenance" || store.status.Failure == "" || store.status.Applied != "old" {
+				t.Fatalf("unverified commits reached %v with %+v: %v", ops.calls, store.status, err)
+			}
+		})
+	}
+	ops := &fakeOps{selection: All()}
+	if err := (Reconciler{Store: &memoryStore{}, Ops: ops}).Apply(context.Background(), false); !errors.Is(err, provenance.ErrNoProvenanceBase) || len(ops.provenance) != 0 || len(ops.calls) != 0 {
+		t.Fatalf("first reconciliation without a base returned %v after %v", err, ops.calls)
 	}
 }

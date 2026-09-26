@@ -19,6 +19,7 @@ import (
 
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
+	"github.com/fredrir/infra/internal/provenance"
 )
 
 type memoryStore struct {
@@ -51,7 +52,7 @@ type fakeOps struct {
 	selection       Selection
 	drift           []Plan
 	plans           []Plan
-	provenance      []ProvenanceRange
+	provenance      []provenance.ProvenanceRange
 	volatile        int
 	volatileFailure error
 }
@@ -69,7 +70,7 @@ func (o *fakeOps) Select(_ context.Context, base string, full bool) (Selection, 
 	o.full = full
 	return o.selection, nil
 }
-func (o *fakeOps) Provenance(_ context.Context, checked ProvenanceRange) error {
+func (o *fakeOps) Provenance(_ context.Context, checked provenance.ProvenanceRange) error {
 	o.provenance = append(o.provenance, checked)
 	if o.fail == "provenance" {
 		return cmp.Or(o.failure, errors.New("unverified commits"))

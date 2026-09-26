@@ -17,23 +17,24 @@ import (
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/process"
+	"github.com/fredrir/infra/internal/provenance"
 )
 
 type Status struct {
-	Evaluated        string             `json:"evaluated_revision,omitempty"`
-	Selection        Selection          `json:"selection"`
-	HostScope        string             `json:"host_scope,omitempty"`
-	LastFullRevision string             `json:"last_full_revision,omitempty"`
-	LastFullVerified time.Time          `json:"last_full_verified_at,omitzero"`
-	HostsReusedFrom  string             `json:"hosts_reused_from,omitempty"`
-	Desired          string             `json:"desired_revision"`
-	Applied          string             `json:"applied_revision"`
-	Stage            string             `json:"stage"`
-	Provenance       *ProvenanceRange   `json:"provenance,omitempty"`
-	Failure          string             `json:"failure,omitempty"`
-	VolatileFailure  string             `json:"volatile_failure,omitempty"`
-	Updated          time.Time          `json:"updated_at"`
-	Durations        map[string]float64 `json:"stage_seconds,omitempty"`
+	Evaluated        string                      `json:"evaluated_revision,omitempty"`
+	Selection        Selection                   `json:"selection"`
+	HostScope        string                      `json:"host_scope,omitempty"`
+	LastFullRevision string                      `json:"last_full_revision,omitempty"`
+	LastFullVerified time.Time                   `json:"last_full_verified_at,omitzero"`
+	HostsReusedFrom  string                      `json:"hosts_reused_from,omitempty"`
+	Desired          string                      `json:"desired_revision"`
+	Applied          string                      `json:"applied_revision"`
+	Stage            string                      `json:"stage"`
+	Provenance       *provenance.ProvenanceRange `json:"provenance,omitempty"`
+	Failure          string                      `json:"failure,omitempty"`
+	VolatileFailure  string                      `json:"volatile_failure,omitempty"`
+	Updated          time.Time                   `json:"updated_at"`
+	Durations        map[string]float64          `json:"stage_seconds,omitempty"`
 }
 
 func (s Status) NeedsRecovery() bool {

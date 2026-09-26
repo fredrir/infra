@@ -7,6 +7,8 @@ import (
 	"io"
 	"slices"
 	"time"
+
+	"github.com/fredrir/infra/internal/provenance"
 )
 
 type Plan struct {
@@ -19,7 +21,7 @@ type Plan struct {
 type Operations interface {
 	Revision(context.Context) (string, error)
 	Select(context.Context, string, bool) (Selection, error)
-	Provenance(context.Context, ProvenanceRange) error
+	Provenance(context.Context, provenance.ProvenanceRange) error
 	Preflight(context.Context, Plan) (Plan, error)
 	Plan(context.Context, Plan) error
 	Expand(context.Context, Plan) error
@@ -129,7 +131,7 @@ func (r Reconciler) Apply(ctx context.Context, full bool) (err error) {
 		return nil
 	}
 	if err = stage("provenance", func() error {
-		checked, err := NewProvenanceRange(status.Applied, r.ProvenanceBase, revision)
+		checked, err := provenance.NewProvenanceRange(status.Applied, r.ProvenanceBase, revision)
 		if err != nil {
 			return err
 		}

@@ -18,6 +18,7 @@ import (
 	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/platformops"
 	"github.com/fredrir/infra/internal/process"
+	"github.com/fredrir/infra/internal/provenance"
 	"github.com/fredrir/infra/internal/reconcile"
 )
 
@@ -319,7 +320,7 @@ func (a Applier) gate(ctx context.Context, current session, credentials Credenti
 	environment := append(append(credentials.stateEnvironment(a.Config.Site), current.secretEnvironment()...), "PROVENANCE_TOKEN="+credentials[ProvenanceToken])
 	_, gateErr := gate.run(ctx, current.source, environment, self, "reconcile", "provenance", "--root="+current.source, "--state-bucket="+a.Config.Bucket, "--state-prefix="+a.Config.Prefix, "--report="+report)
 	data, readErr := os.ReadFile(report)
-	var checked reconcile.ProvenanceOutcome
+	var checked provenance.ProvenanceOutcome
 	if readErr == nil {
 		readErr = json.Unmarshal(data, &checked)
 		run.Provenance = data

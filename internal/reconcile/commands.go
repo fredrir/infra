@@ -17,6 +17,7 @@ import (
 	"github.com/fredrir/infra/internal/fluxartifacts"
 	"github.com/fredrir/infra/internal/kustomize"
 	"github.com/fredrir/infra/internal/process"
+	"github.com/fredrir/infra/internal/provenance"
 	"github.com/google/go-github/v88/github"
 )
 
@@ -28,7 +29,7 @@ type Commands struct {
 	ProvenanceEnv []string
 	Publisher     *Publisher
 	GitHub        *github.Client
-	PullRequests  PullRequests
+	PullRequests  provenance.PullRequests
 	RunnerToken   string
 	kubernetes    *kubernetesState
 
@@ -302,6 +303,32 @@ func (c *Commands) currentMain(ctx context.Context, revision string) error {
 		}
 	}
 	return nil
+}
+
+func (c *Commands) Provenance(ctx context.Context, checked provenance.ProvenanceRange) error {
+	return (&provenance.Verifier{Runner: c.Runner, Work: c.Work, Env: c.ProvenanceEnv, PullRequests: c.PullRequests}).Verify(ctx, checked)
+}
+
+func (c *Commands) contains(ctx context.Context, descendant, ancestor string) (bool, error) {
+	unmerged, err := c.git(ctx, "rev-list", "--max-count=1", ancestor, "^"+descendant)
+	return err == nil && len(unmerged.Stdout) == 0, err
+}
+
+func (c *Commands) git(ctx context.Context, args ...string) (process.Result, error) {
+	execute := c.Runner.Execute
+	if execute == nil {
+		execute = process.Run
+	}
+	result, err := execute(ctx, process.Options{Name: "git", Args: args, Dir: c.Runner.Dir, Env: append(append(os.Environ(), c.Runner.Env...), "GIT_NO_REPLACE_OBJECTS=1")})
+	if err != nil {
+		return result, errors.New(cmp.Or(lastLine(result.Stderr), err.Error()))
+	}
+	return result, nil
+}
+
+func lastLine(output []byte) string {
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	return lines[len(lines)-1]
 }
 
 func PushIgnored(path string) bool {

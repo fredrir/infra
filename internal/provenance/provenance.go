@@ -1,4 +1,4 @@
-package reconcile
+package provenance
 
 import (
 	"bufio"
@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,6 +30,8 @@ const (
 	deploymentMappings     = ".github/deployments"
 	deploymentTrust        = ".github/chainguard"
 )
+
+var revisionPattern = regexp.MustCompile(`^[a-f0-9]{40}$`)
 
 var ErrNoProvenanceBase = errors.New("no applied revision to verify commits from; apply once with --provenance-base")
 
@@ -54,15 +57,22 @@ type provenanceCommit struct {
 	acknowledges  []string
 }
 
+type Verifier struct {
+	Runner       ci.Runner
+	Work         string
+	Env          []string
+	PullRequests PullRequests
+}
+
 type provenanceGate struct {
-	commands *Commands
+	verifier *Verifier
 	base     string
 	signers  string
 }
 
 type provenanceRule func(context.Context, provenanceCommit) error
 
-func (c *Commands) Provenance(ctx context.Context, checked ProvenanceRange) error {
+func (v *Verifier) Verify(ctx context.Context, checked ProvenanceRange) error {
 	base, revision := checked.Base, checked.Revision
 	switch {
 	case !revisionPattern.MatchString(base):
@@ -70,22 +80,22 @@ func (c *Commands) Provenance(ctx context.Context, checked ProvenanceRange) erro
 	case base == revision:
 		return nil
 	}
-	if _, err := c.git(ctx, nil, "cat-file", "-e", base+"^{commit}"); err != nil {
+	if _, err := v.git(ctx, nil, "cat-file", "-e", base+"^{commit}"); err != nil {
 		return fmt.Errorf("provenance base %s is not in the checkout: %w", base, err)
 	}
-	if contained, err := c.contains(ctx, revision, base); err != nil || !contained {
+	if contained, err := v.contains(ctx, revision, base); err != nil || !contained {
 		return errors.Join(fmt.Errorf("provenance base %s is not an ancestor of %s", base, revision), err)
 	}
-	directory, err := os.MkdirTemp(c.Work, "provenance-")
+	directory, err := os.MkdirTemp(v.Work, "provenance-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(directory)
-	gate := provenanceGate{commands: c, base: base, signers: filepath.Join(directory, "allowed_signers")}
+	gate := provenanceGate{verifier: v, base: base, signers: filepath.Join(directory, "allowed_signers")}
 	if err := gate.trust(ctx, base); err != nil {
 		return err
 	}
-	commits, err := c.provenanceCommits(ctx, base, revision)
+	commits, err := v.provenanceCommits(ctx, base, revision)
 	if err != nil {
 		return err
 	}
@@ -93,7 +103,7 @@ func (c *Commands) Provenance(ctx context.Context, checked ProvenanceRange) erro
 }
 
 func (g provenanceGate) trust(ctx context.Context, base string) error {
-	keys, err := g.commands.git(ctx, nil, "show", base+":"+adminKeys)
+	keys, err := g.verifier.git(ctx, nil, "show", base+":"+adminKeys)
 	if err != nil {
 		return fmt.Errorf("read %s at %s: %w", adminKeys, base, err)
 	}
@@ -186,7 +196,7 @@ func (g provenanceGate) withoutOwner(ctx context.Context, commit provenanceCommi
 
 func (g provenanceGate) acknowledged(ctx context.Context, commit string, acknowledgers []string) bool {
 	for _, acknowledger := range acknowledgers {
-		if contained, err := g.commands.contains(ctx, acknowledger, commit); err == nil && contained {
+		if contained, err := g.verifier.contains(ctx, acknowledger, commit); err == nil && contained {
 			return true
 		}
 	}
@@ -201,7 +211,7 @@ func (g provenanceGate) ownerSigned(ctx context.Context, commit provenanceCommit
 	if signature.header != "gpgsig" || !bytes.HasPrefix(signature.armor, []byte("-----BEGIN SSH SIGNATURE-----\n")) {
 		return errors.New("not an SSH signature")
 	}
-	if _, err := g.commands.git(ctx, nil, "-c", "gpg.program=false", "-c", "gpg.openpgp.program=false", "-c", "gpg.x509.program=false", "-c", "gpg.ssh.program=ssh-keygen", "-c", "gpg.ssh.allowedSignersFile="+g.signers, "verify-commit", commit.hash); err != nil {
+	if _, err := g.verifier.git(ctx, nil, "-c", "gpg.program=false", "-c", "gpg.openpgp.program=false", "-c", "gpg.x509.program=false", "-c", "gpg.ssh.program=ssh-keygen", "-c", "gpg.ssh.allowedSignersFile="+g.signers, "verify-commit", commit.hash); err != nil {
 		return fmt.Errorf("SSH signature not by a key in %s at the base revision: %w", adminKeys, err)
 	}
 	return nil
@@ -215,7 +225,7 @@ type commitSignature struct {
 }
 
 func (g provenanceGate) signature(ctx context.Context, commit string) (commitSignature, error) {
-	object, err := g.commands.git(ctx, nil, "cat-file", "commit", commit)
+	object, err := g.verifier.git(ctx, nil, "cat-file", "commit", commit)
 	if err != nil {
 		return commitSignature{}, err
 	}
@@ -257,7 +267,7 @@ func (g provenanceGate) deployment(ctx context.Context, commit provenanceCommit)
 		return errors.New("not a deployment: merge commit")
 	}
 	parent := commit.parents[0]
-	changed, err := g.commands.changedFiles(ctx, parent, commit.hash)
+	changed, err := g.verifier.changedFiles(ctx, parent, commit.hash)
 	if err != nil {
 		return fmt.Errorf("not a deployment: %w", err)
 	}
@@ -270,7 +280,7 @@ func (g provenanceGate) deployment(ctx context.Context, commit provenanceCommit)
 	if len(receipts) != 1 {
 		return fmt.Errorf("not a deployment: changes %d deployment receipts", len(receipts))
 	}
-	receipt, err := g.commands.git(ctx, nil, "show", commit.hash+":"+receipts[0])
+	receipt, err := g.verifier.git(ctx, nil, "show", commit.hash+":"+receipts[0])
 	if err != nil {
 		return err
 	}
@@ -278,7 +288,7 @@ func (g provenanceGate) deployment(ctx context.Context, commit provenanceCommit)
 	if err != nil {
 		return fmt.Errorf("not a deployment: %s: %w", receipts[0], err)
 	}
-	tree, err := g.commands.tree(ctx, parent, deploymentMappings, deploymentTrust, path.Dir(path.Dir(receipts[0])))
+	tree, err := g.verifier.tree(ctx, parent, deploymentMappings, deploymentTrust, path.Dir(path.Dir(receipts[0])))
 	if err != nil {
 		return fmt.Errorf("not a deployment: %w", err)
 	}
@@ -308,11 +318,11 @@ func (g provenanceGate) deployedBy(ctx context.Context, commit string, changed m
 			expected[name] = data
 		}
 	}
-	if err := g.commands.matches(ctx, commit, changed, expected); err != nil {
+	if err := g.verifier.matches(ctx, commit, changed, expected); err != nil {
 		return err
 	}
-	attestations := g.commands.Runner
-	attestations.Env = append(slices.Clone(attestations.Env), g.commands.ProvenanceEnv...)
+	attestations := g.verifier.Runner
+	attestations.Env = append(slices.Clone(attestations.Env), g.verifier.Env...)
 	attestations.Stdout = nil
 	attested, err := ci.VerifyDeploymentProvenance(ctx, attestations, tree, source.repositoryID, source.mapping, order.Image, order.Digest, order.Revision)
 	if err != nil {
@@ -351,12 +361,12 @@ func deploymentSources(tree fstest.MapFS, image string) ([]deploymentSource, err
 	return sources, nil
 }
 
-func (c *Commands) matches(ctx context.Context, commit string, changed map[string]bool, expected map[string][]byte) error {
+func (v *Verifier) matches(ctx context.Context, commit string, changed map[string]bool, expected map[string][]byte) error {
 	if names := slices.Sorted(maps.Keys(changed)); !slices.Equal(names, slices.Sorted(maps.Keys(expected))) {
 		return fmt.Errorf("changes %s, a deployment changes %s", strings.Join(names, ", "), strings.Join(slices.Sorted(maps.Keys(expected)), ", "))
 	}
 	for name, data := range expected {
-		committed, err := c.git(ctx, nil, "show", commit+":"+name)
+		committed, err := v.git(ctx, nil, "show", commit+":"+name)
 		if err != nil {
 			return err
 		}
@@ -367,8 +377,8 @@ func (c *Commands) matches(ctx context.Context, commit string, changed map[strin
 	return nil
 }
 
-func (c *Commands) changedFiles(ctx context.Context, parent, commit string) (map[string]bool, error) {
-	diff, err := c.git(ctx, nil, "diff-tree", "-r", "--no-renames", "--no-commit-id", "-z", parent, commit)
+func (v *Verifier) changedFiles(ctx context.Context, parent, commit string) (map[string]bool, error) {
+	diff, err := v.git(ctx, nil, "diff-tree", "-r", "--no-renames", "--no-commit-id", "-z", parent, commit)
 	if err != nil {
 		return nil, err
 	}
@@ -386,8 +396,8 @@ func (c *Commands) changedFiles(ctx context.Context, parent, commit string) (map
 	return changed, nil
 }
 
-func (c *Commands) tree(ctx context.Context, revision string, paths ...string) (fstest.MapFS, error) {
-	listing, err := c.git(ctx, nil, append([]string{"ls-tree", "-r", "-z", "--full-tree", revision, "--"}, paths...)...)
+func (v *Verifier) tree(ctx context.Context, revision string, paths ...string) (fstest.MapFS, error) {
+	listing, err := v.git(ctx, nil, append([]string{"ls-tree", "-r", "-z", "--full-tree", revision, "--"}, paths...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +413,7 @@ func (c *Commands) tree(ctx context.Context, revision string, paths ...string) (
 	if len(names) == 0 {
 		return nil, fmt.Errorf("%s has none of %s", revision, strings.Join(paths, ", "))
 	}
-	blobs, err := c.git(ctx, strings.NewReader(strings.Join(objects, "\n")+"\n"), "cat-file", "--batch")
+	blobs, err := v.git(ctx, strings.NewReader(strings.Join(objects, "\n")+"\n"), "cat-file", "--batch")
 	if err != nil {
 		return nil, err
 	}
@@ -431,8 +441,8 @@ func (c *Commands) tree(ctx context.Context, revision string, paths ...string) (
 	return tree, nil
 }
 
-func (c *Commands) provenanceCommits(ctx context.Context, base, revision string) ([]provenanceCommit, error) {
-	log, err := c.git(ctx, nil, "log", "-z", "--reverse", "--topo-order", "--format=%H%x1f%P%x1f%(trailers:key="+acknowledgementTrailer+",valueonly,separator=%x20)%x1f%s", base+".."+revision)
+func (v *Verifier) provenanceCommits(ctx context.Context, base, revision string) ([]provenanceCommit, error) {
+	log, err := v.git(ctx, nil, "log", "-z", "--reverse", "--topo-order", "--format=%H%x1f%P%x1f%(trailers:key="+acknowledgementTrailer+",valueonly,separator=%x20)%x1f%s", base+".."+revision)
 	if err != nil {
 		return nil, err
 	}
@@ -453,17 +463,17 @@ func (c *Commands) provenanceCommits(ctx context.Context, base, revision string)
 	return commits, nil
 }
 
-func (c *Commands) contains(ctx context.Context, descendant, ancestor string) (bool, error) {
-	unmerged, err := c.git(ctx, nil, "rev-list", "--max-count=1", ancestor, "^"+descendant)
+func (v *Verifier) contains(ctx context.Context, descendant, ancestor string) (bool, error) {
+	unmerged, err := v.git(ctx, nil, "rev-list", "--max-count=1", ancestor, "^"+descendant)
 	return err == nil && len(unmerged.Stdout) == 0, err
 }
 
-func (c *Commands) git(ctx context.Context, stdin io.Reader, args ...string) (process.Result, error) {
-	execute := c.Runner.Execute
+func (v *Verifier) git(ctx context.Context, stdin io.Reader, args ...string) (process.Result, error) {
+	execute := v.Runner.Execute
 	if execute == nil {
 		execute = process.Run
 	}
-	result, err := execute(ctx, process.Options{Name: "git", Args: args, Dir: c.Runner.Dir, Env: append(append(os.Environ(), c.Runner.Env...), "GIT_NO_REPLACE_OBJECTS=1"), Stdin: stdin})
+	result, err := execute(ctx, process.Options{Name: "git", Args: args, Dir: v.Runner.Dir, Env: append(append(os.Environ(), v.Runner.Env...), "GIT_NO_REPLACE_OBJECTS=1"), Stdin: stdin})
 	if err != nil {
 		return result, errors.New(cmp.Or(lastLine(result.Stderr), err.Error()))
 	}

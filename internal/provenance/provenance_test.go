@@ -1,4 +1,4 @@
-package reconcile
+package provenance
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
+	"github.com/google/go-github/v88/github"
 )
 
 const (
@@ -90,7 +91,7 @@ func provenanceFixtureIn(t *testing.T, area string) *provenanceFixture {
 	f := &provenanceFixture{t: t, root: filepath.Join(area, "infra"), remote: filepath.Join(area, "origin.git"), owner: filepath.Join(area, "owner"), visitor: filepath.Join(area, "visitor"), attested: map[string][]int{}, api: &pullRequestAPI{}}
 	server := httptest.NewServer(f.api)
 	t.Cleanup(server.Close)
-	client, err := GitHubClient(server.URL, "provenance-token")
+	client, err := github.NewClient(github.WithURLs(&server.URL, nil), github.WithAuthToken("provenance-token"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +314,7 @@ func (f *provenanceFixture) deploy(image string, run int) string {
 func (f *provenanceFixture) verify(base, head string) error {
 	f.t.Helper()
 	f.verifications = nil
-	return (&Commands{Runner: ci.Runner{Dir: f.root, Stderr: io.Discard, Execute: f.attestation}, Work: f.t.TempDir(), PullRequests: f.pullRequests}).Provenance(context.Background(), ProvenanceRange{Base: base, Revision: head})
+	return (&Verifier{Runner: ci.Runner{Dir: f.root, Stderr: io.Discard, Execute: f.attestation}, Work: f.t.TempDir(), PullRequests: f.pullRequests}).Verify(context.Background(), ProvenanceRange{Base: base, Revision: head})
 }
 
 type provenanceGateCase struct {
@@ -519,48 +520,6 @@ func TestProvenanceRange(t *testing.T) {
 				t.Fatalf("range %+v, %v; want %+v, %q", got, err, test.want, test.err)
 			}
 		})
-	}
-}
-
-func TestProvenanceGatesApplyBeforeAnyCheckoutTooling(t *testing.T) {
-	for _, test := range []struct {
-		name, override string
-		selection      Selection
-		want           ProvenanceRange
-		fail           bool
-	}{
-		{name: "applied base", selection: All(), want: ProvenanceRange{Base: "old", Revision: "new"}},
-		{name: "override", override: "admin", selection: All(), want: ProvenanceRange{Base: "admin", Revision: "new", Override: true}},
-		{name: "unverified", selection: All(), want: ProvenanceRange{Base: "old", Revision: "new"}, fail: true},
-		{name: "unverified tooling change", selection: Selection{Tooling: true}, want: ProvenanceRange{Base: "old", Revision: "new"}, fail: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
-			ops := &fakeOps{selection: test.selection}
-			if test.fail {
-				ops.fail = "provenance"
-			}
-			err := (Reconciler{Store: store, Ops: ops, ProvenanceBase: test.override}).Apply(context.Background(), false)
-			if len(ops.provenance) != 1 || ops.provenance[0] != test.want {
-				t.Fatalf("provenance verified %v, want %+v", ops.provenance, test.want)
-			}
-			if store.status.Provenance == nil || *store.status.Provenance != test.want {
-				t.Fatalf("status records provenance %+v", store.status.Provenance)
-			}
-			if !test.fail {
-				if err != nil {
-					t.Fatal(err)
-				}
-				return
-			}
-			if !strings.HasPrefix(fmt.Sprint(err), "provenance: unverified commits") || len(ops.calls) != 0 || len(ops.drift) != 0 || store.status.Stage != "provenance" || store.status.Failure == "" || store.status.Applied != "old" {
-				t.Fatalf("unverified commits reached %v with %+v: %v", ops.calls, store.status, err)
-			}
-		})
-	}
-	ops := &fakeOps{selection: All()}
-	if err := (Reconciler{Store: &memoryStore{}, Ops: ops}).Apply(context.Background(), false); !errors.Is(err, ErrNoProvenanceBase) || len(ops.provenance) != 0 || len(ops.calls) != 0 {
-		t.Fatalf("first reconciliation without a base returned %v after %v", err, ops.calls)
 	}
 }
 

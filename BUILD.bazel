@@ -158,7 +158,7 @@ filegroup(
 filegroup(
     name = "web_flow_key",
     srcs = ["keys/github-web-flow.asc"],
-    visibility = ["//internal/reconcile:__pkg__"],
+    visibility = ["//internal/provenance:__pkg__"],
 )
 
 filegroup(

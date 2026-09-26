@@ -14,6 +14,7 @@ import (
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/platformops"
+	"github.com/fredrir/infra/internal/provenance"
 	"github.com/fredrir/infra/internal/reconcile"
 	"github.com/fredrir/infra/internal/reconciler"
 	"github.com/spf13/cobra"
@@ -103,7 +104,7 @@ func newReconcileCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			pullRequests := reconcile.GitHubPullRequests{Client: client, Owner: "fredrir", Name: "infra"}
+			pullRequests := provenance.GitHubPullRequests{Client: client, Owner: "fredrir", Name: "infra"}
 			if action == "provenance" {
 				return verifyProvenance(cmd, store, &reconcile.Commands{Runner: runner, ProvenanceEnv: attestations, PullRequests: pullRequests}, provenanceBase, report)
 			}
@@ -181,9 +182,9 @@ func githubCredentials() (string, []string, func(), error) {
 }
 
 func verifyProvenance(cmd *cobra.Command, store reconcile.S3Store, ops *reconcile.Commands, override, report string) (err error) {
-	var checked reconcile.ProvenanceRange
+	var checked provenance.ProvenanceRange
 	defer func() {
-		outcome := reconcile.NewProvenanceOutcome(checked, err)
+		outcome := provenance.NewProvenanceOutcome(checked, err)
 		err = errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(outcome))
 		if report != "" {
 			err = errors.Join(err, writeReport(report, outcome))
@@ -197,7 +198,7 @@ func verifyProvenance(cmd *cobra.Command, store reconcile.S3Store, ops *reconcil
 	if err != nil {
 		return err
 	}
-	if checked, err = reconcile.NewProvenanceRange(status.Applied, override, revision); err != nil {
+	if checked, err = provenance.NewProvenanceRange(status.Applied, override, revision); err != nil {
 		return err
 	}
 	return ops.Provenance(cmd.Context(), checked)

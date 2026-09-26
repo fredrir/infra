@@ -1,0 +1,38 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "provenance",
+    srcs = [
+        "provenance.go",
+        "review.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/provenance",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/ci",
+        "//internal/process",
+        "@com_github_google_go_github_v88//github",
+        "@com_github_hmarr_codeowners//:codeowners",
+        "@com_github_protonmail_go_crypto//openpgp",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)
+
+go_test(
+    name = "provenance_test",
+    srcs = [
+        "provenance_test.go",
+        "review_test.go",
+    ],
+    data = ["//:web_flow_key"],
+    embed = [":provenance"],
+    shard_count = 4,
+    deps = [
+        "//internal/ci",
+        "//internal/process",
+        "@com_github_google_go_github_v88//github",
+        "@com_github_protonmail_go_crypto//openpgp",
+        "@com_github_protonmail_go_crypto//openpgp/armor",
+        "@com_github_protonmail_go_crypto//openpgp/packet",
+    ],
+)

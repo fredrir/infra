@@ -1,4 +1,4 @@
-package reconcile
+package provenance
 
 import (
 	"bytes"
@@ -139,10 +139,10 @@ func (g provenanceGate) reviewed(ctx context.Context, commits []provenanceCommit
 }
 
 func (g provenanceGate) reviewGate(ctx context.Context, commits []provenanceCommit) (*reviewGate, error) {
-	if g.commands.PullRequests == nil {
+	if g.verifier.PullRequests == nil {
 		return nil, errors.New("no pull request API")
 	}
-	key, err := g.commands.git(ctx, nil, "show", g.base+":"+webFlowKey)
+	key, err := g.verifier.git(ctx, nil, "show", g.base+":"+webFlowKey)
 	if err != nil {
 		return nil, fmt.Errorf("read %s at %s: %w", webFlowKey, g.base, err)
 	}
@@ -150,7 +150,7 @@ func (g provenanceGate) reviewGate(ctx context.Context, commits []provenanceComm
 	if err != nil {
 		return nil, fmt.Errorf("%s at %s: %w", webFlowKey, g.base, err)
 	}
-	owners, err := g.commands.git(ctx, nil, "show", g.base+":"+codeOwners)
+	owners, err := g.verifier.git(ctx, nil, "show", g.base+":"+codeOwners)
 	if err != nil {
 		return nil, fmt.Errorf("read %s at %s: %w", codeOwners, g.base, err)
 	}
@@ -158,7 +158,7 @@ func (g provenanceGate) reviewGate(ctx context.Context, commits []provenanceComm
 	if err != nil {
 		return nil, fmt.Errorf("%s at %s: %w", codeOwners, g.base, err)
 	}
-	review := &reviewGate{provenanceGate: g, api: g.commands.PullRequests, keyring: keyring, owners: ruleset, commits: map[string]provenanceCommit{}, merges: map[int]reviewedMerge{}}
+	review := &reviewGate{provenanceGate: g, api: g.verifier.PullRequests, keyring: keyring, owners: ruleset, commits: map[string]provenanceCommit{}, merges: map[int]reviewedMerge{}}
 	for _, commit := range commits {
 		review.commits[commit.hash] = commit
 	}
@@ -192,7 +192,7 @@ func (r *reviewGate) approvedMerge(ctx context.Context, number int) ([]string, e
 	if err != nil {
 		return nil, err
 	}
-	paths, err := r.commands.git(ctx, nil, "diff-tree", "-r", "--no-renames", "--name-only", "-z", before, merge)
+	paths, err := r.verifier.git(ctx, nil, "diff-tree", "-r", "--no-renames", "--name-only", "-z", before, merge)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (r *reviewGate) landed(ctx context.Context, pull *github.PullRequest) (stri
 		if err := r.reproduces(ctx, commit.parents[0], head, merge); err != nil {
 			return "", nil, err
 		}
-		merged, err := r.commands.git(ctx, nil, "rev-list", head, "^"+commit.parents[0])
+		merged, err := r.verifier.git(ctx, nil, "rev-list", head, "^"+commit.parents[0])
 		return commit.parents[0], append([]string{merge}, strings.Fields(string(merged.Stdout))...), err
 	case signature == nil && len(commit.parents) == 1:
 		return commit.parents[0], []string{merge}, r.reproduces(ctx, commit.parents[0], head, merge)
@@ -262,7 +262,7 @@ func (r *reviewGate) rebasedCommits(ctx context.Context, pull *github.PullReques
 		if !revisionPattern.MatchString(commit.GetSHA()) {
 			return 0, fmt.Errorf("commit %q is not a revision", commit.GetSHA())
 		}
-		parents, err := r.commands.git(ctx, nil, "rev-list", "--no-walk", "--parents", commit.GetSHA())
+		parents, err := r.verifier.git(ctx, nil, "rev-list", "--no-walk", "--parents", commit.GetSHA())
 		if err != nil {
 			return 0, err
 		}
@@ -270,7 +270,7 @@ func (r *reviewGate) rebasedCommits(ctx context.Context, pull *github.PullReques
 		if len(revisions) != 2 {
 			continue
 		}
-		changed, err := r.commands.git(ctx, nil, "diff-tree", "--name-only", "-r", revisions[1], revisions[0])
+		changed, err := r.verifier.git(ctx, nil, "diff-tree", "--name-only", "-r", revisions[1], revisions[0])
 		if err != nil {
 			return 0, err
 		}
@@ -282,10 +282,10 @@ func (r *reviewGate) rebasedCommits(ctx context.Context, pull *github.PullReques
 }
 
 func (r *reviewGate) present(ctx context.Context, head string) error {
-	if _, err := r.commands.git(ctx, nil, "cat-file", "-e", head+"^{commit}"); err == nil {
+	if _, err := r.verifier.git(ctx, nil, "cat-file", "-e", head+"^{commit}"); err == nil {
 		return nil
 	}
-	if _, err := r.commands.git(ctx, nil, "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "origin", head); err != nil {
+	if _, err := r.verifier.git(ctx, nil, "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "origin", head); err != nil {
 		err = fmt.Errorf("fetch the head %s: %w", head[:12], err)
 		if ci.UnavailableOutput(err.Error()) {
 			return ci.Unavailable(err)
@@ -299,11 +299,11 @@ func (r *reviewGate) reproduces(ctx context.Context, base, head, landed string) 
 	if err := r.present(ctx, head); err != nil {
 		return err
 	}
-	merged, err := r.commands.git(ctx, nil, "merge-tree", "--write-tree", "--no-messages", base, head)
+	merged, err := r.verifier.git(ctx, nil, "merge-tree", "--write-tree", "--no-messages", base, head)
 	if err != nil {
 		return fmt.Errorf("merge the head %s onto %s: %w", head[:12], base[:12], err)
 	}
-	tree, err := r.commands.git(ctx, nil, "rev-parse", landed+"^{tree}")
+	tree, err := r.verifier.git(ctx, nil, "rev-parse", landed+"^{tree}")
 	if err != nil {
 		return err
 	}
