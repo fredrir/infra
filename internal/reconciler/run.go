@@ -186,21 +186,20 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 }
 
 func (s Supervisor) requestRepair(run Run, main string, log io.Writer) {
+	repairable := run.Outcome == reconcile.OutcomeDiffers && slices.ContainsFunc(run.Verification.Differences, func(difference reconcile.Difference) bool { return difference.System != "rulesets" })
 	switch {
-	case run.Outcome == reconcile.OutcomeMatches:
+	case repairable:
+		request := Request{Kind: RequestRepair, Revision: main, Full: true, Reason: truncate(run.failure().Error()), Requested: s.now()}
+		if err := WriteRequest(s.Config.Shared, request); err != nil {
+			fmt.Fprintf(log, "request repair: %v\n", err)
+			return
+		}
+		fmt.Fprintf(log, "Requested a full reconciliation of %s at %s\n", reviewedBranch, main)
+	case run.Outcome == reconcile.OutcomeMatches || run.Outcome == reconcile.OutcomeDiffers:
 		if err := os.Remove(requestPath(s.Config.Shared, RequestRepair)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			fmt.Fprintf(log, "withdraw repair: %v\n", err)
 		}
-		return
-	case run.Outcome != reconcile.OutcomeDiffers || !slices.ContainsFunc(run.Verification.Differences, func(difference reconcile.Difference) bool { return difference.System != "rulesets" }):
-		return
 	}
-	request := Request{Kind: RequestRepair, Revision: main, Full: true, Reason: truncate(run.failure().Error()), Requested: s.now()}
-	if err := WriteRequest(s.Config.Shared, request); err != nil {
-		fmt.Fprintf(log, "request repair: %v\n", err)
-		return
-	}
-	fmt.Fprintf(log, "Requested a full reconciliation of %s at %s\n", reviewedBranch, main)
 }
 
 func (s Supervisor) finish(ctx context.Context, run Run, credentials Credentials, log *runLog) error {

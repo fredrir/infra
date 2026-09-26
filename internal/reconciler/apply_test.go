@@ -308,6 +308,11 @@ func (h *applyHarness) execute(t *testing.T) func(context.Context, process.Optio
 		}
 		switch name {
 		case "git":
+			if slices.Contains(options.Args, "fetch") {
+				if result, err := h.step(t, "fetch", call); err != nil {
+					return result, err
+				}
+			}
 			return process.Run(ctx, options)
 		case "supervisor":
 			if options.Args[0] == "ci" {
@@ -392,15 +397,10 @@ func (h *applyHarness) inspectApply(t *testing.T, call engineCall) {
 	if entries, err := os.ReadDir(filepath.Join(call.work, "home")); err != nil || len(entries) != 0 {
 		t.Errorf("engine HOME holds %v: %v", entries, err)
 	}
-	extra, ok := environment["ANSIBLE_SSH_EXTRA_ARGS"]
-	if ok != hosts {
-		t.Fatalf("host access %q with hosts selected %v", extra, hosts)
-	}
-	if hosts {
-		config, err := os.ReadFile(strings.TrimPrefix(extra, "-F "))
-		if err != nil || filepath.Dir(strings.TrimPrefix(extra, "-F ")) != secrets || !strings.Contains(string(config), "IdentityFile "+h.applier.Identity+"\n") || !strings.Contains(string(config), "UserKnownHostsFile "+h.applier.Config.KnownHosts+"\n") {
-			t.Errorf("SSH configuration %q: %s %v", extra, config, err)
-		}
+	extra := environment["ANSIBLE_SSH_EXTRA_ARGS"]
+	sshConfig, err := os.ReadFile(strings.TrimPrefix(extra, "-F "))
+	if err != nil || filepath.Dir(strings.TrimPrefix(extra, "-F ")) != secrets || !strings.Contains(string(sshConfig), "IdentityFile "+h.applier.Identity+"\n") || !strings.Contains(string(sshConfig), "UserKnownHostsFile "+h.applier.Config.KnownHosts+"\n") {
+		t.Errorf("SSH configuration %q: %s %v", extra, sshConfig, err)
 	}
 	var config kubeconfig
 	data, err := os.ReadFile(environment["KUBECONFIG"])
@@ -539,14 +539,26 @@ func TestApplyGatesTheMainTipBeforeBuildingAndPublishesThroughTheEngine(t *testi
 	}
 }
 
-func TestApplyMintsNoRunnerTokenOrHostAccessWithoutHostChanges(t *testing.T) {
-	h := newApplyHarness(t)
-	h.selection = reconcile.Selection{Kubernetes: true, Projects: []string{"portfolio"}}
-	if err := h.applier.Apply(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if _, minted := h.github.minted[fmt.Sprint(runnerInstall)]; minted || len(h.applies) != 1 {
-		t.Fatalf("minted %v for applies %d", h.github.minted, len(h.applies))
+func TestApplyMintsTheRunnerTokenOnlyWhenHostsAreSelected(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		selection reconcile.Selection
+		minted    bool
+	}{
+		{name: "project only", selection: reconcile.Selection{Kubernetes: true, Projects: []string{"portfolio"}}},
+		{name: "host playbooks", selection: reconcile.Selection{Ansible: true, HostScope: reconcile.HostScopeFull}, minted: true},
+		{name: "tooling only", selection: reconcile.Selection{Tooling: true}, minted: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			h := newApplyHarness(t)
+			h.selection = test.selection
+			if err := h.applier.Apply(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if _, minted := h.github.minted[fmt.Sprint(runnerInstall)]; minted != test.minted || len(h.applies) != 1 {
+				t.Fatalf("minted %v for applies %d", h.github.minted, len(h.applies))
+			}
+		})
 	}
 }
 
@@ -570,6 +582,9 @@ func TestGateReportsBindTheCheckedRevision(t *testing.T) {
 			return 1, `{"base":"","revision":"","error":"read reconciliation status: 503 Slow Down"}`
 		}, want: "503 Slow Down"},
 		{name: "gate crashed", report: func(h *applyHarness) (int, string) { return -1, "" }, want: "no such file"},
+		{name: "attestation outage", report: func(h *applyHarness) (int, string) {
+			return 1, fmt.Sprintf(`{"base":%q,"revision":%q,"error":"unverified commits: deploy: source unavailable: HTTP 502","unavailable":true}`, h.applied, h.tip)
+		}, want: "source unavailable: HTTP 502"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			h := newApplyHarness(t)
@@ -600,6 +615,39 @@ func TestGateReportsBindTheCheckedRevision(t *testing.T) {
 	}
 }
 
+func TestGateOutagesRetryABoundedNumberOfTimes(t *testing.T) {
+	h := newApplyHarness(t)
+	h.gate = func(t *testing.T, call engineCall) (int, string) {
+		return 1, fmt.Sprintf(`{"base":%q,"revision":%q,"error":"unverified commits: deploy: source unavailable: HTTP 503","unavailable":true}`, h.applied, h.tip)
+	}
+	now := time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC)
+	for attempt := 1; attempt <= gateOutageRetries+1; attempt++ {
+		h.reset(t)
+		h.applier.Now = func() time.Time { return now }
+		if err := h.applier.Apply(context.Background()); err == nil {
+			t.Fatalf("attempt %d succeeded", attempt)
+		}
+		ledger := h.ledger(t)
+		want := OutcomeRetry
+		if attempt > gateOutageRetries {
+			want = reconcile.OutcomeFailed
+		}
+		if ledger.Outcome != want || ledger.Attempts != attempt && want == OutcomeRetry {
+			t.Fatalf("attempt %d left %+v, want %s", attempt, ledger, want)
+		}
+		if h.index(t, "go ") >= 0 {
+			t.Fatalf("attempt %d built after an unverified gate: %q", attempt, h.commands)
+		}
+		now = ledger.RetryAt
+		if want == reconcile.OutcomeFailed {
+			decision, err := h.applier.Pending(context.Background())
+			if err != nil || decision.Run {
+				t.Fatalf("a settled outage still retries: %+v, %v", decision, err)
+			}
+		}
+	}
+}
+
 func TestTransientFailuresRetryAndDeterministicFailuresWait(t *testing.T) {
 	for _, test := range []struct {
 		name     string
@@ -607,6 +655,14 @@ func TestTransientFailuresRetryAndDeterministicFailuresWait(t *testing.T) {
 		stage    string
 		terminal bool
 	}{
+		{name: "GitHub unreachable during checkout", stage: "checkout", prepare: func(h *applyHarness) {
+			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) {
+				if name == "fetch" {
+					return process.Result{ExitCode: 128}, errors.New("fatal: unable to access 'https://github.com/fredrir/infra.git/': Could not resolve host: github.com")
+				}
+				return process.Result{}, nil
+			}
+		}},
 		{name: "module proxy down", stage: "build", prepare: func(h *applyHarness) {
 			h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) {
 				if name == "build" {
@@ -694,7 +750,7 @@ func TestTransientFailuresRetryAndDeterministicFailuresWait(t *testing.T) {
 			if run, _ := h.uploaded(t); run.Stage != test.stage {
 				t.Errorf("failed at %s, want %s", run.Stage, test.stage)
 			}
-			if test.name != "missing credential" && (len(h.github.checks) != 2 || h.github.checks[1] != "complete "+conclusion) {
+			if test.stage != "checkout" && test.name != "missing credential" && (len(h.github.checks) != 2 || h.github.checks[1] != "complete "+conclusion) {
 				t.Errorf("check run %q", h.github.checks)
 			}
 			if test.name != "missing credential" && (len(h.gatus.received) != 1 || h.gatus.received[0].Get("success") != "false") {
@@ -890,6 +946,46 @@ func TestReadinessReportsTheLedgerAndExpiringCredentialsDaily(t *testing.T) {
 				t.Errorf("ledger %+v", ledger)
 			}
 		})
+	}
+}
+
+func TestInvalidRequestsAreQuarantinedOnceWithAFailingHeartbeat(t *testing.T) {
+	h := newApplyHarness(t)
+	h.settle(t, Ledger{Revision: h.tip, Outcome: OutcomeApplied, Checked: h.applier.Now()})
+	if err := os.WriteFile(requestPath(h.applier.Config.Shared, RequestApply), []byte(`{"kind":"apply","full":tr`), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	decision, err := h.applier.Pending(context.Background())
+	if err != nil || !decision.Run || decision.Apply || decision.Reason != "quarantine an invalid apply request" {
+		t.Fatalf("pending decided %+v, %v", decision, err)
+	}
+	var journal strings.Builder
+	h.applier.Log = &journal
+	if err := h.applier.Apply(context.Background()); err == nil || !strings.Contains(err.Error(), "apply request: unexpected EOF") {
+		t.Fatalf("apply returned %v", err)
+	}
+	if !strings.Contains(journal.String(), "quarantined ") || len(h.applies) != 0 {
+		t.Errorf("journal %q, applies %d", journal.String(), len(h.applies))
+	}
+	if len(h.gatus.received) != 1 || h.gatus.received[0].Get("success") != "false" || !strings.Contains(h.gatus.received[0].Get("error"), "apply request: unexpected EOF") {
+		t.Errorf("heartbeats %v", h.gatus.received)
+	}
+	if ledger := h.ledger(t); len(ledger.Quarantined[RequestApply]) != 64 || ledger.Outcome != OutcomeApplied {
+		t.Errorf("ledger %+v", ledger)
+	}
+	if decision, err := h.applier.Pending(context.Background()); err != nil || decision.Run {
+		t.Fatalf("a quarantined request is still pending: %+v, %v", decision, err)
+	}
+	h.reset(t)
+	if err := h.applier.Apply(context.Background()); err != nil || len(h.gatus.received) != 0 {
+		t.Fatalf("a quarantined request reported again: %v %v", err, h.gatus.received)
+	}
+	if err := WriteRequest(h.applier.Config.Shared, Request{Kind: RequestApply, Full: true, Reason: "operator", Requested: h.applier.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	h.writeCredentials(t)
+	if err := h.applier.Apply(context.Background()); err != nil || len(h.applies) != 1 || !slices.Contains(h.applies[0].args, "--full") {
+		t.Fatalf("a corrected request did not apply: %v %v", err, h.applies)
 	}
 }
 

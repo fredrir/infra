@@ -123,7 +123,7 @@ func TestVerificationRequestsARepairOnlyForRepairableDifferences(t *testing.T) {
 		withdraw    bool
 	}{
 		{name: "declaration drift", code: 1, report: verification("differs", []reconcile.Difference{{System: "opentofu", Item: "cloudflare_dns_record.grafana update"}, {System: "rulesets", Item: "production"}}, []string{}), wantRequest: true},
-		{name: "rulesets only", code: 1, report: verification("differs", []reconcile.Difference{{System: "rulesets", Item: "production"}}, []string{})},
+		{name: "rulesets only", code: 1, report: verification("differs", []reconcile.Difference{{System: "rulesets", Item: "production"}}, []string{}), withdraw: true},
 		{name: "matches", report: verification("matches", []reconcile.Difference{}, []string{}), withdraw: true},
 		{name: "errors", code: 1, report: verification("failed", []reconcile.Difference{}, []string{"kubectl failed"})},
 		{name: "lease held", code: 75, report: verification("failed", []reconcile.Difference{}, []string{"comparisons skipped: reconciliation locked"})},
@@ -139,9 +139,9 @@ func TestVerificationRequestsARepairOnlyForRepairableDifferences(t *testing.T) {
 				t.Fatal(err)
 			}
 			_ = h.supervisor.Verify(context.Background())
-			requests, err := readRequests(h.supervisor.Config.Shared)
-			if err != nil {
-				t.Fatal(err)
+			requests, invalid := readRequests(h.supervisor.Config.Shared, time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC))
+			if len(invalid) != 0 {
+				t.Fatal(invalid)
 			}
 			request, requested := requests[RequestRepair]
 			switch {
@@ -165,9 +165,9 @@ func TestOffMainProductionRequestsARepairOfMain(t *testing.T) {
 	if err := h.supervisor.Verify(context.Background()); err == nil {
 		t.Fatal("an off-main revision verified")
 	}
-	requests, err := readRequests(h.supervisor.Config.Shared)
-	if err != nil || requests[RequestRepair].Revision != gitCommand(t, origin, "rev-parse", "main") {
-		t.Fatalf("requests %+v, %v", requests, err)
+	requests, invalid := readRequests(h.supervisor.Config.Shared, time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC))
+	if len(invalid) != 0 || requests[RequestRepair].Revision != gitCommand(t, origin, "rev-parse", "main") {
+		t.Fatalf("requests %+v, %+v", requests, invalid)
 	}
 }
 

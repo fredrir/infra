@@ -55,10 +55,42 @@ func TestDecideRunsForNewTipsRetriesRequestsAndCappedRepairs(t *testing.T) {
 		{name: "deferred repair keeps full and repair", ledger: Ledger{Revision: tip, Outcome: OutcomeDeferred, Full: true, Repair: true, Checked: checked}, tip: tip, want: Decision{Run: true, Apply: true, Full: true, Repair: true, Reason: "retry deferred " + tip}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if got := decide(test.ledger, test.tip, test.requests, now); !reflect.DeepEqual(got, test.want) {
+			if got := decide(test.ledger, test.tip, test.requests, nil, now); !reflect.DeepEqual(got, test.want) {
 				t.Fatalf("decided %+v, want %+v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestDecideIgnoresStaleRequestsAndQuarantinesInvalidOnesOnce(t *testing.T) {
+	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
+	tip := strings.Repeat("b", 40)
+	applied := Ledger{Revision: tip, Outcome: OutcomeApplied, Checked: now.Add(-time.Hour)}
+	stale := map[string]Request{
+		RequestApply:  {Kind: RequestApply, Full: true, Reason: "operator", Requested: now.Add(-requestLifetime)},
+		RequestRepair: {Kind: RequestRepair, Revision: tip, Full: true, Reason: "drift", Requested: now.Add(-requestLifetime - time.Minute)},
+	}
+	if got := decide(applied, tip, stale, nil, now); !reflect.DeepEqual(got, Decision{}) {
+		t.Fatalf("stale requests decided %+v", got)
+	}
+	invalid := map[string]invalidRequest{RequestApply: {Fingerprint: strings.Repeat("f", 64), Reason: "apply request: unexpected EOF"}}
+	got := decide(applied, tip, nil, invalid, now)
+	if want := (Decision{Run: true, Reason: "quarantine an invalid apply request", Quarantine: invalid}); !reflect.DeepEqual(got, want) {
+		t.Fatalf("decided %+v, want %+v", got, want)
+	}
+	quarantined := applied.quarantine(got.Quarantine)
+	if got := decide(quarantined, tip, nil, invalid, now); !reflect.DeepEqual(got, Decision{}) {
+		t.Fatalf("a quarantined request decided %+v", got)
+	}
+	if applied.Quarantined != nil || quarantined.Quarantined[RequestApply] != strings.Repeat("f", 64) {
+		t.Fatalf("quarantine changed the original ledger or missed the fingerprint: %+v", quarantined)
+	}
+	replaced := map[string]invalidRequest{RequestApply: {Fingerprint: strings.Repeat("e", 64), Reason: "apply request: unexpected EOF"}}
+	if got := decide(quarantined, tip, nil, replaced, now); !got.Run || got.Quarantine == nil {
+		t.Fatalf("a replaced invalid request decided %+v", got)
+	}
+	if got := decide(Ledger{Revision: strings.Repeat("a", 40), Outcome: OutcomeApplied, Checked: now}, tip, nil, invalid, now); !got.Apply || got.Reason != "main at "+tip || got.Quarantine == nil {
+		t.Fatalf("a new tip with an invalid request decided %+v", got)
 	}
 }
 
@@ -107,7 +139,7 @@ func TestLedgerRecordsTheAttemptAndItsOutcome(t *testing.T) {
 	}
 	retried := started.end(applyRun{Run: Run{Revision: tip, Outcome: OutcomeRetry, Stage: "build", Error: "proxy.golang.org: 503"}}, now)
 	for attempt, delay := range []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute, 16 * time.Minute, 30 * time.Minute, 30 * time.Minute} {
-		retried = retried.begin(decide(retried, tip, nil, retried.RetryAt), tip, retried.RetryAt)
+		retried = retried.begin(decide(retried, tip, nil, nil, retried.RetryAt), tip, retried.RetryAt)
 		if retried.Attempts != attempt+2 {
 			t.Fatalf("attempt %d recorded as %d", attempt+2, retried.Attempts)
 		}

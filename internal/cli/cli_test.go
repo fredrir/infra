@@ -3,6 +3,8 @@ package cli_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -340,6 +342,37 @@ func TestApplyUnitConditionAndOperatorRequest(t *testing.T) {
 	}
 }
 
+func handled(t *testing.T, state, origin string, quarantined map[string]string) {
+	t.Helper()
+	command := exec.Command("git", "rev-parse", "main")
+	command.Dir = origin
+	tip, err := command.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ledger, _ := json.Marshal(map[string]any{"revision": strings.TrimSpace(string(tip)), "outcome": "applied", "checked_at": time.Now().UTC(), "quarantined": quarantined})
+	if err := os.WriteFile(filepath.Join(state, "ledger.json"), ledger, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func invalidRequest(t *testing.T, config string) []byte {
+	t.Helper()
+	var settings struct{ Shared string }
+	data, err := os.ReadFile(config)
+	if err == nil {
+		err = json.Unmarshal(data, &settings)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := []byte(`{"kind":"apply","full":tr`)
+	if err := os.WriteFile(filepath.Join(settings.Shared, "requests", "apply.json"), request, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	return request
+}
+
 func TestPendingExitCodesTellSystemdRunSkipOrFail(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -356,6 +389,14 @@ func TestPendingExitCodesTellSystemdRunSkipOrFail(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(state, "ledger.json"), []byte("{"), 0o600); err != nil {
 				t.Fatal(err)
 			}
+		}},
+		{name: "new invalid request", want: 0, damage: func(t *testing.T, config, state, origin string) {
+			handled(t, state, origin, nil)
+			invalidRequest(t, config)
+		}},
+		{name: "quarantined invalid request", want: 1, damage: func(t *testing.T, config, state, origin string) {
+			digest := sha256.Sum256(invalidRequest(t, config))
+			handled(t, state, origin, map[string]string{"apply": hex.EncodeToString(digest[:])})
 		}},
 		{name: "unreadable main without other work", want: 255, damage: func(t *testing.T, _, state, origin string) {
 			ledger, _ := json.Marshal(map[string]any{"revision": strings.Repeat("a", 40), "outcome": "applied", "checked_at": time.Now().UTC()})

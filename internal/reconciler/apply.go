@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,9 +22,10 @@ import (
 )
 
 const (
-	applyDeadline    = 2 * time.Hour
-	leaseWait        = "11m"
-	tokenExpiryAlert = 30 * 24 * time.Hour
+	applyDeadline     = 2 * time.Hour
+	leaseWait         = "11m"
+	tokenExpiryAlert  = 30 * 24 * time.Hour
+	gateOutageRetries = 3
 )
 
 var (
@@ -70,9 +72,9 @@ func (a Applier) Pending(ctx context.Context) (Decision, error) {
 	if err != nil {
 		return Decision{}, err
 	}
-	requests, requestErr := readRequests(a.Config.Shared)
-	tip, tipErr := a.remote().remoteMain(ctx, a.Config.Repository)
-	return decide(ledger, tip, requests, a.now()), errors.Join(requestErr, tipErr)
+	requests, invalid := readRequests(a.Config.Shared, a.now())
+	tip, err := a.remote().remoteMain(ctx, a.Config.Repository)
+	return decide(ledger, tip, requests, invalid, a.now()), err
 }
 
 func (a Applier) Apply(ctx context.Context) error {
@@ -89,22 +91,39 @@ func (a Applier) Apply(ctx context.Context) error {
 	if err != nil {
 		return errors.Join(credentialErr, err)
 	}
-	requests, requestErr := readRequests(a.Config.Shared)
+	requests, invalid := readRequests(a.Config.Shared, a.now())
 	tip, tipErr := a.remote().remoteMain(ctx, a.Config.Repository)
-	for _, problem := range []error{requestErr, tipErr} {
-		if problem != nil {
-			fmt.Fprintln(log, problem)
-		}
+	if tipErr != nil {
+		fmt.Fprintln(log, tipErr)
 	}
-	decision := decide(ledger, tip, requests, a.now())
+	decision := decide(ledger, tip, requests, invalid, a.now())
 	if !decision.Run {
 		return credentialErr
 	}
+	var quarantined error
+	if len(decision.Quarantine) > 0 {
+		ledger = ledger.quarantine(decision.Quarantine)
+		for _, kind := range slices.Sorted(maps.Keys(decision.Quarantine)) {
+			quarantined = errors.Join(quarantined, fmt.Errorf("quarantined %s: %s", decision.Quarantine[kind].Fingerprint[:12], decision.Quarantine[kind].Reason))
+		}
+		if a.Log != nil {
+			fmt.Fprintln(a.Log, quarantined)
+		}
+		if err := saveLedger(a.Config.State, ledger); err != nil {
+			return errors.Join(credentialErr, quarantined, err)
+		}
+		if err := a.heartbeat(ctx, credentials, quarantined); err != nil && a.Log != nil {
+			fmt.Fprintln(a.Log, err)
+		}
+	}
 	fmt.Fprintf(log, "Reconciling: %s\n", decision.Reason)
 	if !decision.Apply {
+		if quarantined != nil && a.now().Sub(ledger.Checked) < readinessInterval {
+			return errors.Join(credentialErr, quarantined)
+		}
 		ledger.Checked, ledger.Consumed = a.now(), decision.Consumed
 		failure := errors.Join(ledger.failure(), credentialErr, a.readiness(ctx, credentials))
-		return errors.Join(failure, saveLedger(a.Config.State, ledger), a.heartbeat(ctx, credentials, failure))
+		return errors.Join(quarantined, failure, saveLedger(a.Config.State, ledger), a.heartbeat(ctx, credentials, failure))
 	}
 	started := ledger.begin(decision, tip, a.now())
 	if err := saveLedger(a.Config.State, started); err != nil {
@@ -116,12 +135,12 @@ func (a Applier) Apply(ctx context.Context) error {
 	if credentialErr != nil {
 		failure = &stageFailure{stage: "credentials", err: credentialErr}
 	} else {
-		ignored, failure = a.reconcile(ctx, credentials, decision, ledger, run, log)
+		ignored, failure = a.reconcile(ctx, credentials, decision, ledger, started.Attempts, run, log)
 	}
 	if ignored {
 		ledger.Revision, ledger.Checked, ledger.Consumed = run.Revision, a.now(), decision.Consumed
 		fmt.Fprintf(log, "Only push-ignored paths changed up to %s\n", run.Revision)
-		return saveLedger(a.Config.State, ledger)
+		return errors.Join(quarantined, saveLedger(a.Config.State, ledger))
 	}
 	if failure != nil {
 		run.Stage, run.Error, run.Outcome = failure.stage, failure.err.Error(), OutcomeRetry
@@ -130,10 +149,10 @@ func (a Applier) Apply(ctx context.Context) error {
 		}
 		fmt.Fprintf(log, "%s failed: %v\n", failure.stage, failure.err)
 	}
-	return a.finish(ctx, credentials, started, run, log)
+	return errors.Join(quarantined, a.finish(ctx, credentials, started, run, log))
 }
 
-func (a Applier) reconcile(ctx context.Context, credentials Credentials, decision Decision, ledger Ledger, run *applyRun, log *runLog) (bool, *stageFailure) {
+func (a Applier) reconcile(ctx context.Context, credentials Credentials, decision Decision, ledger Ledger, attempt int, run *applyRun, log *runLog) (bool, *stageFailure) {
 	transient := func(stage string, err error) (bool, *stageFailure) {
 		return false, &stageFailure{stage: stage, err: err}
 	}
@@ -170,10 +189,13 @@ func (a Applier) reconcile(ctx context.Context, credentials Credentials, decisio
 	base, err := a.gate(ctx, current, credentials, run)
 	if err != nil {
 		var rejected rejection
-		if errors.As(err, &rejected) {
-			return terminal("provenance", err)
+		switch {
+		case !errors.As(err, &rejected):
+			return transient("provenance", err)
+		case rejected.unavailable && attempt <= gateOutageRetries:
+			return transient("provenance", err)
 		}
-		return transient("provenance", err)
+		return terminal("provenance", err)
 	}
 	engine := filepath.Join(work, "infra")
 	if err := commands.buildEngine(ctx, work, a.Config.Cache, source, engine); err != nil {
@@ -202,8 +224,11 @@ func (a Applier) reconcile(ctx context.Context, credentials Credentials, decisio
 	if err != nil {
 		return transient("requirements", err)
 	}
+	environment, err := current.hostAccess(a.Identity, a.Config.KnownHosts)
+	if err != nil {
+		return transient("credentials", err)
+	}
 	var token string
-	var environment []string
 	if hosts {
 		minted, revoke, err := runnerFleetToken(ctx, a.Config.Runner, []byte(credentials[RunnerAppKey]), source, "write")
 		if err != nil {
@@ -215,9 +240,6 @@ func (a Applier) reconcile(ctx context.Context, credentials Credentials, decisio
 			}
 		}()
 		token = minted
-		if environment, err = current.hostAccess(a.Identity, a.Config.KnownHosts); err != nil {
-			return transient("credentials", err)
-		}
 	}
 	kubeconfig, err := current.kubeconfig(a.Config.Kubernetes, "infrastructure-apply", credentials[KubernetesToken])
 	if err != nil {
@@ -274,7 +296,10 @@ func (a Applier) hostsSelected(ctx context.Context, commands executor, engine, s
 	return selection.Ansible || selection.Tooling, nil
 }
 
-type rejection struct{ error }
+type rejection struct {
+	error
+	unavailable bool
+}
 
 func (a Applier) gate(ctx context.Context, current session, credentials Credentials, run *applyRun) (string, error) {
 	self := a.Self
@@ -294,10 +319,7 @@ func (a Applier) gate(ctx context.Context, current session, credentials Credenti
 	environment := append(append(credentials.stateEnvironment(a.Config.Site), current.secretEnvironment()...), "PROVENANCE_TOKEN="+credentials[ProvenanceToken])
 	_, gateErr := gate.run(ctx, current.source, environment, self, "reconcile", "provenance", "--root="+current.source, "--state-bucket="+a.Config.Bucket, "--state-prefix="+a.Config.Prefix, "--report="+report)
 	data, readErr := os.ReadFile(report)
-	var checked struct {
-		reconcile.ProvenanceRange
-		Error string `json:"error"`
-	}
+	var checked reconcile.ProvenanceOutcome
 	if readErr == nil {
 		readErr = json.Unmarshal(data, &checked)
 		run.Provenance = data
@@ -308,11 +330,11 @@ func (a Applier) gate(ctx context.Context, current session, credentials Credenti
 	case checked.Revision == "" && checked.Base == "":
 		return "", cmp.Or(errorText(checked.Error), gateErr, errors.New("provenance report names no range"))
 	case checked.Revision != run.Revision:
-		return "", rejection{fmt.Errorf("provenance report covers %s..%s, not %s", checked.Base, checked.Revision, run.Revision)}
+		return "", rejection{error: fmt.Errorf("provenance report covers %s..%s, not %s", checked.Base, checked.Revision, run.Revision)}
 	case !revisionPattern.MatchString(checked.Base):
-		return "", rejection{fmt.Errorf("provenance report has an invalid base %q", checked.Base)}
+		return "", rejection{error: fmt.Errorf("provenance report has an invalid base %q", checked.Base)}
 	case gateErr != nil || checked.Error != "":
-		return "", rejection{cmp.Or(errorText(checked.Error), gateErr)}
+		return "", rejection{error: cmp.Or(errorText(checked.Error), gateErr), unavailable: checked.Unavailable}
 	}
 	return checked.Base, nil
 }

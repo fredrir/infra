@@ -38,15 +38,33 @@ func TestRequestsLiveInTheirOwnersDirectoriesAndAreValidated(t *testing.T) {
 			t.Fatalf("%s: %v %v", path, info, err)
 		}
 	}
-	requests, err := readRequests(shared)
-	if err != nil || !reflect.DeepEqual(requests, map[string]Request{RequestRepair: repair, RequestApply: operator}) {
-		t.Fatalf("read %+v, %v", requests, err)
+	requests, invalid := readRequests(shared, now)
+	if len(invalid) != 0 || !reflect.DeepEqual(requests, map[string]Request{RequestRepair: repair, RequestApply: operator}) {
+		t.Fatalf("read %+v, %+v", requests, invalid)
 	}
-	if err := os.WriteFile(requestPath(shared, RequestApply), []byte(`{"kind":"repair","revision":"`+strings.Repeat("d", 40)+`","full":true,"requested_at":"2026-09-26T12:00:00Z"}`), 0o640); err != nil {
+	fingerprints := map[string]bool{}
+	for name, content := range map[string]string{
+		"misplaced": `{"kind":"repair","revision":"` + strings.Repeat("d", 40) + `","full":true,"requested_at":"2026-09-26T12:00:00Z"}`,
+		"truncated": `{"kind":"apply","full":tr`,
+		"future":    `{"kind":"apply","full":true,"requested_at":"2026-09-26T12:06:00Z"}`,
+		"unknown":   `{"kind":"apply","full":true,"requested_at":"2026-09-26T12:00:00Z","now":true}`,
+	} {
+		if err := os.WriteFile(requestPath(shared, RequestApply), []byte(content), 0o640); err != nil {
+			t.Fatal(err)
+		}
+		requests, invalid := readRequests(shared, now)
+		quarantine, found := invalid[RequestApply]
+		if !found || !reflect.DeepEqual(requests, map[string]Request{RequestRepair: repair}) || len(quarantine.Fingerprint) != 64 || quarantine.Reason == "" || fingerprints[quarantine.Fingerprint] {
+			t.Fatalf("%s request read %+v, %+v", name, requests, invalid)
+		}
+		fingerprints[quarantine.Fingerprint] = true
+	}
+	skewed := Request{Kind: RequestApply, Full: true, Reason: "operator", Requested: now.Add(requestSkew)}
+	if err := WriteRequest(shared, skewed); err != nil {
 		t.Fatal(err)
 	}
-	if requests, err := readRequests(shared); err == nil || !reflect.DeepEqual(requests, map[string]Request{RequestRepair: repair}) {
-		t.Fatalf("a misplaced request read %+v, %v", requests, err)
+	if requests, invalid := readRequests(shared, now); len(invalid) != 0 || requests[RequestApply] != skewed {
+		t.Fatalf("a request within the clock skew read %+v, %+v", requests, invalid)
 	}
 	if err := os.Remove(requestPath(shared, RequestApply)); err != nil {
 		t.Fatal(err)
@@ -54,8 +72,8 @@ func TestRequestsLiveInTheirOwnersDirectoriesAndAreValidated(t *testing.T) {
 	if err := os.Symlink(requestPath(shared, RequestRepair), requestPath(shared, RequestApply)); err != nil {
 		t.Fatal(err)
 	}
-	if requests, err := readRequests(shared); err == nil || len(requests) != 1 {
-		t.Fatalf("a linked request read %+v, %v", requests, err)
+	if requests, invalid := readRequests(shared, now); len(invalid) != 1 || len(requests) != 1 {
+		t.Fatalf("a linked request read %+v, %+v", requests, invalid)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -26,18 +27,19 @@ const (
 )
 
 type Ledger struct {
-	Revision   string    `json:"revision,omitempty"`
-	Outcome    string    `json:"outcome,omitempty"`
-	Failure    string    `json:"failure,omitempty"`
-	Full       bool      `json:"full,omitempty"`
-	Repair     bool      `json:"repair,omitempty"`
-	Attempts   int       `json:"attempts,omitempty"`
-	RetryAt    time.Time `json:"retry_at,omitzero"`
-	Started    time.Time `json:"started_at,omitzero"`
-	Finished   time.Time `json:"finished_at,omitzero"`
-	Checked    time.Time `json:"checked_at,omitzero"`
-	Consumed   Consumed  `json:"consumed,omitzero"`
-	LastRepair *Attempt  `json:"last_repair,omitempty"`
+	Revision    string            `json:"revision,omitempty"`
+	Outcome     string            `json:"outcome,omitempty"`
+	Failure     string            `json:"failure,omitempty"`
+	Full        bool              `json:"full,omitempty"`
+	Repair      bool              `json:"repair,omitempty"`
+	Attempts    int               `json:"attempts,omitempty"`
+	RetryAt     time.Time         `json:"retry_at,omitzero"`
+	Started     time.Time         `json:"started_at,omitzero"`
+	Finished    time.Time         `json:"finished_at,omitzero"`
+	Checked     time.Time         `json:"checked_at,omitzero"`
+	Consumed    Consumed          `json:"consumed,omitzero"`
+	Quarantined map[string]string `json:"quarantined,omitempty"`
+	LastRepair  *Attempt          `json:"last_repair,omitempty"`
 }
 
 type Consumed struct {
@@ -52,13 +54,14 @@ type Attempt struct {
 }
 
 type Decision struct {
-	Run      bool
-	Apply    bool
-	Advanced bool
-	Full     bool
-	Repair   bool
-	Reason   string
-	Consumed Consumed
+	Run        bool
+	Apply      bool
+	Advanced   bool
+	Full       bool
+	Repair     bool
+	Reason     string
+	Consumed   Consumed
+	Quarantine map[string]invalidRequest
 }
 
 func (l Ledger) settled() bool {
@@ -70,13 +73,16 @@ func (l Ledger) repairCapped(revision string, now time.Time) bool {
 	return last != nil && last.Revision == revision && (last.Outcome == reconcile.OutcomeFailed || now.Sub(last.Started) < repairCooldown)
 }
 
-func decide(ledger Ledger, tip string, requests map[string]Request, now time.Time) Decision {
+func decide(ledger Ledger, tip string, requests map[string]Request, invalid map[string]invalidRequest, now time.Time) Decision {
 	decision := Decision{Consumed: ledger.Consumed}
-	if request, ok := requests[RequestApply]; ok && request.Requested.After(ledger.Consumed.Apply) {
+	current := func(request Request, consumed time.Time) bool {
+		return request.Requested.After(consumed) && now.Sub(request.Requested) < requestLifetime
+	}
+	if request, ok := requests[RequestApply]; ok && current(request, ledger.Consumed.Apply) {
 		decision.Consumed.Apply = request.Requested
 		decision.Run, decision.Apply, decision.Full, decision.Reason = true, true, request.Full, "requested: "+request.Reason
 	}
-	if request, ok := requests[RequestRepair]; ok && request.Requested.After(ledger.Consumed.Repair) {
+	if request, ok := requests[RequestRepair]; ok && current(request, ledger.Consumed.Repair) {
 		decision.Consumed.Repair = request.Requested
 		if tip != "" && request.Revision == tip && !ledger.repairCapped(tip, now) {
 			decision.Run, decision.Apply, decision.Full, decision.Repair, decision.Reason = true, true, true, true, "repair: "+request.Reason
@@ -100,7 +106,29 @@ func decide(ledger Ledger, tip string, requests map[string]Request, now time.Tim
 	if !decision.Apply {
 		decision.Full, decision.Repair = false, false
 	}
+	for kind, request := range invalid {
+		if ledger.Quarantined[kind] == request.Fingerprint {
+			continue
+		}
+		if decision.Quarantine == nil {
+			decision.Quarantine = map[string]invalidRequest{}
+		}
+		decision.Quarantine[kind] = request
+		decision.Run, decision.Reason = true, cmp.Or(decision.Reason, "quarantine an invalid "+kind+" request")
+	}
 	return decision
+}
+
+func (l Ledger) quarantine(requests map[string]invalidRequest) Ledger {
+	quarantined := maps.Clone(l.Quarantined)
+	if quarantined == nil {
+		quarantined = map[string]string{}
+	}
+	for kind, request := range requests {
+		quarantined[kind] = request.Fingerprint
+	}
+	l.Quarantined = quarantined
+	return l
 }
 
 func (l Ledger) begin(decision Decision, tip string, now time.Time) Ledger {
@@ -111,7 +139,7 @@ func (l Ledger) begin(decision Decision, tip string, now time.Time) Ledger {
 	return Ledger{
 		Revision: tip, Outcome: OutcomeRunning, Failure: l.Failure, Full: decision.Full, Repair: decision.Repair,
 		Attempts: attempts, RetryAt: now.Add(retryDelay(attempts)), Started: now, Finished: l.Finished,
-		Checked: l.Checked, Consumed: decision.Consumed, LastRepair: l.LastRepair,
+		Checked: l.Checked, Consumed: decision.Consumed, Quarantined: l.Quarantined, LastRepair: l.LastRepair,
 	}
 }
 

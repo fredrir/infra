@@ -2,6 +2,8 @@ package reconciler
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,9 +15,11 @@ import (
 )
 
 const (
-	RequestApply  = "apply"
-	RequestRepair = "repair"
-	requestLimit  = 64 << 10
+	RequestApply    = "apply"
+	RequestRepair   = "repair"
+	requestLimit    = 64 << 10
+	requestSkew     = 5 * time.Minute
+	requestLifetime = 24 * time.Hour
 )
 
 var requestDirectories = map[string]string{RequestApply: "requests", RequestRepair: "repairs"}
@@ -67,45 +71,58 @@ func WriteRequest(shared string, request Request) error {
 	return os.Rename(file.Name(), path)
 }
 
-func readRequests(shared string) (map[string]Request, error) {
-	requests := map[string]Request{}
-	var problems []error
-	for _, kind := range []string{RequestApply, RequestRepair} {
-		request, err := readRequest(requestPath(shared, kind))
-		switch {
-		case errors.Is(err, os.ErrNotExist):
-		case err == nil && request.Kind != kind:
-			problems = append(problems, fmt.Errorf("%s request of kind %q", kind, request.Kind))
-		case err != nil:
-			problems = append(problems, fmt.Errorf("%s request: %w", kind, err))
-		default:
-			requests[kind] = request
-		}
-	}
-	return requests, errors.Join(problems...)
+type invalidRequest struct {
+	Fingerprint string
+	Reason      string
 }
 
-func readRequest(path string) (Request, error) {
+func readRequests(shared string, now time.Time) (map[string]Request, map[string]invalidRequest) {
+	requests, invalid := map[string]Request{}, map[string]invalidRequest{}
+	for _, kind := range []string{RequestApply, RequestRepair} {
+		request, fingerprint, err := readRequest(requestPath(shared, kind))
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+			continue
+		case err == nil && request.Kind != kind:
+			err = fmt.Errorf("kind %q", request.Kind)
+		case err == nil && request.Requested.After(now.Add(requestSkew)):
+			err = fmt.Errorf("requested_at %s is in the future", request.Requested.Format(time.RFC3339))
+		}
+		if err != nil {
+			invalid[kind] = invalidRequest{Fingerprint: fingerprint, Reason: fmt.Sprintf("%s request: %v", kind, err)}
+			continue
+		}
+		requests[kind] = request
+	}
+	return requests, invalid
+}
+
+func readRequest(path string) (Request, string, error) {
 	file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		return Request{}, err
+		return Request{}, fingerprint([]byte(err.Error())), err
 	}
 	defer file.Close()
 	if err := singleRegularFile(file); err != nil {
-		return Request{}, err
+		return Request{}, fingerprint([]byte(err.Error())), err
 	}
 	data, err := io.ReadAll(io.LimitReader(file, requestLimit+1))
 	if err != nil {
-		return Request{}, err
+		return Request{}, fingerprint([]byte(err.Error())), err
 	}
 	if len(data) > requestLimit {
-		return Request{}, errors.New("request exceeds 64 KiB")
+		return Request{}, fingerprint(data), errors.New("request exceeds 64 KiB")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var request Request
 	if err := decoder.Decode(&request); err != nil {
-		return Request{}, err
+		return Request{}, fingerprint(data), err
 	}
-	return request, request.validate()
+	return request, fingerprint(data), request.validate()
+}
+
+func fingerprint(data []byte) string {
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
 }
