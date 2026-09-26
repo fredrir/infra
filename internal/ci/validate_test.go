@@ -99,6 +99,35 @@ func TestValidateRendersEveryChangedKustomizationInProcess(t *testing.T) {
 	}
 }
 
+func TestKustomizationsRenderOnlyForInputsKustomizeReads(t *testing.T) {
+	root := t.TempDir()
+	writeDeclarations(t, root, map[string]string{"platform/components/broken/kustomization.yaml": "resources:\n- missing.yaml\n"})
+	for _, test := range []struct {
+		changed  string
+		rendered bool
+	}{
+		{"platform/BUILD.bazel", false},
+		{"platform/components/BUILD", false},
+		{"platform/components/broken/rules.bzl", false},
+		{"platform/components/broken/kustomization.yaml", true},
+		{"platform/components/broken/values.txt", true},
+		{"charts/project/values.yaml", true},
+	} {
+		t.Run(test.changed, func(t *testing.T) {
+			runner := Runner{Dir: root, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				if options.Name == "git" {
+					return process.Result{Stdout: []byte(test.changed + "\n")}, nil
+				}
+				return process.Result{}, nil
+			}}
+			err := Validate(context.Background(), runner, "")
+			if rendered := err != nil && strings.Contains(err.Error(), "kustomize "+filepath.Join(root, "platform/components/broken")+":"); rendered != test.rendered {
+				t.Fatalf("rendered = %t, want %t: %v", rendered, test.rendered, err)
+			}
+		})
+	}
+}
+
 func TestDeclarationChecksReportOutputAndErrorsInDeclarationOrder(t *testing.T) {
 	var output bytes.Buffer
 	runner := Runner{Stdout: &output, Stderr: &output}

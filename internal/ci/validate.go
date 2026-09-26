@@ -55,6 +55,13 @@ func matching(pattern string) func(string) bool {
 
 var reconcilerTofuInputs = matching(`^(tofu/reconciler/|keys/admin_keys$)`)
 
+var renderedTrees = matching(`^(platform/|charts/|build/rollout/flux-artifacts/)`)
+
+func kustomizationInputs(path string) bool {
+	name := filepath.Base(path)
+	return renderedTrees(path) && name != "BUILD" && name != "BUILD.bazel" && !strings.HasSuffix(name, ".bzl")
+}
+
 func rootTofuInputs(path string) bool {
 	return path == "platform/clusters/production/settings.yaml" || strings.HasPrefix(path, "tofu/") && !strings.HasPrefix(path, "tofu/reconciler/") && !strings.HasSuffix(path, ".tftest.hcl")
 }
@@ -124,7 +131,7 @@ func declarationChecks(root string, changed func(func(string) bool) bool) ([]dec
 	if changed(matching(`^(platform/projects/|platform/components/(policy|backup-job|repository-maintenance)/|platform/clusters/production/(root|settings)\.yaml$|build/rollout/flux-artifacts/|internal/fluxartifacts/|internal/ci/validate\.go$)`)) {
 		checks = append(checks, func(context.Context, Runner) error { return fluxartifacts.Check(root, kustomize.Build) })
 	}
-	if changed(matching(`^(platform/|charts/|build/rollout/flux-artifacts/)`)) {
+	if changed(kustomizationInputs) {
 		directories, err := kustomizations(root)
 		if err != nil {
 			return nil, err
