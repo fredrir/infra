@@ -7,6 +7,7 @@ go_test(
         "bazel_test.go",
         "build_vm_test.go",
         "cancellation_test.go",
+        "check_workflow_test.go",
         "cli_inputs_test.go",
         "firewall_test.go",
         "host_secrets_test.go",
