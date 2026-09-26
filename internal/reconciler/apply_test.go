@@ -27,6 +27,7 @@ import (
 
 	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/reconcile"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -37,10 +38,16 @@ const (
 	publisherInstall = 164968284
 )
 
+type appIdentity struct {
+	issuer string
+	key    *rsa.PublicKey
+}
+
 type githubAPI struct {
 	mu         sync.Mutex
 	expiration string
 	failMint   bool
+	apps       map[string]appIdentity
 	minted     map[string][]map[string]any
 	revoked    []string
 	checks     []string
@@ -60,6 +67,10 @@ func (g *githubAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		installation := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/app/installations/"), "/access_tokens")
 		if g.failMint && installation == fmt.Sprint(runnerInstall) {
 			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		if !g.authenticates(installation, authorization) {
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		g.minted[installation] = append(g.minted[installation], decoded)
@@ -85,6 +96,30 @@ func (g *githubAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
+}
+
+func (g *githubAPI) authenticates(installation, authorization string) bool {
+	app, found := g.apps[installation]
+	bearer, bearing := strings.CutPrefix(authorization, "Bearer ")
+	if !found || !bearing {
+		return false
+	}
+	claims := jwt.RegisteredClaims{}
+	_, err := jwt.ParseWithClaims(bearer, &claims, func(*jwt.Token) (any, error) { return app.key, nil }, jwt.WithValidMethods([]string{"RS256"}))
+	return err == nil && claims.Issuer == app.issuer
+}
+
+func appIdentityOf(t *testing.T, app App, privateKey string) appIdentity {
+	t.Helper()
+	block, _ := pem.Decode([]byte(privateKey))
+	if block == nil {
+		t.Fatal("App key is not PEM")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return appIdentity{issuer: fmt.Sprint(app.AppID), key: &key.PublicKey}
 }
 
 type stateBucket struct {
@@ -228,6 +263,7 @@ func newApplyHarness(t *testing.T) *applyHarness {
 	}
 	h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) { return process.Result{}, nil }
 	h.applier = Applier{Config: config, Identity: identity, Self: supervisorBinary, Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, LockPoll: time.Millisecond, Execute: h.execute(t)}
+	h.github.apps = map[string]appIdentity{fmt.Sprint(runnerInstall): appIdentityOf(t, config.Runner, h.credentials[RunnerAppKey]), fmt.Sprint(publisherInstall): appIdentityOf(t, config.Publisher.App, h.credentials[PublisherAppKey])}
 	h.writeCredentials(t)
 	return h
 }
