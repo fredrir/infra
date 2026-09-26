@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "host": "fredrir-10",
+  "cause": "tailscaled selected peers' pod-network addresses (10.42.4.1:41641, 10.42.1.1:41641) as direct endpoints; those packets routed into flannel-wg, which itself rides tailscale0, and looped",
+  "fixes": [
+    {
+      "commit": "6bbecc245b5c015465d0bb2ae3c5325a3823e464",
+      "change": "Host firewall output chain drops Tailscale bypass-marked packets (0x80000/0xff0000) to the pod CIDR",
+      "run": "https://github.com/fredrir/infra/actions/runs/36258801409",
+      "applied_manually_on_fredrir_10": "2026-09-26T17:20Z"
+    },
+    {
+      "commit": "f2160019aaff53f878ded50aef878e8ed2b6e517",
+      "change": "Hetzner firewalls of fredrir-04 and fredrir-05 accept inbound UDP 41641 like the other fleet firewalls",
+      "run": "https://github.com/fredrir/infra/actions/runs/36258989806"
+    }
+  ],
+  "windows": {
+    "before": "2026-09-26T16:35Z/17:15Z, 41 one-minute samples",
+    "after": "2026-09-26T17:24Z/17:40Z, 17 one-minute samples"
+  },
+  "mean": {
+    "flannel_wg_tx_packets_per_second": {"before": 53576, "after": 1.6},
+    "tailscale0_tx_packets_per_second": {"before": 44403, "after": 11.8},
+    "tailscale0_dropped_packets_per_second": {"before": 9682, "after": 0},
+    "flannel_wg_tx_megabytes_per_second": {"before": 35.6, "after": 0.001},
+    "cores_outside_pods_and_k3s_agent": {"before": 2.84, "after": 0.03},
+    "node_busy_cores": {"before": 3.0, "after": 0.58},
+    "tcp_retransmit_ratio_percent": {"before": 8.4, "after": 0}
+  },
+  "peer_paths_after": {
+    "fredrir-04": "direct 95.217.135.164:41641, 23 ms",
+    "fredrir-05": "direct 46.62.214.182:41641, 23 ms",
+    "fredrir-07": "direct, 23 ms",
+    "fredrir-08": "direct, 23 ms",
+    "fredrir-09": "direct, 39 ms"
+  },
+  "limitations": [
+    "The after window is 16 minutes",
+    "fredrir-04 and fredrir-05 were DERP-relayed until f216001 applied"
+  ]
+}
