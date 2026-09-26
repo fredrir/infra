@@ -135,36 +135,34 @@ func TestRenovateUpdatesEveryPinWithItsDigest(t *testing.T) {
 			}
 		}
 	}
-	var seaweedfs []renovatePin
-	cells, err := filepath.Glob(filepath.Join(repository, "platform/components/object-store/*.yaml"))
+	manifests, err := filepath.Glob(filepath.Join(repository, "platform/components/object-store/*.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifests := []string{"platform/versions.yaml"}
-	for _, cell := range cells {
-		if strings.Contains(string(read(t, cell)), "docker.io/chrislusf/seaweedfs:") {
-			relative, err := filepath.Rel(repository, cell)
+	manifests = append(manifests, filepath.Join(repository, "platform/versions.yaml"))
+	for _, image := range []string{"docker.io/chrislusf/seaweedfs", "docker.io/rclone/rclone"} {
+		var images []renovatePin
+		for _, manifest := range manifests {
+			relative, err := filepath.Rel(repository, manifest)
 			if err != nil {
 				t.Fatal(err)
 			}
-			manifests = append(manifests, relative)
+			content, found := pins(relative)
+			references := strings.Count(content, image+":")
+			found = slices.DeleteFunc(found, func(pin renovatePin) bool { return pin.groups["depName"] != image })
+			if len(found) != references {
+				t.Errorf("%s: Renovate updates %d of %d %s image references", relative, len(found), references, image)
+			}
+			images = append(images, found...)
 		}
-	}
-	if len(manifests) < 2 {
-		t.Fatal("no object store manifests pin SeaweedFS")
-	}
-	for _, path := range manifests {
-		content, found := pins(path)
-		found = slices.DeleteFunc(found, func(pin renovatePin) bool { return pin.groups["depName"] != "docker.io/chrislusf/seaweedfs" })
-		references := strings.Count(content, "docker.io/chrislusf/seaweedfs:")
-		if references == 0 || len(found) != references {
-			t.Errorf("%s: Renovate updates %d of %d SeaweedFS image references", path, len(found), references)
+		if len(images) < 2 {
+			t.Errorf("%s is not pinned in platform/versions.yaml and an object store manifest", image)
+			continue
 		}
-		seaweedfs = append(seaweedfs, found...)
-	}
-	for _, pin := range seaweedfs {
-		if pin.groups["currentValue"] != seaweedfs[0].groups["currentValue"] || pin.groups["currentDigest"] != seaweedfs[0].groups["currentDigest"] {
-			t.Errorf("SeaweedFS pins disagree: %s@%s and %s@%s", pin.groups["currentValue"], pin.groups["currentDigest"], seaweedfs[0].groups["currentValue"], seaweedfs[0].groups["currentDigest"])
+		for _, pin := range images {
+			if pin.groups["currentValue"] != images[0].groups["currentValue"] || pin.groups["currentDigest"] != images[0].groups["currentDigest"] {
+				t.Errorf("%s pins disagree: %s@%s and %s@%s", image, pin.groups["currentValue"], pin.groups["currentDigest"], images[0].groups["currentValue"], images[0].groups["currentDigest"])
+			}
 		}
 	}
 }

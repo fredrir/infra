@@ -95,6 +95,25 @@ spec:
             severity: warning
           annotations:
             summary: Object store provisioner has no successful run; buckets may lack encryption, lifecycle or quota
+        - alert: ParserDatasetMirrorFailing
+          expr: |
+            (time() - kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="parser-dataset-mirror"} > 10800)
+            and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: The parser dataset has no off-host copy newer than three hours; see the parser-dataset-mirror job log
+        - alert: ParserDatasetMirrorNeverSucceeded
+          expr: |
+            (kube_cronjob_info{namespace="object-store",cronjob="parser-dataset-mirror"}
+            unless on(namespace,cronjob) kube_cronjob_status_last_successful_time)
+            and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
+          for: 3h
+          labels:
+            severity: critical
+          annotations:
+            summary: The enabled parser dataset mirror has no successful run
         - alert: ObjectStoreLifecycleStalled
           expr: |
             time() - min by (service) (SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store"} > 0) / 1e9 > 172800

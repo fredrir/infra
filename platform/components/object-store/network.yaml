@@ -47,6 +47,9 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: object-store-provisioner
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: parser-dataset-mirror
       ports:
         - port: 8333
           protocol: TCP
@@ -94,4 +97,38 @@ spec:
               app.kubernetes.io/name: seaweedfs
       ports:
         - port: 8333
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: parser-dataset-mirror-egress
+  namespace: object-store
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: parser-dataset-mirror
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+              app.kubernetes.io/instance: nl
+      ports:
+        - port: 8333
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+              - 127.0.0.0/8
+      ports:
+        - port: 443
           protocol: TCP

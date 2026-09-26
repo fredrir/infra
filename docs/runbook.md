@@ -556,6 +556,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Configuration drift | Versioning or a lock on a bucket that declares neither fails the provisioner; SeaweedFS 4.47 still authorizes bucket subresource writes that carry `?prefix=` as object writes |
 | Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; `seaweedfs-nl` has no admin or worker and no lifecycle buckets; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
 | Logs | stderr only (`-logtostderr=true`) |
+| Parser dataset copy | `parser-dataset-mirror` hourly at :23 on `fredrir-04`: `rclone sync` of `nl` `parser-dataset` to the versioned AWS bucket `llunde-pyparser-bucket`, prefixes `files/`, `extract/`, `assets/`, `convert/` only; at most 1000 deletions per run; `platform-dataset-parser` cannot delete versions |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
 | Disk guard | 1 GiB volumes; `hel1` `-volume.max=60` (60 GiB), `nl` `-volume.max=200` (200 GiB); read-only below 15% free node disk |
 | Memory | `hel1` server GOMEMLIMIT 512MiB, request 384Mi, limit 768Mi; `nl` server GOMEMLIMIT 320MiB, request 224Mi, limit 512Mi; `meta-backup` request 64Mi |
@@ -567,6 +568,8 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | `ObjectStoreProvisionerNeverSucceeded` | Enabled provisioner without any successful run for 90 min |
 | `ObjectStoreWorkerDown` | Lifecycle worker metrics unreachable for 15 min |
 | `ObjectStoreLifecycleStalled` | Any shard without a lifecycle walk, or no lifecycle metrics, for 2 days |
+| `ParserDatasetMirrorFailing` | Enabled mirror without a successful run for 3 h |
+| `ParserDatasetMirrorNeverSucceeded` | Enabled mirror without any successful run for 3 h |
 
 | Operation | Steps |
 | --- | --- |
@@ -576,6 +579,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Restore the filer store | Commands below: scale to 0, copy `/meta/filerldb` over `/data/filerldb` in a helper pod that mounts both PVCs, scale to 1 |
 | Reissue certificates | Decrypt the CA key on Macie or Archie; issue each cell's two leaves with the SANs below; replace `pki/<cell>-*.crt` and the `s3.key`/`internal.key` values; update the alert threshold |
 | Resolve versioning or lock drift | Cache buckets only: remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |
+| Restore the parser dataset | Commands below: suspend the mirror, copy AWS back into `parser-dataset` with the `PARSER_DATASET_*` credentials, resume |
 
 | Leaf | Subject | SAN | Usage |
 | --- | --- | --- | --- |
@@ -641,4 +645,21 @@ EOF
 kubectl -n object-store wait --for=jsonpath='{.status.phase}'=Succeeded pod/meta-restore --timeout=300s
 kubectl -n object-store delete pod meta-restore
 kubectl -n object-store scale statefulset/seaweedfs-hel1 --replicas=1
+```
+
+Copy the parser dataset from AWS into `seaweedfs-nl` (restore, or the initial seed):
+
+```sh
+flux suspend kustomization platform-object-store
+kubectl -n object-store patch cronjob parser-dataset-mirror --type=merge -p '{"spec":{"suspend":true}}'
+kubectl -n object-store create job parser-dataset-restore --from=cronjob/parser-dataset-mirror --dry-run=client -o json \
+  | jq '(.spec.template.spec.containers[0]) |= (
+      .args = ["copy", "aws:llunde-pyparser-bucket", "store:parser-dataset", "--include=/files/**", "--include=/extract/**", "--include=/assets/**", "--include=/convert/**", "--checksum", "--fast-list", "--transfers=16", "--log-level=NOTICE"]
+      | (.env[] | select(.name == "RCLONE_CONFIG_STORE_ACCESS_KEY_ID") | .valueFrom.secretKeyRef.key) = "PARSER_DATASET_ACCESS_KEY_ID"
+      | (.env[] | select(.name == "RCLONE_CONFIG_STORE_SECRET_ACCESS_KEY") | .valueFrom.secretKeyRef.key) = "PARSER_DATASET_SECRET_ACCESS_KEY")' \
+  | kubectl apply -f -
+kubectl -n object-store wait --for=condition=complete job/parser-dataset-restore --timeout=2h
+kubectl -n object-store logs job/parser-dataset-restore
+kubectl -n object-store delete job parser-dataset-restore
+flux resume kustomization platform-object-store
 ```

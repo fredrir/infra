@@ -44,6 +44,7 @@ images:
   attic: ghcr.io/zhaofengli/attic:9eda345a@sha256:325036ce0776ed6e2705819c6bd1ebd1635b0422723110116adf56edf8ea12bd
   node-local-dns: registry.k8s.io/dns/k8s-dns-node-cache:1.26.8@sha256:bc6e64e2c85956af2fcc0aa720086410d41b4f31f378c9a92646fecc85cd4739
   seaweedfs: docker.io/chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+  rclone: docker.io/rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5
 sources:
 - https://grafana.github.io/helm-charts/index.yaml
 - https://prometheus-community.github.io/helm-charts/index.yaml

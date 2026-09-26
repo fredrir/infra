@@ -12,6 +12,8 @@ resources:
 - nl-identities.secret.sops.yaml
 - ci/nsql.secret.sops.yaml
 - provisioner.yaml
+- mirror.yaml
+- parser-dataset-aws.secret.sops.yaml
 - network.yaml
 - monitoring.yaml
 configMapGenerator:
