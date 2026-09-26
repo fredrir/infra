@@ -111,7 +111,7 @@ func newPublishingFixture(t *testing.T) *publishingFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, encoded := githubAppKey(t)
+	key, encoded := githubAppKey(t, "publisher")
 	f.app = &publisherAppServer{t: t, key: &key.PublicKey}
 	f.git = &authenticatedGit{backend: &cgi.Handler{Path: gitBinary, Args: []string{"http-backend"}, Env: []string{"GIT_PROJECT_ROOT=" + area, "GIT_HTTP_EXPORT_ALL=1"}, InheritEnv: []string{"PATH", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL"}}}
 	app, remote := httptest.NewServer(f.app), httptest.NewServer(f.git)

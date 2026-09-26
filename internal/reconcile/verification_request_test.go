@@ -117,18 +117,29 @@ func (g *gatusServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 var heartbeatToken = strings.Repeat("verification-token", 3)
 
-func githubAppKey(t *testing.T) (*rsa.PrivateKey, []byte) {
+var githubAppKeys = struct {
+	sync.Mutex
+	byRole map[string]*rsa.PrivateKey
+}{byRole: map[string]*rsa.PrivateKey{}}
+
+func githubAppKey(t *testing.T, role string) (*rsa.PrivateKey, []byte) {
 	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
+	githubAppKeys.Lock()
+	defer githubAppKeys.Unlock()
+	key, found := githubAppKeys.byRole[role]
+	if !found {
+		var err error
+		if key, err = rsa.GenerateKey(rand.Reader, 2048); err != nil {
+			t.Fatal(err)
+		}
+		githubAppKeys.byRole[role] = key
 	}
 	return key, pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
 }
 
 func verificationFixture(t *testing.T, runs ...runState) (*githubAppServer, *gatusServer, VerificationRequest) {
 	t.Helper()
-	key, encoded := githubAppKey(t)
+	key, encoded := githubAppKey(t, "verification")
 	github := &githubAppServer{t: t, key: key, token: http.StatusCreated, dispatch: http.StatusOK, runID: 7, runs: runs, bodies: map[string]any{}}
 	gatus := &gatusServer{}
 	githubServer, gatusServer := httptest.NewServer(github), httptest.NewServer(gatus)
