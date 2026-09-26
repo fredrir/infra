@@ -21,15 +21,11 @@ spec:
   endpoints:
   - port: https-metrics
     scheme: https
-    honorLabels: true
-    honorTimestamps: true
+    honorLabels: false
+    honorTimestamps: false
     tlsConfig:
       insecureSkipVerify: true
-    authorization:
-      type: Bearer
-      credentials:
-        name: monitoring-prometheus-token
-        key: token
+    bearerTokenFile: /var/run/secrets/kubelet-scrape/token
     relabelings:
     - sourceLabels:
       - __metrics_path__
@@ -42,15 +38,11 @@ spec:
   - port: https-metrics
     scheme: https
     path: /metrics/cadvisor
-    honorLabels: true
-    honorTimestamps: true
+    honorLabels: false
+    honorTimestamps: false
     tlsConfig:
       insecureSkipVerify: true
-    authorization:
-      type: Bearer
-      credentials:
-        name: monitoring-prometheus-token
-        key: token
+    bearerTokenFile: /var/run/secrets/kubelet-scrape/token
     relabelings:
     - sourceLabels:
       - __metrics_path__
@@ -89,6 +81,8 @@ spec:
   endpoints:
   - port: http-metrics
     scheme: http
+    honorLabels: false
+    honorTimestamps: false
     relabelings:
     - sourceLabels:
       - __meta_kubernetes_pod_node_name
