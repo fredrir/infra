@@ -208,19 +208,59 @@ func approval(login, commit string) *github.PullRequestReview {
 	return review(login, "APPROVED", commit)
 }
 
-func TestReviewedMerges(t *testing.T) {
+type reviewedMergeCase struct {
+	name       string
+	build      func() string
+	unverified []string
+}
+
+func TestReviewedMergesFirstQuarter(t *testing.T) { testReviewedMergesQuarter(t, 0) }
+
+func TestReviewedMergesSecondQuarter(t *testing.T) { testReviewedMergesQuarter(t, 1) }
+
+func TestReviewedMergesThirdQuarter(t *testing.T) { testReviewedMergesQuarter(t, 2) }
+
+func TestReviewedMergesFourthQuarter(t *testing.T) { testReviewedMergesQuarter(t, 3) }
+
+func testReviewedMergesQuarter(t *testing.T, quarter int) {
 	f := newProvenanceFixture(t)
+	for index, test := range reviewedMergeCases(f) {
+		if index%4 != quarter {
+			continue
+		}
+		t.Run(test.name, func(t *testing.T) {
+			f.git("checkout", "--quiet", "main")
+			f.git("reset", "--quiet", "--hard", f.base)
+			f.git("push", "--quiet", "--force", "origin", "HEAD:main")
+			f.api.reset()
+			head := test.build()
+			err := f.verify(f.base, head)
+			if len(test.unverified) == 0 {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil || !strings.HasPrefix(err.Error(), "unverified commits: ") {
+				t.Fatalf("got %v, want unverified commits", err)
+			}
+			for _, want := range test.unverified {
+				if !regexp.MustCompile(want).MatchString(err.Error()) {
+					t.Errorf("got %v, want a match of %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func reviewedMergeCases(f *provenanceFixture) []reviewedMergeCase {
 	infrastructure := map[string]string{"tofu/main.tf": "# renovate\n"}
 	platform := map[string]string{"platform/projects/example/namespace.yaml": "# renovate\n"}
 	release := map[string]string{"platform/projects/web/release.yaml": "# renovate\n"}
 	advance := func() string {
 		return f.commit(f.owner, "Change platform", map[string]string{"platform/projects/web/kustomization.yaml": "# owner\n"})
 	}
-	for _, test := range []struct {
-		name       string
-		build      func() string
-		unverified []string
-	}{
+	return []reviewedMergeCase{
 		{name: "approved merge commit with its commits", build: func() string {
 			head, _ := f.pullRequest(7, infrastructure, platform)
 			advance()
@@ -242,7 +282,7 @@ func TestReviewedMerges(t *testing.T) {
 			merge := f.rebase(commits...)
 			f.forget(9)
 			if _, err := f.try("cat-file", "-e", head+"^{commit}"); err == nil {
-				t.Fatal("the approved head is still in the checkout")
+				f.t.Fatal("the approved head is still in the checkout")
 			}
 			f.merged(9, renovate, head, merge, 3, approval(owner, head))
 			f.associate(9, f.git("rev-parse", merge+"~1"), f.git("rev-parse", merge+"~2"))
@@ -386,7 +426,7 @@ func TestReviewedMerges(t *testing.T) {
 			return merge
 		}, unverified: []string{"not signed by the key in keys/github-web-flow.asc at the base revision"}},
 		{name: "web-flow key replaced in the range", build: func() string {
-			f.commit(f.owner, "Trust another web-flow key", map[string]string{webFlowKey: armoredPublicKey(t, f.impostor)})
+			f.commit(f.owner, "Trust another web-flow key", map[string]string{webFlowKey: armoredPublicKey(f.t, f.impostor)})
 			head, _ := f.pullRequest(28, platform)
 			merge := f.sign(f.squash(28, head), f.impostor)
 			f.merged(28, renovate, head, merge, 1, approval(owner, head))
@@ -502,29 +542,6 @@ func TestReviewedMerges(t *testing.T) {
 			f.merged(36, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"fetch the head"}},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			f.git("checkout", "--quiet", "main")
-			f.git("reset", "--quiet", "--hard", f.base)
-			f.git("push", "--quiet", "--force", "origin", "HEAD:main")
-			f.api.reset()
-			head := test.build()
-			err := f.verify(f.base, head)
-			if len(test.unverified) == 0 {
-				if err != nil {
-					t.Fatal(err)
-				}
-				return
-			}
-			if err == nil || !strings.HasPrefix(err.Error(), "unverified commits: ") {
-				t.Fatalf("got %v, want unverified commits", err)
-			}
-			for _, want := range test.unverified {
-				if !regexp.MustCompile(want).MatchString(err.Error()) {
-					t.Errorf("got %v, want a match of %q", err, want)
-				}
-			}
-		})
 	}
 }
 
