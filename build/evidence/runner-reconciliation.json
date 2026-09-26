@@ -237,6 +237,135 @@
       "limitations": [
         "check / validate exceeded the 10 s aggregate budget (12.03 s) once tofu test joined the declarations stage"
       ]
+    },
+    {
+      "change": "Mint hourly verification tokens from the read-only observer App and keep the runner App for applies",
+      "revision": "cf98d62",
+      "observer_app": {
+        "id": 5080610,
+        "installation": 164992211,
+        "permissions": [
+          "administration:read",
+          "contents:read",
+          "metadata:read",
+          "pull_requests:read"
+        ],
+        "repositories": 7
+      },
+      "verification_run": "https://github.com/fredrir/infra/actions/runs/36204964509",
+      "token_steps": {
+        "observer-token": "success",
+        "runner-token": "skipped"
+      },
+      "drift_verification_seconds": 63.6
+    },
+    {
+      "change": "Accept reviewed pull request merges in the provenance gate, bound to the approved head content",
+      "revisions": [
+        "0f1d180",
+        "6f3a325",
+        "e0d5c96",
+        "348aa48"
+      ],
+      "security_review_rounds": 2,
+      "findings_closed": [
+        "web-flow merge or squash tree not bound to the approved head (HIGH)",
+        "rebase chain length counted merge commits (MEDIUM)"
+      ],
+      "gate_release": {
+        "tag": "infra-v0.2.12",
+        "linux_amd64_sha256": "6597c59d9cae6754879e77c81d33efb633c548586e27954ef66243cdf9ec359e",
+        "attestation": "verified against cli-release.yml"
+      },
+      "pin_run": "https://github.com/fredrir/infra/actions/runs/36207872828",
+      "check_lane": {
+        "reconcile_test_sharding_local_seconds": {
+          "before": 3.2,
+          "after": 1.5
+        },
+        "run_after_split": "https://github.com/fredrir/infra/actions/runs/36212193085",
+        "aggregate_seconds_after_split": 6.91
+      }
+    },
+    {
+      "change": "Prepare fredrir-10 as a hardened volatile worker without enrolling it",
+      "revisions": [
+        "11bdf29",
+        "c413197",
+        "694cb44",
+        "76c3eec"
+      ],
+      "merge_run": "https://github.com/fredrir/infra/actions/runs/36206505946",
+      "admission_policies_active": [
+        "node-registration",
+        "node-flannel-writer",
+        "node-no-static-pods"
+      ],
+      "flannel_backend_after": "vxlan on all five nodes, annotations unchanged",
+      "kubelet_series_after_monitoring_change": {
+        "/metrics": 5,
+        "/metrics/cadvisor": 5,
+        "/metrics/probes": 5
+      },
+      "review_rounds": {
+        "security": 5,
+        "merge_safety": 4
+      },
+      "activation_gates": [
+        "WireGuard cutover before enrollment",
+        "fleet flannel clears refuse while a volatile host is enrolled unless volatile_api_cut_off=true"
+      ]
+    },
+    {
+      "change": "Decrypt monitor and control-backup secrets on their own hosts",
+      "revisions": {
+        "host_keys": "d9043da",
+        "recipient_report": "b4cb448",
+        "host_decryption": "ef8152c"
+      },
+      "runs": [
+        "https://github.com/fredrir/infra/actions/runs/36208217456",
+        "https://github.com/fredrir/infra/actions/runs/36208894051",
+        "https://github.com/fredrir/infra/actions/runs/36209861991"
+      ],
+      "host_recipients": {
+        "fredrir-06": "age1xru5rv42fzmnm4uhv9rwz5gf5ynf7v7qr2e68epcjsq9l33zdulqq53v9j",
+        "fredrir-07": "age1aw6w4ttxk62pxjgcgv27nqetekjxmrw538j8cqmmql4wa0577ynqxvs52d"
+      },
+      "gates": "Require secrets encrypted to the host and Verify the host decrypts the declared secrets passed on both hosts",
+      "first_verification_on_host_decryption": {
+        "run": "https://github.com/fredrir/infra/actions/runs/36210471005",
+        "gatus_heartbeat": "2026-09-26T02:06:02Z"
+      },
+      "pending": [
+        "remove the CI recipient after the next control backup succeeds",
+        "retire SOPS_AGE_KEY",
+        "rotate the values the CI key could read"
+      ]
+    },
+    {
+      "change": "Add the reconciler supervisor, verify identity and admin root without deploying a host",
+      "revisions": [
+        "3cbd50c",
+        "18a0376"
+      ],
+      "merge_run": "https://github.com/fredrir/infra/actions/runs/36212820912",
+      "cluster_objects_created": [
+        "serviceaccount/infrastructure-verify",
+        "clusterrole/infrastructure-verify",
+        "secret/infrastructure-verify-credentials"
+      ],
+      "qualification": "build/evidence/reconciler-qualification.json",
+      "security_findings_closed": [
+        "unreviewed main code built with verify credentials and persistent writable caches (HIGH)",
+        "production ancestry judged by production code (MEDIUM)",
+        "verify lock grant (LOW)",
+        "credential open without O_NOFOLLOW (LOW)"
+      ],
+      "held_back": [
+        "verify IAM identity: admin tofu apply",
+        "Gatus reconciliation_deep with a CLI pin bump: before the host first runs"
+      ]
     }
   ]
 }
