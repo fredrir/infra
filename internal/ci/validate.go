@@ -85,7 +85,7 @@ func declarationChecks(root string, changed func(string) bool) ([]declarationChe
 	}
 	var checks []declarationCheck
 	if changed(`^tofu/`) {
-		checks = append(checks, command("tofu", "-chdir=tofu", "validate"), command("tofu", "-chdir=tofu", "fmt", "-check", "-recursive"), command("tofu", "-chdir=tofu", "test"))
+		checks = append(checks, command("tofu", "-chdir=tofu", "validate", "-no-tests"), command("tofu", "-chdir=tofu", "fmt", "-check", "-recursive"))
 	}
 	if changed(`^ansible/`) {
 		playbooks, err := filepath.Glob(filepath.Join(root, "ansible", "*.yml"))

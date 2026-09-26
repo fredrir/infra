@@ -33,8 +33,8 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 
 | Stage | Entry point | Result |
 | --- | --- | --- |
-| Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu expansion and final-state plans, Flux rendering, Ansible task lists |
-| Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout; apply against the last successful revision |
+| Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu tests, expansion and final-state plans, Flux rendering, Ansible task lists |
+| Merge to `main` | `infra reconcile apply` | Fresh plan for the exact checkout, gated on OpenTofu tests; apply against the last successful revision |
 | Hourly verification | `infra-verification-request.timer` on `fredrir-06` → `reconcile.yml` with `verify=true`, `repair=true` → `infra reconcile verify --deep --report REPORT` | Read-only verification and check-mode comparison of OpenTofu and each host playbook; a report listing differences dispatches one full reconciliation of `main` |
 | On-demand verification | `gh workflow run reconcile.yml --ref main -f verify=true` | The hourly verification on demand; differences are reported without dispatching a reconciliation unless `-f repair=true` |
 | Verification | `infra reconcile verify` | Reconciliation lock and recorded status, exact Flux revision, observed generations, Helm readiness, host checks, Grafana configuration and HTTP health, frontend revision; every comparison runs when another fails |

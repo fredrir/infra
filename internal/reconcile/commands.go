@@ -91,6 +91,9 @@ func (c *Commands) Plan(ctx context.Context, plan Plan) error {
 		if err := c.Runner.Run(ctx, "tofu", "-chdir=tofu", "validate"); err != nil {
 			return err
 		}
+		if err := c.Runner.Run(ctx, "tofu", "-chdir=tofu", "test"); err != nil {
+			return err
+		}
 		state, err := c.Runner.Output(ctx, "tofu", "-chdir=tofu", "show", "-json")
 		if err != nil {
 			return err

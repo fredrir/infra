@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -657,5 +658,32 @@ func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
 				t.Fatal("Flux did not converge through its root")
 			}
 		})
+	}
+}
+
+func TestOpenTofuTestsGateThePlan(t *testing.T) {
+	for _, failing := range []bool{false, true} {
+		var calls []string
+		c := Commands{Work: t.TempDir(), Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+			calls = append(calls, strings.Join(o.Args[1:], " "))
+			switch {
+			case o.Args[1] == "test" && failing:
+				return process.Result{ExitCode: 1}, errors.New("boundary test failed")
+			case o.Args[1] == "show":
+				return process.Result{Stdout: []byte("{}")}, nil
+			}
+			return process.Result{}, nil
+		}}}
+		err := c.Plan(context.Background(), Plan{Affected: Selection{Tofu: true}})
+		tested := slices.Index(calls, "test")
+		planned := slices.IndexFunc(calls, func(call string) bool { return strings.HasPrefix(call, "plan") })
+		switch {
+		case tested < 0:
+			t.Fatalf("OpenTofu tests skipped: %v", calls)
+		case failing && (err == nil || planned >= 0):
+			t.Fatalf("failing OpenTofu tests did not stop the plan: %v, %v", err, calls)
+		case !failing && (err != nil || planned < tested):
+			t.Fatalf("OpenTofu plan ran before its tests: %v, %v", err, calls)
+		}
 	}
 }

@@ -225,7 +225,7 @@ func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 	slices.SortFunc(calls, func(a, b []string) int { return strings.Compare(strings.Join(a, " "), strings.Join(b, " ")) })
-	want := [][]string{{"-chdir=tofu", "fmt", "-check", "-recursive"}, {"-chdir=tofu", "test"}, {"-chdir=tofu", "validate"}}
+	want := [][]string{{"-chdir=tofu", "fmt", "-check", "-recursive"}, {"-chdir=tofu", "validate", "-no-tests"}}
 	if !reflect.DeepEqual(calls, want) {
 		t.Fatalf("validation commands: %v, want %v", calls, want)
 	}
