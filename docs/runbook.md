@@ -318,6 +318,14 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Measure | On fredrir-10: `tailscale netcheck`; `tailscale ping --c 20 fredrir-07`; `iperf3` to fredrir-09 over the Tailnet; Rust job `rust-cache-restore` timings |
 | Add a relay | When DERP throughput or latency limits CI: self-hosted `derper` in hel1 with `--verify-clients`, a custom `derpMap` region and 443/tcp |
 
+| Flannel backend | Value |
+| --- | --- |
+| Declared | `k3s_flannel_backend`, default `vxlan`; `wireguard-native` only in an owner-approved window: `ansible-playbook ansible/k3s.yml -e k3s_flannel_backend=wireguard-native`, then `ansible/volatile.yml` with the same value |
+| Change | The k3s role clears a node's `backend-type`, `backend-data` and `backend-v6-data` annotations through the administrator API, then restarts it, when its published backend differs or its WireGuard key file is missing |
+| WireGuard key | `WIREGUARD_KEY_FILE=/var/lib/rancher/k3s/agent/flannel-wireguard.key` in the service's `flannel.conf` drop-in; it survives restarts and reboots, and every run fails when a node publishes a key not derived from its own file |
+| Repair | On a server: `k3s kubectl annotate node <node> flannel.alpha.coreos.com/backend-type- flannel.alpha.coreos.com/backend-data- flannel.alpha.coreos.com/backend-v6-data-`, then restart `k3s` or `k3s-agent` on `<node>`. If the foreign key belonged to another node, restart every other node one at a time as well: peers keep the forged peer entry until their flannel restarts |
+| Rotate a key or rebuild a node | Delete the key file or rejoin without it, then reconcile; the role clears the annotations and restarts the node |
+
 ### fredrir-10 activation
 
 | Order | Owner action | Value |
