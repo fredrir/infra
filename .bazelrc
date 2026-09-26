@@ -4,3 +4,4 @@ build --nostamp
 test --test_output=errors
 build:ci --color=no
 build:ci --curses=no
+build:ci --repo_env=PATH=/usr/bin:/bin

@@ -4,6 +4,7 @@ go_test(
     name = "contracts_test",
     srcs = [
         "arc_test.go",
+        "bazel_test.go",
         "build_vm_test.go",
         "cancellation_test.go",
         "firewall_test.go",
