@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -332,6 +333,61 @@ func TestVerificationCollectsEveryPart(t *testing.T) {
 			outcome := VerificationOutcome("", ScopeCloud, verify(context.Background(), plan))
 			if !reflect.DeepEqual(outcome.Differences, test.differences) || !reflect.DeepEqual(outcome.Errors, test.errors) {
 				t.Fatalf("verification reported %+v, want differences %+v and errors %q", outcome, test.differences, test.errors)
+			}
+		})
+	}
+}
+
+func TestUnchangedKubernetesInputsRequestOnlyKustomizations(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	kustomizations, releases := "kustomizations.kustomize.toolkit.fluxcd.io", "helmreleases.helm.toolkit.fluxcd.io"
+	for _, test := range []struct {
+		name      string
+		selected  Selection
+		requested []string
+	}{
+		{"host playbooks", Selection{Ansible: true, HostScope: HostScopeFull, HostPlaybooks: []string{"k3s.yml", "volatile.yml"}}, []string{kustomizations}},
+		{"runners", Selection{Ansible: true, HostScope: HostScopeRunners}, []string{kustomizations}},
+		{"declared Kubernetes change", Selection{Kubernetes: true}, []string{kustomizations + "," + releases, releases}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var mu sync.Mutex
+			var requested []string
+			token := ""
+			handled := func(item resource) resource {
+				item.Status.LastHandledReconcileAt = token
+				return item
+			}
+			root := readyResource(t, "Kustomization", "flux-system", "flux-system")
+			root.Spec.SourceRef.Kind, root.Spec.SourceRef.Name = "GitRepository", "flux-system"
+			root.Status.LastAppliedRevision, root.Status.Inventory = "production@sha1:"+revision, json.RawMessage(`{"entries":[]}`)
+			commands := Commands{kubernetes: declaredRoot(t), Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				args := strings.Join(options.Args, " ")
+				if options.Name == "flux" {
+					return process.Result{}, nil
+				}
+				if kinds, ok := strings.CutPrefix(args, "annotate "); ok {
+					kinds, annotation, _ := strings.Cut(kinds, " --all --all-namespaces --overwrite --field-manager=flux-client-side-apply ")
+					requested, token = append(requested, kinds), strings.TrimSuffix(strings.TrimPrefix(annotation, "reconcile.fluxcd.io/requestedAt="), " --request-timeout=30s")
+					return process.Result{}, nil
+				}
+				if result, ok := deployedArtifacts(t, revision, args); ok {
+					return result, nil
+				}
+				return kubernetesFake{
+					"get gitrepository flux-system -n=flux-system": map[string]any{"spec": map[string]any{"ref": map[string]string{"branch": "production"}}, "status": map[string]any{"artifact": map[string]string{"revision": "production@sha1:" + revision}}},
+					"get " + kustomizations + " -n=flux-system":    items(root),
+					"get " + kustomizations + " --all-namespaces":  items(handled(root)),
+					"get " + releases + " --all-namespaces":        items(handled(readyResource(t, "HelmRelease", "observability", "monitoring"))),
+				}.execute(t, options)
+			}}}
+			if err := commands.Kubernetes(context.Background(), Plan{Revision: revision, Affected: test.selected}); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(requested, test.requested) || token == "" {
+				t.Fatalf("requested reconciliation of %q with token %q, want %q", requested, token, test.requested)
 			}
 		})
 	}

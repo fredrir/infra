@@ -165,7 +165,11 @@ func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
 		})
 	}
 	token := time.Now().UTC().Format(time.RFC3339Nano)
-	if err := c.requestReconcile(ctx, "kustomizations.kustomize.toolkit.fluxcd.io,helmreleases.helm.toolkit.fluxcd.io", token); err != nil {
+	kinds := "kustomizations.kustomize.toolkit.fluxcd.io"
+	if plan.Affected.Kubernetes {
+		kinds += ",helmreleases.helm.toolkit.fluxcd.io"
+	}
+	if err := c.requestReconcile(ctx, kinds, token); err != nil {
 		return err
 	}
 	wait, cancel := context.WithTimeout(ctx, 20*time.Minute)
@@ -173,12 +177,14 @@ func (c *Commands) Kubernetes(ctx context.Context, plan Plan) error {
 	if err := poll(wait, func() error { return c.verifyKubernetes(wait, revision, token) }); err != nil {
 		return err
 	}
-	// Requests HelmReleases that Kustomizations created while applying the revision.
-	if err := c.requestReconcile(ctx, "helmreleases.helm.toolkit.fluxcd.io", token); err != nil {
-		return err
-	}
-	if err := poll(wait, func() error { return c.verifyHelm(wait, token, "") }); err != nil {
-		return err
+	if plan.Affected.Kubernetes {
+		// Requests HelmReleases that Kustomizations created while applying the revision.
+		if err := c.requestReconcile(ctx, "helmreleases.helm.toolkit.fluxcd.io", token); err != nil {
+			return err
+		}
+		if err := poll(wait, func() error { return c.verifyHelm(wait, token, "") }); err != nil {
+			return err
+		}
 	}
 	return poll(wait, func() error { return c.verifyDeployment(wait, plan) })
 }
