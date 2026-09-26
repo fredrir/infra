@@ -7,49 +7,10 @@
   roles:
     - ubuntu
   tasks:
-    - name: Require an existing transport identity
-      ansible.builtin.stat:
-        path: /var/lib/tailscale/tailscaled.state
-        get_checksum: false
-      register: external_transport_state
-      no_log: true
-
-    - name: Preserve enrolled transport
-      ansible.builtin.assert:
-        that:
-          - external_transport_state.stat.isreg | default(false)
-          - external_transport_state.stat.size > 0
-
-    - name: Install Tailscale
+    - name: Preserve the enrolled transport
       ansible.builtin.import_role:
         name: tailscale
-        tasks_from: install.yml
-
-    - name: Read the embedded SSH server preference
-      ansible.builtin.command:
-        argv: [/usr/local/bin/tailscale, debug, prefs]
-      register: external_transport_preferences
-      changed_when: (external_transport_preferences.stdout | from_json).RunSSH
-      check_mode: false
-
-    - name: Disable the embedded SSH server
-      ansible.builtin.command:
-        argv: [/usr/local/bin/tailscale, set, --ssh=false]
-      when: external_transport_preferences.changed
-
-    - name: Read the restored transport address
-      ansible.builtin.command:
-        argv: [/usr/local/bin/tailscale, ip, -4]
-      register: external_transport_ip
-      changed_when: false
-      check_mode: false
-      retries: 12
-      delay: 5
-      until: external_transport_ip.stdout | trim == tailscale_ip
-
-    - name: Require the existing Tailnet address
-      ansible.builtin.assert:
-        that: external_transport_ip.stdout | trim == tailscale_ip
+        tasks_from: enrolled.yml
 
     - name: Configure host network access
       ansible.builtin.import_role:

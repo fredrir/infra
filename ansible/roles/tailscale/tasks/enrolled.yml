@@ -1,0 +1,41 @@
+- name: Require an existing transport identity
+  ansible.builtin.stat:
+    path: /var/lib/tailscale/tailscaled.state
+    get_checksum: false
+  register: platform_tailscale_enrolled_state
+  no_log: true
+
+- name: Preserve enrolled transport
+  ansible.builtin.assert:
+    that:
+      - platform_tailscale_enrolled_state.stat.isreg | default(false)
+      - platform_tailscale_enrolled_state.stat.size > 0
+
+- name: Install Tailscale
+  ansible.builtin.import_tasks: install.yml
+
+- name: Read the embedded SSH server preference
+  ansible.builtin.command:
+    argv: [/usr/local/bin/tailscale, debug, prefs]
+  register: platform_tailscale_enrolled_preferences
+  changed_when: (platform_tailscale_enrolled_preferences.stdout | from_json).RunSSH
+  check_mode: false
+
+- name: Disable the embedded SSH server
+  ansible.builtin.command:
+    argv: [/usr/local/bin/tailscale, set, --ssh=false]
+  when: platform_tailscale_enrolled_preferences.changed
+
+- name: Read the restored transport address
+  ansible.builtin.command:
+    argv: [/usr/local/bin/tailscale, ip, -4]
+  register: platform_tailscale_enrolled_ip
+  changed_when: false
+  check_mode: false
+  retries: 12
+  delay: 5
+  until: platform_tailscale_enrolled_ip.stdout | trim == tailscale_ip
+
+- name: Require the existing Tailnet address
+  ansible.builtin.assert:
+    that: platform_tailscale_enrolled_ip.stdout | trim == tailscale_ip

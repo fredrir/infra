@@ -109,7 +109,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"roles/ci_runtime/tasks/main.yml: Require the pinned runtime and sidecar binaries",
 		"roles/data_volume/tasks/main.yml: Read data volume consumer states",
 		"roles/build_vm/tasks/main.yml: Wait for guest SSH",
-		"external.yml: Read the restored transport address",
+		"roles/tailscale/tasks/enrolled.yml: Read the restored transport address",
 		"roles/gatus/tasks/main.yml: Read the public upstream artifact token",
 		"roles/gatus/tasks/main.yml: Wait for the monitor listener",
 		"roles/gatus/tasks/main.yml: Verify monitor readiness",
@@ -129,7 +129,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"roles/no_container_engines/tasks/main.yml: Find root Podman containers",
 		"roles/no_container_engines/tasks/main.yml: Find installed container engines",
 		"roles/ci_runtime/tasks/main.yml: Compare the extracted runtime and sidecar binaries",
-		"external.yml: Read the embedded SSH server preference",
+		"roles/tailscale/tasks/enrolled.yml: Read the embedded SSH server preference",
 		"roles/gatus/tasks/main.yml: Compare the extracted binary with the pinned executable",
 	}
 	dryRuns := []string{
