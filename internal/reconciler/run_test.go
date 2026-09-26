@@ -137,6 +137,11 @@ type harness struct {
 func newHarness(t *testing.T, credentials map[string]string, engine func(t *testing.T, args []string, env []string) (int, string), build error) *harness {
 	t.Helper()
 	origin, revision := originRepository(t)
+	return newHarnessAt(t, origin, revision, credentials, engine, build)
+}
+
+func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]string, engine func(t *testing.T, args []string, env []string) (int, string), build error) *harness {
+	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
@@ -375,5 +380,53 @@ func TestVerifyReportsFailuresBeforeTheEngineRuns(t *testing.T) {
 				t.Fatalf("uploaded run %+v", run)
 			}
 		})
+	}
+}
+
+func TestVerifyRefusesToBuildProductionOffMain(t *testing.T) {
+	origin, forged := offMainOrigin(t)
+	h := newHarnessAt(t, origin, forged, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
+		t.Error("off-main production code ran")
+		return 0, ""
+	}, errors.New("off-main production built"))
+	want := "production at " + forged + " is not on main"
+	if err := h.supervisor.Verify(context.Background()); err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("verify returned %v, want %q", err, want)
+	}
+	if slices.ContainsFunc(h.commands, func(command string) bool { return !strings.HasPrefix(command, "git ") }) {
+		t.Fatalf("off-main production ran %q", h.commands)
+	}
+	run, log := h.uploaded(t)
+	wantVerification := reconcile.Verification{Revision: forged, Scope: reconcile.ScopeCloud, Outcome: reconcile.OutcomeDiffers, Differences: []reconcile.Difference{{System: "revision", Item: want}}, Errors: []string{}}
+	if run.Revision != forged || run.Stage != "checkout" || run.Outcome != reconcile.OutcomeDiffers || run.Verification == nil || !reflect.DeepEqual(*run.Verification, wantVerification) {
+		t.Fatalf("uploaded run %+v", run)
+	}
+	if !strings.Contains(log, "Refusing production at "+forged+": not on main\n") {
+		t.Fatalf("uploaded log:\n%s", log)
+	}
+	if want := []url.Values{{"success": {"false"}, "error": {"1 differences: revision: " + want}}}; !reflect.DeepEqual(h.heartbeats.received, want) {
+		t.Fatalf("heartbeats %v, want %v", h.heartbeats.received, want)
+	}
+	if len(h.app.minted) != 0 {
+		t.Fatalf("observer tokens minted for off-main production: %v", h.app.minted)
+	}
+}
+
+func TestVerifyFailsClosedWithoutMain(t *testing.T) {
+	origin, published := originRepository(t)
+	gitCommand(t, origin, "checkout", "--quiet", "production")
+	gitCommand(t, origin, "branch", "-D", "main")
+	h := newHarnessAt(t, origin, published, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
+		t.Error("engine ran without a main ancestry check")
+		return 0, ""
+	}, errors.New("built without a main ancestry check"))
+	if err := h.supervisor.Verify(context.Background()); err == nil || !strings.Contains(err.Error(), "checkout: git") {
+		t.Fatalf("verify returned %v, want a checkout failure", err)
+	}
+	if slices.ContainsFunc(h.commands, func(command string) bool { return !strings.HasPrefix(command, "git ") }) {
+		t.Fatalf("ran %q without main", h.commands)
+	}
+	if len(h.heartbeats.received) != 1 || h.heartbeats.received[0].Get("success") != "false" || !strings.HasPrefix(h.heartbeats.received[0].Get("error"), "checkout: ") {
+		t.Fatalf("heartbeats %v", h.heartbeats.received)
 	}
 }

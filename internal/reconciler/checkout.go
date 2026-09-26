@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/fredrir/infra/internal/process"
+	"github.com/fredrir/infra/internal/reconcile"
 )
 
 const publishedBranch = "production"
@@ -53,28 +54,55 @@ var hardenedGit = []string{
 	"GIT_CONFIG_VALUE_1=false",
 }
 
-func (e executor) checkoutPublished(ctx context.Context, source, repository string) (string, error) {
-	tracking := "refs/remotes/origin/" + publishedBranch
+const reviewedBranch = "main"
+
+type publication struct {
+	Revision string
+	OnMain   bool
+}
+
+func (e executor) checkoutPublished(ctx context.Context, source, repository string) (publication, error) {
+	published, reviewed := "refs/remotes/origin/"+publishedBranch, "refs/remotes/origin/"+reviewedBranch
 	for _, step := range [][]string{
 		{"init", "--quiet", "--template=", source},
 		{"-C", source, "remote", "add", "origin", repository},
-		{"-C", source, "fetch", "--quiet", "--no-tags", "origin", "+refs/heads/" + publishedBranch + ":" + tracking},
+		{"-C", source, "fetch", "--quiet", "--no-tags", "origin", "+refs/heads/" + publishedBranch + ":" + published, "+refs/heads/" + reviewedBranch + ":" + reviewed},
 	} {
 		if _, err := e.output(ctx, "", "git", step...); err != nil {
-			return "", err
+			return publication{}, err
 		}
 	}
-	revision, err := e.output(ctx, "", "git", "-C", source, "rev-parse", "--verify", tracking+"^{commit}")
+	revision, err := e.output(ctx, "", "git", "-C", source, "rev-parse", "--verify", published+"^{commit}")
 	if err != nil {
-		return "", err
+		return publication{}, err
 	}
 	if !revisionPattern.MatchString(revision) {
-		return "", fmt.Errorf("%s resolved to an invalid revision", publishedBranch)
+		return publication{}, fmt.Errorf("%s resolved to an invalid revision", publishedBranch)
+	}
+	quiet := e
+	quiet.log = nil
+	result, err := quiet.run(ctx, "", nil, "git", "-C", source, "merge-base", "--is-ancestor", revision, reviewed)
+	switch {
+	case err == nil:
+	case result.ExitCode == 1:
+		return publication{Revision: revision}, nil
+	default:
+		return publication{}, fmt.Errorf("%s ancestry: %w: %s", publishedBranch, err, strings.TrimSpace(string(result.Stderr)))
 	}
 	if _, err := e.output(ctx, "", "git", "-C", source, "checkout", "--quiet", "--detach", revision); err != nil {
-		return "", err
+		return publication{}, err
 	}
-	return revision, nil
+	return publication{Revision: revision, OnMain: true}, nil
+}
+
+func offMain(revision string) *reconcile.Verification {
+	return &reconcile.Verification{
+		Revision:    revision,
+		Scope:       reconcile.ScopeCloud,
+		Outcome:     reconcile.OutcomeDiffers,
+		Differences: []reconcile.Difference{{System: "revision", Item: publishedBranch + " at " + revision + " is not on " + reviewedBranch}},
+		Errors:      []string{},
+	}
 }
 
 func clearDirectory(path string) error {

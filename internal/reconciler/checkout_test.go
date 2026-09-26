@@ -21,9 +21,9 @@ func TestCheckoutBuildsOnlyThePublishedRevision(t *testing.T) {
 		t.Fatal("fixture main does not advance past production")
 	}
 	source := filepath.Join(t.TempDir(), "source")
-	revision, err := hardenedExecutor(t).checkoutPublished(ctx, source, "file://"+origin)
-	if err != nil || revision != published {
-		t.Fatalf("checkout resolved %q, %v; want production %s", revision, err, published)
+	checked, err := hardenedExecutor(t).checkoutPublished(ctx, source, "file://"+origin)
+	if err != nil || checked != (publication{Revision: published, OnMain: true}) {
+		t.Fatalf("checkout resolved %+v, %v; want production %s on main", checked, err, published)
 	}
 	if head := gitCommand(t, source, "rev-parse", "HEAD"); head != published {
 		t.Fatalf("checkout at %s, want %s", head, published)
@@ -37,6 +37,38 @@ func TestCheckoutBuildsOnlyThePublishedRevision(t *testing.T) {
 	gitCommand(t, origin, "branch", "-D", "production")
 	if _, err := hardenedExecutor(t).checkoutPublished(ctx, filepath.Join(t.TempDir(), "source"), "file://"+origin); err == nil {
 		t.Fatal("missing production branch resolved")
+	}
+}
+
+func offMainOrigin(t *testing.T) (string, string) {
+	t.Helper()
+	origin, _ := originRepository(t)
+	gitCommand(t, origin, "checkout", "--quiet", "production")
+	if err := os.WriteFile(filepath.Join(origin, "forged"), []byte("unreviewed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitCommand(t, origin, "add", ".")
+	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "forged")
+	forged := gitCommand(t, origin, "rev-parse", "HEAD")
+	gitCommand(t, origin, "checkout", "--quiet", "main")
+	return origin, forged
+}
+
+func TestCheckoutRefusesProductionOffMain(t *testing.T) {
+	ctx := context.Background()
+	origin, forged := offMainOrigin(t)
+	source := filepath.Join(t.TempDir(), "source")
+	checked, err := hardenedExecutor(t).checkoutPublished(ctx, source, "file://"+origin)
+	if err != nil || checked != (publication{Revision: forged}) {
+		t.Fatalf("off-main production resolved %+v, %v; want %s refused", checked, err, forged)
+	}
+	if entries, err := os.ReadDir(source); err != nil || len(entries) != 1 || entries[0].Name() != ".git" {
+		t.Fatalf("off-main production checked out %v: %v", entries, err)
+	}
+	gitCommand(t, origin, "checkout", "--quiet", "--detach", "production")
+	gitCommand(t, origin, "branch", "-D", "main")
+	if _, err := hardenedExecutor(t).checkoutPublished(ctx, filepath.Join(t.TempDir(), "source"), "file://"+origin); err == nil {
+		t.Fatal("production ancestry accepted without main")
 	}
 }
 

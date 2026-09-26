@@ -114,8 +114,16 @@ func (s Supervisor) Verify(ctx context.Context) (err error) {
 	environment := append([]string{"PATH=" + filepath.Join(work, "tools") + ":/usr/local/bin:/usr/bin:/bin", "HOME=" + home, "LANG=C.UTF-8", "TF_IN_AUTOMATION=true"}, hardenedGit...)
 	commands := executor{execute: s.Execute, env: environment, log: log}
 	source := filepath.Join(work, "source")
-	if run.Revision, err = commands.checkoutPublished(ctx, source, s.Config.Repository); err != nil {
+	published, err := commands.checkoutPublished(ctx, source, s.Config.Repository)
+	if err != nil {
 		return fail("checkout", err)
+	}
+	run.Revision = published.Revision
+	if !published.OnMain {
+		run.Verification = offMain(published.Revision)
+		run.Outcome = run.Verification.Outcome
+		fmt.Fprintf(log, "Refusing %s at %s: not on %s\n", publishedBranch, published.Revision, reviewedBranch)
+		return nil
 	}
 	fmt.Fprintf(log, "Verifying %s at %s\n", publishedBranch, run.Revision)
 	run.Stage = "build"
