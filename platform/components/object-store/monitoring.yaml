@@ -96,7 +96,9 @@ spec:
             summary: Object store provisioner has no successful run; buckets may lack encryption, lifecycle or quota
         - alert: ObjectStoreLifecycleStalled
           expr: |
-            time() - min by (service) (SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store"}) / 1e9 > 172800
+            time() - min by (service) (SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store"} > 0) / 1e9 > 172800
+            or max by (service) (SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store"}) == 0
+              and on (service) max by (service) (SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store"} offset 2d) == 0
             or absent_over_time(SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store",service="seaweedfs-hel1"}[2d])
           for: 1h
           labels:
