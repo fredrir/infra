@@ -1,0 +1,2 @@
+#!/bin/sh
+SSL_CERT_FILE=/usr/local/share/object-store/trust.pem exec /usr/local/libexec/sccache "$@"

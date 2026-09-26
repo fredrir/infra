@@ -19,15 +19,26 @@ import (
 	"github.com/fredrir/infra/internal/objectstore"
 )
 
-func CacheClient() objectstore.Client {
-	return objectstore.Client{Endpoint: os.Getenv("SCCACHE_ENDPOINT"), Region: environmentDefault("SCCACHE_REGION", "garage"), AccessKey: os.Getenv("AWS_ACCESS_KEY_ID"), SecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY")}
+func CacheClient() (objectstore.Client, error) {
+	client := objectstore.Client{Endpoint: os.Getenv("SCCACHE_ENDPOINT"), Region: environmentDefault("SCCACHE_REGION", "garage"), AccessKey: os.Getenv("AWS_ACCESS_KEY_ID"), SecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY")}
+	if authority := os.Getenv("OBJECT_STORE_CA_FILE"); authority != "" {
+		trusted, err := objectstore.TrustingHTTP(authority, "")
+		if err != nil {
+			return client, err
+		}
+		client.HTTP = trusted
+	}
+	return client, nil
 }
 
 func RustCache(ctx context.Context, runner Runner, temporary, action string) error {
 	if action != "restore" && action != "save" {
 		return fmt.Errorf("cache action must be restore or save")
 	}
-	client := CacheClient()
+	client, err := CacheClient()
+	if err != nil {
+		return err
+	}
 	bucket := os.Getenv("SCCACHE_BUCKET")
 	if client.Endpoint == "" || bucket == "" || client.AccessKey == "" || client.SecretKey == "" {
 		_, err := fmt.Fprintln(runner.Stdout, "Build output cache is not configured")
@@ -208,7 +219,10 @@ func FetchSDK(ctx context.Context, temporary string, output io.Writer) error {
 		return err
 	}
 	hash := sha256.New()
-	err = CacheClient().Download(ctx, "toolchains", object, &limitedWriter{Writer: io.MultiWriter(archive, hash), remaining: 16 << 30})
+	client, err := CacheClient()
+	if err == nil {
+		err = client.Download(ctx, "toolchains", object, &limitedWriter{Writer: io.MultiWriter(archive, hash), remaining: 16 << 30})
+	}
 	closeErr := archive.Close()
 	if err != nil {
 		return err

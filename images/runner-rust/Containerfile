@@ -47,10 +47,11 @@ RUN cd /tmp \
     && chmod 755 "/opt/zig-${ZIG_VERSION}/zig" \
     && ln -s "/opt/zig-${ZIG_VERSION}/zig" /usr/local/bin/zig \
     && tar -xJf zigbuild.tar.xz --strip-components=1 -C /usr/local/bin cargo-zigbuild-x86_64-unknown-linux-musl/cargo-zigbuild \
-    && tar -xzf sccache.tar.gz --strip-components=1 -C /usr/local/bin "sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" \
+    && mkdir -p /usr/local/libexec \
+    && tar -xzf sccache.tar.gz --strip-components=1 -C /usr/local/libexec "sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" \
     && tar -xzf nextest.tar.gz -C /usr/local/bin cargo-nextest \
     && tar -xzf audit.tgz --strip-components=1 -C /usr/local/bin "cargo-audit-x86_64-unknown-linux-musl-v${CARGO_AUDIT_VERSION}/cargo-audit" \
-    && chown root:root /usr/local/bin/cargo-zigbuild /usr/local/bin/sccache /usr/local/bin/cargo-nextest /usr/local/bin/cargo-audit \
+    && chown root:root /usr/local/bin/cargo-zigbuild /usr/local/libexec/sccache /usr/local/bin/cargo-nextest /usr/local/bin/cargo-audit \
     && rm -rf /tmp/zig /tmp/*.whl /tmp/*.tar.xz /tmp/*.tar.gz /tmp/*.tgz
 ENV RUSTUP_HOME=/usr/local/rustup
 ENV CARGO_HOME=/usr/local/cargo
@@ -68,11 +69,15 @@ COPY --chmod=755 .infra-artifacts/infra /usr/local/bin/infra
 RUN ln -s /usr/local/bin/infra /usr/local/bin/nix-hash \
     && ln -s /usr/local/bin/infra /usr/local/bin/infra-runner-hook \
     && ln -s /usr/local/bin/infra /usr/local/bin/ci-job-started.sh
+COPY platform/components/object-store/pki/ca.crt /usr/local/share/object-store/ca.crt
+RUN cat /etc/ssl/certs/ca-certificates.crt /usr/local/share/object-store/ca.crt > /usr/local/share/object-store/trust.pem
+COPY --chmod=755 images/runner-rust/sccache /usr/local/bin/sccache
 ENV HOME=/home/runner
 ENV CARGO_INCREMENTAL=0
 ENV CARGO_TERM_COLOR=always
 ENV SCCACHE_REGION=garage
-ENV SCCACHE_S3_USE_SSL=false
 ENV SCCACHE_IGNORE_SERVER_IO_ERROR=1
+ENV SCCACHE_IDLE_TIMEOUT=0
+ENV OBJECT_STORE_CA_FILE=/usr/local/share/object-store/ca.crt
 ENV RUNNER_ALLOW_RUNASROOT=1
 WORKDIR /home/runner

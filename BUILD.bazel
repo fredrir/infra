@@ -43,6 +43,7 @@ filegroup(
         "//build:dagger-embed.patch",
         "//build:toolchain.json",
         "//platform:components/backups/tools.Dockerfile",
+        "//platform:components/object-store/pki/ca.crt",
     ],
     visibility = ["//internal/contracts:__pkg__"],
 )

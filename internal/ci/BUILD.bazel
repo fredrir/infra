@@ -67,6 +67,7 @@ go_test(
     deps = [
         "//internal/kustomize",
         "//internal/process",
+        "@com_github_aws_aws_sdk_go_v2//aws/retry",
         "@com_github_klauspost_compress//zstd",
         "@in_yaml_go_yaml_v3//:yaml",
     ],

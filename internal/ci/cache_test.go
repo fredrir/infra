@@ -3,6 +3,7 @@ package ci
 import (
 	"bytes"
 	"context"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 )
 
 func init() {
@@ -168,5 +172,38 @@ func TestRustCacheRestoresFreshCheckoutAndBoundsWrites(t *testing.T) {
 	}
 	if strings.Contains(output.String(), secret) {
 		t.Fatal("secret exposed in logs")
+	}
+}
+
+func TestCacheClientTrustsTheObjectStoreAuthorityOnly(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "object") }))
+	defer server.Close()
+	authority := filepath.Join(t.TempDir(), "ca.crt")
+	if err := os.WriteFile(authority, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SCCACHE_ENDPOINT", server.URL)
+	t.Setenv("SCCACHE_REGION", "hel1")
+	t.Setenv("AWS_ACCESS_KEY_ID", "access")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "secret")
+	download := func() error {
+		client, err := CacheClient()
+		if err != nil {
+			return err
+		}
+		client.Backoff = retry.BackoffDelayerFunc(func(int, error) (time.Duration, error) { return 0, nil })
+		return client.Download(context.Background(), "toolchains", "sdk", io.Discard)
+	}
+	t.Setenv("OBJECT_STORE_CA_FILE", authority)
+	if err := download(); err != nil {
+		t.Fatalf("object store authority rejected: %v", err)
+	}
+	t.Setenv("OBJECT_STORE_CA_FILE", "")
+	if err := download(); err == nil {
+		t.Fatal("system trust accepted the object store authority")
+	}
+	t.Setenv("OBJECT_STORE_CA_FILE", filepath.Join(t.TempDir(), "missing.crt"))
+	if err := download(); err == nil {
+		t.Fatal("missing object store authority accepted")
 	}
 }
