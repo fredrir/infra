@@ -25,6 +25,11 @@
 | Mitogen host reconciliation | Hosts 469.3 → 211.1 seconds; monitor 49.3 → 21.8; verify 62.9 → 48.8; one production sample each; `INFRA_ANSIBLE_STRATEGY=linear` restores the linear strategy | [Mitogen qualification](../build/evidence/ansible-mitogen.json) |
 | Project-scoped reconciliation planning | Production plan stage 45.489/51.090 → 5.285 seconds for an application-only change; full recursive render 0.525 → 0.097 seconds locally; project documents match the full render exactly for `llunde` (27/27) and `y` (33/33) | [Scoped planning](../build/evidence/reconcile-project-scoped-plan.json), [production sample](../build/evidence/reconcile-scoped-plan-production.json) |
 | Public consumer canaries | Portfolio checks 3.841/6.134/4.355 seconds and Y checks 3.196/4.208 seconds with public provenance verification 0.64–1.15 seconds; all five images reconciled into production | [Portfolio canary](../build/evidence/portfolio-final-canary.json), [Y canary](../build/evidence/Y-final-canary.json) |
+| Hosted-runner Swift probe in cold Bazel analysis | `rules_swift` (via `gazelle` → `rules_apple`) ran `/usr/local/bin/swiftc` probes for 24.3 seconds of a 31-second analysis (run 36258801409) and stalled Build CLI for 30 seconds; with a 2-second fake `swiftc` on four CPUs, 4 probes and 11.0 s → 0 probes and 2.1 s; pure CLI sha256 unchanged | [Bazel configuration](../.bazelrc) |
+| CLI cache saves | About 800 MB `-cli-` entries were saved after every rebuild (10 s p50 post-step) and never restored; the repository cache held 10.6 GB of its 10 GB limit | [CLI workflow](../.github/workflows/infra-cli.yml) |
+| Test-only CLI inputs | 40 of 180 commits since 2026-09-24T17:30Z changed only `_test.go` CLI inputs and rebuilt the CLI | [CLI inputs](../.github/actions/cli-inputs/action.yml) |
+| Reconciler isolation test, Linux | 4.25 → 0.57 seconds; slowest `reconcile_test` shard under Bazel on four CPUs 5.8 → 1.9 seconds; all 21 uncached tests 7.87 → 4.49 seconds | [Test](../internal/reconcile/reconciler_isolation_test.go) |
+| Check replay, four CPUs, declarations under gVisor | Ansible template change: infra-fast 9.32 s and declarations killed at 0.69 s → 2.21 + 0.72 s; OpenTofu module change 0.76 + 2.03 → 0.25 + 1.50 s; reconciler root change initializes one root instead of two; declaration medians of three samples | [Check workflow](../.github/workflows/check.yml) |
 | Historical workflow sample | Includes earlier qualification runs and failures; not an ordinary-traffic deployment percentile | [Baseline](../build/evidence/ci-optimization-baseline.json) |
 | Frontend deployment below 15 seconds | Unqualified | [Previous observed timeline](../build/rollout/flux-artifacts/rollout.json) |
 
@@ -58,6 +63,9 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Application delivery handoff | [Frontend sample](../build/evidence/frontend-delivery-startup.json): 137.4 seconds from workflow creation to hosted verification; publication wait 37.3 seconds and Kubernetes reconciliation 20.1 seconds | Profile remaining workflow startup, protected environment setup and rollout readiness separately |
 | Full host reconciliation | [Task spans](../build/evidence/reconciliation-host-overhead.json): 435 task starts and 637.174 seconds total in one historical run; smart gathering already caches facts within a run | Profile remaining role work and preserve drift detection and registration checks |
 | Production revision publication | Full infrastructure convergence still serializes application publication; a concurrent frontend change exceeded its original serving deadline during qualification | Keep publication queueing visible and bounded; isolate application delivery further only with an equivalent infrastructure and artifact baseline |
+| OpenTofu validation on the check pool | `tofu validate` 4.2–9.7 seconds and 6.7–18.8 CPU seconds in runs 36249739111, 36249858108 and 36258989806; 1.0 seconds native and 1.5 seconds under local gVisor with warm providers; provider download 11–80 seconds per run | Rely on the plan gate's `tofu validate`, or keep a lock-verified provider cache on the check pool |
+| Check cache save | 10 s p50 on every main push; 827 MB entries | Save only when Bazel executed actions |
+| Bazel install extraction | 4.3 seconds per hosted job | Cache the install base with the Bazel caches |
 
 | Scanner rollout constraint | Requirement |
 | --- | --- |
@@ -73,7 +81,11 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 
 | Control | Behavior |
 | --- | --- |
-| Shared CLI | Checks and image planning consume one verified CLI artifact; reconciliation directly installs the matching pinned release or awaits the shared build when CLI inputs differ |
+| Shared CLI | Checks and image planning consume one verified CLI artifact; reconciliation directly installs the matching pinned release or awaits the shared build when CLI inputs differ; `_test.go` files are not CLI inputs |
+| CLI build cache | Restored from check caches; saved only when no cache of the current family exists |
+| CI repository rules | `--config=ci` pins the repository rule `PATH` to `/usr/bin:/bin` |
+| Check budget | The Bazel check and declaration validation run concurrently, each measured against ten seconds; the `budget` job sums both receipts against the ten-second ceiling |
+| Generated BUILD check | Runs for Go, BUILD, `.bzl`, Go module and `MODULE.bazel` changes and for files below Go package directories |
 | Production validation | Apply validates declarations and live preflight before mutation; checks run alongside reconciliation; production application is serialized |
 | Application setup | Durable applied state selects tools; application-only changes skip host tooling, SSH and runner-registration credentials; recovery retains full setup |
 | State operations | Signed S3 requests reuse HTTP connections with conditional lease ownership, encryption and durable status updates |
@@ -88,7 +100,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Tooling changes | `cmd/`, `internal/`, `.github/`, Go and Bazel modules and listed `build/` inputs run read-only drift verification of the applied revision: generated artifacts, `tofu plan -detailed-exitcode`, workloads and hosts; failure forces full recovery |
 | Workload verification | Each verification poll lists workloads once per kind and namespace; expected ownership, images, readiness and generations remain required |
 | Transport installation | Pinned archive content is compared with extracted and installed binaries before extraction or copy; missing or corrupted files are repaired |
-| Declaration validation | Changed-scope checks run concurrently up to `GOMAXPROCS`; each check's output is released in check order once it and every earlier check finish; errors follow check order; a panic fails only its check; kustomize renders in-process, byte-identical to `kubectl kustomize` per `infra dev qualify kustomize`; a contract test ties the linked kustomize modules to the pinned `kubectl` and `kustomize` |
+| Declaration validation | Changed-scope checks run concurrently up to `GOMAXPROCS`; each check's output is released in check order once it and every earlier check finish; errors follow check order; a panic fails only its check; kustomize renders in-process, byte-identical to `kubectl kustomize` per `infra dev qualify kustomize`; a contract test ties the linked kustomize modules to the pinned `kubectl` and `kustomize`; the root OpenTofu module is initialized and validated for `tofu/` changes outside the reconciler root and `.tftest.hcl` files and for production settings; the reconciler root only for its own inputs |
 | Rust target cache | Cache save identity includes source contents, lockfile and build arguments; dependency outputs remain reusable across source changes |
 | VM admission | A configurable host-wide limit bounds complete jobs across repository listeners; leases use worker PID and process start time and are reclaimed after worker exit |
 | Timing | A read-only completion observer retains job and step timestamps for successful and failed workflow attempts for 30 days |
