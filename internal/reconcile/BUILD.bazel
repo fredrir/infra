@@ -87,7 +87,7 @@ go_test(
         "//:reconciliation_action_data",
         "//:runner_routing_data",
         "//:web_flow_key",
-        "//platform:policy_testdata",
+        "//platform:components/policy/reconciliation.yaml",
     ],
     embed = [":reconcile"],
     shard_count = 4,

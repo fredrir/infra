@@ -5,10 +5,7 @@ filegroup(
         "components/**/*.yaml",
         "projects/**/*.yaml",
     ]),
-    visibility = [
-        "//internal/policy:__pkg__",
-        "//internal/reconcile:__pkg__",
-    ],
+    visibility = ["//internal/policy:__pkg__"],
 )
 
 exports_files([
@@ -16,6 +13,11 @@ exports_files([
     "components/observability/build-vm.yaml",
     "versions.yaml",
 ])
+
+exports_files(
+    ["components/policy/reconciliation.yaml"],
+    visibility = ["//internal/reconcile:__pkg__"],
+)
 
 filegroup(
     name = "promotion_testdata",
