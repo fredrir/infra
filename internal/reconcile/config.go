@@ -44,6 +44,10 @@ func Affected(paths []string) Selection {
 			selected.Reasons = append(selected.Reasons, "deployment-independent input: "+path)
 			continue
 		}
+		if administratorApplied(path) {
+			selected.Reasons = append(selected.Reasons, "administrator-applied input: "+path)
+			continue
+		}
 		if toolingInput(path) {
 			selected.Tooling = true
 			selected.Reasons = append(selected.Reasons, "tooling input: "+path)
@@ -134,6 +138,10 @@ func deploymentIndependent(path string) bool {
 		strings.HasPrefix(path, "images/") || strings.HasPrefix(path, "dev/") ||
 		strings.HasPrefix(path, "tests/") || pushIgnored(path) ||
 		((strings.HasPrefix(path, "internal/") || strings.HasPrefix(path, "cmd/")) && strings.HasSuffix(path, "_test.go"))
+}
+
+func administratorApplied(path string) bool {
+	return canonicalPath(path) && strings.HasPrefix(path, "tofu/reconciler/")
 }
 
 func selectHosts(selected *Selection, scope string) {

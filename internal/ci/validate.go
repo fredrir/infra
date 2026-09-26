@@ -54,13 +54,20 @@ func declarationChanged(files []byte, pattern string) bool {
 	return false
 }
 
+const reconcilerTofuInputs = `^(tofu/reconciler/|keys/admin_keys$)`
+
 func PrepareValidation(ctx context.Context, runner Runner, before string) error {
 	files, err := validationInputs(ctx, runner, before)
 	if err != nil {
 		return err
 	}
-	if declarationChanged(files, `^tofu/`) {
-		return runner.Run(ctx, "tofu", "-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false")
+	for _, root := range []struct{ directory, inputs string }{{"tofu", `^tofu/`}, {"tofu/reconciler", reconcilerTofuInputs}} {
+		if !declarationChanged(files, root.inputs) {
+			continue
+		}
+		if err := runner.Run(ctx, "tofu", "-chdir="+root.directory, "init", "-backend=false", "-lockfile=readonly", "-input=false"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -86,6 +93,9 @@ func declarationChecks(root string, changed func(string) bool) ([]declarationChe
 	var checks []declarationCheck
 	if changed(`^tofu/`) {
 		checks = append(checks, command("tofu", "-chdir=tofu", "validate", "-no-tests"), command("tofu", "-chdir=tofu", "fmt", "-check", "-recursive"))
+	}
+	if changed(reconcilerTofuInputs) {
+		checks = append(checks, command("tofu", "-chdir=tofu/reconciler", "test"))
 	}
 	if changed(`^ansible/`) {
 		playbooks, err := filepath.Glob(filepath.Join(root, "ansible", "*.yml"))

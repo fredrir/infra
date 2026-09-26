@@ -327,6 +327,8 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 		{"platform/components/policy/kustomization.yaml", All()},
 		{"internal/../tofu/main.tf", All()},
 		{"README.md", Selection{}},
+		{"tofu/reconciler/server.tf", Selection{}},
+		{"tofu/reconciler/../reconciliation.tf", Selection{Tofu: true, Ansible: true}},
 	} {
 		if got := Affected([]string{test.path}); !sameSelection(got, test.want) {
 			t.Errorf("%s: %+v", test.path, got)

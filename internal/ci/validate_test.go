@@ -239,6 +239,71 @@ func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
 	}
 }
 
+func TestReconcilerTofuRootIsPreparedAndTestedOnlyForItsInputs(t *testing.T) {
+	mainInit := []string{"-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false"}
+	reconcilerInit := []string{"-chdir=tofu/reconciler", "init", "-backend=false", "-lockfile=readonly", "-input=false"}
+	mainChecks := [][]string{{"-chdir=tofu", "fmt", "-check", "-recursive"}, {"-chdir=tofu", "validate", "-no-tests"}}
+	reconcilerTest := []string{"-chdir=tofu/reconciler", "test"}
+	for _, test := range []struct {
+		changed             string
+		prepared, validated [][]string
+	}{
+		{"tofu/reconciler/server.tf", [][]string{mainInit, reconcilerInit}, append(slices.Clone(mainChecks), reconcilerTest)},
+		{"tofu/reconciler/tests/reconciler.tftest.hcl", [][]string{mainInit, reconcilerInit}, append(slices.Clone(mainChecks), reconcilerTest)},
+		{"keys/admin_keys", [][]string{reconcilerInit}, [][]string{reconcilerTest}},
+		{"tofu/reconciliation.tf", [][]string{mainInit}, mainChecks},
+		{"docs/runbook.md", nil, nil},
+	} {
+		t.Run(test.changed, func(t *testing.T) {
+			var lock sync.Mutex
+			var calls [][]string
+			runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				switch options.Name {
+				case "git":
+					return process.Result{Stdout: []byte(test.changed + "\n")}, nil
+				case "tofu":
+					lock.Lock()
+					defer lock.Unlock()
+					calls = append(calls, options.Args)
+					return process.Result{}, nil
+				default:
+					t.Errorf("unexpected validator: %s", options.Name)
+					return process.Result{}, nil
+				}
+			}}
+			if err := PrepareValidation(context.Background(), runner, ""); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(calls, test.prepared) {
+				t.Fatalf("preparation commands: %v, want %v", calls, test.prepared)
+			}
+			calls = nil
+			if err := Validate(context.Background(), runner, ""); err != nil {
+				t.Fatal(err)
+			}
+			slices.SortFunc(calls, func(a, b []string) int { return strings.Compare(strings.Join(a, " "), strings.Join(b, " ")) })
+			if !reflect.DeepEqual(calls, test.validated) {
+				t.Fatalf("validation commands: %v, want %v", calls, test.validated)
+			}
+		})
+	}
+}
+
+func TestReconcilerTofuPreparationFailureStopsPreparation(t *testing.T) {
+	failure := errors.New("provider lock mismatch")
+	var calls [][]string
+	runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		if options.Name == "git" {
+			return process.Result{Stdout: []byte("tofu/reconciler/server.tf\n")}, nil
+		}
+		calls = append(calls, options.Args)
+		return process.Result{}, failure
+	}}
+	if err := PrepareValidation(context.Background(), runner, ""); !errors.Is(err, failure) || len(calls) != 1 {
+		t.Fatalf("preparation continued after %v: %v", err, calls)
+	}
+}
+
 func TestGeneratedOverlaysValidateOnEveryGeneratorInput(t *testing.T) {
 	for _, path := range []string{
 		"platform/components/policy/reconciliation.yaml",
