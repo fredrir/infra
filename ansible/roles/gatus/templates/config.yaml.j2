@@ -208,9 +208,9 @@ external-endpoints:
           failure-threshold: 1
           success-threshold: 1
           send-on-resolved: true
-    - name: verification
+    - name: deep
       group: reconciliation
-      token: "${GATUS_TOKEN_RECONCILIATION_VERIFICATION}"
+      token: "${GATUS_TOKEN_RECONCILIATION_DEEP}"
       heartbeat:
         interval: 3h
       alerts:
@@ -218,5 +218,16 @@ external-endpoints:
           failure-threshold: 1
           success-threshold: 1
           send-on-resolved: true
-          description: Hourly infrastructure verification failed or stopped reporting; the Gatus result names the run
+          description: Hourly GitHub deep verification failed or stopped reporting; the Gatus result names the run
+    - name: verification
+      group: reconciliation
+      token: "${GATUS_TOKEN_RECONCILIATION_VERIFICATION}"
+      heartbeat:
+        interval: 2h
+      alerts:
+        - type: email
+          failure-threshold: 2
+          success-threshold: 1
+          send-on-resolved: true
+          description: Reconciler verification failed twice in a row or stopped reporting; the Gatus result names the stage
 metrics: true

@@ -58,19 +58,20 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | Timer | `infra-verification-request.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |
 | Service | `infra-verification-request.service`: oneshot `infra reconcile request-verification`, `DynamicUser=yes`, IPv4/IPv6 sockets only, read-only system, `TimeoutStartSec=160min`; runs never overlap, and an hour that elapses during a run starts one run after it completes |
 | Binary | `/usr/local/bin/infra` from `build/cli-release.json`; a CLI release also runs `external.yml --tags=infra_binary` |
+| Pinned CLI | Must accept `request-verification --heartbeat`; a unit change that passes a new flag lands together with a `build/cli-release.json` pin of a release that has it |
 | Credentials | Root `0600` ciphertext `/etc/infra-verification/credentials.sops.yaml`; decrypted at start into the unit's runtime directory with the [host key](Secrets.md#host-scoped-secrets) |
 | Token | Installation token restricted to `infra` with `actions: write` |
 | Dispatch | `reconcile.yml` at `main`, `verify=true`, `repair=true`, actor `fredrir-infra-verification[bot]` |
 | Wait | Polls the dispatched run every 30 s with ETag revalidation; honors `Retry-After` and `X-RateLimit-Reset`; deadline 150 minutes |
-| Heartbeat | Gatus `reconciliation_verification`: `success=true` for `success`; `success=false` with the run URL and conclusion for `failure`, `timed_out`, `startup_failure` or the deadline; none for `cancelled` or a stopped unit |
+| Heartbeat | Gatus `reconciliation_deep` (`--heartbeat=reconciliation_deep`): `success=true` for `success`; `success=false` with the run URL and conclusion for `failure`, `timed_out`, `startup_failure` or the deadline; none for `cancelled` or a stopped unit |
 | Failed dispatch | Unit `failed`; journal `infra: dispatch reconcile.yml in fredrir/infra at main: ERROR`; no run and no heartbeat; the next hour retries |
 
 | Owner notification | Value |
 | --- | --- |
-| Failed, timed out or unfinished verification run | Email `reconciliation/verification: Alert triggered` on the report; Gatus result error names the run URL and conclusion |
+| Failed, timed out or unfinished verification run | Email `reconciliation/deep: Alert triggered` on the report; Gatus result error names the run URL and conclusion |
 | No report for 3 hours | Same email; dispatch failures or a stopped timer |
 | `fredrir-06` or Gatus unreachable for 10 minutes | Alertmanager email `IndependentMonitorDown` from the cluster's scrape of `100.86.241.75:8080/metrics`; Gatus cannot report its own host |
-| Next successful run | Email `reconciliation/verification: Alert resolved` |
+| Next successful run | Email `reconciliation/deep: Alert resolved` |
 | Superseded run | No email |
 | Deployment scope | Role and Gatus changes run `external.yml --tags=gatus,verification_trigger` |
 
@@ -89,7 +90,7 @@ ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl start infra-verifica
 | App / installation ID | `5077572` / `164918469`; `fredrir-06` in `ansible/inventory/production.yml` |
 | Private key | `ansible/roles/verification_trigger/files/credentials.sops.yaml`, field `private_key`; recipients in [Secrets](Secrets.md) |
 | Rotation | Generate a key in the App settings; replace `private_key`; reconcile; delete the previous key |
-| Heartbeat token | `ansible/roles/verification_trigger/files/credentials.sops.yaml`, field `token`; equal to `GATUS_TOKEN_RECONCILIATION_VERIFICATION` in `ansible/roles/gatus/files/secrets.sops.yaml` |
+| Heartbeat token | `ansible/roles/verification_trigger/files/credentials.sops.yaml`, field `token`; equal to `GATUS_TOKEN_RECONCILIATION_DEEP` in `ansible/roles/gatus/files/secrets.sops.yaml` |
 
 ```sh
 jq -Rs . < NEW_KEY.pem | sops set --value-stdin ansible/roles/verification_trigger/files/credentials.sops.yaml '["private_key"]'
@@ -401,7 +402,7 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | `platform-mail-recipient` | `PLATFORM_MAIL_RECIPIENT` |
 | `kubernetes-token` | `flux-system/infrastructure-verify-credentials` |
 | `observer-app-key` | `OBSERVER_APP_PRIVATE_KEY` |
-| `gatus-token` | `GATUS_TOKEN_RECONCILIATION_VERIFICATION` in `ansible/roles/gatus/files/secrets.sops.yaml` |
+| `gatus-token` | Set; equal to `GATUS_TOKEN_RECONCILIATION_VERIFICATION` in `ansible/roles/gatus/files/secrets.sops.yaml` |
 
 ```sh
 credential() { jq -Rs 'rtrimstr("\n")' | sops set --value-stdin ansible/roles/reconciler/files/credentials.sops.yaml "[\"verify\"][\"$1\"]"; }

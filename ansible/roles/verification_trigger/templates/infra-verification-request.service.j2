@@ -7,7 +7,7 @@ Type=oneshot
 ExecStartPre=+/usr/bin/env SOPS_AGE_KEY_FILE={{ host_secrets_key }} /usr/local/bin/sops decrypt --extract '["private_key"]' --output %t/infra-verification-request/github-app.pem /etc/infra-verification/credentials.sops.yaml
 ExecStartPre=+/usr/bin/env SOPS_AGE_KEY_FILE={{ host_secrets_key }} /usr/local/bin/sops decrypt --extract '["token"]' --output %t/infra-verification-request/gatus-token /etc/infra-verification/credentials.sops.yaml
 ExecStartPre=+/usr/bin/chown --reference=%t/infra-verification-request %t/infra-verification-request/github-app.pem %t/infra-verification-request/gatus-token
-ExecStart=/usr/local/bin/infra reconcile request-verification --app-id={{ verification_trigger_app_id }} --installation-id={{ verification_trigger_installation_id }} --private-key=%t/infra-verification-request/github-app.pem --heartbeat-token=%t/infra-verification-request/gatus-token
+ExecStart=/usr/local/bin/infra reconcile request-verification --app-id={{ verification_trigger_app_id }} --installation-id={{ verification_trigger_installation_id }} --private-key=%t/infra-verification-request/github-app.pem --heartbeat-token=%t/infra-verification-request/gatus-token --heartbeat=reconciliation_deep
 DynamicUser=yes
 RuntimeDirectory=infra-verification-request
 RuntimeDirectoryMode=0700
