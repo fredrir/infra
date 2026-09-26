@@ -17,7 +17,7 @@ func hardenedExecutor(t *testing.T) executor {
 func TestCheckoutBuildsOnlyThePublishedRevision(t *testing.T) {
 	ctx := context.Background()
 	origin, published := originRepository(t)
-	main := gitCommand(t, origin, "rev-parse", "main")
+	main := branchTip(t, origin, "main")
 	if main == published {
 		t.Fatal("fixture main does not advance past production")
 	}
@@ -43,16 +43,28 @@ func TestCheckoutBuildsOnlyThePublishedRevision(t *testing.T) {
 
 func offMainOrigin(t *testing.T) (string, string) {
 	t.Helper()
-	origin, _ := originRepository(t)
+	origin := offMainTemplate.copy(t, buildOffMainOrigin)
+	return origin, branchTip(t, origin, "production")
+}
+
+func buildOffMainOrigin(t *testing.T) string {
+	t.Helper()
+	source, _ := originRepository(t)
+	origin, err := os.MkdirTemp("", "reconciler-off-main-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.CopyFS(origin, os.DirFS(source)); err != nil {
+		t.Fatal(err)
+	}
 	gitCommand(t, origin, "checkout", "--quiet", "production")
 	if err := os.WriteFile(filepath.Join(origin, "forged"), []byte("unreviewed"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	gitCommand(t, origin, "add", ".")
 	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "forged")
-	forged := gitCommand(t, origin, "rev-parse", "HEAD")
 	gitCommand(t, origin, "checkout", "--quiet", "main")
-	return origin, forged
+	return origin
 }
 
 func TestCheckoutRefusesProductionOffMain(t *testing.T) {
@@ -60,7 +72,7 @@ func TestCheckoutRefusesProductionOffMain(t *testing.T) {
 	origin, forged := offMainOrigin(t)
 	source := filepath.Join(t.TempDir(), "source")
 	checked, err := hardenedExecutor(t).checkoutPublished(ctx, source, "file://"+origin)
-	if err != nil || checked != (publication{Revision: forged, Main: gitCommand(t, origin, "rev-parse", "main")}) {
+	if err != nil || checked != (publication{Revision: forged, Main: branchTip(t, origin, "main")}) {
 		t.Fatalf("off-main production resolved %+v, %v; want %s refused", checked, err, forged)
 	}
 	if entries, err := os.ReadDir(source); err != nil || len(entries) != 1 || entries[0].Name() != ".git" {
@@ -76,7 +88,7 @@ func TestCheckoutRefusesProductionOffMain(t *testing.T) {
 func TestCheckoutMainChecksOutTheMainTip(t *testing.T) {
 	ctx := context.Background()
 	origin, _ := originRepository(t)
-	main := gitCommand(t, origin, "rev-parse", "main")
+	main := branchTip(t, origin, "main")
 	source := filepath.Join(t.TempDir(), "source")
 	hardened := hardenedExecutor(t)
 	if revision, err := hardened.checkoutMain(ctx, source, "file://"+origin); err != nil || revision != main {
@@ -103,7 +115,7 @@ func TestHardenedGitIgnoresPlantedHooksAndReplacements(t *testing.T) {
 	if _, err := hardened.checkoutPublished(ctx, source, "file://"+origin); err != nil {
 		t.Fatal(err)
 	}
-	decoy := gitCommand(t, origin, "rev-parse", "main")
+	decoy := branchTip(t, origin, "main")
 	if _, err := hardened.output(ctx, source, "git", "fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main"); err != nil {
 		t.Fatal(err)
 	}

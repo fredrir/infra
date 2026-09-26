@@ -41,28 +41,45 @@ func gitCommand(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(output))
 }
 
-var originTemplate struct {
-	once                 sync.Once
-	directory, published string
+type repositoryTemplate struct {
+	once      sync.Once
+	directory string
+}
+
+var originTemplate, offMainTemplate repositoryTemplate
+
+func (r *repositoryTemplate) copy(t *testing.T, build func(t *testing.T) string) string {
+	t.Helper()
+	r.once.Do(func() { r.directory = build(t) })
+	if r.directory == "" {
+		t.Fatal("repository template unavailable")
+	}
+	copied := t.TempDir()
+	if err := os.CopyFS(copied, os.DirFS(r.directory)); err != nil {
+		t.Fatal(err)
+	}
+	return copied
+}
+
+func branchTip(t *testing.T, repository, branch string) string {
+	t.Helper()
+	tip, err := os.ReadFile(filepath.Join(repository, ".git", "refs", "heads", branch))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(tip))
 }
 
 func originRepository(t *testing.T) (string, string) {
 	t.Helper()
-	originTemplate.once.Do(func() { originTemplate.directory, originTemplate.published = buildOriginRepository(t) })
-	if originTemplate.directory == "" {
-		t.Fatal("origin repository template unavailable")
-	}
-	origin := t.TempDir()
-	if err := os.CopyFS(origin, os.DirFS(originTemplate.directory)); err != nil {
-		t.Fatal(err)
-	}
-	return origin, originTemplate.published
+	origin := originTemplate.copy(t, buildOriginRepository)
+	return origin, branchTip(t, origin, "production")
 }
 
 func TestOriginTemplateStartsNoBackgroundGitMaintenance(t *testing.T) {
 	events := filepath.Join(t.TempDir(), "trace2.json")
 	t.Setenv("GIT_TRACE2_EVENT", events)
-	directory, _ := buildOriginRepository(t)
+	directory := buildOriginRepository(t)
 	t.Cleanup(func() { os.RemoveAll(directory) })
 	if started := gitMaintenanceStarts(t, events); len(started) != 0 {
 		t.Fatalf("building the origin template started %q", started)
@@ -91,7 +108,7 @@ func gitMaintenanceStarts(t *testing.T, events string) []string {
 	return started
 }
 
-func buildOriginRepository(t *testing.T) (string, string) {
+func buildOriginRepository(t *testing.T) string {
 	t.Helper()
 	origin, err := os.MkdirTemp("", "reconciler-origin-")
 	if err != nil {
@@ -109,19 +126,18 @@ func buildOriginRepository(t *testing.T) (string, string) {
 			t.Fatal(err)
 		}
 	}
-	gitCommand(t, origin, "init", "--quiet", "--initial-branch=main")
+	gitCommand(t, origin, "init", "--quiet", "--initial-branch=main", "--ref-format=files")
 	gitCommand(t, origin, "config", "maintenance.auto", "false")
 	gitCommand(t, origin, "config", "gc.auto", "0")
 	gitCommand(t, origin, "add", ".")
 	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "declare")
 	gitCommand(t, origin, "branch", "production")
-	published := gitCommand(t, origin, "rev-parse", "production")
 	if err := os.WriteFile(filepath.Join(origin, "unpublished"), []byte("unreviewed"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	gitCommand(t, origin, "add", ".")
 	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "unpublished")
-	return origin, published
+	return origin
 }
 
 const providerLock = `provider "registry.opentofu.org/hashicorp/aws" {
@@ -339,8 +355,10 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 func TestMain(m *testing.M) {
 	memoryBacked = func(string) error { return nil }
 	code := m.Run()
-	if originTemplate.directory != "" {
-		os.RemoveAll(originTemplate.directory)
+	for _, template := range []*repositoryTemplate{&originTemplate, &offMainTemplate} {
+		if template.directory != "" {
+			os.RemoveAll(template.directory)
+		}
 	}
 	os.Exit(code)
 }

@@ -130,7 +130,7 @@ func TestVerificationRequestsARepairOnlyForRepairableDifferences(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			origin, revision := originRepository(t)
-			main := gitCommand(t, origin, "rev-parse", "main")
+			main := branchTip(t, origin, "main")
 			h := newHarnessAt(t, origin, revision, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
 				return test.code, test.report
 			}, nil)
@@ -166,7 +166,7 @@ func TestOffMainProductionRequestsARepairOfMain(t *testing.T) {
 		t.Fatal("an off-main revision verified")
 	}
 	requests, invalid := readRequests(h.supervisor.Config.Shared, time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC))
-	if len(invalid) != 0 || requests[RequestRepair].Revision != gitCommand(t, origin, "rev-parse", "main") {
+	if len(invalid) != 0 || requests[RequestRepair].Revision != branchTip(t, origin, "main") {
 		t.Fatalf("requests %+v, %+v", requests, invalid)
 	}
 }

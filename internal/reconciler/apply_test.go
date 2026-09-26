@@ -236,7 +236,7 @@ func validApplyConfig() ApplyConfig {
 func newApplyHarness(t *testing.T) *applyHarness {
 	t.Helper()
 	origin, applied := originRepository(t)
-	h := &applyHarness{origin: origin, applied: applied, tip: gitCommand(t, origin, "rev-parse", "main"), credentials: applyCredentialValues(t), github: &githubAPI{minted: map[string][]map[string]any{}, expiration: "2027-09-26 12:00:00 UTC"}, bucket: &stateBucket{applied: applied, puts: map[string][]byte{}}, gatus: &applyHeartbeats{}, selection: reconcile.Selection{Tofu: true, Ansible: true, HostScope: reconcile.HostScopeFull}}
+	h := &applyHarness{origin: origin, applied: applied, tip: branchTip(t, origin, "main"), credentials: applyCredentialValues(t), github: &githubAPI{minted: map[string][]map[string]any{}, expiration: "2027-09-26 12:00:00 UTC"}, bucket: &stateBucket{applied: applied, puts: map[string][]byte{}}, gatus: &applyHeartbeats{}, selection: reconcile.Selection{Tofu: true, Ansible: true, HostScope: reconcile.HostScopeFull}}
 	urls := map[string]string{}
 	for name, handler := range map[string]http.Handler{"github": h.github, "s3": h.bucket, "gatus": h.gatus} {
 		server := httptest.NewServer(handler)
@@ -512,7 +512,7 @@ func (h *applyHarness) commit(t *testing.T, files map[string]string) string {
 	}
 	gitCommand(t, h.origin, "add", ".")
 	gitCommand(t, h.origin, "commit", "--quiet", "--no-gpg-sign", "-m", "change")
-	return gitCommand(t, h.origin, "rev-parse", "main")
+	return branchTip(t, h.origin, "main")
 }
 
 func (h *applyHarness) settle(t *testing.T, ledger Ledger) {
@@ -941,7 +941,7 @@ func TestPushIgnoredCommitsAreSkippedOnlyAfterASettledAncestor(t *testing.T) {
 		h := newApplyHarness(t)
 		gitCommand(t, h.origin, "checkout", "--quiet", "--orphan", "rewritten")
 		gitCommand(t, h.origin, "commit", "--quiet", "--no-gpg-sign", "-m", "rewritten")
-		rewritten := gitCommand(t, h.origin, "rev-parse", "HEAD")
+		rewritten := branchTip(t, h.origin, "rewritten")
 		gitCommand(t, h.origin, "checkout", "--quiet", "main")
 		h.settle(t, Ledger{Revision: rewritten, Outcome: OutcomeApplied, Checked: h.applier.Now()})
 		if err := h.applier.Apply(context.Background()); err != nil || len(h.applies) != 1 {
@@ -1081,21 +1081,21 @@ func TestApplyWaitsForTheHostLock(t *testing.T) {
 
 func TestOnlyIgnoredRequiresTheHandledRevisionAsAnAncestor(t *testing.T) {
 	origin, _ := originRepository(t)
-	base := gitCommand(t, origin, "rev-parse", "main")
+	base := branchTip(t, origin, "main")
 	gitCommand(t, origin, "checkout", "--quiet", "-b", "side")
 	if err := os.WriteFile(filepath.Join(origin, "README.md"), []byte("side"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	gitCommand(t, origin, "add", ".")
 	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "side")
-	side := gitCommand(t, origin, "rev-parse", "side")
+	side := branchTip(t, origin, "side")
 	gitCommand(t, origin, "checkout", "--quiet", "main")
 	if err := os.WriteFile(filepath.Join(origin, "CHANGELOG.md"), []byte("main"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	gitCommand(t, origin, "add", ".")
 	gitCommand(t, origin, "commit", "--quiet", "--no-gpg-sign", "-m", "main")
-	tip := gitCommand(t, origin, "rev-parse", "main")
+	tip := branchTip(t, origin, "main")
 	hardened := hardenedExecutor(t)
 	if ignored, err := hardened.onlyIgnored(context.Background(), origin, base, tip); err != nil || !ignored {
 		t.Fatalf("an ancestor with push-ignored changes: %v, %v", ignored, err)
