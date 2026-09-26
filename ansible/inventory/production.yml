@@ -155,7 +155,7 @@ all:
           build_engine_parallelism: 3
           build_runner_cpus_percent: 800
           build_runner_memory: 4G
-          build_runner_job_slots: 3
+          build_runner_job_slots: 4
           infra_binary_url: 'https://github.com/fredrir/infra/releases/download/{{ build_runner_cli.tag }}/infra-linux-amd64'
           infra_binary_revision: '{{ build_runner_cli.revision }}'
           infra_binary_sha256: '{{ build_runner_cli.sha256 }}'
