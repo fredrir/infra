@@ -5,7 +5,10 @@ filegroup(
         "components/**/*.yaml",
         "projects/**/*.yaml",
     ]),
-    visibility = ["//internal/policy:__pkg__"],
+    visibility = [
+        "//internal/policy:__pkg__",
+        "//internal/reconcile:__pkg__",
+    ],
 )
 
 exports_files([

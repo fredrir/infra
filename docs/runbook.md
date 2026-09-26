@@ -237,9 +237,10 @@ These activation steps provision external credentials once; merge, verification 
 | AWS identity policies | `tofu/reconciliation.tf`; attached managed policies; deployment identities cannot change their own grants |
 | AWS workload boundary | `policy/boundary/infra-workload-boundary` on every OpenTofu-managed IAM user outside `/automation/`; dataset S3 objects except `tofu-state/`, `tf-state-backups/` and `reconciliation/`, SES from the alert sender; the apply identity cannot edit, remove or bypass it |
 | Kubernetes identities | `platform/components/policy/reconciliation.yaml` |
-| Kubernetes tokens | Controller-populated `infrastructure-plan-credentials` and `infrastructure-apply-credentials` Secrets in `flux-system` |
+| Kubernetes tokens | Controller-populated `infrastructure-plan-credentials`, `infrastructure-apply-credentials` and `infrastructure-verify-credentials` Secrets in `flux-system` |
 | Kubernetes API address | Reachable control-plane Tailnet address with a matching certificate; include its CA in each kubeconfig |
-| Kubernetes apply scope | Read Flux resources; patch reconciliation annotations; admission rejects spec changes |
+| Kubernetes verify scope | Read Flux resources, workloads, runner sets, listener pods and artifacts; no writes |
+| Kubernetes apply scope | Verify scope; patch reconciliation annotations; admission rejects spec changes |
 | Tailnet plan scope | Control-plane API only |
 | Tailnet apply scope | Control-plane API and SSH to managed hosts |
 | Host SSH key | `ansible/files/reconciliation.pub`; maintained by `ansible/reconciliation-identity.yml` |

@@ -12,6 +12,13 @@ metadata:
   namespace: flux-system
 automountServiceAccountToken: false
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: infrastructure-verify
+  namespace: flux-system
+automountServiceAccountToken: false
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -35,6 +42,9 @@ subjects:
   namespace: flux-system
 - kind: ServiceAccount
   name: infrastructure-apply
+  namespace: flux-system
+- kind: ServiceAccount
+  name: infrastructure-verify
   namespace: flux-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -64,11 +74,14 @@ subjects:
 - kind: ServiceAccount
   name: infrastructure-apply
   namespace: flux-system
+- kind: ServiceAccount
+  name: infrastructure-verify
+  namespace: flux-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: infrastructure-apply
+  name: infrastructure-verify
 rules:
 - apiGroups: [apps]
   resources: [deployments, statefulsets, daemonsets]
@@ -79,6 +92,28 @@ rules:
 - apiGroups: [actions.github.com]
   resources: [autoscalingrunnersets, ephemeralrunners]
   verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: infrastructure-verify
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: infrastructure-verify
+subjects:
+- kind: ServiceAccount
+  name: infrastructure-verify
+  namespace: flux-system
+- kind: ServiceAccount
+  name: infrastructure-apply
+  namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: infrastructure-apply
+rules:
 - apiGroups: [source.toolkit.fluxcd.io]
   resources: [gitrepositories]
   resourceNames: [flux-system]
@@ -123,6 +158,9 @@ subjects:
 - kind: ServiceAccount
   name: infrastructure-apply
   namespace: flux-system
+- kind: ServiceAccount
+  name: infrastructure-verify
+  namespace: flux-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -150,6 +188,9 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: infrastructure-apply
+  namespace: flux-system
+- kind: ServiceAccount
+  name: infrastructure-verify
   namespace: flux-system
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -195,4 +236,13 @@ metadata:
   namespace: flux-system
   annotations:
     kubernetes.io/service-account.name: infrastructure-apply
+type: kubernetes.io/service-account-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infrastructure-verify-credentials
+  namespace: flux-system
+  annotations:
+    kubernetes.io/service-account.name: infrastructure-verify
 type: kubernetes.io/service-account-token
