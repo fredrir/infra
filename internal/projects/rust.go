@@ -18,7 +18,6 @@ import (
 )
 
 const runnersPath = "platform/components/runners"
-const cachePath = "platform/components/build-cache/projects"
 const registryPath = ".github/rust-projects.yaml"
 
 type RustProvider interface {
@@ -185,14 +184,14 @@ func OnboardRust(ctx context.Context, provider RustProvider, options RustOptions
 		return err
 	}
 	overlay := runnersPath + "/" + options.Project
-	keys := cachePath + "/" + options.Project + ".secret.sops.yaml"
+	keys := storePath + "/ci/" + options.Project + ".secret.sops.yaml"
 	for _, path := range []string{overlay, keys} {
 		if _, err := root.Lstat(path); !os.IsNotExist(err) {
 			return fmt.Errorf("project already onboarded or path inaccessible")
 		}
 	}
 	originals := map[string][]byte{}
-	for _, path := range []string{registryPath, runnersPath + "/kustomization.yaml", cachePath + "/kustomization.yaml"} {
+	for _, path := range []string{registryPath, runnersPath + "/kustomization.yaml", storePath + "/kustomization.yaml", storePath + "/" + cacheCell + ".yaml", storePath + "/" + cacheCell + "-identities.json", storePath + "/buckets.yaml"} {
 		data, err := root.ReadFile(path)
 		if err != nil {
 			return err
@@ -238,9 +237,9 @@ func OnboardRust(ctx context.Context, provider RustProvider, options RustOptions
 	namespace := "ci-" + options.Project
 	documents := map[string]any{overlay + "/github-app.secret.sops.yaml": secret("github-app", namespace, credentials, nil)}
 	resources := []string{"../ci-namespace", "github-app.secret.sops.yaml"}
-	provisioner := map[string]string{}
+	storeCredentials := map[string]string{}
 	for _, pool := range []string{"ro", "rw", "release"} {
-		id := make([]byte, 12)
+		id := make([]byte, 10)
 		key := make([]byte, 32)
 		if _, err := rand.Read(id); err != nil {
 			return err
@@ -248,15 +247,16 @@ func OnboardRust(ctx context.Context, provider RustProvider, options RustOptions
 		if _, err := rand.Read(key); err != nil {
 			return err
 		}
-		access := "GK" + hex.EncodeToString(id)
+		access := strings.ToUpper(hex.EncodeToString(id))
 		secretKey := hex.EncodeToString(key)
 		name := "sccache-" + pool
 		documents[overlay+"/"+name+".secret.sops.yaml"] = secret(name, namespace, map[string]string{"AWS_ACCESS_KEY_ID": access, "AWS_SECRET_ACCESS_KEY": secretKey}, nil)
 		resources = append(resources, name+".secret.sops.yaml")
-		provisioner[pool+"_id"] = access
-		provisioner[pool+"_secret"] = secretKey
+		variable := cacheCredentialPrefix(options.Project) + strings.ToUpper(pool) + "_"
+		storeCredentials[variable+"ACCESS_KEY_ID"] = access
+		storeCredentials[variable+"SECRET_ACCESS_KEY"] = secretKey
 	}
-	documents[keys] = secret("build-cache-"+options.Project, "build-cache", provisioner, map[string]string{"infra.fredrir.com/build-cache-project": options.Project})
+	documents[keys] = secret(cacheCredentialSecret(options.Project), "object-store", storeCredentials, nil)
 	files := map[string][]byte{}
 	for path, document := range documents {
 		plaintext, err := yaml.Marshal(document)
@@ -280,9 +280,20 @@ func OnboardRust(ctx context.Context, provider RustProvider, options RustOptions
 	if err != nil {
 		return err
 	}
-	for path, entry := range map[string]string{runnersPath + "/kustomization.yaml": options.Project, cachePath + "/kustomization.yaml": options.Project + ".secret.sops.yaml"} {
+	for path, entry := range map[string]string{runnersPath + "/kustomization.yaml": options.Project, storePath + "/kustomization.yaml": "ci/" + options.Project + ".secret.sops.yaml"} {
 		files[path], err = AppendResource(originals[path], entry)
 		if err != nil {
+			return err
+		}
+	}
+	for path, edit := range map[string]func([]byte) ([]byte, error){
+		storePath + "/" + cacheCell + ".yaml": func(data []byte) ([]byte, error) {
+			return AppendCellCredentials(data, cacheCredentialSecret(options.Project))
+		},
+		storePath + "/" + cacheCell + "-identities.json": func(data []byte) ([]byte, error) { return AppendCacheIdentities(data, options.Project) },
+		storePath + "/buckets.yaml":                      func(data []byte) ([]byte, error) { return AppendCacheBuckets(data, options.Project) },
+	} {
+		if files[path], err = edit(originals[path]); err != nil {
 			return err
 		}
 	}

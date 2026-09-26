@@ -20,7 +20,7 @@ import (
 )
 
 func CacheClient() (objectstore.Client, error) {
-	client := objectstore.Client{Endpoint: os.Getenv("SCCACHE_ENDPOINT"), Region: environmentDefault("SCCACHE_REGION", "garage"), AccessKey: os.Getenv("AWS_ACCESS_KEY_ID"), SecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY")}
+	client := objectstore.Client{Endpoint: os.Getenv("SCCACHE_ENDPOINT"), Region: os.Getenv("SCCACHE_REGION"), AccessKey: os.Getenv("AWS_ACCESS_KEY_ID"), SecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY")}
 	if authority := os.Getenv("OBJECT_STORE_CA_FILE"); authority != "" {
 		trusted, err := objectstore.TrustingHTTP(authority, "")
 		if err != nil {
@@ -40,7 +40,7 @@ func RustCache(ctx context.Context, runner Runner, temporary, action string) err
 		return err
 	}
 	bucket := os.Getenv("SCCACHE_BUCKET")
-	if client.Endpoint == "" || bucket == "" || client.AccessKey == "" || client.SecretKey == "" {
+	if client.Endpoint == "" || client.Region == "" || bucket == "" || client.AccessKey == "" || client.SecretKey == "" {
 		_, err := fmt.Fprintln(runner.Stdout, "Build output cache is not configured")
 		return err
 	}

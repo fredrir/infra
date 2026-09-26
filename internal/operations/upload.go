@@ -54,9 +54,9 @@ func UploadMacOSSDK(ctx context.Context, o SDKUploadOptions) (err error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, o.Timeout)
 	defer cancel()
-	secret := filepath.Join(o.Root, "platform/components/build-cache/provisioner.secret.sops.yaml")
+	secret := filepath.Join(o.Root, "platform/components/object-store/hel1-identities.secret.sops.yaml")
 	credentials := map[string]string{}
-	for _, field := range []string{"id", "secret"} {
+	for _, field := range []string{"TOOLCHAINS_UPLOAD_ACCESS_KEY_ID", "TOOLCHAINS_UPLOAD_SECRET_ACCESS_KEY"} {
 		r, e := o.Run(ctx, process.Options{Name: "sops", Args: []string{"decrypt", "--extract", `["stringData"]["` + field + `"]`, secret}, Timeout: 30 * time.Second})
 		if e != nil {
 			return fmt.Errorf("decrypt toolchain credentials: %w", e)
@@ -72,7 +72,7 @@ func UploadMacOSSDK(ctx context.Context, o SDKUploadOptions) (err error) {
 	out := &forwardOutput{ready: ready}
 	done := make(chan error, 1)
 	go func() {
-		_, e := o.Run(forwardCtx, process.Options{Name: "kubectl", Args: []string{"--namespace", "build-cache", "port-forward", "--address", "127.0.0.1", "service/garage", ":3900"}, Stdout: out})
+		_, e := o.Run(forwardCtx, process.Options{Name: "kubectl", Args: []string{"--namespace", "object-store", "port-forward", "--address", "127.0.0.1", "service/seaweedfs-hel1", ":8333"}, Stdout: out})
 		done <- e
 	}()
 	defer func() { stop(); <-done }()
@@ -83,13 +83,19 @@ func UploadMacOSSDK(ctx context.Context, o SDKUploadOptions) (err error) {
 	case address = <-ready:
 	case e = <-done:
 		done <- e
-		return errors.New("Garage port-forward exited before readiness")
+		return errors.New("object store port-forward exited before readiness")
 	case <-timer.C:
-		return errors.New("Garage port-forward readiness timeout")
+		return errors.New("object store port-forward readiness timeout")
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	client := objectstore.Client{Endpoint: "http://" + address, Region: "garage", AccessKey: credentials["id"], SecretKey: credentials["secret"], HTTP: o.HTTP}
+	trusted := o.HTTP
+	if trusted == nil {
+		if trusted, e = objectstore.TrustingHTTP(filepath.Join(o.Root, "platform/components/object-store/pki/ca.crt"), "seaweedfs-hel1.object-store.svc"); e != nil {
+			return e
+		}
+	}
+	client := objectstore.Client{Endpoint: "https://" + address, Region: "hel1", AccessKey: credentials["TOOLCHAINS_UPLOAD_ACCESS_KEY_ID"], SecretKey: credentials["TOOLCHAINS_UPLOAD_SECRET_ACCESS_KEY"], HTTP: trusted}
 	return client.Upload(ctx, "toolchains", filepath.Base(o.Archive), archive)
 }
 
@@ -117,10 +123,10 @@ func (f *forwardOutput) Write(p []byte) (int, error) {
 			return 0, e
 		}
 		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "Forwarding from ") || !strings.HasSuffix(line, " -> 3900") {
+		if !strings.HasPrefix(line, "Forwarding from ") || !strings.HasSuffix(line, " -> 8333") {
 			continue
 		}
-		address := strings.TrimSuffix(strings.TrimPrefix(line, "Forwarding from "), " -> 3900")
+		address := strings.TrimSuffix(strings.TrimPrefix(line, "Forwarding from "), " -> 8333")
 		host, port, e := net.SplitHostPort(address)
 		if e != nil || host != "127.0.0.1" {
 			return 0, errors.New("port-forward must bind loopback")

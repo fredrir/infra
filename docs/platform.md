@@ -54,7 +54,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Traces                 | Alloy → Tempo; 7 days, bounded ingestion and sensitive attribute removal                                                                                                                                                                                                          |
 | Cluster DNS            | NodeLocal DNSCache on every node; answers on `10.43.0.10` and `169.254.20.10`; cluster zones → CoreDNS over TCP, other names → node resolvers; host firewall admits pod DNS on `cni0`; project pods use `ndots:2` |
 | Nix cache              | Attic scaled to zero; retained PVC, signing identity and hourly backups                                                                                                                                                                                                           |
-| Build cache            | Garage S3 on `fredrir-09`; `ci-<project>-main` 20 GiB (sccache, `target/` archive, retained legacy build layers), `ci-<project>-release` 10 GiB, 14-day expiry; `toolchains` 5 GiB; provisioner fails at 90% of a quota, `BuildCacheProvisionerFailing` after 1 h without success |
+| Build cache            | Object store `seaweedfs-hel1`: `ci-<project>-main` 20 GiB (sccache, `target/` archive), `ci-<project>-release` 10 GiB, 14-day expiry; `toolchains` 5 GiB; read-only, read-write and release credentials per project; legacy BuildKit layers in Garage on `fredrir-09` |
 | Object store           | SeaweedFS cell `seaweedfs-hel1` (`fredrir-04`); S3 over TLS only; [operation](runbook.md#object-store) |
 | Independent monitoring | Gatus on `fredrir-06`; 12 endpoint checks, five authenticated backup heartbeats and one verification heartbeat; cluster alert when unreachable                                                                                                                                    |
 | Email                  | `alerts@fredrir.com`; [credentials and operation](mail-alerts.md)                                                                                                                                                                                                                 |
@@ -70,7 +70,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | CI capacity           | Check, deploy and Rust ARC pools retain slot limits; hosted Dagger jobs do not consume cluster slots; [execution boundaries](development.md#execution-boundaries)                                                                                                                              |
 | JavaScript actions | Node 24 LTS; pinned native Node 24 actions; explicit workflow runtime selection |
 | Runner permissions    | Cluster ARC pools have no host sockets, host paths or Kubernetes API token; Dagger runs on isolated hosted machines or qualified dedicated VMs                                                                                                                                                 |
-| Build egress          | Hosted build network; cluster Rust pools retain DNS, HTTPS and Garage TCP 3900; legacy CI namespaces and credentials retained for rollback                                                                                                                                                     |
+| Build egress          | Hosted build network; cluster Rust pools retain DNS, HTTPS and object store TCP 8333; legacy CI namespaces and credentials retained for rollback                                                                                                                                                     |
 | Repository checks     | [`check.yml`](../.github/workflows/check.yml): verified release reuse with hosted Bazel fallback, native Go tests, generated BUILD drift checks, changed infrastructure validation, and a real SSH hop for reconciler host access                                                                                                                                    |
 | Job timeout           | 45 minutes; callers with long native test suites pass `timeout-minutes`                                                                                                                                                                                                                        |
 | Runner scratch        | Retained cluster pools enforce scratch storage limits; dedicated VM cache collection and resource ceilings are declared in the build-engine role                                                                                                                                               |
@@ -131,7 +131,7 @@ infra onboard-rust fredrir/example \
 | Generated                                   | Destination                                     |
 | ------------------------------------------- | ----------------------------------------------- |
 | `platform/components/runners/example/`      | Written in place; three pools and cache secrets |
-| `platform/components/build-cache/projects/` | Written in place; provisioner keys              |
+| `platform/components/object-store/`         | Written in place; cache credentials, identities and buckets |
 | `.github/rust-projects.yaml`                | Written in place                                |
 | `project/.github/`                          | Project repository callers and auto-tag policy  |
 | `packages/.github/chainguard/`              | `fredrir/packages`                              |
@@ -172,7 +172,7 @@ infra onboard fredrir/example \
 | Application credentials               | Add encrypted `project-registry` and `project-runtime` Secrets                             |
 | Activation                            | Review generated YAML, resource limits and secrets, then raise workload replicas from zero |
 
-Container onboarding uses the qualified VM when enabled and hosted Dagger jobs otherwise; Rust onboarding provisions its scoped Garage cache credentials.
+Container onboarding uses the qualified VM when enabled and hosted Dagger jobs otherwise; Rust onboarding generates its scoped object store cache credentials, identities and buckets.
 
 | `infra` setting  | Value                                                                                   |
 | ---------------- | --------------------------------------------------------------------------------------- |

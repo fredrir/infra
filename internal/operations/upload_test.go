@@ -22,14 +22,14 @@ func TestSDKUploadSignsRequestAndStopsForwarder(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusForbidden} {
 		t.Run(fmt.Sprint(status), func(t *testing.T) {
 			var received atomic.Bool
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				received.Store(true)
 				body, err := io.ReadAll(r.Body)
 				if err != nil || string(body) != "archive content" || r.Method != "PUT" || r.URL.Path != "/toolchains/MacOSX15.4.sdk.tar.zst" {
 					t.Errorf("request %s %s %q: %v", r.Method, r.URL.Path, body, err)
 				}
 				auth := r.Header.Get("Authorization")
-				if !strings.Contains(auth, "Credential=access-id/") || !strings.Contains(auth, "/garage/s3/aws4_request") || strings.Contains(auth, "private-secret") {
+				if !strings.Contains(auth, "Credential=access-id/") || !strings.Contains(auth, "/hel1/s3/aws4_request") || strings.Contains(auth, "private-secret") {
 					t.Errorf("invalid authorization: %s", auth)
 				}
 				w.WriteHeader(status)
@@ -46,7 +46,7 @@ func TestSDKUploadSignsRequestAndStopsForwarder(t *testing.T) {
 					t.Error("secret leaked to arguments")
 				}
 				if p.Name == "sops" {
-					if strings.Contains(p.Args[2], `["id"]`) {
+					if strings.Contains(p.Args[2], `["TOOLCHAINS_UPLOAD_ACCESS_KEY_ID"]`) {
 						return process.Result{Stdout: []byte("access-id\n")}, nil
 					}
 					return process.Result{Stdout: []byte("private-secret\n")}, nil
@@ -57,7 +57,10 @@ func TestSDKUploadSignsRequestAndStopsForwarder(t *testing.T) {
 				if !strings.Contains(strings.Join(p.Args, " "), "--address 127.0.0.1") {
 					t.Error("forwarder not loopback")
 				}
-				_, err := fmt.Fprintf(p.Stdout, "Forwarding from %s -> 3900\n", strings.TrimPrefix(server.URL, "http://"))
+				if !strings.Contains(strings.Join(p.Args, " "), "service/seaweedfs-hel1 :8333") {
+					t.Errorf("forwarder targets %v", p.Args)
+				}
+				_, err := fmt.Fprintf(p.Stdout, "Forwarding from %s -> 8333\n", strings.TrimPrefix(server.URL, "https://"))
 				if err != nil {
 					return process.Result{}, err
 				}
@@ -65,7 +68,7 @@ func TestSDKUploadSignsRequestAndStopsForwarder(t *testing.T) {
 				stopped.Store(true)
 				return process.Result{}, ctx.Err()
 			}
-			err := UploadMacOSSDK(context.Background(), SDKUploadOptions{Root: root, Archive: archive, Run: run, Timeout: time.Minute})
+			err := UploadMacOSSDK(context.Background(), SDKUploadOptions{Root: root, Archive: archive, Run: run, HTTP: server.Client(), Timeout: time.Minute})
 			if (err == nil) != (status == 200) {
 				t.Fatalf("status=%d err=%v", status, err)
 			}
@@ -82,7 +85,7 @@ func TestSDKUploadSignsRequestAndStopsForwarder(t *testing.T) {
 func TestForwardReadinessHandlesFragmentedOutput(t *testing.T) {
 	ready := make(chan string, 1)
 	out := &forwardOutput{ready: ready}
-	for _, text := range []string{"initial message\nFor", "warding from 127.0.0.1:", "49152 -> 3900\n"} {
+	for _, text := range []string{"initial message\nFor", "warding from 127.0.0.1:", "49152 -> 8333\n"} {
 		if _, err := out.Write([]byte(text)); err != nil {
 			t.Fatal(err)
 		}
@@ -95,8 +98,8 @@ func TestForwardReadinessHandlesFragmentedOutput(t *testing.T) {
 	default:
 		t.Fatal("missing readiness")
 	}
-	for _, address := range []string{"0.0.0.0:3900", "127.0.0.1:0", "127.0.0.1:65536"} {
-		if _, err := out.Write([]byte("Forwarding from " + address + " -> 3900\n")); err == nil {
+	for _, address := range []string{"0.0.0.0:8333", "127.0.0.1:0", "127.0.0.1:65536"} {
+		if _, err := out.Write([]byte("Forwarding from " + address + " -> 8333\n")); err == nil {
 			t.Fatal("accepted", address)
 		}
 	}

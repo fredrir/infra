@@ -37,7 +37,8 @@ func TestRustCacheRestoresFreshCheckoutAndBoundsWrites(t *testing.T) {
 	}
 	t.Setenv("PATH", binaries+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("SCCACHE_BUCKET", "ci-example-main")
-	t.Setenv("AWS_ACCESS_KEY_ID", "GK"+strings.Repeat("a", 24))
+	t.Setenv("AWS_ACCESS_KEY_ID", strings.Repeat("A", 20))
+	t.Setenv("SCCACHE_REGION", "hel1")
 	secret := strings.Repeat("b", 64)
 	t.Setenv("AWS_SECRET_ACCESS_KEY", secret)
 	t.Setenv("SCCACHE_S3_RW_MODE", "READ_WRITE")

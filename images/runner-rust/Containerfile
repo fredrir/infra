@@ -75,7 +75,6 @@ COPY --chmod=755 images/runner-rust/sccache /usr/local/bin/sccache
 ENV HOME=/home/runner
 ENV CARGO_INCREMENTAL=0
 ENV CARGO_TERM_COLOR=always
-ENV SCCACHE_REGION=garage
 ENV SCCACHE_IGNORE_SERVER_IO_ERROR=1
 ENV SCCACHE_IDLE_TIMEOUT=0
 ENV OBJECT_STORE_CA_FILE=/usr/local/share/object-store/ca.crt

@@ -124,7 +124,15 @@ func TestInvalidOnboardingIsRejectedBeforeNetworkOrWrites(t *testing.T) {
 func rustFixture(t *testing.T) (RustOptions, map[string][]byte) {
 	t.Helper()
 	root := t.TempDir()
-	files := map[string][]byte{registryPath: []byte("projects: []\n"), runnersPath + "/kustomization.yaml": []byte("apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources: []\n"), cachePath + "/kustomization.yaml": []byte("apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources: []\n"), "platform/existing.secret.sops.yaml": []byte("sops:\n  age:\n    - recipient: age1example\n")}
+	files := map[string][]byte{
+		registryPath:                         []byte("projects: []\n"),
+		runnersPath + "/kustomization.yaml":  []byte("apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources: []\n"),
+		storePath + "/kustomization.yaml":    []byte("apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources: []\n"),
+		storePath + "/hel1.yaml":             []byte("apiVersion: v1\nkind: Service\nmetadata:\n  name: seaweedfs-hel1\n---\napiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: seaweedfs-hel1\nspec:\n  template:\n    spec:\n      containers:\n        - name: server\n          envFrom:\n            - secretRef:\n                name: seaweedfs-hel1-identities\n        - name: admin\n"),
+		storePath + "/hel1-identities.json":  []byte("{\"identities\": []}\n"),
+		storePath + "/buckets.yaml":          []byte("cells:\n  - name: hel1\n    endpoint: https://seaweedfs-hel1.object-store.svc.cluster.local:8333\n    buckets: []\n"),
+		"platform/existing.secret.sops.yaml": []byte("sops:\n  age:\n    - recipient: age1example\n"),
+	}
 	for name, data := range files {
 		path := filepath.Join(root, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -145,13 +153,13 @@ func TestRustOnboardingSeparatesPoolCredentialsAndRegistersResources(t *testing.
 	if len(provider.encryptions) != 5 {
 		t.Fatalf("encrypted documents: %d", len(provider.encryptions))
 	}
-	var provisioner map[string]any
+	var store map[string]any
 	pools := map[string]map[string]any{}
 	for _, document := range provider.encryptions {
 		name := nested(document, "metadata", "name").(string)
 		data := document["stringData"].(map[string]any)
-		if name == "build-cache-example" {
-			provisioner = data
+		if name == "seaweedfs-hel1-ci-example" && nested(document, "metadata", "namespace") == "object-store" {
+			store = data
 		} else if strings.HasPrefix(name, "sccache-") {
 			pools[strings.TrimPrefix(name, "sccache-")] = data
 			if nested(document, "metadata", "namespace") != "ci-example" {
@@ -164,13 +172,43 @@ func TestRustOnboardingSeparatesPoolCredentialsAndRegistersResources(t *testing.
 		data := pools[pool]
 		id := data["AWS_ACCESS_KEY_ID"].(string)
 		key := data["AWS_SECRET_ACCESS_KEY"].(string)
-		if !regexp.MustCompile(`^GK[0-9a-f]{24}$`).MatchString(id) || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(key) || ids[id] {
+		if !regexp.MustCompile(`^[0-9A-F]{20}$`).MatchString(id) || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(key) || ids[id] {
 			t.Fatal("invalid or shared cache identity")
 		}
 		ids[id] = true
-		if provisioner[pool+"_id"] != id || provisioner[pool+"_secret"] != key {
-			t.Fatal("provisioner and runner credentials differ")
+		variable := "CI_EXAMPLE_" + strings.ToUpper(pool) + "_"
+		if store[variable+"ACCESS_KEY_ID"] != id || store[variable+"SECRET_ACCESS_KEY"] != key {
+			t.Fatal("object store and runner credentials differ")
 		}
+	}
+	if len(store) != 6 {
+		t.Fatalf("object store credentials: %d", len(store))
+	}
+	identities, err := os.ReadFile(filepath.Join(options.Root, storePath, "hel1-identities.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"name": "ci-example-ro"`, `"Write:ci-example-main/*"`, `"Write:ci-example-release/*"`, `"Read:toolchains"`, `"${CI_EXAMPLE_RW_SECRET_ACCESS_KEY}"`} {
+		if !strings.Contains(string(identities), want) {
+			t.Fatalf("identities lack %s:\n%s", want, identities)
+		}
+	}
+	for _, bucketWide := range []string{`"Write:ci-example-main"`, `"Write:ci-example-release"`, `"Write:toolchains`} {
+		if strings.Contains(string(identities), bucketWide) {
+			t.Fatalf("onboarding grants %s", bucketWide)
+		}
+	}
+	buckets, err := os.ReadFile(filepath.Join(options.Root, storePath, "buckets.yaml"))
+	if err != nil || !strings.Contains(string(buckets), "name: ci-example-main\n        quotaGiB: 20\n        expireDays: 14") || !strings.Contains(string(buckets), "name: ci-example-release") {
+		t.Fatalf("buckets not declared: %s %v", buckets, err)
+	}
+	cell, err := os.ReadFile(filepath.Join(options.Root, storePath, "hel1.yaml"))
+	if err != nil || !strings.Contains(string(cell), "- secretRef:\n                name: seaweedfs-hel1-ci-example\n        - name: admin") {
+		t.Fatalf("cell does not load the credentials: %s %v", cell, err)
+	}
+	kustomization := readDocument(t, filepath.Join(options.Root, storePath, "kustomization.yaml"))
+	if !reflect.DeepEqual(kustomization["resources"], []any{"ci/example.secret.sops.yaml"}) {
+		t.Fatal("credential secret not registered")
 	}
 	overlay := readDocument(t, filepath.Join(options.Root, runnersPath, "example/kustomization.yaml"))
 	if overlay["namespace"] != "ci-example" || !reflect.DeepEqual(overlay["components"], []any{"../rust"}) {
@@ -197,7 +235,7 @@ func TestEncryptionFailureLeavesRepositoryAndOutputUntouched(t *testing.T) {
 			t.Fatalf("input mutated: %s", name)
 		}
 	}
-	for _, path := range []string{options.Output, filepath.Join(options.Root, runnersPath, "example"), filepath.Join(options.Root, cachePath, "example.secret.sops.yaml")} {
+	for _, path := range []string{options.Output, filepath.Join(options.Root, runnersPath, "example"), filepath.Join(options.Root, storePath, "ci/example.secret.sops.yaml")} {
 		if _, err := os.Lstat(path); !os.IsNotExist(err) {
 			t.Fatalf("partial output exists: %s", path)
 		}

@@ -100,7 +100,9 @@ spec:
                 name: sccache-ro
                 key: AWS_SECRET_ACCESS_KEY
           - name: SCCACHE_ENDPOINT
-            value: http://garage.build-cache.svc.cluster.local:3900
+            value: https://seaweedfs-hel1.object-store.svc.cluster.local:8333
+          - name: SCCACHE_REGION
+            value: hel1
           - name: RUSTC_WRAPPER
             value: sccache
           - name: CARGO_BUILD_JOBS

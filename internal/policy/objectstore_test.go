@@ -349,11 +349,32 @@ func TestObjectStoreIdentitiesHoldExactlyTheirRoleActions(t *testing.T) {
 		}
 	}
 	reference := regexp.MustCompile(`^\$\{([A-Z0-9_]+)\}$`)
+	resources := renderedTree(t, objectStore, objectStore)
+	secrets := map[string]object{}
+	for _, resource := range resources {
+		if resource["kind"] == "Secret" {
+			secrets[at(resource, "metadata", "name").(string)] = resource["stringData"].(object)
+		}
+	}
 	for cell := range objectStoreCells {
-		secret := load(t, objectStore+"/"+cell+"-identities.secret.sops.yaml")
 		declared := map[string]bool{}
-		for key := range secret["stringData"].(object) {
-			declared[key] = false
+		for _, resource := range resources {
+			if resource["kind"] != "StatefulSet" || at(resource, "metadata", "name") != "seaweedfs-"+cell {
+				continue
+			}
+			for _, source := range at(resource, "spec", "template", "spec", "containers", 0, "envFrom").([]any) {
+				reference, _ := source.(object)["secretRef"].(object)
+				name, ok := reference["name"].(string)
+				if !ok {
+					continue
+				}
+				if secrets[name] == nil {
+					t.Errorf("%s loads missing secret %s", cell, name)
+				}
+				for key := range secrets[name] {
+					declared[key] = false
+				}
+			}
 		}
 		var config struct {
 			Identities []struct {

@@ -7,6 +7,7 @@ resources:
 - hel1.yaml
 - hel1.secret.sops.yaml
 - hel1-identities.secret.sops.yaml
+- ci/nsql.secret.sops.yaml
 - provisioner.yaml
 - network.yaml
 - monitoring.yaml

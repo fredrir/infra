@@ -111,7 +111,7 @@ Enrollment requires the verified binary on the SSH target before creating a key;
 | Compiled binary | Executable for one revision/platform       | Trusted artifact identity; no compiler on consumers              |
 | Bazel           | Content-addressed action outputs           | Separate writable trusted builds from read-only untrusted builds |
 | Dagger          | Container execution and filesystem results | Dedicated engine per trust boundary                              |
-| Garage          | Rust compiler/target cache and SDK objects | Existing project and release scoped credentials                  |
+| Object store    | Rust compiler/target cache and SDK objects | Read-only, read-write and release credentials per project        |
 
 ```sh
 infra pipeline affected --base "$BASE_REVISION"

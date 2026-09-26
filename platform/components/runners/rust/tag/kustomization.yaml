@@ -47,6 +47,11 @@ patches:
       path: /spec/values/template/spec/containers/0/env/2
     - op: test
       path: /spec/values/template/spec/containers/0/env/2/name
+      value: SCCACHE_REGION
+    - op: remove
+      path: /spec/values/template/spec/containers/0/env/2
+    - op: test
+      path: /spec/values/template/spec/containers/0/env/2/name
       value: RUSTC_WRAPPER
     - op: remove
       path: /spec/values/template/spec/containers/0/env/2
