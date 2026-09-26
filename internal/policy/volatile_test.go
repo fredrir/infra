@@ -47,9 +47,10 @@ func declaresVolatileToleration(value any) bool {
 	return false
 }
 
-func TestOnlyNodeMetricsAndUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
+func TestOnlyNodeAgentsAndUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
 	root := repoRoot(t)
 	allowed := []string{
+		"platform/components/dns/node-local-dns.yaml",
 		"platform/components/observability/monitoring.yaml",
 		"platform/components/runners/infra/check-values.yaml",
 		"platform/components/runners/rust/volatile/kustomization.yaml",

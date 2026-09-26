@@ -191,13 +191,18 @@ func TestNodeLocalDNSCacheMetricsReachPrometheus(t *testing.T) {
 
 	var monitor struct {
 		Spec struct {
+			SampleLimit       int `yaml:"sampleLimit"`
 			NamespaceSelector struct {
 				MatchNames []string `yaml:"matchNames"`
 			} `yaml:"namespaceSelector"`
 			Selector struct {
 				MatchLabels map[string]string `yaml:"matchLabels"`
 			}
-			PodMetricsEndpoints []struct{ Port string } `yaml:"podMetricsEndpoints"`
+			PodMetricsEndpoints []struct {
+				Port            string
+				HonorLabels     *bool `yaml:"honorLabels"`
+				HonorTimestamps *bool `yaml:"honorTimestamps"`
+			} `yaml:"podMetricsEndpoints"`
 		}
 	}
 	found := false
@@ -211,6 +216,9 @@ func TestNodeLocalDNSCacheMetricsReachPrometheus(t *testing.T) {
 	})
 	if !found || !slices.Equal(monitor.Spec.NamespaceSelector.MatchNames, []string{cache.Cache.Metadata.Namespace}) || len(monitor.Spec.PodMetricsEndpoints) != 1 || monitor.Spec.PodMetricsEndpoints[0].Port != "metrics" {
 		t.Fatalf("PodMonitor %+v does not scrape the cache metrics port", monitor.Spec)
+	}
+	if endpoint := monitor.Spec.PodMetricsEndpoints[0]; endpoint.HonorLabels == nil || *endpoint.HonorLabels || endpoint.HonorTimestamps == nil || *endpoint.HonorTimestamps || monitor.Spec.SampleLimit == 0 {
+		t.Error("volatile workers serve their own cache metrics, so the scrape must bound samples and ignore target labels and timestamps")
 	}
 	for key, value := range monitor.Spec.Selector.MatchLabels {
 		if cache.Cache.Spec.Template.Metadata.Labels[key] != value {
@@ -252,7 +260,7 @@ func TestNodeLocalDNSCacheMetricsReachPrometheus(t *testing.T) {
 			}
 			if matched, err := tailnetPortMatches(ports, 10250); err != nil {
 				t.Fatal(err)
-			} else if matched && host != "tag:platform-volatile" {
+			} else if matched {
 				kubeletTargets[host] = true
 			}
 		}
@@ -269,24 +277,42 @@ func TestNodeLocalDNSCacheMetricsReachPrometheus(t *testing.T) {
 	}
 }
 
-func TestNodeLocalDNSCacheRunsOnControlPlanesButNotVolatileWorkers(t *testing.T) {
+func TestNodeLocalDNSCacheToleratesEveryDeclaredNodeTaint(t *testing.T) {
+	repository := root(t)
 	cache := loadNodeLocalDNS(t)
-	config := string(read(t, filepath.Join(root(t), "ansible/roles/k3s/templates/config.yaml.j2")))
-	match := regexp.MustCompile(`(?m)^node-taint: \["([^=]+)=[^:]*:NoSchedule"\]`).FindStringSubmatch(config)
+	config := string(read(t, filepath.Join(repository, "ansible/roles/k3s/templates/config.yaml.j2")))
+	match := regexp.MustCompile(`(?m)^node-taint: \["([^"]+)"\]`).FindStringSubmatch(config)
 	if match == nil {
 		t.Fatal("control-plane taint not found in the k3s configuration")
 	}
-	tolerated := false
-	for _, toleration := range cache.Cache.Spec.Template.Spec.Tolerations {
-		switch {
-		case toleration.Key == match[1] && toleration.Operator == "Exists" && toleration.Effect == "NoSchedule":
-			tolerated = true
-		case toleration.Key == "" || strings.HasPrefix(toleration.Key, "node-restriction.kubernetes.io/"):
-			t.Errorf("cache tolerates %q, which admits it onto volatile workers", toleration.Key)
+	taints := []string{match[1]}
+	var inventory struct {
+		All map[string]any `yaml:"all"`
+	}
+	if err := yaml.Unmarshal(read(t, filepath.Join(repository, "ansible/inventory/production.yml")), &inventory); err != nil {
+		t.Fatal(err)
+	}
+	hosts := map[string]map[string]any{}
+	inventoryHosts(inventory.All, hosts)
+	for _, variables := range hosts {
+		declared, _ := variables["k3s_node_taints"].([]any)
+		for _, taint := range declared {
+			taints = append(taints, fmt.Sprint(taint))
 		}
 	}
-	if !tolerated {
-		t.Errorf("cache does not tolerate %s, so control-plane pods keep the cross-node DNS hop", match[1])
+	for _, taint := range taints {
+		key, rest, _ := strings.Cut(taint, "=")
+		value, effect, _ := strings.Cut(rest, ":")
+		if !slices.ContainsFunc(cache.Cache.Spec.Template.Spec.Tolerations, func(toleration struct{ Key, Operator, Value, Effect string }) bool {
+			return toleration.Key == key && toleration.Effect == effect && (toleration.Operator == "Exists" || (toleration.Operator == "Equal" && toleration.Value == value))
+		}) {
+			t.Errorf("cache does not tolerate %s, so pods on those nodes keep the cross-node DNS hop", taint)
+		}
+	}
+	for _, toleration := range cache.Cache.Spec.Template.Spec.Tolerations {
+		if toleration.Key == "" {
+			t.Error("cache tolerates every taint")
+		}
 	}
 }
 

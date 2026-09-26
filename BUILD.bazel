@@ -63,6 +63,7 @@ filegroup(
 filegroup(
     name = "node_local_dns_data",
     srcs = [
+        "ansible/inventory/production.yml",
         "ansible/roles/k3s/templates/config.yaml.j2",
         "renovate.json",
         "//platform:versions.yaml",

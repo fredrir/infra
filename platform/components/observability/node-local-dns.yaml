@@ -7,7 +7,10 @@ metadata:
     release: monitoring
 spec:
   jobLabel: k8s-app
-  sampleLimit: 5000
+  sampleLimit: 3000
+  labelLimit: 40
+  labelNameLengthLimit: 63
+  labelValueLengthLimit: 1024
   namespaceSelector:
     matchNames:
     - kube-system
@@ -16,6 +19,8 @@ spec:
       k8s-app: node-local-dns
   podMetricsEndpoints:
   - port: metrics
+    honorLabels: false
+    honorTimestamps: false
     relabelings:
     - sourceLabels:
       - __meta_kubernetes_pod_node_name
@@ -31,7 +36,9 @@ spec:
   - name: node-local-dns
     rules:
     - alert: NodeLocalDNSMetricsMissing
-      expr: up{job="node-local-dns"} == 0 or absent(up{job="node-local-dns"})
+      expr: |
+        (up{job="node-local-dns"} == 0 unless on(node) kube_node_status_condition{condition="Ready",status="true"} == 0)
+        or absent(up{job="node-local-dns"})
       for: 10m
       labels:
         severity: warning

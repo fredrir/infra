@@ -88,7 +88,7 @@
       "dst": [
         "tag:platform-control:9100,9253,10250",
         "tag:platform-worker:9100,9253,10250",
-        "tag:platform-volatile:9100,10250",
+        "tag:platform-volatile:9100,9253,10250",
         "platform-control-05:9100,9253,10250",
         "platform-control-07:9100,9253,10250",
         "platform-control-08:9100,9253,10250"
@@ -311,6 +311,7 @@
         "tag:platform-worker:9253",
         "tag:platform-volatile:9100",
         "tag:platform-volatile:10250",
+        "tag:platform-volatile:9253",
         "platform-control-05:9100",
         "platform-control-05:10250",
         "platform-control-05:9253",
@@ -331,7 +332,6 @@
         "tag:platform-worker:2380",
         "tag:platform-worker:8472",
         "tag:platform-volatile:22",
-        "tag:platform-volatile:9253",
         "tag:platform-volatile:2379",
         "tag:platform-volatile:6443",
         "tag:platform-volatile:8472",
@@ -387,6 +387,7 @@
         "tag:platform-worker:9253",
         "tag:platform-volatile:9100",
         "tag:platform-volatile:10250",
+        "tag:platform-volatile:9253",
         "platform-control-05:9100",
         "platform-control-05:10250",
         "platform-control-05:9253",
@@ -407,7 +408,6 @@
         "tag:platform-worker:2380",
         "tag:platform-worker:8472",
         "tag:platform-volatile:22",
-        "tag:platform-volatile:9253",
         "tag:platform-volatile:2379",
         "tag:platform-volatile:6443",
         "tag:platform-volatile:8472",
@@ -558,7 +558,8 @@
         "platform-control-08:9253",
         "tag:platform-volatile:22",
         "tag:platform-volatile:9100",
-        "tag:platform-volatile:10250"
+        "tag:platform-volatile:10250",
+        "tag:platform-volatile:9253"
       ]
     },
     {
@@ -615,7 +616,8 @@
         "platform-control-08:9253",
         "tag:platform-volatile:22",
         "tag:platform-volatile:9100",
-        "tag:platform-volatile:10250"
+        "tag:platform-volatile:10250",
+        "tag:platform-volatile:9253"
       ]
     },
     {
