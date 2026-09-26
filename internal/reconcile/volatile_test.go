@@ -116,9 +116,16 @@ func TestVolatileHostsConvergeInTheirOwnLinearInvocation(t *testing.T) {
 			visit(file, play)
 		}
 	}
+	playbooks, err := filepath.Glob(filepath.Join(root, "*.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	walked := 0
-	for _, playbook := range []string{"reconcile.yml", "external.yml", "verify.yml", "build-runners.yml", "verify-runners.yml"} {
-		walk(playbook, func(file string, play ansiblePlay) {
+	for _, playbook := range playbooks {
+		if filepath.Base(playbook) == volatilePlaybook {
+			continue
+		}
+		walk(filepath.Base(playbook), func(file string, play ansiblePlay) {
 			walked++
 			if file == volatilePlaybook || slices.ContainsFunc(fleet.resolve(play.Hosts), func(host string) bool { return slices.Contains(volatile, host) }) {
 				t.Errorf("%s: fleet play %q reaches volatile hosts", file, play.Name)
