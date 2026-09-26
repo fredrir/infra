@@ -272,12 +272,17 @@
       + ((k3s_volatile_nodes.stdout | from_json)['items']
       | selectattr('metadata.labels', 'defined') | selectattr('metadata.labels', 'search', 'node-restriction.kubernetes.io/volatile')
       | map(attribute='metadata.name') | list) }}
+    k3s_enrolled_volatile_hosts: "{{ groups.get('volatile', []) | map('extract', hostvars, 'tailscale_ip') | select | list }}"
   ansible.builtin.assert:
-    that: k3s_volatile_node_names | length == 0 or not (k3s_flannel_state.changed or k3s_flannel_state.stdout == '')
+    that: >-
+      not (k3s_flannel_state.changed or k3s_flannel_state.stdout == '')
+      or (k3s_volatile_node_names | length == 0
+      and (k3s_enrolled_volatile_hosts | length == 0 or volatile_api_cut_off | default(false) | bool))
     fail_msg: >-
       A volatile worker is enrolled and this run would clear or first-set {{ inventory_hostname }}'s flannel backend,
       reopening the write-once race; cut every volatile worker off the API first (remove tag:platform-volatile's 6443
-      grant or deauthorize its tailnet node, stop its agent, then delete its Node object) — see docs/runbook.md.
+      grant or deauthorize its tailnet node, stop its agent, then delete its Node object), then rerun with
+      -e volatile_api_cut_off=true — see docs/runbook.md.
   when: k3s_volatile_nodes is not skipped
 
 - name: Release the previous flannel backend through the administrator API

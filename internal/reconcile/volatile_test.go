@@ -158,7 +158,13 @@ func TestVolatileHostsConvergeInTheirOwnLinearInvocation(t *testing.T) {
 func TestFleetTemplatesNeverReadVolatileHosts(t *testing.T) {
 	root := filepath.Join("..", "..", "ansible")
 	fleet := loadInventory(t, root)
-	reference := regexp.MustCompile(`(inventory_hostname\s+(?:not\s+)?in\s+)?groups(?:\[['"]([A-Za-z0-9_]+)['"]\]|\.get\(['"]([A-Za-z0-9_]+)['"])`)
+	reference := regexp.MustCompile(`(inventory_hostname\s+(?:not\s+)?in\s+)?groups(?:\[['"]([A-Za-z0-9_]+)['"]\]|\.get\(['"]([A-Za-z0-9_]+)['"](?:,\s*\[\])?\))(?:\s*\|\s*map\(['"]extract['"],\s*hostvars,\s*['"]([A-Za-z0-9_]+)['"]\))?`)
+	declaredOnVolatileHosts := func(variable string) bool {
+		return !strings.HasPrefix(variable, "ansible_") && !slices.ContainsFunc(fleet.groups["volatile"], func(host string) bool {
+			_, declared := fleet.vars[host][variable]
+			return !declared
+		})
+	}
 	scanned := 0
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
@@ -179,6 +185,9 @@ func TestFleetTemplatesNeverReadVolatileHosts(t *testing.T) {
 		}
 		for _, match := range reference.FindAllStringSubmatch(string(data), -1) {
 			group := match[2] + match[3]
+			if match[4] != "" && declaredOnVolatileHosts(match[4]) {
+				continue
+			}
 			if match[1] == "" && slices.ContainsFunc(fleet.groups[group], func(host string) bool { return slices.Contains(fleet.groups["volatile"], host) }) {
 				t.Errorf("%s iterates %s, which contains volatile hosts", relative, group)
 			}
@@ -224,7 +233,8 @@ func TestFlannelClearRefusesWhileVolatileWorkersAreEnrolled(t *testing.T) {
 		case "roles/k3s/tasks/main.yml: Refuse to clear or first-register flannel while a volatile worker can race the API":
 			condition := fmt.Sprint(task.Definition[task.Module])
 			selection := fmt.Sprint(task.Definition["vars"])
-			guarded = strings.Contains(condition, "k3s_flannel_state.changed") && strings.Contains(condition, "k3s_flannel_state.stdout == ''")
+			guarded = strings.Contains(condition, "k3s_flannel_state.changed") && strings.Contains(condition, "k3s_flannel_state.stdout == ''") &&
+				strings.Contains(condition, "volatile_api_cut_off") && strings.Contains(selection, "map('extract', hostvars, 'tailscale_ip')")
 			keyedOnTaint = strings.Contains(selection, "spec.taints") && strings.Contains(selection, "node-restriction.kubernetes.io/volatile")
 		}
 	})
