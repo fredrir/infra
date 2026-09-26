@@ -194,6 +194,11 @@ func buildProvenanceTemplate(t *testing.T) *provenanceTemplate {
 		"platform/projects/web/release.yaml":                       "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: web\nspec:\n  values:\n    workloads:\n      web:\n        image: old\n        replicas: 0\n",
 		"tofu/main.tf":                                             "\n",
 	})
+	if err := os.WriteFile(filepath.Join(f.remote, "objects", "info", "alternates"), []byte("../../infra/.git/objects\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.run(f.remote, "update-ref", "refs/heads/main", f.base)
+	f.git("update-ref", "refs/remotes/origin/main", f.base)
 	return &provenanceTemplate{area: area, base: f.base, webFlow: f.webFlow, impostor: f.impostor}
 }
 
@@ -211,6 +216,33 @@ func (f *provenanceFixture) run(dir string, args ...string) string {
 func (f *provenanceFixture) git(args ...string) string {
 	f.t.Helper()
 	return f.run(f.root, args...)
+}
+
+func (f *provenanceFixture) head() string {
+	f.t.Helper()
+	directory := filepath.Join(f.root, ".git")
+	data, err := os.ReadFile(filepath.Join(directory, "HEAD"))
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	reference, symbolic := strings.CutPrefix(strings.TrimSpace(string(data)), "ref: ")
+	if !symbolic {
+		return reference
+	}
+	if data, err := os.ReadFile(filepath.Join(directory, reference)); err == nil {
+		return strings.TrimSpace(string(data))
+	}
+	packed, err := os.ReadFile(filepath.Join(directory, "packed-refs"))
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	for line := range strings.Lines(string(packed)) {
+		if hash, name, _ := strings.Cut(strings.TrimSpace(line), " "); name == reference {
+			return hash
+		}
+	}
+	f.t.Fatalf("%s does not resolve", reference)
+	return ""
 }
 
 func (f *provenanceFixture) publicKey(key string) string {
@@ -244,7 +276,7 @@ func (f *provenanceFixture) commit(key, message string, files map[string]string)
 		args = append([]string{"-c", "user.signingkey=" + key}, append(args, "--gpg-sign")...)
 	}
 	f.git(args...)
-	return f.git("rev-parse", "HEAD")
+	return f.head()
 }
 
 func (f *provenanceFixture) forge(commit string, header func(string) string) string {
@@ -264,7 +296,7 @@ func (f *provenanceFixture) amend(files map[string]string) string {
 	f.write(files)
 	f.git("add", "--all")
 	f.git("commit", "--quiet", "--amend", "--no-edit", "--no-gpg-sign")
-	return f.git("rev-parse", "HEAD")
+	return f.head()
 }
 
 func (f *provenanceFixture) read(name string) string {
@@ -308,7 +340,7 @@ func (f *provenanceFixture) deploy(image string, run int) string {
 	if err := ci.Deploy(context.Background(), ci.Runner{Dir: f.root, Stdout: io.Discard, Stderr: io.Discard, Execute: f.attestation}, options); err != nil {
 		f.t.Fatal(err)
 	}
-	return f.git("rev-parse", "HEAD")
+	return f.head()
 }
 
 func (f *provenanceFixture) verify(base, head string) error {
@@ -339,7 +371,6 @@ func testProvenanceGateQuarter(t *testing.T, quarter int) {
 		}
 		t.Run(test.name, func(t *testing.T) {
 			f := newProvenanceFixture(t)
-			f.git("push", "--quiet", "--force", "origin", "HEAD:main")
 			err := f.verify(f.base, test.build(f))
 			if test.unverified == "" && err != nil {
 				t.Fatal(err)
@@ -448,7 +479,7 @@ func provenanceGateCases() []provenanceGateCase {
 			f.git("checkout", "--quiet", "main")
 			f.commit(f.owner, "Change platform", map[string]string{"platform/projects/example/namespace.yaml": "# main\n"})
 			f.git("-c", "user.signingkey="+f.owner, "merge", "--quiet", "--no-ff", "--gpg-sign", "--message", "Merge side", "signed")
-			return f.git("rev-parse", "HEAD")
+			return f.head()
 		}},
 		{name: "unsigned merge", build: func(f *provenanceFixture) string {
 			f.git("checkout", "--quiet", "-b", "unsigned")
@@ -456,7 +487,7 @@ func provenanceGateCases() []provenanceGateCase {
 			f.git("checkout", "--quiet", "main")
 			f.commit(f.owner, "Change platform", map[string]string{"platform/projects/example/namespace.yaml": "# main\n"})
 			f.git("merge", "--quiet", "--no-ff", "--no-gpg-sign", "--message", "Merge side", "unsigned")
-			return f.git("rev-parse", "HEAD")
+			return f.head()
 		}, unverified: `"Merge side": unsigned; not a deployment: merge commit`},
 	}
 }

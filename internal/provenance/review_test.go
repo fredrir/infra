@@ -142,7 +142,7 @@ func (f *provenanceFixture) pullRequest(number int, changes ...map[string]string
 	for index, files := range changes {
 		commits = append(commits, f.commit("", fmt.Sprintf("Change %d of #%d", index+1, number), files))
 	}
-	f.git("push", "--quiet", "origin", fmt.Sprintf("HEAD:refs/pull/%d/head", number))
+	f.run(f.remote, "update-ref", fmt.Sprintf("refs/pull/%d/head", number), commits[len(commits)-1])
 	f.git("checkout", "--quiet", "main")
 	f.api.commits[number] = commits
 	return commits[len(commits)-1], commits
@@ -151,24 +151,28 @@ func (f *provenanceFixture) pullRequest(number int, changes ...map[string]string
 func (f *provenanceFixture) mergeCommit(number int, head string) string {
 	f.t.Helper()
 	f.git("merge", "--quiet", "--no-ff", "--no-gpg-sign", "--message", fmt.Sprintf("Merge pull request #%d", number), head)
-	return f.git("rev-parse", "HEAD")
+	return f.head()
 }
 
 func (f *provenanceFixture) squash(number int, head string) string {
 	f.t.Helper()
 	f.git("merge", "--quiet", "--squash", head)
 	f.git("commit", "--quiet", "--no-gpg-sign", "--message", fmt.Sprintf("Squashed pull request #%d", number))
-	return f.git("rev-parse", "HEAD")
+	return f.head()
 }
 
 func (f *provenanceFixture) rebase(commits ...string) string {
 	f.t.Helper()
 	f.git(append([]string{"-c", "user.name=GitHub", "-c", "user.email=noreply@github.com", "cherry-pick", "--allow-empty"}, commits...)...)
-	return f.git("rev-parse", "HEAD")
+	return f.head()
 }
 
 func (f *provenanceFixture) forget(number int) {
 	f.t.Helper()
+	f.run(f.remote, "repack", "--quiet", "-a", "-d")
+	if err := os.Remove(filepath.Join(f.remote, "objects", "info", "alternates")); err != nil {
+		f.t.Fatal(err)
+	}
 	f.git("branch", "--quiet", "-D", fmt.Sprintf("pull/%d", number))
 	f.git("reflog", "expire", "--expire=now", "--all")
 	f.git("gc", "--quiet", "--prune=now")
@@ -233,7 +237,6 @@ func testReviewedMergesQuarter(t *testing.T, quarter int) {
 		}
 		t.Run(test.name, func(t *testing.T) {
 			f := newProvenanceFixture(t)
-			f.git("push", "--quiet", "--force", "origin", "HEAD:main")
 			f.api.reset()
 			head := test.build(f)
 			err := f.verify(f.base, head)
@@ -474,7 +477,7 @@ func reviewedMergeCases(base string) []reviewedMergeCase {
 			f.git("reset", "--quiet", "--hard", f.git("commit-tree", first+"^{tree}", "-p", first, "-p", f.base, "-m", "Merge applied history"))
 			f.git("cherry-pick", "--no-commit", commits[1], commits[2])
 			f.git("commit", "--quiet", "--no-gpg-sign", "--message", "Changes 2 and 3 of #33")
-			merge := f.git("rev-parse", "HEAD")
+			merge := f.head()
 			f.merged(33, renovate, head, merge, 3, approval(owner, head))
 			return merge
 		}, unverified: []string{"rebase merge of 3 commits is not a linear chain in the verified range"}},
@@ -492,7 +495,7 @@ func reviewedMergeCases(base string) []reviewedMergeCase {
 			conflicted, _ := f.try("merge-tree", "--write-tree", "--no-messages", main, head)
 			tree, _, _ := strings.Cut(conflicted, "\n")
 			f.git("reset", "--quiet", "--hard", f.git("commit-tree", tree, "-p", main, "-m", "Change 1 of #35"))
-			merge := f.git("rev-parse", "HEAD")
+			merge := f.head()
 			f.merged(35, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"merge the head"}},
@@ -541,7 +544,7 @@ func reviewedMergeCases(base string) []reviewedMergeCase {
 		{name: "rebase merge of a head that cannot be fetched", build: func(f *provenanceFixture) string {
 			head, commits := f.pullRequest(36, platform)
 			merge := f.rebase(commits...)
-			f.git("push", "--quiet", "origin", "--delete", "refs/pull/36/head")
+			f.run(f.remote, "update-ref", "-d", "refs/pull/36/head")
 			f.run(f.remote, "gc", "--quiet", "--prune=now")
 			f.forget(36)
 			f.merged(36, renovate, head, merge, 1, approval(owner, head))
@@ -561,7 +564,7 @@ func (f *provenanceFixture) updatedRebase(number int, empty bool) string {
 	f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# unreviewed\n"})
 	f.git("checkout", "--quiet", fmt.Sprintf("pull/%d", number))
 	f.git("merge", "--quiet", "--no-ff", "--no-gpg-sign", "--message", "Merge branch 'main'", "main")
-	commits = append(commits, f.git("rev-parse", "HEAD"))
+	commits = append(commits, f.head())
 	head := f.commit("", fmt.Sprintf("Change 2 of #%d", number), map[string]string{"platform/projects/web/release.yaml": "# renovate\n"})
 	commits = append(commits, head)
 	f.git("checkout", "--quiet", "main")
