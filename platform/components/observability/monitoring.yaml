@@ -246,7 +246,7 @@ spec:
     kubelet:
       enabled: true
       serviceMonitor:
-        sampleLimit: 5000
+        sampleLimit: 150000
         labelLimit: 40
         labelNameLengthLimit: 63
         labelValueLengthLimit: 1024
@@ -285,7 +285,7 @@ spec:
           type: RuntimeDefault
       prometheus:
         monitor:
-          sampleLimit: 2000
+          sampleLimit: 10000
           labelLimit: 40
           labelNameLengthLimit: 63
           labelValueLengthLimit: 1024
