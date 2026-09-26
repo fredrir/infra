@@ -82,6 +82,7 @@ go_test(
         "//:web_flow_key",
     ],
     embed = [":reconcile"],
+    shard_count = 4,
     deps = [
         "//internal/ci",
         "//internal/objectstore",
