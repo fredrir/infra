@@ -378,10 +378,6 @@ func TestVerificationRunsWithReadOnlyCredentials(t *testing.T) {
 	if persisted := checkout.With["persist-credentials"]; persisted != "false" {
 		t.Errorf("checkout persists credentials with %q", persisted)
 	}
-	token := apply.step(t, func(step workflowStep) bool { return strings.HasPrefix(step.Uses, "actions/create-github-app-token@") })
-	if administration := token.With["permission-administration"]; administration != "${{ env.VERIFICATION == 'true' && 'read' || 'write' }}" {
-		t.Errorf("runner registration token administration permission is %q", administration)
-	}
 	setup := apply.step(t, func(step workflowStep) bool { return step.ID == "setup" })
 	if full := setup.With["full"]; full != "${{ env.VERIFICATION == 'true' || inputs.full }}" {
 		t.Errorf("verification prepares tooling with full=%q", full)
@@ -675,12 +671,33 @@ func TestRunnerTokenReachesOnlyTheEngine(t *testing.T) {
 	for name, job := range readWorkflow(t, "reconcile-job.yml").Jobs {
 		for _, step := range job.Steps {
 			engine := name == "apply" && step.ID == "reconcile"
-			if token := step.Env["GH_TOKEN"]; (token == "${{ steps.runner-token.outputs.token }}") != engine {
+			if token := step.Env["GH_TOKEN"]; (token == "${{ steps.runner-token.outputs.token || steps.observer-token.outputs.token }}") != engine {
 				t.Errorf("job %s step %q receives GH_TOKEN %q", name, cmp.Or(step.ID, step.Name, step.Uses), token)
 			}
-			if strings.Contains(step.Run, "steps.runner-token") || (!engine && slices.ContainsFunc(slices.Collect(maps.Values(step.Env)), func(value string) bool { return strings.Contains(value, "steps.runner-token") })) {
-				t.Errorf("job %s step %q reads the runner token", name, cmp.Or(step.ID, step.Name, step.Uses))
+			readsToken := func(value string) bool {
+				return strings.Contains(value, "steps.runner-token") || strings.Contains(value, "steps.observer-token")
 			}
+			if readsToken(step.Run) || (!engine && slices.ContainsFunc(slices.Collect(maps.Values(step.Env)), readsToken)) {
+				t.Errorf("job %s step %q reads a fleet token", name, cmp.Or(step.ID, step.Name, step.Uses))
+			}
+		}
+	}
+}
+
+func TestVerificationMintsOnlyObserverTokens(t *testing.T) {
+	apply := readWorkflow(t, "reconcile-job.yml").Jobs["apply"]
+	for id, want := range map[string]struct{ condition, app, permission string }{
+		"observer-token": {"env.VERIFICATION == 'true'", "OBSERVER_APP", "read"},
+		"runner-token":   {"env.VERIFICATION != 'true'", "RUNNER_APP", "write"},
+	} {
+		step := apply.step(t, func(step workflowStep) bool { return step.ID == id })
+		if !strings.Contains(step.If, want.condition) || step.With["app-id"] != "${{ steps.doppler.outputs."+want.app+"_ID }}" || step.With["private-key"] != "${{ steps.doppler.outputs."+want.app+"_PRIVATE_KEY }}" || step.With["permission-administration"] != want.permission {
+			t.Errorf("%s mints with %v when %q", id, step.With, step.If)
+		}
+	}
+	for _, step := range apply.Steps {
+		if step.ID != "runner-token" && slices.ContainsFunc(slices.Collect(maps.Values(step.With)), func(value string) bool { return strings.Contains(value, "RUNNER_APP_PRIVATE_KEY") }) {
+			t.Errorf("step %q reads the runner App key", cmp.Or(step.ID, step.Name, step.Uses))
 		}
 	}
 }

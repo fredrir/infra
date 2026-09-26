@@ -209,7 +209,8 @@ These activation steps provision external credentials once; merge, verification 
 | `SSH_PRIVATE_KEY` | Unset | Dedicated key for managed hosts and build guest |
 | `SSH_KNOWN_HOSTS` | Unset | Verified Tailnet host keys, `fredrir-06` and `infra-build-09` aliases |
 | `SOPS_AGE_KEY` | Unset | Decrypt host monitoring, verification trigger and backup credentials |
-| `RUNNER_APP_ID`, `RUNNER_APP_PRIVATE_KEY` | Unset | Existing runner GitHub App; mint a short-lived installation token with repository administration permission |
+| `RUNNER_APP_ID`, `RUNNER_APP_PRIVATE_KEY` | Unset | Runner GitHub App; applies mint a short-lived installation token with repository administration write |
+| `OBSERVER_APP_ID`, `OBSERVER_APP_PRIVATE_KEY` | Unset | Observer GitHub App; verifications mint a short-lived installation token with repository administration read |
 | `PUBLISHER_APP_PRIVATE_KEY` | Unset | [Publisher App](#publishing) private key; delivered to the engine as a file |
 
 | OIDC setting | `infrastructure-plan` | `infrastructure-apply` |

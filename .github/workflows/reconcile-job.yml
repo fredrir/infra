@@ -178,14 +178,23 @@ jobs:
         test -n "$owner" && test "$owner" != null && test -n "$repositories"
         printf 'owner=%s\nrepositories=%s\n' "$owner" "$repositories" >> "$GITHUB_OUTPUT"
     - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
-      if: steps.setup.outputs.hosts == 'true'
+      if: steps.setup.outputs.hosts == 'true' && env.VERIFICATION == 'true'
+      id: observer-token
+      with:
+        app-id: ${{ steps.doppler.outputs.OBSERVER_APP_ID }}
+        private-key: ${{ steps.doppler.outputs.OBSERVER_APP_PRIVATE_KEY }}
+        owner: ${{ steps.runner-fleet.outputs.owner }}
+        repositories: ${{ steps.runner-fleet.outputs.repositories }}
+        permission-administration: read
+    - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+      if: steps.setup.outputs.hosts == 'true' && env.VERIFICATION != 'true'
       id: runner-token
       with:
         app-id: ${{ steps.doppler.outputs.RUNNER_APP_ID }}
         private-key: ${{ steps.doppler.outputs.RUNNER_APP_PRIVATE_KEY }}
         owner: ${{ steps.runner-fleet.outputs.owner }}
         repositories: ${{ steps.runner-fleet.outputs.repositories }}
-        permission-administration: ${{ env.VERIFICATION == 'true' && 'read' || 'write' }}
+        permission-administration: write
     - name: Write publisher key
       if: env.VERIFICATION != 'true'
       env:
@@ -203,7 +212,7 @@ jobs:
         TF_VAR_hcloud_token: ${{ steps.doppler.outputs.HCLOUD_TOKEN }}
         TF_VAR_platform_mail_recipient: ${{ steps.doppler.outputs.PLATFORM_MAIL_RECIPIENT }}
         SOPS_AGE_KEY: ${{ steps.doppler.outputs.SOPS_AGE_KEY }}
-        GH_TOKEN: ${{ steps.runner-token.outputs.token }}
+        GH_TOKEN: ${{ steps.runner-token.outputs.token || steps.observer-token.outputs.token }}
         PROVENANCE_TOKEN: ${{ github.token }}
         PUBLISHER_APP_PRIVATE_KEY_FILE: ${{ env.VERIFICATION != 'true' && format('{0}/publisher/key.pem', runner.temp) || '' }}
         FULL: ${{ inputs.full }}
