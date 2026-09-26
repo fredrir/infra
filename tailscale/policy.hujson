@@ -166,7 +166,11 @@
       "proto": "tcp",
       "dst": [
         "tag:platform-control:6443",
-        "platform-monitor:8080"
+        "platform-monitor:8080",
+        "tag:platform-control:22",
+        "tag:platform-worker:22",
+        "tag:platform-volatile:22",
+        "platform-monitor:22"
       ]
     },
     {
@@ -847,25 +851,29 @@
       "proto": "tcp",
       "accept": [
         "tag:platform-control:6443",
-        "platform-monitor:8080"
+        "platform-monitor:8080",
+        "tag:platform-control:22",
+        "tag:platform-worker:22",
+        "tag:platform-volatile:22",
+        "platform-monitor:22"
       ],
       "deny": [
-        "tag:platform-control:22",
         "tag:platform-control:2379",
         "tag:platform-control:2380",
         "tag:platform-control:9100",
         "tag:platform-control:10250",
-        "tag:platform-worker:22",
         "tag:platform-worker:6443",
         "tag:platform-worker:9100",
         "tag:platform-worker:10250",
+        "tag:platform-volatile:6443",
+        "tag:platform-volatile:10250",
         "platform-control-05:2379",
         "platform-control-05:2380",
         "platform-control-07:2379",
         "platform-control-07:2380",
         "platform-control-08:2379",
         "platform-control-08:2380",
-        "platform-monitor:22",
+        "platform-monitor:9090",
         "macie:22",
         "archie:22"
       ]

@@ -180,7 +180,7 @@ func TestTailnetEvaluatorRejectsUngrantedExpectations(t *testing.T) {
 	}
 }
 
-func TestReconcilerReachesOnlyTheAPIAndMonitor(t *testing.T) {
+func TestReconcilerReachesOnlyTheAPIMonitorAndManagedHostSSH(t *testing.T) {
 	const reconciler = "tag:infra-reconciler"
 	policy := parseTailnetPolicy(t, read(t, filepath.Join(root(t), "tailscale/policy.hujson")))
 	var outbound, inbound []string
@@ -201,7 +201,11 @@ func TestReconcilerReachesOnlyTheAPIAndMonitor(t *testing.T) {
 			}
 		}
 	}
-	if want := []string{reconciler + " tcp → tag:platform-control:6443", reconciler + " tcp → platform-monitor:8080"}; !slices.Equal(outbound, want) {
+	want := []string{reconciler + " tcp → tag:platform-control:6443", reconciler + " tcp → platform-monitor:8080"}
+	for _, host := range []string{"tag:platform-control", "tag:platform-worker", "tag:platform-volatile", "platform-monitor"} {
+		want = append(want, reconciler+" tcp → "+host+":22")
+	}
+	if !slices.Equal(outbound, want) {
 		t.Errorf("reconciler grants = %q, want %q", outbound, want)
 	}
 	if want := []string{"macie tcp → " + reconciler + ":22", "archie tcp → " + reconciler + ":22"}; !slices.Equal(inbound, want) {

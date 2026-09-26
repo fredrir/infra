@@ -246,7 +246,7 @@ These activation steps provision external credentials once; merge, verification 
 | Kubernetes apply scope | Verify scope; patch reconciliation annotations; admission rejects spec changes |
 | Tailnet plan scope | Control-plane API only |
 | Tailnet apply scope | Control-plane API and SSH to managed hosts |
-| Tailnet reconciler scope | `tag:infra-reconciler`: control-plane API and Gatus heartbeats; reached only by Macie and Archie on SSH |
+| Tailnet reconciler scope | `tag:infra-reconciler`: control-plane API, Gatus heartbeats and SSH to managed hosts and `fredrir-06`; reached only by Macie and Archie on SSH |
 | Host SSH key | `ansible/files/reconciliation.pub`; maintained by `ansible/reconciliation-identity.yml` |
 | Provider-policy, workload-boundary or bucket-lifecycle changes, revoked credentials | Administrator repair required |
 
@@ -321,7 +321,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Volatile series labels | With `honorLabels: false`, fredrir-10's kubelet and cAdvisor series carry the target namespace `kube-system`, and their real `namespace` and `pod` move to `exported_namespace` and `exported_pod`, so namespace-keyed alerts do not attribute fredrir-10 series to the workload's namespace |
 | Kubelet scrape credential | The volatile kubelet monitors present a 1 h projected token (`bearerTokenFile`), not the chart's non-expiring `monitoring-prometheus-token`, so a hostile kubelet capturing it can replay it against the API for at most its lifetime; the token is the Prometheus pod's own `monitoring-prometheus` identity (nodes, nodes/metrics, services, endpoints, pods, endpointslices, ingresses read; no nodes/proxy, no writes). A dedicated least-privilege ServiceAccount is not achievable through the operator: projected tokens mint only for the pod's ServiceAccount, and a kubelet-only audience fails the kubelet's TokenReview against the cluster api-audiences, so the pod identity with a short lifetime is the least exposure. `monitoring-prometheus-token` is created by the kube-prometheus-stack chart (`prometheus.serviceAccount.createTokenSecret`) for the fleet kubelet monitor, not a leftover |
 | Readiness waits | `verify.yml` and `maintenance.yml` exclude `node-restriction.kubernetes.io/volatile`; `maintenance.yml` never targets volatile hosts, which take unattended patching |
-| Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100, 9253 and 10250; SSH from Macie, Archie and `tag:infra-apply` |
+| Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100, 9253 and 10250; SSH from Macie, Archie, `tag:infra-apply` and `tag:infra-reconciler` |
 | Inbound access | Tailnet; NTNU VPN (`~/ntnu-proxy`, `10.50.0.0/16`) is owner-only break-glass SSH with keys only, never used by the fleet |
 | Container engines | Docker, containerd.io, Podman and Buildah removed at takeover; only the k3s agent runs |
 | Trust | NTNU controls hypervisor and network; no ProxyJump, `ForwardAgent=no`, no delegated secrets; holds its node credentials and the job credentials of its CI pools |
