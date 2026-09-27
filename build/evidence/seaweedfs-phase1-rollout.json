@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "date": "2026-09-27",
+  "cell": "seaweedfs-hel1 (SeaweedFS 4.47) on fredrir-04",
+  "steps": [
+    {"step": 1, "commit": "c0f6f72c258304e0b254b9d471fca59e8eeeed7e", "result": "cell 4/4 Running, 0 restarts, no fail-closed refusals"},
+    {"step": "1.4", "commit": "4bbb8220b9721110e640c73cc095d1d53a7ff710", "result": "tools image sha256:677c7d34afabc19b697b88ea6b39ff85707ddcba7fe18160f3b31b072e34da3d promoted after attestation by reconcile.yml on main; 8 pins rewritten"},
+    {"step": "1.5", "result": "first provisioner run created ci-nsql-main (20 GiB), ci-nsql-release (10 GiB) and toolchains (5 GiB) with encryption, lifecycle and quota; second run wrote nothing"},
+    {"step": "1.fix", "commit": "8648bf0cfb64e15ae5a9ae499d48d40afc3adcea", "result": "Prometheus egress lacked worker-metrics 9328; added with a policy test that fails without it; both endpoints up, 16 lifecycle shards reporting"},
+    {"step": "1.fix", "commit": "f5167d117760425eb318511815ec435066802d3b", "result": "ObjectStoreLifecycleStalled treated never-walked shards (0) as stale; promtool rule tests: new cell quiet, never walked for 2 days fires, stale walk fires"},
+    {"step": 2, "commit": "dc68bd709ff5551513d3aa3251fa4ef78b897b57", "result": "runner-rust sha256:128b41ff091c5e0a21e2043a452cf5951eabd0b9d0b09afa6e41a8846e55e179 attested, authorized in bd820994971e4f72f4a6ef879fd44af5ae115c2f, promoted in dcdf4dab73b9878139f8c259bf3866283ad44ebe; first apply attempt failed on a kubectl download TLS timeout and succeeded on rerun"},
+    {"step": 3, "result": "MacOSX27.0.sdk.tar.zst copied from Garage, sha256 206f0ccf…52ab verified, uploaded; stored object 67077298 bytes"},
+    {"step": 4, "commit": "cb5ba8f6c5141cd8ca9edff93cde7ec9fcc4da19", "result": "Rust pools use https://seaweedfs-hel1.object-store.svc.cluster.local:8333 region hel1; S3 requests over two nsql runs: GET 200 451, GET 404 361, PUT 200 348; runner-rust sha256:f2d189a35cf9dad9b303b002db423affe0669754c6880af90923a76332b0482e authorized in d7a555d5cdc4753c9c7f094d88f4d226e9c0f7f0 and promoted in 1ee580c2c5f4ade55fbdcfcc8e72a4b1875aaf66"},
+    {"step": 5, "commit": "9d05e97316dc4245689f48a0f48113d87e8e3c4b", "result": "build-cache, ci-backend, ci-frontend, ci-parser, ci-portfolio and ci-y namespaces NotFound; Garage PV removed; nix-cache policy NotFound; admission conflict resolved by keeping the two current runner-rust digests"}
+  ],
+  "observations": [
+    "nsql main checks exceed their 10 s budget on fredrir-10 regardless of cache backend: rust-preparation 221 s warm and checks 10.1 s there, against 102 s and 5.0 s for the same commit on fredrir-04"
+  ],
+  "limitations": ["cache_check's run-success criterion failed on the fredrir-10 budget; sccache enablement and absence of cache errors were verified from the logs instead"]
+}
