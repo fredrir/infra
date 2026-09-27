@@ -1,9 +1,13 @@
 package reconciler
 
 import (
+	"encoding/pem"
+	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -65,6 +69,42 @@ func TestSSHIdentityIsGeneratedOnTheReconcilerAndNeverLeavesIt(t *testing.T) {
 	}
 	if want := []string{"Create the reconciler configuration directory", "Create the private SSH identity directory", "Generate the reconciler SSH identity", "Restrict the reconciler SSH identity", "Read the reconciler SSH public key", "Report the reconciler SSH public key"}; !slices.Equal(tagged, want) {
 		t.Errorf("ssh_identity runs %q, want %q", tagged, want)
+	}
+}
+
+func TestUnitsHandTheSupervisorAnSSHIdentityItAccepts(t *testing.T) {
+	for unit, user := range map[string]string{"infra-reconcile-apply.service": "infra-apply", "infra-reconcile-verify.service": "infra-verify"} {
+		service := string(roleFile(t, "templates/"+unit+".j2"))
+		if regexp.MustCompile(`(?m)^LoadCredential=`).MatchString(service) {
+			t.Errorf("%s loads a credential that systemd leaves readable by its group", unit)
+		}
+		passed := regexp.MustCompile(`(?m)^ExecStart=.* --ssh-identity=(\S+)$`).FindStringSubmatch(service)
+		if passed == nil {
+			t.Fatalf("%s passes no SSH identity", unit)
+		}
+		installed := regexp.MustCompile(`(?m)^ExecStartPre=\+/usr/bin/install -m (0[0-7]{3}) -o ` + user + ` -g ` + user + ` \{\{ reconciler_ssh_identity \}\} ` + regexp.QuoteMeta(passed[1]) + `$`).FindStringSubmatch(service)
+		if installed == nil {
+			t.Errorf("%s passes --ssh-identity=%s, which no ExecStartPre installs for %s", unit, passed[1], user)
+			continue
+		}
+		mode, err := strconv.ParseUint(installed[1], 8, 32)
+		if err != nil {
+			t.Fatal(err)
+		}
+		directory := t.TempDir()
+		identity, knownHosts := filepath.Join(directory, "ssh-identity"), filepath.Join(directory, "known_hosts")
+		if err := os.WriteFile(identity, pem.EncodeToMemory(&pem.Block{Type: "OPENSSH PRIVATE KEY", Bytes: []byte("key")}), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(knownHosts, []byte("fredrir-06 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(identity, os.FileMode(mode)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := (session{secrets: directory}).hostAccess(identity, knownHosts); err != nil {
+			t.Errorf("%s installs its SSH identity %s, which the supervisor rejects: %v", unit, installed[1], err)
+		}
 	}
 }
 

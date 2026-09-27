@@ -53,14 +53,11 @@ func TestVerifyUnitDecryptsOnlyTheVerifyCredentials(t *testing.T) {
 	for _, directive := range []string{
 		"User=infra-verify", "RuntimeDirectory=infra-reconcile-verify", "RuntimeDirectoryMode=0700", "StateDirectory=infra-verify\n", "CacheDirectory=infra-verify\n", "CacheDirectoryMode=0700", "UMask=0077", "NoNewPrivileges=yes", "ProtectSystem=strict", "PrivateTmp=yes", "CapabilityBoundingSet=\n",
 		"ExecStartPre=+/usr/bin/chown infra-verify:infra-verify " + credentials + "\n",
-		"ExecStart=/usr/local/bin/infra reconcile run verify --config=/etc/infra-reconcile/verify.json --credentials=" + credentials + " --ssh-identity=%d/ssh-identity\n",
+		"ExecStart=/usr/local/bin/infra reconcile run verify --config=/etc/infra-reconcile/verify.json --credentials=" + credentials + " --ssh-identity=%t/infra-reconcile-verify/ssh-identity\n",
 	} {
 		if !strings.Contains(service, directive) {
 			t.Errorf("verify unit lacks %q", directive)
 		}
-	}
-	if loaded := regexp.MustCompile(`(?m)^LoadCredential=.*$`).FindAllString(service, -1); !slices.Equal(loaded, []string{"LoadCredential=ssh-identity:{{ reconciler_ssh_identity }}"}) {
-		t.Errorf("verify unit loads %q", loaded)
 	}
 	if strings.Contains(service, "apply") {
 		t.Error("verify unit reaches the apply credentials")

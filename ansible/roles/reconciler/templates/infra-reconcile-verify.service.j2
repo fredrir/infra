@@ -8,8 +8,8 @@ User=infra-verify
 Group=infra-verify
 ExecStartPre=+/usr/bin/env SOPS_AGE_KEY_FILE={{ host_secrets_key }} /usr/local/bin/sops decrypt --extract '["verify"]' --output-type json --output %t/infra-reconcile-verify/credentials.json /etc/infra-reconcile/credentials.sops.yaml
 ExecStartPre=+/usr/bin/chown infra-verify:infra-verify %t/infra-reconcile-verify/credentials.json
-ExecStart=/usr/local/bin/infra reconcile run verify --config=/etc/infra-reconcile/verify.json --credentials=%t/infra-reconcile-verify/credentials.json --ssh-identity=%d/ssh-identity
-LoadCredential=ssh-identity:{{ reconciler_ssh_identity }}
+ExecStartPre=+/usr/bin/install -m 0400 -o infra-verify -g infra-verify {{ reconciler_ssh_identity }} %t/infra-reconcile-verify/ssh-identity
+ExecStart=/usr/local/bin/infra reconcile run verify --config=/etc/infra-reconcile/verify.json --credentials=%t/infra-reconcile-verify/credentials.json --ssh-identity=%t/infra-reconcile-verify/ssh-identity
 RuntimeDirectory=infra-reconcile-verify
 RuntimeDirectoryMode=0700
 StateDirectory=infra-verify

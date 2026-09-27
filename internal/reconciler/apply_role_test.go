@@ -41,8 +41,7 @@ func TestApplyUnitDecryptsOnlyTheApplyCredentialsAndOutlivesTheLockWait(t *testi
 		"User=infra-apply\n", "Group=infra-apply\n", "RuntimeDirectory=infra-reconcile-apply\n", "RuntimeDirectoryMode=0700", "StateDirectory=infra-apply\n", "CacheDirectory=infra-apply\n", "CacheDirectoryMode=0700", "WorkingDirectory=/var/lib/infra-apply\n",
 		"ExecCondition=/usr/local/bin/infra reconcile run pending --config=/etc/infra-reconcile/apply.json\n",
 		"ExecStartPre=+/usr/bin/chown infra-apply:infra-apply " + credentials + "\n",
-		"ExecStart=/usr/local/bin/infra reconcile run apply --config=/etc/infra-reconcile/apply.json --credentials=" + credentials + " --ssh-identity=%d/ssh-identity\n",
-		"LoadCredential=ssh-identity:{{ reconciler_ssh_identity }}\n",
+		"ExecStart=/usr/local/bin/infra reconcile run apply --config=/etc/infra-reconcile/apply.json --credentials=" + credentials + " --ssh-identity=%t/infra-reconcile-apply/ssh-identity\n",
 	} {
 		if !strings.Contains(service, directive) {
 			t.Errorf("apply unit lacks %q", directive)
