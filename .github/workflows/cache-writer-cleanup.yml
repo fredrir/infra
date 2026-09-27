@@ -25,6 +25,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 jobs:
   test:
+    if: github.triggering_actor != 'fredrir-infra-verification[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -34,7 +35,7 @@ jobs:
       - run: python3 -B -m unittest discover -s .github/scripts -p 'cache_writer_cleanup_test.py'
   cleanup:
     needs: test
-    if: github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["schedule","workflow_dispatch"]'), github.event_name) && vars.TAILSCALE_CACHE_CLEANUP_CLIENT_ID != ''
+    if: github.triggering_actor != 'fredrir-infra-verification[bot]' && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["schedule","workflow_dispatch"]'), github.event_name) && vars.TAILSCALE_CACHE_CLEANUP_CLIENT_ID != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
