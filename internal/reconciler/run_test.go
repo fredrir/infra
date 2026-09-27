@@ -265,11 +265,11 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 	}
 	h := &harness{revision: revision, objects: &objects{puts: map[string][]byte{}}, heartbeats: &heartbeats{}, app: &observerApp{}}
 	servers := map[string]http.Handler{"s3": h.objects, "gatus": h.heartbeats, "github": h.app}
-	urls := map[string]string{}
+	urls, clients := map[string]string{}, map[string]*http.Client{}
 	for name, handler := range servers {
 		server := httptest.NewServer(handler)
 		t.Cleanup(server.Close)
-		urls[name] = server.URL
+		urls[name], clients[name] = server.URL, server.Client()
 	}
 	authority := filepath.Join(t.TempDir(), "kubernetes-ca.crt")
 	if err := os.WriteFile(authority, testAuthority(t), 0o644); err != nil {
@@ -278,7 +278,7 @@ func newHarnessAt(t *testing.T, origin, revision string, credentials map[string]
 	config := validConfig()
 	config.Repository, config.State, config.Cache, config.Endpoint, config.Gatus, config.Observer.API, config.Kubernetes.CertificateAuthority = "file://"+origin, t.TempDir(), t.TempDir(), urls["s3"], urls["gatus"], urls["github"], authority
 	config.Shared = sharedDirectory(t)
-	h.supervisor = Supervisor{Config: config, Credentials: writeCredentials(t, anyValues(credentials)), Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
+	h.supervisor = Supervisor{Config: config, Credentials: writeCredentials(t, anyValues(credentials)), Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, HTTP: clients["s3"], Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
 		h.mu.Lock()
 		h.commands = append(h.commands, filepath.Base(options.Name)+" "+strings.Join(options.Args, " "))
 		h.mu.Unlock()

@@ -227,11 +227,11 @@ func newApplyHarness(t *testing.T) *applyHarness {
 	t.Helper()
 	origin, applied := originRepository(t)
 	h := &applyHarness{origin: origin, applied: applied, tip: branchTip(t, origin, "main"), credentials: applyCredentialValues(t), github: &githubAPI{minted: map[string][]map[string]any{}, expiration: "2027-09-26 12:00:00 UTC"}, bucket: &stateBucket{applied: applied, puts: map[string][]byte{}}, gatus: &applyHeartbeats{}, selection: reconcile.Selection{Tofu: true, Ansible: true, HostScope: reconcile.HostScopeFull}}
-	urls := map[string]string{}
+	urls, clients := map[string]string{}, map[string]*http.Client{}
 	for name, handler := range map[string]http.Handler{"github": h.github, "s3": h.bucket, "gatus": h.gatus} {
 		server := httptest.NewServer(handler)
 		t.Cleanup(server.Close)
-		urls[name] = server.URL
+		urls[name], clients[name] = server.URL, server.Client()
 	}
 	authority := filepath.Join(t.TempDir(), "kubernetes-ca.crt")
 	identity := filepath.Join(t.TempDir(), "ssh-identity")
@@ -252,7 +252,7 @@ func newApplyHarness(t *testing.T) *applyHarness {
 		return 0, fmt.Sprintf(`{"desired_revision":%q,"applied_revision":%q,"stage":"complete"}`, h.tip, h.tip)
 	}
 	h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) { return process.Result{}, nil }
-	h.applier = Applier{Config: config, Identity: identity, Self: supervisorBinary, Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, LockPoll: time.Millisecond, Execute: h.execute(t)}
+	h.applier = Applier{Config: config, Identity: identity, Self: supervisorBinary, Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, LockPoll: time.Millisecond, HTTP: clients["s3"], Execute: h.execute(t)}
 	h.github.apps = map[string]appIdentity{fmt.Sprint(runnerInstall): appIdentityOf(t, config.Runner, h.credentials[RunnerAppKey])}
 	h.writeCredentials(t)
 	return h
