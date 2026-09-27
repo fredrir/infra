@@ -6,6 +6,10 @@
       unit=$(basename "$path" .service)
       case "$declared" in *" $unit "*) ;; *) [ -e "$path" ] && echo "unit $unit" ;; esac
     done
+    systemctl list-units --all --plain --no-legend --type=service 'infra-dagger*' | while read -r unit _; do
+      unit=${unit%.service}
+      case "$declared" in *" $unit "*) ;; *) [ -e "/etc/systemd/system/$unit.service" ] || echo "loaded $unit" ;; esac
+    done
     docker ps --all --format '{{ "{{.Names}}" }}' | while read -r name; do
       case "$name" in infra-dagger|infra-dagger-*) case "$declared" in *" $name "*) ;; *) echo "container $name" ;; esac ;; esac
     done
