@@ -17,10 +17,13 @@ printf '%s ' "$@" >> "$STUB_LOG"
 echo >> "$STUB_LOG"
 case "$1" in
   lsf)
-    case "$*" in
-      *"--format t"*) [ "$STUB_SENTINEL" = 1 ] && echo "$STUB_SEEDED_AT" ;;
-      *) [ "$STUB_SENTINEL" = 1 ] && echo .mirror-seeded ;;
-    esac
+    [ -z "$STUB_LSF_EXIT" ] || exit "$STUB_LSF_EXIT"
+    if [ "$STUB_SENTINEL" = 1 ]; then
+      case "$*" in
+        *"--format t"*) echo "$STUB_SEEDED_AT" ;;
+        *) echo .mirror-seeded ;;
+      esac
+    fi
     ;;
   size)
     case "$2" in
@@ -169,6 +172,9 @@ func TestParserDatasetUnseedRemovesOnlyTheSentinel(t *testing.T) {
 	}
 	if _, err := runMirrorScript(t, "unseed", map[string]string{"STUB_SENTINEL": "1"}); err == nil {
 		t.Fatal("unseed reported success while the sentinel remained")
+	}
+	if _, err := runMirrorScript(t, "unseed", map[string]string{"STUB_SENTINEL": "0", "STUB_LSF_EXIT": "1"}); err == nil {
+		t.Fatal("unseed reported success without listing the store")
 	}
 }
 

@@ -41,7 +41,8 @@ case "${1:-}" in
     ;;
   unseed)
     rclone delete --max-depth 1 "--include=/$sentinel" "$store"
-    ! rclone lsf --files-only --max-depth 1 "--include=/$sentinel" "$store" | grep -qx "$sentinel" || refuse "$store still has $sentinel"
+    remaining=$(rclone lsf --files-only --max-depth 1 "--include=/$sentinel" "$store") || refuse "cannot list $store to confirm $sentinel is gone"
+    [ -z "$remaining" ] || refuse "$store still has $sentinel"
     ;;
   *)
     refuse "usage: mirror.sh sync|seed|restore|unseed"
