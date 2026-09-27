@@ -1,0 +1,174 @@
+{
+  "schema": 1,
+  "date": "2026-09-27",
+  "filter_image": "docker.io/library/nginx:1.30.5-alpine-slim@sha256:32463212baf0e7d91aded2e9b843a4f2b9e017804b8c9d5bae7b51dcef64389c",
+  "configuration_sha256": "0f7832d35b67f43edb3ae55e9d1271de3d6eb73494709ab2cff0b09672ae6d6b",
+  "test_suite": {
+    "passed": 9,
+    "large_blob_mib": 24,
+    "temporary_volume_mib": 16,
+    "cpu_limit": 0.5,
+    "memory_limit_mib": 128,
+    "concurrent_clients": 3,
+    "concurrent_streams_per_client": 8,
+    "rounds_per_stream": 4,
+    "fresh_client_after_cancelled_streams": true,
+    "old_caddy_comparison": "The gRPC concurrency test also passes Caddy; it does not reproduce the previous Bazel connection wedge"
+  },
+  "mutations": [
+    {
+      "mutation": "reader-write",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "reader-wildcard",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "prefix-locations",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "regex-locations",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "normalization-guard",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "protocol-method-content-guard",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "grpc-web",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "put-read",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "get-read",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "http1-read",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "self-access",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "outsider-access",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "open-health",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "small-write-body",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "small-read-body",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "writer-wildcard",
+      "rejected": true,
+      "exit": 1
+    },
+    {
+      "mutation": "merge-slashes-off",
+      "rejected": false,
+      "exit": 0
+    }
+  ],
+  "bazel_load": {
+    "workload_revision": "922c390d",
+    "targets": 87,
+    "actions": 1420,
+    "remote_cache_hits_per_client": 1185,
+    "download_mode": "all",
+    "concurrent_clients": [
+      1,
+      2,
+      3
+    ],
+    "fresh_client_after_load": 4,
+    "client_cpu_affinity": [
+      0,
+      1,
+      8,
+      9
+    ],
+    "configuration_substitutions": [
+      "tailnet address and CIDR mapped to loopback",
+      "listener ports mapped to 19092, 19093 and 19095"
+    ],
+    "results": {
+      "clients": [
+        {
+          "client": 1,
+          "exit": 0,
+          "seconds": 24.194
+        },
+        {
+          "client": 2,
+          "exit": 0,
+          "seconds": 23.994
+        },
+        {
+          "client": 3,
+          "exit": 0,
+          "seconds": 24.094
+        },
+        {
+          "client": 4,
+          "exit": 0,
+          "seconds": 8.474
+        }
+      ],
+      "containers": [
+        {
+          "name": "infra-cache-load-server",
+          "oom_killed": false,
+          "memory_peak_bytes": 753160192
+        },
+        {
+          "name": "infra-cache-load-filter",
+          "oom_killed": false,
+          "memory_peak_bytes": 63373312
+        }
+      ],
+      "filter_limits": {
+        "cpu": 0.5,
+        "memory_mib": 128,
+        "tmpfs_mib": 16
+      },
+      "backend_limits": {
+        "cpu": 2,
+        "memory_mib": 1024,
+        "gomemlimit_mib": 768
+      }
+    }
+  }
+}

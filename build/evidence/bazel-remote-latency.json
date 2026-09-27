@@ -200,5 +200,58 @@
       "status": 34,
       "effect": "Failed to query remote execution capabilities; build fails"
     }
-  ]
+  ],
+  "filtered_cache": {
+    "date": "2026-09-27",
+    "workload_revision": "922c390d",
+    "driver_revision": "a5db72b0",
+    "scope": "All 24 test targets cached, fresh output base for each sample, preparation followed by infra pipeline check-fast including the capabilities probe; 2 cores / 4 threads; loopback netem applies only to the filter address inside pasta",
+    "filter_image": "docker.io/library/nginx:1.30.5-alpine-slim@sha256:32463212baf0e7d91aded2e9b843a4f2b9e017804b8c9d5bae7b51dcef64389c",
+    "configuration_sha256": "0f7832d35b67f43edb3ae55e9d1271de3d6eb73494709ab2cff0b09672ae6d6b",
+    "filter_configuration_substitutions": [
+      "tailnet address and CIDR mapped to loopback",
+      "Unix socket path",
+      "PID path and root user for the isolated user namespace"
+    ],
+    "read_only_build_event_upload_strategy": "local",
+    "reader_write_attempts": 0,
+    "results": [
+      {
+        "cache": "disk",
+        "emulated_rtt_ms": 0,
+        "samples": 3,
+        "preparation_seconds_median": 10.061,
+        "infra_fast_seconds_median": 0.631,
+        "all_passed": true
+      },
+      {
+        "cache": "nginx-reader",
+        "emulated_rtt_ms": 0,
+        "samples": 3,
+        "preparation_seconds_median": 10.87,
+        "infra_fast_seconds_median": 0.683,
+        "all_passed": true
+      },
+      {
+        "cache": "nginx-reader",
+        "emulated_rtt_ms": 76,
+        "samples": 3,
+        "preparation_seconds_median": 16.703,
+        "infra_fast_seconds_median": 0.982,
+        "all_passed": true
+      },
+      {
+        "cache": "nginx-reader",
+        "emulated_rtt_ms": 136,
+        "samples": 3,
+        "preparation_seconds_median": 22.541,
+        "infra_fast_seconds_median": 1.353,
+        "all_passed": true
+      }
+    ],
+    "limitations": [
+      "Local workload replay; live hosted before/after qualification needs the four federated identities",
+      "Changed-source latency results above use the direct backend; this through-filter remeasurement covers the all-cached shape"
+    ]
+  }
 }
