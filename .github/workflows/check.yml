@@ -87,6 +87,13 @@ jobs:
           client-id: ${{ env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && vars.TAILSCALE_BAZEL_CACHE_CHECK_WRITER_CLIENT_ID || vars.TAILSCALE_BAZEL_CACHE_READER_CLIENT_ID }}
       - name: Withhold OIDC token requests from later steps
         run: test -z "${ACTIONS_ID_TOKEN_REQUEST_URL-}${ACTIONS_ID_TOKEN_REQUEST_TOKEN-}"
+      - name: Verify pull request cache role
+        if: github.event_name == 'pull_request'
+        env:
+          CACHE_ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
+        run: |
+          test "$BAZEL_CACHE_IDENTITY" = bazel-cache-reader
+          test "$CACHE_ENDPOINT" = grpc://100.87.168.66:9092
       - name: Qualify cache identity and RPC access
         if: vars.BAZEL_CACHE_QUALIFICATION_NONCE != '' && env.BAZEL_CACHE_IDENTITY != '' && steps.affected.outputs.expression != 'set()'
         env:

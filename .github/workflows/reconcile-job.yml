@@ -58,7 +58,7 @@ jobs:
         TF_VAR_platform_mail_recipient: ${{ secrets.PLATFORM_MAIL_RECIPIENT }}
       run: |
         set -o pipefail
-        infra reconcile plan --base "$BASE" | tee "$RUNNER_TEMP/infrastructure-plan.txt"
+        infra reconcile plan --base "$BASE" --full | tee "$RUNNER_TEMP/infrastructure-plan.txt"
     - name: Require a trusted branch for the live plan
       if: github.event.pull_request.head.repo.full_name != github.repository
       run: |
