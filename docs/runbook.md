@@ -558,7 +558,9 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; `seaweedfs-nl` has no admin or worker and no lifecycle buckets; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
 | Logs | stderr only (`-logtostderr=true`) |
 | Parser dataset | `llunde-pyparser` application pods use `parser-dataset` on `seaweedfs-nl` via `AWS_ENDPOINT_URL_S3` and `AWS_CA_BUNDLE` (ConfigMap `object-store-ca`); stored `s3://` URLs keep their original bucket name, since the parser resolves objects by key |
-| Parser dataset copy | `parser-dataset-mirror` hourly at :23 on `fredrir-04`: `rclone sync` of `nl` `parser-dataset` to the versioned AWS bucket `llunde-pyparser-bucket`, prefixes `files/`, `extract/`, `assets/`, `convert/` only; at most 1000 deletions per run; `platform-dataset-parser` cannot delete versions |
+| Parser dataset copy | `parser-dataset-mirror` hourly at :23 on `fredrir-04` runs `mirror.sh sync`: `rclone sync` of `nl` `parser-dataset` to the versioned AWS bucket `llunde-pyparser-bucket`, prefixes `files/`, `extract/`, `assets/`, `convert/` only; at most 1000 deletions per run; `platform-dataset-parser` cannot delete versions |
+| Mirror guard | The sync runs only when `parser-dataset/.mirror-seeded` exists and `parser-dataset` holds at least 90% of the AWS object count in the four prefixes; `parser-dataset-seed` (suspended, run on demand) copies AWS into `nl`, checks every AWS object arrived and only then writes the sentinel; a recreated or emptied bucket has no sentinel |
+| AWS prefixes | Mirror-only: an object written straight to the four AWS prefixes is delete-markered by the next sync; write through `seaweedfs-nl` |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
 | Disk guard | 1 GiB volumes; `hel1` `-volume.max=60` (60 GiB), `nl` `-volume.max=200` (200 GiB); read-only below 15% free node disk |
 | Memory | `hel1` server GOMEMLIMIT 512MiB, request 384Mi, limit 768Mi; `nl` server GOMEMLIMIT 320MiB, request 224Mi, limit 512Mi; `meta-backup` request 64Mi |
@@ -581,9 +583,12 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Add a bucket | Entry in `buckets.yaml`; merge; provisioner applies within an hour |
 | Restore the filer store | Commands below: scale to 0, copy `/meta/filerldb` over `/data/filerldb` in a helper pod that mounts both PVCs, scale to 1 |
 | Reissue certificates | Decrypt the CA key on Macie or Archie; issue each cell's two leaves with the SANs below; replace `pki/<cell>-*.crt` and the `s3.key`/`internal.key` values; update the alert threshold |
-| Resolve versioning or lock drift | Cache buckets only: remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |
+| Resolve versioning or lock drift on a cache bucket | Remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |
 | Failed provisioner run | Read `kubectl -n object-store logs job/<job>`; for drift restored on a locked bucket, find who changed it, since the filter admits only the provisioner key; then `kubectl -n object-store delete job <job>` |
-| Restore the parser dataset | Commands below: suspend the mirror, copy AWS back into `parser-dataset` with the `PARSER_DATASET_*` credentials, resume |
+| Any `seaweedfs-nl` incident | Suspend the mirror first (commands below), before investigating |
+| Restore the parser dataset | Commands below: suspend the mirror, run `parser-dataset-seed`, resume |
+| Resolve versioning or lock drift on `parser-dataset` | Suspend the mirror; forced `weed shell` cleanup below with `parser-dataset`; provisioner run; seed; resume |
+| Undo mirror deletions in AWS | Administrator only (`platform-dataset-parser` cannot delete versions): remove the delete markers the mirror wrote since the incident, commands below |
 
 | Leaf | Subject | SAN | Usage |
 | --- | --- | --- | --- |
@@ -597,13 +602,14 @@ kubectl -n object-store create job --from=cronjob/object-store-provisioner provi
 kubectl -n object-store exec -i seaweedfs-hel1-0 -c server -- /usr/bin/weed shell -master=127.0.0.1:9333 <<<'s3.bucket.list'
 ```
 
-Remove a drifted cache bucket, for example `ci-nsql-main`, even while it holds locked objects:
+Remove a drifted bucket, even while it holds locked objects (`parser-dataset` only with the mirror suspended):
 
 ```sh
-kubectl -n object-store exec -i seaweedfs-hel1-0 -c server -- /usr/bin/weed shell -master=127.0.0.1:9333 <<'EOF'
+CELL=hel1 BUCKET=ci-nsql-main
+kubectl -n object-store exec -i "seaweedfs-$CELL-0" -c server -- /usr/bin/weed shell -master=127.0.0.1:9333 <<EOF
 lock
-collection.delete -collection=ci-nsql-main -apply
-fs.rm -r /buckets/ci-nsql-main
+collection.delete -collection=$BUCKET -apply
+fs.rm -r /buckets/$BUCKET
 unlock
 EOF
 kubectl -n object-store create job --from=cronjob/object-store-provisioner provision-now
@@ -651,19 +657,31 @@ kubectl -n object-store delete pod meta-restore
 kubectl -n object-store scale statefulset/seaweedfs-hel1 --replicas=1
 ```
 
-Copy the parser dataset from AWS into `seaweedfs-nl` (restore, or the initial seed):
+Suspend the mirror; Flux would otherwise unsuspend it within 10 minutes:
 
 ```sh
 flux suspend kustomization platform-object-store
 kubectl -n object-store patch cronjob parser-dataset-mirror --type=merge -p '{"spec":{"suspend":true}}'
-kubectl -n object-store create job parser-dataset-restore --from=cronjob/parser-dataset-mirror --dry-run=client -o json \
-  | jq '(.spec.template.spec.containers[0]) |= (
-      .args = ["copy", "aws:llunde-pyparser-bucket", "store:parser-dataset", "--include=/files/**", "--include=/extract/**", "--include=/assets/**", "--include=/convert/**", "--checksum", "--fast-list", "--transfers=16", "--log-level=NOTICE"]
-      | (.env[] | select(.name == "RCLONE_CONFIG_STORE_ACCESS_KEY_ID") | .valueFrom.secretKeyRef.key) = "PARSER_DATASET_ACCESS_KEY_ID"
-      | (.env[] | select(.name == "RCLONE_CONFIG_STORE_SECRET_ACCESS_KEY") | .valueFrom.secretKeyRef.key) = "PARSER_DATASET_SECRET_ACCESS_KEY")' \
-  | kubectl apply -f -
-kubectl -n object-store wait --for=condition=complete job/parser-dataset-restore --timeout=2h
-kubectl -n object-store logs job/parser-dataset-restore
-kubectl -n object-store delete job parser-dataset-restore
+```
+
+Seed or restore `parser-dataset` from AWS, then resume:
+
+```sh
+kubectl -n object-store create job parser-dataset-seed-now --from=cronjob/parser-dataset-seed
+kubectl -n object-store wait --for=condition=complete job/parser-dataset-seed-now --timeout=2h
+kubectl -n object-store logs job/parser-dataset-seed-now
+kubectl -n object-store delete job parser-dataset-seed-now
 flux resume kustomization platform-object-store
+```
+
+Remove the delete markers the mirror wrote in AWS since `SINCE` (UTC), with administrator credentials:
+
+```sh
+SINCE=2026-09-27T12:00:00Z
+for prefix in files/ extract/ assets/ convert/; do
+  aws s3api list-object-versions --bucket llunde-pyparser-bucket --prefix "$prefix" \
+    --query "DeleteMarkers[?IsLatest && LastModified>='$SINCE'].{Key: Key, VersionId: VersionId}" --output json \
+    | jq -c '. // [] | range(0; length; 1000) as $start | {Objects: .[$start:$start + 1000], Quiet: true}' \
+    | while read -r batch; do aws s3api delete-objects --bucket llunde-pyparser-bucket --delete "$batch"; done
+done
 ```

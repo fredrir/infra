@@ -38,6 +38,9 @@ configMapGenerator:
 - name: seaweedfs-s3-filter
   files:
   - s3-filter.caddyfile
+- name: parser-dataset-mirror
+  files:
+  - mirror.sh
 - name: object-store-buckets
   files:
   - buckets.yaml

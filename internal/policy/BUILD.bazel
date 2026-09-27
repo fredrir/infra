@@ -7,6 +7,7 @@ go_test(
         "helpers_test.go",
         "listener_test.go",
         "node_test.go",
+        "objectstore_mirror_test.go",
         "objectstore_project_test.go",
         "objectstore_scrape_test.go",
         "objectstore_test.go",
