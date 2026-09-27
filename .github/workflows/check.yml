@@ -9,6 +9,10 @@ on:
         type: string
         required: true
   workflow_dispatch:
+    inputs:
+      qualify-cold-cache:
+        type: boolean
+        default: false
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
@@ -122,11 +126,26 @@ jobs:
         run: |
           echo 'Artifact preparation is measured separately from the check budget.' >> "$GITHUB_STEP_SUMMARY"
           infra pipeline prepare-check --local --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --report-dir dist/reports/preparation
+      - name: Require uncached test execution
+        id: cold
+        if: inputs.qualify-cold-cache == true
+        env:
+          ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
+          BASE: ${{ steps.affected.outputs.base }}
+        run: |
+          test "$BAZEL_CACHE_IDENTITY" = bazel-cache-check-writer
+          test "$ENDPOINT" = grpc://100.87.168.66:9093
+          test -z "$BASE"
+          python3 -B .github/scripts/cache_cold_qualification.py prepare "$RUNNER_TEMP/bazel-cold"
+          printf 'bazel=%s\n' "$RUNNER_TEMP/bazel-cold" >> "$GITHUB_OUTPUT"
       - name: Check affected targets within aggregate budget
         env:
           BAZEL_REMOTE_CACHE: ${{ steps.bazel-cache.outputs.endpoint }}
           BASE: ${{ steps.affected.outputs.base }}
-        run: infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --local
+        run: infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --local --bazel "${{ steps.cold.outputs.bazel || 'bazel' }}"
+      - name: Verify uncached test evidence
+        if: always() && inputs.qualify-cold-cache == true
+        run: python3 -B .github/scripts/cache_cold_qualification.py verify dist/reports
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: ${{ !cancelled() && env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && steps.repository-cache.outputs.cache-primary-key != '' && steps.repository-cache.outputs.cache-hit != 'true' }}
         with:
