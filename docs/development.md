@@ -253,7 +253,7 @@ infra platform prefetch --namespace llunde --node fredrir-09 \
 | Prefetch prerequisites       | Kubernetes 1.36 image volumes; compatible container runtime; namespace pull credentials; verified owned image digests |
 | Native VM evidence           | [Warm VM qualification](../build/evidence/warm-vm-linux-amd64.json)                                                   |
 | Process metrics | OS-reported command CPU and peak memory; timed-out descendants and external build services may be excluded |
-| Selective GitOps | [Qualified controller and ownership handoff](../build/rollout/flux-artifacts/README.md) |
+| Selective GitOps | [Project artifacts and policy readiness](flux-artifacts.md) |
 
 Initial native preparation is explicit; periodic compilation is disabled to avoid contending with running CI jobs.
 
@@ -263,7 +263,7 @@ Initial native preparation is explicit; periodic compilation is disabled to avoi
 | Execution | CI CLI checksum, engine, platform, build arguments and build targets |
 | Cache identity | Dependency bytes and file modes; archive extraction can change modes and invalidate layers |
 | Qualification | Preparation is reported separately; only a measured CI run establishes deployment latency |
-| Evidence | [Frontend checkout-mode diagnosis and publication breakdown](../build/rollout/flux-artifacts/rollout.json) |
+| Evidence | [Frontend checkout-mode diagnosis and publication breakdown](../build/evidence/flux-artifact-qualification.json) |
 
 Create the preparation checkout from an existing repository:
 

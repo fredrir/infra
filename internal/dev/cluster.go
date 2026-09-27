@@ -34,8 +34,8 @@ const (
 var ErrClusterNotReady = errors.New("cluster kustomizations are not ready")
 
 var ClusterProfiles = map[string][]string{
-	"minimal":  {"platform-policy", "platform-projects"},
-	"platform": {"platform-policy", "platform-projects", "platform-sources", "platform-ingress", "platform-observability", "platform-cache", "platform-object-store", "platform-backups", "platform-dns"},
+	"minimal":  {"platform-policy", "project-llunde", "project-portfolio", "project-y", "project-llunde-pyparser"},
+	"platform": {"platform-policy", "project-llunde", "project-portfolio", "project-y", "project-llunde-pyparser", "platform-sources", "platform-ingress", "platform-observability", "platform-cache", "platform-object-store", "platform-backups", "platform-dns"},
 }
 
 var devSettings = map[string]string{"STORAGE_CLASS": "local-path"}
@@ -355,6 +355,7 @@ func generateRoot(root string, selected []string) ([]byte, error) {
 			for _, dependency := range declared {
 				entry, _ := dependency.(map[string]any)
 				if entry != nil && slices.Contains(selected, fmt.Sprint(entry["name"])) {
+					delete(entry, "readyExpr")
 					dependencies = append(dependencies, dependency)
 				}
 			}

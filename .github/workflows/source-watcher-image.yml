@@ -16,7 +16,7 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     with:
       image: ghcr.io/fredrir/infra-source-watcher
-      dockerfile: build/rollout/flux-artifacts/image/Dockerfile
+      dockerfile: images/source-watcher/Dockerfile
       image-test-command: source-watcher --help >/dev/null
       image-test-shell: sh
       release-cli: true

@@ -286,33 +286,6 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: platform-projects
-  namespace: flux-system
-spec:
-  interval: 10m
-  retryInterval: 1m
-  timeout: 15m
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  path: ./platform/projects
-  prune: true
-  wait: true
-  serviceAccountName: platform-reconciler
-  postBuild:
-    substituteFrom:
-    - kind: ConfigMap
-      name: platform-settings
-  decryption:
-    provider: sops
-    secretRef:
-      name: sops-age
-  dependsOn:
-  - name: platform-policy
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
   name: llunde-pyparser-migration
   namespace: flux-system
 spec:
@@ -320,14 +293,14 @@ spec:
   retryInterval: 1m
   timeout: 15m
   sourceRef:
-    kind: GitRepository
-    name: flux-system
+    kind: ExternalArtifact
+    name: project-llunde-pyparser
   path: ./platform/projects/llunde-pyparser/migration
   prune: true
   wait: true
   serviceAccountName: platform-reconciler
   dependsOn:
-  - name: platform-projects
+  - name: project-llunde-pyparser
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -339,8 +312,8 @@ spec:
   retryInterval: 1m
   timeout: 15m
   sourceRef:
-    kind: GitRepository
-    name: flux-system
+    kind: ExternalArtifact
+    name: project-llunde-pyparser
   path: ./platform/projects/llunde-pyparser/application
   prune: true
   wait: true

@@ -18,7 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const productionOverlay = "build/rollout/flux-artifacts/cutover"
+const productionOverlay = "platform/clusters/production"
 
 type kubernetesState struct {
 	owners      map[string]resource

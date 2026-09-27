@@ -108,7 +108,7 @@ func artifactPaths(generator resource, name string) ([]string, error) {
 		if artifact.OriginRevision != "@repo" || len(artifact.Copy) == 0 {
 			return nil, fmt.Errorf("%s has unsupported artifact provenance", name)
 		}
-		paths := []string{productionOverlay, "build/rollout/flux-artifacts/bootstrap", "build/rollout/flux-artifacts/pause", "platform/clusters/production/flux-system", ".sourceignore", ".gitmodules"}
+		paths := []string{productionOverlay, ".sourceignore", ".gitmodules"}
 		for _, copy := range artifact.Copy {
 			if !strings.HasPrefix(copy.From, "@repo/") {
 				return nil, fmt.Errorf("unsupported artifact input %s", copy.From)

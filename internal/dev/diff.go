@@ -26,7 +26,11 @@ func Diff(ctx context.Context, opts DiffOptions) error {
 	if err != nil {
 		return err
 	}
-	arguments := append([]string{"diff"}, append(t.arguments(), "--ignore-paths=**/*.sops.yaml", "--progress-bar=false")...)
+	arguments, err := t.arguments(opts.State.Root)
+	if err != nil {
+		return err
+	}
+	arguments = append([]string{"diff"}, append(arguments, "--ignore-paths=**/*.sops.yaml", "--progress-bar=false")...)
 	result, err := execute(ctx, opts.Runner, process.Options{Name: "flux", Args: arguments, Stdout: opts.Stdout, Stderr: opts.Stderr})
 	if result.ExitCode == 1 {
 		return ErrDifferences

@@ -18,7 +18,7 @@ import (
 
 type object = map[string]any
 
-const directory = "build/rollout/flux-artifacts"
+const directory = "platform/clusters/production/artifacts"
 
 var projectComponents = map[string][]string{
 	"llunde":          {"netpol-gate/egress"},
@@ -105,11 +105,6 @@ func generate(root string, check bool) error {
 		artifacts = append(artifacts, artifact("project-"+project, "platform/projects/"+project, projectComponents[project]))
 	}
 	sources := object{"apiVersion": "source.extensions.fluxcd.io/v1beta1", "kind": "ArtifactGenerator", "metadata": object{"name": "platform-artifacts", "namespace": "flux-system"}, "spec": object{"sources": []any{object{"alias": "repo", "kind": "GitRepository", "name": "flux-system"}}, "artifacts": artifacts}}
-	rootPatch := func(stage string) object {
-		return patch("flux-system", []object{{"op": "replace", "path": "/spec/path", "value": "./" + directory + "/" + stage}})
-	}
-	bootstrap := overlay([]string{"../../../../platform/clusters/production", "../controller", "sources.yaml"}, []object{rootPatch("bootstrap"), {"target": object{"kind": "Deployment", "name": "kustomize-controller", "namespace": "flux-system"}, "patch": "- op: add\n  path: /spec/template/spec/containers/0/args/-\n  value: --feature-gates=ExternalArtifact=true,AdditiveCELDependencyCheck=true\n"}})
-	pauses := []object{rootPatch("pause"), patch("platform-projects", []object{{"op": "add", "path": "/spec/suspend", "value": true}, {"op": "replace", "path": "/spec/prune", "value": false}, {"op": "add", "path": "/spec/deletionPolicy", "value": "Orphan"}}), patch("platform-policy", []object{{"op": "replace", "path": "/spec/sourceRef", "value": object{"kind": "ExternalArtifact", "name": policyName}}})}
 	for _, root := range roots {
 		metadata, metadataOK := root["metadata"].(map[string]any)
 		spec, specOK := root["spec"].(map[string]any)
@@ -117,14 +112,17 @@ func generate(root string, check bool) error {
 		if !metadataOK || !specOK || !nameOK || name == "" {
 			return fmt.Errorf("production root requires named resources with a spec")
 		}
+		if name == "platform-policy" {
+			spec["sourceRef"] = object{"kind": "ExternalArtifact", "name": policyName}
+		}
 		if dependencies, ok := spec["dependsOn"].([]any); ok {
-			for index, dependency := range dependencies {
+			for _, dependency := range dependencies {
 				dependency, ok := dependency.(map[string]any)
 				if !ok {
 					return fmt.Errorf("production root %s has invalid dependency", name)
 				}
 				if dependency["name"] == "platform-policy" {
-					pauses = append(pauses, patch(name, []object{{"op": "add", "path": fmt.Sprintf("/spec/dependsOn/%d/readyExpr", index), "value": barrier}}))
+					dependency["readyExpr"] = barrier
 				}
 			}
 		}
@@ -137,15 +135,11 @@ func generate(root string, check bool) error {
 		}
 		projectRoots = append(projectRoots, root)
 	}
-	cutovers := []object{rootPatch("cutover")}
-	for _, name := range []string{"llunde-pyparser-migration", "llunde-pyparser-application"} {
-		operations := []object{{"op": "replace", "path": "/spec/sourceRef", "value": object{"kind": "ExternalArtifact", "name": "project-llunde-pyparser"}}}
-		if name == "llunde-pyparser-migration" {
-			operations = append(operations, object{"op": "replace", "path": "/spec/dependsOn", "value": []any{object{"name": "project-llunde-pyparser"}}})
-		}
-		cutovers = append(cutovers, patch(name, operations))
+	files := map[string][]object{
+		"sources.yaml":       {sources},
+		"roots.yaml":         append(roots, projectRoots...),
+		"kustomization.yaml": {{"apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "resources": []string{"sources.yaml", "roots.yaml"}}},
 	}
-	files := map[string][]object{"bootstrap/sources.yaml": {sources}, "bootstrap/kustomization.yaml": {bootstrap}, "pause/kustomization.yaml": {overlay([]string{"../bootstrap"}, pauses)}, "cutover/kustomization.yaml": {overlay([]string{"../pause", "projects.yaml"}, cutovers)}, "cutover/projects.yaml": projectRoots}
 	for path, documents := range files {
 		var output bytes.Buffer
 		encoder := yaml.NewEncoder(&output)
@@ -165,7 +159,7 @@ func generate(root string, check bool) error {
 				return err
 			}
 			if !bytes.Equal(current, output.Bytes()) {
-				return fmt.Errorf("stale %s; run go -C %s/generate run .", path, directory)
+				return fmt.Errorf("stale %s; run go -C platform/generate run .", path)
 			}
 		} else {
 			if err := os.MkdirAll(filepath.Dir(filepath.Join(root, path)), 0755); err != nil {
@@ -179,20 +173,8 @@ func generate(root string, check bool) error {
 	return nil
 }
 
-func patch(name string, operations []object) object {
-	data, err := yaml.Marshal(operations)
-	if err != nil {
-		panic(err)
-	}
-	return object{"target": object{"group": "kustomize.toolkit.fluxcd.io", "kind": "Kustomization", "name": name, "namespace": "flux-system"}, "patch": string(data)}
-}
-
-func overlay(resources []string, patches []object) object {
-	return object{"apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "resources": resources, "patches": patches}
-}
-
 func validateArtifacts(repository string, render func(string) ([]byte, error)) error {
-	data, err := os.ReadFile(filepath.Join(repository, directory, "bootstrap/sources.yaml"))
+	data, err := os.ReadFile(filepath.Join(repository, directory, "sources.yaml"))
 	if err != nil {
 		return err
 	}

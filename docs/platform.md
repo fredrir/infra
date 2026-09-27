@@ -24,7 +24,7 @@
 | Ansible                  | Host packages, SSH, firewall, Tailscale, K3s, containerd and native services         |
 | Flux platform reconciler | Shared services, project namespaces, network policy, admission and encrypted secrets |
 | Flux project reconcilers | Four project owners consume content-addressed artifacts; policy readiness and parser migration ordering remain required |
-| Source watcher | [Selective reconciliation, generation and rollback](../build/rollout/flux-artifacts/README.md) |
+| Source watcher | [Selective reconciliation and generation](flux-artifacts.md) |
 | Project repository       | Source, native tests, Dockerfiles and a pinned shared workflow caller                |
 | Deployment workflow            | Verified image digest and source revision, limited to the configured application     |
 | Application owner        | Database schema compatibility and recovery requirements                              |

@@ -100,7 +100,7 @@ func affectedDeployment(paths []string) Selection {
 }
 
 func sharedDeploymentInput(path string) bool {
-	for _, prefix := range []string{"tailscale/", "build/rollout/flux-artifacts/", "platform/components/policy/", "platform/clusters/production/flux-system/"} {
+	for _, prefix := range []string{"tailscale/", "platform/generate/", "platform/clusters/production/artifacts/", "platform/clusters/production/source-watcher/", "build/rollout/flux-artifacts/cutover/", "platform/components/policy/", "platform/clusters/production/flux-system/"} {
 		if strings.HasPrefix(path, prefix) {
 			return true
 		}

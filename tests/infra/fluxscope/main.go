@@ -219,7 +219,7 @@ func execute(root, cluster, output string, reuse, keep bool) error {
 
 func (f fixture) controllers() error {
 	var objects []object
-	for _, path := range []string{"platform/clusters/production/flux-system/gotk-components.yaml", "build/rollout/flux-artifacts/controller/source-watcher.yaml", "build/rollout/flux-artifacts/controller/rbac.yaml"} {
+	for _, path := range []string{"platform/clusters/production/flux-system/gotk-components.yaml", "platform/clusters/production/source-watcher/source-watcher.yaml", "platform/clusters/production/source-watcher/rbac.yaml"} {
 		values, err := readObjects(filepath.Join(f.root, path))
 		if err != nil {
 			return err
@@ -595,7 +595,12 @@ func (f fixture) permissions() error {
 		return err
 	}
 	var policy []object
+	namespaces := map[string]bool{"flux-system": true}
 	for _, obj := range objects {
+		if namespace := text(obj, "metadata", "namespace"); namespace != "" && !namespaces[namespace] {
+			policy = append(policy, object{"apiVersion": "v1", "kind": "Namespace", "metadata": object{"name": namespace}})
+			namespaces[namespace] = true
+		}
 		if obj["kind"] != "Secret" {
 			policy = append(policy, obj)
 		}
@@ -611,7 +616,7 @@ func (f fixture) permissions() error {
 		{"get", "artifactgenerators/platform-artifacts", "flux-system", true},
 		{"get", "artifactgenerators/other", "flux-system", false},
 		{"get", "deployments", "not-created", true},
-		{"list", "deployments", "flux-system", false},
+		{"list", "deployments", "flux-system", true},
 		{"get", "secrets", "flux-system", false},
 		{"patch", "deployments", "flux-system", false},
 		{"get", "externalartifacts", "other", false},

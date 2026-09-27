@@ -55,6 +55,7 @@ func fluxRunner(t *testing.T, root string, calls *[]process.Options) process.Run
 
 func TestRenderSubstitutesSettingsAndReportsLeftovers(t *testing.T) {
 	root := t.TempDir()
+	writeFile(t, filepath.Join(root, clusterKustomizations), fixtureRoot)
 	writeFile(t, filepath.Join(root, settingsFile), "apiVersion: v1\nkind: ConfigMap\ndata:\n  STORAGE_CLASS: local-path\n  GRAFANA_HOST: grafana.example.test\n")
 	var calls []process.Options
 	runner := fluxRunner(t, root, &calls)
@@ -89,6 +90,7 @@ func TestRenderSubstitutesSettingsAndReportsLeftovers(t *testing.T) {
 
 func TestRenderTargetsOneProject(t *testing.T) {
 	root := t.TempDir()
+	writeFile(t, filepath.Join(root, clusterKustomizations), fixtureRoot)
 	writeFile(t, filepath.Join(root, settingsFile), "data:\n  STORAGE_CLASS: local-path\n")
 	var calls []process.Options
 	runner := fluxRunner(t, root, &calls)
@@ -103,7 +105,7 @@ func TestRenderTargetsOneProject(t *testing.T) {
 	if report, err := Render(context.Background(), RenderOptions{State: NewState(root), Runner: runner, Project: "llunde", Output: output}); err != nil || report.Output != output {
 		t.Fatalf("explicit output not honored: %+v, %v", report, err)
 	}
-	for _, argument := range []string{"platform-projects", "--path=./platform/projects/llunde", "--kustomization-file=platform/clusters/production/root.yaml"} {
+	for _, argument := range []string{"project-llunde", "--path=./platform/projects/llunde", "--kustomization-file=platform/clusters/production/artifacts/roots.yaml"} {
 		if !slices.Contains(calls[0].Args, argument) {
 			t.Errorf("project build lacks %s: %v", argument, calls[0].Args)
 		}
@@ -117,6 +119,7 @@ func TestRenderTargetsOneProject(t *testing.T) {
 
 func TestRenderRequiresSettingsAndReportsBuildFailures(t *testing.T) {
 	root := t.TempDir()
+	writeFile(t, filepath.Join(root, clusterKustomizations), fixtureRoot)
 	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		t.Fatal("flux executed without settings")
 		return process.Result{}, nil
@@ -135,6 +138,7 @@ func TestRenderRequiresSettingsAndReportsBuildFailures(t *testing.T) {
 
 func TestDiffReportsDifferencesByExitCode(t *testing.T) {
 	root := t.TempDir()
+	writeFile(t, filepath.Join(root, clusterKustomizations), fixtureRoot)
 	expected := []string{"diff", "kustomization", "flux-system", "--path=./platform/clusters/production", "--kustomization-file=platform/clusters/production/flux-system/gotk-sync.yaml", "--recursive", "--local-sources=GitRepository/flux-system/flux-system=.", "--ignore-paths=**/*.sops.yaml", "--progress-bar=false"}
 	for _, test := range []struct {
 		code   int
@@ -164,5 +168,22 @@ func TestDiffReportsDifferencesByExitCode(t *testing.T) {
 		if !strings.Contains(stdout.String(), "drifted") {
 			t.Fatal("diff output not streamed")
 		}
+	}
+}
+
+func TestRenderMapsEveryExternalArtifactToLocalSources(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, clusterKustomizations), "spec:\n  sourceRef: {kind: ExternalArtifact, name: project-llunde}\n---\nspec:\n  sourceRef: {kind: ExternalArtifact, name: platform-policy-current}\n---\nspec:\n  sourceRef: {kind: ExternalArtifact, name: project-llunde}\n")
+	target, err := selectTarget("llunde")
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments, err := target.arguments(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "--local-sources=ExternalArtifact/flux-system/platform-policy-current=.,ExternalArtifact/flux-system/project-llunde=.,GitRepository/flux-system/flux-system=."
+	if !slices.Contains(arguments, want) {
+		t.Fatalf("external artifacts missing from local render sources: %v", arguments)
 	}
 }

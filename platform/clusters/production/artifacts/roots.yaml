@@ -1,0 +1,468 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-sources
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  interval: 10m
+  path: ./platform/components/sources
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-policy
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  interval: 10m
+  path: ./platform/components/policy
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  sourceRef:
+    kind: ExternalArtifact
+    name: platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-dns
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  interval: 10m
+  path: ./platform/components/dns
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-controllers
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    - name: platform-sources
+  interval: 10m
+  path: ./platform/components/controllers
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-ingress
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    - name: platform-sources
+    - name: platform-observability
+  interval: 10m
+  path: ./platform/components/ingress
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-observability
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    - name: platform-sources
+  interval: 10m
+  path: ./platform/components/observability
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-runners
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-controllers
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    - name: platform-cache
+  interval: 10m
+  path: ./platform/components/runners
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-cache
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  interval: 10m
+  path: ./platform/components/cache
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-bazel-cache
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  interval: 10m
+  path: ./platform/components/bazel-cache
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-object-store
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  interval: 10m
+  path: ./platform/components/object-store
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-backups
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  interval: 10m
+  path: ./platform/components/backups
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: llunde-pyparser-migration
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: project-llunde-pyparser
+  interval: 10m
+  path: ./platform/projects/llunde-pyparser/migration
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: ExternalArtifact
+    name: project-llunde-pyparser
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: llunde-pyparser-application
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: llunde-pyparser-migration
+  interval: 10m
+  path: ./platform/projects/llunde-pyparser/application
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: ExternalArtifact
+    name: project-llunde-pyparser
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-netpol-gate
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  interval: 10m
+  path: ./platform/components/netpol-gate
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: project-llunde
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  interval: 10m
+  path: ./platform/projects/llunde
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: ExternalArtifact
+    name: project-llunde
+  timeout: 15m
+  wait: false
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: project-portfolio
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  interval: 10m
+  path: ./platform/projects/portfolio
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: ExternalArtifact
+    name: project-portfolio
+  timeout: 15m
+  wait: false
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: project-y
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  interval: 10m
+  path: ./platform/projects/y
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: ExternalArtifact
+    name: project-y
+  timeout: 15m
+  wait: false
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: project-llunde-pyparser
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-c8d82c476eadd9c90a597127eba8e4fa19858a18' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: postgres
+      namespace: llunde-pyparser
+  interval: 10m
+  path: ./platform/projects/llunde-pyparser
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: platform-settings
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: ExternalArtifact
+    name: project-llunde-pyparser
+  timeout: 15m
+  wait: false

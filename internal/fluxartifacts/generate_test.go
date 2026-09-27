@@ -26,11 +26,11 @@ func TestPolicyChangesRequireRegeneratedBarrier(t *testing.T) {
 	}
 	write("platform/components/policy/policy.yaml", "policy: initial\n")
 	write("platform/clusters/production/settings.yaml", "settings: initial\n")
-	write("platform/clusters/production/root.yaml", "apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: platform-projects\nspec:\n  dependsOn:\n  - name: platform-policy\n")
+	write("platform/clusters/production/root.yaml", "apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: platform-cache\nspec:\n  dependsOn:\n  - name: platform-policy\n")
 	if err := generate(root, false); err != nil {
 		t.Fatal(err)
 	}
-	projects, err := os.ReadFile(filepath.Join(root, directory, "cutover/projects.yaml"))
+	projects, err := os.ReadFile(filepath.Join(root, directory, "roots.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestPolicyChangesRequireRegeneratedBarrier(t *testing.T) {
 	if err := generate(root, true); err != nil {
 		t.Fatal(err)
 	}
-	before, err := os.ReadFile(filepath.Join(root, directory, "pause/kustomization.yaml"))
+	before, err := os.ReadFile(filepath.Join(root, directory, "roots.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestPolicyChangesRequireRegeneratedBarrier(t *testing.T) {
 	if err := generate(root, false); err != nil {
 		t.Fatal(err)
 	}
-	after, err := os.ReadFile(filepath.Join(root, directory, "pause/kustomization.yaml"))
+	after, err := os.ReadFile(filepath.Join(root, directory, "roots.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestPolicyChangesRequireRegeneratedBarrier(t *testing.T) {
 	if err := generate(root, true); err == nil {
 		t.Fatal("shared settings accepted stale policy barrier")
 	}
-	for _, invalid := range []string{"metadata: {}\n", "metadata: {name: platform-projects}\nspec: {dependsOn: [invalid]}\n"} {
+	for _, invalid := range []string{"metadata: {}\n", "metadata: {name: platform-cache}\nspec: {dependsOn: [invalid]}\n"} {
 		write("platform/clusters/production/root.yaml", invalid)
 		if err := Run(root, false); err == nil {
 			t.Fatal("malformed production root accepted")
@@ -138,7 +138,7 @@ func TestArtifactCheckIncludesParserChildrenAndPropagatesRenderFailure(t *testin
 		write(path, "resources: []\n")
 	}
 	write("platform/clusters/production/settings.yaml", "settings: fixture\n")
-	write("platform/clusters/production/root.yaml", "metadata:\n  name: platform-projects\nspec: {}\n")
+	write("platform/clusters/production/root.yaml", "metadata:\n  name: platform-cache\nspec: {}\n")
 	if err := Run(root, false); err != nil {
 		t.Fatal(err)
 	}

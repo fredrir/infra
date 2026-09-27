@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	check := flag.Bool("check", false, "Reject stale generated overlays")
-	root := flag.String("root", "../../../..", "Repository root")
+	check := flag.Bool("check", false, "Reject stale generated artifacts")
+	root := flag.String("root", "../..", "Repository root")
 	flag.Parse()
 	if err := fluxartifacts.Run(*root, *check); err != nil {
 		fmt.Fprintln(os.Stderr, err)

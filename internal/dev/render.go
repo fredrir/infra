@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
+	"strings"
 
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
@@ -16,9 +18,8 @@ import (
 
 const (
 	rootKustomizationFile = "platform/clusters/production/flux-system/gotk-sync.yaml"
-	clusterKustomizations = "platform/clusters/production/root.yaml"
+	clusterKustomizations = "platform/clusters/production/artifacts/roots.yaml"
 	settingsFile          = "platform/clusters/production/settings.yaml"
-	localSources          = "GitRepository/flux-system/flux-system=."
 )
 
 type RenderOptions struct {
@@ -47,11 +48,34 @@ func selectTarget(project string) (target, error) {
 	if !projectNamePattern.MatchString(project) {
 		return target{}, fmt.Errorf("invalid project name %q", project)
 	}
-	return target{"platform-projects", "./platform/projects/" + project, clusterKustomizations, "project-" + project + ".yaml"}, nil
+	return target{"project-" + project, "./platform/projects/" + project, clusterKustomizations, "project-" + project + ".yaml"}, nil
 }
 
-func (t target) arguments() []string {
-	return []string{"kustomization", t.name, "--path=" + t.path, "--kustomization-file=" + t.kustomizationFile, "--recursive", "--local-sources=" + localSources}
+func (t target) arguments(root string) ([]string, error) {
+	data, err := os.ReadFile(filepath.Join(root, clusterKustomizations))
+	if err != nil {
+		return nil, err
+	}
+	sources := []string{"GitRepository/flux-system/flux-system=."}
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	for {
+		var owner struct {
+			Spec struct {
+				SourceRef struct{ Kind, Name string } `yaml:"sourceRef"`
+			}
+		}
+		if err := decoder.Decode(&owner); err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		if ref := owner.Spec.SourceRef; ref.Kind == "ExternalArtifact" {
+			sources = append(sources, ref.Kind+"/flux-system/"+ref.Name+"=.")
+		}
+	}
+	slices.Sort(sources)
+	sources = slices.Compact(sources)
+	return []string{"kustomization", t.name, "--path=" + t.path, "--kustomization-file=" + t.kustomizationFile, "--recursive", "--local-sources=" + strings.Join(sources, ",")}, nil
 }
 
 func Render(ctx context.Context, opts RenderOptions) (RenderReport, error) {
@@ -71,7 +95,11 @@ func Render(ctx context.Context, opts RenderOptions) (RenderReport, error) {
 		return report, err
 	}
 	built := filepath.Join(opts.State.Render(), "build-"+t.output)
-	arguments := append([]string{"build"}, append(t.arguments(), "--dry-run")...)
+	arguments, err := t.arguments(opts.State.Root)
+	if err != nil {
+		return report, err
+	}
+	arguments = append([]string{"build"}, append(arguments, "--dry-run")...)
 	if err := runToFile(ctx, opts.Runner, built, process.Options{Name: "flux", Args: arguments}); err != nil {
 		return report, fmt.Errorf("flux build: %w", err)
 	}

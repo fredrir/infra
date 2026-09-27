@@ -370,8 +370,8 @@ func TestGeneratedOverlaysValidateOnEveryGeneratorInput(t *testing.T) {
 		"platform/projects/portfolio/deployment.yaml",
 		"platform/clusters/production/root.yaml",
 		"platform/clusters/production/settings.yaml",
-		"build/rollout/flux-artifacts/cutover/kustomization.yaml",
-		"build/rollout/flux-artifacts/generate/main.go",
+		"platform/clusters/production/artifacts/kustomization.yaml",
+		"platform/generate/main.go",
 		"internal/fluxartifacts/generate.go",
 		"internal/ci/validate.go",
 	} {

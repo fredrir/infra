@@ -66,3 +66,9 @@ filegroup(
     srcs = glob(["components/bazel-cache/**"]),
     visibility = ["//internal/contracts:__pkg__"],
 )
+
+filegroup(
+    name = "flux_artifacts_data",
+    srcs = glob(["clusters/production/**/*.yaml"]),
+    visibility = ["//internal/contracts:__pkg__"],
+)

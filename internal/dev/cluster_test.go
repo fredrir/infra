@@ -37,11 +37,11 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: platform-projects
+  name: project-llunde
   namespace: flux-system
 spec:
   interval: 10m
-  path: ./platform/projects
+  path: ./platform/projects/llunde
   prune: true
   sourceRef:
     kind: GitRepository
@@ -65,7 +65,11 @@ spec:
 func clusterRoot(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, clusterKustomizations), fixtureRoot)
+	rootFixture := fixtureRoot
+	for _, name := range ClusterProfiles["minimal"][2:] {
+		rootFixture += fmt.Sprintf("---\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: %s\n  namespace: flux-system\nspec:\n  path: ./platform/projects/example\n  dependsOn:\n  - name: platform-policy\n    readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact'\n", name)
+	}
+	writeFile(t, filepath.Join(root, clusterKustomizations), rootFixture)
 	writeFile(t, filepath.Join(root, settingsFile), "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: platform-settings\n  namespace: flux-system\ndata:\n  STORAGE_CLASS: local-retain\n  GRAFANA_HOST: grafana.example.test\n")
 	writeFile(t, filepath.Join(root, clusterPatchesFile), "- target:\n    kind: Deployment\n  patch: |\n    - op: add\n      path: /spec/replicas\n      value: 0\n")
 	writeFile(t, filepath.Join(root, clusterConfigFile), "apiVersion: k3d.io/v1alpha5\nkind: Simple\n")
@@ -150,7 +154,12 @@ func (f *clusterFake) runner() process.Runner {
 			if !f.ready {
 				condition = "False"
 			}
-			return process.Result{Stdout: []byte(`{"items":[{"metadata":{"name":"platform-policy"},"status":{"lastAppliedRevision":"dev@sha1:` + strings.Repeat("c", 40) + `","conditions":[{"type":"Ready","status":"True","message":"Applied revision"}]}},{"metadata":{"name":"platform-projects"},"status":{"conditions":[{"type":"Ready","status":"` + condition + `","message":"health check"}]}}]}`)}, nil
+			var items []map[string]any
+			for _, name := range ClusterProfiles["minimal"] {
+				items = append(items, map[string]any{"metadata": map[string]any{"name": name}, "status": map[string]any{"lastAppliedRevision": "dev@sha1:" + strings.Repeat("c", 40), "conditions": []map[string]any{{"type": "Ready", "status": condition, "message": "health check"}}}})
+			}
+			data, err := json.Marshal(map[string]any{"items": items})
+			return process.Result{Stdout: data}, err
 		}
 		return process.Result{}, nil
 	}}
@@ -174,11 +183,11 @@ func TestClusterUpCreatesClusterInstallsFluxAndReconcilesArtifact(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !status.Running || status.Revision != strings.Repeat("c", 40) || len(status.Kustomizations) != 2 || !status.Kustomizations[1].Ready {
+	if !status.Running || status.Revision != strings.Repeat("c", 40) || len(status.Kustomizations) != len(ClusterProfiles["minimal"]) || !status.Kustomizations[1].Ready {
 		t.Fatalf("unexpected status %+v", status)
 	}
 	config, _ := filepath.Abs(filepath.Join(root, clusterConfigFile))
-	for _, expected := range []string{"k3d cluster create --config " + config, "k3d kubeconfig get infra-dev", "kubectl apply --server-side --force-conflicts -f " + filepath.Join(root, fluxComponentsFile), "kubectl wait --for=condition=Established", "kubectl rollout status deployment/source-controller", "kubectl rollout status deployment/kustomize-controller", "kubectl rollout status deployment/helm-controller", "age-keygen -o " + filepath.Join(root, ".cache/dev/cluster/age.key"), "kubectl apply --server-side --force-conflicts -f -", "flux push artifact oci://127.0.0.1:5111/platform:dev --path=" + filepath.Join(root, ".cache/dev/cluster/artifact") + " --source=git@github.com:fredrir/infra.git --revision=dev@sha1:" + strings.Repeat("c", 40) + " --insecure-registry --provider=generic", "kubectl apply --server-side --force-conflicts -f " + filepath.Join(root, ".cache/dev/cluster/root.yaml"), "flux reconcile source oci platform-dev", "kubectl wait kustomization/platform-policy --namespace=flux-system --for=condition=Ready", "kubectl wait kustomization/platform-projects", "kubectl get kustomizations.kustomize.toolkit.fluxcd.io --namespace=flux-system --output=json"} {
+	for _, expected := range []string{"k3d cluster create --config " + config, "k3d kubeconfig get infra-dev", "kubectl apply --server-side --force-conflicts -f " + filepath.Join(root, fluxComponentsFile), "kubectl wait --for=condition=Established", "kubectl rollout status deployment/source-controller", "kubectl rollout status deployment/kustomize-controller", "kubectl rollout status deployment/helm-controller", "age-keygen -o " + filepath.Join(root, ".cache/dev/cluster/age.key"), "kubectl apply --server-side --force-conflicts -f -", "flux push artifact oci://127.0.0.1:5111/platform:dev --path=" + filepath.Join(root, ".cache/dev/cluster/artifact") + " --source=git@github.com:fredrir/infra.git --revision=dev@sha1:" + strings.Repeat("c", 40) + " --insecure-registry --provider=generic", "kubectl apply --server-side --force-conflicts -f " + filepath.Join(root, ".cache/dev/cluster/root.yaml"), "flux reconcile source oci platform-dev", "kubectl wait kustomization/platform-policy --namespace=flux-system --for=condition=Ready", "kubectl wait kustomization/project-llunde --namespace=flux-system", "kubectl get kustomizations.kustomize.toolkit.fluxcd.io --namespace=flux-system --output=json"} {
 		if fake.count(expected) != 1 {
 			t.Errorf("expected exactly one %q, got %d in %v", expected, fake.count(expected), fake.commands)
 		}
@@ -238,7 +247,7 @@ func TestClusterSyncReportsUnreadyKustomizations(t *testing.T) {
 	}
 	writeFile(t, filepath.Join(root, ".cache/dev/cluster/kubeconfig"), "kind: Config\n")
 	status, err := ClusterSync(context.Background(), ClusterOptions{State: NewState(root), Runner: fake.runner(), Profile: "minimal"})
-	if !errors.Is(err, ErrClusterNotReady) || len(status.Kustomizations) != 2 || status.Kustomizations[1].Ready || status.Kustomizations[1].Message != "health check" {
+	if !errors.Is(err, ErrClusterNotReady) || len(status.Kustomizations) != len(ClusterProfiles["minimal"]) || status.Kustomizations[1].Ready || status.Kustomizations[1].Message != "health check" {
 		t.Fatalf("unready kustomization not reported: %v %+v", err, status)
 	}
 	if _, err := ClusterSync(context.Background(), ClusterOptions{State: NewState(root), Runner: fake.runner(), Profile: "everything"}); err == nil {
@@ -267,8 +276,11 @@ func TestGenerateRootRetargetsSelectedKustomizations(t *testing.T) {
 		}
 		documents = append(documents, document)
 	}
-	if len(documents) != 4 {
-		t.Fatalf("expected source, settings and two kustomizations, got %d", len(documents))
+	if strings.Contains(string(data), "readyExpr") {
+		t.Fatal("local OCI dependencies retained an ExternalArtifact readiness expression")
+	}
+	if len(documents) != 2+len(ClusterProfiles["minimal"]) {
+		t.Fatalf("expected source, settings and project kustomizations, got %d", len(documents))
 	}
 	source := documents[0]["spec"].(map[string]any)
 	if documents[0]["kind"] != "OCIRepository" || source["url"] != "oci://infra-dev-registry:5000/platform" || source["insecure"] != true || source["ref"].(map[string]any)["tag"] != "dev" {
@@ -279,7 +291,7 @@ func TestGenerateRootRetargetsSelectedKustomizations(t *testing.T) {
 		t.Fatalf("unexpected settings %+v", settings)
 	}
 	projects := documents[3]["spec"].(map[string]any)
-	if documents[3]["metadata"].(map[string]any)["name"] != "platform-projects" || projects["sourceRef"].(map[string]any)["kind"] != "OCIRepository" || projects["sourceRef"].(map[string]any)["name"] != "platform-dev" || projects["interval"] != "1m" || projects["wait"] != false || projects["timeout"] != "2m" {
+	if documents[3]["metadata"].(map[string]any)["name"] != "project-llunde" || projects["sourceRef"].(map[string]any)["kind"] != "OCIRepository" || projects["sourceRef"].(map[string]any)["name"] != "platform-dev" || projects["interval"] != "1m" || projects["wait"] != false || projects["timeout"] != "2m" {
 		t.Fatalf("projects not retargeted: %+v", projects)
 	}
 	if dependencies := projects["dependsOn"].([]any); len(dependencies) != 1 || dependencies[0].(map[string]any)["name"] != "platform-policy" {
@@ -325,7 +337,7 @@ func TestClusterDownDeletesClusterAndKubeconfig(t *testing.T) {
 	fake := &clusterFake{t: t, root: root, stdin: map[string]string{}, exists: true, running: 1}
 	writeFile(t, filepath.Join(root, ".cache/dev/cluster/kubeconfig"), "kind: Config\n")
 	status, err := InspectCluster(context.Background(), ClusterOptions{State: NewState(root), Runner: fake.runner()})
-	if err != nil || !status.Running || len(status.Kustomizations) != 2 {
+	if err != nil || !status.Running || len(status.Kustomizations) != len(ClusterProfiles["minimal"]) {
 		t.Fatalf("running cluster not inspected: %v %+v", err, status)
 	}
 	if err := ClusterDown(context.Background(), ClusterOptions{State: NewState(root), Runner: fake.runner()}); err != nil {

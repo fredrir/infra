@@ -5,4 +5,14 @@ metadata:
 resources:
 - flux-system
 - settings.yaml
-- root.yaml
+- artifacts
+- source-watcher
+patches:
+- target:
+    kind: Deployment
+    name: kustomize-controller
+    namespace: flux-system
+  patch: |
+    - op: add
+      path: /spec/template/spec/containers/0/args/-
+      value: --feature-gates=ExternalArtifact=true,AdditiveCELDependencyCheck=true
