@@ -308,6 +308,24 @@ func (f *provenanceFixture) read(name string) string {
 	return string(data)
 }
 
+func (f *provenanceFixture) makeExecutable(name string) {
+	f.t.Helper()
+	if err := os.Chmod(filepath.Join(f.root, name), 0o755); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func (f *provenanceFixture) symlinkKeepingContent(name string) {
+	f.t.Helper()
+	content, path := f.read(name), filepath.Join(f.root, name)
+	if err := os.Remove(path); err != nil {
+		f.t.Fatal(err)
+	}
+	if err := os.Symlink(content, path); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
 func (f *provenanceFixture) attestation(ctx context.Context, options process.Options) (process.Result, error) {
 	if options.Name != "gh" && options.Name != "cosign" {
 		return process.Run(ctx, options)
@@ -435,6 +453,30 @@ func provenanceGateCases() []provenanceGateCase {
 		{name: "receipt without pins", build: func(f *provenanceFixture) string {
 			return f.commit("", "Deploy example", map[string]string{"platform/projects/example/.deployments/example.json": strings.ReplaceAll(f.read("platform/projects/example/.deployments/example.json"), `"run_id": 100`, `"run_id": 101`)})
 		}, unverified: "a deployment changes"},
+		{name: "deployment with two receipts", build: func(f *provenanceFixture) string {
+			f.deploy(deployedImage, 101)
+			return f.amend(map[string]string{"platform/projects/example/.deployments/second.json": f.read("platform/projects/example/.deployments/example.json")})
+		}, unverified: "not a deployment: changes 2 deployment receipts"},
+		{name: "deployment that makes its receipt executable", build: func(f *provenanceFixture) string {
+			f.deploy(deployedImage, 101)
+			f.makeExecutable("platform/projects/example/.deployments/example.json")
+			return f.amend(nil)
+		}, unverified: "platform/projects/example/.deployments/example.json is not a regular file addition or content change"},
+		{name: "first deployment with an executable receipt", build: func(f *provenanceFixture) string {
+			f.deploy(releasedImage, 101)
+			f.makeExecutable("platform/projects/web/.deployments/web.json")
+			return f.amend(nil)
+		}, unverified: "platform/projects/web/.deployments/web.json is not a regular file addition or content change"},
+		{name: "first deployment with a symlinked receipt", build: func(f *provenanceFixture) string {
+			f.deploy(releasedImage, 101)
+			f.symlinkKeepingContent("platform/projects/web/.deployments/web.json")
+			return f.amend(nil)
+		}, unverified: "platform/projects/web/.deployments/web.json is not a regular file addition or content change"},
+		{name: "deployment that turns a pin into a symlink", build: func(f *provenanceFixture) string {
+			f.deploy(deployedImage, 101)
+			f.symlinkKeepingContent("platform/projects/example/application/kustomization.yaml")
+			return f.amend(nil)
+		}, unverified: "platform/projects/example/application/kustomization.yaml is not a regular file addition or content change"},
 		{name: "unattested deployment", build: func(f *provenanceFixture) string {
 			deployed := f.deploy(deployedImage, 101)
 			clear(f.attested)
@@ -472,6 +514,14 @@ func provenanceGateCases() []provenanceGateCase {
 		{name: "acknowledged by an unsigned commit", build: func(f *provenanceFixture) string {
 			failing := f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
 			return f.commit("", "Accept the change\n\n"+acknowledgementTrailer+": "+failing, nil)
+		}, unverified: `"Change infrastructure": unsigned`},
+		{name: "acknowledged from a parallel branch", build: func(f *provenanceFixture) string {
+			f.git("checkout", "--quiet", "-b", "side")
+			failing := f.commit("", "Change infrastructure", map[string]string{"tofu/main.tf": "# visitor\n"})
+			f.git("checkout", "--quiet", "main")
+			f.commit(f.owner, "Accept the change\n\n"+acknowledgementTrailer+": "+failing, nil)
+			f.git("-c", "user.signingkey="+f.owner, "merge", "--quiet", "--no-ff", "--gpg-sign", "--message", "Merge side", "side")
+			return f.head()
 		}, unverified: `"Change infrastructure": unsigned`},
 		{name: "signed merge", build: func(f *provenanceFixture) string {
 			f.git("checkout", "--quiet", "-b", "signed")
