@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "date": "2026-09-27",
+  "commit": "17ce69d73b6b07aca45c1c332c3b6b5964b5afe0",
+  "change": "Rust main and PR pools prefer fredrir-04 and no longer tolerate fredrir-10; CPU request 750m; cargo fmt --check runs alongside the fast unit tests",
+  "nsql_commit": "1a73eb38ea11398fc22485733b15c54c45b4bad5",
+  "nsql_run": 36254754345,
+  "stage_seconds": {
+    "fredrir_10_warm_sccache": {"rust_preparation": 220.99, "checks": 10.11, "checks_passed": false},
+    "fredrir_04_before_seaweedfs": {"rust_preparation": 102, "checks": 5.0, "checks_passed": true},
+    "fredrir_04_with_hel1_cache": {"rust_preparation": 71.53, "checks": 3.50, "checks_passed": true}
+  },
+  "notes": [
+    "fredrir-10 was CPU-bound at 3.6-7.8x the CPU per unit of work of fredrir-04, with idle disk and no steal",
+    "The hel1 SeaweedFS cell runs on fredrir-04, the same node as the Rust runners"
+  ],
+  "limitations": ["One sample per condition"]
+}
