@@ -15,7 +15,7 @@ resources:
 components:
     - ../../components/netpol-gate/egress
 images:
-    - digest: sha256:5cceb5f25457c48f8755ab7f9633d40ddccd06b8360e247f730e79c3168a8372
+    - digest: sha256:3de20cb2b2f54114d51dd60267c4beb556e72e18d0b697bf078ebd25e41546a8
       name: ghcr.io/fredrir/llunde-backend
       newName: ghcr.io/fredrir/llunde-backend
     - digest: sha256:fd46ecc049188e1a258c2e86ce93229d6c4c34806f4c4d3b50ec53f63f1939bd
