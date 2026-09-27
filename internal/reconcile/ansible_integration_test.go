@@ -410,6 +410,35 @@ esac
 		t.Fatalf("requested runner restart restarted %q, want only %s:\n%s", strings.TrimPrefix(restarted(), steady), runnerUnit("Y"), output)
 	}
 	t.Log("runners reported offline restart without restarting the rest of the fleet")
+	for repository, home := range homes {
+		command("docker", "exec", name, "setpriv", "--reuid="+home, "--regid="+home, "--clear-groups", "sh", "-c", `umask 0077 && mkdir -p "$1" && printf x > "$1/package.json"`, "checkout", "/home/"+home+"/"+repository+"-1/_work/"+repository+"/"+repository)
+	}
+	put("runner-infra/infra-1/bin/Runner.Worker", "#!/bin/sh\nwhile [ -e /fixture/state/job-infra ]; do sleep 0.1; done\n", true)
+	write("state/job-infra", "", false)
+	command("docker", "exec", "-d", name, "/home/runner-infra/infra-1/bin/Runner.Worker", "spawnclient", "1", "2")
+	yStarted := record("started-" + runnerUnit("Y"))
+	converge()
+	if present("runner-y/Y-1/_work") || record("stopped") != runnerUnit("Y")+"\n" || record("started-"+runnerUnit("Y")) == yStarted {
+		t.Fatalf("an idle listener kept a checkout written under the former umask: stopped %q", record("stopped"))
+	}
+	if !present("runner-infra/infra-1/_work/infra/infra/package.json") {
+		t.Fatalf("a busy listener lost its checkout mid-job: stopped %q", record("stopped"))
+	}
+	remove("state/job-infra")
+	if exec.CommandContext(ctx, "docker", "exec", name, "sh", "-c", "while pgrep --full '/bin/Runner[.]Worker' > /dev/null; do sleep 0.1; done").Run() != nil {
+		t.Fatal("simulated job did not finish")
+	}
+	converge()
+	if present("runner-infra/infra-1/_work") {
+		t.Fatal("a listener kept its unreadable checkout after its job finished")
+	}
+	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") {
+		t.Fatalf("replaced checkouts do not converge:\n%s", output)
+	}
+	drop("runner-infra/infra-1/bin/Runner.Worker")
+	remove("state/stopped")
+	remove("state/stopped-mid-job")
+	t.Log("checkouts written under the former umask are replaced only while their listener is stopped between jobs")
 	identity := []string{".runner", ".credentials", ".credentials_rsaparams"}
 	reregisterY := `{"build_runner_reregister":["Y-1"]}`
 	write("bin/gh", `#!/bin/sh

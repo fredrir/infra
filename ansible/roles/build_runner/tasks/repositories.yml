@@ -49,3 +49,37 @@
   loop_control:
     loop_var: build_runner_instance
     label: '{{ build_runner_instance.name }}'
+
+- name: Find listener checkouts unreadable to image users
+  ansible.builtin.shell: |
+    set -eu
+    {% for instance in build_runner_instances %}
+    if [ -d {{ (instance.root ~ '/_work') | quote }} ] && [ -s {{ (instance.root ~ '/.service') | quote }} ] \
+      && ! pgrep --full {{ ((instance.root ~ '/bin/Runner.Worker') | regex_escape ~ '( |$)') | quote }} > /dev/null \
+      && [ -n "$(find {{ (instance.root ~ '/_work') | quote }} -path {{ (instance.root ~ '/_work/_temp') | quote }} -prune -o ! -perm -o=r -print -quit)" ]; then
+      printf '%s %s\n' {{ instance.root | quote }} "$(head -n 1 {{ (instance.root ~ '/.service') | quote }})"
+    fi
+    {% endfor %}
+  register: build_runner_unreadable_checkouts
+  changed_when: false
+  check_mode: false
+
+- name: Replace listener checkouts unreadable to image users
+  ansible.builtin.command:
+    argv:
+    - sh
+    - -c
+    - |
+      set -eu
+      if pgrep --full "$3" > /dev/null; then exit 0; fi
+      systemctl stop "$2"
+      rm -rf "$1/_work"
+      systemctl start "$2"
+      echo replaced
+    - replace
+    - '{{ item.split()[0] }}'
+    - '{{ item.split()[1] }}'
+    - "{{ (item.split()[0] ~ '/bin/Runner.Worker') | regex_escape ~ '( |$)' }}"
+  loop: '{{ build_runner_unreadable_checkouts.stdout_lines }}'
+  register: build_runner_replaced_checkouts
+  changed_when: "'replaced' in build_runner_replaced_checkouts.stdout"
