@@ -3,6 +3,7 @@ load("@gazelle//:def.bzl", "gazelle", "gazelle_test")
 # gazelle:prefix github.com/fredrir/infra
 # gazelle:exclude dist
 # gazelle:exclude .infra
+# gazelle:exclude platform/components/object-store/filtertest
 
 gazelle(name = "gazelle")
 

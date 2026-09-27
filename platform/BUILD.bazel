@@ -44,6 +44,12 @@ filegroup(
 )
 
 filegroup(
+    name = "s3_filter_module",
+    srcs = ["components/object-store/filtertest/go.mod"],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "renovate_pin_data",
     srcs = ["versions.yaml"] + glob(["components/object-store/*.yaml"]),
     visibility = ["//:__pkg__"],

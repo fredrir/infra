@@ -21,6 +21,7 @@ go_test(
         "provisioned_test.go",
         "renovate_test.go",
         "runner_rust_test.go",
+        "s3_filter_test.go",
         "tailnet_test.go",
         "volatile_access_test.go",
     ],
@@ -37,6 +38,7 @@ go_test(
         "//:renovate_pin_data",
         "//:tailnet_policy_data",
         "//platform:arc_chart_data",
+        "//platform:s3_filter_module",
         "//platform:sops_data",
     ],
     deps = [

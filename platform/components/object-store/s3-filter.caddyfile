@@ -2,6 +2,9 @@
 	admin off
 	persist_config off
 	auto_https off
+	servers {
+		protocols h1 h2
+	}
 	log {
 		output stderr
 		format json
@@ -9,46 +12,59 @@
 	}
 }
 
-(provisioner_only) {
-	@{args[0]} {
-		not method GET HEAD
-		query {args[0]}=*
-		not header_regexp Authorization "^AWS4-HMAC-SHA256 Credential={$PROVISIONER_ACCESS_KEY_ID}/"
+(proxy) {
+	reverse_proxy {args[0]} 127.0.0.1:8334 {
+		flush_interval -1
 	}
-	respond @{args[0]} "bucket configuration is reserved for the provisioner" 403
 }
 
 :8333 {
 	tls /etc/seaweedfs/tls/s3.crt /etc/seaweedfs/tls/s3.key {
 		protocols tls1.2
 	}
+	@malformed expression `{http.request.uri.query}.matches("[;]|%([^0-9A-Fa-f]|[0-9A-Fa-f]([^0-9A-Fa-f]|$)|$)")`
+	@provisioner expression `{http.request.header.Authorization}.matches("^AWS4-HMAC-SHA256 Credential={$PROVISIONER_ACCESS_KEY_ID}/[^,]*, ?SignedHeaders=[^,]*, ?Signature=[0-9a-f]{64}$")`
+	@read method GET HEAD
+	@write expression <<CEL
+		{http.request.header.X-Amz-Object-Lock-Mode} == ""
+		&& {http.request.header.X-Amz-Object-Lock-Retain-Until-Date} == ""
+		&& {http.request.header.X-Amz-Object-Lock-Legal-Hold} == ""
+		&& {http.request.header.X-Amz-Bypass-Governance-Retention} == ""
+		&& !{http.request.header.Content-Type}.matches("(?i)^ *multipart/form-data")
+		&& {http.request.uri.query}.matches("^((uploads=?|delete=?|uploadId=[A-Za-z0-9._~-]+|partNumber=[1-9][0-9]{0,4}|x-id=[A-Za-z]+)(&(uploads=?|delete=?|uploadId=[A-Za-z0-9._~-]+|partNumber=[1-9][0-9]{0,4}|x-id=[A-Za-z]+))*)?$")
+		&& !{http.request.uri.query}.matches("(^|&)uploads(=[^&]*)?&(.*&)?uploads(=|&|$)")
+		&& !{http.request.uri.query}.matches("(^|&)delete(=[^&]*)?&(.*&)?delete(=|&|$)")
+		&& !{http.request.uri.query}.matches("(^|&)uploadId=.*&uploadId=")
+		&& !{http.request.uri.query}.matches("(^|&)partNumber=.*&partNumber=")
+		&& !{http.request.uri.query}.matches("(^|&)x-id=.*&x-id=")
+		&& (
+			(
+				{http.request.method} == "PUT"
+				&& {http.request.uri.path}.matches("^/[^/]+/.+")
+				&& !{http.request.uri.query}.matches("(^|&)(uploads|delete)([=&]|$)")
+				&& {http.request.uri.query}.matches("(^|&)partNumber=") == {http.request.uri.query}.matches("(^|&)uploadId=")
+			) || (
+				{http.request.method} == "POST"
+				&& {http.request.uri.path}.matches("^/[^/]+/.+")
+				&& !{http.request.uri.query}.matches("(^|&)(delete([=&]|$)|partNumber=)")
+				&& {http.request.uri.query}.matches("(^|&)uploads([=&]|$)") != {http.request.uri.query}.matches("(^|&)uploadId=")
+			) || (
+				{http.request.method} == "POST"
+				&& {http.request.uri.path}.matches("^/[^/]+/?$")
+				&& {http.request.uri.query}.matches("(^|&)delete([=&]|$)")
+				&& !{http.request.uri.query}.matches("(^|&)(uploads([=&]|$)|uploadId=|partNumber=)")
+			) || (
+				{http.request.method} == "DELETE"
+				&& {http.request.uri.path}.matches("^/[^/]+/.+")
+				&& !{http.request.uri.query}.matches("(^|&)(uploads([=&]|$)|delete([=&]|$)|partNumber=)")
+			)
+		)
+		CEL
 	route {
-		@prefixed {
-			not method GET HEAD
-			query prefix=*
-		}
-		respond @prefixed "prefix is only accepted on reads" 403
-		import provisioner_only versioning
-		import provisioner_only object-lock
-		import provisioner_only retention
-		import provisioner_only legal-hold
-		import provisioner_only lifecycle
-		import provisioner_only encryption
-		import provisioner_only policy
-		import provisioner_only acl
-		import provisioner_only cors
-		import provisioner_only tagging
-		import provisioner_only replication
-		import provisioner_only website
-		import provisioner_only notification
-		import provisioner_only logging
-		import provisioner_only ownershipControls
-		import provisioner_only publicAccessBlock
-		import provisioner_only accelerate
-		import provisioner_only requestPayment
-		import provisioner_only seaweedfs-quota
-		reverse_proxy 127.0.0.1:8334 {
-			flush_interval -1
-		}
+		respond @malformed "malformed query" 400
+		import proxy @provisioner
+		import proxy @read
+		import proxy @write
+		respond "denied by the object store filter" 403
 	}
 }

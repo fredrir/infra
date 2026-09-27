@@ -1,0 +1,42 @@
+name: S3 filter
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/s3-filter.yml
+      - images/caddy/**
+      - platform/components/object-store/s3-filter.caddyfile
+      - platform/components/object-store/filtertest/**
+  pull_request:
+    paths:
+      - .github/workflows/s3-filter.yml
+      - images/caddy/**
+      - platform/components/object-store/s3-filter.caddyfile
+      - platform/components/object-store/filtertest/**
+  workflow_dispatch:
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+permissions:
+  contents: read
+jobs:
+  filter:
+    if: github.triggering_actor != 'fredrir-infra-verification[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install checksum-pinned native Bazel
+        run: |
+          version=$(jq -er '.bazel' build/toolchain.json)
+          checksum=$(jq -er '.bazel_sha256' build/toolchain.json)
+          mkdir -p "$RUNNER_TEMP/bazel/bin"
+          curl --fail --silent --show-error --location --retry 2 --max-time 60 "https://github.com/bazelbuild/bazel/releases/download/$version/bazel-$version-linux-x86_64" --output "$RUNNER_TEMP/bazel/bin/bazel"
+          printf '%s  %s\n' "$checksum" "$RUNNER_TEMP/bazel/bin/bazel" | sha256sum --check --strict
+          chmod 755 "$RUNNER_TEMP/bazel/bin/bazel"
+          printf '%s\n' "$RUNNER_TEMP/bazel/bin" >> "$GITHUB_PATH"
+      - name: Admit only known S3 write shapes through the shipped Caddyfile
+        env:
+          GOTOOLCHAIN: local
+        run: bazel run @rules_go//go -- -C platform/components/object-store/filtertest test ./... -count=1

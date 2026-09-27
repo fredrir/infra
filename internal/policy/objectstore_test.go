@@ -89,40 +89,6 @@ func checkS3Filter(t *testing.T, cell string, container object, caddy string) {
 	}
 }
 
-func TestObjectStoreS3FilterGuardsBucketConfiguration(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(repoRoot(t), objectStore, "s3-filter.caddyfile"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	config := string(data)
-	for _, required := range []string{
-		"\tadmin off\n",
-		"tls /etc/seaweedfs/tls/s3.crt /etc/seaweedfs/tls/s3.key",
-		"\t\t@prefixed {\n\t\t\tnot method GET HEAD\n\t\t\tquery prefix=*\n\t\t}\n\t\trespond @prefixed",
-		"\t@{args[0]} {\n\t\tnot method GET HEAD\n\t\tquery {args[0]}=*\n\t\tnot header_regexp Authorization \"^AWS4-HMAC-SHA256 Credential={$PROVISIONER_ACCESS_KEY_ID}/\"\n\t}\n\trespond @{args[0]}",
-		"\t\treverse_proxy 127.0.0.1:8334 {",
-	} {
-		if !strings.Contains(config, required) {
-			t.Errorf("S3 filter lacks %q", required)
-		}
-	}
-	var keys []string
-	for _, match := range regexp.MustCompile(`(?m)^\t\timport provisioner_only (\S+)$`).FindAllStringSubmatch(config, -1) {
-		keys = append(keys, match[1])
-	}
-	for _, subresource := range []string{"versioning", "object-lock", "retention", "legal-hold", "lifecycle", "encryption", "policy", "acl", "cors", "tagging", "replication", "website", "notification", "logging", "ownershipControls", "publicAccessBlock", "accelerate", "requestPayment", "seaweedfs-quota"} {
-		if !slices.Contains(keys, subresource) {
-			t.Errorf("S3 filter lets writers change ?%s", subresource)
-		}
-	}
-	proxy := strings.Index(config, "reverse_proxy")
-	for _, rule := range []string{"respond @prefixed", "import provisioner_only"} {
-		if index := strings.Index(config, rule); index < 0 || index > proxy {
-			t.Errorf("%s does not run before the proxy", rule)
-		}
-	}
-}
-
 func TestObjectStoreCellsRunHardenedOnTheirDataNode(t *testing.T) {
 	t.Parallel()
 	image := at(load(t, "platform/versions.yaml"), "images", "seaweedfs")
