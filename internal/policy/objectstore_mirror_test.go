@@ -3,6 +3,7 @@ package policy
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +16,12 @@ const stubRclone = `#!/bin/sh
 printf '%s ' "$@" >> "$STUB_LOG"
 echo >> "$STUB_LOG"
 case "$1" in
-  lsf) [ "$STUB_SENTINEL" = 1 ] && echo .mirror-seeded ;;
+  lsf)
+    case "$*" in
+      *"--format t"*) [ "$STUB_SENTINEL" = 1 ] && echo "$STUB_SEEDED_AT" ;;
+      *) [ "$STUB_SENTINEL" = 1 ] && echo .mirror-seeded ;;
+    esac
+    ;;
   size)
     case "$2" in
       store:*) printf '{"count":%s,"bytes":1,"sizeless":0}\n' "$STUB_STORE_COUNT" ;;
@@ -95,6 +101,29 @@ func TestParserDatasetMirrorScriptGuardsTheAWSCopy(t *testing.T) {
 	}
 }
 
+func TestParserDatasetMirrorDemandsASeedAfterTheParserLeftNL(t *testing.T) {
+	fenced := map[string]string{"MIN_SOURCE_PERCENT": "90", "STUB_SENTINEL": "1", "STUB_STORE_COUNT": "100", "STUB_AWS_COUNT": "100", "SEED_NOT_BEFORE": "2026-09-27 12:00:00"}
+	synced := func(calls []string) bool {
+		return slices.ContainsFunc(calls, func(call string) bool { return strings.HasPrefix(call, "sync ") })
+	}
+	for seeded, allowed := range map[string]bool{"2026-09-27 12:00:00": true, "2026-09-28 01:00:00": true, "2026-09-27 11:59:59": false, "2025-12-31 23:00:00": false, "": false} {
+		environment := maps.Clone(fenced)
+		environment["STUB_SEEDED_AT"] = seeded
+		calls, err := runMirrorScript(t, "sync", environment)
+		if allowed != (err == nil && synced(calls)) {
+			t.Errorf("sentinel seeded at %q after the parser left at %s: synced=%v err=%v", seeded, fenced["SEED_NOT_BEFORE"], synced(calls), err)
+		}
+	}
+	for _, fence := range []string{"0", "2026-09-27", "2026-09-27T12:00:00Z", "9999-99-99 99:99:99x"} {
+		environment := maps.Clone(fenced)
+		environment["STUB_SEEDED_AT"] = "2026-09-28 01:00:00"
+		environment["SEED_NOT_BEFORE"] = fence
+		if calls, err := runMirrorScript(t, "sync", environment); err == nil || synced(calls) {
+			t.Errorf("malformed SEED_NOT_BEFORE %q accepted", fence)
+		}
+	}
+}
+
 func TestParserDatasetSeedMarksTheSourceOnlyAfterACheck(t *testing.T) {
 	calls, err := runMirrorScript(t, "seed", nil)
 	if err != nil {
@@ -103,6 +132,7 @@ func TestParserDatasetSeedMarksTheSourceOnlyAfterACheck(t *testing.T) {
 	want := []string{
 		"copy aws:llunde-pyparser-bucket store:parser-dataset --checksum --transfers=16 --log-level=NOTICE " + datasetFilters,
 		"check aws:llunde-pyparser-bucket store:parser-dataset --one-way --size-only " + datasetFilters,
+		"delete --max-depth 1 --include=/.mirror-seeded store:parser-dataset",
 		"touch store:parser-dataset/.mirror-seeded",
 	}
 	if !slices.Equal(calls, want) {
@@ -125,6 +155,23 @@ func TestParserDatasetRestoreKeepsEveryExistingObject(t *testing.T) {
 	}
 }
 
+func TestParserDatasetUnseedRemovesOnlyTheSentinel(t *testing.T) {
+	calls, err := runMirrorScript(t, "unseed", map[string]string{"STUB_SENTINEL": "0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"delete --max-depth 1 --include=/.mirror-seeded store:parser-dataset",
+		"lsf --files-only --max-depth 1 --include=/.mirror-seeded store:parser-dataset",
+	}
+	if !slices.Equal(calls, want) {
+		t.Fatalf("unseed ran\n%s\nwant\n%s", strings.Join(calls, "\n"), strings.Join(want, "\n"))
+	}
+	if _, err := runMirrorScript(t, "unseed", map[string]string{"STUB_SENTINEL": "1"}); err == nil {
+		t.Fatal("unseed reported success while the sentinel remained")
+	}
+}
+
 func TestParserDatasetMirrorJobsKeepTheirBlastRadius(t *testing.T) {
 	image := at(load(t, "platform/versions.yaml"), "images", "rclone")
 	script, err := os.ReadFile(filepath.Join(repoRoot(t), objectStore, "mirror.sh"))
@@ -136,7 +183,7 @@ func TestParserDatasetMirrorJobsKeepTheirBlastRadius(t *testing.T) {
 		mode, cell string
 		extra      map[string]string
 	}{
-		"parser-dataset-mirror": {false, "sync", "PARSER_MIRROR", map[string]string{"MIN_SOURCE_PERCENT": "90"}},
+		"parser-dataset-mirror": {false, "sync", "PARSER_MIRROR", map[string]string{"MIN_SOURCE_PERCENT": "90", "SEED_NOT_BEFORE": "configmap:parser-dataset-mirror-fence/SEED_NOT_BEFORE optional=true"}},
 		"parser-dataset-seed":   {true, "seed", "PARSER_DATASET", nil},
 	}
 	resources := objectStoreResources(t)
@@ -186,6 +233,8 @@ func TestParserDatasetMirrorJobsKeepTheirBlastRadius(t *testing.T) {
 			key := at(env, "name").(string)
 			if reference, ok := lookup(env, "valueFrom", "secretKeyRef").(object); ok {
 				environment[key] = fmt.Sprint(reference["name"]) + "/" + fmt.Sprint(reference["key"])
+			} else if reference, ok := lookup(env, "valueFrom", "configMapKeyRef").(object); ok {
+				environment[key] = fmt.Sprint("configmap:", reference["name"], "/", reference["key"], " optional=", reference["optional"])
 			} else {
 				environment[key] = fmt.Sprint(at(env, "value"))
 			}

@@ -559,7 +559,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Logs | stderr only (`-logtostderr=true`) |
 | Parser dataset | `llunde-pyparser` application pods use `parser-dataset` on `seaweedfs-nl` via `AWS_ENDPOINT_URL_S3` and `AWS_CA_BUNDLE` (the object store CA only, so every botocore client in those pods trusts only `seaweedfs-nl`; other HTTPS clients keep their own roots); stored `s3://` URLs keep their original bucket name, since the parser resolves objects by key |
 | Parser dataset copy | `parser-dataset-mirror` hourly at :23 on `fredrir-04` runs `mirror.sh sync`: `rclone sync` of `nl` `parser-dataset` to the versioned AWS bucket `llunde-pyparser-bucket`, prefixes `files/`, `extract/`, `assets/`, `convert/` only; at most 1000 deletions per run; `platform-dataset-parser` cannot delete versions |
-| Mirror guard | The sync runs only when `parser-dataset/.mirror-seeded` exists and `parser-dataset` holds at least 90% of the AWS object count in the four prefixes; `parser-dataset-seed` (suspended, run on demand) copies AWS into `nl`, checks every AWS object arrived and only then writes the sentinel; a recreated or emptied bucket has no sentinel |
+| Mirror guard | The sync runs only when `parser-dataset/.mirror-seeded` exists and `parser-dataset` holds at least 90% of the AWS object count in the four prefixes; `parser-dataset-seed` (suspended, run on demand) copies AWS into `nl`, checks every AWS object arrived and only then writes the sentinel; a recreated or emptied bucket has no sentinel; `mirror.sh unseed` removes it on purpose; the sync also refuses a sentinel older than `SEED_NOT_BEFORE` in the unmanaged ConfigMap `parser-dataset-mirror-fence`, which a parser rollback writes, so after a rollback only a fresh seed re-enables the mirror, even if the sentinel survived |
 | AWS prefixes | Mirror-only: an object written straight to the four AWS prefixes is delete-markered by the next sync; write through `seaweedfs-nl` |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
 | Disk guard | 1 GiB volumes; `hel1` `-volume.max=60` (60 GiB), `nl` `-volume.max=200` (200 GiB); read-only below 15% free node disk |
@@ -588,6 +588,8 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Any `seaweedfs-nl` incident | Suspend the mirror first (commands below), before investigating |
 | Restore the parser dataset | Commands below: suspend the mirror, stop the parser writers, run `parser-dataset-seed`, which overwrites every object that differs from AWS, start the writers, resume |
 | Bring back missing parser dataset objects | Commands below: suspend the mirror, run `mirror.sh restore` from the seed job template, which copies only objects absent from `parser-dataset` and leaves the sentinel alone, resume; safe while the parser runs |
+| Take the parser off `parser-dataset` | Suspend the mirror, wait until no `parser-dataset-mirror` sync Job runs, set the fence (command below), then run `mirror.sh unseed` from the seed job template (commands below with `MODE=unseed`); the fence alone keeps the mirror refused if `nl` is unreachable |
+| Re-enable the mirror after the parser left `nl` | Stop the parser writers, run `parser-dataset-seed` (commands below), which writes a fresh sentinel, then resume the mirror; the fence can stay |
 | Resolve versioning or lock drift on `parser-dataset` | Suspend the mirror; forced `weed shell` cleanup below with `parser-dataset`; provisioner run; seed; resume |
 | Undo mirror deletions in AWS | Administrator only (`platform-dataset-parser` cannot delete versions): remove the delete markers the mirror wrote since the incident, commands below; this also brings back objects the parser deleted legitimately after `SINCE`, so set `SINCE` as late as the incident allows |
 
@@ -682,15 +684,22 @@ flux resume kustomization project-llunde-pyparser
 flux resume kustomization platform-object-store
 ```
 
-Bring back only the objects missing from `parser-dataset`, with the mirror suspended, then resume:
+Fence the mirror at the moment the parser leaves `nl`; Flux does not manage this ConfigMap:
 
 ```sh
+kubectl -n object-store create configmap parser-dataset-mirror-fence --from-literal=SEED_NOT_BEFORE="$(date -u '+%Y-%m-%d %H:%M:%S')" --dry-run=client -o yaml | kubectl apply -f -
+```
+
+Run `mirror.sh restore` (bring back only the objects missing from `parser-dataset`) or `mirror.sh unseed` (remove the sentinel) with the mirror suspended, then resume:
+
+```sh
+MODE=restore
 kubectl -n object-store get cronjob parser-dataset-seed -o json \
-  | jq '{apiVersion: "batch/v1", kind: "Job", metadata: {name: "parser-dataset-restore", namespace: "object-store"}, spec: (.spec.jobTemplate.spec | .template.spec.containers[0].args = ["restore"])}' \
+  | jq --arg mode "$MODE" '{apiVersion: "batch/v1", kind: "Job", metadata: {name: ("parser-dataset-" + $mode), namespace: "object-store"}, spec: (.spec.jobTemplate.spec | .template.spec.containers[0].args = [$mode])}' \
   | kubectl create -f -
-until kubectl -n object-store get job parser-dataset-restore -o jsonpath='{.status.succeeded}{.status.failed}' | grep -q .; do sleep 10; done
-kubectl -n object-store logs job/parser-dataset-restore
-kubectl -n object-store delete job parser-dataset-restore
+until kubectl -n object-store get job "parser-dataset-$MODE" -o jsonpath='{.status.succeeded}{.status.failed}' | grep -q .; do sleep 10; done
+kubectl -n object-store logs "job/parser-dataset-$MODE"
+kubectl -n object-store delete job "parser-dataset-$MODE"
 flux resume kustomization platform-object-store
 ```
 

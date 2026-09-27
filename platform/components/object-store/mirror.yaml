@@ -52,6 +52,12 @@ spec:
                   value: /etc/ssl/certs:/etc/object-store
                 - name: MIN_SOURCE_PERCENT
                   value: '90'
+                - name: SEED_NOT_BEFORE
+                  valueFrom:
+                    configMapKeyRef:
+                      name: parser-dataset-mirror-fence
+                      key: SEED_NOT_BEFORE
+                      optional: true
                 - name: RCLONE_CONFIG_STORE_TYPE
                   value: s3
                 - name: RCLONE_CONFIG_STORE_PROVIDER
