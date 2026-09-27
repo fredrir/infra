@@ -90,7 +90,7 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 		t.Fatal(err)
 	}
 	version := fleet.Version
-	cli := "#!/bin/sh\necho fixture\n"
+	cli := "#!/bin/sh\nif [ \"$*\" = \"platform runner-admission serve --help\" ]; then echo '  infra platform runner-admission serve [flags]'; exit; fi\necho fixture\n"
 	engine := fmt.Sprintf("true %s\n", toolchain["engine_image"])
 	runnerUnit := func(repository string) string {
 		return "actions.runner." + fleet.Owner + "-" + repository + ".localhost-" + repository + "-1.service"
@@ -117,6 +117,7 @@ show)
   case "$*" in
   *ActiveEnterTimestamp*) cat "$state/started-$unit" 2>/dev/null || true ;;
   *NeedDaemonReload*) if listed reload-units "$unit"; then echo yes; else echo no; fi ;;
+  *--property=ActiveState*) if listed inactive-units "$unit"; then echo inactive; else echo active; fi ;;
   *) if listed inactive-units "$unit"; then echo ActiveState=inactive; else echo ActiveState=active; fi; echo LoadState=loaded ;;
   esac ;;
 is-enabled) if listed disabled-units "$2"; then echo disabled; exit 1; fi; echo enabled ;;
@@ -240,8 +241,44 @@ esac
 			}
 		}
 	}
+	command("docker", "exec", name, "sh", "-c", "mkdir -p /run/infra-runner-admission && echo [] > /run/infra-runner-admission/leases.json && chown -R runner:runner /run/infra-runner-admission")
+	write("infra", "#!/bin/sh\necho fixture\n", true)
+	if output := run("/fixture/converge.yml", false); !strings.Contains(output, "Require the installed CLI's admission broker") {
+		t.Fatalf("a CLI without the admission broker did not stop the play at its check:\n%s", output)
+	}
+	if hook := exec.CommandContext(ctx, "docker", "exec", name, "test", "-e", "/usr/local/libexec/infra-runner-hook.sh").Run(); hook == nil || strings.TrimSpace(string(command("docker", "exec", name, "stat", "-c", "%U", "/run/infra-runner-admission"))) == "root" {
+		t.Fatal("a CLI without the admission broker left job hooks or leases pointing at it")
+	}
+	write("infra", cli, true)
+	t.Log("a CLI without the admission broker stops the play before hooks or leases change")
 	converge()
 	steady := restarted()
+	inspect := func(args ...string) string {
+		return strings.TrimSpace(string(command(append([]string{"docker", "exec", name}, args...)...)))
+	}
+	if owners := inspect("stat", "-c", "%U %a", "/run/infra-runner-admission", "/run/infra-runner-admission/leases.json"); owners != "root 700\nroot 644" {
+		t.Fatalf("jobs can still write admission leases: %q", owners)
+	}
+	if hook := inspect("cat", "/usr/local/libexec/infra-runner-hook.sh"); !strings.HasSuffix(hook, "exec /usr/local/bin/infra platform runner-admission acquire") {
+		t.Fatalf("job hook does not ask the admission broker:\n%s", hook)
+	}
+	socket, broker := inspect("cat", "/etc/systemd/system/infra-runner-admission.socket"), inspect("cat", "/etc/systemd/system/infra-runner-admission.service")
+	for _, want := range []string{"ListenStream=/run/infra-runner-admission.sock", "SocketUser=root", "SocketGroup=infra-runners", "SocketMode=0660"} {
+		if !strings.Contains(socket, want+"\n") {
+			t.Errorf("admission socket lacks %s:\n%s", want, socket)
+		}
+	}
+	if strings.Contains(socket, "Accept=yes") || !strings.Contains(broker, "runner-admission serve --capacity=1 --directory=/run/infra-runner-admission\n") || !strings.Contains(broker, "Restart=always\n") {
+		t.Errorf("admission is not one daemon serving the declared capacity:\n%s\n%s", socket, broker)
+	}
+	tasks := run("/fixture/converge.yml", true, "--list-tasks")
+	if listen, hook := strings.Index(tasks, "Listen for runner admission"), strings.Index(tasks, "Install immutable trusted-job hook adapter"); listen < 0 || hook < listen {
+		t.Errorf("job hooks switch to the broker before its socket listens:\n%s", tasks)
+	}
+	if groups := inspect("id", "-nG", "runner"); !strings.Contains(" "+groups+" ", " infra-runners ") {
+		t.Errorf("runner account %q cannot reach the admission socket", groups)
+	}
+	t.Log("admission runs through a root broker whose leases jobs cannot write")
 	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") || restarted() != steady {
 		t.Fatalf("declared runner state does not converge without restarts:\n%s", output)
 	} else if strings.Contains(output, "tasks/repository.yml") {
@@ -341,6 +378,15 @@ esac
 			failed:    drift,
 		},
 		{
+			name: "edited admission socket",
+			introduce: func() {
+				command("docker", "exec", name, "sh", "-c", "echo >> /etc/systemd/system/infra-runner-admission.socket")
+			},
+			restore: converge,
+			changed: []string{"build_runner : Install runner admission broker", "build_runner : Restart stale runner admission units"},
+			failed:  drift,
+		},
+		{
 			name:      "edited engine configuration",
 			introduce: func() { command("docker", "exec", name, "sh", "-c", "echo >> /etc/infra-dagger.toml") },
 			restore:   converge,
@@ -389,7 +435,7 @@ esac
 		{
 			name:      "wrong CLI",
 			introduce: func() { write("infra", "wrong", true) },
-			restore:   func() { write("infra", cli, true) },
+			restore:   func() { write("infra", cli, true); repairs("infra-runner-admission.service")() },
 			failed:    observed,
 		},
 		{

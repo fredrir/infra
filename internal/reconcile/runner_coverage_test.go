@@ -84,6 +84,7 @@ var (
 		"ansible.builtin.copy",
 		"ansible.builtin.file",
 		"ansible.builtin.get_url",
+		"ansible.builtin.group",
 		"ansible.builtin.hostname",
 		"ansible.builtin.lineinfile",
 		"ansible.builtin.systemd_service",
@@ -318,6 +319,8 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 		"roles/host_packages/tasks/main.yml: Check declared packages",
 		"roles/build_runner/tasks/state.yml: Find stale runner slice",
 		"roles/build_runner/tasks/state.yml: Find stale guest metric services",
+		"roles/build_runner/tasks/state.yml: Require the installed CLI's admission broker",
+		"roles/build_runner/tasks/state.yml: Find stale runner admission units",
 		"roles/build_runner/tasks/repository-services.yml: Find stale runner services",
 		"roles/build_engine/tasks/state.yml: Find stale build engine",
 	}

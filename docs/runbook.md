@@ -499,13 +499,17 @@ Apply retains declaration validation and live preflight, and the parent retains 
 Native signed S3 state requests retain conditional lease creation, takeover and release, server-side encryption and durable status updates; AWS CLI credential resolution remains available when environment credentials are absent.
 `performance.yml` records completed attempt timings, including failures, without checking out or executing the observed revision.
 
-`build_runner_job_slots` limits simultaneous complete jobs across the build VM's repository listeners when `build_runner_admission_enabled` is true.
-The start hook waits for a lease owned by its `Runner.Worker` PID and process start time; the completion hook releases it, and a later attempt reclaims leases from exited workers.
-Admission wait is reported separately in hook output and consumes the job timeout.
+| Runner admission | Value |
+| --- | --- |
+| Capacity | `build_runner_job_slots` complete jobs across all repository listeners while `build_runner_admission_enabled` is true |
+| Broker | `infra-runner-admission.socket`: `/run/infra-runner-admission.sock`, `root:infra-runners` `0660`; one sandboxed `infra platform runner-admission serve` daemon, restarted when its unit or the installed CLI changes; callers retry refused, full or unanswered connections until their timeout |
+| Identity | Caller PID from `SO_PEERCRED`; listener unit from its cgroup below `infra-runners.slice`; nearest `Runner.Worker` ancestor of the same account; one lease per listener unit, replaced by its next acquire; at most two open requests per unit, 5 s to send the request |
+| Leases | `/run/infra-runner-admission`, root `0700`; later requests reclaim leases of exited workers; a disconnected waiter stops waiting |
+| Hooks | Start hook `acquire` waits within the job timeout and reports its wait; completion hook `release --timeout=30s` |
+| CLI | The role fails before touching hooks or leases unless the installed CLI serves the broker; bump `build/cli-release.json` in the same change as broker changes and apply it with `INFRA_VM_POOL_QUALIFIED=false`, since hooks of the previous release fail against the new CLI until the role rewrites them |
+| Corrupt state | Admission fails until an operator repairs `leases.json` with listeners drained |
 
-Install the pinned CLI release before enabling admission, and drain active jobs before changing runner service overrides.
-For rollback, disable admission and reconcile idle listeners before downgrading the CLI.
-Do not delete leases while their workers are running; corrupted lease state fails admission until an operator repairs it with listeners drained.
+Drain active jobs before changing runner service overrides.
 
 | Runner upgrade   | Value                                                                                                     |
 | ---------------- | --------------------------------------------------------------------------------------------------------- |

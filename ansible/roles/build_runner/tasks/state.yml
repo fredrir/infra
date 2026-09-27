@@ -14,10 +14,15 @@
     enabled: true
     state: started
 
+- name: Create runner admission group
+  ansible.builtin.group:
+    name: infra-runners
+    system: true
+
 - name: Create trusted runner account
   ansible.builtin.user:
     name: runner
-    groups: docker
+    groups: [docker, infra-runners]
     shell: /bin/bash
     create_home: true
 
@@ -46,6 +51,14 @@
     daemon_reload: true
   when: build_runner_stale_slice.stdout == 'yes'
 
+- name: Require the installed CLI's admission broker
+  ansible.builtin.command:
+    argv: [/usr/local/bin/infra, platform, runner-admission, serve, --help]
+  register: build_runner_admission_cli
+  changed_when: false
+  failed_when: build_runner_admission_cli.rc != 0 or 'runner-admission serve [flags]' not in build_runner_admission_cli.stdout
+  check_mode: false
+
 - name: Create trusted hook adapter directory
   ansible.builtin.file:
     path: /usr/local/libexec
@@ -53,6 +66,101 @@
     owner: root
     group: root
     mode: '0755'
+
+- name: Install runner admission runtime directory
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/infra-runner-admission.conf
+    content: "d /run/infra-runner-admission 0700 root root -\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Create runner admission runtime directory
+  ansible.builtin.file:
+    path: /run/infra-runner-admission
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Give the admission broker its leases
+  ansible.builtin.file:
+    path: /run/infra-runner-admission
+    state: directory
+    owner: root
+    group: root
+    recurse: true
+
+- name: Install runner admission broker
+  ansible.builtin.copy:
+    dest: '/etc/systemd/system/{{ item.name }}'
+    owner: root
+    group: root
+    mode: '0644'
+    content: '{{ item.content }}'
+  loop:
+  - name: infra-runner-admission.socket
+    content: |
+      [Socket]
+      ListenStream=/run/infra-runner-admission.sock
+      SocketUser=root
+      SocketGroup=infra-runners
+      SocketMode=0660
+
+      [Install]
+      WantedBy=sockets.target
+  - name: infra-runner-admission.service
+    content: |
+      [Unit]
+      Requires=infra-runner-admission.socket
+      After=infra-runner-admission.socket
+
+      [Service]
+      ExecStart=/usr/local/bin/infra platform runner-admission serve --capacity={{ build_runner_job_slots | int }} --directory=/run/infra-runner-admission
+      Restart=always
+      RestartSec=1
+      CapabilityBoundingSet=
+      NoNewPrivileges=true
+      PrivateNetwork=true
+      PrivateTmp=true
+      ProtectHome=true
+      ProtectSystem=strict
+      ReadWritePaths=/run/infra-runner-admission
+      MemoryMax=128M
+      TasksMax=256
+  loop_control:
+    label: '{{ item.name }}'
+  register: build_runner_admission_units
+
+- name: Listen for runner admission
+  ansible.builtin.systemd_service:
+    name: infra-runner-admission.socket
+    enabled: true
+    daemon_reload: '{{ build_runner_admission_units.changed }}'
+    state: started
+
+- name: Find stale runner admission units
+  ansible.builtin.shell: |
+    set -eu
+    for unit in infra-runner-admission.socket infra-runner-admission.service; do
+      [ "$(systemctl show --property=ActiveState --value "$unit")" = active ] || continue
+      started=$(systemctl show --timestamp=us+utc --property=ActiveEnterTimestamp --value "$unit")
+      inputs="/etc/systemd/system/$unit"
+      if [ "$unit" = infra-runner-admission.service ]; then inputs="$inputs $(readlink -f /usr/local/bin/infra)"; fi
+      if [ "$(systemctl show --property=NeedDaemonReload --value "$unit")" = yes ] || [ -n "$(find $inputs -newermt "$started")" ]; then
+        echo "$unit"
+      fi
+    done
+  register: build_runner_stale_admission
+  changed_when: false
+  check_mode: false
+
+- name: Restart stale runner admission units
+  ansible.builtin.systemd_service:
+    name: '{{ item }}'
+    daemon_reload: true
+    state: restarted
+  loop: '{{ build_runner_stale_admission.stdout_lines }}'
 
 - name: Install immutable trusted-job hook adapter
   ansible.builtin.copy:
@@ -65,24 +173,8 @@
       set -eu
       CI_POOL=main /usr/local/bin/infra platform runner-hook
       {% if build_runner_admission_enabled | bool %}
-      exec /usr/local/bin/infra platform runner-admission acquire --capacity={{ build_runner_job_slots | int }}
+      exec /usr/local/bin/infra platform runner-admission acquire
       {% endif %}
-
-- name: Install runner admission runtime directory
-  ansible.builtin.copy:
-    dest: /etc/tmpfiles.d/infra-runner-admission.conf
-    content: "d /run/infra-runner-admission 0700 runner runner -\n"
-    owner: root
-    group: root
-    mode: '0644'
-
-- name: Create runner admission runtime directory
-  ansible.builtin.file:
-    path: /run/infra-runner-admission
-    state: directory
-    owner: runner
-    group: runner
-    mode: '0700'
 
 - name: Install job completion hook
   ansible.builtin.copy:

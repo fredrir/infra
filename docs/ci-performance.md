@@ -114,11 +114,11 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Transport installation | Pinned archive content is compared with extracted and installed binaries before extraction or copy; missing or corrupted files are repaired |
 | Declaration validation | Changed-scope checks run concurrently up to `GOMAXPROCS`; each check's output is released in check order once it and every earlier check finish; errors follow check order; a panic fails only its check; kustomize renders in-process, byte-identical to `kubectl kustomize` per `infra dev qualify kustomize`; a contract test ties the linked kustomize modules to the pinned `kubectl` and `kustomize`; the root OpenTofu module is initialized and validated for `tofu/` changes outside the reconciler root and `.tftest.hcl` files and for production settings; the reconciler root is only format-checked, and its mock tests run in the reconcile plan gate for full selections and when `tofu/reconciler/` or `keys/admin_keys` change |
 | Rust target cache | Cache save identity includes source contents, lockfile and build arguments; dependency outputs remain reusable across source changes |
-| VM admission | A configurable host-wide limit bounds complete jobs across repository listeners; leases use worker PID and process start time and are reclaimed after worker exit |
+| VM admission | A root broker bounds complete jobs across repository listeners; it identifies each caller's `Runner.Worker` through the socket peer, and leases use worker PID and process start time and are reclaimed after worker exit |
 | Timing | A read-only completion observer retains job and step timestamps for successful and failed workflow attempts for 30 days |
 | Frontend deadlines | Publication queueing has a separate eight-minute measurement; the subsequent exact served-revision check retains its 60-second budget within the existing ten-minute job |
 
-VM admission requires an installed CLI with `platform runner-admission` before `build_runner_admission_enabled` is enabled; production admits four jobs on the 16 GiB build VM.
+Production admits four jobs on the 16 GiB build VM.
 A `fredrir-11` verification that lists differences outside `rulesets` requests one full reconciliation of the `main` tip it fetched, at most once per revision every six hours and never after a failed repair of it; a new commit on `main` lifts the cap; hosted verification never repairs.
 These controls do not establish an ordinary-traffic latency percentile; compare the completion observer's post-rollout samples with equivalent workloads.
 
