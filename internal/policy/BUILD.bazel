@@ -5,6 +5,7 @@ go_test(
     srcs = [
         "backup_repositories_test.go",
         "dns_test.go",
+        "grafana_test.go",
         "helpers_test.go",
         "listener_test.go",
         "netpolcanary_test.go",

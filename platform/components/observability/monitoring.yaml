@@ -41,6 +41,11 @@ spec:
       enabled: false
     grafana:
       enabled: true
+      deploymentStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 0
+          maxUnavailable: 1
       image:
         tag: 13.2.1
         sha: f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
