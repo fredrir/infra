@@ -1,0 +1,11 @@
+[Unit]
+Before=infra-build-vm.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/nftables.d/infra-build-vm-egress.nft
+ExecReload=/usr/sbin/nft -f /etc/nftables.d/infra-build-vm-egress.nft
+
+[Install]
+RequiredBy=infra-build-vm.service

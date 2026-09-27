@@ -148,6 +148,7 @@ git diff -- platform
 | Host reservation                | 8.25 CPUs / 18 GiB reserved; resulting allocatable 7.5 CPUs / 13,197,260 KiB                                                                |
 | Guest                           | Eight CPUs / 16 GiB RAM / 80 GiB sparse persistent disk                                                                                     |
 | Host boundary                   | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding; guest metrics forwarded to the tailnet address, port 9101              |
+| Guest egress                    | nftables `inet infra_build_vm` (`infra-build-vm-egress.service`, required by the guest): connections the QEMU account opens (new or untracked) to host addresses, RFC 1918, CGNAT/tailnet, link-local and ULA ranges dropped; host resolver `127.0.0.53:53` allowed; inbound SSH and metrics forwards unaffected; [qualification](../build/evidence/build-vm-guest-egress.json) |
 | Guest metrics                   | Node exporter `:9100`; `infra_cgroup_*` for `infra-engine.slice` and `infra-runners.slice`; Prometheus job `build-vm`                      |
 | Activation gates                | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true`                                                       |
 | Runner registration             | `build/runners.json` counts per repository, named `infra-build-09-<repository>-<n>`; protected main pushes or manual runs only              |

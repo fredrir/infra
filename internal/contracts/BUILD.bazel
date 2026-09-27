@@ -6,6 +6,7 @@ go_test(
         "arc_test.go",
         "bazel_test.go",
         "build_engine_test.go",
+        "build_vm_egress_test.go",
         "build_vm_test.go",
         "cancellation_test.go",
         "check_workflow_test.go",
@@ -24,6 +25,7 @@ go_test(
     ],
     data = [
         "//:build_engine_data",
+        "//:build_vm_egress_data",
         "//:build_vm_metrics_data",
         "//:cli_input_data",
         "//:host_firewall_data",

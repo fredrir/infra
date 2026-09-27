@@ -49,6 +49,17 @@ filegroup(
 )
 
 filegroup(
+    name = "build_vm_egress_data",
+    srcs = [
+        "ansible/roles/build_vm/files/infra-build-vm-egress.nft",
+        "ansible/roles/build_vm/files/infra-build-vm-egress.service",
+        "ansible/roles/build_vm/templates/infra-build-vm.service.j2",
+        "ansible/roles/k3s/defaults/main.yml",
+    ],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "build_vm_metrics_data",
     srcs = [
         "ansible/inventory/production.yml",

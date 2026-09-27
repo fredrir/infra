@@ -1,0 +1,25 @@
+add table inet infra_build_vm
+delete table inet infra_build_vm
+table inet infra_build_vm {
+  set guest_denied_ipv4 {
+    type ipv4_addr
+    flags interval
+    elements = { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16 }
+  }
+
+  set guest_denied_ipv6 {
+    type ipv6_addr
+    flags interval
+    elements = { ::1, fc00::/7, fe80::/10 }
+  }
+
+  chain output {
+    type filter hook output priority -150; policy accept;
+    meta skuid != "infra-build-vm" accept
+    ct state { established, related } accept
+    ip daddr 127.0.0.53 meta l4proto { tcp, udp } th dport 53 accept
+    fib daddr type local drop
+    ip daddr @guest_denied_ipv4 drop
+    ip6 daddr @guest_denied_ipv6 drop
+  }
+}

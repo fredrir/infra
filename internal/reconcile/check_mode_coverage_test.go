@@ -109,6 +109,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 		"volatile.yml: Read the fleet flannel backends through the administrator API",
 		"roles/ci_runtime/tasks/main.yml: Require the pinned runtime and sidecar binaries",
 		"roles/data_volume/tasks/main.yml: Read data volume consumer states",
+		"roles/build_vm/tasks/main.yml: Read loaded guest egress filter",
 		"roles/build_vm/tasks/main.yml: Wait for guest SSH",
 		"roles/tailscale/tasks/enrolled.yml: Read the restored transport address",
 		"roles/gatus/tasks/main.yml: Read the public upstream artifact token",

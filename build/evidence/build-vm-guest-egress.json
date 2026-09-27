@@ -1,0 +1,78 @@
+{
+ "schema": 1,
+ "recorded_at_utc": "2026-09-27T02:30:00Z",
+ "question": "Can build jobs in infra-build-09 open connections to fredrir-09's loopback, host addresses, tailnet and cluster through QEMU user networking, and does a guest egress filter close that without breaking the guest's inbound forwards, DNS or internet?",
+ "production_probe": {
+  "observed_at_utc": "2026-09-27T01:59:40Z",
+  "host": {
+   "qemu": "10.2.1+ds-1ubuntu3.2",
+   "libslirp": "4.9.1-1ubuntu1.1",
+   "netdev": "user,id=net0,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:100.87.168.66:9101-:9100",
+   "ip_address_filtering": "none"
+  },
+  "guest_open": [
+   "10.0.2.2:22",
+   "10.0.2.2:2222",
+   "10.0.2.2:6444",
+   "10.0.2.2:9353",
+   "10.0.2.2:10010",
+   "10.0.2.2:10248",
+   "10.0.2.2:10249",
+   "10.0.2.2:10250",
+   "10.0.2.2:10256",
+   "85.190.100.72:22",
+   "100.87.168.66:22",
+   "100.87.168.66:10250",
+   "10.43.0.1:443",
+   "10.42.0.1:10250",
+   "169.254.169.254:80"
+  ],
+  "reading": "10.0.2.2 maps to fredrir-09's 127.0.0.1: the k3s API proxy, kubelet, kube-proxy, containerd stream and node-local-dns listeners, the host's public and tailnet addresses, the Kubernetes API service, pods on other nodes and cloud metadata were all reachable from build jobs"
+ },
+ "local_qualification": {
+  "topology": "Ubuntu 26.04 host guest (QEMU 11.1 host \u2192 KVM, kernel 7.0, systemd) provisioned with ansible/build-vms.yml; nested infra-build guest from the pinned noble image; dummy tailscale0 100.100.100.100/32; host resolver 127.0.0.53",
+  "filtered": {
+   "10.0.2.2:22": "timeout",
+   "10.0.2.2:18080 (host loopback-only listener)": "timeout",
+   "10.0.2.2:2222": "timeout",
+   "100.100.100.100:18081 (host address)": "timeout",
+   "1.1.1.1:443": "open",
+   "dns github.com": "resolved",
+   "https github.com": 200,
+   "hostfwd 127.0.0.1:2222 from the host": "SSH-2.0 banner",
+   "hostfwd 100.100.100.100:9101 from the host": 200
+  },
+  "unfiltered": {
+   "10.0.2.2:22": "open",
+   "10.0.2.2:18080": "open",
+   "10.0.2.2:2222": "open",
+   "100.100.100.100:18081": "open"
+  },
+  "without_resolver_allowance": {
+   "dns example.org": "failed"
+  },
+  "systemd_ip_address_deny": {
+   "setting": "IPAddressDeny=127.0.0.0/8 ::1 169.254.0.0/16 100.64.0.0/10 fd7a:115c:a1e0::/48 10.42.0.0/16 10.43.0.0/16, IPAddressAllow=127.0.0.53",
+   "hostfwd 127.0.0.1:2222": "failed",
+   "hostfwd 100.100.100.100:9101": "failed",
+   "reading": "cgroup address filtering also applies to the sockets QEMU accepts for its forwards, so it cannot keep the SSH path and the Prometheus scrape while denying their source ranges"
+  },
+  "role": {
+   "check_mode_with_table_removed": "changed=1 (Reload changed or missing guest egress filter)",
+   "apply": "changed=1",
+   "steady_apply": "changed=0",
+   "steady_check": "changed=0",
+   "reboot": "infra-build-vm-egress active before infra-build-vm; table present"
+  }
+ },
+ "tests": [
+  "internal/reconcile/build_vm_egress_test.go",
+  "internal/contracts/build_vm_egress_test.go"
+ ],
+ "untracked_packets": {
+  "finding": "node-local-dns adds raw OUTPUT NOTRACK rules for 169.254.20.10 and 10.43.0.10 ports 53 and 8080, so an accept for every state but new also accepted guest connections to the cluster DNS cache",
+  "rule": "ct state { established, related } accept",
+  "test": "a NOTRACK rule for 169.254.20.10:53 in the gated behaviour test; the previous rule answered ok, the current one drops"
+ },
+ "reload": "add table, delete table and the definition in one transaction, so elements removed from a set leave on reload"
+}

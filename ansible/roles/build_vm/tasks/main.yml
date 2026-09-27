@@ -59,6 +59,55 @@
     shell: /usr/sbin/nologin
     create_home: false
 
+- name: Create guest egress filter directory
+  ansible.builtin.file:
+    path: /etc/nftables.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install guest egress filter
+  ansible.builtin.copy:
+    src: infra-build-vm-egress.nft
+    dest: /etc/nftables.d/infra-build-vm-egress.nft
+    owner: root
+    group: root
+    mode: '0644'
+    validate: /usr/sbin/nft -c -f %s
+  register: build_vm_egress_rules
+
+- name: Install guest egress filter service
+  ansible.builtin.copy:
+    src: infra-build-vm-egress.service
+    dest: /etc/systemd/system/infra-build-vm-egress.service
+    owner: root
+    group: root
+    mode: '0644'
+  register: build_vm_egress_unit
+
+- name: Start guest egress filter before the guest
+  ansible.builtin.systemd_service:
+    name: infra-build-vm-egress
+    daemon_reload: '{{ build_vm_egress_unit.changed }}'
+    enabled: true
+    state: started
+  register: build_vm_egress_service
+
+- name: Read loaded guest egress filter
+  ansible.builtin.command:
+    argv: [nft, list, table, inet, infra_build_vm]
+  register: build_vm_egress_table
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Reload changed or missing guest egress filter
+  ansible.builtin.systemd_service:
+    name: infra-build-vm-egress
+    state: reloaded
+  when: (build_vm_egress_rules.changed or build_vm_egress_table.rc != 0) and not build_vm_egress_service.changed
+
 - name: Create VM storage
   ansible.builtin.file:
     path: '{{ build_vm_directory }}'
