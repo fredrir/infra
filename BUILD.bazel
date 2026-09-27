@@ -60,7 +60,10 @@ filegroup(
 filegroup(
     name = "build_engine_data",
     srcs = ["ansible/roles/build_engine/templates/infra-dagger.service.j2"],
-    visibility = ["//internal/contracts:__pkg__"],
+    visibility = [
+        "//internal/contracts:__pkg__",
+        "//internal/dev:__pkg__",
+    ],
 )
 
 filegroup(

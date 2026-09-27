@@ -44,7 +44,10 @@ go_test(
         "render_test.go",
         "setup_test.go",
     ],
-    data = ["//:dev_hosts_data"],
+    data = [
+        "//:build_engine_data",
+        "//:dev_hosts_data",
+    ],
     embed = [":dev"],
     deps = [
         "//internal/ci",

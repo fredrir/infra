@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fredrir/infra/internal/kata"
 	"github.com/fredrir/infra/internal/pipeline"
@@ -146,6 +147,19 @@ func StopEngine(ctx context.Context, opts EngineOptions, volumes bool) error {
 		}
 		if _, err := capture(ctx, opts.Runner, "docker", "rm", "--force", opts.Profile.Name); err != nil && !absent(err) {
 			return err
+		}
+		for status.Image != "" {
+			if status, err = InspectEngine(ctx, opts); err != nil {
+				return err
+			}
+			if status.Image == "" {
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(100 * time.Millisecond):
+			}
 		}
 		fmt.Fprintln(opts.Log, "Stopped:", opts.Profile.Name)
 	}

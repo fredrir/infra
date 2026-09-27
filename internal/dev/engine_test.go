@@ -27,6 +27,7 @@ type fakeDocker struct {
 	image    string
 	running  bool
 	volume   bool
+	removing int
 	commands [][]string
 }
 
@@ -46,6 +47,11 @@ func (d *fakeDocker) runner(t *testing.T, root string) process.Runner {
 		}
 		switch options.Args[0] {
 		case "inspect":
+			if d.removing > 0 {
+				if d.removing--; d.removing == 0 {
+					d.image = ""
+				}
+			}
 			if d.image == "" {
 				fmt.Fprintln(options.Stderr, "Error: No such object: infra-dagger-dev")
 				return process.Result{ExitCode: 1}, errors.New("docker failed: exit status 1")
@@ -56,8 +62,16 @@ func (d *fakeDocker) runner(t *testing.T, root string) process.Runner {
 		case "stop":
 			d.running = false
 		case "rm":
+			if d.removing > 0 {
+				fmt.Fprintln(options.Stderr, "Error response from daemon: removal of container infra-dagger-dev is already in progress")
+				return process.Result{ExitCode: 1}, errors.New("docker failed: exit status 1")
+			}
 			d.image = ""
 		case "volume":
+			if d.image != "" {
+				fmt.Fprintln(options.Stderr, "Error response from daemon: remove infra-dagger-dev-cache: volume is in use")
+				return process.Result{ExitCode: 1}, errors.New("docker failed: exit status 1")
+			}
 			if !d.volume {
 				fmt.Fprintln(options.Stderr, "Error response from daemon: get infra-dagger-dev-cache: no such volume")
 				return process.Result{ExitCode: 1}, errors.New("docker failed: exit status 1")
@@ -188,5 +202,14 @@ func TestCleanAllStopsEngineAndRemovesVolume(t *testing.T) {
 	}
 	if _, err := os.Stat(state.Cache); !os.IsNotExist(err) {
 		t.Fatal("state directory retained")
+	}
+}
+
+func TestStopEngineWaitsForAutomaticRemovalBeforeDroppingTheCache(t *testing.T) {
+	root := toolchainRoot(t)
+	docker := &fakeDocker{image: fixtureEngineImage, running: true, volume: true, removing: 3}
+	opts := EngineOptions{State: NewState(root), Runner: docker.runner(t, root)}
+	if err := StopEngine(context.Background(), opts, true); err != nil || docker.volume {
+		t.Fatalf("cache of a container still being removed: %v, volume retained=%t, %v", err, docker.volume, docker.commands)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,5 +57,15 @@ func TestStartedEngineAppliesItsCachePolicy(t *testing.T) {
 	}
 	if used != limits.CacheGiB<<30 || free != limits.EmergencyFreeGiB<<30 {
 		t.Fatalf("engine reports maxUsedSpace %d and minFreeSpace %d, want %d and %d from its policy", used, free, limits.CacheGiB<<30, limits.EmergencyFreeGiB<<30)
+	}
+}
+
+func TestBuildEngineRoleMountsItsPolicyAtTheDevEngineConfigPath(t *testing.T) {
+	unit, err := os.ReadFile(filepath.Join("..", "..", "ansible/roles/build_engine/templates/infra-dagger.service.j2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(unit), ":"+EngineConfigPath+":ro ") {
+		t.Fatalf("the build engine role and the development engine mount their policies at different paths:\n%s", unit)
 	}
 }
