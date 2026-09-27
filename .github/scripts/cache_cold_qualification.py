@@ -1,8 +1,36 @@
 import json
+import os
 import pathlib
 import shlex
 import shutil
+import subprocess
 import sys
+
+
+def host_metadata():
+    fields = {"Model name:", "CPU(s):", "On-line CPU(s) list:", "Thread(s) per core:",
+              "Core(s) per socket:", "Socket(s):", "CPU max MHz:", "CPU min MHz:"}
+    cpu = json.loads(subprocess.check_output(["lscpu", "--json"], text=True))
+    root = pathlib.Path("/sys/fs/cgroup")
+    group = next((line.removeprefix("0::") for line in pathlib.Path("/proc/self/cgroup").read_text().splitlines()
+                  if line.startswith("0::")), "/")
+    current = root / group.lstrip("/")
+    if not current.is_dir() or ".." in current.parts:
+        current = root
+    limits = []
+    while True:
+        limit = {name: (current / name).read_text().strip()
+                 for name in ("cpu.max", "cpuset.cpus.effective") if (current / name).is_file()}
+        if limit:
+            limits.append(limit)
+        if current == root:
+            break
+        current = current.parent
+    return {"schema": 1, "nproc": int(subprocess.check_output(["nproc"], text=True)),
+            "affinity": sorted(os.sched_getaffinity(0)),
+            "cpu": {entry["field"].removesuffix(":"): entry["data"]
+                    for entry in cpu["lscpu"] if entry["field"] in fields},
+            "cgroup_limits_nearest_first": limits}
 
 
 def prepare(path):
@@ -15,6 +43,9 @@ def prepare(path):
                     "  exec " + shlex.quote(bazel) + " test --nocache_test_results \"$@\"\n" +
                     "fi\nexec " + shlex.quote(bazel) + " \"$@\"\n")
     path.chmod(0o755)
+    metadata = pathlib.Path("dist/reports/cold-cache-host.json")
+    metadata.parent.mkdir(parents=True, exist_ok=True)
+    metadata.write_text(json.dumps(host_metadata(), indent=2) + "\n")
 
 
 def verify(path):
