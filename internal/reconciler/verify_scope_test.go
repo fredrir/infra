@@ -27,6 +27,7 @@ func fullScope(t *testing.T, h *harness) {
 }
 
 func TestFullVerificationReachesHostsThroughTheRunSSHConfiguration(t *testing.T) {
+	t.Parallel()
 	var engineArgs, engineEnv []string
 	var config, home []string
 	h := newHarness(t, verifyCredentialValues(), func(t *testing.T, args, env []string) (int, string) {
@@ -71,6 +72,7 @@ func TestFullVerificationReachesHostsThroughTheRunSSHConfiguration(t *testing.T)
 }
 
 func TestCloudVerificationHasNoHostAccess(t *testing.T) {
+	t.Parallel()
 	var engineEnv []string
 	h := newHarness(t, verifyCredentialValues(), func(t *testing.T, _, env []string) (int, string) {
 		engineEnv = env
@@ -87,6 +89,7 @@ func TestCloudVerificationHasNoHostAccess(t *testing.T) {
 }
 
 func TestFullVerificationFailsWithoutHostAccess(t *testing.T) {
+	t.Parallel()
 	for name, change := range map[string]func(h *harness){
 		"readable identity": func(h *harness) {
 			if err := os.Chmod(h.supervisor.Identity, 0o644); err != nil {
@@ -101,6 +104,7 @@ func TestFullVerificationFailsWithoutHostAccess(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			h := newHarness(t, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
 				t.Error("the engine ran without host access")
 				return 0, ""
@@ -115,6 +119,7 @@ func TestFullVerificationFailsWithoutHostAccess(t *testing.T) {
 }
 
 func TestVerificationRequestsARepairOnlyForRepairableDifferences(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name        string
 		code        int
@@ -129,6 +134,7 @@ func TestVerificationRequestsARepairOnlyForRepairableDifferences(t *testing.T) {
 		{name: "lease held", code: 75, report: verification("failed", []reconcile.Difference{}, []string{"comparisons skipped: reconciliation locked"})},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			origin, revision := originRepository(t)
 			main := branchTip(t, origin, "main")
 			h := newHarnessAt(t, origin, revision, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
@@ -157,6 +163,7 @@ func TestVerificationRequestsARepairOnlyForRepairableDifferences(t *testing.T) {
 }
 
 func TestOffMainProductionRequestsARepairOfMain(t *testing.T) {
+	t.Parallel()
 	origin, forged := offMainOrigin(t)
 	h := newHarnessAt(t, origin, forged, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
 		t.Error("the engine ran for an off-main revision")
@@ -172,6 +179,7 @@ func TestOffMainProductionRequestsARepairOfMain(t *testing.T) {
 }
 
 func TestVerificationWaitsForARunningApply(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
 		return 0, verification("matches", []reconcile.Difference{}, []string{})
 	}, nil)

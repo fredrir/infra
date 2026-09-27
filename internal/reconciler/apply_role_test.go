@@ -27,6 +27,7 @@ func unitDuration(t *testing.T, service, directive string) time.Duration {
 }
 
 func TestApplyUnitDecryptsOnlyTheApplyCredentialsAndOutlivesTheLockWait(t *testing.T) {
+	t.Parallel()
 	defaults := roleDefaults(t)
 	if !slices.Equal(defaults.ApplyCredentials, ApplyCredentials) {
 		t.Fatalf("role requires apply credentials %q, supervisor reads %q", defaults.ApplyCredentials, ApplyCredentials)
@@ -73,6 +74,7 @@ func TestApplyUnitDecryptsOnlyTheApplyCredentialsAndOutlivesTheLockWait(t *testi
 }
 
 func TestApplyRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
+	t.Parallel()
 	defaults := roleDefaults(t)
 	declared := defaults.Apply
 	runner, _ := declared["runner"].(map[string]any)
@@ -141,6 +143,7 @@ type gatusExternalEndpoint struct {
 }
 
 func TestApplyHeartbeatOutlastsReadinessAndToleratesOneRetry(t *testing.T) {
+	t.Parallel()
 	template, err := os.ReadFile(filepath.Join("..", "..", "ansible", "roles", "gatus", "templates", "config.yaml.j2"))
 	if err != nil {
 		t.Fatal(err)

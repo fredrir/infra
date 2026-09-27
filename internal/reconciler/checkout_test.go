@@ -15,6 +15,7 @@ func hardenedExecutor(t *testing.T) executor {
 }
 
 func TestCheckoutBuildsOnlyThePublishedRevision(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	origin, published := originRepository(t)
 	main := branchTip(t, origin, "main")
@@ -68,6 +69,7 @@ func buildOffMainOrigin(t *testing.T) string {
 }
 
 func TestCheckoutRefusesProductionOffMain(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	origin, forged := offMainOrigin(t)
 	source := filepath.Join(t.TempDir(), "source")
@@ -86,6 +88,7 @@ func TestCheckoutRefusesProductionOffMain(t *testing.T) {
 }
 
 func TestCheckoutMainChecksOutTheMainTip(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	origin, _ := originRepository(t)
 	main := branchTip(t, origin, "main")
@@ -108,6 +111,7 @@ func TestCheckoutMainChecksOutTheMainTip(t *testing.T) {
 }
 
 func TestHardenedGitIgnoresPlantedHooksAndReplacements(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	origin, published := originRepository(t)
 	source := filepath.Join(t.TempDir(), "source")
@@ -157,6 +161,7 @@ func TestHardenedGitIgnoresPlantedHooksAndReplacements(t *testing.T) {
 }
 
 func TestClearDirectoryRemovesReadOnlyTrees(t *testing.T) {
+	t.Parallel()
 	state := t.TempDir()
 	plantPoison(t, state)
 	if err := clearDirectory(state); err != nil {

@@ -11,6 +11,7 @@ import (
 )
 
 func TestDecideRunsForNewTipsRetriesRequestsAndCappedRepairs(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
 	tip, previous := strings.Repeat("b", 40), strings.Repeat("a", 40)
 	checked, earlier := now.Add(-time.Hour), now.Add(-2*time.Hour)
@@ -63,6 +64,7 @@ func TestDecideRunsForNewTipsRetriesRequestsAndCappedRepairs(t *testing.T) {
 }
 
 func TestDecideIgnoresStaleRequestsAndQuarantinesInvalidOnesOnce(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
 	tip := strings.Repeat("b", 40)
 	applied := Ledger{Revision: tip, Outcome: OutcomeApplied, Checked: now.Add(-time.Hour)}
@@ -95,6 +97,7 @@ func TestDecideIgnoresStaleRequestsAndQuarantinesInvalidOnesOnce(t *testing.T) {
 }
 
 func TestLedgerRecordsTheAttemptAndItsOutcome(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
 	tip := strings.Repeat("c", 40)
 	repair := Decision{Run: true, Apply: true, Full: true, Repair: true, Consumed: Consumed{Repair: now}}
@@ -155,6 +158,7 @@ func TestLedgerRecordsTheAttemptAndItsOutcome(t *testing.T) {
 }
 
 func TestPushIgnoredCommitKeepsTheFailedRevisionInItsFailure(t *testing.T) {
+	t.Parallel()
 	failed := Ledger{Revision: strings.Repeat("d", 40), Outcome: reconcile.OutcomeFailed, Failure: "reconciliation of " + strings.Repeat("d", 40) + " failed at apply: hosts"}
 	failed.Revision = strings.Repeat("e", 40)
 	if err := failed.failure(); err == nil || !strings.Contains(err.Error(), strings.Repeat("d", 40)) {
@@ -163,6 +167,7 @@ func TestPushIgnoredCommitKeepsTheFailedRevisionInItsFailure(t *testing.T) {
 }
 
 func TestLedgerSurvivesARoundTripAndStartsEmpty(t *testing.T) {
+	t.Parallel()
 	state := t.TempDir()
 	if ledger, err := loadLedger(state); err != nil || !reflect.DeepEqual(ledger, Ledger{}) {
 		t.Fatalf("empty state loaded %+v, %v", ledger, err)

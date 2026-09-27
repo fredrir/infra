@@ -41,6 +41,7 @@ func roleDefaults(t *testing.T) reconcilerDefaults {
 }
 
 func TestVerifyUnitDecryptsOnlyTheVerifyCredentials(t *testing.T) {
+	t.Parallel()
 	if got := roleDefaults(t).Credentials; !slices.Equal(got, VerifyCredentials) {
 		t.Fatalf("role requires verify credentials %q, supervisor reads %q", got, VerifyCredentials)
 	}
@@ -65,6 +66,7 @@ func TestVerifyUnitDecryptsOnlyTheVerifyCredentials(t *testing.T) {
 }
 
 func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
+	t.Parallel()
 	defaults := roleDefaults(t)
 	declared := defaults.Verify
 	templated := regexp.MustCompile(`\{\{.*\}\}`)
@@ -99,6 +101,7 @@ func TestRoleConfigurationMatchesTheSupervisorSchema(t *testing.T) {
 }
 
 func TestVerifyUnitLetsOpenTofuProvidersAdjustTheirSoftLimits(t *testing.T) {
+	t.Parallel()
 	service := string(roleFile(t, "templates/infra-reconcile-verify.service.j2"))
 	for _, line := range strings.Split(service, "\n") {
 		if strings.HasPrefix(line, "SystemCallFilter=~") && strings.Contains(line, "@resources") {

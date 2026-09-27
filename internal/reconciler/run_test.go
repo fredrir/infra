@@ -437,6 +437,7 @@ func verification(outcome string, differences []reconcile.Difference, errors []s
 }
 
 func TestVerifyBuildsThePublishedEngineAndReportsItsOutcome(t *testing.T) {
+	t.Parallel()
 	differs := []reconcile.Difference{{System: "opentofu", Item: "cloudflare_dns_record.grafana update"}}
 	for _, test := range []struct {
 		name          string
@@ -452,6 +453,7 @@ func TestVerifyBuildsThePublishedEngineAndReportsItsOutcome(t *testing.T) {
 		{name: "locked", code: 75, report: verification("failed", []reconcile.Difference{}, []string{"comparisons skipped: reconciliation locked by fredrir-11 pid 7 until 2026-09-26 03:10:00 +0000 UTC"}), wantOutcome: "skipped"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			var engineArgs, engineEnv []string
 			h := newHarness(t, verifyCredentialValues(), func(t *testing.T, args, env []string) (int, string) {
 				engineArgs, engineEnv = args, env
@@ -498,6 +500,7 @@ func TestVerifyBuildsThePublishedEngineAndReportsItsOutcome(t *testing.T) {
 }
 
 func TestVerifyReportsFailuresBeforeTheEngineRuns(t *testing.T) {
+	t.Parallel()
 	missing := verifyCredentialValues()
 	delete(missing, KubernetesToken)
 	for _, test := range []struct {
@@ -511,6 +514,7 @@ func TestVerifyReportsFailuresBeforeTheEngineRuns(t *testing.T) {
 		{name: "build failure", credentials: verifyCredentialValues(), build: errors.New("go failed: exit status 1"), wantStage: "build", wantError: "build: build engine with go1.27.1: go failed: exit status 1"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			h := newHarness(t, test.credentials, func(t *testing.T, _, _ []string) (int, string) {
 				t.Error("engine verification ran")
 				return 0, ""
@@ -540,6 +544,7 @@ func TestVerifyReportsFailuresBeforeTheEngineRuns(t *testing.T) {
 }
 
 func TestVerifyKeepsOnlyReverifiedCachesAcrossRuns(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
 		return 0, verification("matches", []reconcile.Difference{}, []string{})
 	}, nil)
@@ -582,6 +587,7 @@ func TestVerifyKeepsOnlyReverifiedCachesAcrossRuns(t *testing.T) {
 }
 
 func TestVerifyRefusesToBuildProductionOffMain(t *testing.T) {
+	t.Parallel()
 	origin, forged := offMainOrigin(t)
 	h := newHarnessAt(t, origin, forged, verifyCredentialValues(), func(t *testing.T, _, _ []string) (int, string) {
 		t.Error("off-main production code ran")
@@ -611,6 +617,7 @@ func TestVerifyRefusesToBuildProductionOffMain(t *testing.T) {
 }
 
 func TestVerifyFailsClosedWithoutMain(t *testing.T) {
+	t.Parallel()
 	origin, published := originRepository(t)
 	gitCommand(t, origin, "checkout", "--quiet", "production")
 	gitCommand(t, origin, "branch", "-D", "main")

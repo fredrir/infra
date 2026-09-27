@@ -523,6 +523,7 @@ func (h *applyHarness) reset(t *testing.T) {
 }
 
 func TestApplyGatesTheMainTipBeforeBuildingAndPublishesThroughTheEngine(t *testing.T) {
+	t.Parallel()
 	h := newApplyHarness(t)
 	if err := h.applier.Apply(context.Background()); err != nil {
 		t.Fatal(err)
@@ -576,6 +577,7 @@ func TestApplyGatesTheMainTipBeforeBuildingAndPublishesThroughTheEngine(t *testi
 }
 
 func TestApplyMintsTheRunnerTokenOnlyWhenHostsAreSelected(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name      string
 		selection reconcile.Selection
@@ -586,6 +588,7 @@ func TestApplyMintsTheRunnerTokenOnlyWhenHostsAreSelected(t *testing.T) {
 		{name: "tooling only", selection: reconcile.Selection{Tooling: true}, minted: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			h := newApplyHarness(t)
 			h.selection = test.selection
 			if err := h.applier.Apply(context.Background()); err != nil {
@@ -599,6 +602,7 @@ func TestApplyMintsTheRunnerTokenOnlyWhenHostsAreSelected(t *testing.T) {
 }
 
 func TestGateReportsBindTheCheckedRevision(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name     string
 		report   func(h *applyHarness) (int, string)
@@ -623,6 +627,7 @@ func TestGateReportsBindTheCheckedRevision(t *testing.T) {
 		}, want: "source unavailable: HTTP 502"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			h := newApplyHarness(t)
 			h.gate = func(t *testing.T, call engineCall) (int, string) { return test.report(h) }
 			err := h.applier.Apply(context.Background())
@@ -652,6 +657,7 @@ func TestGateReportsBindTheCheckedRevision(t *testing.T) {
 }
 
 func TestGateOutagesRetryABoundedNumberOfTimes(t *testing.T) {
+	t.Parallel()
 	h := newApplyHarness(t)
 	h.gate = func(t *testing.T, call engineCall) (int, string) {
 		return 1, fmt.Sprintf(`{"base":%q,"revision":%q,"error":"unverified commits: deploy: source unavailable: HTTP 503","unavailable":true}`, h.applied, h.tip)
@@ -685,6 +691,7 @@ func TestGateOutagesRetryABoundedNumberOfTimes(t *testing.T) {
 }
 
 func TestTransientFailuresRetryAndDeterministicFailuresWait(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name     string
 		prepare  func(h *applyHarness)
@@ -767,6 +774,7 @@ func TestTransientFailuresRetryAndDeterministicFailuresWait(t *testing.T) {
 		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			h := newApplyHarness(t)
 			test.prepare(h)
 			if test.name == "missing credential" {
@@ -819,6 +827,7 @@ func TestTransientFailuresRetryAndDeterministicFailuresWait(t *testing.T) {
 }
 
 func TestACrashedRunIsRetriedWithItsIntent(t *testing.T) {
+	t.Parallel()
 	h := newApplyHarness(t)
 	h.settle(t, Ledger{Revision: h.tip, Outcome: OutcomeRunning, Full: true, Repair: true, Attempts: 1, RetryAt: h.applier.Now(), Started: h.applier.Now().Add(-time.Hour), Checked: h.applier.Now().Add(-time.Hour)})
 	if err := h.applier.Apply(context.Background()); err != nil {
@@ -833,6 +842,7 @@ func TestACrashedRunIsRetriedWithItsIntent(t *testing.T) {
 }
 
 func TestADeferredRepairKeepsFullAndDoesNotSpendTheCap(t *testing.T) {
+	t.Parallel()
 	h := newApplyHarness(t)
 	h.settle(t, Ledger{Revision: h.tip, Outcome: OutcomeApplied, Checked: h.applier.Now()})
 	if err := WriteRequest(h.applier.Config.Shared, Request{Kind: RequestRepair, Revision: h.tip, Full: true, Reason: "1 differences: opentofu: drift", Requested: h.applier.Now()}); err != nil {
@@ -862,6 +872,7 @@ func TestADeferredRepairKeepsFullAndDoesNotSpendTheCap(t *testing.T) {
 }
 
 func TestApplyDefersOrYieldsWhenTheEngineAsksForARetry(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name    string
 		advance bool
@@ -871,6 +882,7 @@ func TestApplyDefersOrYieldsWhenTheEngineAsksForARetry(t *testing.T) {
 		{name: "main advanced", advance: true, want: OutcomeSuperseded},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			h := newApplyHarness(t)
 			h.engine = func(t *testing.T, call engineCall) (int, string) {
 				if test.advance {
@@ -896,8 +908,10 @@ func TestApplyDefersOrYieldsWhenTheEngineAsksForARetry(t *testing.T) {
 }
 
 func TestPushIgnoredCommitsAreSkippedOnlyAfterASettledAncestor(t *testing.T) {
+	t.Parallel()
 	documents := map[string]string{"docs/runbook.md": "runbook", "README.md": "readme", "build/evidence/run.json": "{}"}
 	t.Run("settled ancestor", func(t *testing.T) {
+		t.Parallel()
 		h := newApplyHarness(t)
 		h.settle(t, Ledger{Revision: h.tip, Outcome: OutcomeApplied, Checked: h.applier.Now()})
 		documented := h.commit(t, documents)
@@ -918,6 +932,7 @@ func TestPushIgnoredCommitsAreSkippedOnlyAfterASettledAncestor(t *testing.T) {
 	})
 	for _, outcome := range []string{OutcomeDeferred, OutcomeSuperseded, OutcomeRetry, OutcomeRunning} {
 		t.Run("unsettled "+outcome, func(t *testing.T) {
+			t.Parallel()
 			h := newApplyHarness(t)
 			h.settle(t, Ledger{Revision: h.tip, Outcome: outcome, Checked: h.applier.Now()})
 			h.tip = h.commit(t, documents)
@@ -927,6 +942,7 @@ func TestPushIgnoredCommitsAreSkippedOnlyAfterASettledAncestor(t *testing.T) {
 		})
 	}
 	t.Run("unrelated history", func(t *testing.T) {
+		t.Parallel()
 		h := newApplyHarness(t)
 		gitCommand(t, h.origin, "checkout", "--quiet", "--orphan", "rewritten")
 		gitCommand(t, h.origin, "commit", "--quiet", "--no-gpg-sign", "-m", "rewritten")
@@ -938,6 +954,7 @@ func TestPushIgnoredCommitsAreSkippedOnlyAfterASettledAncestor(t *testing.T) {
 		}
 	})
 	t.Run("failed revision keeps the blame", func(t *testing.T) {
+		t.Parallel()
 		h := newApplyHarness(t)
 		failed := "reconciliation of " + h.tip + " failed at apply: hosts: unreachable"
 		h.settle(t, Ledger{Revision: h.tip, Outcome: reconcile.OutcomeFailed, Failure: failed, Checked: h.applier.Now()})
@@ -952,6 +969,7 @@ func TestPushIgnoredCommitsAreSkippedOnlyAfterASettledAncestor(t *testing.T) {
 }
 
 func TestReadinessReportsTheLedgerAndExpiringCredentialsDaily(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name       string
 		expiration string
@@ -965,6 +983,7 @@ func TestReadinessReportsTheLedgerAndExpiringCredentialsDaily(t *testing.T) {
 		{name: "failed tip", expiration: "2027-09-26 12:00:00 UTC", outcome: reconcile.OutcomeFailed, want: url.Values{"success": {"false"}, "error": {"reconciliation failed"}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			h := newApplyHarness(t)
 			h.github.expiration = test.expiration
 			h.settle(t, Ledger{Revision: h.tip, Outcome: test.outcome, Failure: "reconciliation failed", Checked: h.applier.Now().Add(-readinessInterval)})
@@ -986,6 +1005,7 @@ func TestReadinessReportsTheLedgerAndExpiringCredentialsDaily(t *testing.T) {
 }
 
 func TestInvalidRequestsAreQuarantinedOnceWithAFailingHeartbeat(t *testing.T) {
+	t.Parallel()
 	h := newApplyHarness(t)
 	h.settle(t, Ledger{Revision: h.tip, Outcome: OutcomeApplied, Checked: h.applier.Now()})
 	if err := os.WriteFile(requestPath(h.applier.Config.Shared, RequestApply), []byte(`{"kind":"apply","full":tr`), 0o640); err != nil {
@@ -1026,6 +1046,7 @@ func TestInvalidRequestsAreQuarantinedOnceWithAFailingHeartbeat(t *testing.T) {
 }
 
 func TestPendingNeedsNoCredentials(t *testing.T) {
+	t.Parallel()
 	h := newApplyHarness(t)
 	if err := os.Remove(h.applier.Credentials); err != nil {
 		t.Fatal(err)
@@ -1046,6 +1067,7 @@ func TestPendingNeedsNoCredentials(t *testing.T) {
 }
 
 func TestApplyWaitsForTheHostLock(t *testing.T) {
+	t.Parallel()
 	h := newApplyHarness(t)
 	release, err := acquireHostLock(context.Background(), h.applier.Config.Shared, time.Millisecond)
 	if err != nil {
@@ -1069,6 +1091,7 @@ func TestApplyWaitsForTheHostLock(t *testing.T) {
 }
 
 func TestOnlyIgnoredRequiresTheHandledRevisionAsAnAncestor(t *testing.T) {
+	t.Parallel()
 	origin, _ := originRepository(t)
 	base := branchTip(t, origin, "main")
 	gitCommand(t, origin, "checkout", "--quiet", "-b", "side")
@@ -1133,6 +1156,7 @@ func TestSecretsStayOnAMemoryBackedFileSystem(t *testing.T) {
 }
 
 func TestApplyConfigRequiresHostAccessAndApps(t *testing.T) {
+	t.Parallel()
 	if _, err := LoadApplyConfig(writeConfig(t, validApplyConfig())); err != nil {
 		t.Fatal(err)
 	}

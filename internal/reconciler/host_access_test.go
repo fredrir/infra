@@ -24,6 +24,7 @@ type roleTask struct {
 }
 
 func TestSSHIdentityIsGeneratedOnTheReconcilerAndNeverLeavesIt(t *testing.T) {
+	t.Parallel()
 	var defaults struct {
 		Identity string `yaml:"reconciler_ssh_identity"`
 	}
@@ -73,6 +74,7 @@ func TestSSHIdentityIsGeneratedOnTheReconcilerAndNeverLeavesIt(t *testing.T) {
 }
 
 func TestUnitsHandTheSupervisorAnSSHIdentityItAccepts(t *testing.T) {
+	t.Parallel()
 	for unit, user := range map[string]string{"infra-reconcile-apply.service": "infra-apply", "infra-reconcile-verify.service": "infra-verify"} {
 		service := string(roleFile(t, "templates/"+unit+".j2"))
 		if regexp.MustCompile(`(?m)^LoadCredential=`).MatchString(service) {
@@ -118,6 +120,7 @@ func yamlString(t *testing.T, value any) string {
 }
 
 func TestVerificationSharesOnlyTheReconciliationDirectory(t *testing.T) {
+	t.Parallel()
 	var tasks []struct {
 		Name  string         `yaml:"name"`
 		Group map[string]any `yaml:"ansible.builtin.group"`

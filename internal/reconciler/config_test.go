@@ -43,6 +43,7 @@ func writeConfig(t *testing.T, value any) string {
 }
 
 func TestLoadConfigAcceptsTheDeclaredShape(t *testing.T) {
+	t.Parallel()
 	want := validConfig()
 	got, err := LoadConfig(writeConfig(t, want))
 	if err != nil || got != want {
@@ -56,6 +57,7 @@ func TestLoadConfigAcceptsTheDeclaredShape(t *testing.T) {
 }
 
 func TestLoadConfigRejectsInvalidSettings(t *testing.T) {
+	t.Parallel()
 	for name, change := range map[string]func(*Config){
 		"repository credentials":   func(c *Config) { c.Repository = "https://token@github.com/fredrir/infra.git" },
 		"repository scheme":        func(c *Config) { c.Repository = "ssh://github.com/fredrir/infra.git" },
@@ -94,6 +96,7 @@ func TestLoadConfigRejectsInvalidSettings(t *testing.T) {
 }
 
 func TestLoadConfigRejectsUnknownAndTrailingData(t *testing.T) {
+	t.Parallel()
 	path := writeConfig(t, map[string]any{"repository": "https://github.com/fredrir/infra.git", "deep": true})
 	if _, err := LoadConfig(path); err == nil || !strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("unknown field returned %v", err)

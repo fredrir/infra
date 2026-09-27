@@ -68,6 +68,7 @@ func verifyCredentialValues() map[string]string {
 }
 
 func TestConsumeCredentialsTrimsRemovesAndNamesOnlyProblems(t *testing.T) {
+	t.Parallel()
 	values := verifyCredentialValues()
 	path := writeCredentials(t, anyValues(values))
 	credentials, err := ConsumeCredentials(path, VerifyCredentials)
@@ -142,6 +143,7 @@ func TestConsumeCredentialsTrimsRemovesAndNamesOnlyProblems(t *testing.T) {
 }
 
 func TestEngineEnvironmentMapsOnlyEngineCredentials(t *testing.T) {
+	t.Parallel()
 	credentials, err := ConsumeCredentials(writeCredentials(t, anyValues(verifyCredentialValues())), VerifyCredentials)
 	if err != nil {
 		t.Fatal(err)
@@ -168,6 +170,7 @@ func TestEngineEnvironmentMapsOnlyEngineCredentials(t *testing.T) {
 }
 
 func TestKubeconfigCarriesTheDeclaredServerAuthorityAndToken(t *testing.T) {
+	t.Parallel()
 	authority := testAuthority(t)
 	data, err := Kubeconfig("https://100.115.121.9:6443", authority, "infrastructure-verify", "kubernetes-secret-value")
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 )
 
 func TestRequestsLiveInTheirOwnersDirectoriesAndAreValidated(t *testing.T) {
+	t.Parallel()
 	shared := sharedDirectory(t)
 	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
 	repair := Request{Kind: RequestRepair, Revision: strings.Repeat("d", 40), Full: true, Reason: "1 differences", Requested: now}
@@ -78,6 +79,7 @@ func TestRequestsLiveInTheirOwnersDirectoriesAndAreValidated(t *testing.T) {
 }
 
 func TestHostLockSerializesUnitsAndIsNeverCreated(t *testing.T) {
+	t.Parallel()
 	shared := sharedDirectory(t)
 	release, err := acquireHostLock(context.Background(), shared, time.Millisecond)
 	if err != nil {
