@@ -51,7 +51,11 @@ func newPlatformCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return platformops.MaintainRepositories(cmd.Context(), resticCommand(repositories, cmd.OutOrStdout(), cmd.ErrOrStderr()), repositories)
+		timeout, err := strconv.ParseInt(os.Getenv("BACKUP_MAINTENANCE_TIMEOUT"), 10, 32)
+		if err != nil || timeout <= 0 {
+			return fmt.Errorf("invalid BACKUP_MAINTENANCE_TIMEOUT")
+		}
+		return platformops.MaintainRepositories(cmd.Context(), resticCommand(repositories, cmd.OutOrStdout(), cmd.ErrOrStderr()), repositories, time.Duration(timeout)*time.Second)
 	}})
 	return root
 }

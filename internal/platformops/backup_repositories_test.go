@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func dualRepositories() []Repository {
@@ -190,14 +191,44 @@ func TestMaintenanceCoversEveryRepository(t *testing.T) {
 		}
 		return nil, nil
 	}
-	err := MaintainRepositories(context.Background(), restic, dualRepositories())
+	err := MaintainRepositories(context.Background(), restic, dualRepositories(), time.Minute)
 	if err == nil || !strings.Contains(err.Error(), "maintenance of primary") {
 		t.Fatalf("primary maintenance failure not reported: %v", err)
 	}
 	if !slices.Equal(calls, []string{"primary check", "offsite check", "offsite forget"}) {
 		t.Fatalf("maintenance ran %v", calls)
 	}
-	if err := MaintainRepositories(context.Background(), restic, nil); err == nil {
+	if err := MaintainRepositories(context.Background(), restic, nil, time.Minute); err == nil {
 		t.Fatal("maintenance without repositories accepted")
+	}
+	succeeding := func(context.Context, Repository, ...string) ([]byte, error) { return nil, nil }
+	if err := MaintainRepositories(context.Background(), succeeding, dualRepositories(), 0); err == nil {
+		t.Fatal("maintenance without a timeout accepted")
+	}
+}
+
+func TestSlowRepositoryMaintenanceLeavesTheOthersTheirTime(t *testing.T) {
+	var calls []string
+	restic := func(ctx context.Context, repository Repository, args ...string) ([]byte, error) {
+		calls = append(calls, repository.Name+" "+args[2])
+		if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > 200*time.Millisecond {
+			return nil, errors.New(repository.Name + " runs beyond its own maintenance time")
+		}
+		if repository.Name == "primary" {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) < 150*time.Millisecond {
+			return nil, errors.New("offsite started without its own time")
+		}
+		return nil, nil
+	}
+	started := time.Now()
+	err := MaintainRepositories(context.Background(), restic, dualRepositories(), 200*time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "maintenance of primary") || strings.Contains(err.Error(), "offsite") {
+		t.Fatalf("maintenance returned %v", err)
+	}
+	if !slices.Equal(calls, []string{"primary check", "offsite check", "offsite forget"}) || time.Since(started) > time.Second {
+		t.Fatalf("maintenance ran %v in %v", calls, time.Since(started))
 	}
 }

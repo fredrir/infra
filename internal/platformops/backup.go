@@ -78,20 +78,31 @@ func ResticEnvironment(base []string, repositories []Repository, repository Repo
 	return append(environment, repository.Env...)
 }
 
-func MaintainRepositories(ctx context.Context, restic ResticCommand, repositories []Repository) error {
+func MaintainRepositories(ctx context.Context, restic ResticCommand, repositories []Repository, timeout time.Duration) error {
 	if len(repositories) == 0 {
 		return fmt.Errorf("backup repositories required")
 	}
+	if timeout <= 0 {
+		return fmt.Errorf("maintenance timeout required")
+	}
 	var failures []error
 	for _, repository := range repositories {
-		for _, args := range [][]string{{"--retry-lock", "10m", "check", "--read-data-subset=10%"}, {"--retry-lock", "10m", "forget", "--group-by", "host,tags", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune"}} {
-			if _, err := restic(ctx, repository, args...); err != nil {
-				failures = append(failures, fmt.Errorf("maintenance of %s: %w", repository.Name, err))
-				break
-			}
+		if err := maintainRepository(ctx, restic, repository, timeout); err != nil {
+			failures = append(failures, fmt.Errorf("maintenance of %s: %w", repository.Name, err))
 		}
 	}
 	return errors.Join(failures...)
+}
+
+func maintainRepository(ctx context.Context, restic ResticCommand, repository Repository, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	for _, args := range [][]string{{"--retry-lock", "10m", "check", "--read-data-subset=10%"}, {"--retry-lock", "10m", "forget", "--group-by", "host,tags", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune"}} {
+		if _, err := restic(ctx, repository, args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type BackupConfig struct {
