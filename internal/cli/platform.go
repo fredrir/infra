@@ -1,15 +1,18 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/coreos/go-systemd/v22/activation"
 	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/platformops"
 	"github.com/fredrir/infra/internal/process"
@@ -54,26 +57,42 @@ func newPlatformCommand() *cobra.Command {
 }
 
 func newRunnerAdmissionCommand() *cobra.Command {
+	command := &cobra.Command{Use: "runner-admission", Short: "Bound complete jobs on the build VM", RunE: missingCommand}
+	for _, verb := range []string{"acquire", "release"} {
+		var socket string
+		var timeout time.Duration
+		request := &cobra.Command{Use: verb, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
+			defer cancel()
+			started := time.Now()
+			err := platformops.RequestRunnerAdmission(ctx, socket, verb == "release")
+			fmt.Fprintf(cmd.OutOrStdout(), "Runner admission %s took %.3fs\n", verb, time.Since(started).Seconds())
+			return err
+		}}
+		request.Flags().StringVar(&socket, "socket", cmp.Or(os.Getenv("INFRA_RUNNER_ADMISSION_SOCKET"), "/run/infra-runner-admission.sock"), "Admission broker socket")
+		request.Flags().DurationVar(&timeout, "timeout", 30*time.Minute, "Admission wait limit")
+		command.AddCommand(request)
+	}
 	var directory string
 	var capacity int
-	var timeout time.Duration
-	command := &cobra.Command{Use: "runner-admission acquire|release", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		if args[0] != "acquire" && args[0] != "release" {
-			return fmt.Errorf("runner admission requires acquire or release")
+	serve := &cobra.Command{Use: "serve", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		listeners, err := activation.Listeners()
+		if err != nil {
+			return err
 		}
-		if timeout <= 0 {
-			return fmt.Errorf("runner admission timeout must be positive")
+		var sockets []*net.UnixListener
+		for index, listener := range listeners {
+			unix, ok := listener.(*net.UnixListener)
+			if !ok {
+				return fmt.Errorf("runner admission serves unix stream sockets; systemd passed descriptor %d as %T", index+3, listener)
+			}
+			sockets = append(sockets, unix)
 		}
-		ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
-		defer cancel()
-		started := time.Now()
-		err := platformops.RunnerAdmission(ctx, directory, capacity, args[0] == "release")
-		fmt.Fprintf(cmd.OutOrStdout(), "Runner admission %s took %.3fs\n", args[0], time.Since(started).Seconds())
-		return err
+		return platformops.ServeRunnerAdmissions(cmd.Context(), sockets, directory, capacity, cmd.ErrOrStderr())
 	}}
-	command.Flags().StringVar(&directory, "directory", "/run/infra-runner-admission", "Host admission directory")
-	command.Flags().IntVar(&capacity, "capacity", 1, "Concurrent jobs on the build host")
-	command.Flags().DurationVar(&timeout, "timeout", 30*time.Minute, "Admission wait limit")
+	serve.Flags().StringVar(&directory, "directory", "/run/infra-runner-admission", "Broker lease directory")
+	serve.Flags().IntVar(&capacity, "capacity", 1, "Concurrent jobs on the build host")
+	command.AddCommand(serve)
 	return command
 }
 

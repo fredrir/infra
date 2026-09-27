@@ -33,6 +33,7 @@ var Suites = []Suite{
 	{Name: "kata", Package: "./internal/kata", Test: "^TestDaggerExecutesBoundedWorker$", Env: []string{"INFRA_KATA_ENGINE_TEST=1"}, BinaryVariable: "INFRA_KATA_BINARY", Engine: "kata"},
 	{Name: "reconciler", Package: "./internal/reconciler", Test: "^TestReconcilerQualification$", Tools: []string{"sops"}, Env: []string{"INFRA_RECONCILER_QUALIFY=1"}, RootVariable: "INFRA_TEST_SOURCE_ROOT", BinaryVariable: "INFRA_QUALIFICATION_BINARY", Hosts: []string{"dev-reconciler-1"}},
 	{Name: "engine-policy", Package: "./internal/dev", Test: "^TestStartedEngineAppliesItsCachePolicy$", Env: []string{"INFRA_ENGINE_POLICY_TEST=1"}, RootVariable: "INFRA_TEST_SOURCE_ROOT"},
+	{Name: "admission-flood", Package: "./internal/platformops", Test: "^TestRunnerAdmissionFloodOnOneRepositorySocketDoesNotDelayAnother$", Env: []string{"INFRA_ADMISSION_FLOOD_TEST=1"}},
 }
 
 func SuiteNames() []string {

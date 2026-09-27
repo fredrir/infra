@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.47.0
 	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
+	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-github/v88 v88.0.0
 	github.com/hmarr/codeowners v1.2.1

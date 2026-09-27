@@ -42,6 +42,7 @@ go_library(
         "//internal/reconcile",
         "//internal/reconciler",
         "//internal/release",
+        "@com_github_coreos_go_systemd_v22//activation",
         "@com_github_spf13_cobra//:cobra",
     ],
 )

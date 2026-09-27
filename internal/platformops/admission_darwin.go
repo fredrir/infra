@@ -3,8 +3,10 @@ package platformops
 import (
 	"context"
 	"fmt"
+	"io"
+	"net"
 )
 
-func RunnerAdmission(context.Context, string, int, bool) error {
+func ServeRunnerAdmissions(context.Context, []*net.UnixListener, string, int, io.Writer) error {
 	return fmt.Errorf("runner admission requires Linux")
 }
