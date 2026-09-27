@@ -150,11 +150,30 @@ class CleanupTest(unittest.TestCase):
                     self.run_sweep()
                 self.assertEqual(self.deletes(), [])
 
-    def test_excessive_candidates_are_not_partially_deleted(self):
-        self.inventory([device(f"node-{index}") for index in range(101)])
+    def test_large_inventory_makes_bounded_oldest_first_progress(self):
+        nodes = [device(f"node-{index:03}", age=3600 + index) for index in range(101)]
+        self.inventory(nodes)
+        report = self.run_sweep()
+        self.assertEqual(report["eligible"], 101)
+        self.assertEqual(report["deferred"], 1)
+        self.assertEqual(self.deletes(), [f"/device/node-{index:03}" for index in range(100, 0, -1)])
+        self.inventory([nodes[0]])
+        self.assertEqual(self.run_sweep()["deferred"], 0)
+        self.assertEqual(len(self.deletes()), 101)
+        self.assertEqual(self.deletes()[-1], "/device/node-000")
+
+    def test_rate_limit_after_deletion_preserves_progress_and_stops(self):
+        nodes = [device(f"node-{index}") for index in range(3)]
+        self.inventory(nodes)
+        self.routes[("DELETE", "/device/node-1")] = (429, {}, {})
+        progress, report = [], {}
         with self.assertRaises(cleanup.CleanupError):
-            self.run_sweep()
-        self.assertEqual(self.deletes(), [])
+            cleanup.sweep(self.api, report, True, NOW, lambda current: progress.append(copy.deepcopy(current)))
+        self.assertEqual(self.deletes(), ["/device/node-0", "/device/node-1"])
+        self.assertEqual(progress[-1]["devices"][0]["result"], "deleted")
+        self.inventory(nodes[1:])
+        self.assertEqual(len(self.run_sweep()["devices"]), 2)
+        self.assertEqual(self.deletes()[-2:], ["/device/node-1", "/device/node-2"])
 
     def test_http_failure_stops_and_never_echoes_response_secrets(self):
         for code in [401, 403, 429, 500]:

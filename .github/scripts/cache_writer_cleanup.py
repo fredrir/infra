@@ -116,7 +116,7 @@ def eligible(device, now):
     return now - instant >= MINIMUM_AGE
 
 
-def sweep(api, report, apply=False, now=None):
+def sweep(api, report, apply=False, now=None, progress=None):
     now = now or datetime.datetime.now(datetime.timezone.utc)
     if now.tzinfo is None or now.utcoffset() is None:
         raise CleanupError("Cleanup time must include timezone")
@@ -132,13 +132,18 @@ def sweep(api, report, apply=False, now=None):
             seen.add(device["nodeId"])
         if eligible(device, now):
             candidates.append(device)
-    if len(candidates) > MAXIMUM_DELETIONS:
-        raise CleanupError("Writer deletion limit exceeded")
+    candidates.sort(key=lambda item: (datetime.datetime.fromisoformat(item["created"].replace("Z", "+00:00")), item["nodeId"]))
     report["examined"] = len(inventory["devices"])
-    for device in candidates:
+    report["eligible"] = len(candidates)
+    report["deferred"] = max(0, len(candidates) - MAXIMUM_DELETIONS)
+    if progress:
+        progress(report)
+    for device in candidates[:MAXIMUM_DELETIONS]:
         node_id = device["nodeId"]
         receipt = {"node_id": node_id, "created": device["created"], "result": "candidate"}
         report["devices"].append(receipt)
+        if progress:
+            progress(report)
         current = api.request("GET", "/device/" + node_id + "?fields=all")
         if current is None:
             receipt["result"] = "already_absent"
@@ -150,6 +155,8 @@ def sweep(api, report, apply=False, now=None):
             receipt["result"] = "deleted"
         else:
             receipt["result"] = "would_delete"
+        if progress:
+            progress(report)
 
 
 def main():
@@ -159,15 +166,19 @@ def main():
     args = parser.parse_args()
     report = {"schema": 1, "writer_tag": WRITER_TAG}
     result = 0
+    def save(receipt):
+        temporary = args.report.with_name(args.report.name + ".tmp")
+        temporary.write_text(json.dumps(receipt, indent=2) + "\n")
+        temporary.replace(args.report)
     try:
         api = API()
         api.authenticate(os.environ.get("TAILSCALE_CACHE_CLEANUP_CLIENT_ID", ""),
                          os.environ.get("TAILSCALE_CACHE_CLEANUP_CLIENT_SECRET", ""))
-        sweep(api, report, args.apply)
+        sweep(api, report, args.apply, progress=save)
     except CleanupError as error:
         report["error"] = str(error)
         result = 1
-    args.report.write_text(json.dumps(report, indent=2) + "\n")
+    save(report)
     print(json.dumps(report))
     return result
 
