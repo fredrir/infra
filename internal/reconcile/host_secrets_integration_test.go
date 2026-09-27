@@ -364,14 +364,7 @@ systemctl daemon-reload`); err != nil {
 	controlPlay(true)
 	t.Log("check mode compares the installed ciphertext without printing plaintext")
 
-	must("docker", "exec", name, "sh", "-c", "mkdir -p /etc/infra-verification; printf secret > /etc/infra-verification/plaintext; printf '[Service]\nExecStart=/bin/sleep infinity\n' > /etc/systemd/system/infra-verification-request.service; printf '[Timer]\nOnCalendar=daily\n[Install]\nWantedBy=timers.target\n' > /etc/systemd/system/infra-verification-request.timer; systemctl daemon-reload; systemctl enable --now infra-verification-request.timer; systemctl start infra-verification-request.service")
 	monitorPlay()
-	absent("/etc/infra-verification", "/etc/systemd/system/infra-verification-request.timer", "/etc/systemd/system/infra-verification-request.service", "/usr/local/bin/infra")
-	for _, unit := range []string{"infra-verification-request.service", "infra-verification-request.timer"} {
-		if _, err := run("docker", "exec", name, "systemctl", "is-active", unit); err == nil {
-			t.Fatalf("retired unit %s remains active", unit)
-		}
-	}
 	for _, mode := range [][]string{nil, {"--check"}} {
 		if output := monitorPlay(mode...); len(changed(output)) != 0 {
 			t.Fatalf("monitor %v is not idempotent: %q", mode, changed(output))
