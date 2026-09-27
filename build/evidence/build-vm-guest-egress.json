@@ -74,5 +74,50 @@
   "rule": "ct state { established, related } accept",
   "test": "a NOTRACK rule for 169.254.20.10:53 in the gated behaviour test; the previous rule answered ok, the current one drops"
  },
- "reload": "add table, delete table and the definition in one transaction, so elements removed from a set leave on reload"
+ "reload": "add table, delete table and the definition in one transaction, so elements removed from a set leave on reload",
+ "production_verification": {
+  "revision": "0cd3960247e7e4da12198487f22d5e12758679b8",
+  "applied_utc": "2026-09-27T09:50:35Z",
+  "apply": "build_vm changed three tasks on fredrir-09 (filter file, filter service, start filter); infra-build-vm.service not restarted (active since 2026-09-25T22:50:45)",
+  "host": {
+   "probed_utc": "2026-09-27T09:51:47Z",
+   "infra-build-vm-egress.service": "active, enabled, since 09:49:40",
+   "vm_requires_egress": 1,
+   "nft_table": "present"
+  },
+  "guest": {
+   "probed_utc": "2026-09-27T09:52:13Z",
+   "account": "builder",
+   "dns github.com": "resolved",
+   "https github.com": 200,
+   "timeout": [
+    "10.0.2.2:22",
+    "10.0.2.2:2222",
+    "10.0.2.2:6444",
+    "10.0.2.2:9353",
+    "10.0.2.2:10010",
+    "10.0.2.2:10248",
+    "10.0.2.2:10249",
+    "10.0.2.2:10250",
+    "10.0.2.2:10256",
+    "169.254.20.10:53 tcp",
+    "169.254.20.10:53 udp",
+    "169.254.20.10:8080",
+    "10.43.0.10:53 tcp",
+    "10.43.0.10:53 udp",
+    "10.43.0.1:443",
+    "10.42.0.1:10250",
+    "169.254.169.254:80",
+    "85.190.100.72:22",
+    "100.87.168.66:22",
+    "100.87.168.66:10250"
+   ],
+   "reachable": [
+    "10.0.2.3:53 udp",
+    "1.1.1.1:443",
+    "140.82.112.3:443"
+   ]
+  },
+  "image_builds": "push run 36310526344: platform-caddy, infra-runner-check, platform-backup-tools and infra-runner-rust built on the build VM after the filter applied"
+ }
 }
