@@ -58,6 +58,12 @@ filegroup(
 )
 
 filegroup(
+    name = "build_engine_data",
+    srcs = ["ansible/roles/build_engine/templates/infra-dagger.service.j2"],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "host_firewall_data",
     srcs = [
         "ansible/roles/firewall/defaults/main.yml",

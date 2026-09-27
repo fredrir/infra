@@ -99,7 +99,7 @@ func TestStartEngineRunsPinnedImageWithRoleLimits(t *testing.T) {
 			run = command
 		}
 	}
-	expected := []string{"docker", "run", "--detach", "--rm", "--name", "infra-dagger-dev", "--privileged", "--cpus=4", "--memory=8g", "--memory-swap=8g", "--pids-limit=1024", "--volume", "infra-dagger-dev-cache:/var/lib/dagger", "--volume", policy + ":/etc/buildkit/buildkitd.toml:ro", fixtureEngineImage, "--oci-max-parallelism=4", "--oci-worker-gc"}
+	expected := []string{"docker", "run", "--detach", "--rm", "--name", "infra-dagger-dev", "--privileged", "--cpus=4", "--memory=8g", "--memory-swap=8g", "--pids-limit=1024", "--volume", "infra-dagger-dev-cache:/var/lib/dagger", "--volume", policy + ":/etc/dagger/engine.toml:ro", fixtureEngineImage, "--oci-max-parallelism=4", "--oci-worker-gc"}
 	if !slices.Equal(run, expected) {
 		t.Fatalf("unexpected docker run:\n%v\n%v", run, expected)
 	}

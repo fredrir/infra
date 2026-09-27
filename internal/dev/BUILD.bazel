@@ -37,6 +37,7 @@ go_test(
         "bench_test.go",
         "cluster_test.go",
         "doctor_test.go",
+        "engine_policy_test.go",
         "engine_test.go",
         "hosts_test.go",
         "qualify_test.go",
@@ -51,5 +52,6 @@ go_test(
         "//internal/process",
         "@com_github_kdomanski_iso9660//:iso9660",
         "@in_yaml_go_yaml_v3//:yaml",
+        "@io_dagger_dagger//:dagger",
     ],
 )

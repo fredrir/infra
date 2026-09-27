@@ -5,6 +5,7 @@ go_test(
     srcs = [
         "arc_test.go",
         "bazel_test.go",
+        "build_engine_test.go",
         "build_vm_test.go",
         "cancellation_test.go",
         "check_workflow_test.go",
@@ -22,6 +23,7 @@ go_test(
         "volatile_access_test.go",
     ],
     data = [
+        "//:build_engine_data",
         "//:build_vm_metrics_data",
         "//:cli_input_data",
         "//:host_firewall_data",
@@ -36,6 +38,7 @@ go_test(
     ],
     deps = [
         "//internal/ci",
+        "//internal/dev",
         "//internal/images",
         "@com_github_tailscale_hujson//:hujson",
         "@dev_cel_cel_go//cel",

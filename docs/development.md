@@ -56,7 +56,7 @@ git diff --exit-code -- '*BUILD.bazel'
 | `infra dev bench run [--baseline FILE] [SCENARIO...]` | hyperfine samples of `dev/bench/scenarios.yaml` with the freshly built binary; median, p95, CPU, peak memory and budget per scenario in `.cache/dev/bench/<timestamp>/summary.json` and `latest.json`; non-zero exit on failures, budget breaches or regressions beyond `--threshold` |
 | `infra dev bench compare BASE CANDIDATE` | Median deltas between two summaries |
 | `infra dev bench go [PACKAGE...]` | `go test -bench` with repetitions; benchstat against `.cache/dev/bench/go-baseline.txt` when present |
-| `infra dev qualify SUITE [-- go test flags]` | Gated suites `onboarding`, `image`, `reconcile-plan`, `publishing`, `kustomize`, `packages`, `kata`; builds `.cache/dev/bin/infra` and starts the engine when the suite needs them |
+| `infra dev qualify SUITE [-- go test flags]` | Gated suites `onboarding`, `image`, `reconcile-plan`, `publishing`, `kustomize`, `packages`, `kata`, `reconciler`, `engine-policy`; builds `.cache/dev/bin/infra` and starts the engine when the suite needs them |
 
 | Setting | Value |
 | --- | --- |
@@ -158,7 +158,7 @@ git diff -- platform
 | Persistent caches               | `infra-dagger-cache` Docker volume; engine-local Bazel action cache                                                                         |
 | Runner environment              | `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger`                                                                          |
 | Runner enforcement              | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected                                            |
-| Cache collection                | Dagger ordinary layers first; named caches preferred for 48 h; 25 GiB target / 32 GiB ceiling; 8 GiB / 4 GiB emergency free space           |
+| Cache collection                | `/etc/infra-dagger.toml` at `/etc/dagger/engine.toml`, the path the engine entrypoint reads; Dagger ordinary layers first; named caches preferred for 48 h; 25 GiB target / 32 GiB ceiling; 8 GiB / 4 GiB emergency free space |
 | Verified tooling                | CLI release checksum and revision; pinned GitHub runner archive                                                                             |
 | Warm ARC capacity               | One deploy runner and one declaration-check runner                                                                                          |
 | Pool isolation                  | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines                                                           |

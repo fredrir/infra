@@ -15,6 +15,8 @@ import (
 
 const EngineName = "infra-dagger-dev"
 
+const EngineConfigPath = "/etc/dagger/engine.toml"
+
 type EngineLimits struct {
 	CPUs             int
 	Memory           string
@@ -123,7 +125,7 @@ func StartEngine(ctx context.Context, opts EngineOptions) (EngineStatus, error) 
 	limits := opts.Profile.Limits
 	arguments := []string{"run", "--detach", "--rm", "--name", opts.Profile.Name, "--privileged",
 		fmt.Sprintf("--cpus=%d", limits.CPUs), "--memory=" + limits.Memory, "--memory-swap=" + limits.Memory, fmt.Sprintf("--pids-limit=%d", limits.Pids),
-		"--volume", opts.Profile.Volume() + ":/var/lib/dagger", "--volume", policy + ":/etc/buildkit/buildkitd.toml:ro",
+		"--volume", opts.Profile.Volume() + ":/var/lib/dagger", "--volume", policy + ":" + EngineConfigPath + ":ro",
 		config.EngineImage, fmt.Sprintf("--oci-max-parallelism=%d", limits.Parallelism), "--oci-worker-gc"}
 	if _, err := capture(ctx, opts.Runner, "docker", arguments...); err != nil {
 		return status, fmt.Errorf("start %s: %w", opts.Profile.Name, err)
@@ -180,5 +182,6 @@ minFreeSpace = "%dGiB"
 }
 
 func absent(err error) bool {
-	return err != nil && strings.Contains(strings.ToLower(err.Error()), "no such")
+	message := strings.ToLower(fmt.Sprint(err))
+	return err != nil && (strings.Contains(message, "no such") || strings.Contains(message, "removal of container") && strings.Contains(message, "already in progress"))
 }
