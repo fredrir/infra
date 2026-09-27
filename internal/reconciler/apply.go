@@ -48,7 +48,6 @@ type Applier struct {
 
 type applyRun struct {
 	Run
-	check int64
 }
 
 type stageFailure struct {
@@ -183,10 +182,6 @@ func (a Applier) reconcile(ctx context.Context, credentials Credentials, decisio
 		}
 	}
 	fmt.Fprintf(log, "Reconciling %s at %s\n", reviewedBranch, revision)
-	publisher := checks{publisher: a.Config.Publisher, key: []byte(credentials[PublisherAppKey])}
-	if run.check, err = publisher.start(ctx, revision, run.ID(), run.Started); err != nil {
-		fmt.Fprintf(log, "check run: %v\n", err)
-	}
 	base, err := a.gate(ctx, current, credentials, run)
 	if err != nil {
 		var rejected rejection
@@ -353,7 +348,7 @@ func (a Applier) readiness(ctx context.Context, credentials Credentials) error {
 }
 
 func (a Applier) provenanceTokenLifetime(ctx context.Context, token string) error {
-	client, err := reconcile.GitHubClient(a.Config.Publisher.API, token)
+	client, err := reconcile.GitHubClient(a.Config.Runner.API, token)
 	if err != nil {
 		return err
 	}
@@ -380,12 +375,6 @@ func (a Applier) finish(ctx context.Context, credentials Credentials, started Le
 	ledger := started.end(*run, run.Finished)
 	client := objectstore.Client{Endpoint: cmp.Or(a.Config.Endpoint, "https://s3."+a.Config.Region+".amazonaws.com"), Region: a.Config.Region, AccessKey: credentials[AWSAccessKeyID], SecretKey: credentials[AWSSecretAccessKey], HTTP: a.HTTP}
 	uploadErr := Store{Client: client, Bucket: a.Config.Bucket, Prefix: a.Config.Prefix}.upload(ctx, run.Run, log.bytes())
-	if run.check != 0 {
-		title, conclusion := run.conclusion()
-		if err := (checks{publisher: a.Config.Publisher, key: []byte(credentials[PublisherAppKey])}).complete(ctx, run.check, conclusion, title, run.summary(a.Config.Site), run.Finished); err != nil {
-			fmt.Fprintf(log, "check run: %v\n", err)
-		}
-	}
 	var heartbeatErr error
 	if slices.Contains([]string{OutcomeApplied, OutcomeEvaluated, reconcile.OutcomeFailed, OutcomeRetry}, run.Outcome) || readiness != nil {
 		heartbeatErr = a.heartbeat(ctx, credentials, errors.Join(ledger.failure(), readiness, uploadErr))
@@ -413,40 +402,6 @@ func (r applyRun) status() reconcile.Status {
 	var status reconcile.Status
 	_ = json.Unmarshal(r.Status, &status)
 	return status
-}
-
-func (r applyRun) conclusion() (string, string) {
-	revision := r.Revision
-	if len(revision) > 12 {
-		revision = revision[:12]
-	}
-	switch r.Outcome {
-	case OutcomeApplied:
-		return "Applied " + revision, "success"
-	case OutcomeEvaluated:
-		return "Evaluated " + revision + "; nothing to apply", "success"
-	case OutcomeSuperseded:
-		return "Superseded by a newer main", "skipped"
-	case OutcomeDeferred:
-		return "Deferred: another reconciliation holds the lease", "skipped"
-	case OutcomeRetry:
-		return "Retrying after " + r.Stage + " failed", "neutral"
-	}
-	return "Failed at " + r.Stage, "failure"
-}
-
-func (r applyRun) summary(site Site) string {
-	var summary strings.Builder
-	fmt.Fprintf(&summary, "| Name | Value |\n| --- | --- |\n| Revision | `%s` |\n| Reason | %s |\n| Full | %t |\n| Outcome | %s |\n| Stage | %s |\n| Report | `s3://%s/%s/runs/%s/` |\n", r.Revision, r.Reason, r.Full, r.Outcome, r.Stage, site.Bucket, site.Prefix, r.ID())
-	if r.Error != "" {
-		fmt.Fprintf(&summary, "\n```text\n%s\n```\n", truncate(r.Error))
-	}
-	for _, report := range [][]byte{r.Provenance, r.Status} {
-		if len(report) > 0 {
-			fmt.Fprintf(&summary, "\n```json\n%s\n```\n", strings.TrimSpace(string(report)))
-		}
-	}
-	return summary.String()
 }
 
 func errorText(text string) error {

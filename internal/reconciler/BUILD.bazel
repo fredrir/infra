@@ -8,7 +8,6 @@ go_library(
         "build.go",
         "cache.go",
         "checkout.go",
-        "checks.go",
         "config.go",
         "credentials.go",
         "ledger.go",

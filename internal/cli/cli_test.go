@@ -306,7 +306,6 @@ func applyUnitFixture(t *testing.T) (string, string, string) {
 		"gatus": "http://100.86.241.75:8080", "heartbeat": "reconciliation_apply", "known_hosts": "/etc/infra-reconcile/known_hosts",
 		"kubernetes": map[string]any{"server": "https://100.115.121.9:6443", "certificate_authority": "/etc/infra-reconcile/kubernetes-ca.crt"},
 		"runner":     map[string]any{"app_id": 4924976, "installation_id": 1, "api": "https://api.github.com"},
-		"publisher":  map[string]any{"app_id": 5079532, "installation_id": 164968284, "api": "https://api.github.com", "repository": "fredrir/infra"},
 	})
 	if err != nil {
 		t.Fatal(err)

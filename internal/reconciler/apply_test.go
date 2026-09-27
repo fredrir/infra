@@ -35,7 +35,6 @@ const (
 	supervisorBinary = "/opt/supervisor/infra"
 	provenanceSecret = "ghp_provenance-secret"
 	runnerInstall    = 4242
-	publisherInstall = 164968284
 )
 
 type appIdentity struct {
@@ -50,8 +49,7 @@ type githubAPI struct {
 	apps       map[string]appIdentity
 	minted     map[string][]map[string]any
 	revoked    []string
-	checks     []string
-	outputs    []map[string]any
+	unexpected []string
 	rateReads  int
 }
 
@@ -79,14 +77,6 @@ func (g *githubAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodDelete && r.URL.Path == "/installation/token":
 		g.revoked = append(g.revoked, authorization)
 		w.WriteHeader(http.StatusNoContent)
-	case r.URL.Path == "/repos/fredrir/infra/check-runs" && r.Method == http.MethodPost && authorization == fmt.Sprintf("Bearer ghs_%d", publisherInstall):
-		g.checks = append(g.checks, "create "+decoded["head_sha"].(string)+" "+decoded["status"].(string))
-		_ = json.NewEncoder(w).Encode(map[string]any{"id": 77})
-	case r.URL.Path == "/repos/fredrir/infra/check-runs/77" && r.Method == http.MethodPatch && authorization == fmt.Sprintf("Bearer ghs_%d", publisherInstall):
-		output, _ := decoded["output"].(map[string]any)
-		g.checks = append(g.checks, "complete "+decoded["conclusion"].(string))
-		g.outputs = append(g.outputs, output)
-		_ = json.NewEncoder(w).Encode(map[string]any{"id": 77})
 	case r.URL.Path == "/rate_limit" && authorization == "Bearer "+provenanceSecret:
 		g.rateReads++
 		if g.expiration != "" {
@@ -94,6 +84,7 @@ func (g *githubAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"resources": map[string]any{}})
 	default:
+		g.unexpected = append(g.unexpected, r.Method+" "+r.URL.Path)
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
@@ -227,9 +218,8 @@ func validApplyConfig() ApplyConfig {
 	site := validConfig().Site
 	site.State, site.Cache, site.Heartbeat, site.KnownHosts = "/var/lib/infra-apply", "/var/cache/infra-apply", "reconciliation_apply", "/etc/infra-reconcile/known_hosts"
 	return ApplyConfig{
-		Site:      site,
-		Runner:    App{AppID: 4924976, InstallationID: runnerInstall, API: "https://api.github.com"},
-		Publisher: Publisher{App: App{AppID: 5079532, InstallationID: publisherInstall, API: "https://api.github.com"}, Repository: "fredrir/infra"},
+		Site:   site,
+		Runner: App{AppID: 4924976, InstallationID: runnerInstall, API: "https://api.github.com"},
 	}
 }
 
@@ -254,7 +244,7 @@ func newApplyHarness(t *testing.T) *applyHarness {
 	config := validApplyConfig()
 	config.Repository, config.State, config.Cache, config.Shared, config.Endpoint, config.Gatus, config.KnownHosts = "file://"+origin, t.TempDir(), t.TempDir(), sharedDirectory(t), urls["s3"], urls["gatus"], knownHosts
 	config.Kubernetes.CertificateAuthority = authority
-	config.Runner.API, config.Publisher.API = urls["github"], urls["github"]
+	config.Runner.API = urls["github"]
 	h.gate = func(t *testing.T, call engineCall) (int, string) {
 		return 0, fmt.Sprintf(`{"base":%q,"revision":%q}`, h.applied, h.tip)
 	}
@@ -263,7 +253,7 @@ func newApplyHarness(t *testing.T) *applyHarness {
 	}
 	h.step = func(t *testing.T, name string, call engineCall) (process.Result, error) { return process.Result{}, nil }
 	h.applier = Applier{Config: config, Identity: identity, Self: supervisorBinary, Now: func() time.Time { return time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC) }, LockPoll: time.Millisecond, Execute: h.execute(t)}
-	h.github.apps = map[string]appIdentity{fmt.Sprint(runnerInstall): appIdentityOf(t, config.Runner, h.credentials[RunnerAppKey]), fmt.Sprint(publisherInstall): appIdentityOf(t, config.Publisher.App, h.credentials[PublisherAppKey])}
+	h.github.apps = map[string]appIdentity{fmt.Sprint(runnerInstall): appIdentityOf(t, config.Runner, h.credentials[RunnerAppKey])}
 	h.writeCredentials(t)
 	return h
 }
@@ -527,7 +517,7 @@ func (h *applyHarness) reset(t *testing.T) {
 	h.mu.Lock()
 	h.commands, h.applies = nil, nil
 	h.mu.Unlock()
-	h.github.checks, h.github.outputs, h.gatus.received = nil, nil, nil
+	h.github.unexpected, h.gatus.received = nil, nil
 	h.bucket.puts = map[string][]byte{}
 	h.writeCredentials(t)
 }
@@ -551,14 +541,13 @@ func TestApplyGatesTheMainTipBeforeBuildingAndPublishesThroughTheEngine(t *testi
 	if gate := h.commands[h.index(t, "supervisor reconcile provenance")]; gate != "supervisor reconcile provenance --root="+source+" --state-bucket=llunde-pyparser-bucket --state-prefix=reconciliation/production --report="+filepath.Join(h.applies[0].work, "provenance.json") {
 		t.Errorf("gate ran %q", gate)
 	}
-	if want := []string{"create " + h.tip + " in_progress", "complete success"}; !slices.Equal(h.github.checks, want) || h.github.outputs[0]["title"] != "Applied "+h.tip[:12] {
-		t.Errorf("check run %q %v", h.github.checks, h.github.outputs)
+	if len(h.github.unexpected) != 0 {
+		t.Errorf("supervisor called GitHub beyond the runner token and token lifetime: %q", h.github.unexpected)
 	}
 	wantMinted := map[string][]map[string]any{
-		fmt.Sprint(runnerInstall):    {{"repositories": []any{"Y", "infra"}, "permissions": map[string]any{"administration": "write", "metadata": "read"}}},
-		fmt.Sprint(publisherInstall): {{"repositories": []any{"infra"}, "permissions": map[string]any{"checks": "write", "metadata": "read"}}, {"repositories": []any{"infra"}, "permissions": map[string]any{"checks": "write", "metadata": "read"}}},
+		fmt.Sprint(runnerInstall): {{"repositories": []any{"Y", "infra"}, "permissions": map[string]any{"administration": "write", "metadata": "read"}}},
 	}
-	if !reflect.DeepEqual(h.github.minted, wantMinted) || len(h.github.revoked) != 3 {
+	if !reflect.DeepEqual(h.github.minted, wantMinted) || len(h.github.revoked) != 1 {
 		t.Errorf("minted %v and revoked %v", h.github.minted, h.github.revoked)
 	}
 	run, log := h.uploaded(t)
@@ -644,12 +633,12 @@ func TestGateReportsBindTheCheckedRevision(t *testing.T) {
 				t.Fatalf("checkout tooling ran after a failed gate: %q", h.commands)
 			}
 			run, _ := h.uploaded(t)
-			want, conclusion := OutcomeRetry, "complete neutral"
+			want := OutcomeRetry
 			if test.terminal {
-				want, conclusion = reconcile.OutcomeFailed, "complete failure"
+				want = reconcile.OutcomeFailed
 			}
-			if run.Outcome != want || run.Stage != "provenance" || h.ledger(t).Outcome != want || !slices.Equal(h.github.checks, []string{"create " + h.tip + " in_progress", conclusion}) {
-				t.Errorf("uploaded run %+v, check run %q", run, h.github.checks)
+			if run.Outcome != want || run.Stage != "provenance" || h.ledger(t).Outcome != want || len(h.github.unexpected) != 0 {
+				t.Errorf("uploaded run %+v, GitHub calls %q", run, h.github.unexpected)
 			}
 			if len(h.gatus.received) != 1 || h.gatus.received[0].Get("success") != "false" || !strings.Contains(h.gatus.received[0].Get("error"), test.want) {
 				t.Errorf("heartbeats %v", h.gatus.received)
@@ -787,9 +776,9 @@ func TestTransientFailuresRetryAndDeterministicFailuresWait(t *testing.T) {
 				t.Fatal("a failed run returned no error")
 			}
 			ledger := h.ledger(t)
-			want, conclusion := OutcomeRetry, "neutral"
+			want := OutcomeRetry
 			if test.terminal {
-				want, conclusion = reconcile.OutcomeFailed, "failure"
+				want = reconcile.OutcomeFailed
 			}
 			if ledger.Outcome != want || ledger.Revision != h.tip {
 				t.Fatalf("ledger %+v, want %s", ledger, want)
@@ -797,8 +786,8 @@ func TestTransientFailuresRetryAndDeterministicFailuresWait(t *testing.T) {
 			if run, _ := h.uploaded(t); run.Stage != test.stage {
 				t.Errorf("failed at %s, want %s", run.Stage, test.stage)
 			}
-			if test.stage != "checkout" && test.name != "missing credential" && (len(h.github.checks) != 2 || h.github.checks[1] != "complete "+conclusion) {
-				t.Errorf("check run %q", h.github.checks)
+			if len(h.github.unexpected) != 0 {
+				t.Errorf("GitHub calls %q", h.github.unexpected)
 			}
 			if test.name != "missing credential" && (len(h.gatus.received) != 1 || h.gatus.received[0].Get("success") != "false") {
 				t.Errorf("heartbeats %v", h.gatus.received)
@@ -895,8 +884,8 @@ func TestApplyDefersOrYieldsWhenTheEngineAsksForARetry(t *testing.T) {
 			if run, _ := h.uploaded(t); run.Outcome != test.want {
 				t.Errorf("uploaded run %+v", run)
 			}
-			if len(h.gatus.received) != 0 || !slices.Equal(h.github.checks, []string{"create " + h.tip + " in_progress", "complete skipped"}) {
-				t.Errorf("heartbeats %v and check run %q", h.gatus.received, h.github.checks)
+			if len(h.gatus.received) != 0 || len(h.github.unexpected) != 0 {
+				t.Errorf("heartbeats %v and GitHub calls %q", h.gatus.received, h.github.unexpected)
 			}
 			decision, err := h.applier.Pending(context.Background())
 			if err != nil || !decision.Run || !decision.Apply {
@@ -915,7 +904,7 @@ func TestPushIgnoredCommitsAreSkippedOnlyAfterASettledAncestor(t *testing.T) {
 		if err := h.applier.Apply(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if h.index(t, "supervisor ") >= 0 || h.index(t, "go ") >= 0 || len(h.github.checks) != 0 || len(h.gatus.received) != 0 || len(h.bucket.puts) != 0 {
+		if h.index(t, "supervisor ") >= 0 || h.index(t, "go ") >= 0 || len(h.github.unexpected) != 0 || len(h.gatus.received) != 0 || len(h.bucket.puts) != 0 {
 			t.Fatalf("a push-ignored commit ran %q", h.commands)
 		}
 		if ledger := h.ledger(t); ledger.Revision != documented || ledger.Outcome != OutcomeApplied {
@@ -983,7 +972,7 @@ func TestReadinessReportsTheLedgerAndExpiringCredentialsDaily(t *testing.T) {
 			if (err == nil) != (test.want.Get("success") == "true") {
 				t.Fatalf("readiness returned %v", err)
 			}
-			if len(h.applies) != 0 || h.index(t, "go ") >= 0 || len(h.github.checks) != 0 {
+			if len(h.applies) != 0 || h.index(t, "go ") >= 0 || len(h.github.unexpected) != 0 {
 				t.Fatalf("readiness reconciled: %q", h.commands)
 			}
 			if !reflect.DeepEqual(h.gatus.received, []url.Values{test.want}) {
@@ -1148,11 +1137,9 @@ func TestApplyConfigRequiresHostAccessAndApps(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, change := range map[string]func(*ApplyConfig){
-		"known hosts":          func(c *ApplyConfig) { c.KnownHosts = "" },
-		"runner app":           func(c *ApplyConfig) { c.Runner.InstallationID = 0 },
-		"publisher app":        func(c *ApplyConfig) { c.Publisher.AppID = 0 },
-		"publisher repository": func(c *ApplyConfig) { c.Publisher.Repository = "infra" },
-		"shared":               func(c *ApplyConfig) { c.Shared = c.State + "/shared" },
+		"known hosts": func(c *ApplyConfig) { c.KnownHosts = "" },
+		"runner app":  func(c *ApplyConfig) { c.Runner.InstallationID = 0 },
+		"shared":      func(c *ApplyConfig) { c.Shared = c.State + "/shared" },
 	} {
 		config := validApplyConfig()
 		change(&config)
@@ -1162,5 +1149,17 @@ func TestApplyConfigRequiresHostAccessAndApps(t *testing.T) {
 	}
 	if _, err := LoadApplyConfig(writeConfig(t, validConfig())); err == nil {
 		t.Error("the verify configuration loaded as an apply configuration")
+	}
+	data, err := json.Marshal(validApplyConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var withPublisher map[string]any
+	if err := json.Unmarshal(data, &withPublisher); err != nil {
+		t.Fatal(err)
+	}
+	withPublisher["publisher"] = map[string]any{"app_id": 5079532, "installation_id": 164968284, "api": "https://api.github.com", "repository": "fredrir/infra"}
+	if _, err := LoadApplyConfig(writeConfig(t, withPublisher)); err == nil || !strings.Contains(err.Error(), `unknown field "publisher"`) {
+		t.Errorf("an apply configuration with a publisher App loaded: %v", err)
 	}
 }

@@ -39,8 +39,7 @@ type Config struct {
 
 type ApplyConfig struct {
 	Site
-	Runner    App       `json:"runner"`
-	Publisher Publisher `json:"publisher"`
+	Runner App `json:"runner"`
 }
 
 type Kubernetes struct {
@@ -54,17 +53,11 @@ type App struct {
 	API            string `json:"api"`
 }
 
-type Publisher struct {
-	App
-	Repository string `json:"repository"`
-}
-
 var (
-	bucketPattern     = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
-	prefixPattern     = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$`)
-	regionPattern     = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-[0-9]$`)
-	heartbeatPattern  = regexp.MustCompile(`^[a-z0-9-]+_[a-z0-9-]+$`)
-	repositoryPattern = regexp.MustCompile(`^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$`)
+	bucketPattern    = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
+	prefixPattern    = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$`)
+	regionPattern    = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-[0-9]$`)
+	heartbeatPattern = regexp.MustCompile(`^[a-z0-9-]+_[a-z0-9-]+$`)
 )
 
 func LoadConfig(path string) (Config, error) {
@@ -116,10 +109,7 @@ func (c ApplyConfig) validate() error {
 	if !cleanAbsolute(c.KnownHosts) {
 		return fmt.Errorf("known_hosts %q is not a clean absolute path", c.KnownHosts)
 	}
-	if !repositoryPattern.MatchString(c.Publisher.Repository) {
-		return fmt.Errorf("publisher repository %q is not OWNER/NAME", c.Publisher.Repository)
-	}
-	return errors.Join(c.Runner.validate("runner"), c.Publisher.App.validate("publisher"))
+	return c.Runner.validate("runner")
 }
 
 func (s Site) validate() error {
