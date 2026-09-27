@@ -32,6 +32,8 @@ type ResticCommand func(ctx context.Context, repository Repository, args ...stri
 
 var repositoryName = regexp.MustCompile(`^[a-z]{1,16}$`)
 
+var sharedResticSettings = []string{"RESTIC_CACHE_DIR"}
+
 var repositorySettings = []string{"RESTIC_REPOSITORY", "RESTIC_PASSWORD", "RESTIC_CACERT", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"}
 
 func RepositoryPrefix(name string) string {
@@ -67,7 +69,8 @@ func ResticEnvironment(base []string, repositories []Repository, repository Repo
 	var environment []string
 	for _, entry := range base {
 		key, _, _ := strings.Cut(entry, "=")
-		if slices.Contains(repositorySettings, key) || slices.ContainsFunc(repositories, func(other Repository) bool { return strings.HasPrefix(key, RepositoryPrefix(other.Name)) }) {
+		repositoryScoped := (strings.HasPrefix(key, "RESTIC_") || strings.HasPrefix(key, "AWS_")) && !slices.Contains(sharedResticSettings, key)
+		if repositoryScoped || slices.ContainsFunc(repositories, func(other Repository) bool { return strings.HasPrefix(key, RepositoryPrefix(other.Name)) }) {
 			continue
 		}
 		environment = append(environment, entry)

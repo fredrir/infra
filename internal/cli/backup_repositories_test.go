@@ -25,6 +25,11 @@ func TestResticRunsWithOnlyItsRepositorySettings(t *testing.T) {
 	t.Setenv("RESTIC_CACHE_DIR", "/cache")
 	t.Setenv("RESTIC_CACERT", "/unrelated/ca.crt")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "unrelated-secret")
+	t.Setenv("RESTIC_PASSWORD_FILE", "/unrelated/password")
+	t.Setenv("RESTIC_REPOSITORY_FILE", "/unrelated/repository")
+	t.Setenv("AWS_SESSION_TOKEN", "unrelated-token")
+	t.Setenv("AWS_PROFILE", "unrelated")
+	t.Setenv("AWS_CONFIG_FILE", "/unrelated/config")
 	repositories, err := backupRepositories()
 	if err != nil {
 		t.Fatal(err)
