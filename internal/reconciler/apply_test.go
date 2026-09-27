@@ -961,7 +961,7 @@ func TestReadinessReportsTheLedgerAndExpiringCredentialsDaily(t *testing.T) {
 		{name: "ready", expiration: "2027-09-26 12:00:00 UTC", outcome: OutcomeApplied, want: url.Values{"success": {"true"}}},
 		{name: "offset expiry", expiration: "2027-09-26 12:00:00 +0200", outcome: OutcomeApplied, want: url.Values{"success": {"true"}}},
 		{name: "expiring token", expiration: "2026-10-10 12:00:00 UTC", outcome: OutcomeApplied, want: url.Values{"success": {"false"}, "error": {"provenance token: expires 2026-10-10"}}},
-		{name: "token without expiry", outcome: OutcomeApplied, want: url.Values{"success": {"false"}, "error": {"provenance token: has no expiry"}}},
+		{name: "token without expiry", outcome: OutcomeApplied, want: url.Values{"success": {"true"}}},
 		{name: "failed tip", expiration: "2027-09-26 12:00:00 UTC", outcome: reconcile.OutcomeFailed, want: url.Values{"success": {"false"}, "error": {"reconciliation failed"}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {

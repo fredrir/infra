@@ -356,11 +356,7 @@ func (a Applier) provenanceTokenLifetime(ctx context.Context, token string) erro
 	if err != nil {
 		return err
 	}
-	expires := response.TokenExpiration.Time
-	switch {
-	case expires.IsZero():
-		return errors.New("has no expiry")
-	case expires.Sub(a.now()) < tokenExpiryAlert:
+	if expires := response.TokenExpiration.Time; !expires.IsZero() && expires.Sub(a.now()) < tokenExpiryAlert {
 		return fmt.Errorf("expires %s", expires.UTC().Format(time.DateOnly))
 	}
 	return nil

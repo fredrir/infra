@@ -88,7 +88,7 @@ jq -Rs 'rtrimstr("\n")' < NEW_PASSWORD | sops set --value-stdin ansible/roles/co
 | Use | `PROVENANCE_TOKEN` of the fredrir-11 gate and engine: public pull request reads, `gh attestation verify`, `cosign verify` of private GHCR deployment images |
 | Location | `ansible/roles/reconciler/files/credentials.sops.yaml` `["apply"]["provenance-token"]` |
 | Lifetime | One year; expiry `<YYYY-MM-DD>`, set when the token is created |
-| Alert | Gatus `reconciliation_apply` fails daily from 30 days before expiry, and for a token without expiry |
+| Alert | Gatus `reconciliation_apply` fails daily from 30 days before an expiring token's expiry |
 | Rotate | Generate a replacement with the same scope and a one-year expiry; `sops set`; `ansible-playbook ansible/reconciler.yml`; confirm the next readiness check or apply; revoke the previous token |
 
 ## Retire a recipient

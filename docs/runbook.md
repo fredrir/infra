@@ -420,7 +420,7 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | Engine | Built from the gated checkout; `ci prepare-validation` and `ci validate` against the applied revision; `reconcile requirements`; `reconcile apply --wait=11m [--full]` with the publisher key as a consumed `0600` file, the provenance token and `INFRA_RECONCILE_TAILNET=true`; the run SSH configuration always; the runner App token (`administration: write`) only when requirements select Ansible or tooling |
 | Outcomes | `applied`, `evaluated`; exit 75 is `superseded` when `main` moved and `deferred` otherwise; `failed` (gate rejection, `ci validate`, engine exit ≥ 1) waits for a new tip, repair or request; an `unavailable` gate rejection retries three times before it counts as `failed`; `retry` (checkout, gate tools or unreadable state, build, tools, `uv`, `ci prepare-validation`, requirements, token minting, credentials, a killed engine) reruns on the next tick, then after 1, 2, 4, 8, 16 and 30 minutes |
 | Reports | `s3://llunde-pyparser-bucket/reconciliation/production/runs/<utc>-apply-<rev12>/`: `report.json`, `log.txt.zst`; `production` names the last published revision; no GitHub status or Check Run; the publisher App key reaches only the engine |
-| Heartbeat | Gatus `reconciliation_apply` after `applied`, `evaluated`, `failed`, `retry` and readiness checks: failure for a failed or retrying tip, an unreadable state bucket, or a provenance token without expiry or expiring within 30 days |
+| Heartbeat | Gatus `reconciliation_apply` after `applied`, `evaluated`, `failed`, `retry` and readiness checks: failure for a failed or retrying tip, an unreadable state bucket, or a provenance token expiring within 30 days |
 
 | Apply credential | Source |
 | --- | --- |
