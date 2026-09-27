@@ -49,6 +49,7 @@ go_test(
     ],
     data = ["//:reconciler_role_data"],
     embed = [":reconciler"],
+    shard_count = 2,
     deps = [
         "//internal/ci",
         "//internal/dev",
