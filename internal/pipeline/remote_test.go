@@ -125,8 +125,11 @@ func TestUnavailableRemoteCacheIsLeftOutOfTheBazelInvocation(t *testing.T) {
 		if report.RemoteCache != test.report || strings.Contains(invocation, "--remote_cache=") != test.used {
 			t.Errorf("%s: report %q, invocation %q", test.endpoint, report.RemoteCache, invocation)
 		}
-		if test.used && (!strings.Contains(invocation, "--remote_cache_compression") || !strings.Contains(invocation, "--remote_timeout=") || !strings.Contains(invocation, "--remote_upload_local_results=false")) {
-			t.Errorf("remote invocation %q lacks compression, timeout or read-only uploads", invocation)
+		if test.used && (!strings.Contains(invocation, "--remote_cache_compression") || !strings.Contains(invocation, "--remote_timeout=") || !strings.Contains(invocation, "--jobs=") || !strings.Contains(invocation, "--remote_upload_local_results=false")) {
+			t.Errorf("remote invocation %q lacks compression, timeout, concurrent lookups or read-only uploads", invocation)
+		}
+		if !test.used && strings.Contains(invocation, "--jobs=") {
+			t.Errorf("local invocation %q raises the job count", invocation)
 		}
 		if !test.used && !strings.Contains(log.String(), "remote cache unavailable") {
 			t.Errorf("fallback not logged: %q", log.String())

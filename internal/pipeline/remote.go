@@ -15,6 +15,7 @@ import (
 const (
 	remoteCacheProbeTimeout = 2 * time.Second
 	remoteCacheTimeout      = "10s"
+	remoteCacheJobs         = "100"
 	capabilitiesMethod      = "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities"
 )
 

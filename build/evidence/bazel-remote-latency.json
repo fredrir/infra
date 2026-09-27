@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "date": "2026-09-27",
+  "scope": "Local replay of hosted check shapes against bazel-remote 2.6.2; network delay emulated with netem behind pasta; each push starts from an empty output base like a new hosted runner",
+  "host": "AMD Ryzen 7 9800X3D, 2 cores / 4 threads (taskset 0,1,8,9), --local_resources=cpu=4",
+  "bazel": "9.2.0",
+  "cache_image": "buchgr/bazel-remote-cache:v2.6.2@sha256:8109f1f39eb17d898cf51e08b41e4eabaaaeb1f584c2f22c1be45b7568fcc512",
+  "rtt": "Median duration of cache lookups on an open connection",
+  "flags": {
+    "disk": "--disk_cache with the parent run's cache",
+    "remote": "--remote_cache=grpc://\u2026 --remote_cache_compression --remote_download_toplevel",
+    "remote-jobs-100": "remote plus --jobs=100"
+  },
+  "excluded": "Samples taken with host load above 8 or failed runs",
+  "results": [
+    {
+      "shape": "27bc88c parent f9c0b6d re-checked: every test cached",
+      "cache": "disk",
+      "rtt_ms": 0,
+      "samples": 6,
+      "infra_fast_seconds_median": 0.66,
+      "preparation_seconds_median": 6.1
+    },
+    {
+      "shape": "27bc88c parent f9c0b6d re-checked: every test cached",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 47,
+      "samples": 3,
+      "infra_fast_seconds_median": 0.82,
+      "preparation_seconds_median": 9.5
+    },
+    {
+      "shape": "27bc88c parent f9c0b6d re-checked: every test cached",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 77,
+      "samples": 3,
+      "infra_fast_seconds_median": 0.96,
+      "preparation_seconds_median": 11.9
+    },
+    {
+      "shape": "27bc88c parent f9c0b6d re-checked: every test cached",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 101,
+      "samples": 3,
+      "infra_fast_seconds_median": 1.09,
+      "preparation_seconds_median": 14.2
+    },
+    {
+      "shape": "27bc88c parent f9c0b6d re-checked: every test cached",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 137,
+      "samples": 3,
+      "infra_fast_seconds_median": 1.28,
+      "preparation_seconds_median": 17.1
+    },
+    {
+      "shape": "27bc88c parent f9c0b6d re-checked: every test cached",
+      "cache": "remote-jobs-4",
+      "rtt_ms": 47,
+      "samples": 3,
+      "infra_fast_seconds_median": 1.4,
+      "preparation_seconds_median": 22.5
+    },
+    {
+      "shape": "27bc88c parent f9c0b6d re-checked: every test cached",
+      "cache": "remote-jobs-4",
+      "rtt_ms": 77,
+      "samples": 3,
+      "infra_fast_seconds_median": 1.87,
+      "preparation_seconds_median": 32.6
+    },
+    {
+      "shape": "27bc88c parent f9c0b6d re-checked: every test cached",
+      "cache": "remote-jobs-4",
+      "rtt_ms": 101,
+      "samples": 3,
+      "infra_fast_seconds_median": 2.23,
+      "preparation_seconds_median": 42.1
+    },
+    {
+      "shape": "27bc88c parent f9c0b6d re-checked: every test cached",
+      "cache": "remote-jobs-4",
+      "rtt_ms": 137,
+      "samples": 3,
+      "infra_fast_seconds_median": 2.81,
+      "preparation_seconds_median": 55.7
+    },
+    {
+      "shape": "f39e9ac on 0b43bd8 results",
+      "cache": "disk",
+      "rtt_ms": 0,
+      "samples": 2,
+      "infra_fast_seconds_median": 2.37,
+      "preparation_seconds_median": 8.5
+    },
+    {
+      "shape": "f39e9ac on 0b43bd8 results",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 77,
+      "samples": 2,
+      "infra_fast_seconds_median": 2.97,
+      "preparation_seconds_median": 14.7
+    },
+    {
+      "shape": "f39e9ac on 0b43bd8 results",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 137,
+      "samples": 2,
+      "infra_fast_seconds_median": 3.28,
+      "preparation_seconds_median": 20.9
+    },
+    {
+      "shape": "27bc88c on f9c0b6d results",
+      "cache": "disk",
+      "rtt_ms": 0,
+      "samples": 2,
+      "infra_fast_seconds_median": 1.75,
+      "preparation_seconds_median": 6.2
+    },
+    {
+      "shape": "27bc88c on f9c0b6d results",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 77,
+      "samples": 2,
+      "infra_fast_seconds_median": 2.21,
+      "preparation_seconds_median": 12.3
+    },
+    {
+      "shape": "27bc88c on f9c0b6d results",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 137,
+      "samples": 2,
+      "infra_fast_seconds_median": 2.54,
+      "preparation_seconds_median": 17.2
+    },
+    {
+      "shape": "f9c0b6d on f39e9ac results",
+      "cache": "disk",
+      "rtt_ms": 0,
+      "samples": 1,
+      "infra_fast_seconds_median": 3.15,
+      "preparation_seconds_median": 13.0
+    },
+    {
+      "shape": "f9c0b6d on f39e9ac results",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 77,
+      "samples": 2,
+      "infra_fast_seconds_median": 3.67,
+      "preparation_seconds_median": 17.4
+    },
+    {
+      "shape": "f9c0b6d on f39e9ac results",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 137,
+      "samples": 2,
+      "infra_fast_seconds_median": 3.96,
+      "preparation_seconds_median": 20.2
+    },
+    {
+      "shape": "7d07599 on d660a4d results",
+      "cache": "disk",
+      "rtt_ms": 0,
+      "samples": 1,
+      "infra_fast_seconds_median": 1.99,
+      "preparation_seconds_median": 7.1
+    },
+    {
+      "shape": "7d07599 on d660a4d results",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 77,
+      "samples": 2,
+      "infra_fast_seconds_median": 2.5,
+      "preparation_seconds_median": 14.6
+    },
+    {
+      "shape": "7d07599 on d660a4d results",
+      "cache": "remote-jobs-100",
+      "rtt_ms": 137,
+      "samples": 2,
+      "infra_fast_seconds_median": 2.79,
+      "preparation_seconds_median": 21.9
+    }
+  ],
+  "faults": [
+    {
+      "fault": "cache process killed 1 s into infra-fast, 77 ms",
+      "status": 0,
+      "infra_fast_seconds": 5.36,
+      "effect": "UNAVAILABLE warnings, tests pass, results not uploaded"
+    },
+    {
+      "fault": "all packets to the cache dropped 1 s into infra-fast, 77 ms, --remote_timeout=10s",
+      "status": 0,
+      "infra_fast_seconds": 65.31,
+      "effect": "DEADLINE_EXCEEDED after 10 s per call and retry; tests pass"
+    },
+    {
+      "fault": "cache refusing connections before Bazel starts, without the probe",
+      "status": 34,
+      "effect": "Failed to query remote execution capabilities; build fails"
+    }
+  ]
+}
