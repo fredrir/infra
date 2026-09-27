@@ -169,7 +169,9 @@ func startCache(t *testing.T) cache {
 		testcontainers.WithHostConfigModifier(func(host *container.HostConfig) {
 			host.NetworkMode = "host"
 			host.ReadonlyRootfs = true
-			host.Tmpfs = map[string]string{"/tmp": ""}
+			host.Tmpfs = map[string]string{"/tmp": "size=16m"}
+			host.Resources.Memory = 128 << 20
+			host.Resources.NanoCPUs = 500_000_000
 			host.Binds = []string{configuration + ":/etc/nginx/filter:ro", directory + ":" + sockets}
 		}),
 		testcontainers.WithWaitStrategyAndDeadline(time.Minute, wait.ForLog("start worker process")),
@@ -575,7 +577,7 @@ func TestFilterCarriesLargeBlobsAndLookups(t *testing.T) {
 	c := startCache(t)
 	writer, reader := connect(t, c.writer, peerIP), connect(t, c.reader, peerIP)
 	ctx := context10(t)
-	blob := bytes.Repeat([]byte("large cached output "), 8<<20/20)
+	blob := bytes.Repeat([]byte("large cached output "), 24<<20/20)
 	if err := writeStream(ctx, writer, blob); err != nil {
 		t.Fatalf("writer ByteStream.Write of %d bytes: %v", len(blob), err)
 	}
