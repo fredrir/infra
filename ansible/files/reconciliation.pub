@@ -1,1 +1,1 @@
-PLACEHOLDER: fredrir-11's public key, printed by ansible-playbook ansible/reconciler.yml --tags ssh_identity
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBlY61QOsunTMTWOydx0NAaVQtkZblqAbzh6NJjOm2EM infra-reconciler@fredrir-11

@@ -1,1 +1,8 @@
-# PLACEHOLDER: verified tailnet host keys with the fredrir-06, fredrir-10 and infra-build-09 aliases and fredrir-09's tailnet address for ProxyJump.
+100.115.121.9 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICzSJTGndwKmb3c6Zm5B9L8PZr4fYSur17AK2uLzb4mb root@ubuntu-8gb-hel1-1
+100.96.114.53 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPIN3iWiGd7tWmUOyvp6guxNLUH8emQOb6Ll6uwd5oTS root@ubuntu-8gb-hel1-2
+100.107.74.107 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINXgdu19fhYBrRlEbVMBAylND9ys5yLm4GBRyziTepZp root@fredrir-05
+100.66.14.60 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINlrr01daQleAyGnauzhMgDtivVgW7Jdkr4o1NfmjKGS root@fredrir-04
+100.87.168.66 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICi3NqEARHS9q5J4/uaoUhGMKSZlaZfPPvfPCc5ieazl root@cloud-server-10643982
+fredrir-06 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILj/ObqEIPVA2jEJ2V7azJPSjKTvXlcMCbkbon0EoS4N root@localhost
+infra-build-09 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILFMjnDPG/C2N0AJ77XEs7zg0hB6pe5iGlZwZcN6bnB/ root@infra-build
+fredrir-10 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHOtK8X/fVKlNaGuG1WfIMYSDLwFNko3DfI4P3yCZa+W

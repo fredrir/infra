@@ -63,6 +63,5 @@ reconciler_apply:
     certificate_authority: /etc/infra-reconcile/kubernetes-ca.crt
   runner:
     app_id: 4924976
-    # PLACEHOLDER: the runner App's installation ID for fredrir/infra.
-    installation_id: null
+    installation_id: 161243498
     api: https://api.github.com
