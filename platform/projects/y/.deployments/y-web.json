@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "image": "ghcr.io/fredrir/y-web",
-  "revision": "61e29e10692dd61d084d4dc58ff907be6a33bca7",
-  "digest": "sha256:b9d15aec4565237f2d341c447c52d3ec1525483ada2ea499d04ab45fca2e302f",
-  "run_id": 36329067113,
-  "attempt": 3
+  "revision": "9542fc865cc07d08d5b2683a88dd40ca154e9588",
+  "digest": "sha256:06d27b9451be553f380cb50ca95e887ed5f2b060ce12a56cfc06312e72ea5c68",
+  "run_id": 36358866437,
+  "attempt": 1
 }
