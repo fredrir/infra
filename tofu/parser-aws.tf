@@ -107,7 +107,7 @@ data "aws_iam_policy_document" "dataset_access" {
   statement {
     sid       = "ReadWriteDatasetObjects"
     actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-    resources = ["${data.aws_s3_bucket.dataset.arn}/*"]
+    resources = [for prefix in ["files", "extract", "assets", "convert"] : "${data.aws_s3_bucket.dataset.arn}/${prefix}/*"]
   }
 
   # Deny fences

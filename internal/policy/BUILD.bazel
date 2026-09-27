@@ -7,6 +7,7 @@ go_test(
         "helpers_test.go",
         "listener_test.go",
         "node_test.go",
+        "objectstore_dataset_scope_test.go",
         "objectstore_mirror_test.go",
         "objectstore_project_test.go",
         "objectstore_scrape_test.go",
@@ -18,6 +19,7 @@ go_test(
         "volatile_test.go",
     ],
     data = [
+        "//:dataset_access_data",
         "//:node_registration_data",
         "//:workflows",
         "//platform:policy_testdata",
