@@ -3,6 +3,8 @@ kind: Kustomization
 namespace: llunde-pyparser
 resources:
     - application.yaml
+components:
+    - ../../../components/object-store-trust
 images:
     - digest: sha256:a591588d3612b9f1c78b78db003060d3866503214de8c32b66e5a6fea95bf3d3
       name: ghcr.io/fredrir/pyparser-review
