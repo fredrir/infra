@@ -1,281 +1,444 @@
 {
-  "schema": 1,
-  "completed_at": "2026-09-20T20:45:37Z",
-  "active_path": "./build/rollout/flux-artifacts/cutover",
+  "schema": 2,
+  "observed_at": "2026-09-27T23:32:20.364396+00:00",
+  "active_path": "./platform/clusters/production",
+  "source_revision": "production@sha1:4ed9421e5758e7f9b3c70dc09d28dcfd2d8a0358",
   "image": "ghcr.io/fredrir/infra-source-watcher@sha256:632f482078fb655603c3648169e9f99c3647c91d83a04f1cb8591d6ac9849f76",
-  "source_revision": "main@sha1:9354b19939e672259c19e9ebe7742914ae10b61a",
-  "inventory": {
-    "before_count": 127,
-    "after_count": 127,
-    "missing": [],
-    "extra": [],
-    "duplicate_owners": [],
-    "owners": {
-      "project-llunde": 27,
-      "project-portfolio": 34,
-      "project-y": 33,
-      "project-llunde-pyparser": 28,
-      "llunde-pyparser-migration": 1,
-      "llunde-pyparser-application": 4
+  "migration": {
+    "normal_tree_active": true,
+    "aggregate_owner_absent": true,
+    "temporary_rollout_paths_removed": true,
+    "adoption": {
+      "revision": "979d7f6704e2d9db474f74d01f3f8d4132fc8055",
+      "path": "./platform/clusters/production",
+      "root_observed_generation": 5,
+      "removed_owners": [
+        "platform-projects"
+      ],
+      "active_owner_uids_preserved": 19,
+      "all_active_owners_ready": true,
+      "aggregate_objects_retained_under_active_owners": 122,
+      "project_inventories_unchanged": true
+    },
+    "removal": {
+      "at": "2026-09-27T22:41:18.568886+00:00",
+      "revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af",
+      "active_owners": 19,
+      "all_ready": true,
+      "all_owner_uids_preserved": true,
+      "all_project_inventories_preserved": true,
+      "root_path": "./platform/clusters/production",
+      "aggregate_absent": true,
+      "temporary_wrapper_removed": true
+    },
+    "active_owners": [
+      {
+        "name": "flux-system",
+        "uid": "63bec321-fbfc-4d88-bfd7-6959e6b351a4",
+        "generation": 5,
+        "observed_generation": 5,
+        "ready": true,
+        "inventory_count": 60
+      },
+      {
+        "name": "llunde-pyparser-application",
+        "uid": "cbee0e99-786c-498f-9dfa-5de9fbbd55d6",
+        "generation": 2,
+        "observed_generation": 2,
+        "ready": true,
+        "inventory_count": 5
+      },
+      {
+        "name": "llunde-pyparser-migration",
+        "uid": "4df2de3f-dfbf-45da-853b-a326e92b8bcf",
+        "generation": 2,
+        "observed_generation": 2,
+        "ready": true,
+        "inventory_count": 1
+      },
+      {
+        "name": "platform-backups",
+        "uid": "b3442411-4c6e-475e-b449-a652659a10de",
+        "generation": 24,
+        "observed_generation": 24,
+        "ready": true,
+        "inventory_count": 4
+      },
+      {
+        "name": "platform-bazel-cache",
+        "uid": "54e86040-cdce-4ae2-b708-fc72d7eb3f6a",
+        "generation": 3,
+        "observed_generation": 3,
+        "ready": true,
+        "inventory_count": 2
+      },
+      {
+        "name": "platform-cache",
+        "uid": "21f97042-4744-4be8-bbe3-560ba859ec5b",
+        "generation": 24,
+        "observed_generation": 24,
+        "ready": true,
+        "inventory_count": 11
+      },
+      {
+        "name": "platform-controllers",
+        "uid": "72163bdb-f730-4821-8e1b-7e8bc9c40c2d",
+        "generation": 24,
+        "observed_generation": 24,
+        "ready": true,
+        "inventory_count": 5
+      },
+      {
+        "name": "platform-dns",
+        "uid": "31775f0c-7e3c-4944-9884-a5627e12bd1c",
+        "generation": 12,
+        "observed_generation": 12,
+        "ready": true,
+        "inventory_count": 3
+      },
+      {
+        "name": "platform-ingress",
+        "uid": "586ec120-90c2-4735-bde5-067d038344f0",
+        "generation": 24,
+        "observed_generation": 24,
+        "ready": true,
+        "inventory_count": 13
+      },
+      {
+        "name": "platform-netpol-gate",
+        "uid": "247f24e5-4f77-413e-a1ea-699c4cabf386",
+        "generation": 5,
+        "observed_generation": 5,
+        "ready": true,
+        "inventory_count": 7
+      },
+      {
+        "name": "platform-object-store",
+        "uid": "ffe63fbf-7709-460d-a769-7329e994ccf7",
+        "generation": 11,
+        "observed_generation": 11,
+        "ready": true,
+        "inventory_count": 32
+      },
+      {
+        "name": "platform-observability",
+        "uid": "d852b583-824c-49d8-b4de-2a7da9acf40e",
+        "generation": 26,
+        "observed_generation": 26,
+        "ready": true,
+        "inventory_count": 24
+      },
+      {
+        "name": "platform-policy",
+        "uid": "56dd6488-65c1-4b1b-8442-860e3a826a35",
+        "generation": 25,
+        "observed_generation": 25,
+        "ready": true,
+        "inventory_count": 96
+      },
+      {
+        "name": "platform-runners",
+        "uid": "022c3b42-1e69-4cc5-a4b1-16402eac159b",
+        "generation": 24,
+        "observed_generation": 24,
+        "ready": true,
+        "inventory_count": 38
+      },
+      {
+        "name": "platform-sources",
+        "uid": "0a1fe261-a73e-4005-badb-bda2fa115769",
+        "generation": 1,
+        "observed_generation": 1,
+        "ready": true,
+        "inventory_count": 7
+      },
+      {
+        "name": "project-llunde",
+        "uid": "6b878b1f-6369-46fc-a3ce-7d2468db9db1",
+        "generation": 22,
+        "observed_generation": 22,
+        "ready": true,
+        "inventory_count": 28
+      },
+      {
+        "name": "project-llunde-pyparser",
+        "uid": "8f2f76a1-e426-4267-834c-fdc9692f3289",
+        "generation": 25,
+        "observed_generation": 25,
+        "ready": true,
+        "inventory_count": 33
+      },
+      {
+        "name": "project-portfolio",
+        "uid": "b6078d97-1ddd-4ea8-9275-8350a835edc3",
+        "generation": 22,
+        "observed_generation": 22,
+        "ready": true,
+        "inventory_count": 38
+      },
+      {
+        "name": "project-y",
+        "uid": "4deaf7ab-dd1e-4819-8c7a-a957c8ef978e",
+        "generation": 22,
+        "observed_generation": 22,
+        "ready": true,
+        "inventory_count": 37
+      }
+    ],
+    "preserved_controls": [
+      "Source-watcher CRD, RBAC and feature gates",
+      "Versioned policy artifact readiness barrier",
+      "Independent project artifacts and paths",
+      "Parser database, migration and application dependency order"
+    ]
+  },
+  "controller": {
+    "images": [
+      "ghcr.io/fredrir/infra-source-watcher@sha256:632f482078fb655603c3648169e9f99c3647c91d83a04f1cb8591d6ac9849f76"
+    ],
+    "ready_replicas": 1,
+    "resources": {
+      "limits": {
+        "cpu": "1",
+        "memory": "256Mi"
+      },
+      "requests": {
+        "cpu": "50m",
+        "memory": "64Mi"
+      }
     }
   },
   "artifact_payloads": [
     {
-      "name": "platform-policy-f12037929eefe180c344468b72c86f63cab4f032",
-      "files": 11,
-      "digest": "sha256:4106554d6efe99cc3f12a31fb0a6b5e5b30ab217665c004cc4db3ccf58f51d70",
-      "exact_source_match": true
+      "name": "platform-policy-1cae523f5e7497613e87a02ca87d001e06c98ffb",
+      "digest": "sha256:84c6b2eb022ef35b066317e04623b321708a29b473cf3c8427f6c6da6973ea3b",
+      "revision": "latest@sha256:84c6b2eb022ef35b066317e04623b321708a29b473cf3c8427f6c6da6973ea3b"
     },
     {
       "name": "project-llunde",
-      "files": 13,
-      "digest": "sha256:a4309f1b549f8cd7635fb8d67f4ac60dd3ffb8668ff52e12fac9e0448e7bcb55",
-      "exact_source_match": true
+      "digest": "sha256:27404fee58b5419ce95887b38cc748bd6ece6ee9de9fe852d5e1bcb4d47285d0",
+      "revision": "latest@sha256:27404fee58b5419ce95887b38cc748bd6ece6ee9de9fe852d5e1bcb4d47285d0"
     },
     {
       "name": "project-llunde-pyparser",
-      "files": 21,
-      "digest": "sha256:dc3aea6930459813dec80df5a7539b38978d26c7bd791c03e3f333a4f9e2d62c",
-      "exact_source_match": true
+      "digest": "sha256:88b646fcc807c2a23fb4bdacdbdbaf57e70ba8512a629435bd11c7964067fdca",
+      "revision": "latest@sha256:88b646fcc807c2a23fb4bdacdbdbaf57e70ba8512a629435bd11c7964067fdca"
     },
     {
       "name": "project-portfolio",
-      "files": 19,
-      "digest": "sha256:f7f1e3e418e30c31ac77ed0e83da4936f2bfb6c83fb77b47d34418fe06d0ee7e",
-      "exact_source_match": true
+      "digest": "sha256:1b16d2108732611e6549a5d27dcf5aabef410080bb895de66c47429eff54e0aa",
+      "revision": "latest@sha256:1b16d2108732611e6549a5d27dcf5aabef410080bb895de66c47429eff54e0aa"
     },
     {
       "name": "project-y",
-      "files": 21,
-      "digest": "sha256:f5a42625f097ca67a3386c16da9bade98a2738dbd076bef69ad7c849f7f0debb",
-      "exact_source_match": true
+      "digest": "sha256:480b8228215c8531c866afb35bcbef1df439719094d8284434b71d994535ff57",
+      "revision": "latest@sha256:480b8228215c8531c866afb35bcbef1df439719094d8284434b71d994535ff57"
     }
   ],
-  "old_owner": {
-    "name": "platform-projects",
-    "suspended": true,
-    "prune": false,
-    "deletion_policy": "Orphan"
-  },
-  "controller": {
-    "ready_replicas": 1,
-    "requests": {
-      "cpu": "50m",
-      "memory": "64Mi"
-    },
-    "limits": {
-      "cpu": "1",
-      "memory": "256Mi"
-    },
-    "observed_usage": {
-      "cpu": "2m",
-      "memory": "16Mi"
-    },
-    "secret_access": false,
-    "workload_write_access": false
-  },
-  "deploy_workflow": {
-    "before": "active",
-    "during": "disabled_manually",
-    "after": "active"
-  },
-  "all_desired_nonzero_deployments_available": true,
-  "parser_children_ready": true,
+  "measured_delivery": true,
   "end_to_end_latency_qualified": false,
-  "selective_promotion": {
-    "infra_revision": "278171f6e24ae4d1cd6063db0c9b928c8ee0deaf",
-    "application_repository": "fredrir/portfolio",
-    "application_revision": "a09f477f74f99f75b78b86f1be838b6a4f051477",
-    "image": "ghcr.io/fredrir/portfolio-api@sha256:cd271ffe5bced1c0b1dde91c195b313905791e445701a7b4ce3c7f5f147e71f9",
-    "changed_artifacts": [
-      "project-portfolio"
-    ],
-    "unchanged_artifacts": [
-      "platform-policy-f12037929eefe180c344468b72c86f63cab4f032",
-      "project-llunde",
-      "project-llunde-pyparser",
-      "project-y"
-    ],
-    "artifact_before": "latest@sha256:f7f1e3e418e30c31ac77ed0e83da4936f2bfb6c83fb77b47d34418fe06d0ee7e",
-    "artifact_after": "latest@sha256:a0698b9d7cf7117051baaab67c4b4bb6bd58d17f1e870110250e473bd6f97326",
-    "artifact_updated_at": "2026-09-20T20:55:22Z",
-    "infra_commit_timestamp": "2026-09-20T20:55:15Z",
-    "reconciliation_finished_at": "2026-09-20T20:55:29.299Z",
-    "reconciliation_seconds": 1.025701181,
-    "commit_timestamp_to_reconciliation_finished_seconds": 14.299,
-    "deployment_observation": {
-      "namespace": "portfolio",
-      "name": "api",
-      "generation": 9,
-      "observed_generation": 9,
-      "desired_replicas": 1,
-      "updated_replicas": 1,
-      "ready_replicas": 1
-    },
-    "frontend_end_to_end_latency_qualified": false
-  },
+  "subminute_end_to_end_qualified": false,
+  "delivery_target_seconds": 15,
   "frontend_canary": {
     "application_repository": "fredrir/llunde-frontend",
-    "application_revision": "a555e9dffc435399d917d28782c3370ede9661a2",
-    "infra_revision": "7706a5b6176788dc2738068ce7da82037beacff6",
-    "image": "ghcr.io/fredrir/llunde-frontend@sha256:5a020d64ec9ef99ec2d8fd6d74d765dc75f252c72fd3de908c848db4aeb12141",
-    "build_run": "https://github.com/fredrir/llunde-frontend/actions/runs/35538973695",
-    "deployment_run": "https://github.com/fredrir/infra/actions/runs/35539028808",
-    "build_created_at": "2026-09-20T21:31:34Z",
-    "deployment_created_at": "2026-09-20T21:32:36Z",
-    "check_ledger": {
-      "schema": 1,
-      "accounting": "sum-of-recorded-check-durations",
-      "budget_seconds": 10,
-      "duration_seconds": 6.169446967,
-      "remaining_seconds": 3.830553033,
-      "success": true,
-      "stages": [
-        {
-          "schema": 1,
-          "stage": "frontend",
-          "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
-          "started": "2026-09-20T21:32:03.678529576Z",
-          "duration_seconds": 1.20400055,
-          "budget_seconds": 10,
-          "budget_exceeded": false,
-          "success": true,
-          "exit_code": 0,
-          "cpu_seconds": 4.114426,
-          "peak_memory_bytes": 282853376
-        },
-        {
-          "schema": 1,
-          "stage": "provenance-verification",
-          "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
-          "started": "2026-09-20T21:32:27.283374158Z",
-          "duration_seconds": 3.073234563,
-          "budget_seconds": 6.903787596,
-          "budget_exceeded": false,
-          "success": true,
-          "exit_code": 0,
-          "cpu_seconds": 0.311471,
-          "peak_memory_bytes": 69599232
-        },
-        {
-          "schema": 1,
-          "stage": "vulnerability-scan",
-          "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
-          "started": "2026-09-20T21:32:18.779808644Z",
-          "duration_seconds": 1.8922118540000001,
-          "budget_seconds": 8.79599945,
-          "budget_exceeded": false,
-          "success": true,
-          "exit_code": 0,
-          "cpu_seconds": 0.518008,
-          "peak_memory_bytes": 125566976
-        }
-      ]
-    },
-    "changed_artifacts": [
-      "project-llunde"
-    ],
-    "unchanged_artifacts": [
-      "platform-policy-95ec2fca6f8c2675459bbc41c21af122e9310580",
-      "project-llunde-pyparser",
-      "project-portfolio",
-      "project-y"
-    ],
-    "artifact_before": "latest@sha256:a4309f1b549f8cd7635fb8d67f4ac60dd3ffb8668ff52e12fac9e0448e7bcb55",
-    "artifact_after": "latest@sha256:8afb71f40c3e5a4e7be59d1894a261697d109d590f5bc4530142161cdba98a20",
-    "artifact_updated_at": "2026-09-20T21:33:00Z",
-    "reconciliation_finished_at": "2026-09-20T21:33:08.205Z",
-    "reconciliation_seconds": 0.597968067,
-    "pod_created_at": "2026-09-20T21:33:08Z",
-    "image_pull_seconds": 2.177,
-    "pod_ready_at": "2026-09-20T21:33:12Z",
-    "readiness_check": {
-      "success": false,
-      "duration_seconds": 19.012761383,
-      "completed_at": "2026-09-20T21:33:15.1983239Z",
-      "error": "Expected revision not observed before deadline; HTTP 200"
-    },
-    "served_revision_observation": {
-      "observed_at": "2026-09-20T21:33:28Z",
-      "revision": "a555e9dffc435399d917d28782c3370ede9661a2",
-      "method": "curl HTTPS response",
-      "seconds_from_build_creation": 114,
-      "measurement": "Observation upper bound, not exact first-serving time"
-    },
-    "deployment_available": true,
-    "subminute_end_to_end_qualified": false,
-    "build_publication": {
-      "workflow_step_seconds": 29,
-      "dagger_session_seconds": 28.7,
-      "phase_seconds": {
-        "host_filesync": 0.6,
-        "check_target_graph": 13.9,
-        "runtime_image_graph": 9.6,
-        "oci_publication": 4.1
+    "application_revision": "26a5f7b3bc6415803a87a9b808e4e2dd763293de",
+    "workflow_revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af",
+    "infra_revision": "7798c062bfd31d1d59b17c9ba90760b2247b775a",
+    "image": "ghcr.io/fredrir/llunde-frontend@sha256:5604c51be0ca9668d5a4a640a9348ab127c9b5d97a204c0df8344243136ef871",
+    "build_run": "https://github.com/fredrir/llunde-frontend/actions/runs/36358434000",
+    "deployment_run": "https://github.com/fredrir/infra/actions/runs/36358519941",
+    "build_created_at": "2026-09-27T23:21:48Z",
+    "image_publication_finished_at": "2026-09-27T23:22:56Z",
+    "infra_committed_at": "2026-09-27T23:23:37Z",
+    "deployment_stages": {
+      "promotion": {
+        "schema": 1,
+        "stage": "promotion",
+        "revision": "d64513f84897261a441b0e189c80f89216f8685d",
+        "started": "2026-09-27T23:23:30.548902737Z",
+        "duration_seconds": 9.107971109,
+        "budget_seconds": 30,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 1.31,
+        "peak_memory_bytes": 132501504
       },
-      "components": {
-        "dependency_install": {
-          "command": "bun install --frozen-lockfile",
-          "packages": 377,
-          "reported_install_seconds": 4.54,
-          "execution_seconds": 6.01173323
-        },
-        "dependency_mount_content_hash": {
-          "preceding_execution_finished_at": "2026-09-20T21:31:58.326Z",
-          "bind_mount_call_finished_at": "2026-09-20T21:32:03.494Z",
-          "interval_seconds": 5.168,
-          "operation": "Dockerfile bind source content hashing before mounting node_modules"
-        },
-        "frontend_check_seconds": 1.20400055,
-        "vite": {
-          "execution_seconds_approximate": 7.2,
-          "reported_bundling_seconds": 4.54
-        },
-        "runtime_apk_upgrade_seconds": 0.8,
-        "oci_layer_export_seconds": 0.5,
-        "publication_http_operations": {
-          "HEAD": 16,
-          "POST": 5,
-          "PUT": 5,
-          "GET": 1
-        }
+      "publication-wait": {
+        "schema": 1,
+        "stage": "publication-wait",
+        "revision": "d64513f84897261a441b0e189c80f89216f8685d",
+        "started": "2026-09-27T23:23:39.734564647Z",
+        "duration_seconds": 81.788180333,
+        "budget_seconds": 480,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 5.84,
+        "peak_memory_bytes": 79376384
       },
-      "accounting": "Components are contained in phase spans; nested or overlapping measurements must not be summed.",
-      "base_images_cached": [
-        "oven/bun",
-        "library/node"
-      ],
-      "diagnosis": {
-        "preparation_revision": "b8e4d01ce2f2370fd6c5fd98e6b3984a7ec87987",
-        "preparation_source": "git archive extracted with mode 0664",
-        "workflow_source": "Git checkout with mode 0644",
-        "identical_file_sha256": {
-          "package.json": "d76085ea64ae3bb26b912abe3b0f19c40d514fc00ceb6f1f8ce103d41978d37b",
-          "bun.lock": "c9a0c73ff346322c254dc3896db066ad940f40e38d2bf81898774663547325d2"
-        },
-        "snapshot_observations": {
-          "preparation": {
-            "ids": [
-              2436,
-              2439
-            ],
-            "file_mode": "0664"
-          },
-          "workflow": {
-            "ids": [
-              2481,
-              2482
-            ],
-            "file_mode": "0644"
-          }
-        },
-        "gc_eviction_between_preparation_and_workflow": false,
-        "cache_key_includes_file_mode": true,
-        "cache_key_excludes_mtime": true,
-        "implementation_source": "https://github.com/dagger/dagger/blob/v0.21.9/engine/contenthash/tarsum.go",
-        "correction": "Prepare from an actual Git checkout with CI file modes and matching execution inputs.",
-        "corrected_checkout_cache_reuse_remeasured": false
+      "served-revision": {
+        "schema": 1,
+        "stage": "served-revision",
+        "revision": "26a5f7b3bc6415803a87a9b808e4e2dd763293de",
+        "started": "2026-09-27T23:25:01.583042335Z",
+        "duration_seconds": 21.921910397,
+        "budget_seconds": 65,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 0.18,
+        "peak_memory_bytes": 46637056
       }
+    },
+    "workflow_served_check": {
+      "completed_at": "2026-09-27T23:25:23.504952+00:00",
+      "success": true,
+      "build_creation_to_completion_seconds": 215.505,
+      "image_publication_to_completion_seconds": 147.505,
+      "infra_commit_to_completion_seconds": 106.505,
+      "measurement": "GitHub workflow timestamps and runner-reported duration; a single observation, not a traffic percentile."
+    },
+    "independent_observer": {
+      "baseline": {
+        "requested_at": "2026-09-27T23:22:47.997340+00:00",
+        "observed_at": "2026-09-27T23:22:48.398118+00:00",
+        "status": 200,
+        "revision": "c56ddf87af6cdda0cf18a295e4e77f49b313727c"
+      },
+      "last_nonmatching_observation": {
+        "requested_at": "2026-09-27T23:25:41.007834+00:00",
+        "observed_at": "2026-09-27T23:25:41.104807+00:00",
+        "status": 200,
+        "revision": "c56ddf87af6cdda0cf18a295e4e77f49b313727c"
+      },
+      "first_served_match": {
+        "requested_at": "2026-09-27T23:25:42.105186+00:00",
+        "observed_at": "2026-09-27T23:25:42.202065+00:00",
+        "status": 200,
+        "revision": "26a5f7b3bc6415803a87a9b808e4e2dd763293de"
+      },
+      "run_created_to_served_seconds_upper_bound": 234.202,
+      "infra_commit_to_served_seconds_upper_bound": 125.202,
+      "publication_to_served_seconds_upper_bound": 166.202
+    },
+    "clock_comparison": [
+      {
+        "source": "github",
+        "request_at": "2026-09-27T23:31:36.572984+00:00",
+        "response_at": "2026-09-27T23:31:36.678161+00:00",
+        "date": "Sun, 27 Sep 2026 23:31:16 GMT",
+        "age": null,
+        "cf_cache_status": null
+      },
+      {
+        "source": "frontend",
+        "request_at": "2026-09-27T23:31:36.678205+00:00",
+        "response_at": "2026-09-27T23:31:36.886673+00:00",
+        "date": "Sun, 27 Sep 2026 23:31:17 GMT",
+        "age": null,
+        "cf_cache_status": "DYNAMIC"
+      },
+      {
+        "source": "fredrir-11",
+        "request_at": "2026-09-27T23:31:36.886762+00:00",
+        "response_at": "2026-09-27T23:31:36.953885+00:00",
+        "host_time": "2026-09-27T23:31:17.893087487Z"
+      }
+    ],
+    "observer_limits": [
+      "The workstation clock was about 19 seconds ahead of fredrir-11 and HTTP Date in a later bracketed check; raw cross-clock intervals are retained without retrospective correction.",
+      "The first observer attempt received HTTP 403 with the default Python User-Agent; the restarted observer used infra-deployment-observer/1 and recorded HTTP 200 for the old revision before rollout.",
+      "The first matching response bounds detection at the observer; it is not an exact global first-serving timestamp."
+    ],
+    "rollout": {
+      "pod": "llunde/web-594644d49-wj5bq",
+      "created_at": "2026-09-27T23:25:11Z",
+      "ready_at": "2026-09-27T23:25:17Z",
+      "image_pull_seconds": 2.297,
+      "deployment_available": true
+    },
+    "source_permissions": {
+      "uid": 10001,
+      "gid": 10001,
+      "readable_static_files": 159,
+      "directories_readable_and_traversable": true,
+      "index_mode": "0644",
+      "caddyfile_mode": "0644",
+      "isolated_caddy_served_exact_index_and_revision": true
     }
+  },
+  "reconciliation_timeline": [
+    {
+      "at": "2026-09-27T23:24:01.224134+00:00",
+      "event": "main at 7798c062bfd31d1d59b17c9ba90760b2247b775a"
+    },
+    {
+      "at": "2026-09-27T23:24:01.914440+00:00",
+      "event": "Reconciling: main at 7798c062bfd31d1d59b17c9ba90760b2247b775a"
+    },
+    {
+      "at": "2026-09-27T23:24:03.437974+00:00",
+      "event": "Reconciling main at 7798c062bfd31d1d59b17c9ba90760b2247b775a"
+    },
+    {
+      "at": "2026-09-27T23:24:09.289407+00:00",
+      "event": "{\"base\":\"d64513f84897261a441b0e189c80f89216f8685d\",\"revision\":\"7798c062bfd31d1d59b17c9ba90760b2247b775a\"}"
+    },
+    {
+      "at": "2026-09-27T23:24:49.720458+00:00",
+      "event": "provenance desired=7798c062bfd31d1d59b17c9ba90760b2247b775a applied=d64513f84897261a441b0e189c80f89216f8685d"
+    },
+    {
+      "at": "2026-09-27T23:24:55.137817+00:00",
+      "event": "plan desired=7798c062bfd31d1d59b17c9ba90760b2247b775a applied=d64513f84897261a441b0e189c80f89216f8685d"
+    },
+    {
+      "at": "2026-09-27T23:24:57.346196+00:00",
+      "event": "publish desired=7798c062bfd31d1d59b17c9ba90760b2247b775a applied=d64513f84897261a441b0e189c80f89216f8685d"
+    },
+    {
+      "at": "2026-09-27T23:24:59.787160+00:00",
+      "event": "   d64513f..7798c06  7798c062bfd31d1d59b17c9ba90760b2247b775a -> production"
+    },
+    {
+      "at": "2026-09-27T23:25:00.078753+00:00",
+      "event": "kubernetes desired=7798c062bfd31d1d59b17c9ba90760b2247b775a applied=d64513f84897261a441b0e189c80f89216f8685d"
+    },
+    {
+      "at": "2026-09-27T23:25:04.174946+00:00",
+      "event": "\u2714 fetched revision production@sha1:7798c062bfd31d1d59b17c9ba90760b2247b775a"
+    },
+    {
+      "at": "2026-09-27T23:25:08.345031+00:00",
+      "event": "\u2714 applied revision production@sha1:7798c062bfd31d1d59b17c9ba90760b2247b775a"
+    },
+    {
+      "at": "2026-09-27T23:25:20.820584+00:00",
+      "event": "verify desired=7798c062bfd31d1d59b17c9ba90760b2247b775a applied=d64513f84897261a441b0e189c80f89216f8685d"
+    },
+    {
+      "at": "2026-09-27T23:25:23.178004+00:00",
+      "event": "complete desired=7798c062bfd31d1d59b17c9ba90760b2247b775a applied=7798c062bfd31d1d59b17c9ba90760b2247b775a"
+    },
+    {
+      "at": "2026-09-27T23:25:24.624037+00:00",
+      "event": "Finished infra-reconcile-apply.service."
+    }
+  ],
+  "latency_findings": [
+    "Image publication to infra commit took 41 seconds, including scan, private provenance, dispatch, runner setup and promotion.",
+    "The pull supervisor first observed the infra commit 24.224 seconds after its commit timestamp.",
+    "The outer provenance gate ended at 23:24:09.289; per-run Go toolchain/module extraction and compilation, tool setup and declaration validation preceded the inner provenance stage at 23:24:49.720.",
+    "Production publication completed at 23:24:59.787; the root applied at 23:25:08.345 and the web pod became Ready at 23:25:17.",
+    "Neither the 15-second delivery target nor subminute delivery was met; no budget or isolation control was changed."
+  ],
+  "previous_canary": {
+    "observed_at": "2026-09-20T21:33:28Z",
+    "application_revision": "a555e9dffc435399d917d28782c3370ede9661a2",
+    "build_run": "https://github.com/fredrir/llunde-frontend/actions/runs/35538973695",
+    "raw_build_creation_to_observation_seconds": 114,
+    "subminute_end_to_end_qualified": false,
+    "measurement": "Historical observation upper bound, not exact first-serving time."
   }
 }

@@ -263,7 +263,7 @@ Initial native preparation is explicit; periodic compilation is disabled to avoi
 | Execution | CI CLI checksum, engine, platform, build arguments and build targets |
 | Cache identity | Dependency bytes and file modes; archive extraction can change modes and invalidate layers |
 | Qualification | Preparation is reported separately; only a measured CI run establishes deployment latency |
-| Evidence | [Frontend checkout-mode diagnosis and publication breakdown](../build/evidence/flux-artifact-qualification.json) |
+| Evidence | [Production source-mode check and publication timeline](../build/evidence/flux-artifact-qualification.json) |
 
 Create the preparation checkout from an existing repository:
 

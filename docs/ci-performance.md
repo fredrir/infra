@@ -46,7 +46,7 @@
 | Build-VM runner convergence, 11 converged runners | Task results 165 → 8; 4.6 → 1.5 seconds over a local connection; only differing runners enter the per-runner replacement path | [Runner probe](../build/evidence/build-runner-probe.json) |
 | Fourth build-VM slot, empty engine cache | Engine anonymous and kernel peak 2.5–2.9 GiB with three jobs → 3.0–4.1 GiB with four (two of them compiling every runner-check Go tool), of 10 GiB; four concurrent cold image scans 0.7 GiB anonymous in a 4 GiB scope; no OOM kills; build times unchanged | [Fourth slot](../build/evidence/build-vm-fourth-slot.json) |
 | Engine per repository, four concurrent builds, emulated build VM | Cold 376–384 s on one engine → 418–430 s on four engines (each pulls its own base images); engine CPU 827–837 → 850–861 s; anonymous and kernel peak 3.1–3.6 → 3.6–3.9 GiB; no OOM kills; warm rebuilds 8 → 6 s; parallelism 2 per engine 417 s and 4.1 GiB, so three stays | [Isolation qualification](../build/evidence/build-vm-repository-isolation.json) |
-| Frontend deployment below 15 seconds | Unqualified | [Previous observed timeline](../build/evidence/flux-artifact-qualification.json) |
+| Frontend deployment below 15 seconds | Unqualified; the normal-tree canary served the expected revision, with the workflow serving check completing 215.505 seconds after build creation | [Measured timeline and clock limits](../build/evidence/flux-artifact-qualification.json) |
 
 | Accounting | Rule |
 | --- | --- |
