@@ -108,3 +108,33 @@ func TestEvaluatorMatchesTailscaleClaimPatterns(t *testing.T) {
 		}
 	}
 }
+
+func TestOnlyMainIsAProtectedBranchNamedLikeMain(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join(root(t), ".github", "*-ruleset.json"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("rulesets unavailable: %v", err)
+	}
+	for _, path := range paths {
+		var ruleset struct {
+			Target     string `json:"target"`
+			Conditions struct {
+				RefName struct {
+					Include []string `json:"include"`
+				} `json:"ref_name"`
+			} `json:"conditions"`
+		}
+		if err := json.Unmarshal(read(t, path), &ruleset); err != nil {
+			t.Fatal(err)
+		}
+		if ruleset.Target != "branch" {
+			continue
+		}
+		for _, pattern := range ruleset.Conditions.RefName.Include {
+			for _, branch := range []string{"main-copy", "main/x", "mainline", "main.x", "main_x", "main@refs/heads/main"} {
+				if pattern == "~ALL" || globMatches(strings.ReplaceAll(pattern, "?", "*"), "refs/heads/"+branch) {
+					t.Errorf("%s protects refs/heads/%s through %q", filepath.Base(path), branch, pattern)
+				}
+			}
+		}
+	}
+}

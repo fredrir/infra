@@ -192,7 +192,10 @@ filegroup(
 filegroup(
     name = "publishing_data",
     srcs = glob([".github/*-ruleset.json"]) + ["//build:publisher.json"],
-    visibility = ["//internal/reconcile:__pkg__"],
+    visibility = [
+        "//internal/contracts:__pkg__",
+        "//internal/reconcile:__pkg__",
+    ],
 )
 
 filegroup(

@@ -172,6 +172,12 @@ func TestOnlyProtectedMainRunsReachTheCacheWriterPort(t *testing.T) {
 	}{
 		{"main push", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/heads/main")}, []int{9092, 9093}},
 		{"main dispatch of the CLI build", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("infra-cli.yml", "refs/heads/main")}, []int{9092, 9093}},
+		{"main image build", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("build-image.yml", "refs/heads/main")}, nil},
+		{"main signing release", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("cosign-release.yml", "refs/heads/main")}, nil},
+		{"main deploy dispatch", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("deploy.yml", "refs/heads/main")}, nil},
+		{"future workflow on main", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("future.yml", "refs/heads/main")}, nil},
+		{"check workflow from a branch ending in main's ref", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/heads/x@refs/heads/main")}, nil},
+		{"check workflow of another repository", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": "attacker/infra/.github/workflows/check.yml@refs/heads/main"}, nil},
 		{"pull request", "pull_request", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("check.yml", "refs/pull/7/merge")}, []int{9092}},
 		{"pull request claiming main's workflow", "pull_request", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/heads/main")}, []int{9092}},
 		{"release tag", "ref:refs/tags/infra-v0.2.20", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("cli-release.yml", "refs/tags/infra-v0.2.20")}, []int{9092}},
@@ -179,6 +185,7 @@ func TestOnlyProtectedMainRunsReachTheCacheWriterPort(t *testing.T) {
 		{"branch push", "ref:refs/heads/feature", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("check.yml", "refs/heads/feature")}, nil},
 		{"branch named after main", "ref:refs/heads/main-copy", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/heads/main-copy")}, nil},
 		{"unprotected main", "ref:refs/heads/main", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("check.yml", "refs/heads/main")}, nil},
+		{"unprotected main CLI build", "ref:refs/heads/main", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("infra-cli.yml", "refs/heads/main")}, nil},
 		{"workflow from a pull request ref on main", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/pull/7/merge")}, nil},
 		{"plan environment", "environment:infrastructure-plan", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("reconcile-job.yml", "refs/pull/7/merge")}, nil},
 	} {

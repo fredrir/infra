@@ -38,6 +38,7 @@ go_test(
         "//:host_secret_data",
         "//:image_contract_data",
         "//:node_local_dns_data",
+        "//:publishing_data",
         "//:reconciler_access_data",
         "//:renovate_pin_data",
         "//:tailnet_policy_data",

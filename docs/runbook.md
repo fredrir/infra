@@ -571,7 +571,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Wipe | `kubectl -n bazel-cache scale statefulset/bazel-cache --replicas=0`; delete PVC `data-bazel-cache-0` and its released PV; scale to 1 |
 | Resize | Change `--max_size` and the PVC request together; `--max_size` stays at most three quarters of the volume |
 | Readiness | `kubectl -n bazel-cache get pod bazel-cache-0`; bazel-remote's probes call its health RPC through the filter; the filter's liveness probe opens TCP port 9095 |
-| Grant CI access | Apply `tailscale/policy.hujson`; create `bazel-cache-reader`, `bazel-cache-release-reader` and `bazel-cache-writer` from `tailscale/federated-identities.json`; store each client ID in the repository variable it names |
+| Grant CI access | Apply `tailscale/policy.hujson`; create `bazel-cache-reader`, `bazel-cache-release-reader`, `bazel-cache-check-writer` and `bazel-cache-cli-writer` from `tailscale/federated-identities.json`; store each of the four client IDs in the repository variable it names |
 
 ## Object store
 

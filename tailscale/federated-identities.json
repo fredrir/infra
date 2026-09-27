@@ -44,13 +44,25 @@
       "tags": ["tag:ci-bazel-reader"]
     },
     {
-      "name": "bazel-cache-writer",
-      "clientIdVariable": "TAILSCALE_BAZEL_CACHE_WRITER_CLIENT_ID",
+      "name": "bazel-cache-check-writer",
+      "clientIdVariable": "TAILSCALE_BAZEL_CACHE_CHECK_WRITER_CLIENT_ID",
       "subject": "repo:fredrir@114402558/infra@1328085692:ref:refs/heads/main",
-      "audience": "bazel-cache-writer",
+      "audience": "bazel-cache-check-writer",
       "claims": {
         "ref_protected": "true",
-        "job_workflow_ref": "fredrir/infra/.github/workflows/*@refs/heads/main"
+        "job_workflow_ref": "fredrir/infra/.github/workflows/check.yml@refs/heads/main"
+      },
+      "scopes": ["auth_keys"],
+      "tags": ["tag:ci-bazel-writer"]
+    },
+    {
+      "name": "bazel-cache-cli-writer",
+      "clientIdVariable": "TAILSCALE_BAZEL_CACHE_CLI_WRITER_CLIENT_ID",
+      "subject": "repo:fredrir@114402558/infra@1328085692:ref:refs/heads/main",
+      "audience": "bazel-cache-cli-writer",
+      "claims": {
+        "ref_protected": "true",
+        "job_workflow_ref": "fredrir/infra/.github/workflows/infra-cli.yml@refs/heads/main"
       },
       "scopes": ["auth_keys"],
       "tags": ["tag:ci-bazel-writer"]
