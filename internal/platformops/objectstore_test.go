@@ -9,7 +9,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/fredrir/infra/internal/objectstore"
 )
 
@@ -201,7 +203,7 @@ func TestProvisionObjectStoreReportsEveryFailedBucket(t *testing.T) {
 	spec.Cells[1].Endpoint = "https://127.0.0.1:1"
 	clients := map[string]objectstore.Client{
 		"hel1": {Region: "hel1", AccessKey: "provisioner", SecretKey: "secret", HTTP: hel1Server.Client()},
-		"nl":   {Region: "nl", AccessKey: "provisioner", SecretKey: "secret"},
+		"nl":   {Region: "nl", AccessKey: "provisioner", SecretKey: "secret", Backoff: retry.BackoffDelayerFunc(func(int, error) (time.Duration, error) { return 0, nil })},
 	}
 	err = ProvisionObjectStore(context.Background(), ObjectStoreConfig{Spec: spec, Clients: clients, WaitAttempts: 2})
 	if err == nil || !strings.Contains(err.Error(), "bucket ci-example-main") || !strings.Contains(err.Error(), "cell nl") || strings.Contains(err.Error(), "secret") {

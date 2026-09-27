@@ -45,6 +45,7 @@ go_test(
         "//internal/kustomize",
         "//internal/objectstore",
         "//internal/process",
+        "@com_github_aws_aws_sdk_go_v2//aws/retry",
         "@in_yaml_go_yaml_v3//:yaml",
     ],
 )
