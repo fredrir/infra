@@ -58,5 +58,43 @@
         "embedded_infra_cli_result": "passed"
       }
     }
+  },
+  "live_qualification": {
+    "observed_at": "2026-09-27T23:34:16.071074+00:00",
+    "source_revision": "production@sha1:4d6f04d2df29bd6fa8419afc90e1035e2298b4d3",
+    "jobs": [
+      {
+        "repository": "fredrir/infra",
+        "run_id": 36358683519,
+        "run_attempt": 2,
+        "job_id": 108732343409,
+        "job_url": "https://github.com/fredrir/infra/actions/runs/36358683519/job/108732343409",
+        "conclusion": "success",
+        "runner": "check-amd64-jjhdk-runner-zdljg",
+        "pod_uid": "bc41fdc4-f7ab-4d6c-886a-756a6e6453d8",
+        "image": "ghcr.io/fredrir/infra-runner-check@sha256:fe7b8563b3f2531a7234523bee0eef32bf7ac35723ff8d714c37674bcb2dfa4c",
+        "image_id": "ghcr.io/fredrir/infra-runner-check@sha256:fe7b8563b3f2531a7234523bee0eef32bf7ac35723ff8d714c37674bcb2dfa4c",
+        "started_at": "2026-09-27T23:32:13Z",
+        "completed_at": "2026-09-27T23:32:45Z"
+      },
+      {
+        "repository": "fredrir/nsql",
+        "run_id": 36254754345,
+        "run_attempt": 11,
+        "job_id": 108731793865,
+        "job_url": "https://github.com/fredrir/nsql/actions/runs/36254754345/job/108731793865",
+        "conclusion": "success",
+        "runner": "rust-amd64-sl8rj-runner-m74qg",
+        "pod_uid": "86498c15-8a43-4cd2-a1d7-be77b715ef06",
+        "image": "ghcr.io/fredrir/infra-runner-rust@sha256:1df48e3f7153dd7acd547791b102125de01492ba7b2b18088b560f3f8ac84267",
+        "image_id": "ghcr.io/fredrir/infra-runner-rust@sha256:1df48e3f7153dd7acd547791b102125de01492ba7b2b18088b560f3f8ac84267",
+        "started_at": "2026-09-27T23:31:20Z",
+        "completed_at": "2026-09-27T23:33:10Z"
+      }
+    ],
+    "old_image_pods": 0,
+    "pools_all_new_images": true,
+    "policy_removal_commit": "cebcf6cc",
+    "approved_for_old_allowance_removal": true
   }
 }
