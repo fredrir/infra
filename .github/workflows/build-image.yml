@@ -96,7 +96,7 @@ jobs:
       id-token: write
       attestations: write
     outputs:
-      image: ${{ steps.build.outputs.image }}
+      image: ${{ steps.build.outputs.digest && format('{0}@{1}', inputs.image, steps.build.outputs.digest) || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
