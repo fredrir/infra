@@ -120,3 +120,6 @@
     daemon_reload: true
     state: restarted
   loop: '{{ build_engine_stale.stdout_lines }}'
+
+- name: Wait for build engine readiness
+  ansible.builtin.import_tasks: readiness.yml

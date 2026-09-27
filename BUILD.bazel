@@ -73,7 +73,12 @@ filegroup(
 
 filegroup(
     name = "build_engine_data",
-    srcs = ["ansible/roles/build_engine/templates/infra-dagger.service.j2"],
+    srcs = [
+        "ansible/roles/build_engine/tasks/readiness.yml",
+        "ansible/roles/build_engine/tasks/state.yml",
+        "ansible/roles/build_engine/templates/infra-dagger.service.j2",
+        "ansible/verify-runners.yml",
+    ],
     visibility = [
         "//internal/contracts:__pkg__",
         "//internal/dev:__pkg__",

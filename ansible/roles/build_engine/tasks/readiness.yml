@@ -1,0 +1,16 @@
+- name: Wait for build engine sockets
+  ansible.builtin.command:
+    argv:
+    - python3
+    - -c
+    - import socket, sys; connection = socket.socket(socket.AF_UNIX); connection.settimeout(2); connection.connect(sys.argv[1]); connection.close()
+    - '/run/infra-dagger/{{ item.slug }}/engine.sock'
+  loop: '{{ build_engine_repositories }}'
+  loop_control:
+    label: '{{ item.name }}'
+  register: build_engine_ready
+  until: build_engine_ready.rc == 0
+  retries: 60
+  delay: 5
+  changed_when: false
+  check_mode: false

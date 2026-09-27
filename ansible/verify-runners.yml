@@ -21,6 +21,11 @@
       name: build_engine
       tasks_from: pin.yml
 
+  - name: Wait for build engine readiness
+    ansible.builtin.import_role:
+      name: build_engine
+      tasks_from: readiness.yml
+
   - name: Probe observed runner host
     ansible.builtin.shell: |
       set -eu
