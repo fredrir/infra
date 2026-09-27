@@ -48,7 +48,6 @@ func TestKustomizationsCoverAggregatesAndChildren(t *testing.T) {
 		"platform/projects/example",
 		"platform/projects/llunde-pyparser/migration",
 		"platform/projects/llunde-pyparser/application",
-		"build/rollout/flux-artifacts/cutover",
 	} {
 		files[directory+"/kustomization.yaml"] = "resources: []\n"
 	}
@@ -62,7 +61,7 @@ func TestKustomizationsCoverAggregatesAndChildren(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"platform/clusters/production", "platform/projects", "build/rollout/flux-artifacts/cutover", "platform/components/common", "platform/projects/example", "platform/projects/llunde-pyparser/application", "platform/projects/llunde-pyparser/migration"}
+	want := []string{"platform/clusters/production", "platform/projects", "platform/components/common", "platform/projects/example", "platform/projects/llunde-pyparser/application", "platform/projects/llunde-pyparser/migration"}
 	if !reflect.DeepEqual(directories, want) {
 		t.Fatalf("kustomizations %v, want %v", directories, want)
 	}

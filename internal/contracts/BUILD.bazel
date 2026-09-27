@@ -43,7 +43,6 @@ go_test(
         "//:reconciler_access_data",
         "//:renovate_pin_data",
         "//:tailnet_policy_data",
-        "//build:rollout/flux-artifacts/cutover/kustomization.yaml",
         "//platform:arc_chart_data",
         "//platform:bazel_cache_data",
         "//platform:flux_artifacts_data",

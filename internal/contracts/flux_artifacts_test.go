@@ -127,23 +127,3 @@ func copyFluxTree(t *testing.T, source, destination string) {
 		t.Fatal(err)
 	}
 }
-
-func TestFluxCutoverEntrypointConvergesToProduction(t *testing.T) {
-	fixture := t.TempDir()
-	production := "platform/clusters/production"
-	cutover := "build/rollout/flux-artifacts/cutover"
-	for _, tree := range []string{production, cutover} {
-		copyFluxTree(t, filepath.Join(root(t), tree), filepath.Join(fixture, tree))
-	}
-	canonical, err := kustomize.Build(filepath.Join(fixture, production))
-	if err != nil {
-		t.Fatal(err)
-	}
-	transition, err := kustomize.Build(filepath.Join(fixture, cutover))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(transition, canonical) {
-		t.Fatal("cutover entrypoint does not declare the canonical root and identical resources")
-	}
-}

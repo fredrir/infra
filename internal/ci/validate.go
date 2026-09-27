@@ -146,7 +146,7 @@ func declarationChecks(root string, changed func(func(string) bool) bool) ([]con
 }
 
 func kustomizations(root string) ([]string, error) {
-	candidates := []string{"platform/clusters/production", "platform/components", "platform/projects", "build/rollout/flux-artifacts/cutover"}
+	candidates := []string{"platform/clusters/production", "platform/components", "platform/projects"}
 	for _, pattern := range []string{"platform/components/*", "platform/projects/*", "platform/projects/llunde-pyparser/*"} {
 		matches, err := filepath.Glob(filepath.Join(root, pattern))
 		if err != nil {
