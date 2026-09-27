@@ -28,6 +28,9 @@ func Doctor(ctx context.Context, root, bazel string, engine bool) []Diagnostic {
 	}
 	for _, tool := range tools {
 		command := exec.CommandContext(ctx, tool, "--version")
+		if tool == bazel {
+			command.Env = bazelEnvironment()
+		}
 		data, err := command.CombinedOutput()
 		detail := strings.TrimSpace(string(data))
 		if err != nil {

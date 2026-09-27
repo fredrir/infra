@@ -8,6 +8,7 @@ go_library(
         "config.go",
         "doctor.go",
         "engine.go",
+        "environment.go",
         "fast.go",
         "image.go",
         "metrics.go",
@@ -28,6 +29,7 @@ go_test(
     srcs = [
         "cache_test.go",
         "engine_test.go",
+        "environment_test.go",
         "image_test.go",
         "metrics_test.go",
         "pipeline_test.go",

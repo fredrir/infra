@@ -167,7 +167,8 @@ func runLocal(ctx context.Context, opts Options, config Toolchain, expression st
 	if bazel == "" {
 		bazel = "bazel"
 	}
-	version, err := process.Run(ctx, process.Options{Name: bazel, Args: []string{"--version"}, Timeout: time.Minute})
+	environment := bazelEnvironment()
+	version, err := process.Run(ctx, process.Options{Name: bazel, Args: []string{"--version"}, Env: environment, Timeout: time.Minute})
 	data := version.Stdout
 	if err != nil {
 		return fmt.Errorf("read Bazel version: %w", err)
@@ -177,7 +178,7 @@ func runLocal(ctx context.Context, opts Options, config Toolchain, expression st
 	}
 	targets := opts.Targets
 	if len(targets) == 0 && expression != "//..." {
-		query, err := process.Run(ctx, process.Options{Name: bazel, Args: []string{"query", expression, "--output=label"}, Dir: opts.Root, Stderr: opts.Log})
+		query, err := process.Run(ctx, process.Options{Name: bazel, Args: []string{"query", expression, "--output=label"}, Env: environment, Dir: opts.Root, Stderr: opts.Log})
 		data := query.Stdout
 		if err != nil {
 			return fmt.Errorf("query affected targets: %w", err)
@@ -195,7 +196,7 @@ func runLocal(ctx context.Context, opts Options, config Toolchain, expression st
 	if err != nil {
 		return err
 	}
-	_, err = process.Run(ctx, process.Options{Name: bazel, Args: buildArgs(opts, config, targets, reports), Dir: opts.Root, Stdout: opts.Log, Stderr: opts.Log})
+	_, err = process.Run(ctx, process.Options{Name: bazel, Args: buildArgs(opts, config, targets, reports), Env: environment, Dir: opts.Root, Stdout: opts.Log, Stderr: opts.Log})
 	return err
 }
 
