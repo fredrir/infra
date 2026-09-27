@@ -145,7 +145,7 @@ git diff -- platform
 | Host provisioning               | `ansible/build-vms.yml`; inventory group `build_vm_hosts`                                                                                   |
 | Runner and engine provisioning  | `ansible/build-runners.yml`; inventory group `build_engines`                                                                                |
 | Production placement            | `ansible/inventory/production.yml`; `infra-build-09` on `fredrir-09`                                                                        |
-| Host reservation                | 8.25 CPUs / 18 GiB reserved; resulting allocatable 7.5 CPUs / 13,197,260 KiB                                                                |
+| Host reservation                | 8.25 CPUs / 17,920 MiB reserved and the guest service's `MemoryMax`: 16 GiB guest plus 1,536 MiB for QEMU and its page cache (at least 1 GiB); resulting allocatable 7.5 CPUs / 13,721,548 KiB |
 | Guest                           | Eight CPUs / 16 GiB RAM / 80 GiB sparse persistent disk                                                                                     |
 | Host boundary                   | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding; guest metrics forwarded to the tailnet address, port 9101              |
 | Guest egress                    | nftables `inet infra_build_vm` (`infra-build-vm-egress.service`, required by the guest): connections the QEMU account opens (new or untracked) to host addresses, RFC 1918, CGNAT/tailnet, link-local and ULA ranges dropped; host resolver `127.0.0.53:53` allowed; inbound SSH and metrics forwards unaffected; [qualification](../build/evidence/build-vm-guest-egress.json) |

@@ -510,6 +510,7 @@ Native signed S3 state requests retain conditional lease creation, takeover and 
 | Corrupt state | Admission fails until an operator repairs `leases.json` with listeners drained |
 
 Drain active jobs before changing runner service overrides.
+A change to `build_vm_system_reserved_memory` restarts the build VM and `k3s-agent` on its host: set `INFRA_VM_POOL_QUALIFIED=false` in every repository of `build/runners.json`, wait until its runners are idle, apply, then restore the variable.
 
 | Runner upgrade   | Value                                                                                                     |
 | ---------------- | --------------------------------------------------------------------------------------------------------- |
