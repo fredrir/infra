@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -77,5 +79,21 @@ func TestTimeoutKillsUncooperativeCommand(t *testing.T) {
 	_, err := process.Run(context.Background(), o)
 	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > 3*time.Second {
 		t.Fatalf("timeout: %v", err)
+	}
+}
+
+func TestBareNamesResolveAgainstTheChildPath(t *testing.T) {
+	directory := t.TempDir()
+	o := helper(t, "output")
+	if err := os.Symlink(o.Name, filepath.Join(directory, "child-only-tool")); err != nil {
+		t.Fatal(err)
+	}
+	o.Name = "child-only-tool"
+	o.Env = append(o.Env, "PATH="+directory)
+	if r, err := process.Run(context.Background(), o); err != nil || string(r.Stdout) != "output" {
+		t.Fatalf("result=%+v error=%v", r, err)
+	}
+	if _, err := process.Run(context.Background(), process.Options{Name: "sh", Args: []string{"-c", "true"}, Env: []string{"PATH=" + t.TempDir()}}); !errors.Is(err, exec.ErrNotFound) {
+		t.Fatalf("resolved outside the child PATH: %v", err)
 	}
 }

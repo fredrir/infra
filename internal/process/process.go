@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -73,7 +75,11 @@ func Run(ctx context.Context, o Options) (Result, error) {
 	if grace <= 0 {
 		grace = 2 * time.Second
 	}
-	command := exec.Command(o.Name, o.Args...)
+	name, lookupErr := executable(o.Name, o.Env)
+	if lookupErr != nil {
+		return Result{Duration: time.Since(start), ExitCode: -1}, fmt.Errorf("start %s: %w", o.Name, lookupErr)
+	}
+	command := exec.Command(name, o.Args...)
 	command.Dir = o.Dir
 	command.Env = o.Env
 	command.Stdin = o.Stdin
@@ -119,4 +125,30 @@ func Run(ctx context.Context, o Options) (Result, error) {
 		return result, fmt.Errorf("%s failed: %w", filepath.Base(o.Name), err)
 	}
 	return result, nil
+}
+
+func executable(name string, env []string) (string, error) {
+	path, declared := declaredPath(env)
+	if !declared || strings.ContainsRune(name, filepath.Separator) {
+		return name, nil
+	}
+	for _, directory := range filepath.SplitList(path) {
+		if !filepath.IsAbs(directory) {
+			continue
+		}
+		candidate := filepath.Join(directory, name)
+		if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0 {
+			return candidate, nil
+		}
+	}
+	return "", &exec.Error{Name: name, Err: exec.ErrNotFound}
+}
+
+func declaredPath(env []string) (string, bool) {
+	for i := len(env) - 1; i >= 0; i-- {
+		if path, found := strings.CutPrefix(env[i], "PATH="); found {
+			return path, true
+		}
+	}
+	return "", false
 }
