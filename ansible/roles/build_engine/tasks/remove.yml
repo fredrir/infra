@@ -42,8 +42,3 @@
     path: '{{ item.split()[1] }}'
     state: absent
   loop: "{{ build_engine_undeclared.stdout_lines | select('match', '^file ') | list }}"
-
-- name: Remove the shared engine policy
-  ansible.builtin.file:
-    path: /etc/infra-dagger.toml
-    state: absent

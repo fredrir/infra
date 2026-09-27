@@ -69,16 +69,5 @@
 - name: Retire listeners outside their declared roots
   ansible.builtin.import_tasks: retire.yml
 
-- name: Remove the shared runner account
-  ansible.builtin.user:
-    name: runner
-    state: absent
-    remove: true
-
-- name: Remove the shared admission group
-  ansible.builtin.group:
-    name: infra-runners
-    state: absent
-
 - name: Configure repository runners
   ansible.builtin.import_tasks: repositories.yml

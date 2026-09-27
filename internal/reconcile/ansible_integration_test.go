@@ -333,8 +333,8 @@ esac
 	t.Log("admission runs through a root broker whose leases jobs cannot write")
 	for repository, home := range homes {
 		slug := strings.ToLower(repository)
-		if groups := " " + inspect("id", "-nG", home) + " "; !strings.Contains(groups, " infra-dagger-"+slug+" ") || strings.Contains(groups, " docker ") || strings.Contains(groups, " infra-runners ") {
-			t.Errorf("%s has groups %q, want its own engine group and no Docker or shared admission access", home, groups)
+		if groups := strings.Fields(inspect("id", "-nG", home)); !slices.Equal(slices.Sorted(slices.Values(groups)), []string{"infra-dagger-" + slug, home}) {
+			t.Errorf("%s has groups %q, want only its own and its engine's", home, groups)
 		}
 		if admission := inspect("stat", "-c", "%U %G %a", "/run/infra-runner-admission.d", "/run/infra-runner-admission.d/"+slug); admission != "root root 755\nroot "+home+" 750" {
 			t.Errorf("%s admission socket directory is %q, want root:%s 0750", repository, admission, home)
@@ -410,35 +410,6 @@ esac
 		t.Fatalf("requested runner restart restarted %q, want only %s:\n%s", strings.TrimPrefix(restarted(), steady), runnerUnit("Y"), output)
 	}
 	t.Log("runners reported offline restart without restarting the rest of the fleet")
-	for repository, home := range homes {
-		command("docker", "exec", name, "setpriv", "--reuid="+home, "--regid="+home, "--clear-groups", "sh", "-c", `umask 0077 && mkdir -p "$1" && printf x > "$1/package.json"`, "checkout", "/home/"+home+"/"+repository+"-1/_work/"+repository+"/"+repository)
-	}
-	put("runner-infra/infra-1/bin/Runner.Worker", "#!/bin/sh\nwhile [ -e /fixture/state/job-infra ]; do sleep 0.1; done\n", true)
-	write("state/job-infra", "", false)
-	command("docker", "exec", "-d", name, "/home/runner-infra/infra-1/bin/Runner.Worker", "spawnclient", "1", "2")
-	yStarted := record("started-" + runnerUnit("Y"))
-	converge()
-	if present("runner-y/Y-1/_work") || record("stopped") != runnerUnit("Y")+"\n" || record("started-"+runnerUnit("Y")) == yStarted {
-		t.Fatalf("an idle listener kept a checkout written under the former umask: stopped %q", record("stopped"))
-	}
-	if !present("runner-infra/infra-1/_work/infra/infra/package.json") {
-		t.Fatalf("a busy listener lost its checkout mid-job: stopped %q", record("stopped"))
-	}
-	remove("state/job-infra")
-	if exec.CommandContext(ctx, "docker", "exec", name, "sh", "-c", "while pgrep --full '/bin/Runner[.]Worker' > /dev/null; do sleep 0.1; done").Run() != nil {
-		t.Fatal("simulated job did not finish")
-	}
-	converge()
-	if present("runner-infra/infra-1/_work") {
-		t.Fatal("a listener kept its unreadable checkout after its job finished")
-	}
-	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") {
-		t.Fatalf("replaced checkouts do not converge:\n%s", output)
-	}
-	drop("runner-infra/infra-1/bin/Runner.Worker")
-	remove("state/stopped")
-	remove("state/stopped-mid-job")
-	t.Log("checkouts written under the former umask are replaced only while their listener is stopped between jobs")
 	identity := []string{".runner", ".credentials", ".credentials_rsaparams"}
 	reregisterY := `{"build_runner_reregister":["Y-1"]}`
 	write("bin/gh", `#!/bin/sh
@@ -910,18 +881,6 @@ esac
 		t.Fatalf("retired runner was not removed after its job:\n%s", github(calls))
 	}
 	t.Log("a retired runner stops taking jobs, keeps its running job and is deregistered after it finishes")
-	shared := "actions.runner." + fleet.Owner + "-Y.localhost-Y-2.service"
-	command("docker", "exec", name, "useradd", "--create-home", "runner")
-	put("runner/Y-2/.runner", runnerRegistration("Y-2", "Y", 21), false)
-	put("runner/Y-2/.service", shared+"\n", false)
-	command("docker", "exec", name, "mkdir", "-p", "/etc/systemd/system/"+shared+".d")
-	command("docker", "exec", name, "touch", "/etc/systemd/system/"+shared, "/etc/systemd/system/"+shared+".d/resources.conf")
-	calls = record("gh")
-	run("/fixture/removal.yml", true)
-	if present("runner") || exec.CommandContext(ctx, "docker", "exec", name, "id", "runner").Run() == nil || exists("/etc/systemd/system/"+shared) || !strings.Contains(github(calls), "api --method DELETE --silent repos/"+fleet.Owner+"/Y/actions/runners/21\n") {
-		t.Fatalf("the shared runner account or its listener outlived the migration:\n%s", github(calls))
-	}
-	t.Log("listeners of the shared runner account are drained and deregistered before the account is removed")
 	write("packages.yml", "- hosts: build_engines\n  gather_facts: false\n  module_defaults:\n    ansible.builtin.apt:\n      update_cache_retries: 1\n  roles:\n  - role: host_packages\n    vars:\n      host_packages_required: '{{ packages }}'\n", false)
 	installed := `{"packages":["dpkg","tar"]}`
 	if output := run("/fixture/packages.yml", true, "--extra-vars", installed); !strings.Contains(output, "changed=0") {

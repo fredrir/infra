@@ -2,19 +2,19 @@
   ansible.builtin.shell: |
     set -eu
     declared=" {{ build_engine_repositories | map(attribute='name') | join(' ') }} "
-    for path in /etc/systemd/system/infra-dagger*.service; do
+    for path in /etc/systemd/system/infra-dagger-*.service; do
       unit=$(basename "$path" .service)
       case "$declared" in *" $unit "*) ;; *) [ -e "$path" ] && echo "unit $unit" ;; esac
     done
-    systemctl list-units --all --plain --no-legend --type=service 'infra-dagger*' | while read -r unit _; do
+    systemctl list-units --all --plain --no-legend --type=service 'infra-dagger-*' | while read -r unit _; do
       unit=${unit%.service}
       case "$declared" in *" $unit "*) ;; *) [ -e "/etc/systemd/system/$unit.service" ] || echo "loaded $unit" ;; esac
     done
     docker ps --all --format '{{ "{{.Names}}" }}' | while read -r name; do
-      case "$name" in infra-dagger|infra-dagger-*) case "$declared" in *" $name "*) ;; *) echo "container $name" ;; esac ;; esac
+      case "$name" in infra-dagger-*) case "$declared" in *" $name "*) ;; *) echo "container $name" ;; esac ;; esac
     done
     docker volume ls --format '{{ "{{.Name}}" }}' | while read -r volume; do
-      case "$volume" in infra-dagger-cache|infra-dagger-cache-*) case "$declared" in *" infra-dagger-${volume#infra-dagger-cache-} "*) ;; *) echo "volume $volume" ;; esac ;; esac
+      case "$volume" in infra-dagger-cache-*) case "$declared" in *" infra-dagger-${volume#infra-dagger-cache-} "*) ;; *) echo "volume $volume" ;; esac ;; esac
     done
     for path in /etc/infra-dagger/*.toml /etc/infra-dagger/*.env; do
       slug=$(basename "${path%.*}")

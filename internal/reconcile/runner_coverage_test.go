@@ -317,9 +317,6 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 		"roles/build_runner/tasks/remove.yml: Stop retired runner service",
 		"roles/build_runner/tasks/remove.yml: Remove retired runner unit and resource override",
 		"roles/build_runner/tasks/remove.yml: Reload systemd without retired runner",
-		"roles/build_runner/tasks/main.yml: Remove the shared runner account",
-		"roles/build_runner/tasks/main.yml: Remove the shared admission group",
-		"roles/build_engine/tasks/remove.yml: Remove the shared engine policy",
 	}
 	hostReads := []string{
 		"verify-runners.yml: Probe observed runner host",
