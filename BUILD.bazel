@@ -43,6 +43,8 @@ filegroup(
         "//build:BUILD.bazel",
         "//build:dagger-embed.patch",
         "//build:toolchain.json",
+        "//cmd/netpol-gate:image_sources",
+        "//internal/netpolgate:image_sources",
         "//platform:components/backups/tools.Dockerfile",
         "//platform:components/object-store-trust/ca.crt",
     ],

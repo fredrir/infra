@@ -1,0 +1,26 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "netpolgate",
+    srcs = [
+        "gate.go",
+        "run.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/netpolgate",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "netpolgate_test",
+    srcs = ["gate_test.go"],
+    embed = [":netpolgate"],
+)
+
+filegroup(
+    name = "image_sources",
+    srcs = [
+        "gate.go",
+        "run.go",
+    ],
+    visibility = ["//:__pkg__"],
+)

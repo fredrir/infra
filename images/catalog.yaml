@@ -48,3 +48,17 @@
   - platform/components/backups/tools.Dockerfile
   - platform/components/object-store-trust/ca.crt
   check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version; test ! -e /etc/ssl/certs/object-store.pem; grep -q "BEGIN CERTIFICATE" /usr/local/share/object-store/ca.crt
+- image: ghcr.io/fredrir/netpol-gate
+  dockerfile: images/netpol-gate/Containerfile
+  inputs:
+  - images/netpol-gate
+  - cmd/netpol-gate/main.go
+  - internal/netpolgate/gate.go
+  - internal/netpolgate/run.go
+  check: >-
+    netpol-gate serve --allowed 18080 --denied 18081 >/dev/null 2>&1 & serve=$!;
+    sleep 0.2;
+    timeout 5 netpol-gate wait --canary 127.0.0.1 --allowed 18080 --denied 18082 | grep -q '^egress policy enforced';
+    if timeout 1 netpol-gate wait --canary 127.0.0.1 --allowed 18080 --denied 18081; then exit 1; fi;
+    kill "$serve"
+  shell: '["/bin/sh", "-euc"]'
