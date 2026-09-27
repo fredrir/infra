@@ -153,7 +153,7 @@ func buildArgs(opts Options, config Toolchain, targets []string, reports string)
 		args = append(args, "--remote_executor="+opts.RemoteExecutor)
 	}
 	if opts.ReadOnlyCache {
-		args = append(args, "--remote_upload_local_results=false")
+		args = append(args, "--remote_upload_local_results=false", "--experimental_build_event_upload_strategy=local")
 	}
 	return append(args, targets...)
 }
