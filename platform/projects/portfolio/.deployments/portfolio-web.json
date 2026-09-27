@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "image": "ghcr.io/fredrir/portfolio-web",
-  "revision": "c7e6e6ab45c5f9288590023ac8e84d5cb31442f3",
-  "digest": "sha256:b4b789f5f5d0c213034c476a1e77a4609689f26263238e062f5c510fa9f90b34",
-  "run_id": 36333932699,
+  "revision": "e51a9d8fe96a01dbce530bdf1ca03f226266267e",
+  "digest": "sha256:252c39d97c28db06868671ddc91d2fabf0291499008c10684b8312e3d6ddee4e",
+  "run_id": 36358867467,
   "attempt": 1
 }
