@@ -272,9 +272,20 @@
       "llunde-backend": "sha256:5cceb5f25457c48f8755ab7f9633d40ddccd06b8360e247f730e79c3168a8372"
      },
      "result": "pushed with the restored tests in one push; pod Ready; /ready reports database and valkey; public GET /courses 401"
+    },
+    {
+     "repository": "llunde-pyparser",
+     "runs": {
+      "dependencies": 36342085353,
+      "images": 36342085376
+     },
+     "images": {
+      "pyparser-review": "sha256:2cd44bd44bbb9a0ad134d4abe63105eeedfad423ac07c73941cba1e1bda3a0e7"
+     },
+     "result": "dependency plan reused the existing image under contract 8d794e4f; review Ready with /healthz ok and a 1024-byte read from seaweedfs-nl; tunnel ready with no request errors; both workers polling the empty queue"
     }
    ],
-   "pool_variable": "INFRA_VM_POOL_QUALIFIED set true per repository immediately before its pin push and kept true once proven; llunde-pyparser stays false until its pin is proven",
+   "pool_variable": "INFRA_VM_POOL_QUALIFIED set true per repository immediately before its pin push and kept true once proven, in all six consumers",
    "edge_cache": "Cloudflare kept the 508-byte fallback for the three yeeter.no assets cached from the broken window (max-age 4 h, until about 19:40Z); origin responses were correct from 15:52Z"
   }
  }
