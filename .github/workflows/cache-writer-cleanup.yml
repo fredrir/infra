@@ -1,0 +1,61 @@
+name: Remove expired Bazel cache writers
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/cache_writer_cleanup*.py
+      - .github/workflows/cache-writer-cleanup.yml
+  pull_request:
+    paths:
+      - .github/scripts/cache_writer_cleanup*.py
+      - .github/workflows/cache-writer-cleanup.yml
+permissions:
+  contents: read
+concurrency:
+  group: cache-writer-cleanup-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s .github/scripts -p 'cache_writer_cleanup_test.py'
+  cleanup:
+    needs: test
+    if: github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["schedule","workflow_dispatch"]'), github.event_name) && vars.TAILSCALE_CACHE_CLEANUP_CLIENT_ID != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Remove writers older than one hour
+        env:
+          TAILSCALE_CACHE_CLEANUP_CLIENT_ID: ${{ vars.TAILSCALE_CACHE_CLEANUP_CLIENT_ID }}
+          TAILSCALE_CACHE_CLEANUP_CLIENT_SECRET: ${{ secrets.TAILSCALE_CACHE_CLEANUP_CLIENT_SECRET }}
+          APPLY: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          args=(--report "$RUNNER_TEMP/cache-writer-cleanup.json")
+          if [ "$APPLY" = true ]; then
+            args+=(--apply)
+          fi
+          python3 -B .github/scripts/cache_writer_cleanup.py "${args[@]}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: cache-writer-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cache-writer-cleanup.json
+          retention-days: 30
+          if-no-files-found: error

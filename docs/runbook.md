@@ -574,6 +574,12 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Resize | Change `--max_size` and the PVC request together; `--max_size` stays at most three quarters of the volume |
 | Readiness | `kubectl -n bazel-cache get pod bazel-cache-0`; bazel-remote's probes call its health RPC through the filter; the filter's liveness probe opens TCP port 9095 |
 | Grant CI access | Apply `tailscale/policy.hujson`; create `bazel-cache-reader`, `bazel-cache-release-reader`, `bazel-cache-check-writer` and `bazel-cache-cli-writer` from `tailscale/federated-identities.json`; set each Audience explicitly to its `audience` value and store each client ID in the repository variable it names |
+| Writer expiry | `cache-writer-cleanup.yml` runs every 15 minutes; removes nodes at least one hour old whose only tag is `tag:ci-bazel-writer`; writer jobs time out within 30 minutes; connected old writers are also removed |
+| Cleanup credential | Dedicated OAuth client `bazel-cache-writer-cleanup`: only `devices:core`, tag `tag:ci-bazel-writer`; repository variable `TAILSCALE_CACHE_CLEANUP_CLIENT_ID` and secret `TAILSCALE_CACHE_CLEANUP_CLIENT_SECRET`; [API scope](https://tailscale.com/docs/reference/trust-credentials#scopes) |
+| Cleanup checks | Complete inventory before mutation; re-read each candidate before deletion; preserve young, external, reader and mixed-tag nodes; invalid dates, IDs, pagination, API errors or more than 100 candidates fail closed |
+| Cleanup preview | `gh workflow run cache-writer-cleanup.yml --ref main`; inspect `cache-writer-cleanup-<run>-<attempt>` artifact; `-f apply=true` deletes eligible nodes; scheduled runs delete automatically |
+| Cleanup failure | Failed Actions run and JSON receipt; repair credential/API availability and rerun preview; Actions schedule delays extend writer lifetime |
+| Disable cleanup | Remove `TAILSCALE_CACHE_CLEANUP_CLIENT_ID` repository variable; revoke only its dedicated OAuth client when retiring the sweep |
 
 ## Object store
 

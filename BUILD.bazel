@@ -20,6 +20,12 @@ exports_files([
 ])
 
 filegroup(
+    name = "cache_cleanup_data",
+    srcs = glob([".github/scripts/cache_writer_cleanup*.py"]),
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "workflows",
     srcs = glob([".github/workflows/*.yml"]),
     visibility = [
