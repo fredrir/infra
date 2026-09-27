@@ -344,7 +344,7 @@ func TestPullRequestsNeverUploadToTheBazelCache(t *testing.T) {
 		command.Env = append(os.Environ(), "RUNNER_TEMP="+filepath.Dir(bazel), "BAZEL_CACHE_IDENTITY="+test.identity, "BAZEL_REMOTE_CACHE="+test.endpoint)
 		output, err := command.Output()
 		arguments := strings.Split(strings.TrimSpace(string(output)), "\n")
-		if err != nil || slices.Contains(arguments, "--remote_upload_local_results=false") == test.uploads || slices.Contains(arguments, "--remote_cache="+test.endpoint) != test.remote {
+		if err != nil || slices.Contains(arguments, "--remote_upload_local_results=false") == test.uploads || slices.Contains(arguments, "--experimental_build_event_upload_strategy=local") == test.uploads || slices.Contains(arguments, "--remote_cache="+test.endpoint) != test.remote {
 			t.Errorf("CLI build as %q with %q runs %v (%v)", test.identity, test.endpoint, arguments, err)
 		}
 	}
@@ -478,7 +478,7 @@ func TestReusableWorkflowCallersGrantTheirCalleesOIDCTokens(t *testing.T) {
 	}
 }
 
-func TestStepsAfterTheCacheJoinCannotRequestOIDCTokens(t *testing.T) {
+func TestRunStepsWithholdOIDCRequestEnvironment(t *testing.T) {
 	variables := []string{"ACTIONS_ID_TOKEN_REQUEST_URL=https://token.example/idtoken", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=token"}
 	requested := append(os.Environ(), variables...)
 	run := func(shell, script string, environment []string) ([]byte, error) {

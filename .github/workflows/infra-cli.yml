@@ -95,7 +95,7 @@ jobs:
             flags+=(--remote_cache="$BAZEL_REMOTE_CACHE" --remote_cache_compression --remote_timeout=10s --jobs=100)
           fi
           if [ "$BAZEL_CACHE_IDENTITY" != bazel-cache-cli-writer ]; then
-            flags+=(--remote_upload_local_results=false)
+            flags+=(--remote_upload_local_results=false --experimental_build_event_upload_strategy=local)
           fi
           "$RUNNER_TEMP/bazel" --batch build "${flags[@]}" //cmd/infra:infra
       - name: Store binary identity
