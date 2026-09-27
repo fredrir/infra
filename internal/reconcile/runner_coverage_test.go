@@ -327,6 +327,7 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 		"roles/build_runner/tasks/state.yml: Find stale runner admission units",
 		"roles/build_runner/tasks/repository-services.yml: Find stale runner services",
 		"roles/build_engine/tasks/state.yml: Find stale build engines",
+		"roles/build_engine/tasks/readiness.yml: Wait for build engine sockets",
 		"roles/build_engine/tasks/undeclared.yml: Find undeclared build engines",
 	}
 	applied := map[string]bool{}
