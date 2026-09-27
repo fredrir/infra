@@ -243,7 +243,7 @@ spec:
                 name: seaweedfs-internal-tls
           env:
             - name: GOMEMLIMIT
-              value: 96MiB
+              value: 160MiB
             - name: WEED_GRPC_COMPONENTS
               value: CLIENT
             - name: WEED_GRPC_SERVED
@@ -254,7 +254,7 @@ spec:
               memory: 64Mi
             limits:
               cpu: 250m
-              memory: 128Mi
+              memory: 256Mi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

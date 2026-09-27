@@ -563,7 +563,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | AWS prefixes | Mirror-only: an object written straight to the four AWS prefixes is delete-markered by the next sync; write through `seaweedfs-nl` |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
 | Disk guard | 1 GiB volumes; `hel1` `-volume.max=60` (60 GiB), `nl` `-volume.max=200` (200 GiB); read-only below 15% free node disk |
-| Memory | `hel1` server GOMEMLIMIT 512MiB, request 384Mi, limit 768Mi; `nl` server GOMEMLIMIT 320MiB, request 224Mi, limit 512Mi; `meta-backup` request 64Mi |
+| Memory | `hel1` server GOMEMLIMIT 512MiB, request 384Mi, limit 768Mi; `nl` server GOMEMLIMIT 320MiB, request 224Mi, limit 512Mi; `meta-backup` GOMEMLIMIT 160MiB, request 64Mi, limit 256Mi; `s3-filter` GOMEMLIMIT 96MiB, request 32Mi, limit 128Mi |
 | Certificates expire | 2029-09-26; `ObjectStoreCertificateExpiring` from 2029-08-27 |
 
 | Alert | Fires |
