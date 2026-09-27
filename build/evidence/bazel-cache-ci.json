@@ -1,0 +1,554 @@
+{
+  "schema": 1,
+  "observed_at": "2026-09-27T23:22:26.889682+00:00",
+  "server_revision": "05b18fb1bc3d99c3b24739132fd4f73996b3487a",
+  "client_revision": "d64513f84897261a441b0e189c80f89216f8685d",
+  "deployment": {
+    "observed_at": "2026-09-27T23:15:21.568451+00:00",
+    "pod_uid": "8d2cefe0-1508-4898-870c-f3f067ef406b",
+    "node": "fredrir-09",
+    "configmap": "bazel-cache-filter-fd55g657tg",
+    "nginx_config_sha256": "ed47481b7ddb1fc65c3cee2490a4ec0b84012c26b2b318a3ddadba9a37a13109",
+    "writer_preread_256k": true,
+    "writer_body_buffer_256k": true,
+    "containers": [
+      {
+        "name": "bazel-remote",
+        "ready": true,
+        "restart_count": 0,
+        "image_id": "docker.io/buchgr/bazel-remote-cache@sha256:8109f1f39eb17d898cf51e08b41e4eabaaaeb1f584c2f22c1be45b7568fcc512"
+      },
+      {
+        "name": "filter",
+        "ready": true,
+        "restart_count": 0,
+        "image_id": "docker.io/library/nginx@sha256:32463212baf0e7d91aded2e9b843a4f2b9e017804b8c9d5bae7b51dcef64389c"
+      }
+    ]
+  },
+  "runs": {
+    "protected_main": "https://github.com/fredrir/infra/actions/runs/36358000034",
+    "reader_pull_request": "https://github.com/fredrir/infra/actions/runs/36358067877",
+    "wrong_writer_workflow": "https://github.com/fredrir/infra/actions/runs/36358055840",
+    "reader_pr": "https://github.com/fredrir/infra/pull/153"
+  },
+  "writer_receipts": [
+    {
+      "schema": 1,
+      "role": "writer",
+      "nonce": "bc6eb71ef8645468d204cad9965bceb7",
+      "rpc": [
+        {
+          "address": "100.87.168.66:9093",
+          "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9093",
+          "path": "/google.bytestream.ByteStream/Write",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/Read",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        }
+      ],
+      "identity": "bazel-cache-check-writer",
+      "endpoint": "grpc://100.87.168.66:9093",
+      "run_id": "36358000034",
+      "attempt": "1",
+      "revision": "d64513f84897261a441b0e189c80f89216f8685d",
+      "at": "2026-09-27T23:15:36.385086+00:00",
+      "tailnet_ip": "100.77.130.35",
+      "oidc_request_environment_absent": true,
+      "blob_sha256": "e844317d11afa0a0433e6a10abcb5fa6dfbe0526ab37b73c9d66feca492e4370",
+      "blob_bytes": 58,
+      "read_matches": true,
+      "passed": true
+    },
+    {
+      "schema": 1,
+      "role": "writer",
+      "nonce": "bc6eb71ef8645468d204cad9965bceb7",
+      "rpc": [
+        {
+          "address": "100.87.168.66:9093",
+          "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9093",
+          "path": "/google.bytestream.ByteStream/Write",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/Read",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        }
+      ],
+      "identity": "bazel-cache-cli-writer",
+      "endpoint": "grpc://100.87.168.66:9093",
+      "run_id": "36358000034",
+      "attempt": "1",
+      "revision": "d64513f84897261a441b0e189c80f89216f8685d",
+      "at": "2026-09-27T23:14:31.079926+00:00",
+      "tailnet_ip": "100.101.188.90",
+      "oidc_request_environment_absent": true,
+      "blob_sha256": "e844317d11afa0a0433e6a10abcb5fa6dfbe0526ab37b73c9d66feca492e4370",
+      "blob_bytes": 58,
+      "read_matches": true,
+      "passed": true
+    }
+  ],
+  "reader_receipts": [
+    {
+      "schema": 1,
+      "role": "reader",
+      "nonce": "bc6eb71ef8645468d204cad9965bceb7",
+      "rpc": [
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/Write",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/QueryWriteStatus",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9093",
+          "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+          "http": "000",
+          "grpc": [],
+          "curl_exit": 28,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/Read",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        }
+      ],
+      "identity": "bazel-cache-reader",
+      "endpoint": "grpc://100.87.168.66:9092",
+      "run_id": "36358067877",
+      "attempt": "1",
+      "revision": "cd8b8726b2a199c1fe037b323851bdf6e3acbcc6",
+      "at": "2026-09-27T23:16:35.080789+00:00",
+      "tailnet_ip": "100.102.10.61",
+      "oidc_request_environment_absent": true,
+      "blob_sha256": "e844317d11afa0a0433e6a10abcb5fa6dfbe0526ab37b73c9d66feca492e4370",
+      "blob_bytes": 58,
+      "read_matches": true,
+      "passed": true
+    },
+    {
+      "schema": 1,
+      "role": "reader",
+      "nonce": "bc6eb71ef8645468d204cad9965bceb7",
+      "rpc": [
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/Write",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/QueryWriteStatus",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9093",
+          "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+          "http": "000",
+          "grpc": [],
+          "curl_exit": 28,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/Read",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        }
+      ],
+      "identity": "bazel-cache-reader",
+      "endpoint": "grpc://100.87.168.66:9092",
+      "run_id": "36358067877",
+      "attempt": "1",
+      "revision": "cd8b8726b2a199c1fe037b323851bdf6e3acbcc6",
+      "at": "2026-09-27T23:15:38.348797+00:00",
+      "tailnet_ip": "100.99.50.53",
+      "oidc_request_environment_absent": true,
+      "blob_sha256": "e844317d11afa0a0433e6a10abcb5fa6dfbe0526ab37b73c9d66feca492e4370",
+      "blob_bytes": 58,
+      "read_matches": true,
+      "passed": true
+    }
+  ],
+  "negative_writer_workflows": {
+    "run_id": "36358055840",
+    "revision": "d64513f84897261a441b0e189c80f89216f8685d",
+    "results": [
+      {
+        "identity": "bazel-cache-check-writer",
+        "client_id": "Txd3KGkEHu11CNTRL-kkiErEBZen11CNTRL",
+        "http": 403,
+        "claims": {
+          "sub": "repo:fredrir@114402558/infra@1328085692:ref:refs/heads/main",
+          "aud": "bazel-cache-check-writer",
+          "ref": "refs/heads/main",
+          "ref_protected": "true",
+          "job_workflow_ref": "fredrir/infra/.github/workflows/cache-identity-negative.yml@refs/heads/main"
+        },
+        "passed": true
+      },
+      {
+        "identity": "bazel-cache-cli-writer",
+        "client_id": "Txd3KGkEHu11CNTRL-kHpBnLGTUz11CNTRL",
+        "http": 403,
+        "claims": {
+          "sub": "repo:fredrir@114402558/infra@1328085692:ref:refs/heads/main",
+          "aud": "bazel-cache-cli-writer",
+          "ref": "refs/heads/main",
+          "ref_protected": "true",
+          "job_workflow_ref": "fredrir/infra/.github/workflows/cache-identity-negative.yml@refs/heads/main"
+        },
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  "filter_observations": [
+    {
+      "identity": "bazel-cache-check-writer",
+      "tailnet_ip": "100.77.130.35",
+      "successful_bytestream_writes": 60,
+      "successful_action_updates": 43,
+      "maximum_write_seconds": 7.927,
+      "denial_count": 0,
+      "denial_methods": [],
+      "unexpected_failures": [],
+      "action_update_sample": {
+        "time": "2026-09-27T23:15:59+00:00",
+        "remote": "100.77.130.35",
+        "port": 9093,
+        "method": "POST",
+        "uri": "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult",
+        "protocol": "HTTP/2.0",
+        "content_type": "application/grpc",
+        "status": 200,
+        "grpc_status": "0",
+        "bytes": 351,
+        "seconds": 0.005
+      }
+    },
+    {
+      "identity": "bazel-cache-cli-writer",
+      "tailnet_ip": "100.101.188.90",
+      "successful_bytestream_writes": 6,
+      "successful_action_updates": 3,
+      "maximum_write_seconds": 6.354,
+      "denial_count": 0,
+      "denial_methods": [],
+      "unexpected_failures": [],
+      "action_update_sample": {
+        "time": "2026-09-27T23:15:00+00:00",
+        "remote": "100.101.188.90",
+        "port": 9093,
+        "method": "POST",
+        "uri": "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult",
+        "protocol": "HTTP/2.0",
+        "content_type": "application/grpc",
+        "status": 200,
+        "grpc_status": "0",
+        "bytes": 471,
+        "seconds": 0.002
+      }
+    },
+    {
+      "identity": "bazel-cache-reader",
+      "tailnet_ip": "100.102.10.61",
+      "successful_bytestream_writes": 0,
+      "successful_action_updates": 0,
+      "maximum_write_seconds": 0,
+      "denial_count": 4,
+      "denial_methods": [
+        "/google.bytestream.ByteStream/Write",
+        "/google.bytestream.ByteStream/QueryWriteStatus",
+        "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs",
+        "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult"
+      ],
+      "unexpected_failures": [],
+      "action_update_sample": null
+    },
+    {
+      "identity": "bazel-cache-reader",
+      "tailnet_ip": "100.99.50.53",
+      "successful_bytestream_writes": 0,
+      "successful_action_updates": 0,
+      "maximum_write_seconds": 0,
+      "denial_count": 4,
+      "denial_methods": [
+        "/google.bytestream.ByteStream/Write",
+        "/google.bytestream.ByteStream/QueryWriteStatus",
+        "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs",
+        "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult"
+      ],
+      "unexpected_failures": [],
+      "action_update_sample": null
+    }
+  ],
+  "real_bazel": {
+    "main_cli": {
+      "job": 108729456512,
+      "elapsed_seconds": 28.622,
+      "remote_cache_hits": 740,
+      "local_executions": 3,
+      "internal_actions": 84,
+      "cache_warnings": 0
+    },
+    "reader_cli": {
+      "job": 108729645690,
+      "elapsed_seconds": 20.517,
+      "remote_cache_hits": 743,
+      "local_executions": 0,
+      "internal_actions": 84,
+      "cache_warnings": 0
+    },
+    "cli_artifact_comparison": [
+      {
+        "bundle": "main-cli-bundle",
+        "sha256": "a9c33a43e3a0c3610182a12b1000c75510cb256df0ccbc57145d735967cfecf3",
+        "declared_matches": true,
+        "bytes": 19398816,
+        "revision": "d64513f84897261a441b0e189c80f89216f8685d"
+      },
+      {
+        "bundle": "pr-cli-bundle",
+        "sha256": "a9c33a43e3a0c3610182a12b1000c75510cb256df0ccbc57145d735967cfecf3",
+        "declared_matches": true,
+        "bytes": 19398816,
+        "revision": "cd8b8726b2a199c1fe037b323851bdf6e3acbcc6"
+      }
+    ],
+    "main_prepare": {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 1420,
+        "remote_cache_hits": 1154,
+        "system_network_bytes_sent": 330361231,
+        "system_network_bytes_received": 333834084
+      },
+      "operation": "prepare-check",
+      "targets": [
+        "//...",
+        "//:gazelle_test"
+      ],
+      "started": "2026-09-27T23:15:38.676173519Z",
+      "duration_seconds": 93.99703164,
+      "success": true,
+      "remote_cache": "used"
+    },
+    "main_fast": {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 31,
+        "remote_cache_hits": 17,
+        "system_network_bytes_sent": 623297495,
+        "system_network_bytes_received": 345104290
+      },
+      "operation": "test",
+      "targets": [
+        "//...",
+        "//:gazelle_test"
+      ],
+      "started": "2026-09-27T23:17:12.697713145Z",
+      "duration_seconds": 8.501759074,
+      "success": true,
+      "remote_cache": "used"
+    },
+    "main_budget": {
+      "schema": 1,
+      "stage": "infra-fast",
+      "revision": "d64513f84897261a441b0e189c80f89216f8685d",
+      "started": "2026-09-27T23:17:12.692150971Z",
+      "duration_seconds": 8.508248171,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.054211,
+      "peak_memory_bytes": 24322048
+    },
+    "reader_prepare": {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 701,
+        "remote_cache_hits": 616,
+        "system_network_bytes_sent": 4926981,
+        "system_network_bytes_received": 482935422
+      },
+      "operation": "prepare-check",
+      "targets": [
+        "//:image_contract_data",
+        "//internal/contracts:contracts_test",
+        "//:gazelle_test"
+      ],
+      "started": "2026-09-27T23:16:43.799753146Z",
+      "duration_seconds": 53.749013833,
+      "success": true,
+      "remote_cache": "used"
+    },
+    "reader_fast": {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 2,
+        "local_cache_hits": 6,
+        "system_network_bytes_sent": 5026883,
+        "system_network_bytes_received": 482961132
+      },
+      "operation": "test",
+      "targets": [
+        "//:image_contract_data",
+        "//internal/contracts:contracts_test"
+      ],
+      "started": "2026-09-27T23:17:37.575346559Z",
+      "duration_seconds": 3.392576991,
+      "success": true,
+      "remote_cache": "used"
+    }
+  },
+  "cleanup": {
+    "manual_preview_run": "https://github.com/fredrir/infra/actions/runs/36355873734",
+    "manual_preview": {
+      "schema": 1,
+      "writer_tag": "tag:ci-bazel-writer",
+      "at": "2026-09-27T22:36:43.397393+00:00",
+      "apply": false,
+      "minimum_age_seconds": 3600,
+      "devices": [],
+      "examined": 13,
+      "eligible": 0,
+      "deferred": 0
+    },
+    "scheduled_execution": "pending"
+  },
+  "release_reader": {
+    "live_enrollment": "not_exercised",
+    "protected_tag_ruleset": 23732515,
+    "protected_tag_pattern": "refs/tags/infra-v*",
+    "ruleset_enforcement": "active"
+  },
+  "limitations": [
+    "The qualified hosted fast check includes 17 remote hits; the earlier d41 fully cold 25-test run exceeded 10 seconds. A separate local four-CPU 160ms cold 25-test run passed in 4.894 seconds.",
+    "The release-reader identity is installed and constrained to protected release tags; no release was published for this qualification.",
+    "PR153 remains open for a full infrastructure plan after credential rotation; temporary qualification workflows and nonce require removal after that validation."
+  ]
+}
