@@ -29,6 +29,12 @@
     ],
     "tag:infra-reconciler": [
       "autogroup:admin"
+    ],
+    "tag:ci-bazel-reader": [
+      "autogroup:admin"
+    ],
+    "tag:ci-bazel-writer": [
+      "autogroup:admin"
     ]
   },
   "hosts": {
@@ -37,7 +43,8 @@
     "platform-control-05": "10.60.0.5",
     "platform-control-07": "10.60.0.7",
     "platform-control-08": "10.60.0.8",
-    "platform-monitor": "100.86.241.75"
+    "platform-monitor": "100.86.241.75",
+    "bazel-cache": "100.87.168.66"
   },
   "acls": [
     {
@@ -182,6 +189,28 @@
       "proto": "tcp",
       "dst": [
         "tag:infra-reconciler:22"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "tag:ci-bazel-reader",
+        "macie",
+        "archie"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "bazel-cache:9092"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "tag:ci-bazel-writer"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "bazel-cache:9092,9093"
       ]
     }
   ],
@@ -984,6 +1013,182 @@
       "deny": [
         "tag:infra-reconciler:22",
         "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "tag:ci-bazel-reader",
+      "proto": "tcp",
+      "accept": [
+        "bazel-cache:9092"
+      ],
+      "deny": [
+        "bazel-cache:9093",
+        "bazel-cache:9095",
+        "bazel-cache:22",
+        "bazel-cache:10250",
+        "tag:platform-control:22",
+        "tag:platform-control:6443",
+        "tag:platform-worker:22",
+        "tag:platform-worker:10250",
+        "tag:platform-volatile:22",
+        "platform-control-05:6443",
+        "platform-monitor:22",
+        "platform-monitor:8080",
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "tag:ci-bazel-writer",
+      "proto": "tcp",
+      "accept": [
+        "bazel-cache:9092",
+        "bazel-cache:9093"
+      ],
+      "deny": [
+        "bazel-cache:9095",
+        "bazel-cache:22",
+        "bazel-cache:10250",
+        "tag:platform-control:22",
+        "tag:platform-control:6443",
+        "tag:platform-worker:22",
+        "tag:platform-worker:10250",
+        "tag:platform-volatile:22",
+        "platform-control-05:6443",
+        "platform-monitor:22",
+        "platform-monitor:8080",
+        "tag:infra-reconciler:22",
+        "tag:infra-reconciler:8787"
+      ]
+    },
+    {
+      "src": "macie",
+      "proto": "tcp",
+      "accept": [
+        "bazel-cache:9092"
+      ],
+      "deny": [
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "archie",
+      "proto": "tcp",
+      "accept": [
+        "bazel-cache:9092"
+      ],
+      "deny": [
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "tag:ci",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "tag:server",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "tag:infra-plan",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "tag:infra-apply",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "tag:infra-reconciler",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "tag:platform-enrollment",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "tag:platform-control",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "tag:platform-worker",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "tag:platform-volatile",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "platform-monitor",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "fredrir@github",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "10.42.0.10",
+      "proto": "tcp",
+      "deny": [
+        "bazel-cache:9092",
+        "bazel-cache:9093",
+        "bazel-cache:9095"
       ]
     }
   ]

@@ -197,7 +197,7 @@ GH_TOKEN="$(gh auth token)" PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" go
 | 5 | Create GitHub environments `infrastructure-plan` and `infrastructure-apply`; restrict `infrastructure-apply` to `main` without deployment reviewers |
 | 6 | Set the plan secrets in `infrastructure-plan`; install the read-only `prd_reconciliation_apply` service token as `DOPPLER_TOKEN` in `infrastructure-apply` for hosted verification |
 | 7 | Run `ansible-playbook reconciliation-identity.yml` with administrator SSH access; retain existing administrator keys |
-| 8 | Apply `tailscale/policy.hujson`; create the environment-bound OIDC identities below |
+| 8 | Apply `tailscale/policy.hujson`; create the OIDC identities declared in [`tailscale/federated-identities.json`](../tailscale/federated-identities.json) |
 | 9 | Provision fredrir-11 ([reconciler host](#reconciler-host)) and confirm `desired_revision == applied_revision` with `stage == complete` |
 
 Pull request plans read their environment secrets; hosted verification fetches the Doppler apply configuration; fredrir-11 decrypts its host-scoped credentials.
@@ -216,16 +216,11 @@ Pull request plans read their environment secrets; hosted verification fetches t
 | `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS` | Check-mode host comparison |
 | `OBSERVER_APP_ID`, `OBSERVER_APP_PRIVATE_KEY` | Observer GitHub App; a short-lived installation token with repository administration read |
 
-| OIDC setting | `infrastructure-plan` | `infrastructure-apply` |
-| --- | --- | --- |
-| GitHub environment variable | `TAILSCALE_CLIENT_ID` | `TAILSCALE_CLIENT_ID` |
-| Issuer | `https://token.actions.githubusercontent.com` | Same issuer |
-| Subject | `repo:fredrir@114402558/infra@1328085692:environment:infrastructure-plan` | `repo:fredrir@114402558/infra@1328085692:environment:infrastructure-apply` |
-| Audience | `infra-reconciliation-plan` | `infra-reconciliation-apply` |
-| Immutable identity | Owner `114402558`, repository `1328085692` in subject | Same identity |
-| Workflow claim | Unset | `workflow_ref=fredrir/infra/.github/workflows/reconcile.yml@refs/heads/main` |
-| Scope / tag | `auth_keys` / `tag:infra-plan` | `auth_keys` / `tag:infra-apply` |
-| Device lifetime | Ephemeral; removed after job completion | Same lifetime |
+| Tailscale federated identity | Value |
+| --- | --- |
+| Declaration | [`tailscale/federated-identities.json`](../tailscale/federated-identities.json): issuer, subject, custom claims, audience, scope and tags per identity; `clientIdVariable` names the GitHub variable holding the client ID, in `environment` when set |
+| Subject | Immutable form `repo:fredrir@114402558/infra@1328085692:…` |
+| Device lifetime | Ephemeral; removed after job completion |
 
 | Credential boundary | Value |
 | --- | --- |
@@ -565,6 +560,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | --- | --- |
 | Server | bazel-remote in StatefulSet `bazel-cache/bazel-cache` on `fredrir-09`; `max_size` 60 GiB LRU on an 80 Gi `local-retain` PVC; blobs up to 256 MiB; zstd storage; loss costs speed only |
 | Listeners | `hostNetwork`; nginx `filter` binds only `fredrir-09`'s tailnet address: 9092 read-only gRPC, 9093 read-write gRPC, 9095 gRPC health; bazel-remote serves only Unix sockets inside the pod |
+| Tailnet | Host `bazel-cache`; `tag:ci-bazel-reader`, Macie and Archie reach 9092; `tag:ci-bazel-writer` reaches 9092 and 9093; nothing reaches 9095 |
 | Filter | [`nginx.conf`](../platform/components/bazel-cache/nginx.conf): HTTP/2 gRPC only; exact unnormalized request paths, POST and `application/grpc` or `application/grpc+proto` content; sources in `100.64.0.0/10` except the node itself; every other request 403 |
 | Admission | Namespace pod security `privileged` for `hostNetwork`; `bazel-cache-host-network` checks pods and `kubectl debug` containers for the two pinned images, non-root users, runtime-default seccomp and AppArmor, no SELinux options, sysctls, capabilities, host paths, ports, PID or IPC, and read-only roots; debug containers mount no volumes and share no processes; a cache nginx or bazel-remote bump updates `bazel-cache.yaml` and `admission.yaml` together |
 | Behavioural test | [`bazel-cache-filter.yml`](../.github/workflows/bazel-cache-filter.yml): bazel-remote behind the shipped nginx configuration; every write, execution, asset and health RPC on each port, path, method, content-type and protocol variants, cache-miss status through the proxy |
@@ -575,6 +571,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Wipe | `kubectl -n bazel-cache scale statefulset/bazel-cache --replicas=0`; delete PVC `data-bazel-cache-0` and its released PV; scale to 1 |
 | Resize | Change `--max_size` and the PVC request together; `--max_size` stays at most three quarters of the volume |
 | Readiness | `kubectl -n bazel-cache get pod bazel-cache-0`; bazel-remote's probes call its health RPC through the filter; the filter's liveness probe opens TCP port 9095 |
+| Grant CI access | Apply `tailscale/policy.hujson`; create `bazel-cache-reader`, `bazel-cache-release-reader` and `bazel-cache-writer` from `tailscale/federated-identities.json`; store each client ID in the repository variable it names |
 
 ## Object store
 

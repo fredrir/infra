@@ -53,6 +53,9 @@ func TestBazelCacheFilterBindsTheTailnetAddressOfItsNode(t *testing.T) {
 	if node == "" || !strings.HasPrefix(address, "100.") {
 		t.Fatalf("bazel cache node %q has tailnet address %q", node, address)
 	}
+	if alias := parseTailnetPolicy(t, read(t, filepath.Join(repository, "tailscale/policy.hujson"))).Hosts["bazel-cache"]; alias != address {
+		t.Errorf("tailnet host bazel-cache is %q, want %s's tailnet address %s", alias, node, address)
+	}
 	filter := string(read(t, filepath.Join(repository, bazelCacheComponent, "nginx.conf")))
 	listens := regexp.MustCompile(`(?m)^\s*listen ([^:;\s]+):\d+;$`).FindAllStringSubmatch(filter, -1)
 	denials := regexp.MustCompile(`(?m)^\s*deny (\d[^;]*);$`).FindAllStringSubmatch(filter, -1)
@@ -120,5 +123,91 @@ func TestBazelCacheFilterTestRunsTheShippedVersionsOnEveryFilterChange(t *testin
 	})
 	if !runs {
 		t.Error("bazel-cache-filter.yml does not run the filter test module")
+	}
+}
+
+func TestBazelCachePortsAreGrantedOnlyToTheCacheRoles(t *testing.T) {
+	policy := parseTailnetPolicy(t, read(t, filepath.Join(root(t), "tailscale/policy.hujson")))
+	var grants []string
+	for _, rule := range policy.ACLs {
+		for _, destination := range rule.Destination {
+			host, ports, err := splitTailnetEndpoint(destination)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, port := range []int{9092, 9093, 9095} {
+				matched, err := tailnetPortMatches(ports, port)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !matched || host == "autogroup:self" {
+					continue
+				}
+				if host != "bazel-cache" {
+					t.Errorf("%s grants port %d on %s, which may include the cache host", rule.Source, port, host)
+					continue
+				}
+				for _, source := range rule.Source {
+					grants = append(grants, fmt.Sprintf("%s %s → %d", source, rule.Proto, port))
+				}
+			}
+		}
+	}
+	slices.Sort(grants)
+	want := []string{"archie tcp → 9092", "macie tcp → 9092", "tag:ci-bazel-reader tcp → 9092", "tag:ci-bazel-writer tcp → 9092", "tag:ci-bazel-writer tcp → 9093"}
+	if !slices.Equal(grants, want) {
+		t.Errorf("cache grants = %q, want %q", grants, want)
+	}
+}
+
+func TestOnlyProtectedMainRunsReachTheCacheWriterPort(t *testing.T) {
+	policy := parseTailnetPolicy(t, read(t, filepath.Join(root(t), "tailscale/policy.hujson")))
+	identities := federatedIdentities(t)
+	workflow := func(file, ref string) string { return "fredrir/infra/.github/workflows/" + file + "@" + ref }
+	for _, test := range []struct {
+		name    string
+		subject string
+		claims  map[string]string
+		ports   []int
+	}{
+		{"main push", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/heads/main")}, []int{9092, 9093}},
+		{"main dispatch of the CLI build", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("infra-cli.yml", "refs/heads/main")}, []int{9092, 9093}},
+		{"pull request", "pull_request", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("check.yml", "refs/pull/7/merge")}, []int{9092}},
+		{"pull request claiming main's workflow", "pull_request", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/heads/main")}, []int{9092}},
+		{"release tag", "ref:refs/tags/infra-v0.2.20", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("cli-release.yml", "refs/tags/infra-v0.2.20")}, []int{9092}},
+		{"unprotected tag", "ref:refs/tags/infra-v9", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("cli-release.yml", "refs/tags/infra-v9")}, nil},
+		{"branch push", "ref:refs/heads/feature", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("check.yml", "refs/heads/feature")}, nil},
+		{"branch named after main", "ref:refs/heads/main-copy", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/heads/main-copy")}, nil},
+		{"unprotected main", "ref:refs/heads/main", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("check.yml", "refs/heads/main")}, nil},
+		{"workflow from a pull request ref on main", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/pull/7/merge")}, nil},
+		{"plan environment", "environment:infrastructure-plan", map[string]string{"ref_protected": "false", "job_workflow_ref": workflow("reconcile-job.yml", "refs/pull/7/merge")}, nil},
+	} {
+		var reached []int
+		for _, identity := range identities {
+			for _, prefix := range []string{repositorySubject, "repo:fredrir/infra:", "repo:attacker@1/infra@1328085692:"} {
+				token := oidcToken{subject: prefix + test.subject, audience: identity.Audience, claims: test.claims}
+				if !identity.accepts(token) {
+					continue
+				}
+				if prefix != repositorySubject {
+					t.Errorf("%s: %s accepts subject %s", test.name, identity.Name, token.subject)
+				}
+				for _, tag := range identity.Tags {
+					for _, port := range []int{9092, 9093, 9095} {
+						allowed, err := policy.allows(tag, "tcp", fmt.Sprintf("bazel-cache:%d", port))
+						if err != nil {
+							t.Fatal(err)
+						}
+						if allowed && !slices.Contains(reached, port) {
+							reached = append(reached, port)
+						}
+					}
+				}
+			}
+		}
+		slices.Sort(reached)
+		if !slices.Equal(reached, test.ports) {
+			t.Errorf("%s reaches cache ports %v, want %v", test.name, reached, test.ports)
+		}
 	}
 }

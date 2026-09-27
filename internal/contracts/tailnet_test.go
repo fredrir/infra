@@ -28,9 +28,10 @@ type tailnetTest struct {
 }
 
 type tailnetPolicy struct {
-	Hosts map[string]string `json:"hosts"`
-	ACLs  []tailnetRule     `json:"acls"`
-	Tests []tailnetTest     `json:"tests"`
+	TagOwners map[string][]string `json:"tagOwners"`
+	Hosts     map[string]string   `json:"hosts"`
+	ACLs      []tailnetRule       `json:"acls"`
+	Tests     []tailnetTest       `json:"tests"`
 }
 
 func parseTailnetPolicy(t *testing.T, data []byte) tailnetPolicy {

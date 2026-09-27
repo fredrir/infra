@@ -121,7 +121,10 @@ filegroup(
 
 filegroup(
     name = "tailnet_policy_data",
-    srcs = ["tailscale/policy.hujson"],
+    srcs = [
+        "tailscale/federated-identities.json",
+        "tailscale/policy.hujson",
+    ],
     visibility = ["//internal/contracts:__pkg__"],
 )
 

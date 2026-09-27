@@ -14,6 +14,7 @@ go_test(
         "cancellation_test.go",
         "check_workflow_test.go",
         "cli_inputs_test.go",
+        "federated_identities_test.go",
         "firewall_test.go",
         "host_secrets_test.go",
         "images_test.go",
