@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "source": "workstation",
+  "address": "100.87.168.66",
+  "deployment_revision": "d4237b89",
+  "at": "2026-09-27T22:14:34.050545+00:00",
+  "checks": [
+    {
+      "name": "capabilities",
+      "port": 9092,
+      "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+      "curl_exit": 0,
+      "http_status": "200",
+      "grpc_status": [
+        "0"
+      ],
+      "passed": true
+    },
+    {
+      "name": "cas_miss",
+      "port": 9092,
+      "path": "/google.bytestream.ByteStream/Read",
+      "curl_exit": 0,
+      "http_status": "200",
+      "grpc_status": [
+        "5"
+      ],
+      "passed": true
+    },
+    {
+      "name": "action_miss",
+      "port": 9092,
+      "path": "/build.bazel.remote.execution.v2.ActionCache/GetActionResult",
+      "curl_exit": 0,
+      "http_status": "200",
+      "grpc_status": [
+        "5"
+      ],
+      "passed": true
+    },
+    {
+      "name": "write_denied",
+      "port": 9092,
+      "path": "/google.bytestream.ByteStream/Write",
+      "curl_exit": 0,
+      "http_status": "403",
+      "grpc_status": [],
+      "passed": true
+    },
+    {
+      "name": "write_denied",
+      "port": 9092,
+      "path": "/google.bytestream.ByteStream/QueryWriteStatus",
+      "curl_exit": 0,
+      "http_status": "403",
+      "grpc_status": [],
+      "passed": true
+    },
+    {
+      "name": "write_denied",
+      "port": 9092,
+      "path": "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs",
+      "curl_exit": 0,
+      "http_status": "403",
+      "grpc_status": [],
+      "passed": true
+    },
+    {
+      "name": "write_denied",
+      "port": 9092,
+      "path": "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult",
+      "curl_exit": 0,
+      "http_status": "403",
+      "grpc_status": [],
+      "passed": true
+    },
+    {
+      "name": "writer_port_blocked",
+      "port": 9093,
+      "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+      "curl_exit": 28,
+      "http_status": "000",
+      "grpc_status": [],
+      "passed": true
+    }
+  ],
+  "client_tailnet_ip": "100.124.205.100",
+  "passed": true,
+  "client": "archie",
+  "pod": {
+    "namespace": "bazel-cache",
+    "name": "bazel-cache-0",
+    "node": "fredrir-09",
+    "images": [
+      {
+        "imageID": "docker.io/buchgr/bazel-remote-cache@sha256:8109f1f39eb17d898cf51e08b41e4eabaaaeb1f584c2f22c1be45b7568fcc512",
+        "name": "bazel-remote",
+        "ready": true
+      },
+      {
+        "imageID": "docker.io/library/nginx@sha256:32463212baf0e7d91aded2e9b843a4f2b9e017804b8c9d5bae7b51dcef64389c",
+        "name": "filter",
+        "ready": true
+      }
+    ]
+  },
+  "denial_log_receipts": [
+    {
+      "time": "2026-09-27T22:14:15+00:00",
+      "remote": "100.124.205.100",
+      "port": 9092,
+      "method": "POST",
+      "uri": "/google.bytestream.ByteStream/Write",
+      "protocol": "HTTP/2.0",
+      "content_type": "application/grpc",
+      "status": 403,
+      "grpc_status": "",
+      "bytes": 146,
+      "seconds": 0.0
+    },
+    {
+      "time": "2026-09-27T22:14:15+00:00",
+      "remote": "100.124.205.100",
+      "port": 9092,
+      "method": "POST",
+      "uri": "/google.bytestream.ByteStream/QueryWriteStatus",
+      "protocol": "HTTP/2.0",
+      "content_type": "application/grpc",
+      "status": 403,
+      "grpc_status": "",
+      "bytes": 146,
+      "seconds": 0.0
+    },
+    {
+      "time": "2026-09-27T22:14:15+00:00",
+      "remote": "100.124.205.100",
+      "port": 9092,
+      "method": "POST",
+      "uri": "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs",
+      "protocol": "HTTP/2.0",
+      "content_type": "application/grpc",
+      "status": 403,
+      "grpc_status": "",
+      "bytes": 146,
+      "seconds": 0.0
+    },
+    {
+      "time": "2026-09-27T22:14:15+00:00",
+      "remote": "100.124.205.100",
+      "port": 9092,
+      "method": "POST",
+      "uri": "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult",
+      "protocol": "HTTP/2.0",
+      "content_type": "application/grpc",
+      "status": 403,
+      "grpc_status": "",
+      "bytes": 146,
+      "seconds": 0.0
+    }
+  ]
+}
