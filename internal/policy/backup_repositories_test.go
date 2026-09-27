@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"testing"
 )
 
@@ -45,8 +46,12 @@ func TestBackupJobsUseOnlyTheirDeclaredRepositories(t *testing.T) {
 			if name == "data-backup" {
 				want["BACKUP_HEARTBEAT_TOKEN"] = "secret:backup-repository/BACKUP_HEARTBEAT_TOKEN"
 			}
-			if deadline, _ := lookup(resource, "spec", "jobTemplate", "spec", "activeDeadlineSeconds").(int); name == "data-backup" && deadline < len(wantSources)*(120+900)+180+600 {
-				t.Errorf("%s ends after %d s, before its preflights, quiesce, export and uploads can time out", job, deadline)
+			deadline, _ := lookup(resource, "spec", "jobTemplate", "spec", "activeDeadlineSeconds").(int)
+			if name == "data-backup" && deadline < len(wantSources)*(120+900)+600+120 {
+				t.Errorf("%s ends after %d s, before its preflights, export, writer resume and uploads can time out", job, deadline)
+			}
+			if timeout, err := strconv.Atoi(settings["BACKUP_MAINTENANCE_TIMEOUT"]); name == "repository-maintenance" && (err != nil || deadline < len(wantSources)*timeout+300) {
+				t.Errorf("%s ends after %d s, before %d repositories of %q s each and 300 s of start-up", job, deadline, len(wantSources), settings["BACKUP_MAINTENANCE_TIMEOUT"])
 			}
 			if !slices.Equal(sources, wantSources) {
 				t.Errorf("%s loads %v, want %v", job, sources, wantSources)

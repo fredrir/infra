@@ -47,6 +47,8 @@ spec:
               env:
                 - name: BACKUP_REPOSITORIES
                   value: offsite
+                - name: BACKUP_MAINTENANCE_TIMEOUT
+                  value: '3600'
                 - name: RESTIC_CACHE_DIR
                   value: /cache
               resources:

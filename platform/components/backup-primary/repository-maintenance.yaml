@@ -5,6 +5,7 @@ metadata:
 spec:
   jobTemplate:
     spec:
+      activeDeadlineSeconds: 7800
       template:
         spec:
           containers:
