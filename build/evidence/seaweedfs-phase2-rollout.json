@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "date": "2026-09-27",
+  "cell": "seaweedfs-nl (SeaweedFS 4.47) on fredrir-09 serving parser-dataset, mirrored hourly to the versioned AWS bucket llunde-pyparser-bucket",
+  "steps": [
+    {"step": 1, "commit": "2dfb326610eb9ff61f87e09f2013b6f737c31572", "result": "object-store-ca ConfigMap published; seaweedfs-hel1 4/4 Running, 0 restarts; nsql cache check passed"},
+    {"step": 2, "commit": "b855e706108b11ad8e48e1f5b5d97db7d6d2388f", "result": "seaweedfs-nl 2/2 Running on fredrir-09, 0 restarts; provisioner created parser-dataset; hel1 holds 3 declared buckets, nl 1"},
+    {"step": 3, "commit": "94ed3ebdd1c15723fd0fd21ff917c7f2580a64ad", "result": "mirror CronJob applied suspended; pre-copy of 30,643 objects (15.9 GiB, largest 100.2 MiB) from AWS into nl succeeded in 4.5 min at a 198 MiB rclone working set; nl server peaked at 291 MiB, 0 restarts"},
+    {"step": 4, "commit": "5947d52ce5a28e6a7317a6933788854ec4eee3c9", "range": "94ed3ebdd1c15723fd0fd21ff917c7f2580a64ad..5947d52ce5a28e6a7317a6933788854ec4eee3c9", "result": "parser writers down 14:47:30-15:00:35 UTC; both cells restarted behind the S3 filter; seed: 30,643 matching files, 0 differences, sentinel written; writers on https://seaweedfs-nl.object-store.svc.cluster.local:8333 region nl bucket parser-dataset, KeyCount 3; aws_iam_policy.dataset_access updated in place (0 added, 1 changed, 0 destroyed); nsql cache check passed; first mirror run 15:05:23-15:05:47 succeeded; BackupWriterLeftScaledDown only pending"},
+    {"step": 5, "commit": "bce4be2bbb51ba54285bb3b37204a11ed7c4bd96", "result": "ParserDatasetShrinking rule live; promtool cases run by the check workflow's alerts job"},
+    {"step": 6, "commit": "ea7556d575739dcb745815a95fa95cace22eb3d2", "result": "tools image sha256:215414b6a1bba8200014d8d139100d0c20ada5e7e3654167d8eb270b8fe469d7 promoted after attestation; 7 pins rewritten; two provisioner runs wrote nothing (hel1 3 buckets, nl 1)"}
+  ],
+  "deviations": [
+    {"step": 3, "issue": "the first pre-copy was OOM-killed at its 256Mi limit (peak 241.7 MB): rclone fills a 16 MiB read-ahead buffer per transfer when nl accepts data slower than AWS serves it; lab at 16 MB/s: 16 transfers x 16M buffers 522 MiB", "fix": "156809fd in the step 4 group: seed and restore copy with 8 transfers and 4 MiB buffers under a 384Mi limit and GOMEMLIMIT 288MiB (lab peak 141 MiB with eight 100 MB objects in flight); the hourly sync uses 4 MiB buffers under its unchanged 256Mi limit (lab peak 114 MiB); the pre-copy reran with 4 MiB buffers under 384Mi"},
+    {"step": 4, "issue": "with project-llunde-pyparser suspended, its migration and application Kustomizations were not Ready, so the fredrir-11 apply stayed running from 14:47 until the project resumed; the window script waited on the apply ledger instead of Flux", "fix": "4.3 and 4.4 ran on Flux's applied revision; the ledger settled as applied at 15:03:36; the rollout doc and window scripts wait on Flux until the resume, and rollback_parser resumes a suspended parser project (lab: resumed, completed)"}
+  ],
+  "observations": ["nl server under 30,500 objects of 2 KiB at its 512Mi limit and 320MiB GOMEMLIMIT: anon peak 294-323 MiB with 8 transfers and 294-302 MiB with 16, 0 restarts; transfers do not change nl memory", "mirror.sh unseed treated a failed verification listing as an absent sentinel; fixed in phase 3 by 4d5dcf2f95d3416c7d378d28d0e69401f01b6f88"],
+  "open_findings": [
+    {"finding": "new pods get unfiltered egress at start: in object-store under default-deny egress, 14 of 14 TCP connects to the API VIP 10.43.0.1:443 and the fredrir-09 kubelet 100.87.168.66:10250 succeeded up to 0.15-0.18 s after container start and were blocked from 0.30 s, in 5 of 5 runs; in the lab a connection opened in that window still carried requests at 5 s and 60 s", "engine": "k3s v1.36.3+k3s1 embedded network policy controller", "owner": "impl-netpol", "evidence": "seaweedfs-lab/results/egress-probe-production.txt, seaweedfs-lab/results/k3d/egress-first-packet.txt, egress-first-packet-fine.txt, egress-held-connection.txt"}
+  ],
+  "limitations": ["the window scripts stopped falsely once on cache_check's display grep under pipefail; success was verified from the run and the script fixed"]
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "date": "2026-09-27",
+  "cell": "seaweedfs-hel1 (SeaweedFS 4.47) on fredrir-04 holding the primary restic repositories of llunde-pyparser, y and portfolio; AWS S3 keeps the off-site copy",
+  "steps": [
+    {"step": 1, "commit": "4d5dcf2f95d3416c7d378d28d0e69401f01b6f88", "range": "ea7556d575739dcb745815a95fa95cace22eb3d2..4d5dcf2f95d3416c7d378d28d0e69401f01b6f88", "result": "restic-parser, restic-y and restic-portfolio created with encryption, versioning, COMPLIANCE object lock, lifecycle and quotas 10 GiB, 10 GiB and 1 GiB; second provisioner run wrote nothing; hel1 holds 6 declared buckets; both cells restarted cleanly; ObjectStoreBackupBucketFilling and ObjectStoreVolumesNearLimit present; mirror.sh unseed fix live and the next mirror run succeeded; nsql cache check passed"},
+    {"step": 2, "commit": "3bfdaf7a5435607ad9f05f2741272a7073fdb2b1", "result": "tools image sha256:225ef0bc2939bac2437fcf436e188425800033fe1afadcdf05fee8898a099f28 built and attested, not yet promoted"},
+    {"step": 3, "commit": "f79b1ea8053a847c254f9949619bc75e635a0f9f", "result": "backup-primary-repository Secret, backup-object-store-egress and maintenance-object-store-egress in llunde-pyparser, y and portfolio; landed in the 19:20 UTC slot"},
+    {"step": 4, "result": "primary repositories initialised with the step 2 image, one Job at a time: restic-parser 6d4a65f0d6, restic-y d6c3bf2031, restic-portfolio dabd8f5420"},
+    {"step": 5, "commit": "74d6e3cb0ee8d40dd95e8a1b2097b696c3be1aad", "result": "job manifests and the tools promotion in one push in the 20:20 UTC slot; manual data-backup Jobs one at a time all succeeded (nix-cache 11 s, portfolio 21 s, llunde-pyparser 42 s, y 71 s); y maintenance: both repositories checked with no errors, off-site forgot 8 snapshots and pruned 40 blobs / 1.253 MiB; platform-backups maintenance: check without errors, forgot 4, pruned 324 blobs / 60.235 MiB; one snapshot per primary: parser c58f01de 286.934 MiB, y 39a662d0 401.163 MiB, portfolio c91d05d9 92.247 KiB; fredrir-09 memory requests unchanged at 11858Mi; only Watchdog active afterwards"}
+  ],
+  "deviations": [
+    {"step": 4, "issue": "the primary restic Job template left its namespace unquoted, so the namespace y parsed as the YAML boolean true and the init Job for y was rejected; nothing was created", "fix": "de1d7a8af7c4bb758209e06b57318b20b75635bc quotes the Job name and namespace in the runbook; the rollout helper does the same and fails when kubectl rejects the Job; a client dry-run renders all three namespaces"},
+    {"step": 4, "issue": "the window script's init log check falsely stopped after the parser repository was created, piping into grep -q under pipefail", "fix": "the check reads the log first and greps the captured text; y and portfolio were then initialised"}
+  ],
+  "observations": ["the digest helper needs a git checkout of the step commit; an exported tree without git metadata yields an empty tag"],
+  "open_findings": [
+    {"finding": "new pods get unfiltered egress at start: in object-store under default-deny egress, 14 of 14 TCP connects to the API VIP 10.43.0.1:443 and the fredrir-09 kubelet 100.87.168.66:10250 succeeded up to 0.15-0.18 s after container start and were blocked from 0.30 s, in 5 of 5 runs; in the lab a connection opened in that window still carried requests at 5 s and 60 s", "engine": "k3s v1.36.3+k3s1 embedded network policy controller", "owner": "impl-netpol", "evidence": "seaweedfs-lab/results/egress-probe-production.txt, seaweedfs-lab/results/k3d/egress-first-packet.txt, egress-first-packet-fine.txt, egress-held-connection.txt"}
+  ],
+  "limitations": ["the manual verification backups log nothing on success, as the scheduled ones; success is the Job status, which requires both uploads"]
+}
