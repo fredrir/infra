@@ -16,7 +16,7 @@
     content: |
       [Service]
       Slice=infra-runners.slice
-      UMask=0077
+      UMask=0022
       PrivateTmp=true
       ProtectProc=invisible
       ProtectHome=tmpfs

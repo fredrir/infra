@@ -343,11 +343,23 @@ esac
 			t.Errorf("%s keeps its listener readable to other accounts: %q", home, mode)
 		}
 		dropIn := inspect("cat", "/etc/systemd/system/"+runnerUnit(repository)+".d/resources.conf")
-		for _, want := range []string{"UMask=0077", "PrivateTmp=true", "ProtectProc=invisible", "ProtectHome=tmpfs", "BindPaths=/home/" + home, "NoNewPrivileges=true", "EnvironmentFile=/etc/infra-dagger/" + slug + ".env", "Environment=INFRA_SCANNER_DATABASES=/var/lib/infra-scanner/databases", "Environment=INFRA_RUNNER_ADMISSION_SOCKET=/run/infra-runner-admission.d/" + slug + "/admission.sock"} {
+		for _, want := range []string{"PrivateTmp=true", "ProtectProc=invisible", "ProtectHome=tmpfs", "BindPaths=/home/" + home, "NoNewPrivileges=true", "EnvironmentFile=/etc/infra-dagger/" + slug + ".env", "Environment=INFRA_SCANNER_DATABASES=/var/lib/infra-scanner/databases", "Environment=INFRA_RUNNER_ADMISSION_SOCKET=/run/infra-runner-admission.d/" + slug + "/admission.sock"} {
 			if !strings.Contains(dropIn, want+"\n") {
 				t.Errorf("%s listener lacks %s:\n%s", repository, want, dropIn)
 			}
 		}
+		umask := ""
+		for line := range strings.SplitSeq(dropIn, "\n") {
+			if value, ok := strings.CutPrefix(line, "UMask="); ok {
+				umask = value
+			}
+		}
+		checkout := "/home/" + home + "/checkout-probe"
+		command("docker", "exec", name, "setpriv", "--reuid="+home, "--regid="+home, "--clear-groups", "sh", "-c", `umask "$1" && mkdir "$2" && printf x > "$2/source"`, "checkout", umask, checkout)
+		if modes := inspect("stat", "-c", "%a", checkout, checkout+"/source"); modes != "755\n644" {
+			t.Errorf("%s listener with UMask=%s checks out sources as %q, which images copy unreadable to their non-root user", repository, umask, modes)
+		}
+		command("docker", "exec", name, "rm", "-r", checkout)
 		if environment := inspect("cat", "/etc/infra-dagger/"+slug+".env"); !strings.Contains(environment, "_EXPERIMENTAL_DAGGER_RUNNER_HOST=unix:///run/infra-dagger/"+slug+"/engine.sock\n") || !strings.Contains(environment, "INFRA_ENGINE_PARALLELISM=") {
 			t.Errorf("%s engine environment:\n%s", repository, environment)
 		}
