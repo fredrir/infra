@@ -73,6 +73,10 @@ var filterCorpus = []filterRequest{
 	writer("restic create multipart", "POST", "/restic-parser/data/00/0011223344?uploads=", true),
 	writer("restic upload part", "PUT", "/restic-parser/data/00/0011223344?partNumber=1&uploadId=4ea59805caad34f0_c9353", true),
 	writer("restic complete multipart", "POST", "/restic-parser/data/00/0011223344?uploadId=4ea59805caad34f0_c9353", true),
+	writer("restic prune delete", "DELETE", "/restic-parser/data/00/0011223344", true),
+	writer("internal version header", "PUT", "/restic-parser/data/00/0011223344", true, "Seaweed-X-Amz-Version-Id", "v1"),
+	writer("internal legal hold header", "PUT", "/ci-nsql-main/sccache/abc", true, "seaweed-x-amz-legal-hold", "ON"),
+	writer("internal filer header", "PUT", "/ci-nsql-main/sccache/abc", true, "X-SeaweedFS-Replication", "001"),
 	writer("boto3 put", "PUT", "/parser-dataset/files/abc.pdf", true),
 	writer("boto3 ranged get", "GET", "/parser-dataset/files/abc.pdf", true, "X-Amz-Checksum-Mode", "ENABLED", "Range", "bytes=0-9"),
 	writer("boto3 list", "GET", "/parser-dataset?continuation-token=abc&encoding-type=url&list-type=2&max-keys=7&prefix=assets%2F", true),
@@ -137,6 +141,11 @@ var filterCorpus = []filterRequest{
 	writer("bucket create", "PUT", "/ci-nsql-main", false),
 	writer("bucket delete", "DELETE", "/ci-nsql-main", false),
 	writer("batch delete on an object path", "POST", "/ci-nsql-main/obj?delete", false),
+	writer("batch delete on a locked bucket", "POST", "/restic-parser?delete", false, "Content-Type", "application/xml"),
+	writer("batch version delete on a locked bucket", "POST", "/restic-y?delete=", false, "Content-Type", "application/xml"),
+	writer("batch delete on a locked bucket with a slash", "POST", "/restic-portfolio/?delete", false),
+	writer("batch delete on a locked bucket with x-id", "POST", "/restic-parser?delete&x-id=DeleteObjects", false),
+	writer("batch delete on an encoded locked bucket", "POST", "/%72estic-parser?delete", false),
 	writer("form upload", "POST", "/ci-nsql-main", false, "Content-Type", "multipart/form-data; boundary=x"),
 	writer("form upload with delete", "POST", "/ci-nsql-main?delete", false, "Content-Type", "Multipart/Form-Data; boundary=x"),
 	writer("lock mode header", "PUT", "/restic-parser/data/obj", false, "X-Amz-Object-Lock-Mode", "GOVERNANCE"),
@@ -201,10 +210,15 @@ func TestObjectStoreS3FilterAdmitsOnlyItsClients(t *testing.T) {
 		t.Fatal(err)
 	}
 	var mutex sync.Mutex
-	var reached []string
+	var reached, leaked []string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mutex.Lock()
 		reached = append(reached, r.Method+" "+r.RequestURI)
+		for name := range r.Header {
+			if lower := strings.ToLower(name); strings.HasPrefix(lower, "seaweed-") || strings.HasPrefix(lower, "x-seaweedfs-") {
+				leaked = append(leaked, r.Method+" "+r.RequestURI+" "+name)
+			}
+		}
 		mutex.Unlock()
 		io.Copy(io.Discard, r.Body)
 		w.WriteHeader(http.StatusOK)
@@ -273,5 +287,8 @@ func TestObjectStoreS3FilterAdmitsOnlyItsClients(t *testing.T) {
 				t.Errorf("HTTP/%d %s %s %s: forwarded=%v status=%d, want admitted=%v", protocol, request.name, request.method, request.uri, forwarded, response.StatusCode, request.admitted)
 			}
 		}
+	}
+	if len(leaked) != 0 {
+		t.Errorf("internal SeaweedFS headers reached the object store: %v", leaked)
 	}
 }

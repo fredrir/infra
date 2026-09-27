@@ -51,6 +51,7 @@
 			) || (
 				{http.request.method} == "POST"
 				&& {http.request.uri.path}.matches("^/[^/]+/?$")
+				&& !{http.request.uri.path}.matches("^/restic-")
 				&& {http.request.uri.query}.matches("(^|&)delete([=&]|$)")
 				&& !{http.request.uri.query}.matches("(^|&)(uploads([=&]|$)|uploadId=|partNumber=)")
 			) || (
@@ -61,6 +62,8 @@
 		)
 		CEL
 	route {
+		request_header -Seaweed-*
+		request_header -X-Seaweedfs-*
 		respond @malformed "malformed query" 400
 		import proxy @provisioner
 		import proxy @read
