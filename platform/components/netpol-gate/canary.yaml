@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: canary
+  namespace: netpol-canary
+spec:
+  replicas: 2
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: netpol-canary
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: netpol-canary
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      priorityClassName: platform-critical
+      terminationGracePeriodSeconds: 5
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-restriction.kubernetes.io/critical
+                operator: In
+                values:
+                - 'true'
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: netpol-canary
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: canary
+        image: ghcr.io/fredrir/netpol-gate@sha256:b5ba08135d0e3a2a2429c7697ff00c98501940d031916c50b326310ca33d45f4
+        imagePullPolicy: IfNotPresent
+        args:
+        - serve
+        ports:
+        - name: allowed
+          containerPort: 8080
+        - name: denied
+          containerPort: 8081
+        readinessProbe:
+          tcpSocket:
+            port: denied
+          periodSeconds: 2
+        livenessProbe:
+          tcpSocket:
+            port: allowed
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 5m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 32Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canary-0
+  namespace: netpol-canary
+spec:
+  clusterIP: 10.43.0.21
+  selector:
+    app.kubernetes.io/name: netpol-canary
+    statefulset.kubernetes.io/pod-name: canary-0
+  ports:
+  - name: allowed
+    port: 8080
+  - name: denied
+    port: 8081
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canary-1
+  namespace: netpol-canary
+spec:
+  clusterIP: 10.43.0.22
+  selector:
+    app.kubernetes.io/name: netpol-canary
+    statefulset.kubernetes.io/pod-name: canary-1
+  ports:
+  - name: allowed
+    port: 8080
+  - name: denied
+    port: 8081
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: canary
+  namespace: netpol-canary
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: netpol-canary

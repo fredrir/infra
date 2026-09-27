@@ -282,7 +282,13 @@ spec:
       == "TCP"))) || (has(p.ipBlock) && p.ipBlock.cidr
       in ["198.41.192.0/24", "198.41.200.0/24"] && has(r.ports) && r.ports.size()
       > 0 && r.ports.all(port, has(port.port) && !has(port.endPort) && port.port ==
-      7844 && (!has(port.protocol) || port.protocol in ["TCP", "UDP"]))) || (has(p.ipBlock)
+      7844 && (!has(port.protocol) || port.protocol in ["TCP", "UDP"]))) || (has(p.namespaceSelector)
+      && has(p.namespaceSelector.matchLabels) && !has(p.namespaceSelector.matchExpressions)
+      && p.namespaceSelector.matchLabels == {"kubernetes.io/metadata.name": "netpol-canary"}
+      && has(p.podSelector) && has(p.podSelector.matchLabels) && !has(p.podSelector.matchExpressions)
+      && p.podSelector.matchLabels == {"app.kubernetes.io/name": "netpol-canary"} && has(r.ports)
+      && r.ports.size() == 1 && r.ports.all(port, has(port.port) && port.port == 8080
+      && !has(port.endPort) && (!has(port.protocol) || port.protocol == "TCP"))) || (has(p.ipBlock)
       && p.ipBlock.cidr == "0.0.0.0/0" && has(p.ipBlock.except) && ["10.0.0.0/8",
       "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "127.0.0.0/8"].all(cidr,
       cidr in p.ipBlock.except) && has(r.ports) && r.ports.all(port, has(port.port)
@@ -302,7 +308,7 @@ spec:
       == "alloy" && has(r.ports) && r.ports.all(port, has(port.port) && !has(port.endPort)
       && port.port in [4317,4318] && (!has(port.protocol) || port.protocol == "TCP")))))'
     message: Project egress may reach its own pods, DNS, Alloy, public HTTPS, Cloudflare
-      Tunnel or its object store cells
+      Tunnel, its object store cells or the egress policy canary
   - expression: '!has(object.spec.ingress) || object.spec.ingress.all(r, has(r.from)
       && r.from.all(p, (has(p.podSelector) && !has(p.namespaceSelector) && !has(p.ipBlock))
       || (has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && "kubernetes.io/metadata.name"
@@ -345,8 +351,8 @@ spec:
         - project
   validations:
   - expression: 'request.userInfo.username in ["system:serviceaccount:flux-system:platform-reconciler", "system:serviceaccount:flux-system:kustomize-controller"]
-      || (request.operation == "DELETE" ? !(oldObject.metadata.name in ["default-deny","dns"]) : !(object.metadata.name
-      in ["default-deny","dns"]))'
+      || (request.operation == "DELETE" ? !(oldObject.metadata.name in ["default-deny","dns","netpol-gate"]) : !(object.metadata.name
+      in ["default-deny","dns","netpol-gate"]))'
     message: Namespace baseline policies belong to the platform
 ---
 apiVersion: admissionregistration.k8s.io/v1

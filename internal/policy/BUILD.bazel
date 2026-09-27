@@ -7,6 +7,7 @@ go_test(
         "dns_test.go",
         "helpers_test.go",
         "listener_test.go",
+        "netpolcanary_test.go",
         "node_test.go",
         "objectstore_alerts_test.go",
         "objectstore_capacity_test.go",

@@ -18,6 +18,7 @@ resources:
 components:
     - ../../components/backup-job
     - ../../components/backup-primary
+    - ../../components/netpol-gate/egress
 images:
     - digest: sha256:397f91a650f193c89b21a47d84403fb0f6e059583f8a7602d26e1dcc42706402
       name: ghcr.io/fredrir/y-api

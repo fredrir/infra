@@ -19,6 +19,7 @@ resources:
 components:
     - ../../components/backup-job
     - ../../components/backup-primary
+    - ../../components/netpol-gate/egress
 images:
     - digest: sha256:950b18a306cede419602086a4e5c5a7be00ac9c100b936098e566ffbcfb82a91
       name: ghcr.io/fredrir/portfolio-api

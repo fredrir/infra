@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netpol-gate
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: netpol-canary
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: netpol-canary
+    ports:
+    - protocol: TCP
+      port: 8080

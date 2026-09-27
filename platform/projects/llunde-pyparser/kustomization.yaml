@@ -17,3 +17,4 @@ resources:
 components:
 - ../../components/backup-job
 - ../../components/backup-primary
+- ../../components/netpol-gate/egress

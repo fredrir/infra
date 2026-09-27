@@ -18,6 +18,7 @@ go_test(
         "images_test.go",
         "kustomize_test.go",
         "managed_zones_test.go",
+        "netpol_gate_test.go",
         "node_local_dns_test.go",
         "provisioned_test.go",
         "renovate_test.go",

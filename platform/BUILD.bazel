@@ -2,6 +2,7 @@ filegroup(
     name = "policy_testdata",
     srcs = glob([
         "clusters/production/flux-system/*.yaml",
+        "clusters/production/root.yaml",
         "components/**/*.yaml",
         "components/object-store/**",
         "components/object-store-trust/**",

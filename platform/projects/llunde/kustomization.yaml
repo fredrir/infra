@@ -12,6 +12,8 @@ resources:
     - application.secret.sops.yaml
     - tunnel.secret.sops.yaml
     - ghcr.secret.sops.yaml
+components:
+    - ../../components/netpol-gate/egress
 images:
     - digest: sha256:5cceb5f25457c48f8755ab7f9633d40ddccd06b8360e247f730e79c3168a8372
       name: ghcr.io/fredrir/llunde-backend

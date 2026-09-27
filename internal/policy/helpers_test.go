@@ -87,7 +87,7 @@ func renderedTree(t *testing.T, tree, path string) []object {
 }
 func renderedWith(t *testing.T, path string, overrides map[string][]byte) []object {
 	t.Helper()
-	return renderedFrom(t, "platform/components/runners", path, overrides)
+	return renderedFrom(t, "platform/components", path, overrides)
 }
 
 var renders sync.Map
