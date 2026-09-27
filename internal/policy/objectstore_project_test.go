@@ -18,9 +18,16 @@ func TestProjectEgressReachesOnlyItsObjectStoreCell(t *testing.T) {
 	if e.admitted(boundary, objectStoreEgress(), "llunde-pyparser", projectRunner, "CREATE", nil) {
 		t.Fatal("project runner granted object store egress")
 	}
+	for _, namespace := range []string{"y", "portfolio", "llunde"} {
+		if e.admitted(boundary, objectStoreEgress(), namespace, reconciler, "CREATE", nil) {
+			t.Errorf("object store egress admitted in %s", namespace)
+		}
+	}
 	for name, mutate := range map[string]func(object){
-		"other name":           func(p object) { set(p, "egress", "metadata", "name") },
-		"other cell":           func(p object) { set(p, "hel1", "spec", "egress", 0, "to", 0, "podSelector", "matchLabels", "app.kubernetes.io/instance") },
+		"other name": func(p object) { set(p, "egress", "metadata", "name") },
+		"other cell": func(p object) {
+			set(p, "hel1", "spec", "egress", 0, "to", 0, "podSelector", "matchLabels", "app.kubernetes.io/instance")
+		},
 		"any object store pod": func(p object) { set(p, object{}, "spec", "egress", 0, "to", 0, "podSelector") },
 		"any namespace":        func(p object) { set(p, object{}, "spec", "egress", 0, "to", 0, "namespaceSelector") },
 		"gRPC port":            func(p object) { set(p, 18333, "spec", "egress", 0, "ports", 0, "port") },
