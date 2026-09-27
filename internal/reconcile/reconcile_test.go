@@ -99,6 +99,7 @@ func (o *fakeOps) VerifyDrift(_ context.Context, plan Plan) error {
 }
 
 func TestTransitionRetiresOnlyAfterVerification(t *testing.T) {
+	t.Parallel()
 	want := []string{"plan", "expand", "hosts", "publish", "kubernetes", "monitor", "verify", "retire"}
 	for _, fail := range append([]string{""}, want...) {
 		t.Run("failure_"+fail, func(t *testing.T) {
@@ -136,6 +137,7 @@ func TestTransitionRetiresOnlyAfterVerification(t *testing.T) {
 }
 
 func TestRecoveryUsesLastSuccessfulRevisionAndForcesAllSystems(t *testing.T) {
+	t.Parallel()
 	for _, full := range []bool{false, true} {
 		store := &memoryStore{status: Status{Desired: "failed", Applied: "old"}}
 		ops := &fakeOps{selection: All()}
@@ -149,6 +151,7 @@ func TestRecoveryUsesLastSuccessfulRevisionAndForcesAllSystems(t *testing.T) {
 }
 
 func TestStateFailurePreventsSideEffects(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{fail: "plan"}
 	ops := &fakeOps{}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
@@ -160,6 +163,7 @@ func TestStateFailurePreventsSideEffects(t *testing.T) {
 }
 
 func TestConcurrentApplyDoesNotExecute(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{locked: true}
 	ops := &fakeOps{}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
@@ -193,6 +197,7 @@ func (o *leaseLosingOps) Hosts(ctx context.Context, _ Plan) error {
 }
 
 func TestLostLeaseStopsTheRunWithoutRecordingState(t *testing.T) {
+	t.Parallel()
 	store := &losingStore{memoryStore: memoryStore{status: Status{Desired: "old", Applied: "old"}}}
 	ops := &leaseLosingOps{fakeOps: fakeOps{selection: All()}, store: store}
 	err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false)
@@ -224,6 +229,7 @@ func (s *unrecordedFailureStore) Write(ctx context.Context, status Status) error
 }
 
 func TestApplyClassifiesRetryableOutcomes(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name      string
 		store     Store
@@ -309,6 +315,7 @@ func sameSelection(a, b Selection) bool {
 }
 
 func TestAffectedCrossSystemInputs(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		path string
 		want Selection
@@ -345,6 +352,7 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 }
 
 func TestAffectedNarrowsKubernetesScopeToSelectedProjects(t *testing.T) {
+	t.Parallel()
 	narrowed := Selection{Kubernetes: true, Projects: []string{"llunde"}}
 	for name, paths := range map[string][]string{
 		"one project":         {"platform/projects/llunde/kustomization.yaml"},
@@ -375,6 +383,7 @@ func TestAffectedNarrowsKubernetesScopeToSelectedProjects(t *testing.T) {
 }
 
 func TestRetainedRoutesIncludeLegacyAndInterruptedTransition(t *testing.T) {
+	t.Parallel()
 	state := []byte(`{"values":{"root_module":{"resources":[{"address":"cloudflare_dns_record.grafana[\"logs.fredrir.com\"]","values":{"name":"logs.fredrir.com"}}],"child_modules":[{"resources":[{"address":"module.platform_dns.cloudflare_dns_record.records[\"grafana\"]","values":{"name":"grafana.fredrir.com"}},{"address":"module.platform_dns.cloudflare_dns_record.records[\"cache\"]","values":{"name":"cache.fredrir.com"}}]}]}}}`)
 	got, err := retainedHosts(state)
 	if err != nil || !reflect.DeepEqual(got, []string{"grafana.fredrir.com", "logs.fredrir.com"}) {
@@ -383,6 +392,7 @@ func TestRetainedRoutesIncludeLegacyAndInterruptedTransition(t *testing.T) {
 }
 
 func TestReadinessRejectsStaleGenerationAndRevision(t *testing.T) {
+	t.Parallel()
 	var item resource
 	if err := json.Unmarshal([]byte(`{"metadata":{"name":"monitoring","generation":2},"status":{"observedGeneration":1,"conditions":[{"type":"Ready","status":"True","observedGeneration":1}]}}`), &item); err != nil {
 		t.Fatal(err)
@@ -407,6 +417,7 @@ func TestReadinessRejectsStaleGenerationAndRevision(t *testing.T) {
 }
 
 func TestGrafanaChecksDatabaseAndAuthenticationWithoutRedirects(t *testing.T) {
+	t.Parallel()
 	for _, failure := range []string{"", "database", "redirect", "auth", "root-url"} {
 		t.Run(failure, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -444,6 +455,7 @@ func TestGrafanaChecksDatabaseAndAuthenticationWithoutRedirects(t *testing.T) {
 }
 
 func TestS3LockUsesConditionalTakeoverAndRelease(t *testing.T) {
+	t.Parallel()
 	for _, expired := range []bool{false, true} {
 		t.Run(fmt.Sprint(expired), func(t *testing.T) {
 			put, deleted := false, false
@@ -492,6 +504,7 @@ func TestS3LockUsesConditionalTakeoverAndRelease(t *testing.T) {
 }
 
 func TestSavedPlanAndStateLockArePreserved(t *testing.T) {
+	t.Parallel()
 	work := t.TempDir()
 	var calls []process.Options
 	c := Commands{Work: work, Runner: process.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
@@ -519,6 +532,7 @@ func TestSavedPlanAndStateLockArePreserved(t *testing.T) {
 }
 
 func TestHostnameOnlyChangeSkipsUnrelatedHostConfiguration(t *testing.T) {
+	t.Parallel()
 	selected := Affected([]string{"platform/clusters/production/settings.yaml"})
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
 	ops := &fakeOps{selection: selected}
@@ -540,6 +554,7 @@ func TestHostnameOnlyChangeSkipsUnrelatedHostConfiguration(t *testing.T) {
 }
 
 func TestOpenTofuVerificationRejectsRemainingDrift(t *testing.T) {
+	t.Parallel()
 	c := Commands{Runner: process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		return process.Result{ExitCode: 2}, errors.New("drift")
 	}}}
@@ -549,6 +564,7 @@ func TestOpenTofuVerificationRejectsRemainingDrift(t *testing.T) {
 }
 
 func TestCancellationStopsVerificationImmediately(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	calls := 0
@@ -561,6 +577,7 @@ func TestCancellationStopsVerificationImmediately(t *testing.T) {
 }
 
 func TestS3LockCreationUsesCreateOnlyCondition(t *testing.T) {
+	t.Parallel()
 	var conditional bool
 	runner := process.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
 		switch o.Args[1] {
@@ -587,6 +604,7 @@ func TestS3LockCreationUsesCreateOnlyCondition(t *testing.T) {
 }
 
 func TestHelmReleasesReconcileAlongsideKustomizations(t *testing.T) {
+	t.Parallel()
 	var calls []string
 	token, lateToken, created := "", "", false
 	item := func(name, namespace, handled string) string {
@@ -628,6 +646,7 @@ func TestHelmReleasesReconcileAlongsideKustomizations(t *testing.T) {
 }
 
 func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
+	t.Parallel()
 	for _, initial := range []string{"main", "production"} {
 		t.Run(initial, func(t *testing.T) {
 			branch, token := initial, ""
@@ -678,6 +697,7 @@ func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
 }
 
 func TestOpenTofuTestsGateThePlan(t *testing.T) {
+	t.Parallel()
 	for _, failing := range []bool{false, true} {
 		var calls []string
 		c := Commands{Work: t.TempDir(), Runner: process.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {

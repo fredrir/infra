@@ -70,6 +70,7 @@ func playPatterns(t *testing.T, root, file string) []string {
 }
 
 func TestOnlyTheReconcilerPlaybookSelectsTheReconcilerGroup(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	descendants, hosts := inventoryGroups(t, root)
 	if _, declared := descendants[reconcilerGroup]; !declared || !slices.Contains(descendants["all"], reconcilerGroup) {

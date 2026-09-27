@@ -291,6 +291,7 @@ func walkAnsibleTasks(t *testing.T, root, file string, tasks []map[string]any, i
 }
 
 func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	probedTasks := []string{
 		"roles/infra_binary/tasks/main.yml: Create root-owned artifact cache",

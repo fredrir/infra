@@ -253,6 +253,7 @@ func TestPublishMasksTheTokenInGitHubActions(t *testing.T) {
 }
 
 func TestPublisherKeyFileIsConsumedOnce(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	write := func(name, content string, mode os.FileMode) string {
 		t.Helper()

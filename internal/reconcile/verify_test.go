@@ -86,6 +86,7 @@ func (f kubernetesFake) execute(t *testing.T, options process.Options) (process.
 func items(resources ...resource) any { return struct{ Items []resource }{resources} }
 
 func TestKustomizationWaitRequiresTheAppliedRequestedRevision(t *testing.T) {
+	t.Parallel()
 	revision := strings.Repeat("a", 40)
 	root := func(t *testing.T) resource {
 		item := readyResource(t, "Kustomization", "flux-system", "flux-system")
@@ -123,6 +124,7 @@ func TestKustomizationWaitRequiresTheAppliedRequestedRevision(t *testing.T) {
 }
 
 func TestHelmReleaseMismatchesAreDifferences(t *testing.T) {
+	t.Parallel()
 	monitoring := func(t *testing.T) resource {
 		item := readyResource(t, "HelmRelease", "observability", "monitoring")
 		item.Spec.Values.Grafana.INI.Server.RootURL = "https://logs.fredrir.com"
@@ -166,6 +168,7 @@ func TestHelmReleaseMismatchesAreDifferences(t *testing.T) {
 }
 
 func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
+	t.Parallel()
 	revision := strings.Repeat("a", 40)
 	digest := "sha256:" + strings.Repeat("b", 64)
 	generator := artifactFixture(t, fmt.Sprintf(`{"kind":"ArtifactGenerator","metadata":{"name":"platform-artifacts","namespace":"flux-system","uid":"generator-id","generation":1},"spec":{"sources":[{"alias":"repo","kind":"GitRepository","name":"flux-system"}],"artifacts":[{"name":"project-y","originRevision":"@repo","copy":[{"from":"@repo/platform/projects/y/**","to":"@artifact/platform/projects/y/"}]}]},"status":{"conditions":[{"type":"Ready","status":"True","observedGeneration":1}],"inventory":[{"name":"project-y","namespace":"flux-system","digest":%q}]}}`, digest))
@@ -268,6 +271,7 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 }
 
 func TestVerificationCollectsEveryPart(t *testing.T) {
+	t.Parallel()
 	fleet := testRunnerFleet()
 	revision := strings.Repeat("a", 40)
 	declared := declaredRoot(t)
@@ -338,6 +342,7 @@ func TestVerificationCollectsEveryPart(t *testing.T) {
 }
 
 func TestUnchangedKubernetesInputsRequestOnlyKustomizations(t *testing.T) {
+	t.Parallel()
 	revision := strings.Repeat("a", 40)
 	kustomizations, releases := "kustomizations.kustomize.toolkit.fluxcd.io", "helmreleases.helm.toolkit.fluxcd.io"
 	for _, test := range []struct {
@@ -393,6 +398,7 @@ func TestUnchangedKubernetesInputsRequestOnlyKustomizations(t *testing.T) {
 }
 
 func TestVerificationPartsRunConcurrently(t *testing.T) {
+	t.Parallel()
 	var arrived sync.WaitGroup
 	arrived.Add(2)
 	together := make(chan struct{})
@@ -428,6 +434,7 @@ func ephemeralRunner(t *testing.T, namespace, scaleSet, job string) resource {
 }
 
 func TestRunnerSetsWithoutRunningListenersFailVerification(t *testing.T) {
+	t.Parallel()
 	check, deploy := runnerSet(t, "ci-infra", "check-amd64", "Running"), runnerSet(t, "ci-infra", "deploy-amd64", "Running")
 	listeners := []resource{listenerPod(t, "ci-infra", "check-amd64", true), listenerPod(t, "ci-infra", "deploy-amd64", true)}
 	idle, busy := ephemeralRunner(t, "ci-infra", "check-amd64", ""), ephemeralRunner(t, "ci-infra", "check-amd64", "1234")

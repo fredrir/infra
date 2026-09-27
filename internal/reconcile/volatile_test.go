@@ -66,6 +66,7 @@ func (i inventory) resolve(pattern string) []string {
 }
 
 func TestVolatileHostsStayUntrusted(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	fleet := loadInventory(t, root)
 	for _, host := range fleet.groups["volatile"] {
@@ -103,6 +104,7 @@ func TestVolatileHostsStayUntrusted(t *testing.T) {
 }
 
 func TestVolatileInvocationPipelinesOverAMultiplexedConnection(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	data, err := os.ReadFile(filepath.Join(root, "ansible.cfg"))
 	if err != nil {
@@ -138,6 +140,7 @@ func TestVolatileInvocationPipelinesOverAMultiplexedConnection(t *testing.T) {
 }
 
 func TestVolatileHostsConvergeInTheirOwnLinearInvocation(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	fleet := loadInventory(t, root)
 	volatile := fleet.groups["volatile"]
@@ -191,6 +194,7 @@ func TestVolatileHostsConvergeInTheirOwnLinearInvocation(t *testing.T) {
 }
 
 func TestFleetTemplatesNeverReadVolatileHosts(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	fleet := loadInventory(t, root)
 	reference := regexp.MustCompile(`(inventory_hostname\s+(?:not\s+)?in\s+)?groups(?:\[['"]([A-Za-z0-9_]+)['"]\]|\.get\(['"]([A-Za-z0-9_]+)['"](?:,\s*\[\])?\))(?:\s*\|\s*map\(['"]extract['"],\s*hostvars,\s*['"]([A-Za-z0-9_]+)['"]\))?`)
@@ -238,6 +242,7 @@ func TestFleetTemplatesNeverReadVolatileHosts(t *testing.T) {
 }
 
 func TestVolatileEnrollmentRequiresWireGuardFleet(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	gated := false
 	for _, play := range loadAnsible[[]ansiblePlay](t, root, volatilePlaybook) {
@@ -258,6 +263,7 @@ func TestVolatileEnrollmentRequiresWireGuardFleet(t *testing.T) {
 }
 
 func TestFlannelClearRefusesWhileVolatileWorkersAreEnrolled(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	guarded, keyedOnTaint, retried := false, false, false
 	walkAnsibleFile(t, root, "roles/k3s/tasks/main.yml", ansibleTask{}, func(task ansibleTask) {

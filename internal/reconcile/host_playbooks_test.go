@@ -29,6 +29,7 @@ func writeAnsibleTree(t *testing.T, files map[string]string) string {
 }
 
 func TestHostPlaybooksFollowRoleClosures(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..")
 	for _, test := range []struct {
 		name  string
@@ -72,6 +73,7 @@ func TestHostPlaybooksFollowRoleClosures(t *testing.T) {
 }
 
 func TestRunnerPlaybookConvergesLast(t *testing.T) {
+	t.Parallel()
 	graph, err := loadHostPlaybookGraph(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -83,6 +85,7 @@ func TestRunnerPlaybookConvergesLast(t *testing.T) {
 }
 
 func TestHostPlaybookGraphFollowsNestedRoleReferences(t *testing.T) {
+	t.Parallel()
 	root := writeAnsibleTree(t, map[string]string{
 		"reconcile.yml":                 "- import_playbook: facts.yml\n- import_playbook: group.yml\n",
 		"facts.yml":                     "- name: Gather\n  hosts: all\n",
@@ -119,6 +122,7 @@ func TestHostPlaybookGraphFollowsNestedRoleReferences(t *testing.T) {
 }
 
 func TestHostPlaybookGraphRejectsUnresolvableReferences(t *testing.T) {
+	t.Parallel()
 	valid := map[string]string{
 		"reconcile.yml":             "- import_playbook: facts.yml\n- import_playbook: first.yml\n",
 		"facts.yml":                 "- name: Gather\n  hosts: all\n",
@@ -169,6 +173,7 @@ var (
 )
 
 func TestHostPlaybookInputsOutsideAnsibleRouteToTheirReaders(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..")
 	graph, err := loadHostPlaybookGraph(root)
 	if err != nil {
@@ -225,6 +230,7 @@ func TestHostPlaybookInputsOutsideAnsibleRouteToTheirReaders(t *testing.T) {
 }
 
 func TestSelectionScopesHostPlaybooks(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name  string
 		paths []string

@@ -22,6 +22,7 @@ import (
 const repositoryRoot = "../.."
 
 func TestProductionRulesetsAdmitOnlyThePublisherFastForward(t *testing.T) {
+	t.Parallel()
 	publisher, err := ReadPublisher(repositoryRoot)
 	if err != nil {
 		t.Fatal(err)
@@ -158,6 +159,7 @@ func named(documents map[int64]map[string]any, name string) map[string]any {
 }
 
 func TestLiveRulesetsMatchTheirDeclaration(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name    string
 		visible bool

@@ -14,6 +14,7 @@ import (
 )
 
 func TestIndependentChangePreservesDeployedBaseline(t *testing.T) {
+	t.Parallel()
 	verified := time.Now().Add(-time.Hour).UTC()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "old", LastFullVerified: verified}}
 	ops := &fakeOps{selection: Affected([]string{"docs/example.md"})}
@@ -30,6 +31,7 @@ func TestIndependentChangePreservesDeployedBaseline(t *testing.T) {
 }
 
 func TestRecipientRulesChangeNoDeployedState(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}
 	ops := &fakeOps{selection: Affected([]string{".sops.yaml"})}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
@@ -45,6 +47,7 @@ func TestRecipientRulesChangeNoDeployedState(t *testing.T) {
 }
 
 func TestToolingChangeVerifiesDeployedRevisionWithoutMutation(t *testing.T) {
+	t.Parallel()
 	verified := time.Now().Add(-time.Hour).UTC()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "old", LastFullVerified: verified}}
 	ops := &fakeOps{selection: Affected([]string{".github/workflows/deploy.yml", "internal/reconcile/run.go"})}
@@ -67,6 +70,7 @@ func TestToolingChangeVerifiesDeployedRevisionWithoutMutation(t *testing.T) {
 }
 
 func TestToolingVerificationFailureForcesFullRecovery(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
 	ops := &fakeOps{selection: Affected([]string{"internal/reconcile/run.go"}), fail: "drift-verification"}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
@@ -86,6 +90,7 @@ func TestToolingVerificationFailureForcesFullRecovery(t *testing.T) {
 }
 
 func TestToolingChangeKeepsSelectedProjectScope(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}
 	ops := &checkpointOps{revision: "new", delta: Affected([]string{"internal/reconcile/run.go", "platform/projects/llunde/kustomization.yaml"})}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
@@ -100,6 +105,7 @@ func TestToolingChangeKeepsSelectedProjectScope(t *testing.T) {
 }
 
 func TestDriftVerificationChecksGeneratedConfigurationFirst(t *testing.T) {
+	t.Parallel()
 	commands := &Commands{RequireMain: true, Runner: process.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
 		t.Fatal("invalid generated inputs reached external commands")
 		return process.Result{}, nil
@@ -110,6 +116,7 @@ func TestDriftVerificationChecksGeneratedConfigurationFirst(t *testing.T) {
 }
 
 func TestFullAndRecoveryCannotSkipIndependentChange(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"explicit", "recovery", "initial", "failed-same-revision", "interrupted-same-revision"} {
 		t.Run(scenario, func(t *testing.T) {
 			store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
@@ -141,6 +148,7 @@ func TestFullAndRecoveryCannotSkipIndependentChange(t *testing.T) {
 }
 
 func TestRunnerConvergenceCannotCreateFullCheckpoint(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
 	ops := &fakeOps{selection: Selection{Ansible: true, HostScope: HostScopeRunners}, fail: "publish"}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
@@ -155,6 +163,7 @@ func TestRunnerConvergenceCannotCreateFullCheckpoint(t *testing.T) {
 }
 
 func TestRunnerSuccessDoesNotRefreshFullVerification(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "older"}}
 	ops := &fakeOps{selection: Selection{Ansible: true, HostScope: HostScopeRunners}}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
@@ -166,6 +175,7 @@ func TestRunnerSuccessDoesNotRefreshFullVerification(t *testing.T) {
 }
 
 func TestScopedHostPlaybooksSkipUnaffectedHostStages(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name      string
 		selection Selection
@@ -193,6 +203,7 @@ func TestScopedHostPlaybooksSkipUnaffectedHostStages(t *testing.T) {
 }
 
 func TestScopedHostPlaybooksDoNotRefreshFullVerification(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "older"}}
 	selection := All()
 	selection.HostPlaybooks = []string{"k3s.yml", "external.yml", "volatile.yml"}
@@ -206,6 +217,7 @@ func TestScopedHostPlaybooksDoNotRefreshFullVerification(t *testing.T) {
 }
 
 func TestCLIReleaseConvergesTheMonitorBinary(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
 	ops := &fakeOps{selection: Affected([]string{"build/cli-release.json"})}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err != nil {
@@ -217,6 +229,7 @@ func TestCLIReleaseConvergesTheMonitorBinary(t *testing.T) {
 }
 
 func TestCompletionWriteFailurePreservesVerificationBaseline(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old", LastFullRevision: "older"}, fail: "complete"}
 	ops := &fakeOps{selection: All()}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
@@ -234,6 +247,7 @@ func (o *rejectedPreflight) Preflight(context.Context, Plan) (Plan, error) {
 }
 
 func TestPreflightFailurePreventsMutations(t *testing.T) {
+	t.Parallel()
 	store := &memoryStore{status: Status{Desired: "old", Applied: "old"}}
 	ops := &rejectedPreflight{fakeOps{selection: All()}}
 	if err := (Reconciler{Store: store, Ops: ops}).Apply(context.Background(), false); err == nil {
@@ -245,6 +259,7 @@ func TestPreflightFailurePreventsMutations(t *testing.T) {
 }
 
 func TestSelectionScopesRunnersAndProjects(t *testing.T) {
+	t.Parallel()
 	for _, path := range []string{"build/cli-release.json", "platform/projects/portfolio/kustomization.yaml"} {
 		commands := &Commands{Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 			if options.Args[0] == "diff" {
@@ -266,6 +281,7 @@ func TestSelectionScopesRunnersAndProjects(t *testing.T) {
 }
 
 func TestApplyChecksGeneratedConfigurationWithoutKubernetesSelection(t *testing.T) {
+	t.Parallel()
 	commands := &Commands{RequireMain: true, Runner: process.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
 		t.Fatal("invalid generated inputs reached external commands")
 		return process.Result{}, nil
@@ -276,6 +292,7 @@ func TestApplyChecksGeneratedConfigurationWithoutKubernetesSelection(t *testing.
 }
 
 func TestReconcilerRootChangesRunOnlyItsPlanGate(t *testing.T) {
+	t.Parallel()
 	for _, failure := range []string{"", "plan"} {
 		store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}
 		ops := &fakeOps{selection: Affected([]string{"tofu/reconciler/server.tf"}), fail: failure}
@@ -293,6 +310,7 @@ func TestReconcilerRootChangesRunOnlyItsPlanGate(t *testing.T) {
 }
 
 func TestReconcilerRootInputsSurviveFullSelections(t *testing.T) {
+	t.Parallel()
 	for _, paths := range [][]string{{"tofu/reconciler/server.tf", "tailscale/policy.hujson"}, {"keys/admin_keys"}, {"tofu/reconciler/tests/reconciler.tftest.hcl", "ansible/site.yml"}} {
 		if !Affected(paths).ReconcilerTofu {
 			t.Errorf("%v does not test the reconciler root", paths)
@@ -306,6 +324,7 @@ func TestReconcilerRootInputsSurviveFullSelections(t *testing.T) {
 }
 
 func TestPlanTestsTheReconcilerRootOnlyWhenItsInputsChange(t *testing.T) {
+	t.Parallel()
 	for _, selected := range []bool{true, false} {
 		var calls []string
 		commands := &Commands{Runner: process.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
@@ -326,6 +345,7 @@ func TestPlanTestsTheReconcilerRootOnlyWhenItsInputsChange(t *testing.T) {
 }
 
 func TestProvenanceGatesApplyBeforeAnyCheckoutTooling(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name, override string
 		selection      Selection

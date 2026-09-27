@@ -90,6 +90,7 @@ func references(text, name string) []string {
 }
 
 func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	hostReads := []string{
 		"roles/ubuntu/tasks/main.yml: Validate the complete SSH configuration",
@@ -256,6 +257,7 @@ func TestHostPlaysCompareProductionInCheckMode(t *testing.T) {
 }
 
 func TestHostPlaysReportChangesOnlyAfterObservedChanges(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	walked := 0
 	for _, playbook := range append(slices.Clone(comparedPlaybooks), volatilePlaybook) {
@@ -272,6 +274,7 @@ func TestHostPlaysReportChangesOnlyAfterObservedChanges(t *testing.T) {
 }
 
 func TestCheckModePlaysNeverReachDryRunSwitches(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "ansible")
 	playbooks, err := filepath.Glob(filepath.Join(root, "*.yml"))
 	if err != nil || len(playbooks) == 0 {
@@ -295,6 +298,7 @@ func TestCheckModePlaysNeverReachDryRunSwitches(t *testing.T) {
 }
 
 func TestCheckModeGuardsReadPlayAndRoleKeywords(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	for path, data := range map[string]string{
 		"site.yml":                      "- name: Apply for real\n  hosts: all\n  check_mode: false\n  vars:\n    live: \"{{ not ansible_check_mode }}\"\n  roles:\n  - role: base\n    check_mode: false\n  - base\n",

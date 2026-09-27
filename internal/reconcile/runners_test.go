@@ -145,6 +145,7 @@ func unregisteredY(runner *registeredRunner) {
 }
 
 func TestLoadRunnerFleetValidatesDeclaration(t *testing.T) {
+	t.Parallel()
 	fleet, err := LoadRunnerFleet(writeRunnerFleet(t, testRunnerFleet()))
 	if err != nil || !reflect.DeepEqual(fleet, testRunnerFleet()) {
 		t.Fatalf("valid runner fleet rejected: %+v, %v", fleet, err)
@@ -193,6 +194,7 @@ func TestLoadRunnerFleetValidatesDeclaration(t *testing.T) {
 }
 
 func TestRunnerDrift(t *testing.T) {
+	t.Parallel()
 	fleet := testRunnerFleet()
 	stale := "2.300.0"
 	for _, test := range []struct {
@@ -235,6 +237,7 @@ func TestRunnerDrift(t *testing.T) {
 }
 
 func TestRunnerStatesQueryEachRepository(t *testing.T) {
+	t.Parallel()
 	fleet := testRunnerFleet()
 	var mu sync.Mutex
 	var queries []string
@@ -269,6 +272,7 @@ func TestRunnerStatesQueryEachRepository(t *testing.T) {
 }
 
 func TestRunnerFleetVerificationFailsWhenDriftPersists(t *testing.T) {
+	t.Parallel()
 	fleet := testRunnerFleet()
 	commands := Commands{Runner: process.Runner{Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
 		runners := healthyRunners(fleet, queriedRepository(opts))
@@ -286,6 +290,7 @@ func TestRunnerFleetVerificationFailsWhenDriftPersists(t *testing.T) {
 }
 
 func TestFleetRoutingMatchesDeclaredRunners(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..")
 	fleet, err := LoadRunnerFleet(root)
 	if err != nil {
@@ -344,6 +349,7 @@ func TestFleetRoutingMatchesDeclaredRunners(t *testing.T) {
 }
 
 func TestRunnerRepairsFollowGitHubState(t *testing.T) {
+	t.Parallel()
 	fleet := testRunnerFleet()
 	states := healthyStates(fleet)
 	if restart, missing := offlineRunners(fleet, states), missingRunners(fleet, states); restart != nil || missing != nil {
@@ -411,6 +417,7 @@ func TestRunnerConvergenceArguments(t *testing.T) {
 }
 
 func TestRunnerLabelsConvergeOnlyMismatchedRunners(t *testing.T) {
+	t.Parallel()
 	harness := &fleetHarness{t: t, fleet: testRunnerFleet(), change: func(runner *registeredRunner) {
 		runner.ID = 7
 		if runner.Name == "infra-build-09-Y-1" {
@@ -524,6 +531,7 @@ func TestScopedHostPlaybooksConvergeRunnersOnlyOnDrift(t *testing.T) {
 }
 
 func TestRejectedLabelUpdateOnlyWarns(t *testing.T) {
+	t.Parallel()
 	harness := &fleetHarness{t: t, fleet: testRunnerFleet(), rejectLabels: true, change: func(runner *registeredRunner) {
 		if runner.Name == "infra-build-09-Y-1" {
 			runner.Labels = runner.Labels[:3]

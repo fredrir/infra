@@ -219,6 +219,7 @@ func networkLeaseStore(t *testing.T, server *leaseServer) S3Store {
 }
 
 func TestNativeStateLockOwnership(t *testing.T) {
+	t.Parallel()
 	for _, initial := range []string{"missing", "expired", "active"} {
 		t.Run(initial, func(t *testing.T) {
 			server := &leaseServer{t: t}
@@ -260,6 +261,7 @@ func TestNativeStateLockOwnership(t *testing.T) {
 }
 
 func TestLeaseRenewsUntilReleased(t *testing.T) {
+	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		server := &leaseServer{t: t}
 		store := leaseStore(server)
@@ -292,6 +294,7 @@ func TestLeaseRenewsUntilReleased(t *testing.T) {
 }
 
 func TestAbandonedLeaseIsTakenOverAfterItsTTL(t *testing.T) {
+	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		server := &leaseServer{t: t}
 		server.set(lease{Owner: "crashed", Expires: time.Now().Add(leaseTTL)})
@@ -311,6 +314,7 @@ func TestAbandonedLeaseIsTakenOverAfterItsTTL(t *testing.T) {
 }
 
 func TestLostLeaseCancelsTheRun(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name     string
 		lose     func(*leaseServer)
@@ -357,6 +361,7 @@ func TestLostLeaseCancelsTheRun(t *testing.T) {
 }
 
 func TestReleaseOutwaitsOnlyOneBoundedRenewal(t *testing.T) {
+	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		server := &leaseServer{t: t}
 		_, unlock, err := leaseStore(server).Lock(t.Context())
@@ -494,6 +499,7 @@ func (a *fakeAWS) execute(_ context.Context, o process.Options) (process.Result,
 }
 
 func TestCLILeaseRenewalDetectsTakeover(t *testing.T) {
+	t.Parallel()
 	thief := lease{Owner: "thief", Expires: time.Now().Add(time.Hour)}
 	for _, test := range []struct {
 		name string
@@ -525,6 +531,7 @@ func TestCLILeaseRenewalDetectsTakeover(t *testing.T) {
 }
 
 func TestCLILeaseSettlesRefusedAndUnconfirmedRequests(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name          string
 		operation     string
@@ -556,6 +563,7 @@ func TestCLILeaseSettlesRefusedAndUnconfirmedRequests(t *testing.T) {
 }
 
 func TestUnconfirmedLeaseRequestsAreSettledByReadingTheLease(t *testing.T) {
+	t.Parallel()
 	thief := &lease{Owner: "thief", Expires: time.Now().Add(time.Hour)}
 	for _, test := range []struct {
 		name            string
@@ -599,6 +607,7 @@ func TestUnconfirmedLeaseRequestsAreSettledByReadingTheLease(t *testing.T) {
 }
 
 func TestUnconfirmedRenewalAdoptsOnlyItsOwnLease(t *testing.T) {
+	t.Parallel()
 	thief := &lease{Owner: "thief", Expires: time.Now().Add(time.Hour)}
 	for _, test := range []struct {
 		name      string
@@ -639,6 +648,7 @@ func TestUnconfirmedRenewalAdoptsOnlyItsOwnLease(t *testing.T) {
 }
 
 func TestConflictedLeaseRequestsAreReissuedOnce(t *testing.T) {
+	t.Parallel()
 	thief := &lease{Owner: "thief", Expires: time.Now().Add(time.Hour)}
 	for _, test := range []struct {
 		name      string
@@ -683,6 +693,7 @@ func TestConflictedLeaseRequestsAreReissuedOnce(t *testing.T) {
 }
 
 func TestReleaseConflictedByATakeoverKeepsTheNewOwner(t *testing.T) {
+	t.Parallel()
 	server := &leaseServer{t: t}
 	_, unlock, err := leaseStore(server).Lock(t.Context())
 	if err != nil {
@@ -698,6 +709,7 @@ func TestReleaseConflictedByATakeoverKeepsTheNewOwner(t *testing.T) {
 }
 
 func TestRenewalConflictKeepsAnOwnedLease(t *testing.T) {
+	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		server := &leaseServer{t: t}
 		held, unlock, err := leaseStore(server).Lock(t.Context())
@@ -720,6 +732,7 @@ func TestRenewalConflictKeepsAnOwnedLease(t *testing.T) {
 }
 
 func TestTransientRenewalFailureKeepsTheLease(t *testing.T) {
+	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		server := &leaseServer{t: t}
 		held, unlock, err := leaseStore(server).Lock(t.Context())
@@ -740,6 +753,7 @@ func TestTransientRenewalFailureKeepsTheLease(t *testing.T) {
 }
 
 func TestLockWaitAcquiresAfterRelease(t *testing.T) {
+	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		server := &leaseServer{t: t}
 		store := leaseStore(server)
@@ -780,6 +794,7 @@ func TestLockWaitAcquiresAfterRelease(t *testing.T) {
 }
 
 func TestNativeStateReadFailsClosed(t *testing.T) {
+	t.Parallel()
 	for _, code := range []int{403, 500, 200} {
 		t.Run(fmt.Sprint(code), func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -796,6 +811,7 @@ func TestNativeStateReadFailsClosed(t *testing.T) {
 }
 
 func TestVerificationDefersToHeldReconciliationLock(t *testing.T) {
+	t.Parallel()
 	status, _ := json.Marshal(Status{Desired: "c", Applied: "b", Stage: "hosts"})
 	recovery := []Difference{{System: "reconciliation", Item: "applied b, desired c, stage hosts"}}
 	for _, test := range []struct {

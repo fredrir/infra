@@ -128,6 +128,7 @@ var (
 )
 
 func TestVerifyIdentityReadsOnlyWhatCloudVerificationReads(t *testing.T) {
+	t.Parallel()
 	got := serviceAccountPermissions(t, reconciliationPolicy[rbacObject](t), "flux-system/infrastructure-verify")
 	want := expectedPermissions(fluxObjectReads, platformSettingsRead, workloadReads, listenerReads, artifactReads)
 	if !maps.Equal(got, want) {
@@ -142,6 +143,7 @@ func TestVerifyIdentityReadsOnlyWhatCloudVerificationReads(t *testing.T) {
 }
 
 func TestPlanAndApplyIdentityPermissions(t *testing.T) {
+	t.Parallel()
 	objects := reconciliationPolicy[rbacObject](t)
 	annotations := expectedPermissions(
 		permissions([]string{"patch"}, []string{"source.toolkit.fluxcd.io"}, []string{"gitrepositories"}, []string{"flux-system"}, "*"),
@@ -158,6 +160,7 @@ func TestPlanAndApplyIdentityPermissions(t *testing.T) {
 }
 
 func TestReconciliationIdentitiesHaveTokenSecrets(t *testing.T) {
+	t.Parallel()
 	var accounts, tokens []string
 	for _, document := range reconciliationPolicy[reconciliationDocument](t) {
 		switch document.Kind {

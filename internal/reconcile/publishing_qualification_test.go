@@ -42,6 +42,7 @@ type publishingQualification struct {
 }
 
 func TestPublishingQualification(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("INFRA_PUBLISHING_QUALIFY") != "1" {
 		t.Skip("INFRA_PUBLISHING_QUALIFY=1, GH_TOKEN of a repository administrator with the workflow scope and PUBLISHER_APP_PRIVATE_KEY_FILE apply and qualify the production rulesets")
 	}

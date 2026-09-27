@@ -59,6 +59,7 @@ func (o *verificationOps) VerifyFull(_ context.Context, plan Plan) error {
 }
 
 func TestVerificationReportsIncompleteReconciliationAsDifference(t *testing.T) {
+	t.Parallel()
 	complete := func(revision string) Status { return Status{Desired: revision, Applied: revision, Stage: "complete"} }
 	unreachable := errors.New("fredrir-04 unreachable")
 	for _, test := range []struct {

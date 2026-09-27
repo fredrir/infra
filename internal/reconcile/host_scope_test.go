@@ -16,6 +16,7 @@ import (
 )
 
 func TestHostScopeSelection(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name             string
 		paths            []string
@@ -65,6 +66,7 @@ func TestHostScopeSelection(t *testing.T) {
 }
 
 func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
+	t.Parallel()
 	fleet := testRunnerFleet()
 	root := writeRunnerFleet(t, fleet)
 	cli := []string{"build/cli-release.json"}
@@ -149,6 +151,7 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 }
 
 func TestHostVerificationReportsEveryFailure(t *testing.T) {
+	t.Parallel()
 	fleet := testRunnerFleet()
 	failure := errors.New("verification failed")
 	var calls, queried atomic.Int32
@@ -187,6 +190,7 @@ func TestHostVerificationReportsEveryFailure(t *testing.T) {
 }
 
 func TestHostPlanValidatesRunnerFleet(t *testing.T) {
+	t.Parallel()
 	commands := Commands{Runner: process.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
 		return process.Result{}, nil
 	}}}
@@ -201,6 +205,7 @@ func TestHostPlanValidatesRunnerFleet(t *testing.T) {
 }
 
 func TestHostCheckpointScopeCompatibility(t *testing.T) {
+	t.Parallel()
 	for _, scope := range []string{"", HostScopeNone, HostScopeMonitor, HostScopeRunners, "unknown"} {
 		status := hostCheckpoint()
 		status.HostScope = scope
@@ -217,6 +222,7 @@ func TestHostCheckpointScopeCompatibility(t *testing.T) {
 }
 
 func TestTrackedReconciliationInputsAreClassified(t *testing.T) {
+	t.Parallel()
 	files, err := exec.Command("git", "ls-files", "-z", "--full-name", "--", ":/").Output()
 	if err != nil {
 		t.Skip("requires a Git checkout")

@@ -114,6 +114,7 @@ func conjunction(t *testing.T, condition string, facts map[string]bool) bool {
 }
 
 func TestHostedWorkflowsNeitherApplyNorRepair(t *testing.T) {
+	t.Parallel()
 	paths, err := filepath.Glob(filepath.Join("..", "..", ".github/workflows", "*.yml"))
 	if err != nil {
 		t.Fatal(err)
@@ -157,6 +158,7 @@ func TestHostedWorkflowsNeitherApplyNorRepair(t *testing.T) {
 }
 
 func TestVerificationRunsOnlyWhenRequestedOnProtectedMain(t *testing.T) {
+	t.Parallel()
 	verify := readWorkflow(t, "reconcile-job.yml").Jobs["verify"]
 	requirements := []string{"!cancelled()", "github.repository_id == '1328085692'", "github.repository_owner_id == '114402558'", "github.ref == 'refs/heads/main'", "github.ref_protected", "github.event_name == 'workflow_dispatch'", "inputs.verify"}
 	facts := map[string]bool{}
@@ -179,6 +181,7 @@ func TestVerificationRunsOnlyWhenRequestedOnProtectedMain(t *testing.T) {
 }
 
 func TestPlanReadsOnlyItsEnvironmentSecrets(t *testing.T) {
+	t.Parallel()
 	workflow := readWorkflow(t, "reconcile-job.yml")
 	plan := workflow.Jobs["plan"]
 	if plan.Environment != "infrastructure-plan" {
@@ -216,6 +219,7 @@ func TestPlanReadsOnlyItsEnvironmentSecrets(t *testing.T) {
 }
 
 func TestVerificationRunsWithReadOnlyCredentials(t *testing.T) {
+	t.Parallel()
 	verify := readWorkflow(t, "reconcile-job.yml").Jobs["verify"]
 	checkout := verify.step(t, func(step workflowStep) bool { return strings.HasPrefix(step.Uses, "actions/checkout@") })
 	if persisted := checkout.With["persist-credentials"]; persisted != "false" {
@@ -241,6 +245,7 @@ func TestVerificationRunsWithReadOnlyCredentials(t *testing.T) {
 }
 
 func TestProvenanceCredentialsReachOnlyTheVerifier(t *testing.T) {
+	t.Parallel()
 	workflow := readWorkflow(t, "reconcile-job.yml")
 	if _, ok := workflow.Env["PROVENANCE_TOKEN"]; ok {
 		t.Error("every job receives the provenance token")
@@ -262,6 +267,7 @@ func TestProvenanceCredentialsReachOnlyTheVerifier(t *testing.T) {
 }
 
 func TestCalledReconciliationJobsRequestOnlyGrantedPermissions(t *testing.T) {
+	t.Parallel()
 	levels := map[string]int{"none": 0, "read": 1, "write": 2}
 	caller := readWorkflow(t, "reconcile.yml").Jobs["reconcile"]
 	for name, job := range readWorkflow(t, "reconcile-job.yml").Jobs {
@@ -304,6 +310,7 @@ func topLevel(t *testing.T, condition, operator string) []string {
 }
 
 func TestVerificationAppStartsOnlyVerification(t *testing.T) {
+	t.Parallel()
 	paths, err := filepath.Glob(filepath.Join("..", "..", ".github/workflows", "*.yml"))
 	if err != nil {
 		t.Fatal(err)
@@ -340,6 +347,7 @@ func TestVerificationAppStartsOnlyVerification(t *testing.T) {
 }
 
 func TestSupersessionIgnoresExactlyThePushIgnoredPaths(t *testing.T) {
+	t.Parallel()
 	var push struct {
 		PathsIgnore []string `yaml:"paths-ignore"`
 	}
@@ -368,6 +376,7 @@ func TestSupersessionIgnoresExactlyThePushIgnoredPaths(t *testing.T) {
 const provenanceGateStep = "Verify commit provenance"
 
 func TestProvenanceGateRunsBeforeAnyCheckoutCode(t *testing.T) {
+	t.Parallel()
 	apply := readWorkflow(t, "reconcile-job.yml").Jobs["verify"]
 	gate := slices.IndexFunc(apply.Steps, func(step workflowStep) bool { return step.Name == provenanceGateStep })
 	if gate < 0 {

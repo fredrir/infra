@@ -88,6 +88,7 @@ func hostCheckpoint() Status {
 }
 
 func TestReconciliationResumesOnlyDurablyCompletedHosts(t *testing.T) {
+	t.Parallel()
 	applied, prior, current := strings.Repeat("a", 40), strings.Repeat("b", 40), strings.Repeat("c", 40)
 	store := &checkpointStore{memoryStore{status: Status{Applied: applied, Desired: applied}}}
 	first := &checkpointOps{fakeOps: fakeOps{fail: "publish"}, revision: prior, delta: All()}
@@ -114,6 +115,7 @@ func TestReconciliationResumesOnlyDurablyCompletedHosts(t *testing.T) {
 }
 
 func TestHostReuseFallsBackForUncertainCheckpointOrChangedInputs(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"full", "earlier-stage", "later-stage", "missing-duration", "zero-duration", "missing-state", "invalid-desired", "invalid-applied", "already-applied", "old", "future", "ansible", "tofu", "unknown-revision", "drift", "proof-failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			status := hostCheckpoint()
@@ -175,6 +177,7 @@ func TestHostReuseFallsBackForUncertainCheckpointOrChangedInputs(t *testing.T) {
 }
 
 func TestHostReusePreservesFailuresAndCancellation(t *testing.T) {
+	t.Parallel()
 	for _, failure := range []string{"plan", "expand", "publish", "kubernetes", "monitor", "verify", "retire", "cancellation"} {
 		t.Run(failure, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -216,6 +219,7 @@ func noDriftPlan() map[string]any {
 }
 
 func TestHostReuseRequiresNoPlannedChangesOrObservedDrift(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"unchanged", "create", "update", "delete", "read", "replace", "unknown-action", "missing-action", "resource-drift", "deferred", "moved", "deposed", "outputs", "unknown-check", "failed-check", "errored", "unsupported-version", "missing-version", "missing-prior", "missing-planned", "missing-resources", "malformed-prior", "import", "incomplete"} {
 		t.Run(scenario, func(t *testing.T) {
 			plan := noDriftPlan()
@@ -277,6 +281,7 @@ func TestHostReuseRequiresNoPlannedChangesOrObservedDrift(t *testing.T) {
 }
 
 func TestHostReuseInspectsTheSavedExpansionPlan(t *testing.T) {
+	t.Parallel()
 	work := t.TempDir()
 	expected := filepath.Join(work, "expand.tfplan")
 	commands := Commands{Work: work, Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
@@ -293,6 +298,7 @@ func TestHostReuseInspectsTheSavedExpansionPlan(t *testing.T) {
 }
 
 func TestSavedExpansionProofWithLocalTofu(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("INFRA_RECONCILE_PLAN_QUALIFY") != "1" {
 		t.Skip("requires OpenTofu")
 	}

@@ -11,6 +11,7 @@ import (
 )
 
 func TestVolatileConvergenceNeverFailsTheFleet(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name      string
 		selection Selection
@@ -60,6 +61,7 @@ func (o *observedVolatile) Volatile(ctx context.Context, plan Plan) error {
 }
 
 func TestVolatileConvergesAfterTheFleetIsRecordedComplete(t *testing.T) {
+	t.Parallel()
 	for _, failure := range []error{nil, errors.New("volatile.yml unreachable hosts: fredrir-10")} {
 		store := &memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}
 		ops := &observedVolatile{fakeOps: fakeOps{selection: All(), volatileFailure: failure}, store: store}
@@ -101,6 +103,7 @@ func (s *cancelableStore) Lock(ctx context.Context) (context.Context, func() err
 }
 
 func TestLostLeaseDuringVolatileConvergenceKeepsTheCompletedFleet(t *testing.T) {
+	t.Parallel()
 	store := &cancelableStore{memoryStore: memoryStore{status: Status{Desired: "old", Applied: "old", Stage: "complete"}}}
 	ops := &observedVolatile{fakeOps: fakeOps{selection: All()}, store: &store.memoryStore}
 	ops.during = func() {
@@ -116,6 +119,7 @@ func TestLostLeaseDuringVolatileConvergenceKeepsTheCompletedFleet(t *testing.T) 
 }
 
 func TestVolatileOutcomesAreDegradedNotFailed(t *testing.T) {
+	t.Parallel()
 	degraded := Degraded{errors.Join(Differences{{System: "volatile", Host: "fredrir-10", Item: "Mount the data volume"}}, errors.New("volatile.yml comparison incomplete: unreachable hosts: fredrir-10"))}
 	verification := VerificationOutcome("r", ScopeFull, errors.Join(errors.New("flux-system is not ready"), degraded))
 	if verification.Outcome != OutcomeFailed || !slices.Equal(verification.Errors, []string{"flux-system is not ready"}) || len(verification.Differences) != 0 {
@@ -136,6 +140,7 @@ func TestVolatileOutcomesAreDegradedNotFailed(t *testing.T) {
 }
 
 func TestVolatilePlaybookResultsSummarizeTheWorker(t *testing.T) {
+	t.Parallel()
 	broken := junitCase("[fredrir-10] Configure volatile workers: data_volume : Require the attached data volume", "roles/data_volume/tasks/main.yml:25", `<failure message="failed"/>`)
 	changed := junitCase("[fredrir-10] Configure volatile workers: data_volume : Mount the data volume", "roles/data_volume/tasks/main.yml:90", junitResult(true))
 	for _, test := range []struct {

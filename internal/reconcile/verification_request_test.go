@@ -149,6 +149,7 @@ func verificationFixture(t *testing.T, runs ...runState) (*githubAppServer, *gat
 }
 
 func TestVerificationRequestDispatchesWithARestrictedInstallationToken(t *testing.T) {
+	t.Parallel()
 	github, gatus, request := verificationFixture(t, runState{status: "queued"}, runState{unchanged: true}, runState{status: "in_progress"}, runState{status: "completed", conclusion: "success"})
 	var log bytes.Buffer
 	request.Log = &log
@@ -179,6 +180,7 @@ func TestVerificationRequestDispatchesWithARestrictedInstallationToken(t *testin
 }
 
 func TestVerificationOutcomeReachesTheHeartbeat(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name     string
 		runs     []runState
@@ -213,6 +215,7 @@ func TestVerificationOutcomeReachesTheHeartbeat(t *testing.T) {
 }
 
 func TestSupersededOrInterruptedVerificationSendsNoHeartbeat(t *testing.T) {
+	t.Parallel()
 	_, gatus, request := verificationFixture(t, runState{status: "completed", conclusion: "cancelled"})
 	var log bytes.Buffer
 	request.Log = &log
@@ -228,6 +231,7 @@ func TestSupersededOrInterruptedVerificationSendsNoHeartbeat(t *testing.T) {
 }
 
 func TestRejectedHeartbeatFailsTheRequest(t *testing.T) {
+	t.Parallel()
 	_, _, request := verificationFixture(t, runState{status: "completed", conclusion: "success"})
 	request.HeartbeatToken = strings.Repeat("rejected-token", 3)
 	if err := RequestVerification(context.Background(), request); err == nil || err.Error() != "heartbeat HTTP 401" {
@@ -236,6 +240,7 @@ func TestRejectedHeartbeatFailsTheRequest(t *testing.T) {
 }
 
 func TestVerificationRequestFailures(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name   string
 		change func(*githubAppServer, *VerificationRequest)
@@ -273,6 +278,7 @@ func TestVerificationRequestFailures(t *testing.T) {
 }
 
 func TestRateLimitDelaysTheNextPoll(t *testing.T) {
+	t.Parallel()
 	now := time.Unix(1_000, 0)
 	for _, test := range []struct {
 		status  int

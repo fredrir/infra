@@ -76,6 +76,7 @@ func playbookArgument(options process.Options) string {
 }
 
 func TestHostComparisonClassifiesCheckModeResults(t *testing.T) {
+	t.Parallel()
 	unchanged := junitCase("[fredrir-07] Configure Ubuntu hosts: ubuntu : Harden SSH authentication", "roles/ubuntu/tasks/main.yml:22", junitResult(false))
 	skipped := junitCase("[fredrir-06] Configure K3s workers: k3s : Assign worker capabilities", "roles/k3s/tasks/main.yml:180", `<skipped message="Conditional result was False"/>`)
 	changed := junitCase("[fredrir-04] Configure host network access: firewall : Configure host input filtering", "roles/firewall/tasks/main.yml:19", junitResult(true))
@@ -130,6 +131,7 @@ func TestHostComparisonClassifiesCheckModeResults(t *testing.T) {
 }
 
 func TestHostComparisonKeepsPlaybookOutputsApart(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	release := make(chan struct{})
 	commands := Commands{Work: t.TempDir(), Runner: process.Runner{Stdout: &stdout, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
@@ -158,6 +160,7 @@ func TestHostComparisonKeepsPlaybookOutputsApart(t *testing.T) {
 }
 
 func TestRunnerVerificationReportsRunnerPlayDifferences(t *testing.T) {
+	t.Parallel()
 	fleet := testRunnerFleet()
 	runner := junitCase("[infra-build-09] Verify dedicated build runners: build_runner : Install immutable trusted-job hook adapter", "roles/build_runner/tasks/state.yml:57", junitResult(true))
 	rejected := junitCase("[infra-build-09] Verify dedicated build runners: Reject declared runner state drift", "verify-runners.yml:92", `<failure message="The build VM differs from its declared runner state"/>`)
@@ -211,6 +214,7 @@ func TestRunnerVerificationReportsRunnerPlayDifferences(t *testing.T) {
 }
 
 func TestVerificationOutcomeSeparatesDifferencesFromErrors(t *testing.T) {
+	t.Parallel()
 	hosts := Differences{{System: "hosts", Host: "fredrir-04", Item: "Configure host network access: firewall : Enable host input filtering"}}
 	infrastructure := Differences{{System: "opentofu", Item: "cloudflare_dns_record.grafana update"}}
 	for _, test := range []struct {
@@ -241,6 +245,7 @@ func TestVerificationOutcomeSeparatesDifferencesFromErrors(t *testing.T) {
 }
 
 func TestDeclarationComparisonCombinesOpenTofuAndHosts(t *testing.T) {
+	t.Parallel()
 	changes := `{"@level":"info","@message":"OpenTofu 1.12.6","type":"version"}
 {"@level":"info","@message":"cloudflare_dns_record.grafana: Plan to update","change":{"resource":{"addr":"cloudflare_dns_record.grafana"},"action":"update"},"type":"planned_change"}
 {"@level":"info","@message":"Plan: 0 to add, 1 to change, 0 to destroy.","changes":{"add":0,"change":1,"remove":0,"operation":"plan"},"type":"change_summary"}
@@ -355,6 +360,7 @@ echo 'fredrir-04 : ok=1 changed=0 unreachable=0 failed=0 skipped=0'
 }
 
 func TestVolatileComparisonRunsDuringFleetComparison(t *testing.T) {
+	t.Parallel()
 	var started sync.WaitGroup
 	started.Add(2)
 	overlapping := make(chan struct{})
@@ -382,6 +388,7 @@ func TestVolatileComparisonRunsDuringFleetComparison(t *testing.T) {
 }
 
 func TestDeepVerificationComparesDeclarationsDuringLiveChecks(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	fleet := testRunnerFleet()

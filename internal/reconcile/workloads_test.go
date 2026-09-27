@@ -8,6 +8,7 @@ import (
 )
 
 func TestWorkloadRejectsWrongImageAndIncompleteRollout(t *testing.T) {
+	t.Parallel()
 	expected := artifactFixture(t, `{"kind":"Deployment","spec":{"replicas":2,"template":{"spec":{"containers":[{"name":"api","image":"example@sha256:desired"}]}}}}`)
 	actual := artifactFixture(t, `{"kind":"Deployment","metadata":{"name":"api","namespace":"y","generation":3},"spec":{"replicas":2,"template":{"spec":{"containers":[{"name":"api","image":"example@sha256:desired"}]}}},"status":{"observedGeneration":3,"replicas":2,"updatedReplicas":2,"availableReplicas":2}}`)
 	if err := workloadReady(expected, actual); err != nil {
@@ -30,6 +31,7 @@ func TestWorkloadRejectsWrongImageAndIncompleteRollout(t *testing.T) {
 }
 
 func TestReplicaCountDiffersOnlyWhenDeclared(t *testing.T) {
+	t.Parallel()
 	actual := artifactFixture(t, `{"kind":"Deployment","metadata":{"name":"api","namespace":"y","generation":2},"spec":{"replicas":3,"template":{"spec":{"containers":[{"name":"api","image":"example@sha256:desired"}]}}},"status":{"observedGeneration":2,"replicas":3,"updatedReplicas":3,"availableReplicas":3}}`)
 	for _, test := range []struct {
 		name, expected string
@@ -47,6 +49,7 @@ func TestReplicaCountDiffersOnlyWhenDeclared(t *testing.T) {
 }
 
 func TestMigrationRequiresCompletion(t *testing.T) {
+	t.Parallel()
 	expected := artifactFixture(t, `{"kind":"Job","spec":{"template":{"spec":{"containers":[{"name":"migrate","image":"example@sha256:new"}]}}}}`)
 	actual := artifactFixture(t, `{"kind":"Job","metadata":{"name":"migrate","namespace":"llunde-pyparser"},"spec":{"template":{"spec":{"containers":[{"name":"migrate","image":"example@sha256:new"}]}}},"status":{"succeeded":1,"conditions":[{"type":"Complete","status":"True"}]}}`)
 	if err := workloadReady(expected, actual); err != nil {
@@ -59,6 +62,7 @@ func TestMigrationRequiresCompletion(t *testing.T) {
 }
 
 func TestPinnedControllerWorkloadEvidence(t *testing.T) {
+	t.Parallel()
 	path := os.Getenv("INFRA_TEST_FLUX_EVIDENCE")
 	if path == "" {
 		t.Skip("requires isolated pinned-controller evidence")

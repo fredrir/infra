@@ -14,6 +14,7 @@ import (
 )
 
 func TestProjectDependencyChain(t *testing.T) {
+	t.Parallel()
 	if got := projectOwners("llunde-pyparser"); len(got) != 3 || got[1] != "llunde-pyparser-migration" || got[2] != "llunde-pyparser-application" {
 		t.Fatalf("incomplete migration chain: %v", got)
 	}
@@ -23,6 +24,7 @@ func TestProjectDependencyChain(t *testing.T) {
 }
 
 func TestSelectedProjectsIncludeEveryMigrationDependency(t *testing.T) {
+	t.Parallel()
 	commands := &Commands{}
 	plan := Plan{Affected: Selection{Projects: []string{"llunde", "llunde-pyparser", "y"}}}
 	want := []string{"project-llunde", "project-llunde-pyparser", "llunde-pyparser-migration", "llunde-pyparser-application", "project-y"}
@@ -35,6 +37,7 @@ func TestSelectedProjectsIncludeEveryMigrationDependency(t *testing.T) {
 }
 
 func TestRenderActiveOverlayLocally(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("INFRA_TEST_FLUX_RENDER") != "true" {
 		t.Skip("requires pinned kubectl and flux executables")
 	}
@@ -55,6 +58,7 @@ func TestRenderActiveOverlayLocally(t *testing.T) {
 }
 
 func TestReadOnlyProductionWorkloadContracts(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("INFRA_TEST_LIVE_READS") != "true" {
 		t.Skip("requires explicit read-only production validation")
 	}
@@ -80,6 +84,7 @@ func TestReadOnlyProductionWorkloadContracts(t *testing.T) {
 }
 
 func TestPlanRendersOnlyCompleteSelectedProjectLocally(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("INFRA_TEST_FLUX_RENDER") != "true" {
 		t.Skip("requires pinned kubectl and flux executables")
 	}
@@ -103,6 +108,7 @@ func TestPlanRendersOnlyCompleteSelectedProjectLocally(t *testing.T) {
 }
 
 func TestReadOnlyProductionScopedVerification(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("INFRA_TEST_LIVE_READS") != "true" {
 		t.Skip("requires explicit read-only production validation")
 	}
@@ -137,6 +143,7 @@ func TestReadOnlyProductionScopedVerification(t *testing.T) {
 }
 
 func TestPreflightFallsBackBeforeWritesForUnknownProject(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var calls []string
 	commands := &Commands{kubernetes: &kubernetesState{}, Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
@@ -164,6 +171,7 @@ func TestPreflightFallsBackBeforeWritesForUnknownProject(t *testing.T) {
 }
 
 func TestPreflightRejectsMissingArtifactPermission(t *testing.T) {
+	t.Parallel()
 	commands := &Commands{kubernetes: &kubernetesState{}, Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		return process.Result{}, fmt.Errorf("forbidden: externalartifacts")
 	}}}

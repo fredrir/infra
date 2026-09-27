@@ -21,6 +21,7 @@ func artifactFixture(t *testing.T, body string) resource {
 }
 
 func TestWorkloadSnapshotBatchesReadsWithoutReusingStalePolls(t *testing.T) {
+	t.Parallel()
 	calls := 0
 	commands := &Commands{Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		calls++
@@ -48,6 +49,7 @@ func TestWorkloadSnapshotBatchesReadsWithoutReusingStalePolls(t *testing.T) {
 }
 
 func TestArtifactOriginRequiresCurrentSourceEvenWhenContentIsUnchanged(t *testing.T) {
+	t.Parallel()
 	generator := artifactFixture(t, `{"spec":{"sources":[{"alias":"repo","kind":"GitRepository","name":"flux-system"}],"artifacts":[{"name":"project-y","originRevision":"@repo","copy":[{"from":"@repo/platform/projects/y/**","to":"@artifact/platform/projects/y/"},{"from":"@repo/platform/components/backup-job/**","to":"@artifact/platform/components/backup-job/"},{"from":"@repo/platform/clusters/production/settings.yaml","to":"@artifact/platform/clusters/production/settings.yaml"}]}]}}`)
 	old := strings.Repeat("a", 40)
 	target := strings.Repeat("b", 40)
@@ -67,6 +69,7 @@ func TestArtifactOriginRequiresCurrentSourceEvenWhenContentIsUnchanged(t *testin
 }
 
 func TestArtifactInputsRejectUnknownTransforms(t *testing.T) {
+	t.Parallel()
 	for _, from := range []string{"@other/foo/**", "@repo/foo/*.yaml", "@repo/../foo/**"} {
 		generator := artifactFixture(t, fmt.Sprintf(`{"spec":{"sources":[{"alias":"repo","kind":"GitRepository","name":"flux-system"}],"artifacts":[{"name":"project-y","originRevision":"@repo","copy":[{"from":%q,"to":"@artifact/foo/"}]}]}}`, from))
 		if _, err := artifactPaths(generator, "project-y"); err == nil {
@@ -76,6 +79,7 @@ func TestArtifactInputsRejectUnknownTransforms(t *testing.T) {
 }
 
 func TestArtifactConditionsRequireObservedGeneration(t *testing.T) {
+	t.Parallel()
 	item := artifactFixture(t, `{"metadata":{"name":"project-y","generation":2},"status":{"conditions":[{"type":"Ready","status":"True","observedGeneration":1}]}}`)
 	if err := conditionReady(item); err == nil {
 		t.Fatal("stale Ready accepted")
@@ -91,6 +95,7 @@ func TestArtifactConditionsRequireObservedGeneration(t *testing.T) {
 }
 
 func TestVerifyArtifactsRejectsStaleAndUnownedContent(t *testing.T) {
+	t.Parallel()
 	revision := strings.Repeat("a", 40)
 	digest := "sha256:" + strings.Repeat("b", 64)
 	generator := fmt.Sprintf(`{"metadata":{"name":"platform-artifacts","namespace":"flux-system","uid":"generator-id","generation":1},"spec":{"sources":[{"alias":"repo","kind":"GitRepository","name":"flux-system"}],"artifacts":[{"name":"project-y","originRevision":"@repo","copy":[{"from":"@repo/platform/projects/y/**","to":"@artifact/platform/projects/y/"}]}]},"status":{"conditions":[{"type":"Ready","status":"True","observedGeneration":1}],"inventory":[{"name":"project-y","namespace":"flux-system","digest":%q}]}}`, digest)
@@ -140,6 +145,7 @@ func TestVerifyArtifactsRejectsStaleAndUnownedContent(t *testing.T) {
 }
 
 func TestPinnedControllerArtifactEvidence(t *testing.T) {
+	t.Parallel()
 	path := os.Getenv("INFRA_TEST_FLUX_EVIDENCE")
 	if path == "" {
 		t.Skip("requires isolated pinned-controller evidence")

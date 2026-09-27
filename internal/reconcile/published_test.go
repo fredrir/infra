@@ -10,6 +10,7 @@ import (
 )
 
 func TestPublishedRevisionRequiresReadyProductionSource(t *testing.T) {
+	t.Parallel()
 	revision := strings.Repeat("a", 40)
 	for _, test := range []struct {
 		name, branch, artifact, ready string
