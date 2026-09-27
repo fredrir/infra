@@ -55,7 +55,7 @@
   - name: Remove the retired hosted reconciliation identity
     ansible.builtin.lineinfile:
       path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh/authorized_keys'
-      regexp: '(^|[ \t])ssh-ed25519[ \t]+AAAAC3NzaC1lZDI1NTE5AAAAIOJJbFoC1uYIOgoEHEnAbmR2NFIN57yJp3yBjVyZuEiZ([ \t]|$)'
+      regexp: '^ssh-ed25519[ \t]+AAAAC3NzaC1lZDI1NTE5AAAAIOJJbFoC1uYIOgoEHEnAbmR2NFIN57yJp3yBjVyZuEiZ([ \t]|$)'
       state: absent
   - name: Read the fleet flannel backends through the administrator API
     ansible.builtin.command:
