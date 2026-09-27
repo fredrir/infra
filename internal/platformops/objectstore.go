@@ -186,6 +186,7 @@ func objectStoreLifecycle(bucket ObjectStoreBucket) lifecycleConfiguration {
 func ensureObjectStoreBucket(ctx context.Context, client objectstore.Client, bucket ObjectStoreBucket, log io.Writer) error {
 	response, err := client.BucketRequest(ctx, http.MethodHead, bucket.Name, nil, nil, nil)
 	var status *objectstore.StatusError
+	created := false
 	switch {
 	case err == nil:
 		response.Body.Close()
@@ -193,6 +194,7 @@ func ensureObjectStoreBucket(ctx context.Context, client objectstore.Client, buc
 		if err := bucketCall(ctx, client, bucket.Name, nil, nil); err != nil {
 			return fmt.Errorf("create: %w", err)
 		}
+		created = true
 		fmt.Fprintln(log, "Created bucket", bucket.Name)
 	default:
 		return err
@@ -216,12 +218,12 @@ func ensureObjectStoreBucket(ctx context.Context, client objectstore.Client, buc
 	if _, err := applySetting(ctx, client, bucket.Name, "encryption", encryptionConfiguration{Algorithm: "AES256"}, log); err != nil {
 		return err
 	}
+	restored := map[string]bool{}
 	if versioned {
-		if _, err := applySetting(ctx, client, bucket.Name, "versioning", versioningConfiguration{Status: "Enabled"}, log); err != nil {
+		if restored["versioning"], err = applySetting(ctx, client, bucket.Name, "versioning", versioningConfiguration{Status: "Enabled"}, log); err != nil {
 			return err
 		}
 	}
-	restored := map[string]bool{"versioning": versioned && versioning.Status == "Suspended"}
 	if bucket.LockDays > 0 {
 		if restored["object-lock"], err = applySetting(ctx, client, bucket.Name, "object-lock", objectLockConfiguration{ObjectLockEnabled: "Enabled", Mode: "COMPLIANCE", Days: bucket.LockDays}, log); err != nil {
 			return err
@@ -230,7 +232,7 @@ func ensureObjectStoreBucket(ctx context.Context, client objectstore.Client, buc
 	if restored["lifecycle"], err = applySetting(ctx, client, bucket.Name, "lifecycle", objectStoreLifecycle(bucket), log); err != nil {
 		return err
 	}
-	if bucket.LockDays > 0 {
+	if bucket.LockDays > 0 && !created {
 		for _, subresource := range []string{"versioning", "object-lock", "lifecycle"} {
 			if restored[subresource] {
 				drift = append(drift, fmt.Errorf("%s had drifted on a locked bucket and was restored", subresource))
@@ -286,7 +288,7 @@ func applySetting[T any](ctx context.Context, client objectstore.Client, bucket,
 		return false, fmt.Errorf("%s: %w", subresource, err)
 	}
 	fmt.Fprintf(log, "Set %s on %s\n", subresource, bucket)
-	return found, nil
+	return true, nil
 }
 
 func currentSetting[T any](ctx context.Context, client objectstore.Client, bucket, subresource string) (T, bool, error) {

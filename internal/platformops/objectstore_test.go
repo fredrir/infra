@@ -273,11 +273,13 @@ func TestProvisionObjectStoreReportsRestoredDriftOnLockedBuckets(t *testing.T) {
 	if err := ProvisionObjectStore(context.Background(), config); err != nil {
 		t.Fatalf("first provisioning reported drift: %v", err)
 	}
-	for subresource, tampered := range map[string]string{
-		"object-lock": "<ObjectLockConfiguration><ObjectLockEnabled>Enabled</ObjectLockEnabled><Rule><DefaultRetention><Mode>COMPLIANCE</Mode><Days>1</Days></DefaultRetention></Rule></ObjectLockConfiguration>",
-		"lifecycle":   "<LifecycleConfiguration></LifecycleConfiguration>",
-		"versioning":  "<VersioningConfiguration><Status>Suspended</Status></VersioningConfiguration>",
+	for _, tampering := range [][2]string{
+		{"object-lock", "<ObjectLockConfiguration><ObjectLockEnabled>Enabled</ObjectLockEnabled><Rule><DefaultRetention><Mode>COMPLIANCE</Mode><Days>1</Days></DefaultRetention></Rule></ObjectLockConfiguration>"},
+		{"lifecycle", "<LifecycleConfiguration></LifecycleConfiguration>"},
+		{"lifecycle", ""},
+		{"versioning", "<VersioningConfiguration><Status>Suspended</Status></VersioningConfiguration>"},
 	} {
+		subresource, tampered := tampering[0], tampering[1]
 		original := hel1.buckets["restic-example"][subresource]
 		hel1.buckets["restic-example"][subresource] = tampered
 		err := ProvisionObjectStore(context.Background(), config)

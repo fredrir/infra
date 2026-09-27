@@ -554,7 +554,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Identities | Actions `<cell>-identities.json`; credentials `<cell>-identities.secret.sops.yaml`, referenced as `${NAME}`; writers hold `Write:<bucket>/*` |
 | Buckets | `buckets.yaml`; `object-store-provisioner` hourly: create, then write versioning, COMPLIANCE lock, SSE, lifecycle and quota only where they drift; never deletes |
 | S3 filter | `s3-filter` (platform-caddy, `s3-filter.caddyfile`) terminates TLS and rejects malformed queries (`;`, bad `%` escapes); reads and requests with exactly one SigV4 `Authorization` header for the cell's provisioner key pass; any other write must be an object PUT or DELETE, a multipart step (`uploads`, `uploadId`, `partNumber`) or a bucket `POST ?delete`, with no other query key, no duplicate key, no object-lock or governance-bypass header and no form upload; SeaweedFS 4.47 would otherwise authorize `?prefix=` requests as object writes |
-| Configuration drift | Versioning or a lock on a bucket that declares neither fails the provisioner; on locked buckets the provisioner restores drifted versioning, lock or lifecycle and fails the run |
+| Configuration drift | Versioning or a lock on a bucket that declares neither fails the provisioner; on an existing locked bucket the provisioner restores changed or deleted versioning, lock or lifecycle and fails the run, which a declared change to such a bucket also does once |
 | Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; `seaweedfs-nl` has no admin or worker and no lifecycle buckets; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
 | Logs | stderr only (`-logtostderr=true`) |
 | Parser dataset | `llunde-pyparser` application pods use `parser-dataset` on `seaweedfs-nl` via `AWS_ENDPOINT_URL_S3` and `AWS_CA_BUNDLE` (the object store CA only, so every botocore client in those pods trusts only `seaweedfs-nl`; other HTTPS clients keep their own roots); stored `s3://` URLs keep their original bucket name, since the parser resolves objects by key |
@@ -570,7 +570,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | --- | --- |
 | `ObjectStoreProvisionerFailing` | No successful provisioner run for 2 h |
 | `ObjectStoreProvisionerNeverSucceeded` | Enabled provisioner without any successful run for 90 min |
-| `ObjectStoreProvisionerRunFailed` | Any failed provisioner Job; stays until the Job is deleted |
+| `ObjectStoreProvisionerRunFailed` | The latest provisioner run failed for 30 min; clears after the next successful run |
 | `ObjectStoreWorkerDown` | Lifecycle worker metrics unreachable for 15 min |
 | `ObjectStoreLifecycleStalled` | Any shard without a lifecycle walk, or no lifecycle metrics, for 2 days |
 | `ParserDatasetMirrorFailing` | Enabled mirror without a successful run for 3 h |
@@ -584,7 +584,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Restore the filer store | Commands below: scale to 0, copy `/meta/filerldb` over `/data/filerldb` in a helper pod that mounts both PVCs, scale to 1 |
 | Reissue certificates | Decrypt the CA key on Macie or Archie; issue each cell's two leaves with the SANs below; replace `pki/<cell>-*.crt` and the `s3.key`/`internal.key` values; update the alert threshold |
 | Resolve versioning or lock drift on a cache bucket | Remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |
-| Failed provisioner run | Read `kubectl -n object-store logs job/<job>`; for drift restored on a locked bucket, find who changed it, since the filter admits only the provisioner key; then `kubectl -n object-store delete job <job>` |
+| Failed provisioner run | Read `kubectl -n object-store logs job/<job>`; for drift restored on a locked bucket, find who changed it, since the filter admits bucket configuration only from the provisioner key |
 | Any `seaweedfs-nl` incident | Suspend the mirror first (commands below), before investigating |
 | Restore the parser dataset | Commands below: suspend the mirror, run `parser-dataset-seed`, resume |
 | Resolve versioning or lock drift on `parser-dataset` | Suspend the mirror; forced `weed shell` cleanup below with `parser-dataset`; provisioner run; seed; resume |

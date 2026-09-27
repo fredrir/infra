@@ -776,7 +776,7 @@ func TestObjectStoreProvisionerFailuresStayVisible(t *testing.T) {
 		case resource["kind"] == "PrometheusRule":
 			for _, rule := range at(resource, "spec", "groups", 0, "rules").([]any) {
 				expression := fmt.Sprint(at(rule, "expr"))
-				alerted = alerted || (strings.Contains(expression, "kube_job_status_failed") && strings.Contains(expression, `job_name=~"object-store-provisioner-.+"`))
+				alerted = alerted || (at(rule, "alert") == "ObjectStoreProvisionerRunFailed" && strings.Contains(expression, `kube_cronjob_status_last_schedule_time{namespace="object-store",cronjob="object-store-provisioner"}`) && strings.Contains(expression, "> on(namespace,cronjob) kube_cronjob_status_last_successful_time"))
 			}
 		}
 	}

@@ -96,11 +96,14 @@ spec:
           annotations:
             summary: Object store provisioner has no successful run; buckets may lack encryption, lifecycle or quota
         - alert: ObjectStoreProvisionerRunFailed
-          expr: kube_job_status_failed{namespace="object-store",job_name=~"object-store-provisioner-.+"} > 0
+          expr: |
+            kube_cronjob_status_last_schedule_time{namespace="object-store",cronjob="object-store-provisioner"}
+            > on(namespace,cronjob) kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="object-store-provisioner"}
+          for: 30m
           labels:
-            severity: critical
+            severity: warning
           annotations:
-            summary: An object store provisioner run failed, for example after restoring drift on a locked bucket; read its log, then delete the Job
+            summary: The latest object store provisioner run failed, for example after restoring drift on a locked bucket; read its log
         - alert: ParserDatasetMirrorFailing
           expr: |
             (time() - kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="parser-dataset-mirror"} > 10800)
