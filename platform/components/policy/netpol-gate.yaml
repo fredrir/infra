@@ -1,0 +1,151 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: netpol-gate
+spec:
+  failurePolicy: Fail
+  reinvocationPolicy: Never
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      resources:
+      - pods
+    namespaceSelector:
+      matchExpressions:
+      - key: infra.fredrir.com/tier
+        operator: In
+        values:
+        - project
+        - ci
+  matchConditions:
+  - name: ungated
+    expression: '!has(object.spec.initContainers) || !object.spec.initContainers.exists(c, c.name == "netpol-gate")'
+  mutations:
+  - patchType: JSONPatch
+    jsonPatch:
+      expression: >-
+        (has(object.spec.initContainers) ? [] : [JSONPatch{op: "add", path: "/spec/initContainers", value: []}])
+        + [JSONPatch{op: "add", path: "/spec/initContainers/0", value: Object.spec.initContainers{
+          name: "netpol-gate",
+          image: "ghcr.io/fredrir/netpol-gate@sha256:b5ba08135d0e3a2a2429c7697ff00c98501940d031916c50b326310ca33d45f4",
+          imagePullPolicy: "IfNotPresent",
+          args: ["wait", "--canary", "10.43.0.21", "--canary", "10.43.0.22"],
+          terminationMessagePolicy: "FallbackToLogsOnError",
+          resources: Object.spec.initContainers.resources{
+            requests: {"cpu": "10m", "memory": "16Mi"},
+            limits: {"cpu": "100m", "memory": "32Mi"}
+          },
+          securityContext: Object.spec.initContainers.securityContext{
+            allowPrivilegeEscalation: false,
+            readOnlyRootFilesystem: true,
+            runAsNonRoot: true,
+            runAsUser: 65534,
+            runAsGroup: 65534,
+            capabilities: Object.spec.initContainers.securityContext.capabilities{drop: ["ALL"]},
+            seccompProfile: Object.spec.initContainers.securityContext.seccompProfile{type: "RuntimeDefault"}
+          }
+        }}]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: netpol-gate
+spec:
+  policyName: netpol-gate
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: netpol-gate
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - pods
+    namespaceSelector:
+      matchExpressions:
+      - key: infra.fredrir.com/tier
+        operator: In
+        values:
+        - project
+        - ci
+  validations:
+  - expression: >-
+      request.operation != "CREATE" || (
+        has(object.spec.initContainers) && object.spec.initContainers.size() > 0
+        && object.spec.initContainers[0].name == "netpol-gate"
+        && object.spec.initContainers[0].image == "ghcr.io/fredrir/netpol-gate@sha256:b5ba08135d0e3a2a2429c7697ff00c98501940d031916c50b326310ca33d45f4"
+        && has(object.spec.initContainers[0].args) && object.spec.initContainers[0].args == ["wait", "--canary", "10.43.0.21", "--canary", "10.43.0.22"]
+        && !has(object.spec.initContainers[0].command) && !has(object.spec.initContainers[0].workingDir)
+        && !has(object.spec.initContainers[0].env) && !has(object.spec.initContainers[0].envFrom)
+        && (!has(object.spec.initContainers[0].volumeMounts) || object.spec.initContainers[0].volumeMounts.all(m,
+          m.mountPath == "/var/run/secrets/kubernetes.io/serviceaccount" && has(m.readOnly) && m.readOnly && !has(m.subPath) && !has(m.subPathExpr)))
+        && !has(object.spec.initContainers[0].volumeDevices)
+        && !has(object.spec.initContainers[0].restartPolicy))
+    message: Untrusted pods must start behind the egress policy gate
+  - expression: >-
+      request.operation != "UPDATE"
+      || (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : [])
+      == (has(oldObject.spec.initContainers) ? oldObject.spec.initContainers.map(c, c.image) : [])
+    message: Init container images are immutable
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: netpol-gate
+spec:
+  policyName: netpol-gate
+  validationActions:
+  - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: netpol-gate-ephemeral
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - UPDATE
+      resources:
+      - pods/ephemeralcontainers
+    namespaceSelector:
+      matchExpressions:
+      - key: infra.fredrir.com/tier
+        operator: In
+        values:
+        - project
+        - ci
+  validations:
+  - expression: >-
+      !has(object.spec.initContainers) || !object.spec.initContainers.exists(c, c.name == "netpol-gate")
+      || (has(object.status.initContainerStatuses) && object.status.initContainerStatuses.exists(s, s.name == "netpol-gate"
+      && has(s.state.terminated) && s.state.terminated.exitCode == 0))
+    message: Ephemeral containers wait until the egress policy gate has passed
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: netpol-gate-ephemeral
+spec:
+  policyName: netpol-gate-ephemeral
+  validationActions:
+  - Deny

@@ -223,13 +223,17 @@ func compileEvaluator(root string) (evaluator, error) {
 	if e != nil {
 		return evaluator{}, e
 	}
-	data, e := os.ReadFile(filepath.Join(root, "platform/components/policy/admission.yaml"))
-	if e != nil {
-		return evaluator{}, e
-	}
-	docs, e := decodeObjects(data)
-	if e != nil {
-		return evaluator{}, e
+	var docs []object
+	for _, path := range []string{"platform/components/policy/admission.yaml", "platform/components/policy/netpol-gate.yaml"} {
+		data, e := os.ReadFile(filepath.Join(root, path))
+		if e != nil {
+			return evaluator{}, e
+		}
+		decoded, e := decodeObjects(data)
+		if e != nil {
+			return evaluator{}, e
+		}
+		docs = append(docs, decoded...)
 	}
 	v := evaluator{programs: map[string][]cel.Program{}}
 	for _, doc := range docs {

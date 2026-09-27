@@ -542,6 +542,20 @@ Frontend deployment records `publication-wait` until `production` contains the p
 Publication has an eight-minute budget within the existing ten-minute deployment job; total delivery latency includes both stages, and divergent production history fails immediately.
 Measured results and scope limits are recorded in [CI performance](ci-performance.md#execution-measurements).
 
+## Egress policy gate
+
+| Egress policy gate | Value |
+| --- | --- |
+| Scope | Pods in `ci` and `project` tier namespaces; MutatingAdmissionPolicy `netpol-gate` inserts init container 0; ValidatingAdmissionPolicy `netpol-gate` rejects pods without the exact gate and init container image changes; `netpol-gate-ephemeral` rejects ephemeral containers until the gate has passed |
+| Proof | Per canary replica `10.43.0.21` and `10.43.0.22` (Services `canary-0` and `canary-1` in `netpol-canary`): `8080` open, `8081` refused with `ECONNREFUSED`, `8080` open; the namespace's `netpol-gate` NetworkPolicy allows only `8080`. Timeouts and other errors hold |
+| Deadline | None; the pod's own `activeDeadlineSeconds` or rollout progress deadline applies. The gate logs why it holds once a minute |
+| Symptom | New pods in `Init:0/1`; `kubectl -n <namespace> logs <pod> -c netpol-gate` |
+| Canary | StatefulSet `canary`, one replica per critical node; `kubectl -n netpol-canary get pods -o wide`; running pods are unaffected by an outage |
+| Ownership | Admission policies and `ci-job-credentials` reconcile together in `platform-policy`; the canary in `platform-netpol-gate`, which depends only on `platform-policy` |
+| Image update | Publish, confirm an anonymous pull, re-pin the canary and both `netpol-gate` policies in one commit |
+| Emergency bypass | `flux suspend kustomization platform-policy`, `kubectl delete mutatingadmissionpolicybinding netpol-gate`, `kubectl delete validatingadmissionpolicybinding netpol-gate`; resume after the fix lands |
+| Tightened policy | Established connections survive a NetworkPolicy change; restart the affected pods |
+
 ## Object store
 
 | Setting | Value |

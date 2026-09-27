@@ -8,6 +8,7 @@ go_test(
         "helpers_test.go",
         "listener_test.go",
         "netpolcanary_test.go",
+        "netpolgate_test.go",
         "node_test.go",
         "objectstore_alerts_test.go",
         "objectstore_capacity_test.go",
@@ -32,10 +33,15 @@ go_test(
     ],
     deps = [
         "//internal/kustomize",
+        "@com_github_evanphx_json_patch_v5//:json-patch",
         "@dev_cel_cel_go//cel",
         "@dev_cel_cel_go//common/types",
+        "@dev_cel_cel_go//common/types/ref",
+        "@dev_cel_cel_go//common/types/traits",
         "@in_yaml_go_yaml_v3//:yaml",
         "@io_k8s_apimachinery//pkg/api/resource",
+        "@io_k8s_apimachinery//pkg/labels",
+        "@io_k8s_apimachinery//pkg/selection",
         "@io_k8s_sigs_kustomize_kyaml//filesys",
     ],
 )
