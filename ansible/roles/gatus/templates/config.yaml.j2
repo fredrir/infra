@@ -225,17 +225,6 @@ external-endpoints:
           failure-threshold: 1
           success-threshold: 1
           send-on-resolved: true
-    - name: deep
-      group: reconciliation
-      token: "${GATUS_TOKEN_RECONCILIATION_DEEP}"
-      heartbeat:
-        interval: 3h
-      alerts:
-        - type: email
-          failure-threshold: 1
-          success-threshold: 1
-          send-on-resolved: true
-          description: Hourly GitHub deep verification failed or stopped reporting; the Gatus result names the run
     - name: verification
       group: reconciliation
       token: "${GATUS_TOKEN_RECONCILIATION_VERIFICATION}"

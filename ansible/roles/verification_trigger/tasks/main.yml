@@ -1,55 +1,32 @@
-- name: Require the GitHub App installation
-  ansible.builtin.assert:
-    that:
-      - verification_trigger_app_id is integer
-      - verification_trigger_app_id > 0
-      - verification_trigger_installation_id is integer
-      - verification_trigger_installation_id > 0
+- name: Read dispatcher unit files
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ item }}"
+  loop: [infra-verification-request.timer, infra-verification-request.service]
+  register: dispatcher_units
 
-- name: Install the verified infrastructure binary
-  ansible.builtin.import_role:
-    name: infra_binary
-  vars:
-    infra_binary_url: "https://github.com/fredrir/infra/releases/download/{{ verification_trigger_cli.tag }}/infra-linux-amd64"
-    infra_binary_revision: "{{ verification_trigger_cli.revision }}"
-    infra_binary_sha256: "{{ verification_trigger_cli.sha256 }}"
-  tags: [infra_binary]
-
-- name: Create the verification credential directory
-  ansible.builtin.file:
-    path: /etc/infra-verification
-    state: directory
-    owner: root
-    group: root
-    mode: "0700"
-
-- name: Install the encrypted verification credentials
-  ansible.builtin.import_role:
-    name: host_secrets
-    tasks_from: install.yml
-  vars:
-    host_secrets_src: credentials.sops.yaml
-    host_secrets_dest: /etc/infra-verification/credentials.sops.yaml
-
-- name: Install the verification request units
-  ansible.builtin.template:
-    src: "{{ item }}.j2"
-    dest: "/etc/systemd/system/{{ item }}"
-    owner: root
-    group: root
-    mode: "0644"
-  loop: [infra-verification-request.service, infra-verification-request.timer]
-  notify: Restart the verification request timer
-
-- name: Schedule verification requests
+- name: Stop dispatcher units
   ansible.builtin.systemd_service:
-    name: infra-verification-request.timer
-    state: started
-    enabled: true
-    daemon_reload: true
+    name: "{{ item.item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ dispatcher_units.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stat.exists
 
-- name: Remove plaintext verification credentials
+- name: Remove dispatcher files
   ansible.builtin.file:
-    path: "/etc/infra-verification/{{ item }}"
+    path: "{{ item }}"
     state: absent
-  loop: [github-app.pem, gatus-token]
+  loop:
+    - /etc/systemd/system/infra-verification-request.timer
+    - /etc/systemd/system/infra-verification-request.service
+    - /etc/infra-verification
+    - /run/infra-verification-request
+    - /usr/local/bin/infra
+  register: dispatcher_files
+
+- name: Reload dispatcher removal
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: dispatcher_files.changed

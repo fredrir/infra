@@ -142,7 +142,7 @@ func TestHostSecretsComeFromTheImportingRole(t *testing.T) {
 			}
 		}
 	}
-	if slices.Sort(importers); !slices.Equal(importers, []string{"control_backup", "gatus", "reconciler", "verification_trigger"}) {
+	if slices.Sort(importers); !slices.Equal(importers, []string{"control_backup", "gatus", "reconciler"}) {
 		t.Errorf("host secrets imported by %v", importers)
 	}
 	defaults, err := filepath.Glob(filepath.Join(repository, "ansible/roles/*/defaults/*.yml"))

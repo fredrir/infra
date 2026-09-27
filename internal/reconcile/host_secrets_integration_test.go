@@ -38,18 +38,6 @@ case "$1 $2" in
   done
   echo "credentials=$(ls "$CREDENTIALS_DIRECTORY")"
   hidden ;;
-"reconcile request-verification")
-  for argument; do
-    case "$argument" in
-    --private-key=*) key=${argument#*=} ;;
-    --heartbeat-token=*) token=${argument#*=} ;;
-    esac
-  done
-  echo "private_key=$(sha256sum < "$key" | cut -d ' ' -f 1)"
-  echo "token=$(sha256sum < "$token" | cut -d ' ' -f 1)"
-  echo "owner=$(stat -c '%u %a' "$key" "$token" | sort -u | paste -sd ,)"
-  echo "user=$(id -u)"
-  hidden ;;
 esac
 `
 	secretsStubGatus = `#!/usr/bin/python3
@@ -141,8 +129,6 @@ func TestHostSecretsWithSystemdContainer(t *testing.T) {
         fredrir-06:
           tailscale_ip: 100.64.0.1
           architecture: amd64
-          verification_trigger_app_id: 1
-          verification_trigger_installation_id: 2
     control:
       hosts:
         fredrir-07: {}
@@ -262,15 +248,13 @@ func TestHostSecretsWithSystemdContainer(t *testing.T) {
 	}
 	control := map[string]string{"RESTIC_PASSWORD": "p \"q\" $HOME \\ '" + random(16), "AWS_ACCESS_KEY_ID": "AKIA" + random(8), "AWS_SECRET_ACCESS_KEY": random(20), "BACKUP_HEARTBEAT_TOKEN": random(20)}
 	gatus := map[string]string{"GATUS_SMTP_USERNAME": "AKIA" + random(8), "GATUS_SMTP_PASSWORD": base64.StdEncoding.EncodeToString(smtpPassword)}
-	for _, endpoint := range []string{"BACKUPS_PARSER", "BACKUPS_Y", "BACKUPS_PORTFOLIO", "BACKUPS_ATTIC", "BACKUPS_CONTROL", "RECONCILIATION_VERIFICATION"} {
+	for _, endpoint := range []string{"BACKUPS_PARSER", "BACKUPS_Y", "BACKUPS_PORTFOLIO", "BACKUPS_ATTIC", "BACKUPS_CONTROL", "RECONCILIATION_APPLY", "RECONCILIATION_VERIFICATION"} {
 		gatus["GATUS_TOKEN_"+endpoint] = random(20)
 	}
-	credentials := map[string]string{"private_key": "-----BEGIN TEST KEY-----\n" + random(24) + "\n" + random(24) + "\n-----END TEST KEY-----\n", "token": random(20)}
 	controlSecrets := "tree/ansible/roles/control_backup/files/control.sops.yaml"
 	gatusSecrets := "tree/ansible/roles/gatus/files/secrets.sops.yaml"
 	encrypt(controlSecrets, control, admin, host)
 	encrypt(gatusSecrets, gatus, admin, host)
-	encrypt("tree/ansible/roles/verification_trigger/files/credentials.sops.yaml", credentials, admin, host)
 	encrypt("foreign.sops.yaml", control, admin)
 
 	write("infra", secretsStubInfra, 0o755)
@@ -291,10 +275,8 @@ func TestHostSecretsWithSystemdContainer(t *testing.T) {
 install -D -m 0600 /fixture/gatus.tar.gz /var/cache/gatus/binary.tar.gz
 ip address add 100.64.0.1/32 dev lo
 printf '[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/true\n' > /etc/systemd/system/tailscaled.service
-install -d -m 0700 /etc/platform-backups /etc/infra-verification
+install -d -m 0700 /etc/platform-backups
 echo plaintext > /etc/platform-backups/control.env
-echo plaintext > /etc/infra-verification/github-app.pem
-echo plaintext > /etc/infra-verification/gatus-token
 systemctl daemon-reload`); err != nil {
 		t.Fatalf("guest setup: %v\n%s", err, output)
 	}
@@ -382,13 +364,20 @@ systemctl daemon-reload`); err != nil {
 	controlPlay(true)
 	t.Log("check mode compares the installed ciphertext without printing plaintext")
 
+	must("docker", "exec", name, "sh", "-c", "mkdir -p /etc/infra-verification; printf secret > /etc/infra-verification/plaintext; printf '[Service]\nExecStart=/bin/sleep infinity\n' > /etc/systemd/system/infra-verification-request.service; printf '[Timer]\nOnCalendar=daily\n[Install]\nWantedBy=timers.target\n' > /etc/systemd/system/infra-verification-request.timer; systemctl daemon-reload; systemctl enable --now infra-verification-request.timer; systemctl start infra-verification-request.service")
 	monitorPlay()
+	absent("/etc/infra-verification", "/etc/systemd/system/infra-verification-request.timer", "/etc/systemd/system/infra-verification-request.service", "/usr/local/bin/infra")
+	for _, unit := range []string{"infra-verification-request.service", "infra-verification-request.timer"} {
+		if _, err := run("docker", "exec", name, "systemctl", "is-active", unit); err == nil {
+			t.Fatalf("retired unit %s remains active", unit)
+		}
+	}
 	for _, mode := range [][]string{nil, {"--check"}} {
 		if output := monitorPlay(mode...); len(changed(output)) != 0 {
 			t.Fatalf("monitor %v is not idempotent: %q", mode, changed(output))
 		}
 	}
-	absent("/etc/infra-verification/github-app.pem", "/etc/infra-verification/gatus-token", "/run/gatus/secrets.env")
+	absent("/run/gatus/secrets.env")
 	config := must("docker", "exec", name, "cat", "/etc/gatus/config.yaml")
 	if strings.Contains(config, "AKIA") || !strings.Contains(config, "https://"+grafana+"/login") {
 		t.Fatalf("monitor settings hold secrets or miss the Grafana endpoint:\n%s", config)
@@ -405,15 +394,6 @@ systemctl daemon-reload`); err != nil {
 	}
 	t.Log("Gatus merges its plain settings with secrets decrypted at start, without access to the host key or a plaintext file left behind")
 
-	must("docker", "exec", name, "systemctl", "start", "infra-verification-request.service")
-	verification := records("infra-verification-request.service", recorded)
-	user = verification["user"]
-	if verification["private_key"] != digest(credentials["private_key"]) || verification["token"] != digest(credentials["token"]) || verification["owner"] != user+" 600" || user == "0" || verification["key"] != "hidden" {
-		t.Fatalf("verification request started with %v", verification)
-	}
-	absent("/run/infra-verification-request")
-	t.Log("verification credentials are decrypted at start into a private runtime directory that is removed after the run")
-
 	gatus["GATUS_TOKEN_BACKUPS_CONTROL"] = random(20)
 	encrypt(gatusSecrets, gatus, admin, host)
 	if output := monitorPlay(); !slices.Contains(changed(output), "gatus : Restart Gatus") {
@@ -422,10 +402,5 @@ systemctl daemon-reload`); err != nil {
 	records("gatus.service", func(values map[string]string) bool {
 		return values["GATUS_TOKEN_BACKUPS_CONTROL"] == digest(gatus["GATUS_TOKEN_BACKUPS_CONTROL"])
 	})
-	must("docker", "exec", name, "sed", "-i", "s/OnCalendar=hourly/OnCalendar=daily/", "/etc/systemd/system/infra-verification-request.timer")
-	if output := monitorPlay("--check"); !slices.Equal(changed(output), []string{"verification_trigger : Install the verification request units", "verification_trigger : Restart the verification request timer"}) {
-		t.Fatalf("edited verification timer reported as %q", changed(output))
-	}
-	monitorPlay()
-	t.Log("changed monitor secrets restart Gatus with the new values, and an edited timer is reported and repaired")
+	t.Log("changed monitor secrets restart Gatus with the new values")
 }

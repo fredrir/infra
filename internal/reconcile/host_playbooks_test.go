@@ -40,7 +40,7 @@ func TestHostPlaybooksFollowRoleClosures(t *testing.T) {
 		{"cluster playbook", []string{"ansible/k3s.yml"}, []string{"k3s.yml"}},
 		{"secret decryption", []string{"ansible/roles/host_secrets/tasks/main.yml"}, []string{"control-backup.yml", "external.yml"}},
 		{"shared transport role", []string{"ansible/roles/tailscale/tasks/install.yml"}, []string{"transport.yml", "external.yml", "volatile.yml"}},
-		{"role used through imports", []string{"ansible/roles/infra_binary/tasks/main.yml"}, []string{"control-backup.yml", "infra-cli.yml", "build-runners.yml", "external.yml"}},
+		{"role used through imports", []string{"ansible/roles/infra_binary/tasks/main.yml"}, []string{"control-backup.yml", "infra-cli.yml", "build-runners.yml"}},
 		{"monitor role", []string{"ansible/roles/gatus/tasks/main.yml"}, []string{"external.yml"}},
 		{"runner fleet", []string{"build/runners.json"}, []string{"build-runners.yml"}},
 		{"CLI release", []string{"build/cli-release.json"}, []string{"build-runners.yml", "external.yml"}},
