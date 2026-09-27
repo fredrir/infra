@@ -562,7 +562,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Mirror guard | The sync runs only when `parser-dataset/.mirror-seeded` exists and `parser-dataset` holds at least 90% of the AWS object count in the four prefixes; `parser-dataset-seed` (suspended, run on demand) copies AWS into `nl`, checks every AWS object arrived and only then writes the sentinel; a recreated or emptied bucket has no sentinel; `mirror.sh unseed` removes it on purpose; the sync also refuses a sentinel older than `SEED_NOT_BEFORE` in the unmanaged ConfigMap `parser-dataset-mirror-fence`, which a parser rollback writes, so after a rollback only a fresh seed re-enables the mirror, even if the sentinel survived |
 | AWS prefixes | Mirror-only: an object written straight to the four AWS prefixes is delete-markered by the next sync; write through `seaweedfs-nl` |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
-| Disk guard | 1 GiB volumes; `hel1` `-volume.max=60` (60 GiB), `nl` `-volume.max=200` (200 GiB); read-only below 15% free node disk |
+| Disk guard | 1 GiB volumes; `hel1` `-volume.max=76` (76 GiB), `nl` `-volume.max=200` (200 GiB); every cell keeps its quota sum × 1.3 within `-volume.max` (per-bucket partial volumes and garbage below the 30% vacuum threshold) and `-volume.max` + 4 GiB within its `data` PVC (one compaction copy, writes past the 1 GiB volume limit, filer store and indexes); read-only below 15% free node disk |
 | Memory | `hel1` server GOMEMLIMIT 512MiB, request 384Mi, limit 768Mi; `nl` server GOMEMLIMIT 320MiB, request 224Mi, limit 512Mi; `meta-backup` GOMEMLIMIT 160MiB, request 64Mi, limit 256Mi; `s3-filter` GOMEMLIMIT 96MiB, request 32Mi, limit 128Mi |
 | Mirror memory | rclone fills one read-ahead buffer per transfer whenever the destination accepts data slower than the source serves it, so `mirror.sh` uses 4 MiB buffers and seed and restore copy with 8 transfers; `parser-dataset-seed` GOMEMLIMIT 288MiB, limit 384Mi (peak 141 MiB with eight 100 MB objects in flight to `nl` at 16 MB/s); `parser-dataset-mirror` GOMEMLIMIT 192MiB, limit 256Mi (peak 114 MiB with four) |
 | Certificates expire | 2029-09-26; `ObjectStoreCertificateExpiring` from 2029-08-27 |
@@ -571,6 +571,8 @@ Every alert has promtool cases in `internal/policy/testdata/object-store-alerts.
 
 | Alert | Fires |
 | --- | --- |
+| `ObjectStoreBackupBucketFilling` | A `restic-*` bucket above 70% of its quota for 1 h |
+| `ObjectStoreVolumesNearLimit` | A cell above 85% of its volume slots for 30 min |
 | `ObjectStoreProvisionerFailing` | No successful provisioner run for 2 h |
 | `ObjectStoreProvisionerNeverSucceeded` | Enabled provisioner without any successful run for 90 min |
 | `ObjectStoreProvisionerRunFailed` | The latest provisioner run failed for 30 min; clears after the next successful run |
@@ -585,6 +587,8 @@ Every alert has promtool cases in `internal/policy/testdata/object-store-alerts.
 | Add an identity | Entry in `<cell>-identities.json`; credentials through `sops set`; merge; the identity ConfigMap hash restarts the cell |
 | Rotate a credential | `sops set` the cell credential and its consumer copy; merge; `kubectl -n object-store rollout restart statefulset/seaweedfs-<cell>` |
 | Add a bucket | Entry in `buckets.yaml`; merge; provisioner applies within an hour |
+| Raise a `restic-*` quota | The bucket cannot be emptied: pruned data stays locked 30 days, then noncurrent 31 days. Raise `quotaGiB` in `buckets.yaml` on `ObjectStoreBackupBucketFilling`, before `ObjectStoreBucketReadOnly`; keep the cell's quota sum × 1.3 within `-volume.max`, raising it within the PVC first if needed; merge; run the provisioner |
+| Volume slots near the limit | `volume.list` in `weed shell` shows which collections hold them; lower a cache bucket's quota or raise `-volume.max` within the PVC; restic buckets only shrink as their versions expire |
 | Restore the filer store | Commands below: scale to 0, copy `/meta/filerldb` over `/data/filerldb` in a helper pod that mounts both PVCs, scale to 1 |
 | Reissue certificates | Decrypt the CA key on Macie or Archie; issue each cell's two leaves with the SANs below; replace `pki/<cell>-*.crt` and the `s3.key`/`internal.key` values; update the alert threshold |
 | Resolve versioning or lock drift on a cache bucket | Remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |

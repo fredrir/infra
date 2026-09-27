@@ -72,7 +72,7 @@ spec:
             - -master.volumeSizeLimitMB=1024
             - -master.defaultReplication=000
             - -master.telemetry=false
-            - -volume.max=60
+            - -volume.max=76
             - -volume.minFreeSpace=15
             - -volume.index=memory
             - -filer

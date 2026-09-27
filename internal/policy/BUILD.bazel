@@ -9,6 +9,7 @@ go_test(
         "listener_test.go",
         "node_test.go",
         "objectstore_alerts_test.go",
+        "objectstore_capacity_test.go",
         "objectstore_dataset_scope_test.go",
         "objectstore_locked_test.go",
         "objectstore_mirror_test.go",

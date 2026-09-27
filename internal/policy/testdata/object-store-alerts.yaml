@@ -272,6 +272,61 @@ tests:
   - eval_time: 1h
     alertname: ObjectStoreCertificateExpiring
     exp_alerts: []
+- name: a restic bucket above 70% of its quota
+  interval: 5m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="restic-y"}
+    values: 650x6 750x30
+  - series: SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="restic-y"}
+    values: 1000x36
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="restic-portfolio"}
+    values: 650x36
+  - series: SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="restic-portfolio"}
+    values: 1000x36
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="ci-nsql-main"}
+    values: 850x36
+  - series: SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="ci-nsql-main"}
+    values: 1000x36
+  alert_rule_test:
+  - eval_time: 1h
+    alertname: ObjectStoreBackupBucketFilling
+    exp_alerts: []
+  - eval_time: 1h35m
+    alertname: ObjectStoreBackupBucketFilling
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        service: seaweedfs-hel1
+        bucket: restic-y
+      exp_annotations:
+        summary: A locked restic bucket is above 70% of its quota and cannot be emptied; raise quotaGiB in buckets.yaml before it turns read-only
+- name: hel1 volume slots at 87%
+  interval: 1m
+  input_series:
+  - series: SeaweedFS_volumeServer_volumes{namespace="object-store",service="seaweedfs-hel1",collection="ci-nsql-main",type="volume"}
+    values: 40x5 46x60
+  - series: SeaweedFS_volumeServer_volumes{namespace="object-store",service="seaweedfs-hel1",collection="restic-parser",type="volume"}
+    values: 20x65
+  - series: SeaweedFS_volumeServer_volumes{namespace="object-store",service="seaweedfs-hel1",collection="restic-parser",type="ec"}
+    values: 30x65
+  - series: SeaweedFS_volumeServer_max_volumes{namespace="object-store",service="seaweedfs-hel1"}
+    values: 76x65
+  - series: SeaweedFS_volumeServer_volumes{namespace="object-store",service="seaweedfs-nl",collection="parser-dataset",type="volume"}
+    values: 150x65
+  - series: SeaweedFS_volumeServer_max_volumes{namespace="object-store",service="seaweedfs-nl"}
+    values: 200x65
+  alert_rule_test:
+  - eval_time: 30m
+    alertname: ObjectStoreVolumesNearLimit
+    exp_alerts: []
+  - eval_time: 40m
+    alertname: ObjectStoreVolumesNearLimit
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        service: seaweedfs-hel1
+      exp_annotations:
+        summary: An object store cell uses more than 85% of its volume slots; when they run out every bucket stops taking writes, even under its quota
 - name: parser-dataset loses 18% of its bytes at once
   interval: 5m
   input_series:
