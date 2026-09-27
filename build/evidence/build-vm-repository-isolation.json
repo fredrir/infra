@@ -225,6 +225,57 @@
    "release_seconds": 0.002
   },
   "pool_variable": "INFRA_VM_POOL_QUALIFIED false in the seven repositories for the admission role and the cutover applies; restored to true after verification",
-  "missed_consumer_pins": "Not caught before the cutover: the six consumer repositories still pinned workflows that start their own Docker engine, which the isolated accounts cannot, so their VM jobs would fail; no consumer job reached the VM before INFRA_VM_POOL_QUALIFIED was set false in those six at 13:18Z, to be restored per repository once its pin is proven on the VM"
+  "missed_consumer_pins": "Not caught before the cutover: the six consumer repositories still pinned workflows that start their own Docker engine, which the isolated accounts cannot, so their VM jobs would fail; no consumer job reached the VM before INFRA_VM_POOL_QUALIFIED was set false in those six at 13:18Z, to be restored per repository once its pin is proven on the VM",
+  "consumer_window": {
+   "trust": "b0c5b601 allowed build-image.yml@607c3058 beside each current pin in the five deploy policies; homebrew-tap 3a2a0e84, nur-packages f50e6d2b and homebrew-nsql 6ff790c8 did the same for packages-publish.yml after the first channel publish was refused with HTTP 403",
+   "umask_incident": "the first Y deploy (425fc375, ae60fd4c) shipped y-api with /app/package.json and y-web with three /srv assets as root-only 0600 files because listeners ran with UMask=0077 and Dagger uploads host modes; both were reverted (c7c9d6fb, 2f430fe5), b6e33e89 set UMask=0022, and a rerun reproduced the same digests because reused work trees keep their modes, so its deploys were reverted before apply (cfb99353) and ed9a82dc replaced all 11 listener work trees",
+   "canary": "images.yml refresh 36332802876 rebuilt runner-check 3a06d57e, runner-rust f439a565, backup-tools ba37b048 and caddy 6f0167c8 with every source-copied file world-readable",
+   "proofs": [
+    {
+     "repository": "Y",
+     "run": 36329067113,
+     "attempt": 3,
+     "images": {
+      "y-api": "sha256:397f91a650f193c89b21a47d84403fb0f6e059583f8a7602d26e1dcc42706402",
+      "y-web": "sha256:b9d15aec4565237f2d341c447c52d3ec1525483ada2ea499d04ab45fca2e302f"
+     },
+     "result": "pre-deploy mode check 644; pods Ready; assets served through yeeter.no with a cache-buster"
+    },
+    {
+     "repository": "portfolio",
+     "run": 36333932699,
+     "images": {
+      "portfolio-api": "sha256:950b18a306cede419602086a4e5c5a7be00ac9c100b936098e566ffbcfb82a91",
+      "portfolio-web": "sha256:b4b789f5f5d0c213034c476a1e77a4609689f26263238e062f5c510fa9f90b34",
+      "portfolio-worker": "sha256:6167ba7f4957f05b849b229b65927df4bbc7a6adba99cf18326f2944404534e8"
+     },
+     "result": "no unreadable paths beyond production; pods Ready; hansteen.dev and its API 200"
+    },
+    {
+     "repository": "llunde-frontend",
+     "run": 36335351591,
+     "images": {
+      "llunde-frontend": "sha256:fd46ecc049188e1a258c2e86ce93229d6c4c34806f4c4d3b50ec53f63f1939bd"
+     },
+     "result": "private image scanned in its pod after rollout; pod Ready; llunde.no and its bundle 200"
+    },
+    {
+     "repository": "packages",
+     "run": 36335702162,
+     "attempt": 3,
+     "result": "build and publish on infra-build-09-packages-1; Pages published and every channel already at nsql 0.1.14"
+    },
+    {
+     "repository": "llunde-backend",
+     "run": 36336968263,
+     "images": {
+      "llunde-backend": "sha256:5cceb5f25457c48f8755ab7f9633d40ddccd06b8360e247f730e79c3168a8372"
+     },
+     "result": "pushed with the restored tests in one push; pod Ready; /ready reports database and valkey; public GET /courses 401"
+    }
+   ],
+   "pool_variable": "INFRA_VM_POOL_QUALIFIED set true per repository immediately before its pin push and kept true once proven; llunde-pyparser stays false until its pin is proven",
+   "edge_cache": "Cloudflare kept the 508-byte fallback for the three yeeter.no assets cached from the broken window (max-age 4 h, until about 19:40Z); origin responses were correct from 15:52Z"
+  }
  }
 }
