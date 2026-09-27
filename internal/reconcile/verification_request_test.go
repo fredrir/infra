@@ -9,13 +9,13 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -142,10 +142,10 @@ func verificationFixture(t *testing.T, runs ...runState) (*githubAppServer, *gat
 	key, encoded := githubAppKey(t, "verification")
 	github := &githubAppServer{t: t, key: key, token: http.StatusCreated, dispatch: http.StatusOK, runID: 7, runs: runs, bodies: map[string]any{}}
 	gatus := &gatusServer{}
-	githubServer, gatusServer := httptest.NewServer(github), httptest.NewServer(gatus)
-	t.Cleanup(githubServer.Close)
-	t.Cleanup(gatusServer.Close)
-	return github, gatus, VerificationRequest{AppID: 42, InstallationID: 43, PrivateKey: encoded, Repository: "fredrir/infra", Workflow: "reconcile.yml", Ref: "main", API: githubServer.URL, Gatus: gatusServer.URL, Heartbeat: "reconciliation_deep", HeartbeatToken: heartbeatToken, Poll: time.Millisecond, Deadline: time.Minute}
+	hosts := http.NewServeMux()
+	hosts.Handle("github.test/", github)
+	hosts.Handle("gatus.test/", gatus)
+	return github, gatus, VerificationRequest{AppID: 42, InstallationID: 43, PrivateKey: encoded, Repository: "fredrir/infra", Workflow: "reconcile.yml", Ref: "main", API: "http://github.test", Gatus: "http://gatus.test", Heartbeat: "reconciliation_deep", HeartbeatToken: heartbeatToken, Poll: time.Millisecond, Deadline: time.Minute, Transport: handlerTransport{hosts}}
 }
 
 func TestVerificationRequestDispatchesWithARestrictedInstallationToken(t *testing.T) {
@@ -195,21 +195,23 @@ func TestVerificationOutcomeReachesTheHeartbeat(t *testing.T) {
 		{name: "unreadable until the deadline", runs: []runState{{limited: true}}, deadline: 50 * time.Millisecond, failure: runURL + " did not complete within 50ms: last poll: 403 Forbidden API rate limit exceeded"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			_, gatus, request := verificationFixture(t, test.runs...)
-			if test.deadline > 0 {
-				request.Deadline = test.deadline
-			}
-			err := RequestVerification(context.Background(), request)
-			want := url.Values{"success": {"true"}}
-			if test.failure != "" {
-				want = url.Values{"success": {"false"}, "error": {test.failure}}
-			}
-			if !reflect.DeepEqual(gatus.heartbeats, []url.Values{want}) {
-				t.Fatalf("heartbeats %v, want %v", gatus.heartbeats, want)
-			}
-			if (err == nil) != (test.failure == "") || (err != nil && err.Error() != test.failure) {
-				t.Fatalf("request returned %v, want %q", err, test.failure)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				_, gatus, request := verificationFixture(t, test.runs...)
+				if test.deadline > 0 {
+					request.Deadline = test.deadline
+				}
+				err := RequestVerification(context.Background(), request)
+				want := url.Values{"success": {"true"}}
+				if test.failure != "" {
+					want = url.Values{"success": {"false"}, "error": {test.failure}}
+				}
+				if !reflect.DeepEqual(gatus.heartbeats, []url.Values{want}) {
+					t.Fatalf("heartbeats %v, want %v", gatus.heartbeats, want)
+				}
+				if (err == nil) != (test.failure == "") || (err != nil && err.Error() != test.failure) {
+					t.Fatalf("request returned %v, want %q", err, test.failure)
+				}
+			})
 		})
 	}
 }

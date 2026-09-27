@@ -34,6 +34,7 @@ type VerificationRequest struct {
 	Poll           time.Duration
 	Deadline       time.Duration
 	Log            io.Writer
+	Transport      http.RoundTripper
 }
 
 const dispatchTimeout = time.Minute
@@ -71,7 +72,11 @@ func RequestVerification(ctx context.Context, request VerificationRequest) error
 	case request.Poll <= 0 || request.Deadline <= 0:
 		return errors.New("poll interval and deadline must be positive")
 	}
-	transport, err := ghinstallation.New(http.DefaultTransport, request.AppID, request.InstallationID, request.PrivateKey)
+	base := request.Transport
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	transport, err := ghinstallation.New(base, request.AppID, request.InstallationID, request.PrivateKey)
 	if err != nil {
 		return fmt.Errorf("GitHub App private key: %w", err)
 	}
@@ -103,7 +108,7 @@ func RequestVerification(ctx context.Context, request VerificationRequest) error
 	default:
 		fmt.Fprintln(log, "Verification succeeded:", run.HTMLURL)
 	}
-	return errors.Join(failure, platformops.ReportHeartbeat(ctx, request.Gatus, request.Heartbeat, request.HeartbeatToken, failure))
+	return errors.Join(failure, platformops.ReportHeartbeat(ctx, request.Transport, request.Gatus, request.Heartbeat, request.HeartbeatToken, failure))
 }
 
 func (c *verificationClient) dispatch(ctx context.Context, endpoint string, request VerificationRequest) (verificationRun, error) {

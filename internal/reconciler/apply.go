@@ -391,7 +391,7 @@ func (a Applier) heartbeat(ctx context.Context, credentials Credentials, failure
 	if failure != nil {
 		failure = errors.New(truncate(failure.Error()))
 	}
-	return platformops.ReportHeartbeat(ctx, a.Config.Gatus, a.Config.Heartbeat, token, failure)
+	return platformops.ReportHeartbeat(ctx, nil, a.Config.Gatus, a.Config.Heartbeat, token, failure)
 }
 
 func (r applyRun) status() reconcile.Status {

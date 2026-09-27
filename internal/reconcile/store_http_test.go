@@ -196,7 +196,9 @@ func (h handlerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	served := make(chan struct{})
 	go func() {
 		defer close(served)
-		defer r.Body.Close()
+		if r.Body != nil {
+			defer r.Body.Close()
+		}
 		h.ServeHTTP(recorder, r)
 	}()
 	select {

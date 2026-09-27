@@ -60,13 +60,13 @@ func TestReportedFailureCarriesItsError(t *testing.T) {
 		query = r.URL.Query()
 	}))
 	defer server.Close()
-	if err := ReportHeartbeat(context.Background(), server.URL, "reconciliation_verification", token, errors.New("run 7 concluded failure & more")); err != nil {
+	if err := ReportHeartbeat(context.Background(), nil, server.URL, "reconciliation_verification", token, errors.New("run 7 concluded failure & more")); err != nil {
 		t.Fatal(err)
 	}
 	if query.Get("success") != "false" || query.Get("error") != "run 7 concluded failure & more" {
 		t.Fatalf("failure reported as %v", query)
 	}
-	if err := ReportHeartbeat(context.Background(), server.URL, "reconciliation_verification", "short", nil); err == nil {
+	if err := ReportHeartbeat(context.Background(), nil, server.URL, "reconciliation_verification", "short", nil); err == nil {
 		t.Fatal("invalid token accepted")
 	}
 }

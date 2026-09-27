@@ -219,7 +219,7 @@ func (s Supervisor) finish(ctx context.Context, run Run, credentials Credentials
 		if token := credentials[GatusToken]; token == "" {
 			heartbeatErr = errors.New("heartbeat not reported: Gatus token unavailable")
 		} else {
-			heartbeatErr = platformops.ReportHeartbeat(ctx, s.Config.Gatus, s.Config.Heartbeat, token, errors.Join(failure, uploadErr))
+			heartbeatErr = platformops.ReportHeartbeat(ctx, nil, s.Config.Gatus, s.Config.Heartbeat, token, errors.Join(failure, uploadErr))
 		}
 	}
 	if s.Log != nil {
