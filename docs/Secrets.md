@@ -101,14 +101,25 @@ These values were copied from Doppler, which still holds them; rotate each befor
 
 | Credential | Copies | Rotate | Verify, then retire the previous value |
 | --- | --- | --- | --- |
-| Runner App key | `["apply"]["runner-app-key"]`; Doppler `prd_reconciliation_apply` `RUNNER_APP_PRIVATE_KEY` | Generate a key in the runner App; `credential runner-app-key < NEW.pem`; `ansible-playbook ansible/reconciler.yml` | A tooling or Ansible apply mints the runner token; delete the previous key in the App |
+| Runner App key | `["apply"]["runner-app-key"]`; operator `ARC_GITHUB_APP_PRIVATE_KEY`; `platform/components/runners/{infra,nsql,packages}/github-app.secret.sops.yaml`; Doppler apply and `ops` | Generate a key in the runner App; `credential runner-app-key < NEW.pem`; `ansible-playbook ansible/reconciler.yml` | A tooling or Ansible apply mints the runner token and all ARC listeners authenticate; delete the previous key in the App |
 | Publisher App key | `["apply"]["publisher-app-key"]`; Doppler `prd_reconciliation_apply` `PUBLISHER_APP_PRIVATE_KEY` | Generate a key in the publisher App; `credential publisher-app-key < NEW.pem`; `ansible-playbook ansible/reconciler.yml` | An apply publishes `production`; delete the previous key in the App |
 | Observer App key | `["verify"]["observer-app-key"]`; Doppler `prd_reconciliation_apply` `OBSERVER_APP_PRIVATE_KEY` | Generate a key in the observer App; set it in the `verify` map; `ansible-playbook ansible/reconciler.yml` | The next verification reads rulesets and runners; delete the previous key in the App |
-| Fleet Hetzner read/write token | `["apply"]["hcloud-token"]`; Doppler `prd_reconciliation_apply` `HCLOUD_TOKEN` | Hetzner console, fleet project, Security, API tokens: generate Read & Write; `credential hcloud-token`; `ansible-playbook ansible/reconciler.yml` | `infra reconcile run request --full` applies; delete the previous token |
+| Fleet Hetzner read/write token | `["apply"]["hcloud-token"]`; operator `HCLOUD_TOKEN`; Doppler apply and `ops` | Hetzner console, fleet project, Security, API tokens: generate Read & Write; `credential hcloud-token`; `ansible-playbook ansible/reconciler.yml` | `infra reconcile run request --full` applies; delete the previous token |
 | Fleet Hetzner read token | `infrastructure-plan` `HCLOUD_TOKEN`; Doppler `prd_reconciliation_plan` `HCLOUD_TOKEN` | Generate Read; `gh secret set HCLOUD_TOKEN --env infrastructure-plan` | The next pull request plan passes; delete the previous token |
 | Plan AWS key, Cloudflare token, kubeconfig | `infrastructure-plan`; Doppler `prd_reconciliation_plan` | Second access key on `/automation/infra-reconciliation-plan`; new read token for managed zones and tunnels; `flux-system/infrastructure-plan` token; `gh secret set` each | The next pull request plan passes; delete the previous key and token |
 | Apply Kubernetes token | `["apply"]["kubernetes-token"]`; Doppler `prd_reconciliation_apply` `KUBE_CONFIG`; `flux-system/infrastructure-apply-credentials` | Issue a replacement service-account token; update SOPS and install reconciler credentials | A full apply succeeds; revoke the previous token |
-| Provenance token | `["apply"]["provenance-token"]`; Doppler `ops` `GHCR_PROVENANCE_PAT` | Generate a classic `read:packages` token without expiry; update SOPS and install reconciler credentials | Private image provenance verification succeeds; revoke the previous token before deleting `ops` |
+| Provenance token | `["apply"]["provenance-token"]`; operator and Doppler `ops` `GHCR_PROVENANCE_PAT` | Generate a classic `read:packages` token without expiry; update SOPS and install reconciler credentials | Private image provenance verification succeeds; revoke the previous token before deleting `ops` |
+
+| Operator credential | Copies | Verify before retiring the old value |
+| --- | --- | --- |
+| `HETZNER_RECONCILIATION_VERIFY` | Operator SOPS, reconciler `verify.hcloud-token`, Doppler `ops` | Full verification |
+| `HETZNER_RECONCILER_ADMIN` | Operator SOPS, Doppler `ops` | Reconciler OpenTofu plan |
+| `CLOUDFLARE_API_TOKEN` | Operator SOPS, Doppler `ops` and apply | Fleet OpenTofu plan with replacement operator token |
+| `CLOUDFLARE_OPENTOFU_ROOT` | Operator SOPS, Doppler `ops` | Account-token inventory and reconciler OpenTofu plan |
+| `LINODE_TOKEN` | Operator SOPS, Doppler `ops` | Confirm its consumers before replacement or revocation |
+| `TAILSCALE_ENROLL_CLIENT_SECRET`, `TAILSCALE_POLICY_CLIENT_SECRET`, `TAILSCALE_RECONCILER` | Operator SOPS, Doppler `ops` | Enrollment, policy validation and reconciler enrollment |
+| `PLATFORM_WATCHDOG_SMTP_PASSWORD` | Operator SOPS, Gatus, Alertmanager, Doppler `ops` | SMTP delivery from both consumers |
+| `PACKAGES_GPG_KEY`, `PACKAGES_APK_KEY`, `AUR_SSH_KEY` | Operator SOPS, `fredrir/packages` environment `publish`, Doppler `ops` | Package signing and AUR publishing; distribute replacement public signing keys before old keys are retired |
 
 `credential NAME` is `jq -Rs 'rtrimstr("\n")' | sops set --value-stdin ansible/roles/reconciler/files/credentials.sops.yaml "[\"apply\"][\"NAME\"]"`.
 
