@@ -75,7 +75,7 @@ func PrepareValidation(ctx context.Context, runner Runner, before string) error 
 	return runner.Run(ctx, "tofu", "-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false")
 }
 
-type declarationCheck func(context.Context, Runner) error
+type concurrentCheck func(context.Context, Runner) error
 
 func Validate(ctx context.Context, runner Runner, before string) error {
 	files, err := validationInputs(ctx, runner, before)
@@ -89,11 +89,11 @@ func Validate(ctx context.Context, runner Runner, before string) error {
 	return runChecks(ctx, runner, checks)
 }
 
-func declarationChecks(root string, changed func(func(string) bool) bool) ([]declarationCheck, error) {
-	command := func(name string, arguments ...string) declarationCheck {
+func declarationChecks(root string, changed func(func(string) bool) bool) ([]concurrentCheck, error) {
+	command := func(name string, arguments ...string) concurrentCheck {
 		return func(ctx context.Context, runner Runner) error { return runner.Run(ctx, name, arguments...) }
 	}
-	var checks []declarationCheck
+	var checks []concurrentCheck
 	if changed(rootTofuInputs) {
 		checks = append(checks, command("tofu", "-chdir=tofu", "validate", "-no-tests"))
 	}
@@ -177,7 +177,7 @@ func kustomizations(root string) ([]string, error) {
 	return directories, nil
 }
 
-func runChecks(ctx context.Context, runner Runner, checks []declarationCheck) error {
+func runChecks(ctx context.Context, runner Runner, checks []concurrentCheck) error {
 	transcripts := make([]transcript, len(checks))
 	failures := make([]error, len(checks))
 	finished := make([]chan struct{}, len(checks))
@@ -205,7 +205,7 @@ func runChecks(ctx context.Context, runner Runner, checks []declarationCheck) er
 	return errors.Join(failures...)
 }
 
-func runCheck(ctx context.Context, runner Runner, check declarationCheck) (err error) {
+func runCheck(ctx context.Context, runner Runner, check concurrentCheck) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("declaration check panicked: %v\n%s", recovered, debug.Stack())

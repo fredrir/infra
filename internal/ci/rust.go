@@ -78,16 +78,19 @@ func PrepareRust(ctx context.Context, runner Runner, temporary, clippy, test str
 }
 
 func CheckRust(ctx context.Context, runner Runner, temporary, stage string) error {
-	if stage == "fast" || stage == "deep" {
-		stages := []string{"format", "unit"}
-		if stage == "fast" {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
-		} else {
-			stages = []string{"format", "lint", "test", "docs", "minimal", "msrv", "audit"}
+	if stage == "fast" {
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		part := func(stage string) concurrentCheck {
+			return func(ctx context.Context, runner Runner) error { return CheckRust(ctx, runner, temporary, stage) }
 		}
-		for _, part := range stages {
+		if err := runChecks(ctx, runner, []concurrentCheck{part("format"), part("unit")}); err != nil {
+			return err
+		}
+		return ctx.Err()
+	}
+	if stage == "deep" {
+		for _, part := range []string{"format", "lint", "test", "docs", "minimal", "msrv", "audit"} {
 			if err := CheckRust(ctx, runner, temporary, part); err != nil {
 				return err
 			}

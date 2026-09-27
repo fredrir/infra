@@ -55,6 +55,7 @@ go_test(
         "performance_test.go",
         "readiness_test.go",
         "registry_test.go",
+        "rust_check_test.go",
         "rust_prepare_test.go",
         "scanner_lease_test.go",
         "scanner_test.go",

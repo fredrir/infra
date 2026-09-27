@@ -133,7 +133,7 @@ func TestDeclarationChecksReportOutputAndErrorsInDeclarationOrder(t *testing.T) 
 	runner := Runner{Stdout: &output, Stderr: &output}
 	laterFinished := make(chan struct{})
 	first, second := errors.New("first failure"), errors.New("second failure")
-	checks := []declarationCheck{
+	checks := []concurrentCheck{
 		func(_ context.Context, runner Runner) error {
 			select {
 			case <-laterFinished:
@@ -180,7 +180,7 @@ func (r *streamRecorder) Write(data []byte) (int, error) {
 func TestDeclarationChecksStreamFinishedOutputWhileLaterChecksRun(t *testing.T) {
 	recorder := &streamRecorder{written: make(chan struct{}, 1)}
 	failure := errors.New("first failure")
-	checks := []declarationCheck{
+	checks := []concurrentCheck{
 		func(_ context.Context, runner Runner) error {
 			runner.Stderr.Write([]byte("first stderr\n"))
 			return failure
@@ -204,7 +204,7 @@ func TestDeclarationChecksStreamFinishedOutputWhileLaterChecksRun(t *testing.T) 
 
 func TestDeclarationCheckPanicBecomesItsErrorWhileSiblingsFinish(t *testing.T) {
 	var output bytes.Buffer
-	checks := []declarationCheck{
+	checks := []concurrentCheck{
 		func(context.Context, Runner) error { panic("broken check") },
 		func(_ context.Context, runner Runner) error {
 			runner.Stdout.Write([]byte("sibling finished\n"))
