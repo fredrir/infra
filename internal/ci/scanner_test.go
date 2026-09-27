@@ -33,9 +33,9 @@ func scannerFixture(t *testing.T, directory string, database scannerDatabase, co
 	}
 }
 
-func scannerDownloader(t *testing.T, calls *atomic.Int32) Runner {
+func scannerDownloader(t *testing.T, calls *atomic.Int32) process.Runner {
 	t.Helper()
-	return Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	return process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		calls.Add(1)
 		if options.Name != "trivy" || len(options.Args) < 5 || options.Args[1] != "--cache-dir" {
 			t.Errorf("unexpected scanner command: %s %q", options.Name, options.Args)
@@ -89,7 +89,7 @@ func TestScannerSeedsFreshCacheWithoutDownload(t *testing.T) {
 	root := t.TempDir()
 	cache := filepath.Join(root, "family")
 	scannerFixture(t, filepath.Join(cache, "db"), scannerDatabases[0], "database", time.Now().Add(-time.Minute), time.Now().Add(time.Hour))
-	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		t.Error("fresh database should not download")
 		return process.Result{}, nil
 	}}
@@ -118,7 +118,7 @@ func TestScannerRefreshPreservesExistingReadersAndRejectsFailedRefresh(t *testin
 	}
 	defer reader.Close()
 	failure := errors.New("registry unavailable")
-	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, failure }}
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, failure }}
 	if err := PrepareScanner(context.Background(), runner, cache, shared, false); !errors.Is(err, failure) {
 		t.Fatalf("failed refresh was accepted: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestScannerConcurrentFamiliesDownloadOnce(t *testing.T) {
 func TestScannerFailureAndLockCancellation(t *testing.T) {
 	cache := filepath.Join(t.TempDir(), "family")
 	failure := errors.New("vulnerabilities found")
-	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, failure }}
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, failure }}
 	if err := RunScanner(context.Background(), runner, cache, []string{"image", "test"}); !errors.Is(err, failure) {
 		t.Fatalf("scan failure lost: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestScannerRejectsInvalidDownloadAndUnsafeCache(t *testing.T) {
 	for _, scenario := range []string{"empty", "stale", "future", "schema", "symlink"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
-			runner := Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				if scenario == "empty" {
 					return process.Result{}, nil
 				}
@@ -221,7 +221,7 @@ func BenchmarkScannerWarmPreparation(b *testing.B) {
 	}
 	b.ResetTimer()
 	for b.Loop() {
-		if err := PrepareScanner(context.Background(), Runner{}, cache, shared, false); err != nil {
+		if err := PrepareScanner(context.Background(), process.Runner{}, cache, shared, false); err != nil {
 			b.Fatal(err)
 		}
 	}

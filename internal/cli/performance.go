@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +17,7 @@ func newMeasureCommand() *cobra.Command {
 	var stage, directory, root string
 	var budget time.Duration
 	command := &cobra.Command{Use: "measure -- COMMAND [ARGS...]", Short: "Run a command within a measured budget", Args: cobra.MinimumNArgs(1), RunE: func(command *cobra.Command, args []string) error {
-		report, err := ci.Measure(command.Context(), ci.Runner{Dir: root, Stdout: command.ErrOrStderr(), Stderr: command.ErrOrStderr()}, stage, budget, directory, args)
+		report, err := ci.Measure(command.Context(), process.Runner{Dir: root, Stdout: command.ErrOrStderr(), Stderr: command.ErrOrStderr()}, stage, budget, directory, args)
 		return errors.Join(err, json.NewEncoder(command.OutOrStdout()).Encode(report))
 	}}
 	command.Flags().StringVar(&stage, "stage", "checks", "Stage name")
@@ -36,7 +37,7 @@ func newTimelineCommand() *cobra.Command {
 		}
 		ctx, cancel := context.WithTimeout(command.Context(), 30*time.Second)
 		defer cancel()
-		runner := ci.Runner{Stderr: command.ErrOrStderr()}
+		runner := process.Runner{Stderr: command.ErrOrStderr()}
 		build, err := ci.ReadWorkflowTimeline(ctx, runner, args[0], id)
 		if err != nil {
 			return err

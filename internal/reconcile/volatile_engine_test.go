@@ -7,7 +7,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -153,7 +152,7 @@ func TestVolatilePlaybookResultsSummarizeTheWorker(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var calls [][]string
-			commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: "/source", Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{Work: t.TempDir(), Runner: process.Runner{Dir: "/source", Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				calls = append(calls, options.Args)
 				return test.playbook.execute(t, options)
 			}}}

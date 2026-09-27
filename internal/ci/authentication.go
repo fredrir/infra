@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/fredrir/infra/internal/process"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-func DeployAuthenticated(ctx context.Context, runner Runner, options DeployOptions, actor, token string) error {
+func DeployAuthenticated(ctx context.Context, runner process.Runner, options DeployOptions, actor, token string) error {
 	directory, err := RegistryConfig(actor, token)
 	if err != nil {
 		return err

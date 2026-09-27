@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
@@ -786,7 +785,7 @@ func TestHostComparisonWithLocalContainer(t *testing.T) {
 	})
 	var mu sync.Mutex
 	var output strings.Builder
-	commands := Commands{Work: fixture, Runner: ci.Runner{Dir: fixture, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
+	commands := Commands{Work: fixture, Runner: process.Runner{Dir: fixture, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
 		args := []string{"exec", "-w", options.Dir}
 		for _, entry := range options.Env {
 			if strings.HasPrefix(entry, "ANSIBLE_") || strings.HasPrefix(entry, "JUNIT_") {

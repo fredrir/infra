@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -22,7 +21,7 @@ func TestCloudVerificationComparesOpenTofuAndRunnerRegistrationsWithoutHostPlays
 	var mu sync.Mutex
 	queried := map[string]bool{}
 	var stdout bytes.Buffer
-	commands := Commands{Work: t.TempDir(), RunnerToken: "observer-token", Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Stdout: &stdout, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	commands := Commands{Work: t.TempDir(), RunnerToken: "observer-token", Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Stdout: &stdout, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		token := slices.Contains(options.Env, "GH_TOKEN=observer-token")

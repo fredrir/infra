@@ -10,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -43,7 +42,7 @@ func TestRenderActiveOverlayLocally(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commands := &Commands{Runner: ci.Runner{Dir: root}, Work: t.TempDir()}
+	commands := &Commands{Runner: process.Runner{Dir: root}, Work: t.TempDir()}
 	plan := Plan{Affected: All()}
 	if err := commands.RenderKubernetes(context.Background(), plan); err != nil {
 		t.Fatal(err)
@@ -63,7 +62,7 @@ func TestReadOnlyProductionWorkloadContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commands := &Commands{Runner: ci.Runner{Dir: root}, Work: t.TempDir()}
+	commands := &Commands{Runner: process.Runner{Dir: root}, Work: t.TempDir()}
 	plan := Plan{Affected: All()}
 	if err = commands.RenderKubernetes(context.Background(), plan); err != nil {
 		t.Fatal(err)
@@ -88,7 +87,7 @@ func TestPlanRendersOnlyCompleteSelectedProjectLocally(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commands := &Commands{Runner: ci.Runner{Dir: root}, Work: t.TempDir()}
+	commands := &Commands{Runner: process.Runner{Dir: root}, Work: t.TempDir()}
 	plan := Plan{Affected: Selection{Kubernetes: true, Projects: []string{"llunde-pyparser"}}}
 	if err = commands.Plan(context.Background(), plan); err != nil {
 		t.Fatal(err)
@@ -113,7 +112,7 @@ func TestReadOnlyProductionScopedVerification(t *testing.T) {
 	}
 	for _, projects := range [][]string{{"portfolio"}, {"llunde"}, {"llunde-pyparser"}, {"llunde", "llunde-pyparser", "y"}} {
 		t.Run(strings.Join(projects, "+"), func(t *testing.T) {
-			commands := &Commands{Runner: ci.Runner{Dir: root}, Work: t.TempDir()}
+			commands := &Commands{Runner: process.Runner{Dir: root}, Work: t.TempDir()}
 			source, err := commands.getResource(context.Background(), "gitrepositories.source.toolkit.fluxcd.io", "flux-system", "flux-system")
 			if err != nil {
 				t.Fatal(err)
@@ -140,7 +139,7 @@ func TestReadOnlyProductionScopedVerification(t *testing.T) {
 func TestPreflightFallsBackBeforeWritesForUnknownProject(t *testing.T) {
 	var mu sync.Mutex
 	var calls []string
-	commands := &Commands{kubernetes: &kubernetesState{}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	commands := &Commands{kubernetes: &kubernetesState{}, Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		command := options.Name + " " + strings.Join(options.Args, " ")
 		mu.Lock()
 		calls = append(calls, command)
@@ -165,7 +164,7 @@ func TestPreflightFallsBackBeforeWritesForUnknownProject(t *testing.T) {
 }
 
 func TestPreflightRejectsMissingArtifactPermission(t *testing.T) {
-	commands := &Commands{kubernetes: &kubernetesState{}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	commands := &Commands{kubernetes: &kubernetesState{}, Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		return process.Result{}, fmt.Errorf("forbidden: externalartifacts")
 	}}}
 	if _, err := commands.Preflight(context.Background(), Plan{Affected: All()}); err == nil {

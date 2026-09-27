@@ -17,10 +17,11 @@ import (
 
 	"github.com/fredrir/infra/internal/fluxartifacts"
 	"github.com/fredrir/infra/internal/kustomize"
+	"github.com/fredrir/infra/internal/process"
 	"golang.org/x/sync/errgroup"
 )
 
-func validationInputs(ctx context.Context, runner Runner, before string) ([]byte, error) {
+func validationInputs(ctx context.Context, runner process.Runner, before string) ([]byte, error) {
 	var files []byte
 	var err error
 	if revisionPattern.MatchString(before) {
@@ -64,7 +65,7 @@ func rootTofuInputs(path string) bool {
 	return path == "platform/clusters/production/settings.yaml" || strings.HasPrefix(path, "tofu/") && !strings.HasPrefix(path, "tofu/reconciler/") && !strings.HasSuffix(path, ".tftest.hcl")
 }
 
-func PrepareValidation(ctx context.Context, runner Runner, before string) error {
+func PrepareValidation(ctx context.Context, runner process.Runner, before string) error {
 	files, err := validationInputs(ctx, runner, before)
 	if err != nil {
 		return err
@@ -75,9 +76,9 @@ func PrepareValidation(ctx context.Context, runner Runner, before string) error 
 	return runner.Run(ctx, "tofu", "-chdir=tofu", "init", "-backend=false", "-lockfile=readonly", "-input=false")
 }
 
-type concurrentCheck func(context.Context, Runner) error
+type concurrentCheck func(context.Context, process.Runner) error
 
-func Validate(ctx context.Context, runner Runner, before string) error {
+func Validate(ctx context.Context, runner process.Runner, before string) error {
 	files, err := validationInputs(ctx, runner, before)
 	if err != nil {
 		return err
@@ -91,7 +92,7 @@ func Validate(ctx context.Context, runner Runner, before string) error {
 
 func declarationChecks(root string, changed func(func(string) bool) bool) ([]concurrentCheck, error) {
 	command := func(name string, arguments ...string) concurrentCheck {
-		return func(ctx context.Context, runner Runner) error { return runner.Run(ctx, name, arguments...) }
+		return func(ctx context.Context, runner process.Runner) error { return runner.Run(ctx, name, arguments...) }
 	}
 	var checks []concurrentCheck
 	if changed(rootTofuInputs) {
@@ -116,14 +117,14 @@ func declarationChecks(root string, changed func(func(string) bool) bool) ([]con
 		checks = append(checks, command("ansible-playbook", arguments...))
 	}
 	if changed(matching(`^(platform/projects/|platform/components/(policy|backup-job|repository-maintenance)/|platform/clusters/production/(root|settings)\.yaml$|build/rollout/flux-artifacts/|internal/fluxartifacts/|internal/ci/validate\.go$)`)) {
-		checks = append(checks, func(context.Context, Runner) error { return fluxartifacts.Check(root, kustomize.Build) })
+		checks = append(checks, func(context.Context, process.Runner) error { return fluxartifacts.Check(root, kustomize.Build) })
 	}
 	if changed(kustomizationInputs) {
 		directories, err := kustomizations(root)
 		if err != nil {
 			return nil, err
 		}
-		checks = append(checks, func(ctx context.Context, _ Runner) error {
+		checks = append(checks, func(ctx context.Context, _ process.Runner) error {
 			var failures []error
 			for _, directory := range directories {
 				if ctx.Err() != nil {
@@ -177,7 +178,7 @@ func kustomizations(root string) ([]string, error) {
 	return directories, nil
 }
 
-func runChecks(ctx context.Context, runner Runner, checks []concurrentCheck) error {
+func runChecks(ctx context.Context, runner process.Runner, checks []concurrentCheck) error {
 	transcripts := make([]transcript, len(checks))
 	failures := make([]error, len(checks))
 	finished := make([]chan struct{}, len(checks))
@@ -205,7 +206,7 @@ func runChecks(ctx context.Context, runner Runner, checks []concurrentCheck) err
 	return errors.Join(failures...)
 }
 
-func runCheck(ctx context.Context, runner Runner, check concurrentCheck) (err error) {
+func runCheck(ctx context.Context, runner process.Runner, check concurrentCheck) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("declaration check panicked: %v\n%s", recovered, debug.Stack())

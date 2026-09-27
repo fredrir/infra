@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +25,7 @@ func newScannerCommand() *cobra.Command {
 			}
 			leases = append(leases, ci.ScannerLease{ID: leaseID, ExpiresAt: time.Now().Add(leaseDuration + 5*time.Minute)})
 		}
-		return ci.PrepareScanner(cmd.Context(), ci.Runner{Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}, cache, shared, java, leases...)
+		return ci.PrepareScanner(cmd.Context(), process.Runner{Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}, cache, shared, java, leases...)
 	}}
 	prepare.Flags().StringVar(&shared, "shared", filepath.Join(os.Getenv("HOME"), ".cache/infra/trivy-databases"), "Shared database directory")
 	prepare.Flags().BoolVar(&java, "java", false, "Prepare the Java database")
@@ -35,7 +36,7 @@ func newScannerCommand() *cobra.Command {
 	}}
 	release.Flags().StringVar(&leaseID, "lease-id", "", "Workflow attempt lease")
 	scan := &cobra.Command{Use: "scan -- ARGS", Args: cobra.MinimumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		return ci.RunScanner(cmd.Context(), ci.Runner{Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}, cache, args)
+		return ci.RunScanner(cmd.Context(), process.Runner{Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}, cache, args)
 	}}
 	command.AddCommand(prepare, scan, release)
 	return command

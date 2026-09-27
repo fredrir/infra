@@ -4,11 +4,12 @@ import (
 	"context"
 	"debug/elf"
 	"fmt"
+	"github.com/fredrir/infra/internal/process"
 	"os"
 	"path/filepath"
 )
 
-func QualifyRustToolchain(ctx context.Context, runner Runner) error {
+func QualifyRustToolchain(ctx context.Context, runner process.Runner) error {
 	directory, err := os.MkdirTemp("", "infra-rust-qualification-")
 	if err != nil {
 		return err

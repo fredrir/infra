@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/fredrir/infra/internal/objectstore"
+	"github.com/fredrir/infra/internal/process"
 )
 
 func CacheClient() (objectstore.Client, error) {
@@ -31,7 +32,7 @@ func CacheClient() (objectstore.Client, error) {
 	return client, nil
 }
 
-func RustCache(ctx context.Context, runner Runner, temporary, action string) error {
+func RustCache(ctx context.Context, runner process.Runner, temporary, action string) error {
 	if action != "restore" && action != "save" {
 		return fmt.Errorf("cache action must be restore or save")
 	}

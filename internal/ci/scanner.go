@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/fredrir/infra/internal/process"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -24,7 +25,7 @@ var scannerDatabases = []scannerDatabase{
 	{"java-db", "trivy-java.db", "--download-java-db-only", 1, 24 * time.Hour},
 }
 
-func PrepareScanner(ctx context.Context, runner Runner, cache, shared string, java bool, leases ...ScannerLease) error {
+func PrepareScanner(ctx context.Context, runner process.Runner, cache, shared string, java bool, leases ...ScannerLease) error {
 	if cache == "" || shared == "" {
 		return fmt.Errorf("scanner cache and shared directory are required")
 	}
@@ -104,7 +105,7 @@ func PrepareScanner(ctx context.Context, runner Runner, cache, shared string, ja
 	return nil
 }
 
-func RunScanner(ctx context.Context, runner Runner, cache string, arguments []string) error {
+func RunScanner(ctx context.Context, runner process.Runner, cache string, arguments []string) error {
 	if cache == "" || len(arguments) == 0 {
 		return fmt.Errorf("scanner cache and arguments are required")
 	}

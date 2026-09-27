@@ -22,6 +22,7 @@ go_library(
     deps = [
         "//internal/ci",
         "//internal/pipeline",
+        "//internal/process",
         "//internal/release",
         "@in_yaml_go_yaml_v3//:yaml",
         "@io_dagger_dagger//:dagger",
@@ -40,7 +41,6 @@ go_test(
     ],
     embed = [":packages"],
     deps = [
-        "//internal/ci",
         "//internal/process",
         "//internal/release",
         "@io_dagger_dagger//:dagger",

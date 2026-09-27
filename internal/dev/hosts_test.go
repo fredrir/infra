@@ -16,7 +16,6 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/kdomanski/iso9660"
 	"go.yaml.in/yaml/v3"
@@ -53,8 +52,8 @@ type hostsFake struct {
 	stdin    map[string]bool
 }
 
-func (f *hostsFake) runner() ci.Runner {
-	return ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+func (f *hostsFake) runner() process.Runner {
+	return process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		if options.Dir != f.root {
 			f.t.Errorf("%s ran outside the repository: %s", options.Name, options.Dir)
 		}

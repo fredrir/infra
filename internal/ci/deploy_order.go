@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/fredrir/infra/internal/process"
 	"io/fs"
 	"path"
 	"strconv"
@@ -134,7 +135,7 @@ func encodeDeploymentOrder(order DeploymentOrder) ([]byte, error) {
 	return append(data, '\n'), err
 }
 
-func checkFetchedDeploymentOrder(ctx context.Context, runner Runner, path string, candidate DeploymentOrder) error {
+func checkFetchedDeploymentOrder(ctx context.Context, runner process.Runner, path string, candidate DeploymentOrder) error {
 	listed, err := runner.Output(ctx, "git", "ls-tree", "--name-only", "FETCH_HEAD", "--", path)
 	if err != nil {
 		return err

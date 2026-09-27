@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -40,8 +39,8 @@ type benchFake struct {
 	commands [][]string
 }
 
-func (f *benchFake) runner() ci.Runner {
-	return ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+func (f *benchFake) runner() process.Runner {
+	return process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		command := append([]string{filepath.Base(options.Name)}, options.Args...)
 		f.commands = append(f.commands, command)
 		switch command[0] {

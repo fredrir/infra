@@ -9,12 +9,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 )
 
 type PrepareOptions struct{ Temporary, Repository, RefType, RefName, CliffConfig, GitHubOutput string }
 
-func Prepare(ctx context.Context, runner ci.Runner, options PrepareOptions) error {
+func Prepare(ctx context.Context, runner process.Runner, options PrepareOptions) error {
 	root, err := filepath.Abs(runner.Dir)
 	if err != nil {
 		return err
@@ -108,7 +108,7 @@ func Prepare(ctx context.Context, runner ci.Runner, options PrepareOptions) erro
 	return nil
 }
 
-func Build(ctx context.Context, runner ci.Runner, temporary string, snapshot bool) error {
+func Build(ctx context.Context, runner process.Runner, temporary string, snapshot bool) error {
 	if temporary == "" {
 		return fmt.Errorf("runner temporary directory is required")
 	}
@@ -119,7 +119,7 @@ func Build(ctx context.Context, runner ci.Runner, temporary string, snapshot boo
 	return runner.Run(ctx, "goreleaser", arguments...)
 }
 
-func Draft(ctx context.Context, runner ci.Runner, bundle, repository, tag string, prerelease bool) error {
+func Draft(ctx context.Context, runner process.Runner, bundle, repository, tag string, prerelease bool) error {
 	if !releaseRepository.MatchString(repository) || !strings.HasPrefix(tag, "v") || strings.ContainsAny(tag, "\r\n\x00") {
 		return fmt.Errorf("invalid release repository or tag")
 	}

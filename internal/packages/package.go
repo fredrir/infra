@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/release"
 )
 
@@ -54,7 +55,7 @@ func NFPMConfig(settings release.Settings, version, architecture, payload string
 	}, nil
 }
 
-type NFPM struct{ Runner ci.Runner }
+type NFPM struct{ Runner process.Runner }
 
 func (builder NFPM) Build(ctx context.Context, settings release.Settings, version, releaseDirectory, work, site string) error {
 	for _, architecture := range []struct{ triple, name string }{{"x86_64", "amd64"}, {"aarch64", "arm64"}} {

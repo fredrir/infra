@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/provenance"
 )
@@ -101,7 +100,7 @@ func TestToolingChangeKeepsSelectedProjectScope(t *testing.T) {
 }
 
 func TestDriftVerificationChecksGeneratedConfigurationFirst(t *testing.T) {
-	commands := &Commands{RequireMain: true, Runner: ci.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
+	commands := &Commands{RequireMain: true, Runner: process.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
 		t.Fatal("invalid generated inputs reached external commands")
 		return process.Result{}, nil
 	}}}
@@ -247,7 +246,7 @@ func TestPreflightFailurePreventsMutations(t *testing.T) {
 
 func TestSelectionScopesRunnersAndProjects(t *testing.T) {
 	for _, path := range []string{"build/cli-release.json", "platform/projects/portfolio/kustomization.yaml"} {
-		commands := &Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		commands := &Commands{Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 			if options.Args[0] == "diff" {
 				return process.Result{Stdout: []byte(path + "\n")}, nil
 			}
@@ -267,7 +266,7 @@ func TestSelectionScopesRunnersAndProjects(t *testing.T) {
 }
 
 func TestApplyChecksGeneratedConfigurationWithoutKubernetesSelection(t *testing.T) {
-	commands := &Commands{RequireMain: true, Runner: ci.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
+	commands := &Commands{RequireMain: true, Runner: process.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
 		t.Fatal("invalid generated inputs reached external commands")
 		return process.Result{}, nil
 	}}}
@@ -309,7 +308,7 @@ func TestReconcilerRootInputsSurviveFullSelections(t *testing.T) {
 func TestPlanTestsTheReconcilerRootOnlyWhenItsInputsChange(t *testing.T) {
 	for _, selected := range []bool{true, false} {
 		var calls []string
-		commands := &Commands{Runner: ci.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		commands := &Commands{Runner: process.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 			calls = append(calls, options.Name+" "+strings.Join(options.Args, " "))
 			return process.Result{}, nil
 		}}}

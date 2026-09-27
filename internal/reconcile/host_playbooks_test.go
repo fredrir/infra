@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -238,7 +237,7 @@ func TestSelectionScopesHostPlaybooks(t *testing.T) {
 		{name: "runner scope", paths: []string{"build/runners.json"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			commands := &Commands{Runner: ci.Runner{Dir: filepath.Join("..", ".."), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := &Commands{Runner: process.Runner{Dir: filepath.Join("..", ".."), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				if options.Args[0] == "diff" {
 					return process.Result{Stdout: []byte(strings.Join(test.paths, "\n") + "\n")}, nil
 				}

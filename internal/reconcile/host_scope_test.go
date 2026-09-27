@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -93,7 +92,7 @@ func TestHostScopeExecutesAndVerifiesMatchingPlaybooks(t *testing.T) {
 			var mu sync.Mutex
 			var calls []string
 			queried := 0
-			commands := Commands{Runner: ci.Runner{Dir: root, Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+			commands := Commands{Runner: process.Runner{Dir: root, Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
 				mu.Lock()
 				defer mu.Unlock()
 				switch opts.Name {
@@ -153,7 +152,7 @@ func TestHostVerificationReportsEveryFailure(t *testing.T) {
 	fleet := testRunnerFleet()
 	failure := errors.New("verification failed")
 	var calls, queried atomic.Int32
-	commands := Commands{Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+	commands := Commands{Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
 		calls.Add(1)
 		if opts.Name == "gh" {
 			queried.Add(1)
@@ -170,7 +169,7 @@ func TestHostVerificationReportsEveryFailure(t *testing.T) {
 	if err := commands.VerifyHosts(context.Background(), Plan{Affected: All()}); err == nil || calls.Load() != 0 {
 		t.Fatalf("missing runner fleet reached host verification: calls=%d, error=%v", calls.Load(), err)
 	}
-	commands = Commands{Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+	commands = Commands{Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
 		if opts.Name != "gh" {
 			return process.Result{}, nil
 		}
@@ -188,7 +187,7 @@ func TestHostVerificationReportsEveryFailure(t *testing.T) {
 }
 
 func TestHostPlanValidatesRunnerFleet(t *testing.T) {
-	commands := Commands{Runner: ci.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
+	commands := Commands{Runner: process.Runner{Dir: t.TempDir(), Execute: func(context.Context, process.Options) (process.Result, error) {
 		return process.Result{}, nil
 	}}}
 	for _, scope := range []string{HostScopeFull, HostScopeRunners} {

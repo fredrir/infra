@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -106,7 +105,7 @@ func TestHostComparisonClassifiesCheckModeResults(t *testing.T) {
 			var mu sync.Mutex
 			var calls [][]string
 			work := t.TempDir()
-			commands := Commands{Work: work, Runner: ci.Runner{Dir: "/source", Env: []string{"JUNIT_OUTPUT_DIR=/elsewhere"}, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{Work: work, Runner: process.Runner{Dir: "/source", Env: []string{"JUNIT_OUTPUT_DIR=/elsewhere"}, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				mu.Lock()
 				calls = append(calls, options.Args)
 				mu.Unlock()
@@ -133,7 +132,7 @@ func TestHostComparisonClassifiesCheckModeResults(t *testing.T) {
 func TestHostComparisonKeepsPlaybookOutputsApart(t *testing.T) {
 	var stdout bytes.Buffer
 	release := make(chan struct{})
-	commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Stdout: &stdout, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	commands := Commands{Work: t.TempDir(), Runner: process.Runner{Stdout: &stdout, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		playbook := playbookArgument(options)
 		if playbook == "reconcile.yml" {
 			<-release
@@ -183,7 +182,7 @@ func TestRunnerVerificationReportsRunnerPlayDifferences(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var mu sync.Mutex
 			queried := 0
-			commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{Work: t.TempDir(), Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				switch options.Name {
 				case "ansible-playbook":
 					reports := map[string][]string{"verify.yml": test.verify, "verify-runners.yml": test.runners}[playbookArgument(options)]
@@ -270,7 +269,7 @@ func TestDeclarationComparisonCombinesOpenTofuAndHosts(t *testing.T) {
 			var mu sync.Mutex
 			var commandsRun []string
 			var stdout bytes.Buffer
-			commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Stdout: &stdout, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{Work: t.TempDir(), Runner: process.Runner{Stdout: &stdout, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				mu.Lock()
 				defer mu.Unlock()
 				command := options.Name + " " + strings.Join(options.Args, " ")
@@ -344,7 +343,7 @@ echo 'fredrir-04 : ok=1 changed=0 unreachable=0 failed=0 skipped=0'
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: root, Stdout: &stdout, Stderr: &stderr}}
+	commands := Commands{Work: t.TempDir(), Runner: process.Runner{Dir: root, Stdout: &stdout, Stderr: &stderr}}
 	if err := commands.compareDeclarations(context.Background()); err != nil {
 		t.Fatalf("matching declarations reported %v\nstdout:\n%s\nstderr:\n%s", err, &stdout, &stderr)
 	}
@@ -363,7 +362,7 @@ func TestVolatileComparisonRunsDuringFleetComparison(t *testing.T) {
 		started.Wait()
 		close(overlapping)
 	}()
-	commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	commands := Commands{Work: t.TempDir(), Runner: process.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		switch playbook := playbookArgument(options); {
 		case options.Name == "tofu":
 			return process.Result{Stdout: []byte(`{"@level":"info","@message":"No changes.","type":"change_summary"}` + "\n")}, nil
@@ -389,7 +388,7 @@ func TestDeepVerificationComparesDeclarationsDuringLiveChecks(t *testing.T) {
 	planning := make(chan struct{})
 	var once sync.Once
 	var stdout bytes.Buffer
-	commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Stdout: &stdout, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
+	commands := Commands{Work: t.TempDir(), Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Stdout: &stdout, Execute: func(ctx context.Context, options process.Options) (process.Result, error) {
 		switch options.Name {
 		case "kubectl":
 			select {

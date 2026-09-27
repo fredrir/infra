@@ -58,7 +58,7 @@ func TestDoctorComparesToolsWithPinsAndReportsEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	var calls []string
-	runner := ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		calls = append(calls, filepath.Base(options.Name)+" "+strings.Join(options.Args, " "))
 		if options.Dir != root {
 			t.Errorf("command ran outside the repository: %s", options.Dir)
@@ -127,7 +127,7 @@ func TestDoctorComparesToolsWithPinsAndReportsEnvironment(t *testing.T) {
 
 func TestDoctorRejectsDirectoriesAndMissingKubeconfigs(t *testing.T) {
 	root := t.TempDir()
-	runner := ci.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		return process.Result{Stdout: []byte("linux\n")}, nil
 	}}
 	opts := DoctorOptions{State: NewState(root), Runner: runner, Kubeconfig: root + string(os.PathListSeparator) + filepath.Join(root, "missing.yaml"), KVMDevice: filepath.Join(root, "no-kvm"), Platform: "linux", Assets: pinnedAssets}
@@ -142,14 +142,14 @@ func TestDoctorRejectsDirectoriesAndMissingKubeconfigs(t *testing.T) {
 		t.Errorf("docker not accepted: %+v", check)
 	}
 	executable(t, filepath.Join(opts.State.Tools(), "kubectl"))
-	reachable := ci.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	reachable := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		return process.Result{Stdout: []byte("Client Version: v1.36.3\nKustomize Version: v5.7.1\nServer Version: v1.36.3+k3s1\n")}, nil
 	}}
 	opts.Runner = reachable
 	if check := diagnostic(t, Doctor(context.Background(), opts), "cluster"); !check.OK || check.Detail != "v1.36.3+k3s1" {
 		t.Errorf("reachable cluster not reported: %+v", check)
 	}
-	unreachable := ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	unreachable := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		fmt.Fprintln(options.Stderr, "Unable to connect to the server: dial tcp: i/o timeout")
 		return process.Result{ExitCode: 1}, errors.New("kubectl failed: exit status 1")
 	}}

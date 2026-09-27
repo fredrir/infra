@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -31,9 +30,9 @@ type fakeDocker struct {
 	commands [][]string
 }
 
-func (d *fakeDocker) runner(t *testing.T, root string) ci.Runner {
+func (d *fakeDocker) runner(t *testing.T, root string) process.Runner {
 	t.Helper()
-	return ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	return process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		if options.Dir != root {
 			t.Errorf("%s ran outside the repository: %s", options.Name, options.Dir)
 		}

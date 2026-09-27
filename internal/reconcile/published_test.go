@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -30,7 +29,7 @@ func TestPublishedRevisionRequiresReadyProductionSource(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			commands := &Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := &Commands{Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				if options.Name != "kubectl" || strings.Join(options.Args, " ") != "get gitrepositories.source.toolkit.fluxcd.io flux-system -n=flux-system -o=json --request-timeout=30s" {
 					t.Fatalf("unexpected read: %s %v", options.Name, options.Args)
 				}

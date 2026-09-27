@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/release"
 )
 
@@ -26,7 +26,7 @@ func TestSignedPackageQualification(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	work := t.TempDir()
-	runner := ci.Runner{Dir: work, Stdout: os.Stdout, Stderr: os.Stderr}
+	runner := process.Runner{Dir: work, Stdout: os.Stdout, Stderr: os.Stderr}
 	home := filepath.Join(work, "gnupg")
 	if err := os.Mkdir(home, 0700); err != nil {
 		t.Fatal(err)

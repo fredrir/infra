@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
@@ -70,7 +69,7 @@ type BenchDelta struct {
 
 type BenchOptions struct {
 	State     State
-	Runner    ci.Runner
+	Runner    process.Runner
 	Names     []string
 	Baseline  string
 	Threshold float64
@@ -293,7 +292,7 @@ func BenchCompare(base, candidate BenchSummary, threshold float64) ([]BenchDelta
 
 type BenchGoOptions struct {
 	State    State
-	Runner   ci.Runner
+	Runner   process.Runner
 	Packages []string
 	Count    int
 	Stdout   io.Writer

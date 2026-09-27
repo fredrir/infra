@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -14,7 +13,7 @@ var ErrDifferences = errors.New("cluster differs from the local declarations")
 
 type DiffOptions struct {
 	State  State
-	Runner ci.Runner
+	Runner process.Runner
 	Stdout io.Writer
 	Stderr io.Writer
 }

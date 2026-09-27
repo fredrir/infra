@@ -28,14 +28,14 @@ type StageReport struct {
 	Error           string    `json:"error,omitempty"`
 }
 
-func Measure(ctx context.Context, runner Runner, stage string, budget time.Duration, directory string, command []string) (StageReport, error) {
+func Measure(ctx context.Context, runner process.Runner, stage string, budget time.Duration, directory string, command []string) (StageReport, error) {
 	report := StageReport{Schema: 1, Stage: stage, Revision: os.Getenv("GITHUB_SHA"), Started: time.Now().UTC(), BudgetSeconds: budget.Seconds(), ExitCode: -1}
 	if !regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`).MatchString(stage) || budget <= 0 || len(command) == 0 {
 		return report, errors.New("stage, positive budget and command required")
 	}
 	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
-	result, err := runner.execute(ctx, process.Options{Name: command[0], Args: command[1:], Dir: runner.Dir, Env: append(os.Environ(), runner.Env...), Stdout: runner.Stdout, Stderr: runner.Stderr, KillGrace: 10 * time.Second})
+	result, err := runner.Invoke(ctx, process.Options{Name: command[0], Args: command[1:], Dir: runner.Dir, Env: append(os.Environ(), runner.Env...), Stdout: runner.Stdout, Stderr: runner.Stderr, KillGrace: 10 * time.Second})
 	report.DurationSeconds = time.Since(report.Started).Seconds()
 	report.ExitCode = result.ExitCode
 	report.CPUSeconds, report.PeakMemoryBytes = result.CPUSeconds, result.PeakMemoryBytes

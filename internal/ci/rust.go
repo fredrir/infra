@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/fredrir/infra/internal/process"
 	"net"
 	"net/url"
 	"os"
@@ -21,7 +22,7 @@ type RustOptions struct {
 	FastTest []string `json:"fast_test,omitempty"`
 }
 
-func PrepareRust(ctx context.Context, runner Runner, temporary, clippy, test string) error {
+func PrepareRust(ctx context.Context, runner process.Runner, temporary, clippy, test string) error {
 	clippyFlags, err := RustArguments(clippy)
 	if err != nil {
 		return err
@@ -77,12 +78,14 @@ func PrepareRust(ctx context.Context, runner Runner, temporary, clippy, test str
 	return runner.Run(ctx, "rustup", "show", "active-toolchain")
 }
 
-func CheckRust(ctx context.Context, runner Runner, temporary, stage string) error {
+func CheckRust(ctx context.Context, runner process.Runner, temporary, stage string) error {
 	if stage == "fast" {
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		part := func(stage string) concurrentCheck {
-			return func(ctx context.Context, runner Runner) error { return CheckRust(ctx, runner, temporary, stage) }
+			return func(ctx context.Context, runner process.Runner) error {
+				return CheckRust(ctx, runner, temporary, stage)
+			}
 		}
 		if err := runChecks(ctx, runner, []concurrentCheck{part("format"), part("unit")}); err != nil {
 			return err
@@ -167,7 +170,7 @@ type rustMetadata struct {
 	}
 }
 
-func cargoMetadata(ctx context.Context, runner Runner) (rustMetadata, error) {
+func cargoMetadata(ctx context.Context, runner process.Runner) (rustMetadata, error) {
 	data, err := runner.Output(ctx, "cargo", "metadata", "--no-deps", "--format-version", "1")
 	if err != nil {
 		return rustMetadata{}, err
@@ -204,7 +207,7 @@ func MaximumRustVersion(versions []string) (string, error) {
 	return selected, nil
 }
 
-func CheckMSRV(ctx context.Context, runner Runner) error {
+func CheckMSRV(ctx context.Context, runner process.Runner) error {
 	metadata, err := cargoMetadata(ctx, runner)
 	if err != nil {
 		return err

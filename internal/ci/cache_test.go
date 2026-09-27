@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/fredrir/infra/internal/process"
 )
 
 func init() {
@@ -105,7 +106,7 @@ func TestRustCacheRestoresFreshCheckoutAndBoundsWrites(t *testing.T) {
 	var output bytes.Buffer
 	run := func(directory, action string) {
 		t.Helper()
-		runner := Runner{Dir: directory, Env: []string{"INFRA_CACHE_TEST_TOOL=1"}, Stdout: &output, Stderr: &output}
+		runner := process.Runner{Dir: directory, Env: []string{"INFRA_CACHE_TEST_TOOL=1"}, Stdout: &output, Stderr: &output}
 		if err := RustCache(context.Background(), runner, temporary, action); err != nil {
 			t.Fatal(err)
 		}

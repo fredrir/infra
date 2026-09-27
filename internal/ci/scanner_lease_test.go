@@ -82,7 +82,7 @@ func TestScannerExpirySkipsActiveScanAndCollectsAfterCancellation(t *testing.T) 
 	finished := make(chan error, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	runner := Runner{Execute: func(ctx context.Context, _ process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(ctx context.Context, _ process.Options) (process.Result, error) {
 		close(entered)
 		<-ctx.Done()
 		return process.Result{}, ctx.Err()
@@ -147,7 +147,7 @@ func TestScannerFailedPreparationCanReleaseLease(t *testing.T) {
 	root := t.TempDir()
 	cache := filepath.Join(root, "trivy-v3", "frontend")
 	failure := errors.New("download unavailable")
-	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, failure }}
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, failure }}
 	if err := PrepareScanner(context.Background(), runner, cache, filepath.Join(root, "shared"), false, ScannerLease{ID: "100-1", ExpiresAt: time.Now().Add(time.Hour)}); !errors.Is(err, failure) {
 		t.Fatalf("download failure lost: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestScannerFailedPreparationCanReleaseLease(t *testing.T) {
 
 func TestScannerLeaseRejectsInvalidExpirationAndSymlinks(t *testing.T) {
 	for _, lease := range []ScannerLease{{ID: "../escape", ExpiresAt: time.Now().Add(time.Hour)}, {ID: "old", ExpiresAt: time.Now().Add(-time.Hour)}, {ID: "forever", ExpiresAt: time.Now().Add(8 * 24 * time.Hour)}} {
-		if err := PrepareScanner(context.Background(), Runner{}, filepath.Join(t.TempDir(), "cache"), filepath.Join(t.TempDir(), "shared"), false, lease); err == nil {
+		if err := PrepareScanner(context.Background(), process.Runner{}, filepath.Join(t.TempDir(), "cache"), filepath.Join(t.TempDir(), "shared"), false, lease); err == nil {
 			t.Fatalf("invalid lease accepted: %+v", lease)
 		}
 	}

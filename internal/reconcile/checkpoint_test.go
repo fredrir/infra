@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -280,7 +279,7 @@ func TestHostReuseRequiresNoPlannedChangesOrObservedDrift(t *testing.T) {
 func TestHostReuseInspectsTheSavedExpansionPlan(t *testing.T) {
 	work := t.TempDir()
 	expected := filepath.Join(work, "expand.tfplan")
-	commands := Commands{Work: work, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	commands := Commands{Work: work, Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		if options.Name != "tofu" || !reflect.DeepEqual(options.Args, []string{"-chdir=tofu", "show", "-json", expected}) {
 			return process.Result{}, errors.New("wrong plan inspected")
 		}
@@ -322,7 +321,7 @@ func TestSavedExpansionProofWithLocalTofu(t *testing.T) {
 	write("original")
 	run("init", "-backend=false", "-input=false", "-no-color")
 	run("apply", "-auto-approve", "-input=false", "-no-color")
-	commands := Commands{Work: root, Runner: ci.Runner{Dir: root}}
+	commands := Commands{Work: root, Runner: process.Runner{Dir: root}}
 	for _, changed := range []bool{false, true} {
 		if changed {
 			write("changed")

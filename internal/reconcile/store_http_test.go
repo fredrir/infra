@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/process"
 )
@@ -405,7 +404,7 @@ func newFakeAWS(t *testing.T) *fakeAWS {
 }
 
 func (a *fakeAWS) store() S3Store {
-	return S3Store{Runner: ci.Runner{Execute: a.execute}, Bucket: "bucket", Prefix: "production"}
+	return S3Store{Runner: process.Runner{Execute: a.execute}, Bucket: "bucket", Prefix: "production"}
 }
 
 func (a *fakeAWS) write(body []byte) {

@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 )
 
-func Index(ctx context.Context, runner ci.Runner, format, directory, keyPath string) error {
+func Index(ctx context.Context, runner process.Runner, format, directory, keyPath string) error {
 	root, err := filepath.Abs(directory)
 	if err != nil {
 		return err
@@ -130,7 +130,7 @@ func Index(ctx context.Context, runner ci.Runner, format, directory, keyPath str
 	return runner.Run(ctx, "gpg", "--batch", "--yes", "--local-user", key, "--digest-algo", "SHA512", "--armor", "--detach-sign", "--output", "dists/stable/Release.gpg", "dists/stable/Release")
 }
 
-func indexAPK(ctx context.Context, runner ci.Runner, keyPath string) error {
+func indexAPK(ctx context.Context, runner process.Runner, keyPath string) error {
 	keys, err := os.MkdirTemp("", "infra-apk-")
 	if err != nil {
 		return err
@@ -167,7 +167,7 @@ func indexAPK(ctx context.Context, runner ci.Runner, keyPath string) error {
 	return nil
 }
 
-func runToFile(ctx context.Context, runner ci.Runner, path, name string, arguments ...string) error {
+func runToFile(ctx context.Context, runner process.Runner, path, name string, arguments ...string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err

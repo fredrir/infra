@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -27,7 +27,7 @@ type Identity struct {
 type RepositoryResolver interface {
 	Repository(context.Context, string) (Identity, error)
 }
-type NativeProvider struct{ Runner ci.Runner }
+type NativeProvider struct{ Runner process.Runner }
 
 var repositoryPattern = regexp.MustCompile(`^fredrir/[A-Za-z0-9_.-]+$`)
 var projectPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,29}$`)

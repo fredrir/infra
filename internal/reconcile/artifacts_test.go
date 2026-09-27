@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -23,7 +22,7 @@ func artifactFixture(t *testing.T, body string) resource {
 
 func TestWorkloadSnapshotBatchesReadsWithoutReusingStalePolls(t *testing.T) {
 	calls := 0
-	commands := &Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	commands := &Commands{Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		calls++
 		if strings.Join(options.Args, " ") != "get deployments.apps -n=llunde -o=json --request-timeout=30s" {
 			t.Fatalf("unexpected resource scope: %v", options.Args)
@@ -124,7 +123,7 @@ func TestVerifyArtifactsRejectsStaleAndUnownedContent(t *testing.T) {
 			art := artifactFixture(t, artifact)
 			owner := artifactFixture(t, fmt.Sprintf(`{"metadata":{"name":"project-y"},"spec":{"sourceRef":{"kind":"ExternalArtifact","name":"project-y"}},"status":{"lastAppliedRevision":%q}}`, "latest@"+digest))
 			test.mutate(&gen, &art, &owner)
-			commands := &Commands{kubernetes: &kubernetesState{generator: gen, baseline: test.baseline}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := &Commands{kubernetes: &kubernetesState{generator: gen, baseline: test.baseline}, Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				var value any = gen
 				if strings.Contains(strings.Join(options.Args, " "), "externalartifacts") {
 					value = struct{ Items []resource }{[]resource{art}}
@@ -189,7 +188,7 @@ func TestPinnedControllerArtifactEvidence(t *testing.T) {
 		{"ready owner while generator lags", lagArtifact, unchangedGenerator, lagOwner, strings.Split(lagSource.Status.Artifact.Revision, ":")[1], true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			commands := &Commands{kubernetes: &kubernetesState{generator: test.generator}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := &Commands{kubernetes: &kubernetesState{generator: test.generator}, Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				var value any = test.generator
 				if strings.Contains(strings.Join(options.Args, " "), "externalartifacts") {
 					value = struct{ Items []resource }{[]resource{test.artifact}}

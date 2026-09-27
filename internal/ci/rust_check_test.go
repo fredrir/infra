@@ -19,13 +19,13 @@ func TestRustFastChecksFormatAlongsideUnitTests(t *testing.T) {
 			directory := t.TempDir()
 			t.Setenv("RUSTC_WRAPPER", "")
 			t.Setenv("FAST_TEST_ARGS", "")
-			succeed := Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, nil }}
+			succeed := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, nil }}
 			if err := PrepareRust(context.Background(), succeed, directory, "", ""); err != nil {
 				t.Fatal(err)
 			}
 			tested := make(chan struct{})
 			var output bytes.Buffer
-			runner := Runner{Stdout: &output, Stderr: &output, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			runner := process.Runner{Stdout: &output, Stderr: &output, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				tool := options.Args[0]
 				switch tool {
 				case "nextest":

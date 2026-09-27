@@ -77,7 +77,7 @@ func TestMeasureCheckUsesOnlyRemainingAggregateBudget(t *testing.T) {
 	directory := t.TempDir()
 	writeCheckReceipt(t, directory, "inline/unit.json", "unit", 7)
 	called := false
-	runner := Runner{Execute: func(ctx context.Context, _ process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(ctx context.Context, _ process.Options) (process.Result, error) {
 		called = true
 		deadline, ok := ctx.Deadline()
 		if !ok || time.Until(deadline) > 3*time.Second {
@@ -98,7 +98,7 @@ func TestMeasureCheckUsesOnlyRemainingAggregateBudget(t *testing.T) {
 func TestMeasureCheckPreservesDeadlineFailure(t *testing.T) {
 	directory := t.TempDir()
 	writeCheckReceipt(t, directory, "unit.json", "unit", 9.999)
-	runner := Runner{Execute: func(ctx context.Context, _ process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(ctx context.Context, _ process.Options) (process.Result, error) {
 		<-ctx.Done()
 		return process.Result{ExitCode: -1}, ctx.Err()
 	}}
@@ -128,7 +128,7 @@ func TestCheckGroupCountsLaterReceiptsAfterFailedStage(t *testing.T) {
 		t.Fatalf("stage or aggregate failure was lost: %v", err)
 	}
 	called := false
-	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		called = true
 		return process.Result{}, nil
 	}}

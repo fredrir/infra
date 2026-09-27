@@ -13,7 +13,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
@@ -43,7 +42,7 @@ var devSettings = map[string]string{"STORAGE_CLASS": "local-path"}
 
 type ClusterOptions struct {
 	State   State
-	Runner  ci.Runner
+	Runner  process.Runner
 	Profile string
 	Timeout time.Duration
 	Log     io.Writer
@@ -93,20 +92,20 @@ func (opts ClusterOptions) tool(name string) string {
 	return name
 }
 
-func (opts ClusterOptions) kube() (ci.Runner, error) {
+func (opts ClusterOptions) kube() (process.Runner, error) {
 	kubeconfig, err := filepath.Abs(opts.State.Kubeconfig())
 	if err != nil {
-		return ci.Runner{}, err
+		return process.Runner{}, err
 	}
 	if _, err := os.Stat(kubeconfig); err != nil {
-		return ci.Runner{}, fmt.Errorf("cluster kubeconfig missing; run infra dev cluster up")
+		return process.Runner{}, fmt.Errorf("cluster kubeconfig missing; run infra dev cluster up")
 	}
 	runner := opts.Runner
 	runner.Env = append(append([]string{}, runner.Env...), "KUBECONFIG="+kubeconfig)
 	return runner, nil
 }
 
-func (opts ClusterOptions) stream(ctx context.Context, runner ci.Runner, name string, args ...string) error {
+func (opts ClusterOptions) stream(ctx context.Context, runner process.Runner, name string, args ...string) error {
 	_, err := execute(ctx, runner, process.Options{Name: name, Args: args, Stdout: opts.Log, Stderr: opts.Log})
 	return err
 }
@@ -242,7 +241,7 @@ func ClusterSync(ctx context.Context, opts ClusterOptions) (ClusterStatus, error
 	return status, nil
 }
 
-func (opts ClusterOptions) installFlux(ctx context.Context, kube ci.Runner) error {
+func (opts ClusterOptions) installFlux(ctx context.Context, kube process.Runner) error {
 	components, err := filepath.Abs(filepath.Join(opts.State.Root, fluxComponentsFile))
 	if err != nil {
 		return err
@@ -261,7 +260,7 @@ func (opts ClusterOptions) installFlux(ctx context.Context, kube ci.Runner) erro
 	return nil
 }
 
-func (opts ClusterOptions) ensureAgeKey(ctx context.Context, kube ci.Runner) (string, error) {
+func (opts ClusterOptions) ensureAgeKey(ctx context.Context, kube process.Runner) (string, error) {
 	key := filepath.Join(opts.State.Cluster(), "age.key")
 	if _, err := os.Stat(key); os.IsNotExist(err) {
 		if _, err := capture(ctx, opts.Runner, opts.tool("age-keygen"), "-o", key); err != nil {
@@ -378,7 +377,7 @@ func generateRoot(root string, selected []string) ([]byte, error) {
 	return out.Bytes(), encoder.Close()
 }
 
-func (opts ClusterOptions) kustomizations(ctx context.Context, kube ci.Runner) ([]KustomizationStatus, error) {
+func (opts ClusterOptions) kustomizations(ctx context.Context, kube process.Runner) ([]KustomizationStatus, error) {
 	output, err := capture(ctx, kube, opts.tool("kubectl"), "get", "kustomizations.kustomize.toolkit.fluxcd.io", "--namespace="+fluxNamespace, "--output=json")
 	if err != nil {
 		return nil, fmt.Errorf("read kustomizations: %w", err)

@@ -10,12 +10,13 @@ import (
 	"runtime"
 
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"golang.org/x/sync/errgroup"
 )
 
 type SetupOptions struct {
 	State    State
-	Runner   ci.Runner
+	Runner   process.Runner
 	Client   *http.Client
 	Platform string
 	Assets   func(string) (ci.ToolAsset, bool)

@@ -9,11 +9,12 @@ import (
 
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/pipeline"
+	"github.com/fredrir/infra/internal/process"
 )
 
 type DoctorOptions struct {
 	State      State
-	Runner     ci.Runner
+	Runner     process.Runner
 	Bazel      string
 	Kubeconfig string
 	KVMDevice  string

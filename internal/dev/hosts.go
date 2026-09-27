@@ -19,7 +19,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/kdomanski/iso9660"
 	"go.yaml.in/yaml/v3"
@@ -58,7 +57,7 @@ type HostsSpec struct {
 type HostsOptions struct {
 	State   State
 	Nodes   []string
-	Runner  ci.Runner
+	Runner  process.Runner
 	Client  *http.Client
 	Timeout time.Duration
 	Signal  func(pid int, signal syscall.Signal) error

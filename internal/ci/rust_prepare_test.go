@@ -30,7 +30,7 @@ func TestRustPreparationPersistsLiteralArgumentsAndDisablesUnavailableCache(t *t
 	t.Setenv("SCCACHE_ENDPOINT", endpoint)
 	var warning bytes.Buffer
 	var executed []string
-	runner := Runner{Stdout: &bytes.Buffer{}, Stderr: &warning, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	runner := process.Runner{Stdout: &bytes.Buffer{}, Stderr: &warning, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		executed = append(executed, options.Name)
 		return process.Result{}, nil
 	}}
@@ -60,7 +60,7 @@ func TestRustPreparationRejectsOverridesBeforeWritingOrExecuting(t *testing.T) {
 	for _, input := range []string{"--features $(id)", "--all-features; curl x", "--config build.rustc-wrapper=x", "--manifest-path ../other/Cargo.toml", "-Zunstable-options", "`id`"} {
 		t.Run(input, func(t *testing.T) {
 			directory := t.TempDir()
-			runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+			runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 				t.Fatal("invalid arguments executed external command")
 				return process.Result{}, nil
 			}}
@@ -80,7 +80,7 @@ func TestRustFastPreparationAndExecutionCombineBuildOptionsAndFilters(t *testing
 	t.Setenv("RUSTC_WRAPPER", "")
 	t.Setenv("FAST_TEST_ARGS", "--release -- --skip editor")
 	var calls [][]string
-	runner := Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		if options.Name == "cargo" {
 			calls = append(calls, options.Args)
 		}
@@ -107,7 +107,7 @@ func TestRustFastPreparationAndExecutionCombineBuildOptionsAndFilters(t *testing
 func TestRustPreparationRejectsAmbiguousFastFilters(t *testing.T) {
 	directory := t.TempDir()
 	t.Setenv("FAST_TEST_ARGS", "-- --skip slow -- --skip editor")
-	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		t.Fatal("ambiguous filters executed a command")
 		return process.Result{}, nil
 	}}

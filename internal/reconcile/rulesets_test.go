@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/google/go-github/v88/github"
 )
 
@@ -206,7 +206,7 @@ func TestLiveRulesetsMatchTheirDeclaration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = (&Commands{Runner: ci.Runner{Dir: repositoryRoot}, GitHub: client}).VerifyRulesets(context.Background())
+			err = (&Commands{Runner: process.Runner{Dir: repositoryRoot}, GitHub: client}).VerifyRulesets(context.Background())
 			var differences Differences
 			switch {
 			case test.failure != 0:

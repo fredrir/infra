@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/fredrir/infra/internal/process"
 	"io"
 	"os"
 	"path/filepath"
@@ -52,7 +53,7 @@ func PlanProjectInputs(ctx context.Context, root, configPath, base, target strin
 	if base == "" {
 		return allProjectInputs(config, "missing-base"), nil
 	}
-	runner := Runner{Dir: root}
+	runner := process.Runner{Dir: root}
 	revision, err := runner.Output(ctx, "git", "rev-parse", "--verify", "--end-of-options", base+"^{commit}")
 	if err != nil {
 		if ctx.Err() != nil {

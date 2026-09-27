@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/kata"
 	"github.com/fredrir/infra/internal/pipeline"
+	"github.com/fredrir/infra/internal/process"
 )
 
 const EngineName = "infra-dagger-dev"
@@ -49,7 +49,7 @@ func EngineProfiles() map[string]EngineProfile {
 
 type EngineOptions struct {
 	State   State
-	Runner  ci.Runner
+	Runner  process.Runner
 	Profile EngineProfile
 	Log     io.Writer
 }

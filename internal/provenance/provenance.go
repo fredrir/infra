@@ -58,7 +58,7 @@ type provenanceCommit struct {
 }
 
 type Verifier struct {
-	Runner       ci.Runner
+	Runner       process.Runner
 	Work         string
 	Env          []string
 	PullRequests PullRequests

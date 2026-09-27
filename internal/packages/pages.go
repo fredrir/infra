@@ -12,7 +12,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 )
 
 //go:embed assets/install.sh.in
@@ -98,7 +98,7 @@ func BuildSite(site string, tools Tools, publicGPG, publicAPK []byte) error {
 	return nil
 }
 
-func PublishPages(ctx context.Context, runner ci.Runner, site, repository string) error {
+func PublishPages(ctx context.Context, runner process.Runner, site, repository string) error {
 	if !repositoryName.MatchString(repository) || os.Getenv("GH_TOKEN") == "" {
 		return fmt.Errorf("package publication requires repository and GitHub credentials")
 	}

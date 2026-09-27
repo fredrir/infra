@@ -86,7 +86,6 @@ go_test(
     embed = [":reconcile"],
     shard_count = 2,
     deps = [
-        "//internal/ci",
         "//internal/objectstore",
         "//internal/process",
         "//internal/provenance",

@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 )
 
-func Tag(ctx context.Context, runner ci.Runner, cliffConfig string) error {
+func Tag(ctx context.Context, runner process.Runner, cliffConfig string) error {
 	root, err := filepath.Abs(runner.Dir)
 	if err != nil {
 		return err

@@ -19,7 +19,7 @@ import (
 type deployFixture struct {
 	t                     *testing.T
 	root, remote, project string
-	runner                Runner
+	runner                process.Runner
 	options               DeployOptions
 	calls                 []process.Options
 	verify                func(process.Options) error
@@ -33,7 +33,7 @@ func newDeployFixture(t *testing.T, mode, visibility string, nested bool) *deplo
 	if err := os.MkdirAll(f.project, 0700); err != nil {
 		t.Fatal(err)
 	}
-	f.runner = Runner{Dir: f.root, Env: []string{"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}, Stdout: io.Discard, Stderr: io.Discard}
+	f.runner = process.Runner{Dir: f.root, Env: []string{"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}, Stdout: io.Discard, Stderr: io.Discard}
 	f.git("init", "--quiet", "--bare", "--initial-branch=main", f.remote)
 	f.git("init", "--quiet", "--initial-branch=main")
 	f.git("config", "user.name", "Test")

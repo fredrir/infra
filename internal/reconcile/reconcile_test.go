@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/provenance"
 )
@@ -279,7 +278,7 @@ func TestMainAdvanceSupersedesOnlyReconciledChanges(t *testing.T) {
 	commit("tofu/main.tf")
 	git(area, "clone", "--quiet", origin, checkout)
 	revision := git(checkout, "rev-parse", "HEAD")
-	ops := &Commands{Runner: ci.Runner{Dir: checkout}, RequireMain: true}
+	ops := &Commands{Runner: process.Runner{Dir: checkout}, RequireMain: true}
 	for _, test := range []struct {
 		name       string
 		advance    func()
@@ -399,7 +398,7 @@ func TestReadinessRejectsStaleGenerationAndRevision(t *testing.T) {
 	if err := ready(item); err != nil {
 		t.Fatal(err)
 	}
-	c := Commands{Runner: ci.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	c := Commands{Runner: process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		return process.Result{Stdout: []byte(`{"items":[{"metadata":{"name":"flux-system","namespace":"flux-system","generation":2},"spec":{"sourceRef":{"kind":"GitRepository","name":"flux-system"}},"status":{"observedGeneration":2,"lastAppliedRevision":"production@sha1:old","conditions":[{"type":"Ready","status":"True","observedGeneration":2}]}}]}`)}, nil
 	}}}
 	if c.verifyKubernetes(context.Background(), "new", "") == nil {
@@ -448,7 +447,7 @@ func TestS3LockUsesConditionalTakeoverAndRelease(t *testing.T) {
 	for _, expired := range []bool{false, true} {
 		t.Run(fmt.Sprint(expired), func(t *testing.T) {
 			put, deleted := false, false
-			runner := ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+			runner := process.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
 				switch o.Args[1] {
 				case "get-object":
 					expiry := time.Now().Add(time.Hour)
@@ -495,7 +494,7 @@ func TestS3LockUsesConditionalTakeoverAndRelease(t *testing.T) {
 func TestSavedPlanAndStateLockArePreserved(t *testing.T) {
 	work := t.TempDir()
 	var calls []process.Options
-	c := Commands{Work: work, Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+	c := Commands{Work: work, Runner: process.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
 		calls = append(calls, o)
 		return process.Result{}, nil
 	}}}
@@ -541,7 +540,7 @@ func TestHostnameOnlyChangeSkipsUnrelatedHostConfiguration(t *testing.T) {
 }
 
 func TestOpenTofuVerificationRejectsRemainingDrift(t *testing.T) {
-	c := Commands{Runner: ci.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	c := Commands{Runner: process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		return process.Result{ExitCode: 2}, errors.New("drift")
 	}}}
 	if c.verifyTofu(context.Background()) == nil {
@@ -563,7 +562,7 @@ func TestCancellationStopsVerificationImmediately(t *testing.T) {
 
 func TestS3LockCreationUsesCreateOnlyCondition(t *testing.T) {
 	var conditional bool
-	runner := ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
 		switch o.Args[1] {
 		case "get-object":
 			return process.Result{ExitCode: 1}, errors.New("missing")
@@ -593,7 +592,7 @@ func TestHelmReleasesReconcileAlongsideKustomizations(t *testing.T) {
 	item := func(name, namespace, handled string) string {
 		return fmt.Sprintf(`{"metadata":{"name":%q,"namespace":%q,"generation":1},"spec":{"sourceRef":{"kind":"GitRepository","name":"flux-system"}},"status":{"observedGeneration":1,"lastAppliedRevision":"production@sha1:revision","lastHandledReconcileAt":%q,"inventory":{"entries":[]},"conditions":[{"type":"Ready","status":"True","observedGeneration":1}]}}`, name, namespace, handled)
 	}
-	c := Commands{kubernetes: declaredRoot(t), Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+	c := Commands{kubernetes: declaredRoot(t), Runner: process.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
 		args := strings.Join(o.Args, " ")
 		if result, ok := deployedArtifacts(t, "revision", args); ok {
 			return result, nil
@@ -633,7 +632,7 @@ func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
 		t.Run(initial, func(t *testing.T) {
 			branch, token := initial, ""
 			var rootReconciles int
-			c := Commands{kubernetes: declaredRoot(t), Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+			c := Commands{kubernetes: declaredRoot(t), Runner: process.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
 				args := strings.Join(o.Args, " ")
 				if result, ok := deployedArtifacts(t, "revision", args); ok {
 					return result, nil
@@ -681,7 +680,7 @@ func TestFluxBootstrapSwitchesThroughItsDeclaredRoot(t *testing.T) {
 func TestOpenTofuTestsGateThePlan(t *testing.T) {
 	for _, failing := range []bool{false, true} {
 		var calls []string
-		c := Commands{Work: t.TempDir(), Runner: ci.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
+		c := Commands{Work: t.TempDir(), Runner: process.Runner{Execute: func(_ context.Context, o process.Options) (process.Result, error) {
 			calls = append(calls, strings.Join(o.Args[1:], " "))
 			switch {
 			case o.Args[1] == "test" && failing:

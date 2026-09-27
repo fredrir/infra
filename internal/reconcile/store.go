@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/provenance"
@@ -48,7 +47,7 @@ type Store interface {
 }
 
 type S3Store struct {
-	Runner         ci.Runner
+	Runner         process.Runner
 	Bucket, Prefix string
 	Client         *objectstore.Client
 }

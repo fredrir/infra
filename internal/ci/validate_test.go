@@ -78,7 +78,7 @@ func TestValidateRendersEveryChangedKustomizationInProcess(t *testing.T) {
 		"platform/components/runners/kustomization.yaml": "resources:\n- settings.yaml\n",
 		"platform/components/runners/settings.yaml":      configMap,
 	})
-	runner := Runner{Dir: root, Execute: changedFiles(t, "platform/components/common/settings.yaml")}
+	runner := process.Runner{Dir: root, Execute: changedFiles(t, "platform/components/common/settings.yaml")}
 	if err := Validate(context.Background(), runner, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestKustomizationsRenderOnlyForInputsKustomizeReads(t *testing.T) {
 		{"charts/project/values.yaml", true},
 	} {
 		t.Run(test.changed, func(t *testing.T) {
-			runner := Runner{Dir: root, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			runner := process.Runner{Dir: root, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				if options.Name == "git" {
 					return process.Result{Stdout: []byte(test.changed + "\n")}, nil
 				}
@@ -130,11 +130,11 @@ func TestKustomizationsRenderOnlyForInputsKustomizeReads(t *testing.T) {
 
 func TestDeclarationChecksReportOutputAndErrorsInDeclarationOrder(t *testing.T) {
 	var output bytes.Buffer
-	runner := Runner{Stdout: &output, Stderr: &output}
+	runner := process.Runner{Stdout: &output, Stderr: &output}
 	laterFinished := make(chan struct{})
 	first, second := errors.New("first failure"), errors.New("second failure")
 	checks := []concurrentCheck{
-		func(_ context.Context, runner Runner) error {
+		func(_ context.Context, runner process.Runner) error {
 			select {
 			case <-laterFinished:
 			case <-time.After(5 * time.Second):
@@ -144,12 +144,12 @@ func TestDeclarationChecksReportOutputAndErrorsInDeclarationOrder(t *testing.T) 
 			runner.Stdout.Write([]byte("first stdout again\n"))
 			return first
 		},
-		func(_ context.Context, runner Runner) error {
+		func(_ context.Context, runner process.Runner) error {
 			defer close(laterFinished)
 			runner.Stderr.Write([]byte("second stderr\n"))
 			return second
 		},
-		func(context.Context, Runner) error { return nil },
+		func(context.Context, process.Runner) error { return nil },
 	}
 	err := runChecks(context.Background(), runner, checks)
 	if !errors.Is(err, first) || !errors.Is(err, second) || err.Error() != "first failure\nsecond failure" {
@@ -181,11 +181,11 @@ func TestDeclarationChecksStreamFinishedOutputWhileLaterChecksRun(t *testing.T) 
 	recorder := &streamRecorder{written: make(chan struct{}, 1)}
 	failure := errors.New("first failure")
 	checks := []concurrentCheck{
-		func(_ context.Context, runner Runner) error {
+		func(_ context.Context, runner process.Runner) error {
 			runner.Stderr.Write([]byte("first stderr\n"))
 			return failure
 		},
-		func(context.Context, Runner) error {
+		func(context.Context, process.Runner) error {
 			select {
 			case <-recorder.written:
 				return nil
@@ -194,7 +194,7 @@ func TestDeclarationChecksStreamFinishedOutputWhileLaterChecksRun(t *testing.T) 
 			}
 		},
 	}
-	if err := runChecks(context.Background(), Runner{Stdout: recorder, Stderr: recorder}, checks); err == nil || err.Error() != failure.Error() {
+	if err := runChecks(context.Background(), process.Runner{Stdout: recorder, Stderr: recorder}, checks); err == nil || err.Error() != failure.Error() {
 		t.Fatalf("unexpected result: %v", err)
 	}
 	if !reflect.DeepEqual(recorder.writes, []string{"first stderr\n"}) {
@@ -205,13 +205,13 @@ func TestDeclarationChecksStreamFinishedOutputWhileLaterChecksRun(t *testing.T) 
 func TestDeclarationCheckPanicBecomesItsErrorWhileSiblingsFinish(t *testing.T) {
 	var output bytes.Buffer
 	checks := []concurrentCheck{
-		func(context.Context, Runner) error { panic("broken check") },
-		func(_ context.Context, runner Runner) error {
+		func(context.Context, process.Runner) error { panic("broken check") },
+		func(_ context.Context, runner process.Runner) error {
 			runner.Stdout.Write([]byte("sibling finished\n"))
 			return nil
 		},
 	}
-	err := runChecks(context.Background(), Runner{Stdout: &output, Stderr: &output}, checks)
+	err := runChecks(context.Background(), process.Runner{Stdout: &output, Stderr: &output}, checks)
 	if err == nil || !strings.HasPrefix(err.Error(), "declaration check panicked: broken check\n") || !strings.Contains(err.Error(), "runCheck") {
 		t.Fatalf("panic not reported with its stack: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestTofuPreparationIsSeparateFromDeclarationChecks(t *testing.T) {
 	changed := "tofu/main.tf\n"
 	failure := errors.New("invalid tofu declaration")
 	var validationFailure error
-	runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	runner := process.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		switch options.Name {
 		case "git":
 			return process.Result{Stdout: []byte(changed)}, nil
@@ -274,10 +274,10 @@ var (
 	rootTofuValidation = []string{"-chdir=tofu", "validate", "-no-tests"}
 )
 
-func recordTofu(t *testing.T, changed string) (Runner, func() [][]string) {
+func recordTofu(t *testing.T, changed string) (process.Runner, func() [][]string) {
 	var lock sync.Mutex
 	var calls [][]string
-	runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	runner := process.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		switch options.Name {
 		case "git":
 			return process.Result{Stdout: []byte(changed + "\n")}, nil
@@ -351,7 +351,7 @@ func TestProductionSettingsReadByTheRootModuleValidateIt(t *testing.T) {
 func TestOpenTofuPreparationFailureStopsPreparation(t *testing.T) {
 	failure := errors.New("provider lock mismatch")
 	var calls [][]string
-	runner := Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	runner := process.Runner{Dir: t.TempDir(), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		if options.Name == "git" {
 			return process.Result{Stdout: []byte("tofu/main.tf\n")}, nil
 		}

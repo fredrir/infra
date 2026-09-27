@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
@@ -24,7 +23,7 @@ const (
 
 type RenderOptions struct {
 	State   State
-	Runner  ci.Runner
+	Runner  process.Runner
 	Project string
 	Output  string
 	Stdout  io.Writer

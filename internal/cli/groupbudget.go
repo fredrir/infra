@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,7 @@ func newMeasureCheckCommand() *cobra.Command {
 	var directory, stage, root string
 	var budget time.Duration
 	command := &cobra.Command{Use: "measure-check -- COMMAND [ARGS...]", Short: "Run a check within the remaining aggregate budget", Args: cobra.MinimumNArgs(1), RunE: func(command *cobra.Command, args []string) error {
-		report, err := ci.MeasureCheck(command.Context(), ci.Runner{Dir: root, Stdout: command.ErrOrStderr(), Stderr: command.ErrOrStderr()}, stage, budget, directory, args)
+		report, err := ci.MeasureCheck(command.Context(), process.Runner{Dir: root, Stdout: command.ErrOrStderr(), Stderr: command.ErrOrStderr()}, stage, budget, directory, args)
 		return errors.Join(err, json.NewEncoder(command.OutOrStdout()).Encode(report))
 	}}
 	command.Flags().StringVar(&directory, "report-dir", "", "Directory containing only check receipts")

@@ -14,6 +14,7 @@ import (
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/objectstore"
 	"github.com/fredrir/infra/internal/platformops"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/provenance"
 	"github.com/fredrir/infra/internal/reconcile"
 	"github.com/fredrir/infra/internal/reconciler"
@@ -79,7 +80,7 @@ func newReconcileCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			runner := ci.Runner{Dir: absolute, Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}
+			runner := process.Runner{Dir: absolute, Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}
 			store := reconcile.S3Store{Runner: runner, Bucket: bucket, Prefix: prefix}
 			region := os.Getenv("AWS_REGION")
 			if region == "" {

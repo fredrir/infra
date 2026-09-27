@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 )
 
 func NURIndex(text, name string) (string, error) {
@@ -74,7 +74,7 @@ func tokenRequest(ctx context.Context, client *http.Client, address, token, fiel
 	return result[field], nil
 }
 
-func PublishChannels(ctx context.Context, runner ci.Runner, channels, knownHosts string) error {
+func PublishChannels(ctx context.Context, runner process.Runner, channels, knownHosts string) error {
 	data, err := os.ReadFile(filepath.Join(channels, "tools.json"))
 	if err != nil {
 		return err
@@ -255,7 +255,7 @@ func ValidateChannels(channels string, tools Tools) error {
 	return nil
 }
 
-func githubCheckout(ctx context.Context, runner ci.Runner, repository, token, destination string) (ci.Runner, string, error) {
+func githubCheckout(ctx context.Context, runner process.Runner, repository, token, destination string) (process.Runner, string, error) {
 	runner.Env = append(slices.Clone(runner.Env), "GH_TOKEN="+token)
 	if err := runner.Run(ctx, "git", "-c", "credential.helper=!gh auth git-credential", "clone", "--quiet", "--depth", "1", "https://github.com/"+repository+".git", destination); err != nil {
 		return runner, "", err
@@ -267,7 +267,7 @@ func githubCheckout(ctx context.Context, runner ci.Runner, repository, token, de
 	branch, err := runner.Output(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 	return runner, strings.TrimSpace(string(branch)), err
 }
-func commitAndPush(ctx context.Context, runner ci.Runner, message, branch string) error {
+func commitAndPush(ctx context.Context, runner process.Runner, message, branch string) error {
 	if err := runner.Run(ctx, "git", "add", "-A"); err != nil {
 		return err
 	}

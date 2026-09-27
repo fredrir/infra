@@ -3,14 +3,14 @@ package cli
 import (
 	"fmt"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/projects"
 	"github.com/spf13/cobra"
 )
 
 func newProjectCommands() []*cobra.Command {
 	provider := func(command *cobra.Command) projects.NativeProvider {
-		return projects.NativeProvider{Runner: ci.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}}
+		return projects.NativeProvider{Runner: process.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}}
 	}
 	var options projects.OnboardOptions
 	onboard := &cobra.Command{Use: "onboard REPOSITORY", Short: "Generate a restricted project and pinned workflow caller", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {

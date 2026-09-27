@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/google/go-github/v88/github"
 )
 
@@ -59,7 +59,7 @@ func TestPublishingQualification(t *testing.T) {
 	}
 	q.canaryAt(q.current)
 	q.restore()
-	if err := (&Commands{Runner: ci.Runner{Dir: q.root}, GitHub: q.admin}).VerifyRulesets(q.ctx); err != nil {
+	if err := (&Commands{Runner: process.Runner{Dir: q.root}, GitHub: q.admin}).VerifyRulesets(q.ctx); err != nil {
 		t.Fatalf("live rulesets after qualification: %v", err)
 	}
 }
@@ -115,7 +115,7 @@ func newPublishingQualification(t *testing.T) *publishingQualification {
 	})
 	q.git(nil, "init", "--quiet", "--bare")
 	var output bytes.Buffer
-	fetch := tokenGit(ci.Runner{Dir: q.repository, Stderr: &output}, q.adminToken)
+	fetch := tokenGit(process.Runner{Dir: q.repository, Stderr: &output}, q.adminToken)
 	if err := fetch.Run(q.ctx, "git", "fetch", "--quiet", "--no-tags", "--depth=3", q.publisher.Remote, "refs/heads/main"); err != nil {
 		t.Fatalf("fetch main: %v\n%s", err, output.String())
 	}
@@ -161,7 +161,7 @@ func (q *publishingQualification) git(stdin []byte, args ...string) string {
 
 func (q *publishingQualification) push(token string, args ...string) (string, error) {
 	var output bytes.Buffer
-	runner := tokenGit(ci.Runner{Dir: q.repository, Stdout: &output, Stderr: &output}, token)
+	runner := tokenGit(process.Runner{Dir: q.repository, Stdout: &output, Stderr: &output}, token)
 	err := runner.Run(q.ctx, "git", append([]string{"push", "--no-verify", q.publisher.Remote}, args...)...)
 	if strings.Contains(output.String(), token) {
 		q.t.Fatal("git printed a push token")

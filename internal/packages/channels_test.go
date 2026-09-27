@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -71,7 +70,7 @@ func TestChannelPublicationDoesNotCommitUnchangedArtifacts(t *testing.T) {
 	root := t.TempDir()
 	remote := filepath.Join(root, "remote.git")
 	checkout := filepath.Join(root, "checkout")
-	runner := ci.Runner{Dir: root, Env: []string{"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}, Stdout: io.Discard, Stderr: io.Discard}
+	runner := process.Runner{Dir: root, Env: []string{"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}, Stdout: io.Discard, Stderr: io.Discard}
 	git := func(arguments ...string) {
 		t.Helper()
 		if err := runner.Run(context.Background(), "git", arguments...); err != nil {

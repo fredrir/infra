@@ -25,7 +25,7 @@ func TestProvenanceVerifierFailuresNameTheirCause(t *testing.T) {
 		{name: "missing verifier", result: process.Result{ExitCode: -1}, err: errors.New(`start gh: exec: "gh": executable file not found in $PATH`), want: `executable file not found`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			runner := Runner{Env: []string{"GH_TOKEN=ghs_attestationsecret"}, Execute: func(context.Context, process.Options) (process.Result, error) { return test.result, test.err }}
+			runner := process.Runner{Env: []string{"GH_TOKEN=ghs_attestationsecret"}, Execute: func(context.Context, process.Options) (process.Result, error) { return test.result, test.err }}
 			_, err := VerifyDeploymentProvenance(context.Background(), runner, trust, "1", mapping, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40))
 			if err == nil || !strings.Contains(err.Error(), test.want) || strings.Contains(err.Error(), "ghs_attestationsecret") {
 				t.Fatalf("verifier failure reported as %v", err)

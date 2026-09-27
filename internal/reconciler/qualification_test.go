@@ -35,6 +35,7 @@ import (
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/dev"
 	"github.com/fredrir/infra/internal/objectstore"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/reconcile"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/klauspost/compress/zstd"
@@ -401,7 +402,7 @@ func TestReconcilerQualification(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Minute)
 	defer cancel()
 	state := dev.NewState(root)
-	q := &qualification{t: t, ctx: ctx, root: root, cache: filepath.Join(state.Cache, "reconciler"), hosts: dev.HostsOptions{State: state, Runner: ci.Runner{Dir: root}}}
+	q := &qualification{t: t, ctx: ctx, root: root, cache: filepath.Join(state.Cache, "reconciler"), hosts: dev.HostsOptions{State: state, Runner: process.Runner{Dir: root}}}
 	if err := os.MkdirAll(q.cache, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +449,7 @@ func TestReconcilerQualification(t *testing.T) {
 	if err := os.Symlink(state.Venv(), filepath.Join(tree, ".venv")); err != nil {
 		t.Fatal(err)
 	}
-	playing := dev.HostsOptions{State: dev.State{Root: tree, Cache: state.Cache}, Runner: ci.Runner{Dir: tree}}
+	playing := dev.HostsOptions{State: dev.State{Root: tree, Cache: state.Cache}, Runner: process.Runner{Dir: tree}}
 	play := func(args ...string) (string, error) {
 		var output bytes.Buffer
 		err := dev.HostsPlay(ctx, dev.PlayOptions{Hosts: playing, Playbook: "reconciler.yml", Args: args, Stdout: &output, Stderr: &output})

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/fredrir/infra/internal/process"
 	"io"
 	"io/fs"
 	"math"
@@ -90,7 +91,7 @@ func CheckGroupBudget(directory string, budget time.Duration, requireReports boo
 	return report, err
 }
 
-func MeasureCheck(ctx context.Context, runner Runner, stage string, budget time.Duration, directory string, command []string) (CheckGroupReport, error) {
+func MeasureCheck(ctx context.Context, runner process.Runner, stage string, budget time.Duration, directory string, command []string) (CheckGroupReport, error) {
 	report, err := CheckGroupBudget(directory, budget, false)
 	if err != nil {
 		return report, err

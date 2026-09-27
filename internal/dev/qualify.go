@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -45,7 +44,7 @@ func SuiteNames() []string {
 
 type QualifyOptions struct {
 	State  State
-	Runner ci.Runner
+	Runner process.Runner
 	Suite  string
 	Args   []string
 	Stdout io.Writer

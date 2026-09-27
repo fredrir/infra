@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -122,7 +121,7 @@ func newPublishingFixture(t *testing.T) *publishingFixture {
 		return process.Run(ctx, options)
 	}
 	f.commands = &Commands{
-		Runner:      ci.Runner{Dir: f.checkout, Execute: record, Stdout: &f.logs, Stderr: &f.logs, Env: []string{"GIT_TRACE=1", "GIT_TRACE_CURL=1", "GIT_CURL_VERBOSE=1", "GIT_TRACE_REDACT=0"}},
+		Runner:      process.Runner{Dir: f.checkout, Execute: record, Stdout: &f.logs, Stderr: &f.logs, Env: []string{"GIT_TRACE=1", "GIT_TRACE_CURL=1", "GIT_CURL_VERBOSE=1", "GIT_TRACE_REDACT=0"}},
 		RequireMain: true,
 		Publisher:   &Publisher{Repository: "fredrir/infra", AppID: 42, InstallationID: 43, PrivateKey: encoded, API: app.URL, Remote: remote.URL + "/origin.git"},
 	}
@@ -324,7 +323,7 @@ func TestProductionAncestryFollowsCurrentMain(t *testing.T) {
 	f := newPublishingFixture(t)
 	published := f.run(f.checkout, "rev-parse", "HEAD")
 	f.commit("docs/later.md")
-	commands := &Commands{Runner: ci.Runner{Dir: f.checkout}}
+	commands := &Commands{Runner: process.Runner{Dir: f.checkout}}
 	if onMain, err := commands.OnMain(context.Background(), published); err != nil || !onMain {
 		t.Fatalf("published ancestor of main: %t, %v", onMain, err)
 	}

@@ -3,6 +3,7 @@ package ci
 import (
 	"context"
 	"fmt"
+	"github.com/fredrir/infra/internal/process"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-func StartPostgres(ctx context.Context, runner Runner, temporary, variable string) error {
+func StartPostgres(ctx context.Context, runner process.Runner, temporary, variable string) error {
 	if !regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`).MatchString(variable) || temporary == "" {
 		return fmt.Errorf("PostgreSQL needs a temporary directory and environment variable name")
 	}
@@ -66,7 +67,7 @@ func StartPostgres(ctx context.Context, runner Runner, temporary, variable strin
 	return nil
 }
 
-func StopPostgres(ctx context.Context, runner Runner, temporary string) error {
+func StopPostgres(ctx context.Context, runner process.Runner, temporary string) error {
 	if temporary == "" {
 		return fmt.Errorf("runner temporary directory is required")
 	}

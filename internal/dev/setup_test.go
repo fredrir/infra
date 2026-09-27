@@ -29,7 +29,7 @@ func TestSetupInstallsPinnedToolsAndSyncsAnsible(t *testing.T) {
 	root := t.TempDir()
 	state := NewState(root)
 	var calls []process.Options
-	runner := ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		calls = append(calls, options)
 		return process.Result{}, nil
 	}}
@@ -69,7 +69,7 @@ func TestSetupInstallsPinnedToolsAndSyncsAnsible(t *testing.T) {
 func TestSetupBuildsTheBinaryButRefusesToolsOnUnsupportedPlatforms(t *testing.T) {
 	state := NewState(t.TempDir())
 	var calls []process.Options
-	runner := ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		calls = append(calls, options)
 		return process.Result{}, nil
 	}}

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/dev"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +23,7 @@ func newDevCommand() *cobra.Command {
 	var bazel string
 	doctor := &cobra.Command{Use: "doctor", Short: "Check pinned tools, Docker, KVM, kubeconfig and the Ansible environment", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			checks := dev.Doctor(cmd.Context(), dev.DoctorOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: io.Discard}, Bazel: bazel})
+			checks := dev.Doctor(cmd.Context(), dev.DoctorOptions{State: dev.NewState(root), Runner: process.Runner{Stderr: io.Discard}, Bazel: bazel})
 			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(checks); err != nil {
 				return err
 			}
@@ -43,20 +43,20 @@ func newDevCommand() *cobra.Command {
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
-			runner := ci.Runner{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()}
+			runner := process.Runner{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()}
 			return dev.Setup(ctx, dev.SetupOptions{State: dev.NewState(root), Runner: runner, Client: &http.Client{Timeout: 2 * time.Minute}, Log: cmd.ErrOrStderr()})
 		}}
 	setup.Flags().DurationVar(&timeout, "timeout", 10*time.Minute, "Installation timeout")
 	var all bool
 	clean := &cobra.Command{Use: "clean", Short: "Remove local development state", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return dev.Clean(cmd.Context(), dev.CleanOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: io.Discard}, All: all, Log: cmd.ErrOrStderr()})
+			return dev.Clean(cmd.Context(), dev.CleanOptions{State: dev.NewState(root), Runner: process.Runner{Stderr: io.Discard}, All: all, Log: cmd.ErrOrStderr()})
 		}}
 	clean.Flags().BoolVar(&all, "all", false, "Also stop the engine and remove its cache volume")
 	var project, out string
 	render := &cobra.Command{Use: "render", Short: "Render the platform tree offline with the controller's Flux build and settings substitution", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			report, err := dev.Render(cmd.Context(), dev.RenderOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: cmd.ErrOrStderr()}, Project: project, Output: out, Stdout: cmd.OutOrStdout()})
+			report, err := dev.Render(cmd.Context(), dev.RenderOptions{State: dev.NewState(root), Runner: process.Runner{Stderr: cmd.ErrOrStderr()}, Project: project, Output: out, Stdout: cmd.OutOrStdout()})
 			if err != nil {
 				return err
 			}
@@ -79,7 +79,7 @@ func newDevCommand() *cobra.Command {
 		if !ok {
 			return dev.EngineOptions{}, fmt.Errorf("unknown engine profile %q", profile)
 		}
-		return dev.EngineOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: io.Discard}, Profile: selected, Log: cmd.ErrOrStderr()}, nil
+		return dev.EngineOptions{State: dev.NewState(root), Runner: process.Runner{Stderr: io.Discard}, Profile: selected, Log: cmd.ErrOrStderr()}, nil
 	}
 	engineStart := &cobra.Command{Use: "start", Short: "Start the pinned engine image", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -119,7 +119,7 @@ func newDevCommand() *cobra.Command {
 	engine.AddCommand(engineStart, engineStop, engineStatus)
 	qualify := &cobra.Command{Use: "qualify SUITE [-- go test flags]", Short: "Run a gated qualification suite: " + strings.Join(dev.SuiteNames(), ", "), Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			runner := ci.Runner{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()}
+			runner := process.Runner{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()}
 			return dev.Qualify(cmd.Context(), dev.QualifyOptions{State: dev.NewState(root), Runner: runner, Suite: args[0], Args: args[1:], Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr(), Log: cmd.ErrOrStderr()})
 		}}
 	cluster := &cobra.Command{Use: "cluster", Short: "Disposable K3s cluster reconciling the local platform tree with Flux", RunE: missingCommand}
@@ -128,7 +128,7 @@ func newDevCommand() *cobra.Command {
 	cluster.PersistentFlags().StringVar(&clusterProfile, "profile", "minimal", "Kustomization profile: minimal or platform")
 	cluster.PersistentFlags().DurationVar(&clusterTimeout, "timeout", 5*time.Minute, "Readiness timeout per Kustomization")
 	clusterOptions := func(cmd *cobra.Command) dev.ClusterOptions {
-		return dev.ClusterOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: cmd.ErrOrStderr()}, Profile: clusterProfile, Timeout: clusterTimeout, Log: cmd.ErrOrStderr()}
+		return dev.ClusterOptions{State: dev.NewState(root), Runner: process.Runner{Stderr: cmd.ErrOrStderr()}, Profile: clusterProfile, Timeout: clusterTimeout, Log: cmd.ErrOrStderr()}
 	}
 	report := func(cmd *cobra.Command, status dev.ClusterStatus, err error) error {
 		return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(status))
@@ -157,7 +157,7 @@ func newDevCommand() *cobra.Command {
 	var hostsTimeout time.Duration
 	hosts.PersistentFlags().DurationVar(&hostsTimeout, "timeout", 10*time.Minute, "Boot timeout until SSH answers")
 	hostsOptions := func(cmd *cobra.Command) dev.HostsOptions {
-		return dev.HostsOptions{State: dev.NewState(root), Runner: ci.Runner{Stderr: cmd.ErrOrStderr()}, Timeout: hostsTimeout, Log: cmd.ErrOrStderr()}
+		return dev.HostsOptions{State: dev.NewState(root), Runner: process.Runner{Stderr: cmd.ErrOrStderr()}, Timeout: hostsTimeout, Log: cmd.ErrOrStderr()}
 	}
 	hostsUp := &cobra.Command{Use: "up [NODE...]", Short: "Download the pinned image, boot the guests and write the dev inventory", Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, nodes []string) error {
@@ -194,7 +194,7 @@ func newDevCommand() *cobra.Command {
 	var threshold float64
 	benchRun := &cobra.Command{Use: "run [SCENARIO...]", Short: "Sample dev/bench/scenarios.yaml; JSON summary under .cache/dev/bench", Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			runner := ci.Runner{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()}
+			runner := process.Runner{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()}
 			summary, err := dev.BenchRun(cmd.Context(), dev.BenchOptions{State: dev.NewState(root), Runner: runner, Names: args, Threshold: threshold, Log: cmd.ErrOrStderr()})
 			if baseline == "" {
 				return errors.Join(err, json.NewEncoder(cmd.OutOrStdout()).Encode(summary))

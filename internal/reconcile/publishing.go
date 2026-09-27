@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/google/go-github/v88/github"
 )
@@ -114,7 +113,7 @@ func GitHubClient(api, token string) (*github.Client, error) {
 	return github.NewClient(options...)
 }
 
-func tokenGit(runner ci.Runner, token string) ci.Runner {
+func tokenGit(runner process.Runner, token string) process.Runner {
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
 		log := runner.Stdout
 		if log == nil {

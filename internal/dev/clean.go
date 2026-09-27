@@ -6,12 +6,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 )
 
 type CleanOptions struct {
 	State  State
-	Runner ci.Runner
+	Runner process.Runner
 	All    bool
 	Log    io.Writer
 }

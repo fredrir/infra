@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -26,9 +25,9 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
-func fluxRunner(t *testing.T, root string, calls *[]process.Options) ci.Runner {
+func fluxRunner(t *testing.T, root string, calls *[]process.Options) process.Runner {
 	t.Helper()
-	return ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	return process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		*calls = append(*calls, options)
 		if options.Name != "flux" || options.Dir != root {
 			t.Errorf("unexpected command %s in %s", options.Name, options.Dir)
@@ -118,7 +117,7 @@ func TestRenderTargetsOneProject(t *testing.T) {
 
 func TestRenderRequiresSettingsAndReportsBuildFailures(t *testing.T) {
 	root := t.TempDir()
-	runner := ci.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		t.Fatal("flux executed without settings")
 		return process.Result{}, nil
 	}}
@@ -126,7 +125,7 @@ func TestRenderRequiresSettingsAndReportsBuildFailures(t *testing.T) {
 		t.Fatalf("missing settings accepted: %v", err)
 	}
 	writeFile(t, filepath.Join(root, settingsFile), "data:\n  STORAGE_CLASS: local-path\n")
-	failing := ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	failing := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		return process.Result{ExitCode: 1}, errors.New("flux failed: exit status 1")
 	}}
 	if _, err := Render(context.Background(), RenderOptions{State: NewState(root), Runner: failing}); err == nil || !strings.HasPrefix(err.Error(), "flux build: ") {
@@ -143,7 +142,7 @@ func TestDiffReportsDifferencesByExitCode(t *testing.T) {
 		want   error
 	}{{0, false, nil}, {1, true, ErrDifferences}, {2, true, nil}} {
 		var arguments []string
-		runner := ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 			arguments = options.Args
 			fmt.Fprintln(options.Stdout, "► Kustomization/flux-system/platform-policy drifted")
 			if test.failed {

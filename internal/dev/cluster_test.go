@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
@@ -89,8 +88,8 @@ type clusterFake struct {
 	ready    bool
 }
 
-func (f *clusterFake) runner() ci.Runner {
-	return ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+func (f *clusterFake) runner() process.Runner {
+	return process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		if options.Dir != f.root {
 			f.t.Errorf("%s ran outside the repository: %s", options.Name, options.Dir)
 		}

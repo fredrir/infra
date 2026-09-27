@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/release"
 	"github.com/spf13/cobra"
 )
@@ -45,7 +46,7 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	deploy := &cobra.Command{Use: "deploy ROOT", Short: "Publish a provenance-verified deployment", Args: cobra.ExactArgs(1)}
 	deploy.RunE = func(command *cobra.Command, args []string) error {
 		options := ci.DeployOptions{Root: args[0], RepositoryID: os.Getenv("SOURCE_REPOSITORY_ID"), Revision: os.Getenv("SOURCE_REVISION"), Image: os.Getenv("IMAGE_NAME"), Digest: os.Getenv("IMAGE_DIGEST"), Token: os.Getenv("DEPLOY_TOKEN")}
-		return ci.DeployAuthenticated(command.Context(), ci.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, options, os.Getenv("GITHUB_ACTOR"), os.Getenv("REGISTRY_TOKEN"))
+		return ci.DeployAuthenticated(command.Context(), process.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, options, os.Getenv("GITHUB_ACTOR"), os.Getenv("REGISTRY_TOKEN"))
 	}
 	ciCommand.AddCommand(deploy)
 	reconcile := &cobra.Command{Use: "reconcile URL", Args: cobra.ExactArgs(1), Short: "Notify the deployment reconciler", RunE: func(command *cobra.Command, args []string) error {
@@ -57,22 +58,22 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	rust.PersistentFlags().StringVar(&rustRoot, "root", ".", "Source checkout")
 	rust.PersistentFlags().StringVar(&rustTemporary, "temporary", os.Getenv("RUNNER_TEMP"), "Runner temporary directory")
 	prepare := &cobra.Command{Use: "prepare", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
-		return ci.PrepareRust(command.Context(), ci.Runner{Dir: rustRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, rustTemporary, clippyArguments, testArguments)
+		return ci.PrepareRust(command.Context(), process.Runner{Dir: rustRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, rustTemporary, clippyArguments, testArguments)
 	}}
 	prepare.Flags().StringVar(&clippyArguments, "clippy-args", os.Getenv("CLIPPY_ARGS"), "Allowed Clippy arguments")
 	prepare.Flags().StringVar(&testArguments, "test-args", os.Getenv("TEST_ARGS"), "Allowed test arguments")
 	checkRust := &cobra.Command{Use: "check fast|deep|toolchain|prepare-fast|format|lint|test|unit|docs|minimal|msrv|audit", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
-		return ci.CheckRust(command.Context(), ci.Runner{Dir: rustRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, rustTemporary, args[0])
+		return ci.CheckRust(command.Context(), process.Runner{Dir: rustRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, rustTemporary, args[0])
 	}}
 	rust.AddCommand(prepare, checkRust)
 	cacheRust := &cobra.Command{Use: "cache restore|save", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
-		return ci.RustCache(command.Context(), ci.Runner{Dir: rustRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, rustTemporary, args[0])
+		return ci.RustCache(command.Context(), process.Runner{Dir: rustRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, rustTemporary, args[0])
 	}}
 	rust.AddCommand(cacheRust)
 	ciCommand.AddCommand(rust)
 	var postgresTemporary, postgresVariable string
 	postgres := &cobra.Command{Use: "postgres start|stop", Args: cobra.ExactArgs(1), Short: "Manage the isolated CI database", RunE: func(command *cobra.Command, args []string) error {
-		runner := ci.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}
+		runner := process.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}
 		switch args[0] {
 		case "start":
 			return ci.StartPostgres(command.Context(), runner, postgresTemporary, postgresVariable)
@@ -100,12 +101,12 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	ciCommand.AddCommand(installTools)
 	var validationRoot, validationBefore string
 	validate := &cobra.Command{Use: "validate", Short: "Validate changed infrastructure declarations", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
-		return ci.Validate(command.Context(), ci.Runner{Dir: validationRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, validationBefore)
+		return ci.Validate(command.Context(), process.Runner{Dir: validationRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, validationBefore)
 	}}
 	validate.Flags().StringVar(&validationRoot, "root", ".", "Source checkout")
 	validate.Flags().StringVar(&validationBefore, "before", os.Getenv("BEFORE"), "Previous Git revision")
 	prepareValidation := &cobra.Command{Use: "prepare-validation", Short: "Prepare declaration validator dependencies", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
-		return ci.PrepareValidation(command.Context(), ci.Runner{Dir: validationRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, validationBefore)
+		return ci.PrepareValidation(command.Context(), process.Runner{Dir: validationRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, validationBefore)
 	}}
 	prepareValidation.Flags().StringVar(&validationRoot, "root", ".", "Source checkout")
 	prepareValidation.Flags().StringVar(&validationBefore, "before", os.Getenv("BEFORE"), "Previous revision")
@@ -139,7 +140,7 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	tagRelease.Flags().StringVar(&releaseRoot, "root", ".", "Source checkout")
 	tagRelease.Flags().StringVar(&cliffConfig, "cliff-config", "", "Fallback git-cliff configuration")
 	tagRelease.RunE = func(command *cobra.Command, _ []string) error {
-		return release.Tag(command.Context(), ci.Runner{Dir: releaseRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, cliffConfig)
+		return release.Tag(command.Context(), process.Runner{Dir: releaseRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, cliffConfig)
 	}
 	releaseCommand.AddCommand(render, tagRelease)
 	bundle := &cobra.Command{Use: "bundle DIST SUMMARY NOTES DESTINATION", Short: "Verify and stage release assets", Args: cobra.ExactArgs(4), RunE: func(command *cobra.Command, args []string) error {
@@ -148,7 +149,7 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	releaseCommand.AddCommand(bundle)
 	var releaseTemporary, releaseRepository, releaseRefType, releaseRefName, releaseOutput, releaseCliff, prepareRoot string
 	prepareRelease := &cobra.Command{Use: "prepare", Short: "Prepare release metadata and notes", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
-		return release.Prepare(command.Context(), ci.Runner{Dir: prepareRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, release.PrepareOptions{Temporary: releaseTemporary, Repository: releaseRepository, RefType: releaseRefType, RefName: releaseRefName, CliffConfig: releaseCliff, GitHubOutput: releaseOutput})
+		return release.Prepare(command.Context(), process.Runner{Dir: prepareRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, release.PrepareOptions{Temporary: releaseTemporary, Repository: releaseRepository, RefType: releaseRefType, RefName: releaseRefName, CliffConfig: releaseCliff, GitHubOutput: releaseOutput})
 	}}
 	prepareRelease.Flags().StringVar(&prepareRoot, "root", ".", "Source checkout")
 	prepareRelease.Flags().StringVar(&releaseTemporary, "temporary", os.Getenv("RUNNER_TEMP"), "Runner temporary directory")
@@ -160,7 +161,7 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	var buildTemporary, buildRoot string
 	var snapshot bool
 	buildRelease := &cobra.Command{Use: "build", Short: "Build all configured release targets", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
-		return release.Build(command.Context(), ci.Runner{Dir: buildRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, buildTemporary, snapshot)
+		return release.Build(command.Context(), process.Runner{Dir: buildRoot, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, buildTemporary, snapshot)
 	}}
 	buildRelease.Flags().StringVar(&buildRoot, "root", ".", "Source checkout")
 	buildRelease.Flags().StringVar(&buildTemporary, "temporary", os.Getenv("RUNNER_TEMP"), "Runner temporary directory")
@@ -168,7 +169,7 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	var draftBundle, draftRepository, draftTag string
 	var prerelease bool
 	draftRelease := &cobra.Command{Use: "draft", Short: "Upload a verified draft release", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
-		return release.Draft(command.Context(), ci.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, draftBundle, draftRepository, draftTag, prerelease)
+		return release.Draft(command.Context(), process.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, draftBundle, draftRepository, draftTag, prerelease)
 	}}
 	draftRelease.Flags().StringVar(&draftBundle, "bundle", "", "Verified release bundle")
 	draftRelease.MarkFlagRequired("bundle")

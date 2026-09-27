@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 )
 
 func init() {
@@ -61,7 +61,7 @@ func TestReleaseCommitAndAnnotatedTagReachRemote(t *testing.T) {
 		}
 	}
 	t.Setenv("PATH", binaries+string(os.PathListSeparator)+os.Getenv("PATH"))
-	runner := ci.Runner{Dir: area, Env: []string{"INFRA_RELEASE_TEST_TOOLS=1", "RUNNER_TEMP=" + area}, Stdout: io.Discard, Stderr: io.Discard}
+	runner := process.Runner{Dir: area, Env: []string{"INFRA_RELEASE_TEST_TOOLS=1", "RUNNER_TEMP=" + area}, Stdout: io.Discard, Stderr: io.Discard}
 	git := func(directory string, args ...string) string {
 		t.Helper()
 		local := runner

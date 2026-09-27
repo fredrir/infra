@@ -13,7 +13,7 @@ import (
 
 func TestMeasureBudgetFailureWritesReport(t *testing.T) {
 	dir := t.TempDir()
-	runner := Runner{Execute: func(ctx context.Context, _ process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(ctx context.Context, _ process.Options) (process.Result, error) {
 		<-ctx.Done()
 		return process.Result{ExitCode: -1}, ctx.Err()
 	}}
@@ -29,7 +29,7 @@ func TestMeasureBudgetFailureWritesReport(t *testing.T) {
 func TestMeasureBudgetLetsTheCommandFinishItsReport(t *testing.T) {
 	reported := filepath.Join(t.TempDir(), "report")
 	script := `trap 'sleep 0.2; echo done > "$0"; exit 1' TERM; while :; do sleep 0.05; done`
-	report, err := Measure(context.Background(), Runner{}, "drift-verification", 300*time.Millisecond, "", []string{"sh", "-c", script, reported})
+	report, err := Measure(context.Background(), process.Runner{}, "drift-verification", 300*time.Millisecond, "", []string{"sh", "-c", script, reported})
 	if err == nil || !report.BudgetExceeded {
 		t.Fatalf("deadline passed: %+v %v", report, err)
 	}
@@ -39,7 +39,7 @@ func TestMeasureBudgetLetsTheCommandFinishItsReport(t *testing.T) {
 }
 
 func TestMeasureCommandFailureDoesNotBecomeSuccess(t *testing.T) {
-	runner := Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		return process.Result{ExitCode: 7}, errors.New("failed check")
 	}}
 	report, err := Measure(context.Background(), runner, "checks", time.Second, "", []string{"check"})

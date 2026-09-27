@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -32,7 +31,7 @@ func TestSmokeBatchInstallsEveryPackageOnceAndExecutesEveryBinary(t *testing.T) 
 			var install []string
 			failure := errors.New("broken binary")
 			var binaryFailure error
-			runner := ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				commands = append(commands, options.Name+" "+strings.Join(options.Args, " "))
 				if options.Args[0] == "install" || options.Args[0] == "add" {
 					install = append(install, options.Args[len(options.Args)-2:]...)
@@ -67,7 +66,7 @@ func TestSmokeBatchInstallsEveryPackageOnceAndExecutesEveryBinary(t *testing.T) 
 }
 
 func TestSmokeBatchRejectsMalformedIdentitiesBeforeInstalling(t *testing.T) {
-	runner := ci.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
 		t.Fatal("invalid identities reached package manager")
 		return process.Result{}, nil
 	}}

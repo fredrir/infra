@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/packages"
+	"github.com/fredrir/infra/internal/process"
 	"github.com/spf13/cobra"
 )
 
@@ -16,8 +16,8 @@ func newPackagesCommand() *cobra.Command {
 	root.PersistentFlags().StringVar(&source, "root", ".", "Infrastructure checkout")
 	root.PersistentFlags().StringVar(&temporary, "temporary", os.Getenv("RUNNER_TEMP"), "Runner temporary directory")
 	root.PersistentFlags().StringVar(&binary, "infra-binary", "", "Prebuilt Linux amd64 infra binary")
-	runner := func(command *cobra.Command) ci.Runner {
-		return ci.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}
+	runner := func(command *cobra.Command) process.Runner {
+		return process.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}
 	}
 	options := func(command *cobra.Command) packages.PipelineOptions {
 		return packages.PipelineOptions{Root: source, Temporary: temporary, Binary: binary, Log: command.ErrOrStderr(), Output: command.OutOrStdout()}

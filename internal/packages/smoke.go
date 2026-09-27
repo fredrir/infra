@@ -7,18 +7,18 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 )
 
-func SmokeInstall(ctx context.Context, runner ci.Runner, format, name, binary string) error {
+func SmokeInstall(ctx context.Context, runner process.Runner, format, name, binary string) error {
 	return SmokeInstallBatch(ctx, runner, format, []string{name, binary})
 }
 
-func SmokeInstallBatch(ctx context.Context, runner ci.Runner, format string, identities []string) error {
+func SmokeInstallBatch(ctx context.Context, runner process.Runner, format string, identities []string) error {
 	return smokeInstallBatch(ctx, runner, format, identities, "/")
 }
 
-func smokeInstallBatch(ctx context.Context, runner ci.Runner, format string, identities []string, root string) error {
+func smokeInstallBatch(ctx context.Context, runner process.Runner, format string, identities []string, root string) error {
 	if len(identities) == 0 || len(identities)%2 != 0 {
 		return fmt.Errorf("package names and binaries must be nonempty pairs")
 	}

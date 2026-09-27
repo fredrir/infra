@@ -15,8 +15,8 @@ import (
 	"strings"
 
 	"dagger.io/dagger"
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/pipeline"
+	"github.com/fredrir/infra/internal/process"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -59,7 +59,7 @@ func Build(ctx context.Context, options PipelineOptions) error {
 		return err
 	}
 	work := filepath.Join(options.Temporary, "packages")
-	runner := ci.Runner{Stdout: options.Output, Stderr: options.Log, Env: []string{"RPM_SIGNING_KEY=" + gpgKey, "APK_SIGNING_KEY=" + apkKey}}
+	runner := process.Runner{Stdout: options.Output, Stderr: options.Log, Env: []string{"RPM_SIGNING_KEY=" + gpgKey, "APK_SIGNING_KEY=" + apkKey}}
 	tools, err := Collect(ctx, &GitHub{Runner: runner}, NFPM{Runner: runner}, CollectOptions{Registry: filepath.Join(options.Root, ".github/rust-projects.yaml"), Work: filepath.Join(work, "work"), Site: filepath.Join(work, "staging"), Channels: filepath.Join(work, "channels")})
 	if err != nil {
 		return err

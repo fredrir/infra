@@ -8,11 +8,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
-func execute(ctx context.Context, runner ci.Runner, options process.Options) (process.Result, error) {
+func execute(ctx context.Context, runner process.Runner, options process.Options) (process.Result, error) {
 	if options.Dir == "" {
 		options.Dir = runner.Dir
 	}
@@ -26,7 +25,7 @@ func execute(ctx context.Context, runner ci.Runner, options process.Options) (pr
 	return process.Run(ctx, options)
 }
 
-func capture(ctx context.Context, runner ci.Runner, name string, args ...string) (string, error) {
+func capture(ctx context.Context, runner process.Runner, name string, args ...string) (string, error) {
 	var stderr bytes.Buffer
 	result, err := execute(ctx, runner, process.Options{Name: name, Args: args, Stderr: &stderr})
 	if err != nil {
@@ -38,7 +37,7 @@ func capture(ctx context.Context, runner ci.Runner, name string, args ...string)
 	return strings.TrimSpace(string(result.Stdout)), nil
 }
 
-func runToFile(ctx context.Context, runner ci.Runner, path string, options process.Options) error {
+func runToFile(ctx context.Context, runner process.Runner, path string, options process.Options) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err

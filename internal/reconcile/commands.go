@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/fluxartifacts"
 	"github.com/fredrir/infra/internal/kustomize"
 	"github.com/fredrir/infra/internal/process"
@@ -22,7 +21,7 @@ import (
 )
 
 type Commands struct {
-	Runner        ci.Runner
+	Runner        process.Runner
 	Work          string
 	Retained      []string
 	RequireMain   bool
@@ -240,7 +239,7 @@ func (c *Commands) ansible(ctx context.Context, playbook string, extra ...string
 	return ansiblePlaybook(ctx, c.Runner, playbook, extra...)
 }
 
-func (c *Commands) runnerAPI() ci.Runner {
+func (c *Commands) runnerAPI() process.Runner {
 	runner := c.Runner
 	if c.RunnerToken != "" {
 		runner.Env = append(slices.Clone(runner.Env), "GH_TOKEN="+c.RunnerToken)
@@ -248,11 +247,11 @@ func (c *Commands) runnerAPI() ci.Runner {
 	return runner
 }
 
-func ansiblePlaybook(ctx context.Context, runner ci.Runner, playbook string, extra ...string) error {
+func ansiblePlaybook(ctx context.Context, runner process.Runner, playbook string, extra ...string) error {
 	return ansiblePlaybooks(ctx, runner, []string{playbook}, extra...)
 }
 
-func ansiblePlaybooks(ctx context.Context, runner ci.Runner, playbooks []string, extra ...string) error {
+func ansiblePlaybooks(ctx context.Context, runner process.Runner, playbooks []string, extra ...string) error {
 	runner.Dir = filepath.Join(runner.Dir, "ansible")
 	runner.Env = append(slices.Clone(runner.Env), "ANSIBLE_CONFIG="+filepath.Join(runner.Dir, "ansible.cfg"))
 	args := slices.Concat([]string{"-i", "inventory/production.yml"}, playbooks, extra)

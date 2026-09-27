@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "group_unix.go",
         "process.go",
+        "runner.go",
     ],
     importpath = "github.com/fredrir/infra/internal/process",
     visibility = ["//:__subpackages__"],

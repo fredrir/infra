@@ -337,7 +337,7 @@ func (f *provenanceFixture) deploy(image string, run int) string {
 	repository := map[string]string{deployedImage: "1", releasedImage: "2"}[image]
 	options := ci.DeployOptions{Root: f.root, RepositoryID: repository, Revision: fmt.Sprintf("%040x", run), Image: image, Digest: fmt.Sprintf("sha256:%064x", run), Token: "token"}
 	f.attested[image+"@"+options.Digest] = []int{run}
-	if err := ci.Deploy(context.Background(), ci.Runner{Dir: f.root, Stdout: io.Discard, Stderr: io.Discard, Execute: f.attestation}, options); err != nil {
+	if err := ci.Deploy(context.Background(), process.Runner{Dir: f.root, Stdout: io.Discard, Stderr: io.Discard, Execute: f.attestation}, options); err != nil {
 		f.t.Fatal(err)
 	}
 	return f.head()
@@ -346,7 +346,7 @@ func (f *provenanceFixture) deploy(image string, run int) string {
 func (f *provenanceFixture) verify(base, head string) error {
 	f.t.Helper()
 	f.verifications = nil
-	return (&Verifier{Runner: ci.Runner{Dir: f.root, Stderr: io.Discard, Execute: f.attestation}, Work: f.t.TempDir(), PullRequests: f.pullRequests}).Verify(context.Background(), ProvenanceRange{Base: base, Revision: head})
+	return (&Verifier{Runner: process.Runner{Dir: f.root, Stderr: io.Discard, Execute: f.attestation}, Work: f.t.TempDir(), PullRequests: f.pullRequests}).Verify(context.Background(), ProvenanceRange{Base: base, Revision: head})
 }
 
 type provenanceGateCase struct {

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -27,7 +27,7 @@ func TestNativeOnboardingQualification(t *testing.T) {
 		t.Skip("set INFRA_ONBOARD_INTEGRATION=1 to qualify native SOPS, Helm and Kustomize")
 	}
 	ctx := context.Background()
-	runner := ci.Runner{Stdout: io.Discard, Stderr: io.Discard}
+	runner := process.Runner{Stdout: io.Discard, Stderr: io.Discard}
 	directory := t.TempDir()
 	key := filepath.Join(directory, "age.key")
 	if err := runner.Run(ctx, "age-keygen", "-o", key); err != nil {

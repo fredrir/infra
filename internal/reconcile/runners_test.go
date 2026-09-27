@@ -17,7 +17,6 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
@@ -94,7 +93,7 @@ type fleetHarness struct {
 }
 
 func (h *fleetHarness) commands() *Commands {
-	return &Commands{Runner: ci.Runner{Dir: writeRunnerFleet(h.t, h.fleet), Execute: h.execute, Stderr: &h.stderr}}
+	return &Commands{Runner: process.Runner{Dir: writeRunnerFleet(h.t, h.fleet), Execute: h.execute, Stderr: &h.stderr}}
 }
 
 func (h *fleetHarness) execute(_ context.Context, opts process.Options) (process.Result, error) {
@@ -239,7 +238,7 @@ func TestRunnerStatesQueryEachRepository(t *testing.T) {
 	fleet := testRunnerFleet()
 	var mu sync.Mutex
 	var queries []string
-	commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+	commands := Commands{Runner: process.Runner{Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		queries = append(queries, opts.Name+" "+strings.Join(opts.Args, " "))
@@ -271,7 +270,7 @@ func TestRunnerStatesQueryEachRepository(t *testing.T) {
 
 func TestRunnerFleetVerificationFailsWhenDriftPersists(t *testing.T) {
 	fleet := testRunnerFleet()
-	commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+	commands := Commands{Runner: process.Runner{Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
 		runners := healthyRunners(fleet, queriedRepository(opts))
 		for index := range runners {
 			runners[index].Version = nil
@@ -488,7 +487,7 @@ func TestScopedHostPlaybooksConvergeRunnersOnlyOnDrift(t *testing.T) {
 			var mu sync.Mutex
 			var token []bool
 			var verified []string
-			commands := &Commands{RunnerToken: "runner-token", Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+			commands := &Commands{RunnerToken: "runner-token", Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
 				mu.Lock()
 				defer mu.Unlock()
 				if opts.Name == "gh" {
@@ -577,7 +576,7 @@ func TestRunnerTokenReachesOnlyRunnerChildren(t *testing.T) {
 		fleet := testRunnerFleet()
 		var mu sync.Mutex
 		var children []process.Options
-		commands := &Commands{Work: t.TempDir(), RunnerToken: "runner-app-secret", Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		commands := &Commands{Work: t.TempDir(), RunnerToken: "runner-app-secret", Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			children = append(children, options)

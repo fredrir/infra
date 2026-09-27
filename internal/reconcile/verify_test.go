@@ -13,7 +13,6 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 )
 
@@ -112,7 +111,7 @@ func TestKustomizationWaitRequiresTheAppliedRequestedRevision(t *testing.T) {
 				test.mutate(&item)
 			}
 			fake := kubernetesFake{"get kustomizations.kustomize.toolkit.fluxcd.io --all-namespaces": items(item)}
-			commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				return fake.execute(t, options)
 			}}}
 			err := commands.verifyKubernetes(context.Background(), revision, "token")
@@ -155,7 +154,7 @@ func TestHelmReleaseMismatchesAreDifferences(t *testing.T) {
 				test.mutate(&releases)
 			}
 			fake := kubernetesFake{"get helmreleases.helm.toolkit.fluxcd.io": items(releases...)}
-			commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				return fake.execute(t, options)
 			}}}
 			outcome := VerificationOutcome("", ScopeCloud, commands.verifyHelm(context.Background(), "", "logs.fredrir.com"))
@@ -255,7 +254,7 @@ func TestDeploymentVerificationClassifiesMismatches(t *testing.T) {
 				"get helmreleases.helm.toolkit.fluxcd.io --all-namespaces":              items(current.monitoring),
 			}
 			var mu sync.Mutex
-			commands := Commands{kubernetes: &kubernetesState{owners: declared, generator: generator, workloads: map[string][]resource{"flux-system": nil, "project-y": {expected}}}, Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{kubernetes: &kubernetesState{owners: declared, generator: generator, workloads: map[string][]resource{"flux-system": nil, "project-y": {expected}}}, Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				mu.Lock()
 				defer mu.Unlock()
 				return fake.execute(t, options)
@@ -304,7 +303,7 @@ func TestVerificationCollectsEveryPart(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var mu sync.Mutex
-			commands := Commands{Work: t.TempDir(), Runner: ci.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{Work: t.TempDir(), Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				switch options.Name {
 				case "kubectl":
 					mu.Lock()
@@ -361,7 +360,7 @@ func TestUnchangedKubernetesInputsRequestOnlyKustomizations(t *testing.T) {
 			root := readyResource(t, "Kustomization", "flux-system", "flux-system")
 			root.Spec.SourceRef.Kind, root.Spec.SourceRef.Name = "GitRepository", "flux-system"
 			root.Status.LastAppliedRevision, root.Status.Inventory = "production@sha1:"+revision, json.RawMessage(`{"entries":[]}`)
-			commands := Commands{kubernetes: declaredRoot(t), Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			commands := Commands{kubernetes: declaredRoot(t), Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 				mu.Lock()
 				defer mu.Unlock()
 				args := strings.Join(options.Args, " ")
@@ -460,7 +459,7 @@ func TestRunnerSetsWithoutRunningListenersFailVerification(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				polls := 0
-				commands := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				commands := Commands{Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 					fake := kubernetesFake{
 						"get autoscalingrunnersets.actions.github.com --all-namespaces":                   items(test.sets...),
 						"get pods -n=arc-system -l=app.kubernetes.io/component=runner-scale-set-listener": items(test.listeners(polls)...),
@@ -482,7 +481,7 @@ func TestRunnerSetsWithoutRunningListenersFailVerification(t *testing.T) {
 			})
 		})
 	}
-	scoped := Commands{Runner: ci.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+	scoped := Commands{Runner: process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		t.Errorf("project-scoped verification ran kubectl %s", strings.Join(options.Args, " "))
 		return process.Result{}, errors.New("unexpected command")
 	}}}

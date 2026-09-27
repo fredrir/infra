@@ -31,7 +31,7 @@ var projectPattern = regexp.MustCompile(`^platform/projects/[a-z][a-z0-9-]*$`)
 var workloadPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 var repositoryIDPattern = regexp.MustCompile(`^[0-9]+$`)
 
-func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
+func Deploy(ctx context.Context, runner process.Runner, options DeployOptions) error {
 	if !repositoryIDPattern.MatchString(options.RepositoryID) || !revisionPattern.MatchString(options.Revision) || !imageReferencePattern.MatchString(options.Image+"@"+options.Digest) || options.Token == "" {
 		return fmt.Errorf("invalid deployment identity or credentials")
 	}
@@ -148,7 +148,7 @@ func Deploy(ctx context.Context, runner Runner, options DeployOptions) error {
 	return fmt.Errorf("deployment push failed after three attempts")
 }
 
-func VerifyDeploymentProvenance(ctx context.Context, runner Runner, root fs.FS, repositoryID string, mapping DeploymentMapping, image, digest, revision string) ([]DeploymentOrder, error) {
+func VerifyDeploymentProvenance(ctx context.Context, runner process.Runner, root fs.FS, repositoryID string, mapping DeploymentMapping, image, digest, revision string) ([]DeploymentOrder, error) {
 	if !repositoryIDPattern.MatchString(repositoryID) {
 		return nil, fmt.Errorf("invalid deployment repository ID")
 	}
@@ -181,7 +181,7 @@ func VerifyDeploymentProvenance(ctx context.Context, runner Runner, root fs.FS, 
 		if mapping.Visibility == "public" {
 			arguments = append(arguments, "--format", "json")
 		}
-		result, err := runner.execute(ctx, process.Options{Name: name, Args: arguments, Dir: runner.Dir, Env: environment, Stderr: runner.Stderr})
+		result, err := runner.Invoke(ctx, process.Options{Name: name, Args: arguments, Dir: runner.Dir, Env: environment, Stderr: runner.Stderr})
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}

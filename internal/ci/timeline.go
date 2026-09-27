@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/fredrir/infra/internal/process"
 	"strconv"
 	"strings"
 	"time"
@@ -44,7 +45,7 @@ type DeploymentTimeline struct {
 	BudgetExceeded           *bool              `json:"budget_exceeded,omitempty"`
 }
 
-func ReadWorkflowTimeline(ctx context.Context, runner Runner, repository string, id uint64) (WorkflowTimeline, error) {
+func ReadWorkflowTimeline(ctx context.Context, runner process.Runner, repository string, id uint64) (WorkflowTimeline, error) {
 	var result WorkflowTimeline
 	if !repositoryPattern.MatchString(repository) || id == 0 {
 		return result, fmt.Errorf("repository and positive workflow run ID required")
