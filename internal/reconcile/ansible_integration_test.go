@@ -154,6 +154,7 @@ esac
 		_ = exec.Command("docker", "rm", "-f", name).Run()
 	})
 	command("docker", "exec", name, "useradd", "--non-unique", "--uid", fmt.Sprint(os.Getuid()), "--no-create-home", "runner")
+	running := map[string]string{"runner": strings.TrimSpace(string(command("docker", "exec", name, "id", "-G", "runner")))}
 	command("docker", "exec", name, "groupadd", "docker")
 	command("docker", "exec", name, "mkdir", "-p", "/etc/tmpfiles.d")
 	command("docker", "exec", name, "ln", "-s", "/fixture/infra", "/usr/local/bin/infra")
@@ -251,10 +252,31 @@ esac
 	}
 	write("infra", cli, true)
 	t.Log("a CLI without the admission broker stops the play before hooks or leases change")
-	converge()
-	steady := restarted()
 	inspect := func(args ...string) string {
 		return strings.TrimSpace(string(command(append([]string{"docker", "exec", name}, args...)...)))
+	}
+	converge()
+	steady := restarted()
+	placeholder := func(path, unit string) {
+		t.Helper()
+		mode, owner, group := "0666", "root", "root"
+		for line := range strings.SplitSeq(unit, "\n") {
+			if value, ok := strings.CutPrefix(line, "SocketMode="); ok {
+				mode = value
+			}
+			if value, ok := strings.CutPrefix(line, "SocketUser="); ok {
+				owner = value
+			}
+			if value, ok := strings.CutPrefix(line, "SocketGroup="); ok {
+				group = value
+			}
+		}
+		command("docker", "exec", name, "install", "-D", "-m", mode, "-o", owner, "-g", group, "/dev/null", path)
+	}
+	reachable := func(account, path string) bool {
+		t.Helper()
+		groups := strings.Fields(running[account])
+		return exec.CommandContext(ctx, "docker", "exec", name, "setpriv", "--reuid="+account, "--regid="+groups[0], "--groups="+strings.Join(groups, ","), "sh", "-c", `test -w "$1"`, "reachable", path).Run() == nil
 	}
 	if owners := inspect("stat", "-c", "%U %a", "/run/infra-runner-admission", "/run/infra-runner-admission/leases.json"); owners != "root 700\nroot 644" {
 		t.Fatalf("jobs can still write admission leases: %q", owners)
@@ -275,8 +297,9 @@ esac
 	if listen, hook := strings.Index(tasks, "Listen for runner admission"), strings.Index(tasks, "Install immutable trusted-job hook adapter"); listen < 0 || hook < listen {
 		t.Errorf("job hooks switch to the broker before its socket listens:\n%s", tasks)
 	}
-	if strings.Contains(socket, "SocketGroup=") || strings.Contains(inspect("id", "-nG", "runner"), "infra-runners") {
-		t.Errorf("admission depends on a group that listeners started before the role ran do not hold:\n%s", socket)
+	placeholder("/run/infra-runner-admission.sock", socket)
+	if !reachable("runner", "/run/infra-runner-admission.sock") {
+		t.Errorf("a listener started before the play, with groups %q, cannot open the admission socket:\n%s", running["runner"], socket)
 	}
 	t.Log("admission runs through a root broker whose leases jobs cannot write")
 	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") || restarted() != steady {
