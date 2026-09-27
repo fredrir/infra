@@ -26,6 +26,21 @@ spec:
                   - rust-amd64
                   - rust-pr-amd64
                   - rust-release-amd64
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - llunde-pyparser
+                  - portfolio
+                  - 'y'
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - data-backup
+                  - repository-maintenance
       ports:
         - port: 8333
           protocol: TCP

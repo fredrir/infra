@@ -93,6 +93,8 @@ spec:
                 name: seaweedfs-hel1-identities
             - secretRef:
                 name: seaweedfs-hel1-ci-nsql
+            - secretRef:
+                name: seaweedfs-hel1-restic
           env:
             - name: GOMEMLIMIT
               value: 512MiB

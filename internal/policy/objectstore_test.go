@@ -357,6 +357,8 @@ func objectStoreActions(identity string) []string {
 		return objectWriter("parser-dataset")
 	case "parser-mirror":
 		return reader("parser-dataset")
+	case "restic-parser", "restic-y", "restic-portfolio":
+		return objectWriter(identity)
 	}
 	if match := cacheIdentity.FindStringSubmatch(identity); match != nil {
 		switch match[2] {
@@ -659,6 +661,7 @@ var objectStorePeers = map[string]map[string][]object{
 		"8333": {
 			{"podSelector": object{"matchLabels": object{"app.kubernetes.io/name": "object-store-provisioner"}}},
 			{"namespaceSelector": object{"matchLabels": object{"infra.fredrir.com/tier": "ci"}}, "podSelector": object{"matchExpressions": []any{object{"key": "actions.github.com/scale-set-name", "operator": "In", "values": []any{"rust-amd64", "rust-pr-amd64", "rust-release-amd64"}}}}},
+			{"namespaceSelector": object{"matchExpressions": []any{object{"key": "kubernetes.io/metadata.name", "operator": "In", "values": []any{"llunde-pyparser", "portfolio", "y"}}}}, "podSelector": object{"matchExpressions": []any{object{"key": "app.kubernetes.io/name", "operator": "In", "values": []any{"data-backup", "repository-maintenance"}}}}},
 		},
 		"9327": {prometheusPeer},
 		"9328": {prometheusPeer},

@@ -11,6 +11,7 @@ resources:
 - nl.secret.sops.yaml
 - nl-identities.secret.sops.yaml
 - ci/nsql.secret.sops.yaml
+- restic.secret.sops.yaml
 - provisioner.yaml
 - mirror.yaml
 - parser-dataset-aws.secret.sops.yaml

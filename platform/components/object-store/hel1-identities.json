@@ -68,6 +68,48 @@
         }
       ],
       "name": "ci-nsql-release"
+    },
+    {
+      "actions": [
+        "Read:restic-parser",
+        "Write:restic-parser/*",
+        "List:restic-parser"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${RESTIC_PARSER_ACCESS_KEY_ID}",
+          "secretKey": "${RESTIC_PARSER_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "restic-parser"
+    },
+    {
+      "actions": [
+        "Read:restic-y",
+        "Write:restic-y/*",
+        "List:restic-y"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${RESTIC_Y_ACCESS_KEY_ID}",
+          "secretKey": "${RESTIC_Y_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "restic-y"
+    },
+    {
+      "actions": [
+        "Read:restic-portfolio",
+        "Write:restic-portfolio/*",
+        "List:restic-portfolio"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${RESTIC_PORTFOLIO_ACCESS_KEY_ID}",
+          "secretKey": "${RESTIC_PORTFOLIO_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "restic-portfolio"
     }
   ]
 }

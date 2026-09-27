@@ -546,7 +546,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 
 | Setting | Value |
 | --- | --- |
-| Cells | `seaweedfs-hel1` on `fredrir-04` (CI caches), `seaweedfs-nl` on `fredrir-09` (`parser-dataset`); namespace `object-store`; one `weed server` per node, no cross-node cluster |
+| Cells | `seaweedfs-hel1` on `fredrir-04` (CI caches, primary backup repositories), `seaweedfs-nl` on `fredrir-09` (`parser-dataset`); namespace `object-store`; one `weed server` per node, no cross-node cluster |
 | Endpoint | `https://seaweedfs-<cell>.object-store.svc.cluster.local:8333`, region `<cell>` |
 | Listeners | Pod IP: S3 TCP 8333 (TLS, HTTP/1.1 and HTTP/2, `s3-filter`), metrics 9327, worker metrics 9328, admin gRPC 33646 (mTLS, client name allow-list); NetworkPolicy admits only 8333, 9327 and 9328; SeaweedFS S3 on 127.0.0.1:8334 with its gRPC, master, volume, filer and admin HTTP on loopback |
 | Trust | CA `platform/components/object-store-trust/ca.crt`, content-hashed ConfigMap `object-store-ca-<hash>` wherever the component is included, so a new CA restarts every consumer; name-constrained to `object-store.svc`, `object-store.svc.cluster.local`, `localhost`, `127.0.0.1`; CA key `pki/ca.sops.yaml` (Macie, Archie) |
@@ -589,6 +589,7 @@ Every alert has promtool cases in `internal/policy/testdata/object-store-alerts.
 | Reissue certificates | Decrypt the CA key on Macie or Archie; issue each cell's two leaves with the SANs below; replace `pki/<cell>-*.crt` and the `s3.key`/`internal.key` values; update the alert threshold |
 | Resolve versioning or lock drift on a cache bucket | Remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |
 | Failed provisioner run | Read `kubectl -n object-store logs job/<job>`; for drift restored on a locked bucket, find who changed it, since the filter admits bucket configuration only from the provisioner key |
+| Drift restored on a `restic-<project>` bucket | Never remove the bucket; find who changed it as above, then run `repository-maintenance` in the project namespace to check both repositories |
 | Any `seaweedfs-nl` incident | Suspend the mirror first (commands below), before investigating |
 | Restore the parser dataset | Commands below: suspend the mirror, stop the parser writers, run `parser-dataset-seed`, which overwrites every object that differs from AWS, start the writers, resume |
 | Bring back missing parser dataset objects | Commands below: suspend the mirror, run `mirror.sh restore` from the seed job template, which copies only objects absent from `parser-dataset` and leaves the sentinel alone, resume; safe while the parser runs |
