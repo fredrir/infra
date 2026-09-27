@@ -224,6 +224,7 @@
    "acquire_seconds": 0.003,
    "release_seconds": 0.002
   },
-  "pool_variable": "INFRA_VM_POOL_QUALIFIED false in the seven repositories for the admission role and the cutover applies; restored to true after verification"
+  "pool_variable": "INFRA_VM_POOL_QUALIFIED false in the seven repositories for the admission role and the cutover applies; restored to true after verification",
+  "missed_consumer_pins": "Not caught before the cutover: the six consumer repositories still pinned workflows that start their own Docker engine, which the isolated accounts cannot, so their VM jobs would fail; no consumer job reached the VM before INFRA_VM_POOL_QUALIFIED was set false in those six at 13:18Z, to be restored per repository once its pin is proven on the VM"
  }
 }
