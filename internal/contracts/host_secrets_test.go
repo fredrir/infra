@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -212,5 +213,24 @@ func TestSOPSFilesUseOnlyDeclaredRecipients(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestWorkspaceSetupDoesNotReadOperatorCredentials(t *testing.T) {
+	command := exec.Command("bash", "-c", `set -e
+PATH_add() { :; }
+watch_file() { :; }
+direnv_load() { "$@"; }
+sops() { echo 'operator decryption was attempted' >&2; exit 81; }
+doppler() { echo 'operator secret import was attempted' >&2; exit 82; }
+docker() { return 1; }
+find() { printf '%s\n' /tmp/operator-free-kubeconfig.yaml; }
+source "$1"
+test "$SOPS_AGE_KEY_FILE" = "$HOME/.config/age/keys.txt"
+test "$KUBECONFIG" = /tmp/operator-free-kubeconfig.yaml
+`, "workspace-setup", filepath.Join(root(t), ".envrc"))
+	command.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + os.Getenv("HOME")}
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("workspace setup must preserve local configuration without operator credentials: %v\n%s", err, output)
 	}
 }

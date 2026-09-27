@@ -255,7 +255,7 @@ Use native `restic snapshots`, `restic restore` and database restore tools with 
 | ---------------- | ------------------------------------------------------------------------------------------------------ |
 | Inputs           | [Production settings](../tofu/production.tfvars.json)                                                  |
 | Backend          | Existing S3 `llunde-pyparser-bucket`, key `tofu-state/infra.tfstate`, `eu-north-1`                     |
-| Credentials      | AWS credential chain, `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`; private `TF_VAR_platform_mail_recipient` |
+| Credentials      | AWS credential chain; command-scoped `TF_VAR_hcloud_token`, `CLOUDFLARE_API_TOKEN`, `TF_VAR_platform_mail_recipient` |
 | Renames          | Declarative `moved` blocks preserve existing resource identities                                       |
 | Resource changes | Review the saved plan before applying it                                                               |
 | Media            | Existing AWS bucket and media identifiers remain unchanged                                             |
@@ -264,6 +264,9 @@ Use native `restic snapshots`, `restic restore` and database restore tools with 
 umask 077
 mkdir -p .infra/plans
 tofu -chdir=tofu init -lockfile=readonly -input=false
+TF_VAR_hcloud_token="$(sops decrypt --extract '["HCLOUD_TOKEN"]' secrets/operator.sops.yaml)" \
+CLOUDFLARE_API_TOKEN="$(sops decrypt --extract '["CLOUDFLARE_API_TOKEN"]' secrets/operator.sops.yaml)" \
+TF_VAR_platform_mail_recipient="$(sops decrypt --extract '["PLATFORM_ALERT_RECIPIENT"]' secrets/operator.sops.yaml)" \
 tofu -chdir=tofu plan -input=false \
   -var-file=production.tfvars.json \
   -out=../.infra/plans/production.tfplan

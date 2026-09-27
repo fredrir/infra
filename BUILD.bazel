@@ -165,6 +165,7 @@ filegroup(
         "ansible/roles/*/tasks/*.yml",
         "secrets/*.yaml",
     ]) + [
+        ".envrc",
         ".sops.yaml",
         "ansible/roles/gatus/templates/config.yaml.j2",
     ],

@@ -33,12 +33,28 @@
 | Env | Value |
 | --- | --- |
 | `SOPS_AGE_KEY_FILE` | `$HOME/.config/age/keys.txt`; set by `.envrc` |
-| Operator environment | `.envrc` imports `secrets/operator.sops.yaml` with `sops exec-env`; `onboard-rust --root` reads that checkout's encrypted file |
+| Workspace environment | `.envrc` configures tool paths, kubeconfig and the age-key file; operator values are passed only to the command that needs them |
+| Rust onboarding | `onboard-rust --root` reads only the three ARC App fields from that checkout's encrypted operator file |
 
 ```sh
 sops secrets/operator.sops.yaml
 sops platform/projects/<project>/<name>.secret.sops.yaml
 sops rotate -i --add-age "$NEW" --rm-age "$OLD" platform/projects/<project>/<name>.secret.sops.yaml
+```
+
+| Operator command | Selected fields from `secrets/operator.sops.yaml` |
+| --- | --- |
+| Fleet OpenTofu | `HCLOUD_TOKEN` → `TF_VAR_hcloud_token`, `CLOUDFLARE_API_TOKEN`, `PLATFORM_ALERT_RECIPIENT` → `TF_VAR_platform_mail_recipient`; [provider command](platform.md#provider-resources) |
+| Reconciler OpenTofu | `HETZNER_RECONCILER_ADMIN` → `TF_VAR_reconciler_hcloud_token`, `CLOUDFLARE_OPENTOFU_ROOT` → `CLOUDFLARE_API_TOKEN` |
+| Node enrollment | `TAILSCALE_ENROLL_CLIENT_ID`, `TAILSCALE_ENROLL_CLIENT_SECRET` |
+| Policy administration | `TAILSCALE_POLICY_CLIENT_ID`, `TAILSCALE_POLICY_CLIENT_SECRET` |
+| Package publication | `PACKAGES_GPG_KEY`, `PACKAGES_APK_KEY`; AUR additionally `AUR_SSH_KEY` |
+| Private image preflight | `GHCR_READ_PACKAGES_TOKEN` |
+
+```sh
+TAILSCALE_ENROLL_CLIENT_ID="$(sops decrypt --extract '["TAILSCALE_ENROLL_CLIENT_ID"]' secrets/operator.sops.yaml)" \
+TAILSCALE_ENROLL_CLIENT_SECRET="$(sops decrypt --extract '["TAILSCALE_ENROLL_CLIENT_SECRET"]' secrets/operator.sops.yaml)" \
+infra operations enrollment create-deliver --node fredrir-NN --role worker
 ```
 
 ## Host-scoped secrets
