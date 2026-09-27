@@ -16,6 +16,11 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BAZEL_CACHE_IDENTITY: ${{ github.repository == 'fredrir/infra' && contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected && 'bazel-cache-cli-writer' || github.repository == 'fredrir/infra' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && 'bazel-cache-reader' || '' }}
     outputs:
       artifact: ${{ steps.bundle.outputs.artifact }}
       sha256: ${{ steps.bundle.outputs.sha256 }}
@@ -57,16 +62,16 @@ jobs:
             printf 'hit=true\n' >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        id: bazel-cache
         if: steps.cached.outputs.hit != 'true'
         with:
-          path: |
-            ~/.cache/infra-bazel-actions
-            ~/.cache/infra-bazel-repository
-          key: infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-cli-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-check-
-            infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-
+          path: ~/.cache/infra-bazel-repository
+          key: infra-bazel-repository-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel.lock', 'go.sum') }}
+      - uses: ./.github/actions/bazel-cache
+        id: bazel-cache
+        if: env.BAZEL_CACHE_IDENTITY != '' && steps.cached.outputs.hit != 'true'
+        with:
+          identity: ${{ env.BAZEL_CACHE_IDENTITY }}
+          client-id: ${{ env.BAZEL_CACHE_IDENTITY == 'bazel-cache-cli-writer' && vars.TAILSCALE_BAZEL_CACHE_CLI_WRITER_CLIENT_ID || vars.TAILSCALE_BAZEL_CACHE_READER_CLIENT_ID }}
       - name: Install pinned Bazel
         if: steps.cached.outputs.hit != 'true'
         env:
@@ -77,15 +82,17 @@ jobs:
           chmod 755 "$RUNNER_TEMP/bazel"
       - name: Build CLI
         if: steps.cached.outputs.hit != 'true'
+        env:
+          BAZEL_REMOTE_CACHE: ${{ steps.bazel-cache.outputs.endpoint }}
         run: |
-          "$RUNNER_TEMP/bazel" --batch build --config=ci --platforms=@rules_go//go/toolchain:linux_amd64 --disk_cache="$HOME/.cache/infra-bazel-actions" --repository_cache="$HOME/.cache/infra-bazel-repository" --@rules_go//go/config:pure //cmd/infra:infra
-      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: steps.cached.outputs.hit != 'true' && steps.bazel-cache.outputs.cache-matched-key == ''
-        with:
-          path: |
-            ~/.cache/infra-bazel-actions
-            ~/.cache/infra-bazel-repository
-          key: ${{ steps.bazel-cache.outputs.cache-primary-key }}
+          flags=(--config=ci --platforms=@rules_go//go/toolchain:linux_amd64 --repository_cache="$HOME/.cache/infra-bazel-repository" --@rules_go//go/config:pure)
+          if [ -n "$BAZEL_REMOTE_CACHE" ]; then
+            flags+=(--remote_cache="$BAZEL_REMOTE_CACHE" --remote_cache_compression --remote_timeout=10s --jobs=100)
+          fi
+          if [ "$BAZEL_CACHE_IDENTITY" != bazel-cache-cli-writer ]; then
+            flags+=(--remote_upload_local_results=false)
+          fi
+          "$RUNNER_TEMP/bazel" --batch build "${flags[@]}" //cmd/infra:infra
       - name: Store binary identity
         if: steps.cached.outputs.hit != 'true'
         env:

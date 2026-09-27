@@ -9,6 +9,9 @@ env:
   MACOS_SDK_SHA256: 206f0ccf404784e98b1d1040fef4dbefce00273b1a4a668f4483c8b0370b52ab
 jobs:
   cli:
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/infra-cli.yml
   build:
     needs: cli

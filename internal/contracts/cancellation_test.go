@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"cel.dev/cel-go/common/types"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -44,7 +43,7 @@ func TestImageBuildCancellationPreservesVerifiedArtifactReuse(t *testing.T) {
 		{"unprotected release CLI", "fredrir/infra", "skipped", "", "ghcr.io/fredrir/infra-runner-deploy", false, false, true, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			result, _, err := program.Eval(map[string]any{
+			allowed, err := program.allows(map[string]any{
 				"github":          map[string]any{"repository": test.repository, "repository_owner_id": "114402558", "event_name": "push", "ref": "refs/heads/main", "ref_protected": test.protected},
 				"inputs":          map[string]any{"cli-artifact": test.artifact, "release-cli": test.released, "image": test.image},
 				"needs":           map[string]any{"cli": map[string]any{"result": test.bootstrap}},
@@ -53,8 +52,8 @@ func TestImageBuildCancellationPreservesVerifiedArtifactReuse(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if result != types.Bool(test.allowed) {
-				t.Fatalf("build allowed = %v, want %v", result, test.allowed)
+			if allowed != test.allowed {
+				t.Fatalf("build allowed = %v, want %v", allowed, test.allowed)
 			}
 		})
 	}

@@ -186,7 +186,16 @@ filegroup(
         ".github/actions/setup-reconciliation-cli/action.yml",
         ".github/actions/setup-reconciliation/action.yml",
     ],
-    visibility = ["//internal/reconcile:__pkg__"],
+    visibility = [
+        "//internal/contracts:__pkg__",
+        "//internal/reconcile:__pkg__",
+    ],
+)
+
+filegroup(
+    name = "bazel_cache_action_data",
+    srcs = [".github/actions/bazel-cache/action.yml"],
+    visibility = ["//internal/contracts:__pkg__"],
 )
 
 filegroup(

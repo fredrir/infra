@@ -30,6 +30,9 @@ permissions:
 jobs:
   cli:
     if: github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/infra-cli.yml
   test:
     needs: cli

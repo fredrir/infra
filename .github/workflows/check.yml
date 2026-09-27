@@ -19,12 +19,20 @@ concurrency:
 jobs:
   cli:
     if: inputs.cli-artifact == '' && github.triggering_actor != 'fredrir-infra-verification[bot]'
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/infra-cli.yml
   check:
     if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
     needs: cli
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BAZEL_CACHE_IDENTITY: ${{ github.repository == 'fredrir/infra' && contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected && 'bazel-cache-check-writer' || github.repository == 'fredrir/infra' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && 'bazel-cache-reader' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -59,16 +67,17 @@ jobs:
           expression=$(infra pipeline affected --base "$base")
           printf 'expression=%s\n' "$expression" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        id: bazel-cache
+        id: repository-cache
         if: steps.affected.outputs.expression != 'set()'
         with:
-          path: |
-            ~/.cache/infra-bazel-actions
-            ~/.cache/infra-bazel-repository
-          key: infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-check-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-check-
-            infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-
+          path: ~/.cache/infra-bazel-repository
+          key: infra-bazel-repository-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel.lock', 'go.sum') }}
+      - uses: ./.github/actions/bazel-cache
+        id: bazel-cache
+        if: env.BAZEL_CACHE_IDENTITY != '' && steps.affected.outputs.expression != 'set()'
+        with:
+          identity: ${{ env.BAZEL_CACHE_IDENTITY }}
+          client-id: ${{ env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && vars.TAILSCALE_BAZEL_CACHE_CHECK_WRITER_CLIENT_ID || vars.TAILSCALE_BAZEL_CACHE_READER_CLIENT_ID }}
       - name: Install checksum-pinned native Bazel
         if: steps.affected.outputs.expression != 'set()'
         run: |
@@ -82,23 +91,21 @@ jobs:
       - name: Prepare affected check artifacts
         if: steps.affected.outputs.expression != 'set()'
         env:
-          BAZEL_REMOTE_CACHE: ''
+          BAZEL_REMOTE_CACHE: ${{ steps.bazel-cache.outputs.endpoint }}
           BASE: ${{ steps.affected.outputs.base }}
         run: |
           echo 'Artifact preparation is measured separately from the check budget.' >> "$GITHUB_STEP_SUMMARY"
-          infra pipeline prepare-check --local --base "$BASE" --read-only-cache=${{ github.event_name == 'pull_request' }} --report-dir dist/reports/preparation
+          infra pipeline prepare-check --local --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --report-dir dist/reports/preparation
       - name: Check affected targets within aggregate budget
         env:
-          BAZEL_REMOTE_CACHE: ''
+          BAZEL_REMOTE_CACHE: ${{ steps.bazel-cache.outputs.endpoint }}
           BASE: ${{ steps.affected.outputs.base }}
-        run: infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ github.event_name == 'pull_request' }} --local
+        run: infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --local
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: ${{ !cancelled() && github.repository == 'fredrir/infra' && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && steps.affected.outputs.expression != 'set()' && steps.bazel-cache.outputs.cache-primary-key != '' }}
+        if: ${{ !cancelled() && env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && steps.repository-cache.outputs.cache-primary-key != '' && steps.repository-cache.outputs.cache-hit != 'true' }}
         with:
-          path: |
-            ~/.cache/infra-bazel-actions
-            ~/.cache/infra-bazel-repository
-          key: ${{ steps.bazel-cache.outputs.cache-primary-key }}
+          path: ~/.cache/infra-bazel-repository
+          key: ${{ steps.repository-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -131,9 +138,7 @@ jobs:
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.cache/infra-bazel-repository
-          key: infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-host-access
-          restore-keys: |
-            infra-bazel-linux-amd64-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc') }}-
+          key: infra-bazel-repository-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel.lock', 'go.sum') }}
       - name: Install checksum-pinned native Bazel
         run: |
           version=$(jq -er '.bazel' build/toolchain.json)

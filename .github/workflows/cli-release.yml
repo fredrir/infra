@@ -14,6 +14,9 @@ jobs:
     if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref_protected
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -25,17 +28,10 @@ jobs:
           fetch-depth: 0
       - name: Require a release from main
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
-          path: |
-            ~/.cache/infra-bazel-actions
-            ~/.cache/infra-bazel-repository
-          key: infra-release-bazel9.2.0-go1.27.1-${{ matrix.platform }}-${{ github.sha }}
-          restore-keys: |
-            ${{ matrix.platform == 'linux_amd64' && format('infra-bazel-linux-amd64-v1-{0}-check-{1}-', hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc'), github.sha) || '' }}
-            infra-release-bazel9.2.0-go1.27.1-${{ matrix.platform }}-
-            ${{ matrix.platform == 'linux_amd64' && format('infra-bazel-linux-amd64-v1-{0}-check-', hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc')) || '' }}
-            ${{ matrix.platform == 'linux_amd64' && format('infra-bazel-linux-amd64-v1-{0}-', hashFiles('build/toolchain.json', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.sum', '.bazelrc')) || '' }}
+          path: ~/.cache/infra-bazel-repository
+          key: infra-bazel-repository-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel.lock', 'go.sum') }}
       - name: Install pinned Bazel
         env:
           BAZEL_SHA256: 7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694
@@ -47,19 +43,29 @@ jobs:
         env:
           PLATFORM: ${{ matrix.platform }}
         run: |
-          "$RUNNER_TEMP/bazel" --batch build --config=ci --platforms="@rules_go//go/toolchain:$PLATFORM" --@rules_go//go/config:pure --disk_cache="$HOME/.cache/infra-bazel-actions" --repository_cache="$HOME/.cache/infra-bazel-repository" //cmd/infra:infra
+          "$RUNNER_TEMP/bazel" --batch build --config=ci --platforms="@rules_go//go/toolchain:$PLATFORM" --@rules_go//go/config:pure --repository_cache="$HOME/.cache/infra-bazel-repository" //cmd/infra:infra
           mkdir -p "$RUNNER_TEMP/release"
           cp bazel-bin/cmd/infra/infra_/infra "$RUNNER_TEMP/release/infra-${PLATFORM/_/-}"
+      - uses: ./.github/actions/bazel-cache
+        id: bazel-cache
+        if: matrix.platform == 'linux_amd64'
+        with:
+          identity: bazel-cache-release-reader
+          client-id: ${{ vars.TAILSCALE_BAZEL_CACHE_RELEASE_READER_CLIENT_ID }}
       - name: Prepare native check artifacts
         if: matrix.platform == 'linux_amd64'
+        env:
+          BAZEL_REMOTE_CACHE: ${{ steps.bazel-cache.outputs.endpoint }}
         run: |
           chmod 755 "$RUNNER_TEMP/release/infra-linux-amd64"
-          "$RUNNER_TEMP/release/infra-linux-amd64" pipeline prepare-check --local --bazel "$RUNNER_TEMP/bazel" --report-dir "$RUNNER_TEMP/check-preparation"
+          "$RUNNER_TEMP/release/infra-linux-amd64" pipeline prepare-check --local --read-only-cache --bazel "$RUNNER_TEMP/bazel" --report-dir "$RUNNER_TEMP/check-preparation"
       - name: Check native targets within aggregate budget
         if: matrix.platform == 'linux_amd64'
+        env:
+          BAZEL_REMOTE_CACHE: ${{ steps.bazel-cache.outputs.endpoint }}
         run: |
           chmod 755 "$RUNNER_TEMP/release/infra-linux-amd64"
-          "$RUNNER_TEMP/release/infra-linux-amd64" pipeline check-fast --local --bazel "$RUNNER_TEMP/bazel" --report-dir "$RUNNER_TEMP/check-reports"
+          "$RUNNER_TEMP/release/infra-linux-amd64" pipeline check-fast --local --read-only-cache --bazel "$RUNNER_TEMP/bazel" --report-dir "$RUNNER_TEMP/check-reports"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: cli-release-${{ matrix.platform }}

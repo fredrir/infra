@@ -23,10 +23,16 @@ concurrency:
 jobs:
   cli:
     if: (inputs.verify || github.triggering_actor != 'fredrir-infra-verification[bot]')
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/infra-cli.yml
   check:
     if: ${{ !inputs.verify && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
     needs: cli
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/check.yml
     with:
       cli-artifact: ${{ needs.cli.outputs.artifact }}

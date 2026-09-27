@@ -1,0 +1,49 @@
+name: Join the Bazel cache
+description: Join the tailnet as a Bazel cache identity and resolve a reachable endpoint.
+inputs:
+  identity:
+    description: Federated identity from tailscale/federated-identities.json.
+    required: true
+  client-id:
+    description: Client ID of the federated identity.
+    required: true
+outputs:
+  endpoint:
+    value: ${{ steps.probe.outputs.endpoint }}
+runs:
+  using: composite
+  steps:
+    - id: role
+      shell: bash
+      env:
+        IDENTITY: ${{ inputs.identity }}
+      run: |
+        case "$IDENTITY" in
+          bazel-cache-check-writer | bazel-cache-cli-writer) printf 'tag=tag:ci-bazel-writer\nport=9093\n' ;;
+          bazel-cache-reader | bazel-cache-release-reader) printf 'tag=tag:ci-bazel-reader\nport=9092\n' ;;
+          *) echo "Unknown Bazel cache identity $IDENTITY" >&2; exit 1 ;;
+        esac >> "$GITHUB_OUTPUT"
+    - id: join
+      continue-on-error: true
+      uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8
+      with:
+        version: 1.102.4
+        sha256sum: 50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9
+        oauth-client-id: ${{ inputs.client-id }}
+        audience: ${{ inputs.identity }}
+        tags: ${{ steps.role.outputs.tag }}
+        hostname: ${{ inputs.identity }}-${{ github.run_id }}-${{ github.run_attempt }}
+        args: --accept-dns=false
+        timeout: 30s
+        retry: 2
+    - id: probe
+      if: steps.join.outcome == 'success'
+      shell: bash
+      env:
+        ADDRESS: 100.87.168.66:${{ steps.role.outputs.port }}
+      run: |
+        if printf '\0\0\0\0\0' | curl --silent --http2-prior-knowledge --connect-timeout 5 --max-time 10 --retry 2 --retry-max-time 20 --output /dev/null --dump-header - --header 'Content-Type: application/grpc' --header 'TE: trailers' --data-binary @- "http://$ADDRESS/build.bazel.remote.execution.v2.Capabilities/GetCapabilities" | tr -d '\r' | grep -qx 'grpc-status: 0'; then
+          printf 'endpoint=grpc://%s\n' "$ADDRESS" >> "$GITHUB_OUTPUT"
+        else
+          echo "Bazel cache $ADDRESS unreachable; building without it." >> "$GITHUB_STEP_SUMMARY"
+        fi
