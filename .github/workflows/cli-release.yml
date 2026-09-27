@@ -17,6 +17,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    defaults:
+      run:
+        shell: env -u ACTIONS_ID_TOKEN_REQUEST_URL -u ACTIONS_ID_TOKEN_REQUEST_TOKEN bash -e {0}
     strategy:
       fail-fast: false
       matrix:
@@ -43,7 +46,7 @@ jobs:
         env:
           PLATFORM: ${{ matrix.platform }}
         run: |
-          "$RUNNER_TEMP/bazel" --batch build --config=ci --platforms="@rules_go//go/toolchain:$PLATFORM" --@rules_go//go/config:pure --repository_cache="$HOME/.cache/infra-bazel-repository" //cmd/infra:infra
+          "$RUNNER_TEMP/bazel" --batch build --config=ci --platforms="@rules_go//go/toolchain:$PLATFORM" --@rules_go//go/config:pure --repository_cache="$HOME/.cache/infra-bazel-repository" --repo_contents_cache= //cmd/infra:infra
           mkdir -p "$RUNNER_TEMP/release"
           cp bazel-bin/cmd/infra/infra_/infra "$RUNNER_TEMP/release/infra-${PLATFORM/_/-}"
       - uses: ./.github/actions/bazel-cache
@@ -52,6 +55,8 @@ jobs:
         with:
           identity: bazel-cache-release-reader
           client-id: ${{ vars.TAILSCALE_BAZEL_CACHE_RELEASE_READER_CLIENT_ID }}
+      - name: Withhold OIDC token requests from later steps
+        run: test -z "${ACTIONS_ID_TOKEN_REQUEST_URL-}${ACTIONS_ID_TOKEN_REQUEST_TOKEN-}"
       - name: Prepare native check artifacts
         if: matrix.platform == 'linux_amd64'
         env:

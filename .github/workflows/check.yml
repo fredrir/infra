@@ -31,6 +31,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    defaults:
+      run:
+        shell: env -u ACTIONS_ID_TOKEN_REQUEST_URL -u ACTIONS_ID_TOKEN_REQUEST_TOKEN bash -e {0}
     env:
       BAZEL_CACHE_IDENTITY: ${{ github.repository == 'fredrir/infra' && contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected && 'bazel-cache-check-writer' || github.repository == 'fredrir/infra' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && 'bazel-cache-reader' || '' }}
     steps:
@@ -78,6 +81,8 @@ jobs:
         with:
           identity: ${{ env.BAZEL_CACHE_IDENTITY }}
           client-id: ${{ env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && vars.TAILSCALE_BAZEL_CACHE_CHECK_WRITER_CLIENT_ID || vars.TAILSCALE_BAZEL_CACHE_READER_CLIENT_ID }}
+      - name: Withhold OIDC token requests from later steps
+        run: test -z "${ACTIONS_ID_TOKEN_REQUEST_URL-}${ACTIONS_ID_TOKEN_REQUEST_TOKEN-}"
       - name: Install checksum-pinned native Bazel
         if: steps.affected.outputs.expression != 'set()'
         run: |

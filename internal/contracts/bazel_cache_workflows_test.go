@@ -15,6 +15,8 @@ import (
 )
 
 const (
+	auditedTailscaleAction  = "tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8"
+	auditedTailscaleVersion = "1.102.4"
 	bazelCacheAction        = "./.github/actions/bazel-cache"
 	bazelRepositoryCache    = "~/.cache/infra-bazel-repository"
 	bazelRepositoryCacheKey = "infra-bazel-repository-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel.lock', 'go.sum') }}"
@@ -26,6 +28,7 @@ type workflowStep struct {
 	If              string            `yaml:"if"`
 	Uses            string            `yaml:"uses"`
 	Run             string            `yaml:"run"`
+	Shell           string            `yaml:"shell"`
 	Env             map[string]string `yaml:"env"`
 	With            map[string]string `yaml:"with"`
 	ContinueOnError bool              `yaml:"continue-on-error"`
@@ -34,8 +37,13 @@ type workflowStep struct {
 type workflowJob struct {
 	Uses        string            `yaml:"uses"`
 	Permissions map[string]string `yaml:"permissions"`
-	Env         map[string]string `yaml:"env"`
-	Steps       []workflowStep    `yaml:"steps"`
+	Defaults    struct {
+		Run struct {
+			Shell string `yaml:"shell"`
+		} `yaml:"run"`
+	} `yaml:"defaults"`
+	Env   map[string]string `yaml:"env"`
+	Steps []workflowStep    `yaml:"steps"`
 }
 
 type workflowFile struct {
@@ -278,6 +286,9 @@ func TestBazelCacheActionMapsEachIdentityToItsTailnetRole(t *testing.T) {
 	if join.Uses != pinned.Uses || join.With["version"] != pinned.With["version"] || join.With["sha256sum"] != pinned.With["sha256sum"] {
 		t.Errorf("cache join runs %s %s, reconciliation %s %s", join.Uses, join.With["version"], pinned.Uses, pinned.With["version"])
 	}
+	if join.Uses != auditedTailscaleAction || join.With["version"] != auditedTailscaleVersion {
+		t.Errorf("re-audit %s with Tailscale %s: the audited pair joins with single-use, ephemeral, preauthorized keys and logs out in its post step", join.Uses, join.With["version"])
+	}
 	if !join.ContinueOnError || join.With["audience"] != "${{ inputs.identity }}" || join.With["tags"] != "${{ steps.role.outputs.tag }}" || !strings.Contains(join.With["args"], "--accept-dns=false") {
 		t.Errorf("cache join %+v may fail the build, resolve names or pick its own role", join.With)
 	}
@@ -351,6 +362,9 @@ func TestReleaseBinariesNeverTakeResultsFromTheBazelCache(t *testing.T) {
 			built = index
 			if strings.Contains(strings.ToLower(step.Run+fmt.Sprint(step.Env)), "remote") {
 				t.Errorf("release binaries build against a remote cache: %s", step.Run)
+			}
+			if !regexp.MustCompile(`--repo_contents_cache=(\s|$)`).MatchString(step.Run) {
+				t.Errorf("release binaries reuse CI-extracted external repositories: %s", step.Run)
 			}
 		}
 		if index > join && regexp.MustCompile(`(cp|mv|install) [^\n]*release`).MatchString(step.Run) {
@@ -461,5 +475,63 @@ func TestReusableWorkflowCallersGrantTheirCalleesOIDCTokens(t *testing.T) {
 				t.Errorf("%s %s calls %s without granting id-token: write", name, jobName, callee)
 			}
 		}
+	}
+}
+
+func TestStepsAfterTheCacheJoinCannotRequestOIDCTokens(t *testing.T) {
+	variables := []string{"ACTIONS_ID_TOKEN_REQUEST_URL=https://token.example/idtoken", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=token"}
+	requested := append(os.Environ(), variables...)
+	run := func(shell, script string, environment []string) ([]byte, error) {
+		path := filepath.Join(t.TempDir(), "step.sh")
+		if err := os.WriteFile(path, []byte(script), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		fields := strings.Fields(strings.ReplaceAll(shell, "{0}", path))
+		if len(fields) == 0 {
+			return nil, fmt.Errorf("no job shell")
+		}
+		command := exec.Command(fields[0], fields[1:]...)
+		command.Env = environment
+		return command.Output()
+	}
+	jobs := 0
+	for name, workflow := range workflows(t) {
+		for jobName, job := range workflow.Jobs {
+			join := slices.IndexFunc(job.Steps, func(step workflowStep) bool { return step.Uses == bazelCacheAction })
+			if join < 0 {
+				continue
+			}
+			jobs++
+			shell := job.Defaults.Run.Shell
+			if output, err := run(shell, "env\n", requested); err != nil || strings.Contains(string(output), "ACTIONS_ID_TOKEN_REQUEST") {
+				t.Errorf("%s %s run steps see OIDC request variables through %q (%v)", name, jobName, shell, err)
+			}
+			if join+1 == len(job.Steps) || job.Steps[join+1].Run == "" {
+				t.Errorf("%s %s does not check its steps for OIDC request variables right after the join", name, jobName)
+			} else {
+				guard := job.Steps[join+1]
+				for _, variable := range variables {
+					if _, err := run("bash -e {0}", guard.Run, append(os.Environ(), variable)); err == nil || guard.If != "" {
+						t.Errorf("%s %s guard %q passes while %s is set", name, jobName, guard.Run, variable)
+					}
+				}
+				if _, err := run(shell, guard.Run, requested); err != nil {
+					t.Errorf("%s %s guard fails under its own shell: %v", name, jobName, err)
+				}
+			}
+			for _, step := range job.Steps {
+				if step.Shell != "" {
+					t.Errorf("%s %s %q replaces the job shell with %q", name, jobName, step.Name, step.Shell)
+				}
+			}
+			for _, step := range job.Steps[join+1:] {
+				if step.Uses != "" && !strings.HasPrefix(step.Uses, "actions/") {
+					t.Errorf("%s %s runs %s after the cache join outside the job shell", name, jobName, step.Uses)
+				}
+			}
+		}
+	}
+	if jobs != 3 {
+		t.Errorf("%d jobs join the Bazel cache", jobs)
 	}
 }
