@@ -146,6 +146,23 @@ jobs:
       - name: Verify uncached test evidence
         if: always() && inputs.qualify-cold-cache == true
         run: python3 -B .github/scripts/cache_cold_qualification.py verify dist/reports
+      - name: Diagnose failed cold tests
+        if: failure() && inputs.qualify-cold-cache == true && steps.cold.outputs.bazel != ''
+        env:
+          ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
+        run: |
+          mkdir -p dist/reports/cold-diagnostic
+          timeout 120s bazel test --config=ci \
+            --action_env="INFRA_BUILD_IMAGE=$(jq -er '.image' build/toolchain.json)" \
+            --repository_cache="$HOME/.cache/infra-bazel-repository" \
+            --remote_cache="$ENDPOINT" --remote_cache_compression --remote_timeout=10s --jobs=100 \
+            --remote_upload_local_results=false --experimental_build_event_upload_strategy=local \
+            --build_tests_only --nocache_test_results --test_arg=-test.v --test_output=all \
+            --build_event_json_file=dist/reports/cold-diagnostic/events.jsonl \
+            --profile=dist/reports/cold-diagnostic/profile.json.gz \
+            //internal/contracts:contracts_test //internal/policy:policy_test \
+            //internal/platformops:platformops_test //internal/reconcile:reconcile_test \
+            //internal/reconciler:reconciler_test
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: ${{ !cancelled() && env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && steps.repository-cache.outputs.cache-primary-key != '' && steps.repository-cache.outputs.cache-hit != 'true' }}
         with:
