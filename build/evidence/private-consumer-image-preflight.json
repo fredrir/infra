@@ -1,0 +1,90 @@
+{
+  "checked_utc": "2026-09-27T22:32:37.522943+00:00",
+  "credential": {
+    "source": "secrets/operator.sops.yaml:GHCR_READ_PACKAGES_TOKEN",
+    "input_regular_owner_file_mode": "0600",
+    "expected_github_account_verified": true,
+    "oauth_scopes": [
+      "read:packages"
+    ],
+    "sops_recipients": [
+      "Macie",
+      "Archie"
+    ],
+    "existing_plaintext_values_unchanged": 20
+  },
+  "inspection": {
+    "image_selection": "running production pod immutable references",
+    "execution": "local containers; no network, no capabilities, no new privileges, read-only root, temporary /tmp",
+    "uid": 10001,
+    "gid": 10001
+  },
+  "images": [
+    {
+      "name": "llunde-backend",
+      "reference": "ghcr.io/fredrir/llunde-backend@sha256:3de20cb2b2f54114d51dd60267c4beb556e72e18d0b697bf078ebd25e41546a8",
+      "platform": "linux/amd64",
+      "source_revision": "e7eed8ea161bf6a4aadd76daa4ede8cdb77cb667",
+      "authenticated_manifest_digest_matches": true,
+      "authenticated_pull": "pass",
+      "permission_checks": {
+        "readable_application_files": 172,
+        "modes": {
+          "/app/entrypoint.sh": "0755"
+        },
+        "directories_readable_and_traversable": true,
+        "entrypoint_executable": true
+      },
+      "smoke": "java -version succeeded as UID10001."
+    },
+    {
+      "name": "llunde-frontend",
+      "reference": "ghcr.io/fredrir/llunde-frontend@sha256:fd46ecc049188e1a258c2e86ce93229d6c4c34806f4c4d3b50ec53f63f1939bd",
+      "platform": "linux/amd64",
+      "source_revision": "c56ddf87af6cdda0cf18a295e4e77f49b313727c",
+      "authenticated_manifest_digest_matches": true,
+      "authenticated_pull": "pass",
+      "permission_checks": {
+        "readable_static_files": 159,
+        "modes": {
+          "/srv/index.html": "0644",
+          "/etc/caddy/Caddyfile": "0644"
+        },
+        "directories_readable_and_traversable": true
+      },
+      "smoke": "Caddy served index.html and .well-known/revision byte-identically over container loopback as UID10001."
+    },
+    {
+      "name": "pyparser-review",
+      "reference": "ghcr.io/fredrir/pyparser-review@sha256:2cd44bd44bbb9a0ad134d4abe63105eeedfad423ac07c73941cba1e1bda3a0e7",
+      "platform": "linux/amd64",
+      "source_revision": "4cdef4bea1539df0c1b9d6b0c42537b3fdaaf0f4",
+      "authenticated_manifest_digest_matches": true,
+      "authenticated_pull": "pass",
+      "permission_checks": {
+        "/app": {
+          "files_readable": 547,
+          "directories_traversable": 50
+        },
+        "/opt/docling-models": {
+          "files_readable": 143,
+          "directories_traversable": 53
+        },
+        "modes": {
+          "/app/pyproject.toml": "0o644",
+          "/app/uv.lock": "0o644",
+          "/app/alembic.ini": "0o644",
+          "/app/llm-providers.toml": "0o644",
+          "/app/src/pyparser/__init__.py": "0o644",
+          "/app/src/pyparser/review/static/index.html": "0o644"
+        },
+        "python_import_and_ui_entrypoint": "pass"
+      },
+      "smoke": "Python package import and review UI entrypoint lookup succeeded as UID10001."
+    }
+  ],
+  "limits": [
+    "These checks qualify registry access and filesystem permissions of the current production digests; future images require the same checks before deployment.",
+    "No database-backed backend startup or parser model generation was run."
+  ]
+}
