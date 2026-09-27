@@ -638,8 +638,8 @@ kubectl apply -f - <<EOF
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: $JOB
-  namespace: $NAMESPACE
+  name: "$JOB"
+  namespace: "$NAMESPACE"
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: 900
