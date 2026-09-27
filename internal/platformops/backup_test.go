@@ -81,7 +81,11 @@ func TestBackupValidatesBeforeUpload(t *testing.T) {
 		if name == "pg_dump" {
 			return nil, os.WriteFile(filepath.Join(c.Work, "source", "database.dump"), []byte("export"), 0o600)
 		}
-		if name == "restic" && len(args) > 2 && args[2] == "backup" {
+		return nil, nil
+	}
+	c.Restic = func(_ context.Context, _ Repository, args ...string) ([]byte, error) {
+		calls = append(calls, "restic "+strings.Join(args, " "))
+		if len(args) > 2 && args[2] == "backup" {
 			data, err := os.ReadFile(filepath.Join(c.Work, "source", "SHA256SUMS"))
 			if err != nil || !strings.Contains(string(data), "./database.dump") {
 				t.Fatal("upload preceded validation")
@@ -123,5 +127,7 @@ func TestChecksumsRejectSymlinks(t *testing.T) {
 
 func testBackupConfig(t *testing.T) BackupConfig {
 	t.Helper()
-	return BackupConfig{Work: t.TempDir(), Files: t.TempDir(), Kind: "postgres", Project: "parser", PreflightTimeout: time.Second, ExportTimeout: time.Second, UploadTimeout: time.Second, QuiesceTimeout: time.Second, RecoveryTimeout: time.Second}
+	return BackupConfig{Work: t.TempDir(), Files: t.TempDir(), Kind: "postgres", Project: "parser", PreflightTimeout: time.Second, ExportTimeout: time.Second, UploadTimeout: time.Second, QuiesceTimeout: time.Second, RecoveryTimeout: time.Second,
+		Repositories: []Repository{{Name: "offsite", Env: []string{"RESTIC_REPOSITORY=s3:offsite", "RESTIC_PASSWORD=secret"}}},
+		Restic:       func(context.Context, Repository, ...string) ([]byte, error) { return nil, nil }}
 }

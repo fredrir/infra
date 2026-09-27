@@ -49,10 +49,11 @@ go_library(
 
 go_test(
     name = "cli_test",
-    srcs = ["cli_test.go"],
-    data = ["//:workflows"],
-    deps = [
-        ":cli",
-        "//internal/reconcile",
+    srcs = [
+        "backup_repositories_test.go",
+        "cli_test.go",
     ],
+    data = ["//:workflows"],
+    embed = [":cli"],
+    deps = ["//internal/reconcile"],
 )

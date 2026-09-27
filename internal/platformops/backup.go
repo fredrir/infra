@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +22,74 @@ import (
 )
 
 type Command func(context.Context, string, string, ...string) ([]byte, error)
+
+type Repository struct {
+	Name string
+	Env  []string
+}
+
+type ResticCommand func(ctx context.Context, repository Repository, args ...string) ([]byte, error)
+
+var repositoryName = regexp.MustCompile(`^[a-z]{1,16}$`)
+
+var repositorySettings = []string{"RESTIC_REPOSITORY", "RESTIC_PASSWORD", "RESTIC_CACERT", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"}
+
+func RepositoryPrefix(name string) string {
+	return strings.ToUpper(name) + "_"
+}
+
+func RepositoriesFromEnvironment(names []string, lookup func(string) (string, bool)) ([]Repository, error) {
+	if len(names) == 0 {
+		return nil, fmt.Errorf("backup repositories required")
+	}
+	var repositories []Repository
+	for _, name := range names {
+		if !repositoryName.MatchString(name) || slices.ContainsFunc(repositories, func(repository Repository) bool { return repository.Name == name }) {
+			return nil, fmt.Errorf("invalid backup repository %q", name)
+		}
+		repository := Repository{Name: name}
+		for _, key := range repositorySettings {
+			if value, ok := lookup(RepositoryPrefix(name) + key); ok && value != "" {
+				repository.Env = append(repository.Env, key+"="+value)
+			}
+		}
+		for _, key := range repositorySettings[:2] {
+			if !slices.ContainsFunc(repository.Env, func(entry string) bool { return strings.HasPrefix(entry, key+"=") }) {
+				return nil, fmt.Errorf("backup repository %s lacks %s", name, key)
+			}
+		}
+		repositories = append(repositories, repository)
+	}
+	return repositories, nil
+}
+
+func ResticEnvironment(base []string, repositories []Repository, repository Repository) []string {
+	var environment []string
+	for _, entry := range base {
+		key, _, _ := strings.Cut(entry, "=")
+		if slices.Contains(repositorySettings, key) || slices.ContainsFunc(repositories, func(other Repository) bool { return strings.HasPrefix(key, RepositoryPrefix(other.Name)) }) {
+			continue
+		}
+		environment = append(environment, entry)
+	}
+	return append(environment, repository.Env...)
+}
+
+func MaintainRepositories(ctx context.Context, restic ResticCommand, repositories []Repository) error {
+	if len(repositories) == 0 {
+		return fmt.Errorf("backup repositories required")
+	}
+	var failures []error
+	for _, repository := range repositories {
+		for _, args := range [][]string{{"--retry-lock", "10m", "check", "--read-data-subset=10%"}, {"--retry-lock", "10m", "forget", "--group-by", "host,tags", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune"}} {
+			if _, err := restic(ctx, repository, args...); err != nil {
+				failures = append(failures, fmt.Errorf("maintenance of %s: %w", repository.Name, err))
+				break
+			}
+		}
+	}
+	return errors.Join(failures...)
+}
 
 type BackupConfig struct {
 	Work               string
@@ -40,7 +110,9 @@ type BackupConfig struct {
 	RecoveryTimeout    time.Duration
 	HeartbeatEndpoint  string
 	HeartbeatToken     string
+	Repositories       []Repository
 	Run                Command
+	Restic             ResticCommand
 	Log                io.Writer
 }
 
@@ -100,28 +172,45 @@ func Backup(ctx context.Context, c BackupConfig, exportOnly bool) error {
 	if err := os.Remove(filepath.Join(source, "SHA256SUMS")); err != nil && !os.IsNotExist(err) {
 		return err
 	}
+	var available []Repository
+	var failures []error
 	if !exportOnly {
-		preflight, cancel := context.WithTimeout(ctx, c.PreflightTimeout)
-		_, err := c.Run(preflight, "", "restic", "cat", "config")
-		cancel()
-		if err != nil {
-			return fmt.Errorf("backup preflight: %w", err)
+		if c.Restic == nil || len(c.Repositories) == 0 {
+			return fmt.Errorf("backup repositories required")
+		}
+		for _, repository := range c.Repositories {
+			preflight, cancel := context.WithTimeout(ctx, c.PreflightTimeout)
+			_, err := c.Restic(preflight, repository, "cat", "config")
+			cancel()
+			if err != nil {
+				failures = append(failures, fmt.Errorf("backup preflight of %s: %w", repository.Name, err))
+				continue
+			}
+			available = append(available, repository)
+		}
+		if len(available) == 0 {
+			return errors.Join(failures...)
 		}
 	}
 	exportCtx, cancel := context.WithTimeout(ctx, c.ExportTimeout)
 	err := exportBackup(exportCtx, c)
 	cancel()
 	if err != nil {
-		return err
+		return errors.Join(append(failures, err)...)
 	}
 	if exportOnly {
 		return nil
 	}
-	upload, cancel := context.WithTimeout(ctx, c.UploadTimeout)
-	_, err = c.Run(upload, "", "restic", "--retry-lock", "10m", "backup", source, "--host", "platform", "--tag", c.Project, "--tag", c.Kind, "--json")
-	cancel()
-	if err != nil {
-		return fmt.Errorf("backup upload: %w", err)
+	for _, repository := range available {
+		upload, cancel := context.WithTimeout(ctx, c.UploadTimeout)
+		_, err := c.Restic(upload, repository, "--retry-lock", "10m", "backup", source, "--host", "platform", "--tag", c.Project, "--tag", c.Kind, "--json")
+		cancel()
+		if err != nil {
+			failures = append(failures, fmt.Errorf("backup upload to %s: %w", repository.Name, err))
+		}
+	}
+	if len(failures) > 0 {
+		return errors.Join(failures...)
 	}
 	if err := Heartbeat(ctx, c.HeartbeatEndpoint, c.Project, c.HeartbeatToken); err != nil {
 		fmt.Fprintln(c.Log, "backup heartbeat failed")

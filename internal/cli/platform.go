@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -46,12 +47,11 @@ func newPlatformCommand() *cobra.Command {
 	}}, &cobra.Command{Use: "heartbeat PROJECT", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return platformops.Heartbeat(cmd.Context(), os.Getenv("BACKUP_HEARTBEAT_URL"), args[0], os.Getenv("BACKUP_HEARTBEAT_TOKEN"))
 	}}, newObjectStoreProvisionCommand(), newBackupCommand(), newControlBackupCommand(), &cobra.Command{Use: "repository-maintenance", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		for _, args := range [][]string{{"--retry-lock", "10m", "check", "--read-data-subset=10%"}, {"--retry-lock", "10m", "forget", "--group-by", "host,tags", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune"}} {
-			if _, err := process.Run(cmd.Context(), process.Options{Name: "restic", Args: args, Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr()}); err != nil {
-				return err
-			}
+		repositories, err := backupRepositories()
+		if err != nil {
+			return err
 		}
-		return nil
+		return platformops.MaintainRepositories(cmd.Context(), resticCommand(repositories, cmd.OutOrStdout(), cmd.ErrOrStderr()), repositories)
 	}})
 	return root
 }
@@ -158,6 +158,17 @@ func newObjectStoreProvisionCommand() *cobra.Command {
 	}}
 }
 
+func backupRepositories() ([]platformops.Repository, error) {
+	return platformops.RepositoriesFromEnvironment(strings.Fields(os.Getenv("BACKUP_REPOSITORIES")), os.LookupEnv)
+}
+
+func resticCommand(repositories []platformops.Repository, stdout, stderr io.Writer) platformops.ResticCommand {
+	return func(ctx context.Context, repository platformops.Repository, args ...string) ([]byte, error) {
+		result, err := process.Run(ctx, process.Options{Name: "restic", Args: args, Env: platformops.ResticEnvironment(os.Environ(), repositories, repository), Stdout: stdout, Stderr: stderr, KillGrace: 2 * time.Second})
+		return append(result.Stdout, result.Stderr...), err
+	}
+}
+
 func newBackupCommand() *cobra.Command {
 	var exportOnly, resumeOnly bool
 	cmd := &cobra.Command{Use: "backup", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
@@ -189,6 +200,13 @@ func newBackupCommand() *cobra.Command {
 		c.Run = func(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
 			result, err := process.Run(ctx, process.Options{Name: name, Args: args, Dir: dir, KillGrace: 2 * time.Second})
 			return append(result.Stdout, result.Stderr...), err
+		}
+		if !exportOnly && !resumeOnly {
+			var err error
+			if c.Repositories, err = backupRepositories(); err != nil {
+				return err
+			}
+			c.Restic = resticCommand(c.Repositories, nil, nil)
 		}
 		if resumeOnly {
 			return platformops.ResumeBackup(cmd.Context(), c)

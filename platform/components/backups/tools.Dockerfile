@@ -15,6 +15,7 @@ RUN sed -i 's|http://|https://|g' /etc/apk/repositories \
     && apk add --no-cache bash ca-certificates coreutils curl jq mongodb-tools postgresql17-client sqlite tar
 COPY --from=restic /usr/local/bin/restic /usr/local/bin/restic
 COPY .infra-artifacts/infra /usr/local/bin/infra
+COPY platform/components/object-store-trust/ca.crt /usr/local/share/object-store/ca.crt
 RUN curl -fsSLo /usr/local/bin/kubectl https://dl.k8s.io/release/v1.37.0/bin/linux/amd64/kubectl \
     && echo '6129359f4e1f3848a5572ccb0b26cf28b8ca08cef38c95a765b2f64a2c961a2f  /usr/local/bin/kubectl' | sha256sum -c - \
     && chmod 755 /usr/local/bin/kubectl

@@ -30,6 +30,7 @@ go_test(
     srcs = [
         "admission_linux_test.go",
         "backup_contract_test.go",
+        "backup_repositories_test.go",
         "backup_test.go",
         "control_test.go",
         "heartbeat_test.go",
