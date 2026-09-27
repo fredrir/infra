@@ -116,7 +116,7 @@ func declarationChecks(root string, changed func(func(string) bool) bool) ([]con
 		}
 		checks = append(checks, command("ansible-playbook", arguments...))
 	}
-	if changed(matching(`^(platform/projects/|platform/components/(policy|backup-job|repository-maintenance|object-store-trust)/|platform/clusters/production/(root|settings)\.yaml$|build/rollout/flux-artifacts/|internal/fluxartifacts/|internal/ci/validate\.go$)`)) {
+	if changed(matching(`^(platform/projects/|platform/components/(policy|backup-job|repository-maintenance|backup-primary|object-store-trust)/|platform/clusters/production/(root|settings)\.yaml$|build/rollout/flux-artifacts/|internal/fluxartifacts/|internal/ci/validate\.go$)`)) {
 		checks = append(checks, func(context.Context, process.Runner) error { return fluxartifacts.Check(root, kustomize.Build) })
 	}
 	if changed(kustomizationInputs) {

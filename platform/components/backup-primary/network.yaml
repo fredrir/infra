@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backup-object-store-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: data-backup
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: object-store
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+              app.kubernetes.io/instance: hel1
+      ports:
+        - port: 8333
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: maintenance-object-store-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: repository-maintenance
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: object-store
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+              app.kubernetes.io/instance: hel1
+      ports:
+        - port: 8333
+          protocol: TCP

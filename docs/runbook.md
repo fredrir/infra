@@ -561,6 +561,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Parser dataset copy | `parser-dataset-mirror` hourly at :23 on `fredrir-04` runs `mirror.sh sync`: `rclone sync` of `nl` `parser-dataset` to the versioned AWS bucket `llunde-pyparser-bucket`, prefixes `files/`, `extract/`, `assets/`, `convert/` only; at most 1000 deletions per run; `platform-dataset-parser` cannot delete versions |
 | Mirror guard | The sync runs only when `parser-dataset/.mirror-seeded` exists and `parser-dataset` holds at least 90% of the AWS object count in the four prefixes; `parser-dataset-seed` (suspended, run on demand) copies AWS into `nl`, checks every AWS object arrived and only then writes the sentinel; a recreated or emptied bucket has no sentinel; `mirror.sh unseed` removes it on purpose and fails unless a listing confirms it is gone; the sync also refuses a sentinel older than `SEED_NOT_BEFORE` in the unmanaged ConfigMap `parser-dataset-mirror-fence`, which a parser rollback writes, so after a rollback only a fresh seed re-enables the mirror, even if the sentinel survived |
 | AWS prefixes | Mirror-only: an object written straight to the four AWS prefixes is delete-markered by the next sync; write through `seaweedfs-nl` |
+| Backup primaries | `restic-parser`, `restic-y`, `restic-portfolio` on `seaweedfs-hel1`: COMPLIANCE lock 30 days, noncurrent versions kept 31 days, quotas 10, 10 and 1 GiB; identity `restic-<project>`, consumer copy `platform/projects/<namespace>/backup-primary.secret.sops.yaml`; reached only by the `data-backup` and `repository-maintenance` pods of `llunde-pyparser`, `y` and `portfolio` |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
 | Disk guard | 1 GiB volumes; `hel1` `-volume.max=76` (76 GiB), `nl` `-volume.max=200` (200 GiB); every cell keeps its quota sum × 1.3 within `-volume.max` (per-bucket partial volumes and garbage below the 30% vacuum threshold) and `-volume.max` + 4 GiB within its `data` PVC (one compaction copy, writes past the 1 GiB volume limit, filer store and indexes); read-only below 15% free node disk |
 | Memory | `hel1` server GOMEMLIMIT 512MiB, request 384Mi, limit 768Mi; `nl` server GOMEMLIMIT 320MiB, request 224Mi, limit 512Mi; `meta-backup` GOMEMLIMIT 160MiB, request 64Mi, limit 256Mi; `s3-filter` GOMEMLIMIT 96MiB, request 32Mi, limit 128Mi |
@@ -601,6 +602,7 @@ Every alert has promtool cases in `internal/policy/testdata/object-store-alerts.
 | Re-enable the mirror after the parser left `nl` | Stop the parser writers, run `parser-dataset-seed` (commands below), which writes a fresh sentinel, then resume the mirror; the fence can stay |
 | Resolve versioning or lock drift on `parser-dataset` | Suspend the mirror; forced `weed shell` cleanup below with `parser-dataset`; provisioner run; seed; resume |
 | Undo mirror deletions in AWS | Administrator only (`platform-dataset-parser` cannot delete versions): remove the delete markers the mirror wrote since the incident, commands below; this also brings back objects the parser deleted legitimately after `SINCE`, so set `SINCE` as late as the incident allows |
+| Run restic on a primary repository | Job below in the project namespace with the `repository-maintenance` label, which carries the egress to `seaweedfs-hel1`; `ARGS` such as `[init]`, `[snapshots]` or `[check]` |
 
 | Leaf | Subject | SAN | Usage |
 | --- | --- | --- | --- |
@@ -625,6 +627,50 @@ fs.rm -r /buckets/$BUCKET
 unlock
 EOF
 kubectl -n object-store create job --from=cronjob/object-store-provisioner provision-now
+```
+
+Run restic on the primary repository of `llunde-pyparser`, `y` or `portfolio`:
+
+```sh
+NAMESPACE=y JOB=restic-snapshots ARGS='[snapshots]'
+IMAGE=$(kubectl -n "$NAMESPACE" get cronjob repository-maintenance -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].image}')
+kubectl apply -f - <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: $JOB
+  namespace: $NAMESPACE
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: repository-maintenance
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      priorityClassName: batch
+      nodeSelector: {kubernetes.io/hostname: fredrir-09, kubernetes.io/arch: amd64}
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: restic
+          image: $IMAGE
+          command: [restic]
+          args: $ARGS
+          envFrom: [{secretRef: {name: backup-primary-repository}}]
+          env:
+            - {name: RESTIC_CACERT, value: /usr/local/share/object-store/ca.crt}
+            - {name: AWS_DEFAULT_REGION, value: hel1}
+            - {name: RESTIC_CACHE_DIR, value: /tmp/cache}
+          resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: '1', memory: 512Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {sizeLimit: 1Gi}}]
+EOF
+until kubectl -n "$NAMESPACE" get job "$JOB" -o jsonpath='{.status.succeeded}{.status.failed}' | grep -q .; do sleep 5; done
+kubectl -n "$NAMESPACE" logs "job/$JOB"
 ```
 
 Restore the filer store of `seaweedfs-hel1` from its metadata replica:
