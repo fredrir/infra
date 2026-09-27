@@ -54,6 +54,7 @@ func objectStoreResources(t *testing.T) []object {
 }
 
 func TestObjectStoreCellsRunHardenedOnTheirDataNode(t *testing.T) {
+	t.Parallel()
 	image := at(load(t, "platform/versions.yaml"), "images", "seaweedfs")
 	resources := objectStoreResources(t)
 	literals := map[string]map[string]string{}
@@ -218,6 +219,7 @@ func TestObjectStoreCellsRunHardenedOnTheirDataNode(t *testing.T) {
 }
 
 func TestObjectStoreEntrypointRefusesPartialGRPCSecurity(t *testing.T) {
+	t.Parallel()
 	script, err := os.ReadFile(filepath.Join(repoRoot(t), objectStore, "weed.sh"))
 	if err != nil {
 		t.Fatal(err)
@@ -325,6 +327,7 @@ func objectStoreActions(identity string) []string {
 }
 
 func TestObjectStoreIdentitiesHoldExactlyTheirRoleActions(t *testing.T) {
+	t.Parallel()
 	root := repoRoot(t)
 	var spec struct {
 		Cells []struct {
@@ -456,6 +459,7 @@ func objectStoreCertificate(t *testing.T, file string) *x509.Certificate {
 }
 
 func TestObjectStoreCertificatesChainToTheCAAndMatchTheirAlert(t *testing.T) {
+	t.Parallel()
 	authority := objectStoreCertificate(t, "ca.crt")
 	roots := x509.NewCertPool()
 	roots.AddCert(authority)
@@ -490,6 +494,7 @@ func TestObjectStoreCertificatesChainToTheCAAndMatchTheirAlert(t *testing.T) {
 }
 
 func TestObjectStoreAuthorityIsConstrainedToTheObjectStore(t *testing.T) {
+	t.Parallel()
 	authority := objectStoreCertificate(t, "ca.crt")
 	var ranges []string
 	for _, network := range authority.PermittedIPRanges {
@@ -614,6 +619,7 @@ var objectStorePeers = map[string]map[string][]object{
 var prometheusPeer = object{"namespaceSelector": object{"matchLabels": object{"kubernetes.io/metadata.name": "observability"}}, "podSelector": object{"matchLabels": object{"app.kubernetes.io/name": "prometheus"}}}
 
 func TestObjectStoreAdmitsExactlyItsDeclaredPeers(t *testing.T) {
+	t.Parallel()
 	resources := objectStoreResources(t)
 	namespaced, err := os.ReadFile(filepath.Join(repoRoot(t), "platform/components/policy/network.yaml"))
 	if err != nil {
@@ -691,6 +697,7 @@ func TestObjectStoreAdmitsExactlyItsDeclaredPeers(t *testing.T) {
 }
 
 func TestObjectStoreConfigMapsSkipFluxSubstitution(t *testing.T) {
+	t.Parallel()
 	for _, resource := range objectStoreResources(t) {
 		if resource["kind"] != "ConfigMap" {
 			continue

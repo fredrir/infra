@@ -10,6 +10,7 @@ import (
 )
 
 func TestRunnerAdmissionBoundaries(t *testing.T) {
+	t.Parallel()
 	e := newEvaluator(t)
 	base := rustRunner(t, "main")
 	if !e.runner(base, "ci-nsql", controller) {
@@ -36,6 +37,7 @@ func TestRunnerAdmissionBoundaries(t *testing.T) {
 }
 
 func TestRunnerJITTokenIsBoundToControllerAndOwnPod(t *testing.T) {
+	t.Parallel()
 	e := newEvaluator(t)
 	p := rustRunner(t, "main")
 	secret := object{"name": "ACTIONS_RUNNER_INPUT_JITCONFIG", "valueFrom": object{"secretKeyRef": object{"name": "rust-1", "key": "jitToken"}}}
@@ -50,6 +52,7 @@ func TestRunnerJITTokenIsBoundToControllerAndOwnPod(t *testing.T) {
 }
 
 func TestRunnerSlotQuantitiesAreExact(t *testing.T) {
+	t.Parallel()
 	base := rustRunner(t, "main")
 	for _, tc := range []struct {
 		value   any
@@ -71,6 +74,7 @@ func TestRunnerSlotQuantitiesAreExact(t *testing.T) {
 }
 
 func TestCheckAndDeployPoolsRemainBounded(t *testing.T) {
+	t.Parallel()
 	e := newEvaluator(t)
 	check := runner(t, "infra/check-values.yaml")
 	check["metadata"] = object{"name": "check-1", "labels": object{"actions.github.com/scale-set-name": "check-amd64"}}
@@ -105,6 +109,7 @@ func TestCheckAndDeployPoolsRemainBounded(t *testing.T) {
 }
 
 func TestRustCacheCredentialsStayWithinPool(t *testing.T) {
+	t.Parallel()
 	e := newEvaluator(t)
 	pools := map[string]string{"pr": "sccache-ro", "main": "sccache-rw", "release": "sccache-release"}
 	for variant, own := range pools {
@@ -182,6 +187,7 @@ func placementScore(nodeAffinity object, labels ...string) int {
 }
 
 func TestOnlyUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
+	t.Parallel()
 	const volatile = "node-restriction.kubernetes.io/volatile"
 	tolerating := map[string]bool{"check-amd64": true}
 	seen := map[string]bool{}
@@ -245,6 +251,7 @@ func TestOnlyUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
 }
 
 func TestRustPoolsRunOnTheSharedWorker(t *testing.T) {
+	t.Parallel()
 	const sharedWorkerHeadroom = "850m"
 	data, err := os.ReadFile(filepath.Join(repoRoot(t), "platform/components/policy/runtime.yaml"))
 	if err != nil {

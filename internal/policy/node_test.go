@@ -108,6 +108,7 @@ func node(name string, taints ...any) object {
 }
 
 func TestOnlyInventoryNodesRegisterAndVolatileNodesStayTainted(t *testing.T) {
+	t.Parallel()
 	policy := loadNodePolicy(t, "node-registration")
 	volatile := object{"key": "node-restriction.kubernetes.io/volatile", "value": "true", "effect": "NoSchedule"}
 	kubelet := []any{"system:nodes", "system:authenticated"}
@@ -136,6 +137,7 @@ func TestOnlyInventoryNodesRegisterAndVolatileNodesStayTainted(t *testing.T) {
 }
 
 func TestNodeRegistrationDeclaresTheInventory(t *testing.T) {
+	t.Parallel()
 	data, err := os.ReadFile(filepath.Join(repoRoot(t), "ansible/inventory/production.yml"))
 	if err != nil {
 		t.Fatal(err)
@@ -200,6 +202,7 @@ func TestNodeRegistrationDeclaresTheInventory(t *testing.T) {
 }
 
 func TestSharedFlannelIdentityWritesOnlyItsOwnNodeNetwork(t *testing.T) {
+	t.Parallel()
 	policy := loadNodePolicy(t, "node-flannel-writer")
 	const flannel = "flannel.alpha.coreos.com/"
 	base := node("fredrir-09")
@@ -284,6 +287,7 @@ func TestSharedFlannelIdentityWritesOnlyItsOwnNodeNetwork(t *testing.T) {
 }
 
 func TestNodesMayNotCreateStaticPods(t *testing.T) {
+	t.Parallel()
 	policy := loadNodePolicy(t, "node-no-static-pods")
 	pod := object{"metadata": object{"name": "mirror"}, "spec": object{"nodeName": "fredrir-09"}}
 	if policy.admits(t, nodeRequest(pod, nil, "system:node:fredrir-09", "system:nodes")) {

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"cel.dev/cel-go/cel"
@@ -41,22 +42,28 @@ func repoRoot(t *testing.T) string {
 }
 func yamlObjects(t *testing.T, data []byte) []object {
 	t.Helper()
+	docs, e := decodeObjects(data)
+	if e != nil {
+		t.Fatal(e)
+	}
+	return docs
+}
+func decodeObjects(data []byte) ([]object, error) {
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	var docs []object
 	for {
 		var doc object
 		e := decoder.Decode(&doc)
 		if e == io.EOF {
-			break
+			return docs, nil
 		}
 		if e != nil {
-			t.Fatal(e)
+			return nil, e
 		}
 		if doc != nil {
 			docs = append(docs, doc)
 		}
 	}
-	return docs
 }
 func load(t *testing.T, path string) object {
 	t.Helper()
@@ -82,10 +89,26 @@ func renderedWith(t *testing.T, path string, overrides map[string][]byte) []obje
 	t.Helper()
 	return renderedFrom(t, "platform/components/runners", path, overrides)
 }
+
+var renders sync.Map
+
 func renderedFrom(t *testing.T, tree, path string, overrides map[string][]byte) []object {
 	t.Helper()
-	memory := filesys.MakeFsInMemory()
 	root := repoRoot(t)
+	render := func() ([]byte, error) { return build(root, tree, path, overrides) }
+	if overrides == nil {
+		shared, _ := renders.LoadOrStore([2]string{tree, path}, sync.OnceValues(render))
+		render = shared.(func() ([]byte, error))
+	}
+	data, e := render()
+	if e != nil {
+		t.Fatal(e)
+	}
+	return yamlObjects(t, data)
+}
+
+func build(root, tree, path string, overrides map[string][]byte) ([]byte, error) {
+	memory := filesys.MakeFsInMemory()
 	e := filepath.WalkDir(filepath.Join(root, tree), func(source string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -108,13 +131,9 @@ func renderedFrom(t *testing.T, tree, path string, overrides map[string][]byte) 
 		return memory.WriteFile(target, data)
 	})
 	if e != nil {
-		t.Fatal(e)
+		return nil, e
 	}
-	b, e := kustomize.BuildFileSystem(memory, "/"+filepath.ToSlash(path))
-	if e != nil {
-		t.Fatal(e)
-	}
-	return yamlObjects(t, b)
+	return kustomize.BuildFileSystem(memory, "/"+filepath.ToSlash(path))
 }
 func at(v any, path ...any) any {
 	for _, key := range path {
@@ -186,18 +205,34 @@ func rustRunner(t *testing.T, variant string) object {
 
 type evaluator struct{ programs map[string][]cel.Program }
 
+var evaluators sync.Map
+
 func newEvaluator(t *testing.T) evaluator {
 	t.Helper()
+	root := repoRoot(t)
+	compiled, _ := evaluators.LoadOrStore(root, sync.OnceValues(func() (evaluator, error) { return compileEvaluator(root) }))
+	v, e := compiled.(func() (evaluator, error))()
+	if e != nil {
+		t.Fatal(e)
+	}
+	return v
+}
+
+func compileEvaluator(root string) (evaluator, error) {
 	env, e := cel.NewEnv(cel.Variable("object", cel.DynType), cel.Variable("oldObject", cel.DynType), cel.Variable("request", cel.DynType))
 	if e != nil {
-		t.Fatal(e)
+		return evaluator{}, e
 	}
-	data, e := os.ReadFile(filepath.Join(repoRoot(t), "platform/components/policy/admission.yaml"))
+	data, e := os.ReadFile(filepath.Join(root, "platform/components/policy/admission.yaml"))
 	if e != nil {
-		t.Fatal(e)
+		return evaluator{}, e
+	}
+	docs, e := decodeObjects(data)
+	if e != nil {
+		return evaluator{}, e
 	}
 	v := evaluator{programs: map[string][]cel.Program{}}
-	for _, doc := range yamlObjects(t, data) {
+	for _, doc := range docs {
 		if doc["kind"] != "ValidatingAdmissionPolicy" {
 			continue
 		}
@@ -205,20 +240,20 @@ func newEvaluator(t *testing.T) evaluator {
 		for _, item := range at(doc, "spec", "validations").([]any) {
 			expr := at(item, "expression").(string)
 			if _, issues := env.Compile(expr); issues.Err() != nil {
-				t.Fatalf("compile %s: %v", name, issues.Err())
+				return evaluator{}, fmt.Errorf("compile %s: %w", name, issues.Err())
 			}
 			ast, issues := env.Parse(expr)
 			if issues.Err() != nil {
-				t.Fatalf("compile %s: %v", name, issues.Err())
+				return evaluator{}, fmt.Errorf("compile %s: %w", name, issues.Err())
 			}
 			p, e := env.Program(ast)
 			if e != nil {
-				t.Fatal(e)
+				return evaluator{}, e
 			}
 			v.programs[name] = append(v.programs[name], p)
 		}
 	}
-	return v
+	return v, nil
 }
 func (e evaluator) admitted(names []string, obj object, namespace, user, operation string, old any) bool {
 	for _, name := range names {

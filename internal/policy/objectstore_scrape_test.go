@@ -19,6 +19,7 @@ func portNumber(t *testing.T, value any) int {
 }
 
 func TestPrometheusReachesEveryObjectStoreScrapePort(t *testing.T) {
+	t.Parallel()
 	servicePorts := map[string]int{}
 	var scraped []string
 	for _, resource := range objectStoreResources(t) {

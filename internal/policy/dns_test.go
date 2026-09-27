@@ -44,6 +44,7 @@ func postRendersProjectDNS(release object) bool {
 }
 
 func TestProjectPodsSearchClusterDomainsOnlyForShortNames(t *testing.T) {
+	t.Parallel()
 	root := repoRoot(t)
 	var overlays []string
 	err := filepath.WalkDir(filepath.Join(root, "platform/projects"), func(path string, entry fs.DirEntry, err error) error {

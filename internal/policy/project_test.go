@@ -13,6 +13,7 @@ func egress(peer object, port object) object {
 }
 
 func TestProjectWorkloadIsolation(t *testing.T) {
+	t.Parallel()
 	e := newEvaluator(t)
 	p := projectPod()
 	if !e.project("workload-isolation", p) {
@@ -55,6 +56,7 @@ func TestProjectWorkloadIsolation(t *testing.T) {
 }
 
 func TestProjectNetworkBoundary(t *testing.T) {
+	t.Parallel()
 	e := newEvaluator(t)
 	for _, peer := range []object{{"namespaceSelector": object{}}, {"ipBlock": object{"cidr": "100.64.0.0/10"}}, {"ipBlock": object{"cidr": "0.0.0.0/0"}}} {
 		if e.project("project-network-boundary", egress(peer, object{"port": 443})) {
@@ -85,6 +87,7 @@ func TestProjectNetworkBoundary(t *testing.T) {
 }
 
 func TestProjectBaselineAndSecretOwnership(t *testing.T) {
+	t.Parallel()
 	e := newEvaluator(t)
 	old := object{"metadata": object{"name": "default-deny"}}
 	if e.admitted([]string{"project-baseline-owner"}, object{}, "portfolio", projectRunner, "DELETE", old) || !e.admitted([]string{"project-baseline-owner"}, object{}, "portfolio", reconciler, "DELETE", old) {

@@ -7,6 +7,7 @@ import (
 )
 
 func TestCIPreemptsOnlyBackfill(t *testing.T) {
+	t.Parallel()
 	data, e := os.ReadFile(filepath.Join(repoRoot(t), "platform/components/policy/priorities.yaml"))
 	if e != nil {
 		t.Fatal(e)

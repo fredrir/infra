@@ -48,6 +48,7 @@ func declaresVolatileToleration(value any) bool {
 }
 
 func TestOnlyNodeAgentsAndUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
+	t.Parallel()
 	root := repoRoot(t)
 	allowed := []string{
 		"platform/components/dns/node-local-dns.yaml",
@@ -99,6 +100,7 @@ func TestOnlyNodeAgentsAndUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) 
 }
 
 func TestReleaseTaggingRunsOffVolatileWorkers(t *testing.T) {
+	t.Parallel()
 	data, err := os.ReadFile(filepath.Join(repoRoot(t), ".github/workflows/rust-auto-tag.yml"))
 	if err != nil {
 		t.Fatal(err)
@@ -150,6 +152,7 @@ func requiresCriticalNodes(affinity any) bool {
 }
 
 func TestClusterControllersRequireCriticalNodes(t *testing.T) {
+	t.Parallel()
 	checked := 0
 	for _, resource := range renderedTree(t, "platform/clusters/production/flux-system", "platform/clusters/production/flux-system") {
 		if resource["kind"] == "Deployment" {
@@ -190,6 +193,7 @@ func TestClusterControllersRequireCriticalNodes(t *testing.T) {
 }
 
 func TestKubeletScrapesKeepTheMetricsPathLabel(t *testing.T) {
+	t.Parallel()
 	keeps := func(relabelings any) bool {
 		items, _ := relabelings.([]any)
 		return slices.ContainsFunc(items, func(item any) bool {

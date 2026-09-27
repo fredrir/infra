@@ -24,6 +24,7 @@ func quantity(t *testing.T, value any) *big.Rat {
 }
 
 func TestEveryRunnerOverlayQuotaIncludesRuntimeOverhead(t *testing.T) {
+	t.Parallel()
 	data, e := os.ReadFile(filepath.Join(repoRoot(t), "platform/components/policy/runtime.yaml"))
 	if e != nil {
 		t.Fatal(e)

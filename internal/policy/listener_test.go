@@ -27,6 +27,7 @@ func valuesHash(t *testing.T, resources []object, name string) string {
 }
 
 func TestWarmRunnerSetsReplaceIdleRunnersWhenTheirValuesChange(t *testing.T) {
+	t.Parallel()
 	warm := 0
 	for _, overlay := range at(load(t, "platform/components/runners/kustomization.yaml"), "resources").([]any) {
 		directory := "platform/components/runners/" + overlay.(string)
