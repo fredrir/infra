@@ -1,11 +1,11 @@
 data "aws_caller_identity" "reconciliation" {}
 
 variable "reconciler_ipv4" {
-  type    = string
-  default = null
+  type     = string
+  nullable = false
 
   validation {
-    condition = var.reconciler_ipv4 == null ? true : (
+    condition = (
       can(regex("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", var.reconciler_ipv4)) &&
       try(cidrhost("${var.reconciler_ipv4}/32", 0) == var.reconciler_ipv4, false) &&
       try(!anytrue([
@@ -18,8 +18,8 @@ variable "reconciler_ipv4" {
 }
 
 locals {
-  reconciliation_identities = toset(concat(["plan", "apply"], var.reconciler_ipv4 == null ? [] : ["verify"]))
-  reconciler_source         = var.reconciler_ipv4 == null ? [] : ["${var.reconciler_ipv4}/32"]
+  reconciliation_identities = toset(["plan", "apply", "verify"])
+  reconciler_source         = ["${var.reconciler_ipv4}/32"]
   reconciliation_iam        = "arn:aws:iam::${data.aws_caller_identity.reconciliation.account_id}"
   reconciliation_users      = ["${local.reconciliation_iam}:user/platform/*"]
   reconciliation_policies   = [for policy in ["platform/*", "pyparser-dataset-*"] : "${local.reconciliation_iam}:policy/${policy}"]
@@ -175,6 +175,7 @@ resource "aws_iam_policy" "reconciliation" {
           Action   = ["s3:PutObject"]
           Resource = ["${data.aws_s3_bucket.dataset.arn}/reconciliation/production/runs/*"]
         },
+        ] : statement if each.key == "verify"], [for statement in [
         {
           Sid      = "RequireReconcilerAddress"
           Effect   = "Deny"
@@ -185,7 +186,7 @@ resource "aws_iam_policy" "reconciliation" {
             Bool         = { "aws:ViaAWSService" = "false" }
           }
         },
-    ] : statement if each.key == "verify"])
+    ] : statement if contains(["apply", "verify"], each.key)])
   })
 }
 

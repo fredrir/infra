@@ -22,13 +22,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   cli:
-    if: inputs.cli-artifact == '' && github.triggering_actor != 'fredrir-infra-verification[bot]'
+    if: inputs.cli-artifact == ''
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/infra-cli.yml
   check:
-    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') }}
     needs: cli
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -177,7 +177,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
   host-access:
-    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') }}
     needs: cli
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -257,7 +257,7 @@ jobs:
           INFRA_HOST_ACCESS_TEST: required
         run: bazel run --repository_cache="$HOME/.cache/infra-bazel-repository" @rules_go//go -- test ./internal/reconcile/ -run '^TestFleetPlaybooksNeverListADeclaredReconciler$' -count=1 -v
   alerts:
-    if: ${{ !cancelled() && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -309,7 +309,7 @@ jobs:
         run: bazel run @rules_go//go -- test ./internal/policy/ -run '^TestObjectStoreAlertsFireOnlyOnTheirConditions$' -count=1 -v
   validate:
     needs: cli
-    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]' && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]' }}
     runs-on: check-amd64
     timeout-minutes: 20
     steps:
@@ -346,7 +346,7 @@ jobs:
           retention-days: 14
   budget:
     needs: [cli, check, validate]
-    if: ${{ !cancelled() && needs.check.result == 'success' && needs.validate.result == 'success' && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
+    if: ${{ !cancelled() && needs.check.result == 'success' && needs.validate.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

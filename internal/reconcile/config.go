@@ -71,7 +71,7 @@ func affectedDeployment(paths []string) Selection {
 		case path == "platform/clusters/production/settings.yaml":
 			selected.Tofu, selected.Kubernetes = true, true
 			selectHosts(&selected, HostScopeMonitor)
-		case strings.HasPrefix(path, "ansible/roles/gatus/"), strings.HasPrefix(path, "ansible/roles/verification_trigger/"):
+		case strings.HasPrefix(path, "ansible/roles/gatus/"):
 			selectHosts(&selected, HostScopeMonitor)
 		case path == "build/cli-release.json", path == "build/runners.json", path == "build/toolchain.json", path == "ansible/build-runners.yml", path == "ansible/verify-runners.yml", strings.HasPrefix(path, "ansible/roles/build_runner/"), strings.HasPrefix(path, "ansible/roles/build_engine/"):
 			selected.RunnerInputs = append(selected.RunnerInputs, path)

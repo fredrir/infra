@@ -6,21 +6,14 @@ import (
 	"slices"
 )
 
-const (
-	monitorTags    = "--tags=gatus,verification_trigger"
-	monitorCLITags = "--tags=infra_binary"
-)
-
-func monitorCLIChanged(selected Selection) bool {
-	return effectiveHostScope(selected) == HostScopeRunners && slices.Contains(selected.RunnerInputs, "build/cli-release.json")
-}
+const monitorTags = "--tags=gatus"
 
 func convergesPlaybook(selected Selection, playbook string) bool {
 	return effectiveHostScope(selected) == HostScopeFull && (len(selected.HostPlaybooks) == 0 || slices.Contains(selected.HostPlaybooks, playbook))
 }
 
 func monitorSelected(selected Selection) bool {
-	return effectiveHostScope(selected) == HostScopeMonitor || monitorCLIChanged(selected) || convergesPlaybook(selected, monitorPlaybook)
+	return effectiveHostScope(selected) == HostScopeMonitor || convergesPlaybook(selected, monitorPlaybook)
 }
 
 func convergencePlaybooks(selected Selection) []string {
@@ -49,9 +42,6 @@ func (c *Commands) PlanHosts(ctx context.Context, plan Plan) error {
 			return err
 		}
 		playbooks = [][]string{{"build-runners.yml"}, {"verify-runners.yml"}}
-		if monitorCLIChanged(plan.Affected) {
-			playbooks = append(playbooks, []string{"external.yml", monitorCLITags})
-		}
 	case HostScopeMonitor:
 		playbooks = [][]string{{"external.yml", monitorTags}, {"verify.yml", "--limit=external"}}
 	}
@@ -150,8 +140,6 @@ func (c *Commands) Monitor(ctx context.Context, plan Plan) error {
 		return c.ansible(ctx, "external.yml")
 	case effectiveHostScope(plan.Affected) == HostScopeMonitor:
 		return c.ansible(ctx, "external.yml", monitorTags)
-	case monitorCLIChanged(plan.Affected):
-		return c.ansible(ctx, "external.yml", monitorCLITags)
 	default:
 		return nil
 	}

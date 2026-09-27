@@ -32,6 +32,7 @@ override_resource {
 }
 
 variables {
+  reconciler_ipv4         = "203.0.113.10"
   hcloud_token            = "mock"
   dataset_bucket_name     = "dataset"
   platform_mail_recipient = "operator@example.net"
@@ -39,33 +40,6 @@ variables {
     domain  = "example.com"
     zone_id = "0123456789abcdef0123456789abcdef"
     sender  = "alerts@example.com"
-  }
-}
-
-run "no_reconciler_declared" {
-  command = plan
-
-  plan_options {
-    target = [aws_iam_policy.reconciliation, aws_iam_user.reconciliation, aws_iam_user_policy_attachment.reconciliation]
-  }
-
-  assert {
-    condition     = keys(aws_iam_user.reconciliation) == ["apply", "plan"] && keys(aws_iam_policy.reconciliation) == ["apply", "plan"] && keys(aws_iam_user_policy_attachment.reconciliation) == ["apply", "plan"]
-    error_message = "Without a declared reconciler only the plan and apply identities exist."
-  }
-
-  assert {
-    condition = (
-      length(jsondecode(aws_iam_policy.reconciliation["plan"].policy).Statement) == 5 &&
-      length(jsondecode(aws_iam_policy.reconciliation["apply"].policy).Statement) == 14 &&
-      alltrue([
-        for policy in values(aws_iam_policy.reconciliation) : !anytrue([
-          for statement in jsondecode(policy.policy).Statement :
-          try(statement.Sid, "") == "RequireReconcilerAddress" || contains(statement.Resource, "arn:aws:s3:::dataset/reconciliation/production/runs/*")
-        ])
-      ])
-    )
-    error_message = "Without a declared reconciler the plan and apply policies keep their statements."
   }
 }
 
@@ -111,12 +85,14 @@ run "reconciler_declared" {
   }
 
   assert {
-    condition = anytrue([
-      for statement in jsondecode(aws_iam_policy.reconciliation["verify"].policy).Statement :
-      try(statement.Sid, "") == "RequireReconcilerAddress" && statement.Effect == "Deny" && statement.Action == ["*"] && statement.Resource == ["*"] &&
-      statement.Condition == { NotIpAddress = { "aws:SourceIp" = ["203.0.113.10/32"] }, Bool = { "aws:ViaAWSService" = "false" } }
+    condition = alltrue([
+      for identity in ["apply", "verify"] : anytrue([
+        for statement in jsondecode(aws_iam_policy.reconciliation[identity].policy).Statement :
+        try(statement.Sid, "") == "RequireReconcilerAddress" && statement.Effect == "Deny" && statement.Action == ["*"] && statement.Resource == ["*"] &&
+        statement.Condition == { NotIpAddress = { "aws:SourceIp" = ["203.0.113.10/32"] }, Bool = { "aws:ViaAWSService" = "false" } }
+      ])
     ])
-    error_message = "The verify identity must be denied every request from another address."
+    error_message = "Apply and verify must deny every request from another address."
   }
 
   assert {
@@ -147,13 +123,11 @@ run "reconciler_declared" {
   }
 
   assert {
-    condition = alltrue([
-      for identity in ["plan", "apply"] : !anytrue([
-        for statement in jsondecode(aws_iam_policy.reconciliation[identity].policy).Statement :
-        try(statement.Sid, "") == "RequireReconcilerAddress" || contains(statement.Resource, "arn:aws:s3:::dataset/reconciliation/production/runs/*")
-      ])
+    condition = !anytrue([
+      for statement in jsondecode(aws_iam_policy.reconciliation["plan"].policy).Statement :
+      try(statement.Sid, "") == "RequireReconcilerAddress" || contains(statement.Resource, "arn:aws:s3:::dataset/reconciliation/production/runs/*")
     ])
-    error_message = "Only the verify identity carries the reconciler grants."
+    error_message = "Hosted plans do not receive the reconciler grants or address restriction."
   }
 
   assert {

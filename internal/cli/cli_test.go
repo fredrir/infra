@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -79,13 +78,13 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 }
 
 func TestCommandValidation(t *testing.T) {
-	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "verify", "--wait=1m"}, {"reconcile", "provenance", "--full"}, {"reconcile", "provenance", "--wait=1m"}, {"reconcile", "request-verification", "--full"}, {"reconcile", "request-verification", "extra"}, {"reconcile", "run"}, {"reconcile", "run", "verify", "extra"}, {"reconcile", "run", "verify", "--config", "/nonexistent/verify.json"}, {"reconcile", "run", "apply", "--credentials=/run/credentials.json"}, {"reconcile", "run", "apply", "--ssh-identity=/run/ssh"}, {"reconcile", "run", "apply", "extra"}, {"reconcile", "run", "pending", "--config", "/nonexistent/apply.json"}, {"reconcile", "run", "request", "--config", "/nonexistent/apply.json"}, {"reconcile", "run", "request", "--revision=main"}} {
+	for _, args := range [][]string{{"unknown"}, {"ci"}, {"ci", "plan-images", "extra"}, {"ci", "plan-images", "--unknown"}, {"ci", "plan-images", "--timeout=0s"}, {"dev"}, {"dev", "doctor", "extra"}, {"dev", "setup", "--timeout=0s"}, {"dev", "engine"}, {"dev", "engine", "status", "--profile=other"}, {"dev", "qualify"}, {"dev", "cluster"}, {"dev", "hosts"}, {"dev", "hosts", "play"}, {"dev", "bench"}, {"dev", "bench", "compare", "one"}, {"reconcile", "apply", "--deep"}, {"reconcile", "verify", "--wait=1m"}, {"reconcile", "provenance", "--full"}, {"reconcile", "provenance", "--wait=1m"}, {"reconcile", "run"}, {"reconcile", "run", "verify", "extra"}, {"reconcile", "run", "verify", "--config", "/nonexistent/verify.json"}, {"reconcile", "run", "apply", "--credentials=/run/credentials.json"}, {"reconcile", "run", "apply", "--ssh-identity=/run/ssh"}, {"reconcile", "run", "apply", "extra"}, {"reconcile", "run", "pending", "--config", "/nonexistent/apply.json"}, {"reconcile", "run", "request", "--config", "/nonexistent/apply.json"}, {"reconcile", "run", "request", "--revision=main"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err == nil {
 			t.Errorf("accepted invalid command %q", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--scope=cloud", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "provenance", "--provenance-base=" + strings.Repeat("a", 40), "--help"}, {"reconcile", "request-verification", "--help"}, {"reconcile", "run", "verify", "--help"}, {"reconcile", "run", "apply", "--help"}, {"reconcile", "run", "pending", "--help"}, {"reconcile", "run", "request", "--full", "--help"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"version"}, {"ci", "plan-images", "--help"}, {"dev", "--help"}, {"dev", "doctor", "--help"}, {"reconcile", "verify", "--scope=cloud", "--help"}, {"reconcile", "apply", "--wait=30m", "--help"}, {"reconcile", "provenance", "--provenance-base=" + strings.Repeat("a", 40), "--help"}, {"reconcile", "run", "verify", "--help"}, {"reconcile", "run", "apply", "--help"}, {"reconcile", "run", "pending", "--help"}, {"reconcile", "run", "request", "--full", "--help"}} {
 		var output bytes.Buffer
 		if err := cli.Run(context.Background(), args, &output, &output); err != nil || output.Len() == 0 {
 			t.Errorf("command %q: %v, output=%q", args, err, &output)
@@ -231,25 +230,6 @@ func TestReconciliationStateHonorsTheS3EndpointOverride(t *testing.T) {
 	}
 }
 
-func TestWorkflowVerificationFlagsParseAtThisRevision(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "reconcile-job.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	invocations := regexp.MustCompile(`-- infra (reconcile verify [^\n]*)`).FindAllSubmatch(data, -1)
-	if len(invocations) != 1 {
-		t.Fatalf("workflow invokes verification %d times, want once", len(invocations))
-	}
-	args := strings.Fields(string(invocations[0][1]))
-	if !slices.Contains(args, "--scope=full") {
-		t.Fatalf("workflow verification runs %q, want the full scope", args)
-	}
-	var output bytes.Buffer
-	if err := cli.Run(context.Background(), append(args, "--help"), &output, &output); err != nil {
-		t.Fatalf("workflow verification flags %q: %v", args, err)
-	}
-}
-
 func TestVerificationRequiresAKnownScope(t *testing.T) {
 	for _, args := range [][]string{{"reconcile", "verify"}, {"reconcile", "verify", "--scope=deep"}, {"reconcile", "verify", "--deep"}} {
 		report := filepath.Join(t.TempDir(), "verification.json")
@@ -260,27 +240,6 @@ func TestVerificationRequiresAKnownScope(t *testing.T) {
 		if _, err := os.Stat(report); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("%q wrote a report for an unknown scope", args)
 		}
-	}
-}
-
-func TestVerificationRequestReadsItsCredentialFiles(t *testing.T) {
-	credentials := t.TempDir()
-	request := []string{"reconcile", "request-verification", "--app-id=1", "--installation-id=2", "--private-key=" + filepath.Join(credentials, "github-app.pem"), "--heartbeat-token=" + filepath.Join(credentials, "gatus-token")}
-	for _, credential := range []string{"github-app.pem", "gatus-token"} {
-		var output bytes.Buffer
-		if err := cli.Run(context.Background(), request, &output, &output); err == nil || !strings.Contains(err.Error(), filepath.Join(credentials, credential)) {
-			t.Fatalf("request without %s returned %v", credential, err)
-		}
-		if err := os.WriteFile(filepath.Join(credentials, credential), []byte("invalid\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var output bytes.Buffer
-	if err := cli.Run(context.Background(), request, &output, &output); err == nil || !strings.Contains(err.Error(), "invalid verification heartbeat token") {
-		t.Fatalf("request with an invalid heartbeat token returned %v", err)
-	}
-	if err := cli.Run(context.Background(), request[:4], &output, &output); err == nil || !strings.Contains(err.Error(), `required flag(s) "heartbeat-token", "private-key" not set`) {
-		t.Fatalf("request without credential files returned %v", err)
 	}
 }
 

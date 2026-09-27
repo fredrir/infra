@@ -286,7 +286,7 @@ systemctl daemon-reload`); err != nil {
 		return play(success, "/fixture/tree/ansible/control-backup.yml", append([]string{"--skip-tags=infra_binary"}, extra...)...)
 	}
 	monitorPlay := func(extra ...string) string {
-		return play(true, "/fixture/tree/ansible/external.yml", append([]string{"--tags=gatus,verification_trigger", "--skip-tags=infra_binary", "--extra-vars", fmt.Sprintf(`{"gatus_archive_sha256":"%x","gatus_binary_sha256":"%x"}`, layerHash, stubHash)}, extra...)...)
+		return play(true, "/fixture/tree/ansible/external.yml", append([]string{"--tags=gatus", "--skip-tags=infra_binary", "--extra-vars", fmt.Sprintf(`{"gatus_archive_sha256":"%x","gatus_binary_sha256":"%x"}`, layerHash, stubHash)}, extra...)...)
 	}
 	records := func(unit string, ready func(map[string]string) bool) map[string]string {
 		t.Helper()

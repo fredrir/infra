@@ -24,9 +24,6 @@
     "tag:infra-plan": [
       "autogroup:admin"
     ],
-    "tag:infra-apply": [
-      "autogroup:admin"
-    ],
     "tag:infra-reconciler": [
       "autogroup:admin"
     ],
@@ -144,25 +141,11 @@
     {
       "action": "accept",
       "src": [
-        "tag:infra-plan",
-        "tag:infra-apply"
+        "tag:infra-plan"
       ],
       "proto": "tcp",
       "dst": [
         "tag:platform-control:6443"
-      ]
-    },
-    {
-      "action": "accept",
-      "src": [
-        "tag:infra-apply"
-      ],
-      "proto": "tcp",
-      "dst": [
-        "tag:platform-control:22",
-        "tag:platform-worker:22",
-        "tag:platform-volatile:22",
-        "platform-monitor:22"
       ]
     },
     {
@@ -859,23 +842,6 @@
       ]
     },
     {
-      "src": "tag:infra-apply",
-      "proto": "tcp",
-      "accept": [
-        "tag:platform-control:22",
-        "tag:platform-control:6443",
-        "tag:platform-worker:22",
-        "tag:platform-volatile:22",
-        "platform-monitor:22"
-      ],
-      "deny": [
-        "tag:platform-control:2379",
-        "tag:platform-control:2380",
-        "platform-monitor:8080",
-        "tag:platform-volatile:10250"
-      ]
-    },
-    {
       "src": "tag:infra-reconciler",
       "proto": "tcp",
       "accept": [
@@ -961,14 +927,6 @@
     },
     {
       "src": "tag:infra-plan",
-      "proto": "tcp",
-      "deny": [
-        "tag:infra-reconciler:22",
-        "tag:infra-reconciler:8787"
-      ]
-    },
-    {
-      "src": "tag:infra-apply",
       "proto": "tcp",
       "deny": [
         "tag:infra-reconciler:22",

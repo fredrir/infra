@@ -4,51 +4,22 @@ inputs:
   network:
     description: Enable private infrastructure access.
     default: 'false'
-  identity:
-    description: Scoped network identity.
-    default: plan
   tailscale-client-id:
     description: Federated network identity.
     required: false
-  full:
-    description: Prepare full infrastructure tooling.
-    default: 'true'
-outputs:
-  hosts:
-    value: ${{ steps.requirements.outputs.hosts }}
 runs:
   using: composite
   steps:
-  - id: requirements
-    shell: bash
-    env:
-      NETWORK: ${{ inputs.network }}
-      IDENTITY: ${{ inputs.identity }}
-      FULL: ${{ inputs.full }}
-    run: |
-      if [ "$NETWORK" = true ] && [ "$IDENTITY" = apply ] && [ "$FULL" = false ]; then
-        selection=$(infra reconcile requirements)
-        printf 'full=%s\nhosts=%s\n' "$(jq -r '.tofu or .ansible or .tooling or .reconciler_tofu' <<< "$selection")" "$(jq -r '.ansible or .tooling' <<< "$selection")" >> "$GITHUB_OUTPUT"
-      else
-        printf 'full=true\nhosts=true\n' >> "$GITHUB_OUTPUT"
-      fi
   - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-    if: steps.requirements.outputs.full == 'true'
     with:
       path: |
         ${{ runner.temp }}/tofu-providers
         ~/.cache/uv
       key: reconciliation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tofu/.terraform.lock.hcl', 'uv.lock') }}
   - shell: bash
-    env:
-      FULL: ${{ steps.requirements.outputs.full }}
-      IDENTITY: ${{ inputs.identity }}
     run: |
-      infra ci install-tools flux kubectl helm actionlint
-      if [ "$FULL" = true ]; then infra ci install-tools tofu uv; fi
-      if [ "$IDENTITY" = apply ]; then infra ci install-tools gh cosign; fi
+      infra ci install-tools flux kubectl helm actionlint tofu uv
   - shell: bash
-    if: steps.requirements.outputs.full == 'true'
     run: |
       uv sync --frozen --group ci --no-install-project
       printf '%s\n' "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
@@ -56,15 +27,13 @@ runs:
       printf 'TF_PLUGIN_CACHE_DIR=%s\n' "$RUNNER_TEMP/tofu-providers" >> "$GITHUB_ENV"
   - if: inputs.network == 'true'
     shell: bash
-    env:
-      RECONCILE_IDENTITY: ${{ inputs.identity }}
     run: |
       for required in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY CLOUDFLARE_API_TOKEN TF_VAR_hcloud_token TF_VAR_platform_mail_recipient KUBE_CONFIG; do
-        if [ -z "${!required}" ]; then echo "Missing $required in infrastructure-$RECONCILE_IDENTITY" >&2; exit 1; fi
+        if [ -z "${!required}" ]; then echo "Missing $required in infrastructure-plan" >&2; exit 1; fi
       done
       identity=$(aws sts get-caller-identity --query Arn --output text)
       case "$identity" in
-        arn:aws:iam::*:user/automation/infra-reconciliation-"$RECONCILE_IDENTITY") ;;
+        arn:aws:iam::*:user/automation/infra-reconciliation-plan) ;;
         *) echo 'Unexpected AWS reconciliation identity' >&2; exit 1 ;;
       esac
       umask 077
@@ -76,7 +45,7 @@ runs:
       version: 1.102.4
       sha256sum: 50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9
       oauth-client-id: ${{ inputs.tailscale-client-id }}
-      audience: infra-reconciliation-${{ inputs.identity }}
-      tags: tag:infra-${{ inputs.identity }}
-      hostname: infra-${{ inputs.identity }}-${{ github.run_id }}
+      audience: infra-reconciliation-plan
+      tags: tag:infra-plan
+      hostname: infra-plan-${{ github.run_id }}
       args: --accept-dns=false

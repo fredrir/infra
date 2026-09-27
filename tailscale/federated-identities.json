@@ -12,18 +12,6 @@
       "tags": ["tag:infra-plan"]
     },
     {
-      "name": "infra-apply",
-      "clientIdVariable": "TAILSCALE_CLIENT_ID",
-      "environment": "infrastructure-apply",
-      "subject": "repo:fredrir@114402558/infra@1328085692:environment:infrastructure-apply",
-      "audience": "infra-reconciliation-apply",
-      "claims": {
-        "workflow_ref": "fredrir/infra/.github/workflows/reconcile.yml@refs/heads/main"
-      },
-      "scopes": ["auth_keys"],
-      "tags": ["tag:infra-apply"]
-    },
-    {
       "name": "bazel-cache-reader",
       "clientIdVariable": "TAILSCALE_BAZEL_CACHE_READER_CLIENT_ID",
       "subject": "repo:fredrir@114402558/infra@1328085692:pull_request",

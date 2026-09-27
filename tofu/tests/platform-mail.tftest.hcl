@@ -14,6 +14,7 @@ mock_provider "aws" {
 mock_provider "cloudflare" {}
 
 variables {
+  reconciler_ipv4      = "203.0.113.10"
   domain               = "example.com"
   zone_id              = "0123456789abcdef0123456789abcdef"
   sender               = "alerts@example.com"

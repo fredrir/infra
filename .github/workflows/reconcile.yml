@@ -7,14 +7,6 @@ on:
       - "docs/**/*.md"
       - "build/evidence/*.json"
   pull_request:
-  workflow_dispatch:
-    inputs:
-      verify:
-        type: boolean
-        default: false
-      repair:
-        type: boolean
-        default: false
 permissions:
   contents: read
 concurrency:
@@ -22,13 +14,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   cli:
-    if: (inputs.verify || github.triggering_actor != 'fredrir-infra-verification[bot]')
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/infra-cli.yml
   check:
-    if: ${{ !inputs.verify && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
     needs: cli
     permissions:
       contents: read
@@ -38,20 +28,16 @@ jobs:
       cli-artifact: ${{ needs.cli.outputs.artifact }}
       cli-sha256: ${{ needs.cli.outputs.sha256 }}
   reconcile:
-    if: (inputs.verify || github.triggering_actor != 'fredrir-infra-verification[bot]') && github.event_name != 'push'
+    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       id-token: write
       actions: read
-      packages: read
-      pull-requests: read
     uses: ./.github/workflows/reconcile-job.yml
     secrets: inherit
-    with:
-      verify: ${{ inputs.verify || false }}
   images:
     needs: cli
-    if: github.event_name == 'push' && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected && (inputs.verify || github.triggering_actor != 'fredrir-infra-verification[bot]')
+    if: github.event_name == 'push' && github.repository_id == '1328085692' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected
     permissions:
       contents: read
       packages: write

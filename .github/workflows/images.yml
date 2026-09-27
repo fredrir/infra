@@ -20,13 +20,13 @@ permissions:
   contents: read
 jobs:
   cli:
-    if: inputs.cli-artifact == '' && github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.triggering_actor != 'fredrir-infra-verification[bot]'
+    if: inputs.cli-artifact == '' && github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/infra-cli.yml
   plan:
-    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') }}
     needs: cli
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -52,7 +52,7 @@ jobs:
           "$RUNNER_TEMP/infra-cli/infra" ci plan-images --infra-binary "$RUNNER_TEMP/infra-cli/infra"
   image:
     needs: [cli, plan]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.images != '[]' && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.images != '[]' }}
     strategy:
       fail-fast: false
       matrix:

@@ -1,1 +1,0 @@
-verification_trigger_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"

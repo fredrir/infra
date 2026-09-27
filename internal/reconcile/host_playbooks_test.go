@@ -43,7 +43,7 @@ func TestHostPlaybooksFollowRoleClosures(t *testing.T) {
 		{"role used through imports", []string{"ansible/roles/infra_binary/tasks/main.yml"}, []string{"control-backup.yml", "infra-cli.yml", "build-runners.yml"}},
 		{"monitor role", []string{"ansible/roles/gatus/tasks/main.yml"}, []string{"external.yml"}},
 		{"runner fleet", []string{"build/runners.json"}, []string{"build-runners.yml"}},
-		{"CLI release", []string{"build/cli-release.json"}, []string{"build-runners.yml", "external.yml"}},
+		{"CLI release", []string{"build/cli-release.json"}, []string{"build-runners.yml"}},
 		{"cluster role and monitor", []string{"ansible/roles/k3s/tasks/main.yml", "ansible/roles/gatus/tasks/main.yml", "docs/runbook.md", "platform/components/observability/monitoring.yaml"}, []string{"k3s.yml", "external.yml", "volatile.yml"}},
 		{"inventory", []string{"ansible/roles/k3s/tasks/main.yml", "ansible/inventory/production.yml"}, nil},
 		{"configuration", []string{"ansible/ansible.cfg"}, nil},

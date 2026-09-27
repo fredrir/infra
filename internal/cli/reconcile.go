@@ -8,12 +8,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/objectstore"
-	"github.com/fredrir/infra/internal/platformops"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/fredrir/infra/internal/provenance"
 	"github.com/fredrir/infra/internal/reconcile"
@@ -26,7 +24,7 @@ func newReconcileCommand() *cobra.Command {
 	var full bool
 	var wait time.Duration
 	command := &cobra.Command{Use: "reconcile", Short: "Plan, apply, and verify managed infrastructure", RunE: missingCommand}
-	command.AddCommand(newRequestVerificationCommand(), newRunCommand())
+	command.AddCommand(newRunCommand())
 	for _, action := range []string{"plan", "apply", "verify", "status", "requirements", "provenance"} {
 		child := &cobra.Command{Use: action, Args: cobra.NoArgs}
 		child.Flags().StringVar(&root, "root", ".", "Source checkout")
@@ -203,36 +201,6 @@ func verifyProvenance(cmd *cobra.Command, store reconcile.S3Store, ops *reconcil
 		return err
 	}
 	return ops.Provenance(cmd.Context(), checked)
-}
-
-func newRequestVerificationCommand() *cobra.Command {
-	request := reconcile.VerificationRequest{API: "https://api.github.com", Poll: 30 * time.Second, Deadline: 150 * time.Minute}
-	var key, token string
-	command := &cobra.Command{Use: "request-verification", Short: "Dispatch deep verification with drift repair and report its conclusion to Gatus", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		var err error
-		if request.PrivateKey, err = os.ReadFile(key); err != nil {
-			return err
-		}
-		heartbeat, err := os.ReadFile(token)
-		if err != nil {
-			return err
-		}
-		request.HeartbeatToken, request.Log = strings.TrimSpace(string(heartbeat)), cmd.OutOrStdout()
-		return reconcile.RequestVerification(cmd.Context(), request)
-	}}
-	command.Flags().Int64Var(&request.AppID, "app-id", 0, "GitHub App ID")
-	command.Flags().Int64Var(&request.InstallationID, "installation-id", 0, "GitHub App installation ID")
-	command.Flags().StringVar(&key, "private-key", "", "GitHub App private key file")
-	command.Flags().StringVar(&token, "heartbeat-token", "", "Gatus external endpoint token file")
-	command.Flags().StringVar(&request.Gatus, "gatus", platformops.GatusURL, "Gatus URL")
-	command.Flags().StringVar(&request.Heartbeat, "heartbeat", "reconciliation_verification", "Gatus external endpoint key as GROUP_NAME")
-	command.Flags().StringVar(&request.Repository, "repository", "fredrir/infra", "Repository as OWNER/NAME")
-	command.Flags().StringVar(&request.Workflow, "workflow", "reconcile.yml", "Workflow file name")
-	command.Flags().StringVar(&request.Ref, "ref", "main", "Workflow revision")
-	for _, name := range []string{"private-key", "heartbeat-token"} {
-		_ = command.MarkFlagRequired(name)
-	}
-	return command
 }
 
 var ErrNothingPending = errors.New("nothing to reconcile")

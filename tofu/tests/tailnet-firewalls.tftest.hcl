@@ -24,6 +24,7 @@ mock_provider "hcloud" {}
 mock_provider "cloudflare" {}
 
 variables {
+  reconciler_ipv4         = "203.0.113.10"
   hcloud_token            = "mock"
   dataset_bucket_name     = "dataset"
   platform_mail_recipient = "operator@example.net"

@@ -36,8 +36,7 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | Pull request | `infra ci prepare-validation`, `infra ci validate`, `infra reconcile plan --base BASE_SHA` | Affected declarations, OpenTofu tests, expansion and final-state plans, Flux rendering, Ansible task lists |
 | Merge to `main` | `infra-reconcile-apply.timer` on `fredrir-11` → `infra reconcile run apply` → `infra reconcile apply` | Within 30 s of the push: gate, then a fresh plan for the exact checkout, gated on OpenTofu tests; apply against the last successful revision; [apply supervisor](#reconciler-host) |
 | Hourly verification | `infra-reconcile-verify.timer` on `fredrir-11` → `infra reconcile verify --scope=full` of `production` | Read-only verification and check-mode comparison of OpenTofu and each host playbook; differences outside `rulesets` request one capped full reconciliation of `main` |
-| Hosted deep verification | `infra-verification-request.timer` on `fredrir-06` → `reconcile.yml` with `verify=true` → `infra reconcile verify --scope=full --report REPORT` | The same comparison from a hosted runner with the Doppler apply configuration, kept beside fredrir-11's for the bake; it requests no repair |
-| On-demand verification | `ssh root@fredrir-11 systemctl start infra-reconcile-verify.service`; hosted: `gh workflow run reconcile.yml --ref main -f verify=true` | The hourly verification on demand |
+| On-demand verification | `ssh root@fredrir-11 systemctl start infra-reconcile-verify.service` | The hourly verification on demand |
 | On-demand reconciliation | `ssh root@fredrir-11 'infra reconcile run request --full && systemctl start infra-reconcile-apply.service'` | A full apply of the `main` tip |
 | Cloud verification | `infra reconcile verify --scope=cloud` | Reconciliation lock and recorded status, rulesets, exact Flux revision, observed generations, Helm readiness, runner listeners and registrations, Grafana configuration and HTTP health, frontend revision, OpenTofu plan comparison; no host access; every comparison runs when another fails |
 | Full verification | `infra reconcile verify --scope=full` | Cloud verification plus host checks and each host playbook compared in check mode; root-equivalent on every host |
@@ -53,50 +52,6 @@ Etcd recovery requires the snapshot's matching K3s version and server token. App
 | Unpublished deploying changes | Difference; comparisons skipped |
 | Repair not requested | Only `rulesets` differences; the apply supervisor skips a repair of a revision whose last repair failed or started within six hours |
 | Repair cap reset | New commit on `main` |
-
-| Verification trigger | Value |
-| --- | --- |
-| Host / role | `fredrir-06` (`external`) / `ansible/roles/verification_trigger` |
-| Timer | `infra-verification-request.timer`: `OnCalendar=hourly`, `Persistent=true`, `RandomizedDelaySec=5min` |
-| Service | `infra-verification-request.service`: oneshot `infra reconcile request-verification`, `DynamicUser=yes`, IPv4/IPv6 sockets only, read-only system, `TimeoutStartSec=160min`; runs never overlap, and an hour that elapses during a run starts one run after it completes |
-| Binary | `/usr/local/bin/infra` from `build/cli-release.json`; a CLI release also runs `external.yml --tags=infra_binary` |
-| Pinned CLI | Must accept `request-verification --heartbeat`; a unit change that passes a new flag lands together with a `build/cli-release.json` pin of a release that has it |
-| Credentials | Root `0600` ciphertext `/etc/infra-verification/credentials.sops.yaml`; decrypted at start into the unit's runtime directory with the [host key](Secrets.md#host-scoped-secrets) |
-| Token | Installation token restricted to `infra` with `actions: write` |
-| Dispatch | `reconcile.yml` at `main`, `verify=true`, `repair=true`, actor `fredrir-infra-verification[bot]`; the workflow declares `repair` for this binary and runs no repair |
-| Wait | Polls the dispatched run every 30 s with ETag revalidation; honors `Retry-After` and `X-RateLimit-Reset`; deadline 150 minutes |
-| Heartbeat | Gatus `reconciliation_deep` (`--heartbeat=reconciliation_deep`): `success=true` for `success`; `success=false` with the run URL and conclusion for `failure`, `timed_out`, `startup_failure` or the deadline; none for `cancelled` or a stopped unit |
-| Failed dispatch | Unit `failed`; journal `infra: dispatch reconcile.yml in fredrir/infra at main: ERROR`; no run and no heartbeat; the next hour retries |
-
-| Owner notification | Value |
-| --- | --- |
-| Failed, timed out or unfinished verification run | Email `reconciliation/deep: Alert triggered` on the report; Gatus result error names the run URL and conclusion |
-| No report for 3 hours | Same email; dispatch failures or a stopped timer |
-| `fredrir-06` or Gatus unreachable for 10 minutes | Alertmanager email `IndependentMonitorDown` from the cluster's scrape of `100.86.241.75:8080/metrics`; Gatus cannot report its own host |
-| Next successful run | Email `reconciliation/deep: Alert resolved` |
-| Superseded run | No email |
-| Deployment scope | Role and Gatus changes run `external.yml --tags=gatus,verification_trigger` |
-
-```sh
-ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl list-timers infra-verification-request.timer --no-pager
-ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 journalctl -u infra-verification-request.service --no-pager -n 20
-ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl start infra-verification-request.service
-```
-
-| GitHub App | Value |
-| --- | --- |
-| Name | `fredrir-infra-verification` |
-| Permissions | Actions: read and write; Metadata: read |
-| Webhook | Disabled |
-| Installation | `fredrir/infra` only |
-| App / installation ID | `5077572` / `164918469`; `fredrir-06` in `ansible/inventory/production.yml` |
-| Private key | `ansible/roles/verification_trigger/files/credentials.sops.yaml`, field `private_key`; recipients in [Secrets](Secrets.md) |
-| Rotation | Generate a key in the App settings; replace `private_key`; reconcile; delete the previous key |
-| Heartbeat token | `ansible/roles/verification_trigger/files/credentials.sops.yaml`, field `token`; equal to `GATUS_TOKEN_RECONCILIATION_DEEP` in `ansible/roles/gatus/files/secrets.sops.yaml` |
-
-```sh
-jq -Rs . < NEW_KEY.pem | sops set --value-stdin ansible/roles/verification_trigger/files/credentials.sops.yaml '["private_key"]'
-```
 
 | Owner | Managed state |
 | --- | --- |
@@ -191,30 +146,16 @@ GH_TOKEN="$(gh auth token)" PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" go
 | Order | Required action |
 | --- | --- |
 | 1 | Prepare an administrator session with OpenTofu backend/provider access, Kubernetes access, existing host SSH identities and SOPS decryption |
-| 2 | Merge the reconciliation implementation without a simultaneous hostname change |
-| 3 | Apply the IAM policies from `tofu/reconciliation.tf` using an administrator OpenTofu session; let Flux install the Kubernetes identities |
-| 4 | Confirm the IAM users, managed policy attachments and Kubernetes service accounts exist; point Flux at `production` |
-| 5 | Create GitHub environments `infrastructure-plan` and `infrastructure-apply`; restrict `infrastructure-apply` to `main` without deployment reviewers |
-| 6 | Set the plan secrets in `infrastructure-plan`; install the read-only `prd_reconciliation_apply` service token as `DOPPLER_TOKEN` in `infrastructure-apply` for hosted verification |
-| 7 | Run `ansible-playbook reconciliation-identity.yml` with administrator SSH access; retain existing administrator keys |
-| 8 | Apply `tailscale/policy.hujson`; create the OIDC identities declared in [`tailscale/federated-identities.json`](../tailscale/federated-identities.json) |
-| 9 | Provision fredrir-11 ([reconciler host](#reconciler-host)) and confirm `desired_revision == applied_revision` with `stage == complete` |
-
-Pull request plans read their environment secrets; hosted verification fetches the Doppler apply configuration; fredrir-11 decrypts its host-scoped credentials.
+| 2 | Apply the IAM policies from `tofu/reconciliation.tf` using an administrator OpenTofu session; let Flux install the Kubernetes identities |
+| 3 | Confirm the IAM users, managed policy attachments and Kubernetes service accounts exist; point Flux at `production` |
+| 4 | Create the GitHub environment `infrastructure-plan` with the six plan secrets |
+| 5 | Run `ansible-playbook reconciliation-identity.yml` with administrator SSH access |
+| 6 | Apply `tailscale/policy.hujson`; create the identities declared in `tailscale/federated-identities.json` |
+| 7 | Provision fredrir-11 ([reconciler host](#reconciler-host)) and confirm `desired_revision == applied_revision` with `stage == complete` |
 
 | GitHub environment | Secrets |
 | --- | --- |
 | `infrastructure-plan` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (`/automation/infra-reconciliation-plan`), `CLOUDFLARE_API_TOKEN` (read managed DNS zones and account tunnels), `HCLOUD_TOKEN` (read the fleet Hetzner project), `KUBE_CONFIG` (`flux-system/infrastructure-plan`), `PLATFORM_MAIL_RECIPIENT` |
-| `infrastructure-apply` | `DOPPLER_TOKEN`, read-only access to `infra / prd_reconciliation_apply` for hosted verification |
-
-| Doppler `prd_reconciliation_apply` | Hosted verification use |
-| --- | --- |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Keys for `/automation/infra-reconciliation-apply` |
-| `CLOUDFLARE_API_TOKEN`, `HCLOUD_TOKEN` | OpenTofu plan comparison |
-| `KUBE_CONFIG` | `flux-system/infrastructure-apply` identity |
-| `PLATFORM_MAIL_RECIPIENT` | Private OpenTofu mail recipient |
-| `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS` | Check-mode host comparison |
-| `OBSERVER_APP_ID`, `OBSERVER_APP_PRIVATE_KEY` | Observer GitHub App; a short-lived installation token with repository administration read |
 
 | Tailscale federated identity | Value |
 | --- | --- |
@@ -224,11 +165,10 @@ Pull request plans read their environment secrets; hosted verification fetches t
 
 | Credential boundary | Value |
 | --- | --- |
-| Secret source | Plans: `infrastructure-plan` environment secrets; hosted verification: Doppler `prd_reconciliation_apply`; fredrir-11: host-scoped SOPS |
-| Doppler scope | One config-scoped read token; it can neither edit secrets nor read `infra/ops` |
-| Doppler parent config | `infra/prd` contains no credentials; reconciliation configs contain only their scoped identities |
+| Secret source | Plans: `infrastructure-plan` environment secrets; fredrir-11: host-scoped SOPS |
 | AWS identity policies | `tofu/reconciliation.tf`; attached managed policies; deployment identities cannot change their own grants |
-| AWS verify identity | `/automation/infra-reconciliation-verify`: the plan policy without the OpenTofu lock, plus `s3:PutObject` on `reconciliation/production/runs/*`; every request from an address other than `reconciler_ipv4` is denied; declared only while `reconciler_ipv4` is set in `tofu/production.tfvars.json` |
+| AWS apply and verify identities | Every request from an address other than the required `reconciler_ipv4` is denied unless it passes through an AWS service |
+| AWS verify identity | `/automation/infra-reconciliation-verify`: the plan policy without the OpenTofu lock, plus `s3:PutObject` on `reconciliation/production/runs/*` |
 | Run report retention | `reconciliation/production/runs/` objects expire after 30 days; noncurrent versions under `reconciliation/production/` after 7 days |
 | AWS workload boundary | `policy/boundary/infra-workload-boundary` on every OpenTofu-managed IAM user outside `/automation/`; dataset S3 objects except `tofu-state/` and `reconciliation/`, SES from the alert sender; the apply identity cannot edit, remove or bypass it |
 | Kubernetes identities | `platform/components/policy/reconciliation.yaml` |
@@ -237,9 +177,8 @@ Pull request plans read their environment secrets; hosted verification fetches t
 | Kubernetes verify scope | Read Flux resources, workloads, runner sets, listener pods and artifacts; no writes |
 | Kubernetes apply scope | Verify scope; patch reconciliation annotations; admission rejects spec changes |
 | Tailnet plan scope | Control-plane API only |
-| Tailnet apply scope | Control-plane API and SSH to managed hosts |
 | Tailnet reconciler scope | `tag:infra-reconciler`: control-plane API, Gatus heartbeats and SSH to managed hosts and `fredrir-06`; reached only by Macie and Archie on SSH |
-| Host SSH key | `ansible/files/reconciliation.pub`, fredrir-11's public key; maintained by `ansible/reconciliation-identity.yml` and `ansible/volatile.yml`, which add it beside existing keys |
+| Host SSH key | `ansible/files/reconciliation.pub`, fredrir-11's public key; maintained by `ansible/reconciliation-identity.yml` and `ansible/volatile.yml` |
 | Provider-policy, workload-boundary or bucket-lifecycle changes, revoked credentials | Administrator repair required |
 
 ```sh
@@ -250,19 +189,6 @@ gh secret set HCLOUD_TOKEN --env infrastructure-plan
 gh secret set KUBE_CONFIG --env infrastructure-plan < PLAN_KUBECONFIG
 gh secret set PLATFORM_MAIL_RECIPIENT --env infrastructure-plan
 ```
-
-### CI SOPS key retirement
-
-The retired CI apply recipient `age1jm6xj8qlmfjlhw0vdseaaqkpt3mqj3yl0upx3smwutsaghcq6pesvrka2t` still decrypts every earlier revision of `ansible/roles/gatus/files/config.sops.yaml`, `ansible/roles/verification_trigger/files/github-app.sops.yaml`, `ansible/roles/verification_trigger/files/heartbeat.sops.yaml` and `platform/components/backups/backup.secret.sops.yaml`.
-
-| Order | Action | Check |
-| --- | --- | --- |
-| 1 | After a green apply without it, delete `SOPS_AGE_KEY` from Doppler `infra/prd_reconciliation_apply` | `doppler secrets get SOPS_AGE_KEY --project infra --config prd_reconciliation_apply` fails; the next apply succeeds |
-| 2 | Verification heartbeat, then each backup heartbeat, one commit per token | [Rotate](Secrets.md#host-scoped-secrets) |
-| 3 | Verification App key | GitHub App settings |
-| 4 | SMTP | Administrator IAM |
-| 5 | Control backup access key | Administrator IAM |
-| 6 | Control repository password | `restic key remove` last |
 
 ### Recovery
 
@@ -317,7 +243,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Volatile series labels | With `honorLabels: false`, fredrir-10's kubelet and cAdvisor series carry the target namespace `kube-system`, and their real `namespace` and `pod` move to `exported_namespace` and `exported_pod`, so namespace-keyed alerts do not attribute fredrir-10 series to the workload's namespace |
 | Kubelet scrape credential | The volatile kubelet monitors present a 1 h projected token (`bearerTokenFile`), not the chart's non-expiring `monitoring-prometheus-token`, so a hostile kubelet capturing it can replay it against the API for at most its lifetime; the token is the Prometheus pod's own `monitoring-prometheus` identity (nodes, nodes/metrics, services, endpoints, pods, endpointslices, ingresses read; no nodes/proxy, no writes). A dedicated least-privilege ServiceAccount is not achievable through the operator: projected tokens mint only for the pod's ServiceAccount, and a kubelet-only audience fails the kubelet's TokenReview against the cluster api-audiences, so the pod identity with a short lifetime is the least exposure. `monitoring-prometheus-token` is created by the kube-prometheus-stack chart (`prometheus.serviceAccount.createTokenSecret`) for the fleet kubelet monitor, not a leftover |
 | Readiness waits | `verify.yml` and `maintenance.yml` exclude `node-restriction.kubernetes.io/volatile`; `maintenance.yml` never targets volatile hosts, which take unattended patching |
-| Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100, 9253 and 10250; SSH from Macie, Archie, `tag:infra-apply` and `tag:infra-reconciler` |
+| Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100, 9253 and 10250; SSH from Macie, Archie and `tag:infra-reconciler` |
 | Inbound access | Tailnet; NTNU VPN (`~/ntnu-proxy`, `10.50.0.0/16`) is owner-only break-glass SSH with keys only, never used by the fleet |
 | Container engines | Docker, containerd.io, Podman and Buildah removed at takeover; only the k3s agent runs |
 | Trust | NTNU controls hypervisor and network; no ProxyJump, `ForwardAgent=no`, no delegated secrets; holds its node credentials and the job credentials of its CI pools |
@@ -361,7 +287,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | 5 | Deliver the enrollment key | `infra operations enrollment create-deliver --node fredrir-10 --role volatile --host ntnu --sudo` |
 | 6 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
 | 7 | Set inventory values | `tailscale_ip` |
-| 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in `ansible/files/reconciliation_known_hosts`, Doppler `SSH_KNOWN_HOSTS` and the admin `known_hosts` |
+| 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in `ansible/files/reconciliation_known_hosts` and the admin `known_hosts` |
 | 9 | Confirm the fleet runs WireGuard (hard gate) | Every fleet node publishes `backend-type=wireguard` with its own verified key before fredrir-10 joins. `volatile.yml` refuses to enroll otherwise, and VXLAN or an unset backend must never coexist with an enrolled fredrir-10 |
 | 10 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 12 |
 | 11 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 30m --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |

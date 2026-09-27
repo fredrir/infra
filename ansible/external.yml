@@ -19,14 +19,9 @@
     - name: Configure host secret decryption
       ansible.builtin.import_role:
         name: host_secrets
-      tags: [gatus, verification_trigger]
+      tags: [gatus]
 
     - name: Configure infrastructure checks
       ansible.builtin.import_role:
         name: gatus
       tags: [gatus]
-
-    - name: Remove hosted verification requests
-      ansible.builtin.import_role:
-        name: verification_trigger
-      tags: [verification_trigger]

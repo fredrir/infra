@@ -83,7 +83,6 @@ func scopedHostPlaybooks(root string, paths []string) ([]string, error) {
 			selected[monitorPlaybook] = true
 		case HostScopeRunners:
 			selected[runnerPlaybook] = true
-			selected[monitorPlaybook] = selected[monitorPlaybook] || monitorCLIChanged(single)
 		default:
 			users := graph.users(path)
 			if len(users) == 0 {

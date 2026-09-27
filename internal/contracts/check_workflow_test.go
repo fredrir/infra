@@ -93,7 +93,6 @@ func TestDeclarationsRunAlongsideTheBazelCheckWithinOneAggregateBudget(t *testin
 		{name: "failed CLI build", cli: "failure", actor: "fredrir", protected: true},
 		{name: "cancelled run", cli: "success", actor: "fredrir", protected: true, cancelled: true},
 		{name: "unprotected reference", cli: "success", actor: "fredrir"},
-		{name: "verification bot", cli: "success", actor: "fredrir-infra-verification[bot]", protected: true},
 		{name: "deployment bot", cli: "success", actor: "octo-sts[bot]", protected: true},
 	} {
 		evaluate(validation, test)
@@ -105,7 +104,6 @@ func TestDeclarationsRunAlongsideTheBazelCheckWithinOneAggregateBudget(t *testin
 		{name: "declarations failed", check: "success", validate: "failure"},
 		{name: "declarations skipped", check: "success", validate: "skipped"},
 		{name: "cancelled run", check: "success", validate: "success", cancelled: true},
-		{name: "verification bot", check: "success", validate: "success", actor: "fredrir-infra-verification[bot]"},
 	} {
 		evaluate(aggregate, test)
 	}

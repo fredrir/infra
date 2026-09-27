@@ -3,8 +3,11 @@ package reconcile
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/cgi"
@@ -27,6 +30,10 @@ const (
 	publisherSecret = "ghs_publisher-installation-secret"
 	publisherBasic  = "eC1hY2Nlc3MtdG9rZW46Z2hzX3B1Ymxpc2hlci1pbnN0YWxsYXRpb24tc2VjcmV0"
 )
+
+var publisherAppKey = sync.OnceValues(func() (*rsa.PrivateKey, error) {
+	return rsa.GenerateKey(rand.Reader, 2048)
+})
 
 type publisherAppServer struct {
 	t       *testing.T
@@ -110,7 +117,11 @@ func newPublishingFixture(t *testing.T) *publishingFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, encoded := githubAppKey(t, "publisher")
+	key, err := publisherAppKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
 	f.app = &publisherAppServer{t: t, key: &key.PublicKey}
 	f.git = &authenticatedGit{backend: &cgi.Handler{Path: gitBinary, Args: []string{"http-backend"}, Env: []string{"GIT_PROJECT_ROOT=" + area, "GIT_HTTP_EXPORT_ALL=1"}, InheritEnv: []string{"PATH", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL"}}}
 	app, remote := httptest.NewServer(f.app), httptest.NewServer(f.git)

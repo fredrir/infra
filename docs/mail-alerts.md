@@ -27,7 +27,6 @@
 
 | Verification heartbeat | Value |
 | --- | --- |
-| `reconciliation_deep` | GitHub deep verification from `fredrir-06`; maximum age 3 hours; failed run reported immediately with its URL; [runbook](runbook.md#reconciliation) |
 | `reconciliation_verification` | Reconciler cloud verification; maximum age 2 hours; alerts after two failed runs in a row with the failing stage; [runbook](runbook.md#reconciler-host) |
 
 Successful backup producers POST to `/api/v1/endpoints/backups_<name>/external?success=true` with separate Bearer tokens from their encrypted repository credentials. Producers keep tokens in private curl configuration files. Tailnet policy permits the control and worker producers to reach the monitor; Kubernetes network policies restrict backup pods to this destination.

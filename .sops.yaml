@@ -49,7 +49,7 @@ creation_rules:
           - *macie
           - *archie
           - *fredrir-07
-  - path_regex: ansible/roles/(gatus/files/secrets|verification_trigger/files/credentials)\.sops\.yaml$
+  - path_regex: ansible/roles/gatus/files/secrets\.sops\.yaml$
     key_groups:
       - age:
           - *macie
