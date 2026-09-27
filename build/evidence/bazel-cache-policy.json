@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "verified_at": "2026-09-27T22:02:02.076681+00:00",
+  "scope": "Reviewed Bazel cache grants applied to the live Tailscale ACL using the operator policy credential and If-Match",
+  "http_status": 200,
+  "before_sha256": "8eaec4c31a9337bae860c2c79533198f1712b0898246b662f567b92eea3e9370",
+  "after_sha256": "b4e2169a2c7bbe418c7b3dc32b0392cb9bd2cf47a951661c577a01b3a4118fe2",
+  "after_etag": "\"b4e2169a2c7bbe418c7b3dc32b0392cb9bd2cf47a951661c577a01b3a4118fe2\"",
+  "saved_live_equals_candidate": true,
+  "unrelated_live_fields_preserved": true,
+  "additions": {
+    "tagOwners": [
+      "tag:ci-bazel-reader",
+      "tag:ci-bazel-writer"
+    ],
+    "hosts": [
+      "bazel-cache"
+    ],
+    "acls": 2,
+    "tests": 16
+  }
+}
