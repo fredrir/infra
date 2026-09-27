@@ -66,7 +66,8 @@ func TestMain(m *testing.M) {
 }
 
 type cache struct {
-	reader, writer, health string
+	reader, writer, health, httpSocket string
+	filter                             testcontainers.Container
 }
 
 func freePort(t *testing.T) string {
@@ -133,7 +134,7 @@ func startCache(t *testing.T) cache {
 	t.Helper()
 	directory := t.TempDir()
 	grpcSocket, httpSocket := filepath.Join(directory, "grpc.sock"), filepath.Join(directory, "http.sock")
-	server := exec.Command(bazelRemote, "--dir", filepath.Join(directory, "data"), "--max_size", "1", "--grpc_address", "unix://"+grpcSocket, "--http_address", "unix://"+httpSocket, "--access_log_level", "none")
+	server := exec.Command(bazelRemote, "--dir", filepath.Join(directory, "data"), "--max_size", "1", "--grpc_address", "unix://"+grpcSocket, "--http_address", "unix://"+httpSocket, "--access_log_level", "none", "--enable_endpoint_metrics")
 	var log bytes.Buffer
 	server.Stdout, server.Stderr = &log, &log
 	if err := server.Start(); err != nil {
@@ -189,7 +190,7 @@ func startCache(t *testing.T) cache {
 			t.Logf("filter:\n%s", output)
 		}
 	})
-	return cache{reader: net.JoinHostPort(hostIP, ports["9092"]), writer: net.JoinHostPort(hostIP, ports["9093"]), health: net.JoinHostPort(hostIP, ports["9095"])}
+	return cache{filter: filter, httpSocket: httpSocket, reader: net.JoinHostPort(hostIP, ports["9092"]), writer: net.JoinHostPort(hostIP, ports["9093"]), health: net.JoinHostPort(hostIP, ports["9095"])}
 }
 
 func dialFrom(source string) func(context.Context, string) (net.Conn, error) {

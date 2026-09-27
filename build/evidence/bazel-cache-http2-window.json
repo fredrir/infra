@@ -1,0 +1,260 @@
+{
+  "schema": 1,
+  "date": "2026-09-27",
+  "source_revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af",
+  "filter_sha256": "ed47481b7ddb1fc65c3cee2490a4ec0b84012c26b2b318a3ddadba9a37a13109",
+  "writer_receive_window_bytes": 262144,
+  "reader_changed": false,
+  "wan_replays": [
+    {
+      "rtt_ms": 136,
+      "writer_buffer_bytes": 65536,
+      "remote_timeout_seconds": 30,
+      "artifacts": {
+        "cli_test": {
+          "bytes": 39430048,
+          "sha256": "ff03edd3715520bfb99a5a2e3e118f467a1430ccdd1a8a1d30e479c2401ac489"
+        },
+        "compiler": {
+          "bytes": 28238898,
+          "sha256": "3780fc07130d6d45096373acf062cc316940d253e2a1d892ece03a3bdd0d21d4"
+        },
+        "github": {
+          "bytes": 29259914,
+          "sha256": "689ea4995ae1cb1feb025c01ea72cd8510114b2732ad82743ee5a1e42026e298"
+        },
+        "infra": {
+          "bytes": 37412800,
+          "sha256": "9ef3ba512ef00d2abcc27d3558247217db4c3343c2b9777943a155a37e0a82db"
+        }
+      },
+      "runs": [
+        {
+          "role": "writer",
+          "exit": 0,
+          "wall_seconds": 31.633,
+          "deadline_warnings": 2,
+          "remote_cache_hits": 0,
+          "action_results": 2
+        },
+        {
+          "role": "reader",
+          "exit": 0,
+          "wall_seconds": 3.575,
+          "deadline_warnings": 0,
+          "remote_cache_hits": 2,
+          "action_results": 2
+        }
+      ],
+      "large_uploads": [
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 11.461
+        },
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 23.326
+        },
+        {
+          "status": 502,
+          "grpc_status": "",
+          "seconds": 30.0
+        },
+        {
+          "status": 400,
+          "grpc_status": "",
+          "seconds": 29.726
+        }
+      ],
+      "successful_action_updates": 2
+    },
+    {
+      "rtt_ms": 136,
+      "writer_buffer_bytes": 262144,
+      "remote_timeout_seconds": 10,
+      "artifacts": {
+        "cli_test": {
+          "bytes": 39430048,
+          "sha256": "ff03edd3715520bfb99a5a2e3e118f467a1430ccdd1a8a1d30e479c2401ac489"
+        },
+        "compiler": {
+          "bytes": 28238898,
+          "sha256": "3780fc07130d6d45096373acf062cc316940d253e2a1d892ece03a3bdd0d21d4"
+        },
+        "github": {
+          "bytes": 29259914,
+          "sha256": "689ea4995ae1cb1feb025c01ea72cd8510114b2732ad82743ee5a1e42026e298"
+        },
+        "infra": {
+          "bytes": 37412800,
+          "sha256": "9ef3ba512ef00d2abcc27d3558247217db4c3343c2b9777943a155a37e0a82db"
+        }
+      },
+      "runs": [
+        {
+          "role": "writer",
+          "exit": 0,
+          "wall_seconds": 11.194,
+          "deadline_warnings": 0,
+          "remote_cache_hits": 0,
+          "action_results": 4
+        },
+        {
+          "role": "reader",
+          "exit": 0,
+          "wall_seconds": 4.376,
+          "deadline_warnings": 0,
+          "remote_cache_hits": 4,
+          "action_results": 4
+        }
+      ],
+      "large_uploads": [
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 3.418
+        },
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 6.289
+        },
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 8.383
+        },
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 9.417
+        }
+      ],
+      "successful_action_updates": 4
+    },
+    {
+      "rtt_ms": 160,
+      "writer_buffer_bytes": 262144,
+      "remote_timeout_seconds": 30,
+      "artifacts": {
+        "cli_test": {
+          "bytes": 39430048,
+          "sha256": "ff03edd3715520bfb99a5a2e3e118f467a1430ccdd1a8a1d30e479c2401ac489"
+        },
+        "compiler": {
+          "bytes": 28238898,
+          "sha256": "3780fc07130d6d45096373acf062cc316940d253e2a1d892ece03a3bdd0d21d4"
+        },
+        "github": {
+          "bytes": 29259914,
+          "sha256": "689ea4995ae1cb1feb025c01ea72cd8510114b2732ad82743ee5a1e42026e298"
+        },
+        "infra": {
+          "bytes": 37412800,
+          "sha256": "9ef3ba512ef00d2abcc27d3558247217db4c3343c2b9777943a155a37e0a82db"
+        }
+      },
+      "runs": [
+        {
+          "role": "writer",
+          "exit": 0,
+          "wall_seconds": 13.04,
+          "deadline_warnings": 0,
+          "remote_cache_hits": 0,
+          "action_results": 4
+        },
+        {
+          "role": "reader",
+          "exit": 0,
+          "wall_seconds": 4.877,
+          "deadline_warnings": 0,
+          "remote_cache_hits": 4,
+          "action_results": 4
+        }
+      ],
+      "large_uploads": [
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 4.015
+        },
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 7.387
+        },
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 10.474
+        },
+        {
+          "status": 200,
+          "grpc_status": "0",
+          "seconds": 10.266
+        }
+      ],
+      "successful_action_updates": 4,
+      "cgroups": {
+        "cache-window-filter": {
+          "memory.max": "134217728",
+          "memory.peak": "8183808",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "cpu.max": "50000 100000",
+          "cpu.stat": "usage_usec 49189\nuser_usec 16284\nsystem_usec 32905\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 85\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0"
+        },
+        "cache-window-backend": {
+          "memory.max": "1073741824",
+          "memory.peak": "152449024",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 1016616\nuser_usec 979283\nsystem_usec 37333\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 136\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0"
+        }
+      }
+    }
+  ],
+  "cancelled_writes": {
+    "connections": 8,
+    "concurrent_incomplete_writes": 512,
+    "received_messages": 1024,
+    "bytes_sent_per_write": 524288,
+    "filter_memory_limit_bytes": 134217728,
+    "filter_cpu_limit": 0.5,
+    "filter_tmpfs_limit_bytes": 16777216,
+    "measured_memory_peaks_bytes": [
+      83214336,
+      56963072
+    ],
+    "oom_kills": 0,
+    "fresh_writer_before_cancellation": "passed",
+    "fresh_writer_and_reader_after_cancellation": "passed"
+  },
+  "fast_checks": {
+    "rtt_ms": 160,
+    "writer_receive_window_bytes": 262144,
+    "pinned_cpu_threads": 4,
+    "tests_executed": 25,
+    "remote_test_hits": 0,
+    "duration_seconds": 4.8940299320000005,
+    "budget_seconds": 10,
+    "successful_rpcs": {
+      "FindMissingBlobs": 86,
+      "Write": 88,
+      "GetCapabilities": 2,
+      "UpdateActionResult": 29
+    },
+    "result": "passed"
+  },
+  "verification": {
+    "filter_tests_passed": 10,
+    "method_protocol_source_and_path_denials": "passed",
+    "generated_artifacts": "unchanged"
+  },
+  "limitations": [
+    "WAN throughput and concurrent cancellation are separate bounded workloads; the512-stream test is not an unlimited concurrency guarantee.",
+    "The cold fast-check replay uses four pinned workstation CPU threads and no filter cgroup limits; the failed hosted d41 cold25-test run still needs requalification.",
+    "The final160ms transfer replay enforces filter128Mi/0.5CPU and backend1Gi/2CPU through cgroups; it does not constrain temporary filesystem size."
+  ]
+}
