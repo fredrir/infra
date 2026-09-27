@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "image": "ghcr.io/fredrir/portfolio-api",
-  "revision": "c7e6e6ab45c5f9288590023ac8e84d5cb31442f3",
-  "digest": "sha256:950b18a306cede419602086a4e5c5a7be00ac9c100b936098e566ffbcfb82a91",
-  "run_id": 36333932699,
+  "revision": "e51a9d8fe96a01dbce530bdf1ca03f226266267e",
+  "digest": "sha256:345250eba47abd77007f771316de707c3ad85d077c0f7390124a1dfdb4d7c2a3",
+  "run_id": 36358867467,
   "attempt": 1
 }
