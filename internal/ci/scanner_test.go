@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,7 +18,7 @@ import (
 	"github.com/fredrir/infra/internal/process"
 )
 
-func scannerFixture(t *testing.T, directory string, database scannerDatabase, contents string, downloaded, next time.Time) {
+func scannerFixture(t testing.TB, directory string, database scannerDatabase, contents string, downloaded, next time.Time) {
 	t.Helper()
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		t.Fatal(err)
@@ -33,7 +35,7 @@ func scannerFixture(t *testing.T, directory string, database scannerDatabase, co
 	}
 }
 
-func scannerDownloader(t *testing.T, calls *atomic.Int32) process.Runner {
+func scannerDownloader(t testing.TB, calls *atomic.Int32) process.Runner {
 	t.Helper()
 	return process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
 		calls.Add(1)
@@ -42,14 +44,47 @@ func scannerDownloader(t *testing.T, calls *atomic.Int32) process.Runner {
 		}
 		for _, database := range scannerDatabases {
 			if slices.Contains(options.Args, database.flag) {
-				scannerFixture(t, filepath.Join(options.Args[2], database.directory), database, database.filename, time.Now().Add(-time.Minute), time.Now().Add(time.Hour))
+				scannerFixture(t, filepath.Join(options.Args[2], database.directory), database, database.filename, time.Now().Add(-time.Minute), time.Now().Add(24*time.Hour))
 			}
 		}
 		return process.Result{}, nil
 	}}
 }
 
-func TestScannerSharesDatabasesAndRetainsFamilyAnalysis(t *testing.T) {
+func scannerGeneration(t *testing.T, shared, name string, database scannerDatabase, contents string, downloaded, next time.Time) string {
+	t.Helper()
+	scannerFixture(t, filepath.Join(shared, name), database, contents, downloaded, next)
+	if err := os.Chmod(shared, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := replaceSymlink(name, filepath.Join(shared, database.key())); err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(shared, name)
+}
+
+func scannerTree(t *testing.T, root string) map[string]string {
+	t.Helper()
+	tree := map[string]string{}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		target, _ := os.Readlink(path)
+		tree[path] = fmt.Sprintf("%v %d %s %d", info.Mode(), info.Size(), target, info.ModTime().UnixNano())
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tree
+}
+
+func TestScannerSharesOneReadOnlyGenerationAcrossFamilies(t *testing.T) {
 	root := t.TempDir()
 	shared := filepath.Join(root, "shared")
 	var calls atomic.Int32
@@ -70,69 +105,167 @@ func TestScannerSharesDatabasesAndRetainsFamilyAnalysis(t *testing.T) {
 			t.Fatalf("family analysis changed: %q, %v", got, err)
 		}
 		for _, database := range scannerDatabases {
-			local, err := os.Stat(filepath.Join(cache, database.directory, database.filename))
-			if err != nil {
-				t.Fatal(err)
+			if target, err := os.Readlink(filepath.Join(cache, database.directory)); err != nil || target != filepath.Join(shared, database.key()) {
+				t.Fatalf("%s links to %q, %v instead of the published generation", database.directory, target, err)
 			}
-			central, err := os.Stat(filepath.Join(shared, ToolAssets["trivy"].Digest, database.directory, database.filename))
-			if err != nil || !os.SameFile(local, central) {
-				t.Fatalf("database is duplicated: %v", err)
+			info, err := os.Stat(filepath.Join(cache, database.directory, database.filename))
+			if err != nil || info.Mode().Perm() != 0o444 {
+				t.Fatalf("published %s is writable or missing: %v, %v", database.filename, info, err)
 			}
 		}
 	}
 	if calls.Load() != 2 {
 		t.Fatalf("got %d downloads, want one per database", calls.Load())
 	}
-}
-
-func TestScannerSeedsFreshCacheWithoutDownload(t *testing.T) {
-	root := t.TempDir()
-	cache := filepath.Join(root, "family")
-	scannerFixture(t, filepath.Join(cache, "db"), scannerDatabases[0], "database", time.Now().Add(-time.Minute), time.Now().Add(time.Hour))
-	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
-		t.Error("fresh database should not download")
-		return process.Result{}, nil
-	}}
-	for range 2 {
-		if err := PrepareScanner(context.Background(), runner, cache, filepath.Join(root, "shared"), false); err != nil {
-			t.Fatal(err)
+	for _, directory := range []string{shared} {
+		if info, err := os.Stat(directory); err != nil || info.Mode().Perm() != 0o755 {
+			t.Fatalf("%s is not readable by other accounts: %v, %v", directory, info, err)
 		}
 	}
 }
 
-func TestScannerRefreshPreservesExistingReadersAndRejectsFailedRefresh(t *testing.T) {
+func TestScannerPrepareOnlyReadsASharedDirectoryOfAnotherAccount(t *testing.T) {
+	root := t.TempDir()
+	fresh := filepath.Join(root, "fresh")
+	stale := filepath.Join(root, "stale")
+	generation := scannerGeneration(t, fresh, "db-v2-1", scannerDatabases[0], "fresh", time.Now().Add(-time.Minute), time.Now().Add(30*time.Minute))
+	scannerGeneration(t, stale, "db-v2-1", scannerDatabases[0], "stale", time.Now().Add(-48*time.Hour), time.Now().Add(-time.Hour))
+	for _, directory := range []string{fresh, stale} {
+		err := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
+			if err != nil || !entry.IsDir() {
+				return err
+			}
+			return os.Chmod(path, 0o555)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_ = filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
+				if err == nil && entry.IsDir() {
+					return os.Chmod(path, 0o755)
+				}
+				return nil
+			})
+		})
+	}
+	previous := scannerAccount
+	scannerAccount = func() int { return os.Geteuid() + 1 }
+	t.Cleanup(func() { scannerAccount = previous })
+	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+		t.Error("a shared directory of another account was refreshed")
+		return process.Result{}, nil
+	}}
+	before := scannerTree(t, fresh)
+	cache := filepath.Join(root, "family")
+	if err := PrepareScanner(context.Background(), runner, cache, fresh, false); err != nil {
+		t.Fatal(err)
+	}
+	if contents, err := os.ReadFile(filepath.Join(cache, "db", "trivy.db")); err != nil || string(contents) != "fresh" {
+		t.Fatalf("family reads %q, %v instead of %s", contents, err, generation)
+	}
+	if after := scannerTree(t, fresh); !maps.Equal(before, after) {
+		t.Fatalf("preparation wrote the shared directory:\n%v\n%v", before, after)
+	}
+	if err := PrepareScanner(context.Background(), runner, cache, stale, false); err == nil || !strings.Contains(err.Error(), "missing or stale") {
+		t.Fatalf("stale shared database accepted: %v", err)
+	}
+}
+
+func TestScannerRefreshReplacesGenerationsWithoutDisturbingReaders(t *testing.T) {
 	root := t.TempDir()
 	shared := filepath.Join(root, "shared")
 	cache := filepath.Join(root, "family")
-	current := filepath.Join(shared, ToolAssets["trivy"].Digest, "db")
-	scannerFixture(t, current, scannerDatabases[0], "old generation", time.Now().Add(-48*time.Hour), time.Now().Add(-time.Hour))
-	if err := os.Mkdir(cache, 0700); err != nil {
+	scannerGeneration(t, shared, "db-v2-1", scannerDatabases[0], "stale", time.Now().Add(-72*time.Hour), time.Now().Add(-48*time.Hour))
+	abandoned := filepath.Join(shared, "db-v1-1")
+	recent := filepath.Join(shared, "db-v3-1")
+	for _, directory := range []string{abandoned, recent} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-8 * 24 * time.Hour)
+	if err := os.Chtimes(abandoned, old, old); err != nil {
 		t.Fatal(err)
 	}
-	if err := linkScannerDatabase(current, filepath.Join(cache, "db"), scannerDatabases[0]); err != nil {
-		t.Fatal(err)
+	failure := errors.New("registry unavailable")
+	failing := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, failure }}
+	if err := PrepareScanner(context.Background(), failing, cache, shared, false); !errors.Is(err, failure) {
+		t.Fatalf("failed refresh was accepted: %v", err)
 	}
-	reader, err := os.Open(filepath.Join(cache, "db", "trivy.db"))
+	if target, _ := os.Readlink(filepath.Join(shared, "db-v2")); target != "db-v2-1" {
+		t.Fatalf("failed refresh replaced the published generation with %q", target)
+	}
+	reader, err := os.Open(filepath.Join(shared, "db-v2", "trivy.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer reader.Close()
-	failure := errors.New("registry unavailable")
-	runner := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) { return process.Result{}, failure }}
-	if err := PrepareScanner(context.Background(), runner, cache, shared, false); !errors.Is(err, failure) {
-		t.Fatalf("failed refresh was accepted: %v", err)
-	}
-	if got, _ := os.ReadFile(filepath.Join(current, "trivy.db")); string(got) != "old generation" {
-		t.Fatalf("failed refresh changed database: %q", got)
-	}
 	var calls atomic.Int32
-	if err := PrepareScanner(context.Background(), scannerDownloader(t, &calls), cache, shared, false); err != nil {
-		t.Fatal(err)
+	for range 3 {
+		scannerGeneration(t, shared, fmt.Sprintf("db-v2-%d", time.Now().UnixNano()), scannerDatabases[0], "stale", time.Now().Add(-72*time.Hour), time.Now().Add(-48*time.Hour))
+		if err := PrepareScanner(context.Background(), scannerDownloader(t, &calls), cache, shared, false); err != nil {
+			t.Fatal(err)
+		}
 	}
 	buffer := make([]byte, 32)
-	n, err := reader.ReadAt(buffer, 0)
-	if string(buffer[:n]) != "old generation" {
-		t.Fatalf("active reader was mutated: %q, %v", buffer[:n], err)
+	if n, _ := reader.ReadAt(buffer, 0); string(buffer[:n]) != "stale" {
+		t.Fatalf("active reader was mutated: %q", buffer[:n])
+	}
+	if contents, err := os.ReadFile(filepath.Join(cache, "db", "trivy.db")); err != nil || string(contents) != "trivy.db" {
+		t.Fatalf("family does not read the new generation: %q, %v", contents, err)
+	}
+	generations, err := filepath.Glob(filepath.Join(shared, "db-v2-*"))
+	if err != nil || len(generations) != 1 {
+		t.Fatalf("superseded generations kept on disk: %v, %v", generations, err)
+	}
+	for path, kept := range map[string]bool{abandoned: false, recent: true} {
+		if _, err := os.Stat(path); (err == nil) != kept {
+			t.Errorf("%s kept=%t after refresh: %v", path, kept, err)
+		}
+	}
+}
+
+func TestScannerTrivyPinsOfOneSchemaShareTheirGeneration(t *testing.T) {
+	root := t.TempDir()
+	shared := filepath.Join(root, "shared")
+	var calls atomic.Int32
+	runner := scannerDownloader(t, &calls)
+	pinned := ToolAssets["trivy"]
+	t.Cleanup(func() { ToolAssets["trivy"] = pinned })
+	for index, digest := range []string{strings.Repeat("a", 64), strings.Repeat("b", 64), strings.Repeat("a", 64)} {
+		ToolAssets["trivy"] = ToolAsset{URL: pinned.URL, Digest: digest, Member: pinned.Member}
+		if err := PrepareScanner(context.Background(), runner, filepath.Join(root, fmt.Sprint(index)), shared, true); err != nil {
+			t.Fatal(err)
+		}
+		for previous := range index + 1 {
+			if _, err := os.Stat(filepath.Join(root, fmt.Sprint(previous), "db", "trivy.db")); err != nil {
+				t.Fatalf("pin %d lost the database of pin %d: %v", index, previous, err)
+			}
+		}
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("trivy pins of one schema downloaded %d times, want once per database", calls.Load())
+	}
+}
+
+func TestScannerRefreshesAheadOfExpiryWhileReadersStillAccept(t *testing.T) {
+	root := t.TempDir()
+	shared := filepath.Join(root, "shared")
+	scannerGeneration(t, shared, "db-v2-1", scannerDatabases[0], "expiring", time.Now().Add(-23*time.Hour), time.Now().Add(30*time.Minute))
+	previous := scannerAccount
+	scannerAccount = func() int { return os.Geteuid() + 1 }
+	reader := process.Runner{Execute: func(context.Context, process.Options) (process.Result, error) {
+		t.Error("a reader refreshed the shared databases")
+		return process.Result{}, nil
+	}}
+	if err := PrepareScanner(context.Background(), reader, filepath.Join(root, "reader"), shared, false); err != nil {
+		t.Fatalf("a database 30 minutes from its next update was rejected: %v", err)
+	}
+	scannerAccount = previous
+	var calls atomic.Int32
+	if err := RefreshScanner(context.Background(), scannerDownloader(t, &calls), shared, false); err != nil || calls.Load() != 1 {
+		t.Fatalf("refresh within the margin of the next update downloaded %d times: %v", calls.Load(), err)
 	}
 }
 
@@ -208,15 +341,8 @@ func TestScannerRejectsInvalidDownloadAndUnsafeCache(t *testing.T) {
 func BenchmarkScannerWarmPreparation(b *testing.B) {
 	root := b.TempDir()
 	cache, shared := filepath.Join(root, "family"), filepath.Join(root, "shared")
-	directory := filepath.Join(shared, ToolAssets["trivy"].Digest, "db")
-	if err := os.MkdirAll(directory, 0700); err != nil {
-		b.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(directory, "trivy.db"), []byte(strings.Repeat("db", 1024)), 0600); err != nil {
-		b.Fatal(err)
-	}
-	metadata, _ := json.Marshal(map[string]any{"Version": 2, "DownloadedAt": time.Now().Add(-time.Minute), "NextUpdate": time.Now().Add(time.Hour)})
-	if err := os.WriteFile(filepath.Join(directory, "metadata.json"), metadata, 0600); err != nil {
+	var calls atomic.Int32
+	if err := RefreshScanner(context.Background(), scannerDownloader(b, &calls), shared, false); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
@@ -224,5 +350,24 @@ func BenchmarkScannerWarmPreparation(b *testing.B) {
 		if err := PrepareScanner(context.Background(), process.Runner{}, cache, shared, false); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestScannerRefreshAheadOfExpiryDownloadsOncePerGrace(t *testing.T) {
+	root := t.TempDir()
+	shared := filepath.Join(root, "shared")
+	var calls atomic.Int32
+	runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		calls.Add(1)
+		scannerFixture(t, filepath.Join(options.Args[2], "db"), scannerDatabases[0], "published", time.Now().Add(-time.Minute), time.Now().Add(30*time.Minute))
+		return process.Result{}, nil
+	}}
+	for range 5 {
+		if err := RefreshScanner(context.Background(), runner, shared, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("an upstream database already inside the refresh margin was downloaded %d times", calls.Load())
 	}
 }

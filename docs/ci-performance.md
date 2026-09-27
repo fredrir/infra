@@ -79,15 +79,13 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Check cache save | 10 s p50 on every main push; 827 MB entries | Save only when Bazel executed actions |
 | Bazel install extraction | 4.3 seconds per hosted job | Cache the install base with the Bazel caches |
 
-| Scanner rollout constraint | Requirement |
+| Scanner database | Value |
 | --- | --- |
-| Shared storage | `trivy-v3` family directories and shared database root must use the same filesystem |
-| Freshness | Pinned Trivy metadata policy; failed or stale refresh blocks preparation |
-| Concurrency | Shared refresh lock; per-family scan lock; immutable database replacement |
-| Database lifetime | Per-attempt leases release family database links after jobs; six-hour maintenance removes expired abandoned leases under family locks |
+| Publication | Immutable generation per database schema, `<shared>/db-v2` and `<shared>/java-db-v1` symlinks replaced atomically, files `0444`; open readers keep the replaced generation, which is deleted once replaced; entries of other schemas are deleted after seven days |
+| Refresh | Only the owner of the shared directory refreshes it, under the shared lock; jobs of other accounts only read it |
+| Freshness | Pinned Trivy metadata policy; readers accept until the later of the next update and the download time plus the database grace (1 h vulnerability, 24 h Java); refresh starts two hours before the next update, at most once per grace; failed or stale refresh blocks preparation |
+| Families | `trivy-v4/<family>` analysis cache per image family; `db` and `java-db` link to the shared generation; per-family scan lock |
 | Analysis warm-up | `scanner-analysis` preparation stage, 5 m budget, exact `vulnerability-scan` arguments; the 10 s check then reads a warm analysis cache |
-| Legacy cache | Database copies removed after draining listeners; analysis caches retained and seeded into the new namespace |
-| Rollback | Previous CLI/workflow pins can reuse retained analysis and download current databases; remove the new prune command before downgrading the installed CLI |
 
 ## Execution controls
 
