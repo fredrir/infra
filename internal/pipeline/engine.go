@@ -22,7 +22,11 @@ type engineContainer struct {
 }
 
 func inspectEngine(ctx context.Context) (engineContainer, bool, error) {
-	name, ok := strings.CutPrefix(os.Getenv("_EXPERIMENTAL_DAGGER_RUNNER_HOST"), "docker-container://")
+	host := os.Getenv("_EXPERIMENTAL_DAGGER_RUNNER_HOST")
+	if strings.HasPrefix(host, "unix://") {
+		return declaredEngine()
+	}
+	name, ok := strings.CutPrefix(host, "docker-container://")
 	if !ok {
 		return engineContainer{}, false, nil
 	}
@@ -34,6 +38,22 @@ func inspectEngine(ctx context.Context) (engineContainer, bool, error) {
 	if err := json.Unmarshal(result.Stdout, &engine); err != nil {
 		return engineContainer{}, false, fmt.Errorf("inspect Dagger engine %s: %w", name, err)
 	}
+	return engine, true, nil
+}
+
+func declaredEngine() (engineContainer, bool, error) {
+	var engine engineContainer
+	values := map[string]int64{}
+	for _, name := range []string{"INFRA_ENGINE_CPUS", "INFRA_ENGINE_MEMORY_BYTES", "INFRA_ENGINE_PARALLELISM"} {
+		value, err := strconv.ParseInt(os.Getenv(name), 10, 64)
+		if err != nil || value <= 0 {
+			return engine, false, fmt.Errorf("%s must declare the engine limit as a positive integer", name)
+		}
+		values[name] = value
+	}
+	engine.HostConfig.NanoCpus = values["INFRA_ENGINE_CPUS"] * 1e9
+	engine.HostConfig.Memory = values["INFRA_ENGINE_MEMORY_BYTES"]
+	engine.Args = []string{fmt.Sprintf("--oci-max-parallelism=%d", values["INFRA_ENGINE_PARALLELISM"])}
 	return engine, true, nil
 }
 

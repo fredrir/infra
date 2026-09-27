@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"testing"
 )
@@ -15,6 +16,25 @@ func TestEngineInspectionOnlyTargetsDockerHostedEngines(t *testing.T) {
 	t.Setenv("_EXPERIMENTAL_DAGGER_RUNNER_HOST", "docker-container://infra-dagger")
 	if _, found, err := inspectEngine(context.Background()); found || err == nil {
 		t.Fatalf("unreadable Docker engine reported limits: found=%t err=%v", found, err)
+	}
+}
+
+func TestSocketEnginesDeclareTheirLimitsThroughTheRunnerEnvironment(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("_EXPERIMENTAL_DAGGER_RUNNER_HOST", "unix:///run/infra-dagger/infra/engine.sock")
+	t.Setenv("INFRA_ENGINE_CPUS", "8")
+	t.Setenv("INFRA_ENGINE_MEMORY_BYTES", fmt.Sprint(int64(10)<<30))
+	t.Setenv("INFRA_ENGINE_PARALLELISM", "3")
+	engine, found, err := inspectEngine(context.Background())
+	if err != nil || !found {
+		t.Fatalf("socket engine limits not read: found=%t err=%v", found, err)
+	}
+	if got, want := goBuildArgs(engine), map[string]string{"GO_BUILD_PARALLELISM": "3", "GO_BUILD_MEMORY_LIMIT": "1137MiB"}; !maps.Equal(got, want) {
+		t.Fatalf("build arguments %v, want %v", got, want)
+	}
+	t.Setenv("INFRA_ENGINE_PARALLELISM", "")
+	if _, found, err := inspectEngine(context.Background()); found || err == nil {
+		t.Fatalf("incomplete socket engine limits accepted: found=%t err=%v", found, err)
 	}
 }
 
