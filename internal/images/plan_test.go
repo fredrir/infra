@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -204,9 +206,8 @@ func TestRegistryFailuresPlanImages(t *testing.T) {
 		})
 	}
 	t.Run("connection-refused", func(t *testing.T) {
-		server := httptest.NewServer(http.NotFoundHandler())
-		server.Close()
-		p := images.Planner{Root: repository(t), Registry: server.URL, InfraBinary: infraBinary(t, "infra v1"), Client: server.Client(), Log: io.Discard}
+		refusing := &http.Client{Transport: &http.Transport{DialContext: func(context.Context, string, string) (net.Conn, error) { return nil, syscall.ECONNREFUSED }}}
+		p := images.Planner{Root: repository(t), Registry: "http://registry.invalid", InfraBinary: infraBinary(t, "infra v1"), Client: refusing, Log: io.Discard}
 		if len(plan(t, p)) != 2 {
 			t.Fatal("connection failure did not plan all images")
 		}
