@@ -28,16 +28,16 @@ case "${1:-}" in
     destination=$(count "$aws")
     [ -n "$source" ] && [ -n "$destination" ] || refuse "object counts unavailable"
     [ $((source * 100)) -ge $((destination * MIN_SOURCE_PERCENT)) ] || refuse "$store holds $source objects, below $MIN_SOURCE_PERCENT% of the $destination in $aws"
-    dataset sync "$store" "$aws" --checksum --max-delete=1000 --log-level=NOTICE
+    dataset sync "$store" "$aws" --checksum --max-delete=1000 --buffer-size=4M --log-level=NOTICE
     ;;
   seed)
-    dataset copy "$aws" "$store" --checksum --transfers=16 --log-level=NOTICE
+    dataset copy "$aws" "$store" --checksum --transfers=8 --buffer-size=4M --log-level=NOTICE
     dataset check "$aws" "$store" --one-way --size-only
     rclone delete --max-depth 1 "--include=/$sentinel" "$store"
     rclone touch "$store/$sentinel"
     ;;
   restore)
-    dataset copy "$aws" "$store" --ignore-existing --transfers=16 --log-level=NOTICE
+    dataset copy "$aws" "$store" --ignore-existing --transfers=8 --buffer-size=4M --log-level=NOTICE
     ;;
   unseed)
     rclone delete --max-depth 1 "--include=/$sentinel" "$store"

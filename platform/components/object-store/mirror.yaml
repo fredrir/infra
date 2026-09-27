@@ -178,7 +178,7 @@ spec:
                 - name: HOME
                   value: /tmp
                 - name: GOMEMLIMIT
-                  value: 192MiB
+                  value: 288MiB
                 - name: SSL_CERT_DIR
                   value: /etc/ssl/certs:/etc/object-store
                 - name: RCLONE_CONFIG_STORE_TYPE
@@ -225,7 +225,7 @@ spec:
                   memory: 96Mi
                 limits:
                   cpu: '1'
-                  memory: 256Mi
+                  memory: 384Mi
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true

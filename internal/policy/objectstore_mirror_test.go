@@ -74,7 +74,7 @@ func TestParserDatasetMirrorScriptGuardsTheAWSCopy(t *testing.T) {
 		"lsf --files-only --max-depth 1 --include=/.mirror-seeded store:parser-dataset",
 		"size store:parser-dataset --json " + datasetFilters,
 		"size aws:llunde-pyparser-bucket --json " + datasetFilters,
-		"sync store:parser-dataset aws:llunde-pyparser-bucket --checksum --max-delete=1000 --log-level=NOTICE " + datasetFilters,
+		"sync store:parser-dataset aws:llunde-pyparser-bucket --checksum --max-delete=1000 --buffer-size=4M --log-level=NOTICE " + datasetFilters,
 	}
 	if !slices.Equal(calls, want) {
 		t.Fatalf("mirror ran\n%s\nwant\n%s", strings.Join(calls, "\n"), strings.Join(want, "\n"))
@@ -130,7 +130,7 @@ func TestParserDatasetSeedMarksTheSourceOnlyAfterACheck(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"copy aws:llunde-pyparser-bucket store:parser-dataset --checksum --transfers=16 --log-level=NOTICE " + datasetFilters,
+		"copy aws:llunde-pyparser-bucket store:parser-dataset --checksum --transfers=8 --buffer-size=4M --log-level=NOTICE " + datasetFilters,
 		"check aws:llunde-pyparser-bucket store:parser-dataset --one-way --size-only " + datasetFilters,
 		"delete --max-depth 1 --include=/.mirror-seeded store:parser-dataset",
 		"touch store:parser-dataset/.mirror-seeded",
@@ -149,7 +149,7 @@ func TestParserDatasetRestoreKeepsEveryExistingObject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"copy aws:llunde-pyparser-bucket store:parser-dataset --ignore-existing --transfers=16 --log-level=NOTICE " + datasetFilters}
+	want := []string{"copy aws:llunde-pyparser-bucket store:parser-dataset --ignore-existing --transfers=8 --buffer-size=4M --log-level=NOTICE " + datasetFilters}
 	if !slices.Equal(calls, want) {
 		t.Fatalf("restore ran\n%s\nwant\n%s", strings.Join(calls, "\n"), strings.Join(want, "\n"))
 	}
@@ -179,12 +179,12 @@ func TestParserDatasetMirrorJobsKeepTheirBlastRadius(t *testing.T) {
 		t.Fatal(err)
 	}
 	roles := map[string]struct {
-		suspended  bool
-		mode, cell string
-		extra      map[string]string
+		suspended                   bool
+		mode, cell, memory, goLimit string
+		extra                       map[string]string
 	}{
-		"parser-dataset-mirror": {false, "sync", "PARSER_MIRROR", map[string]string{"MIN_SOURCE_PERCENT": "90", "SEED_NOT_BEFORE": "configmap:parser-dataset-mirror-fence/SEED_NOT_BEFORE optional=true"}},
-		"parser-dataset-seed":   {true, "seed", "PARSER_DATASET", nil},
+		"parser-dataset-mirror": {false, "sync", "PARSER_MIRROR", "256Mi", "192MiB", map[string]string{"MIN_SOURCE_PERCENT": "90", "SEED_NOT_BEFORE": "configmap:parser-dataset-mirror-fence/SEED_NOT_BEFORE optional=true"}},
+		"parser-dataset-seed":   {true, "seed", "PARSER_DATASET", "384Mi", "288MiB", nil},
 	}
 	resources := objectStoreResources(t)
 	configMaps := map[string]object{}
@@ -228,6 +228,9 @@ func TestParserDatasetMirrorJobsKeepTheirBlastRadius(t *testing.T) {
 		if lookup(container, "securityContext", "allowPrivilegeEscalation") != false || lookup(container, "securityContext", "readOnlyRootFilesystem") != true || fmt.Sprint(lookup(container, "securityContext", "capabilities", "drop")) != "[ALL]" || lookup(container, "securityContext", "runAsUser") != nil {
 			t.Errorf("%s container is not hardened", name)
 		}
+		if lookup(container, "resources", "limits", "memory") != role.memory {
+			t.Errorf("%s memory limit %v, want %s", name, lookup(container, "resources", "limits", "memory"), role.memory)
+		}
 		environment := map[string]string{}
 		for _, env := range container["env"].([]any) {
 			key := at(env, "name").(string)
@@ -241,7 +244,7 @@ func TestParserDatasetMirrorJobsKeepTheirBlastRadius(t *testing.T) {
 		}
 		want := map[string]string{
 			"HOME":                                  "/tmp",
-			"GOMEMLIMIT":                            "192MiB",
+			"GOMEMLIMIT":                            role.goLimit,
 			"SSL_CERT_DIR":                          "/etc/ssl/certs:/etc/object-store",
 			"RCLONE_CONFIG_STORE_TYPE":              "s3",
 			"RCLONE_CONFIG_STORE_PROVIDER":          "SeaweedFS",
