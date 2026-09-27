@@ -116,12 +116,15 @@ These values were copied from Doppler, which still holds them; rotate each befor
 | `HETZNER_RECONCILER_ADMIN` | Operator SOPS, Doppler `ops` | Reconciler OpenTofu plan |
 | `CLOUDFLARE_API_TOKEN` | Operator SOPS, Doppler `ops` and apply | Fleet OpenTofu plan with replacement operator token |
 | `CLOUDFLARE_OPENTOFU_ROOT` | Operator SOPS, Doppler `ops` | Account-token inventory and reconciler OpenTofu plan |
-| `LINODE_TOKEN` | Operator SOPS, Doppler `ops` | Confirm its consumers before replacement or revocation |
-| `TAILSCALE_ENROLL_CLIENT_SECRET`, `TAILSCALE_POLICY_CLIENT_SECRET`, `TAILSCALE_RECONCILER` | Operator SOPS, Doppler `ops` | Enrollment, policy validation and reconciler enrollment |
+| `LINODE_TOKEN` | Operator SOPS, Doppler `ops`; Linode instance `67711497` (`fredrir-06`) | Cloud Manager replacement with `linodes:read_write`; verify instance read; confirm external consumers before revocation |
+| `TAILSCALE_ENROLL_CLIENT_SECRET` | Operator SOPS, Doppler `ops` | OAuth `auth_keys`, owner tag `tag:platform-enrollment`; verify control, worker and volatile enrollment |
+| `TAILSCALE_POLICY_CLIENT_SECRET` | Operator SOPS, Doppler `ops` | OAuth `policy_file`, `devices:core:read`, `devices:posture_attributes`; verify policy validation and device inventory |
 | `PLATFORM_WATCHDOG_SMTP_PASSWORD` | Operator SOPS, Gatus, Alertmanager, Doppler `ops` | SMTP delivery from both consumers |
 | `PACKAGES_GPG_KEY`, `PACKAGES_APK_KEY`, `AUR_SSH_KEY` | Operator SOPS, `fredrir/packages` environment `publish`, Doppler `ops` | Package signing and AUR publishing; distribute replacement public signing keys before old keys are retired |
 
 `credential NAME` is `jq -Rs 'rtrimstr("\n")' | sops set --value-stdin ansible/roles/reconciler/files/credentials.sops.yaml "[\"apply\"][\"NAME\"]"`.
+
+Reconciler provisioning uses a fresh one-use, preauthorized, non-ephemeral auth key with `tag:infra-reconciler`; an enrolled node uses its own node identity.
 
 ## Retire a recipient
 
