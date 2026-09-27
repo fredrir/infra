@@ -120,6 +120,7 @@
   vars:
     host_secrets_src: credentials.sops.yaml
     host_secrets_dest: /etc/infra-reconcile/credentials.sops.yaml
+  tags: [reconciler_credentials]
 
 - name: Require every verification credential
   ansible.builtin.command:
@@ -129,6 +130,7 @@
   loop: "{{ reconciler_verify_credentials }}"
   changed_when: false
   check_mode: false
+  tags: [reconciler_credentials]
 
 - name: Require every apply credential
   ansible.builtin.command:
@@ -138,6 +140,7 @@
   loop: "{{ reconciler_apply_credentials }}"
   changed_when: false
   check_mode: false
+  tags: [reconciler_credentials]
 
 - name: Require the runner App installation
   ansible.builtin.assert:
