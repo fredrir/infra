@@ -223,24 +223,6 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: infrastructure-plan-credentials
-  namespace: flux-system
-  annotations:
-    kubernetes.io/service-account.name: infrastructure-plan
-type: kubernetes.io/service-account-token
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: infrastructure-apply-credentials
-  namespace: flux-system
-  annotations:
-    kubernetes.io/service-account.name: infrastructure-apply
-type: kubernetes.io/service-account-token
----
-apiVersion: v1
-kind: Secret
-metadata:
   name: infrastructure-verify-credentials
   namespace: flux-system
   annotations:
