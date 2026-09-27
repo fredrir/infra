@@ -50,6 +50,8 @@ var provenanceTemplates struct {
 }
 
 func TestMain(m *testing.M) {
+	os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	os.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	code := m.Run()
 	if template := provenanceTemplates.template; template != nil {
 		os.RemoveAll(template.area)
@@ -59,8 +61,6 @@ func TestMain(m *testing.M) {
 
 func sharedProvenanceTemplate(t *testing.T) *provenanceTemplate {
 	t.Helper()
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	provenanceTemplates.once.Do(func() { provenanceTemplates.template = buildProvenanceTemplate(t) })
 	if provenanceTemplates.template == nil {
 		t.Fatal("provenance fixture template unavailable")
@@ -127,8 +127,6 @@ func copyTree(t *testing.T, source, destination string) {
 func TestProvenanceTemplateStartsNoBackgroundGitMaintenance(t *testing.T) {
 	events := filepath.Join(t.TempDir(), "trace2.json")
 	t.Setenv("GIT_TRACE2_EVENT", events)
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	template := buildProvenanceTemplate(t)
 	t.Cleanup(func() { os.RemoveAll(template.area) })
 	data, err := os.ReadFile(events)
@@ -388,6 +386,7 @@ func testProvenanceGateQuarter(t *testing.T, quarter int) {
 			continue
 		}
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			f := newProvenanceFixture(t)
 			err := f.verify(f.base, test.build(f))
 			if test.unverified == "" && err != nil {

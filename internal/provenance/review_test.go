@@ -236,6 +236,7 @@ func testReviewedMergesQuarter(t *testing.T, quarter int) {
 			continue
 		}
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			f := newProvenanceFixture(t)
 			f.api.reset()
 			head := test.build(f)
