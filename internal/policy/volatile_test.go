@@ -53,7 +53,6 @@ func TestOnlyNodeAgentsAndUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) 
 		"platform/components/dns/node-local-dns.yaml",
 		"platform/components/observability/monitoring.yaml",
 		"platform/components/runners/infra/check-values.yaml",
-		"platform/components/runners/rust/volatile/kustomization.yaml",
 	}
 	tolerating := map[string]bool{}
 	scanned := 0
@@ -187,21 +186,6 @@ func TestClusterControllersRequireCriticalNodes(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("no controllers checked")
-	}
-}
-
-func TestVolatileToleranceKeepsSharedWorkerLimits(t *testing.T) {
-	component := load(t, "platform/components/runners/rust/volatile/kustomization.yaml")
-	for _, patch := range at(component, "patches").([]any) {
-		var operations []object
-		if err := yaml.Unmarshal([]byte(at(patch, "patch").(string)), &operations); err != nil {
-			t.Fatal(err)
-		}
-		for _, operation := range operations {
-			if path := operation["path"].(string); strings.Contains(path, "/resources") {
-				t.Errorf("pools that prefer but do not require volatile workers change %s", path)
-			}
-		}
 	}
 }
 

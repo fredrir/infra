@@ -2,6 +2,8 @@ package policy
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -149,7 +151,10 @@ func TestRustCacheCredentialsStayWithinPool(t *testing.T) {
 	}
 }
 
-const gvisorWorker = "node-restriction.kubernetes.io/gvisor"
+const (
+	gvisorWorker = "node-restriction.kubernetes.io/gvisor"
+	kataWorker   = "node-restriction.kubernetes.io/kata"
+)
 
 func placementScore(nodeAffinity object, labels ...string) int {
 	score := 0
@@ -178,7 +183,7 @@ func placementScore(nodeAffinity object, labels ...string) int {
 
 func TestOnlyUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
 	const volatile = "node-restriction.kubernetes.io/volatile"
-	tolerating := map[string]bool{"check-amd64": true, "rust-amd64": true, "rust-pr-amd64": true}
+	tolerating := map[string]bool{"check-amd64": true}
 	seen := map[string]bool{}
 	for _, overlay := range at(load(t, "platform/components/runners/kustomization.yaml"), "resources").([]any) {
 		for _, resource := range rendered(t, "platform/components/runners/"+overlay.(string)) {
@@ -221,12 +226,9 @@ func TestOnlyUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
 			if _, required := nodeAffinity["requiredDuringSchedulingIgnoredDuringExecution"]; required {
 				t.Errorf("%s requires a node selection instead of preferring volatile workers", name)
 			}
-			shared, volatileWorker, kata := placementScore(nodeAffinity, gvisorWorker), placementScore(nodeAffinity, gvisorWorker, volatile), placementScore(nodeAffinity, gvisorWorker, "node-restriction.kubernetes.io/kata")
-			if name == "check-amd64" && (shared <= volatileWorker || volatileWorker <= kata) {
+			shared, volatileWorker, kata := placementScore(nodeAffinity, gvisorWorker), placementScore(nodeAffinity, gvisorWorker, volatile), placementScore(nodeAffinity, gvisorWorker, kataWorker)
+			if shared <= volatileWorker || volatileWorker <= kata {
 				t.Errorf("%s scores shared %d, volatile %d and kata %d workers; want shared first and volatile as the fallback", name, shared, volatileWorker, kata)
-			}
-			if name != "check-amd64" && (volatileWorker <= shared || volatileWorker <= kata) {
-				t.Errorf("%s does not prefer volatile workers: shared %d, volatile %d, kata %d", name, shared, volatileWorker, kata)
 			}
 			for _, container := range spec["containers"].([]any) {
 				if _, ok := at(container, "resources", "requests").(object)["ephemeral-storage"]; !ok {
@@ -238,6 +240,54 @@ func TestOnlyUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
 	for name := range tolerating {
 		if !seen[name] {
 			t.Errorf("volatile pool %s not rendered", name)
+		}
+	}
+}
+
+func TestRustPoolsRunOnTheSharedWorker(t *testing.T) {
+	const sharedWorkerHeadroom = "850m"
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), "platform/components/policy/runtime.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	overhead := map[string]object{}
+	for _, runtime := range yamlObjects(t, data) {
+		overhead[at(runtime, "metadata", "name").(string)] = at(runtime, "overhead", "podFixed").(object)
+	}
+	placed := map[string]bool{}
+	for _, resource := range rendered(t, "platform/components/runners/nsql") {
+		if resource["kind"] != "HelmRelease" {
+			continue
+		}
+		values := at(resource, "spec", "values").(object)
+		name := values["runnerScaleSetName"].(string)
+		spec := at(values, "template", "spec").(object)
+		if toleratesVolatile(spec["tolerations"]) {
+			t.Errorf("%s tolerates volatile workers", name)
+		}
+		if name != "rust-amd64" && name != "rust-pr-amd64" {
+			continue
+		}
+		placed[name] = true
+		affinity, _ := spec["affinity"].(object)
+		nodeAffinity, _ := affinity["nodeAffinity"].(object)
+		if _, required := nodeAffinity["requiredDuringSchedulingIgnoredDuringExecution"]; required {
+			t.Errorf("%s requires a node selection instead of preferring the shared worker", name)
+		}
+		if shared, kata := placementScore(nodeAffinity, gvisorWorker), placementScore(nodeAffinity, gvisorWorker, kataWorker); shared <= kata {
+			t.Errorf("%s scores the shared worker %d and kata workers %d; want the shared worker first", name, shared, kata)
+		}
+		reserved := quantity(t, overhead[spec["runtimeClassName"].(string)]["cpu"])
+		for _, container := range spec["containers"].([]any) {
+			reserved.Add(reserved, quantity(t, at(container, "resources", "requests", "cpu")))
+		}
+		if reserved.Cmp(quantity(t, sharedWorkerHeadroom)) > 0 {
+			t.Errorf("%s reserves %s CPU with its sandbox, more than the shared worker headroom of %s", name, reserved.FloatString(3), sharedWorkerHeadroom)
+		}
+	}
+	for _, name := range []string{"rust-amd64", "rust-pr-amd64"} {
+		if !placed[name] {
+			t.Errorf("Rust pool %s not rendered", name)
 		}
 	}
 }

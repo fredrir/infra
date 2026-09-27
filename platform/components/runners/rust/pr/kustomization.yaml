@@ -4,7 +4,7 @@ nameSuffix: -pr
 resources:
 - ../pool
 components:
-- ../volatile
+- ../shared-worker
 patches:
 - target:
     kind: HelmRelease
