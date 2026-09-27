@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/fredrir/infra/internal/process"
@@ -172,21 +173,23 @@ func TestHostVerificationReportsEveryFailure(t *testing.T) {
 	if err := commands.VerifyHosts(context.Background(), Plan{Affected: All()}); err == nil || calls.Load() != 0 {
 		t.Fatalf("missing runner fleet reached host verification: calls=%d, error=%v", calls.Load(), err)
 	}
-	commands = Commands{Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
-		if opts.Name != "gh" {
-			return process.Result{}, nil
+	synctest.Test(t, func(t *testing.T) {
+		commands := Commands{Runner: process.Runner{Dir: writeRunnerFleet(t, fleet), Execute: func(_ context.Context, opts process.Options) (process.Result, error) {
+			if opts.Name != "gh" {
+				return process.Result{}, nil
+			}
+			runners := healthyRunners(fleet, queriedRepository(opts))
+			for index := range runners {
+				runners[index].Status = "offline"
+			}
+			return runnerResponse(t, runners...), nil
+		}}}
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		if err := commands.VerifyHosts(ctx, Plan{Affected: All()}); err == nil || !strings.Contains(err.Error(), "infra-build-09-infra-1 is offline") {
+			t.Fatalf("runner fleet drift passed host verification: %v", err)
 		}
-		runners := healthyRunners(fleet, queriedRepository(opts))
-		for index := range runners {
-			runners[index].Status = "offline"
-		}
-		return runnerResponse(t, runners...), nil
-	}}}
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	if err := commands.VerifyHosts(ctx, Plan{Affected: All()}); err == nil || !strings.Contains(err.Error(), "infra-build-09-infra-1 is offline") {
-		t.Fatalf("runner fleet drift passed host verification: %v", err)
-	}
+	})
 }
 
 func TestHostPlanValidatesRunnerFleet(t *testing.T) {
