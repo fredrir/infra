@@ -136,3 +136,18 @@ func TestUnavailableRemoteCacheIsLeftOutOfTheBazelInvocation(t *testing.T) {
 		}
 	}
 }
+
+func TestCacheTransferDeadlineAllowsBuildsWithoutExtendingFastChecks(t *testing.T) {
+	for _, test := range []struct{ operation, timeout string }{{"build", "30s"}, {"prepare-check", "30s"}, {"test", "10s"}} {
+		t.Run(test.operation, func(t *testing.T) {
+			root, bazel, calls := fakeWorkspace(t)
+			opts := Options{Root: root, Local: true, Bazel: bazel, Operation: test.operation, RemoteCache: grpcServer(t, "0"), ReportDir: t.TempDir()}
+			if _, err := Run(context.Background(), opts); err != nil {
+				t.Fatal(err)
+			}
+			if invocation := readFile(t, calls); !strings.Contains(invocation, "--remote_timeout="+test.timeout+" ") {
+				t.Fatalf("%s cache deadline missing from %q", test.timeout, invocation)
+			}
+		})
+	}
+}

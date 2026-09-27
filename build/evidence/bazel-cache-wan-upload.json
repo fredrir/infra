@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "date": "2026-09-27",
+  "source_revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af",
+  "live": {
+    "github_run": 36355822422,
+    "cli_job": 108723217482,
+    "cli_writer": {
+      "successful_cas_writes": 2676,
+      "successful_ac_updates": 738,
+      "deadline_aborted_writes": 38,
+      "maximum_successful_write_seconds": 9.671
+    },
+    "cpu_throttled_periods": {
+      "filter": 0,
+      "bazel_remote": 0
+    },
+    "fresh_reader": {
+      "bazel_elapsed_seconds": 21.124,
+      "remote_cache_hits": 738,
+      "internal_actions": 84,
+      "local_actions": 5
+    },
+    "cache_upload_qualification": "failed: large blobs exceeded 10 seconds"
+  },
+  "wan_replay": {
+    "rtt_ms": 136,
+    "concurrent_large_artifacts": 3,
+    "remote_retries": 0,
+    "artifacts": {
+      "compiler": {
+        "bytes": 28238898,
+        "sha256": "3780fc07130d6d45096373acf062cc316940d253e2a1d892ece03a3bdd0d21d4",
+        "stored_compressed_bytes": 9665339
+      },
+      "github": {
+        "bytes": 29259914,
+        "sha256": "0d51867a87c809cc72e413954a889fae211178e936397f3d26f3110a8dfa44ab",
+        "stored_compressed_bytes": 4041060
+      },
+      "infra": {
+        "bytes": 19398816,
+        "sha256": "2baaadfb9b2547e286ee4412a360492845749dc674659691809176c2bdc21437",
+        "stored_compressed_bytes": 8335644
+      }
+    },
+    "runs": [
+      {
+        "timeout": 10,
+        "role": "writer",
+        "exit": 0,
+        "seconds": 11.583,
+        "deadline_warnings": 3,
+        "remote_cache_hits": 0,
+        "cas_blobs": 6,
+        "action_results": 0
+      },
+      {
+        "timeout": 10,
+        "role": "reader",
+        "exit": 0,
+        "seconds": 1.42,
+        "deadline_warnings": 0,
+        "remote_cache_hits": 0,
+        "cas_blobs": 6,
+        "action_results": 0
+      },
+      {
+        "timeout": 30,
+        "role": "writer",
+        "exit": 0,
+        "seconds": 25.098,
+        "deadline_warnings": 0,
+        "remote_cache_hits": 0,
+        "cas_blobs": 9,
+        "action_results": 3
+      },
+      {
+        "timeout": 30,
+        "role": "reader",
+        "exit": 0,
+        "seconds": 3.473,
+        "deadline_warnings": 0,
+        "remote_cache_hits": 3,
+        "cas_blobs": 9,
+        "action_results": 3
+      }
+    ],
+    "successful_large_upload_seconds": [
+      11.439,
+      19.601,
+      23.279
+    ]
+  },
+  "fast_check": {
+    "aggregate_budget_seconds": 10,
+    "cache_rpc_deadline_seconds": 10,
+    "live_d41_result": "failed: local test resource queues exhausted the aggregate budget",
+    "examples": {
+      "contracts_test": {
+        "resource_queue_seconds": 2.503465,
+        "execution_seconds": 4.368597
+      },
+      "enrollment_test": {
+        "resource_queue_seconds": 7.229754,
+        "execution_seconds": 0.202697
+      },
+      "reconciler_shard_1": {
+        "resource_queue_seconds": 7.054585,
+        "execution_seconds_before_cancel": 0.989668
+      }
+    }
+  },
+  "limitations": [
+    "The WAN replay uses production nginx configuration and actual build outputs in an isolated network namespace; container CPU and memory limits are not imposed by this replay.",
+    "The 30-second build deadline still requires qualification on the hosted CI writer.",
+    "The fast-check failure is separate and remains unresolved by the upload deadline change."
+  ]
+}

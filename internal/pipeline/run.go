@@ -147,7 +147,11 @@ func buildArgs(opts Options, config Toolchain, targets []string, reports string)
 		}
 	}
 	if opts.RemoteCache != "" {
-		args = append(args, "--remote_cache="+opts.RemoteCache, "--remote_cache_compression", "--remote_timeout="+remoteCacheTimeout, "--jobs="+remoteCacheJobs)
+		timeout := remoteCacheTimeout
+		if operation == "build" {
+			timeout = "30s"
+		}
+		args = append(args, "--remote_cache="+opts.RemoteCache, "--remote_cache_compression", "--remote_timeout="+timeout, "--jobs="+remoteCacheJobs)
 	}
 	if opts.RemoteExecutor != "" {
 		args = append(args, "--remote_executor="+opts.RemoteExecutor)
