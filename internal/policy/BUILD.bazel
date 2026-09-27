@@ -7,6 +7,7 @@ go_test(
         "helpers_test.go",
         "listener_test.go",
         "node_test.go",
+        "objectstore_alerts_test.go",
         "objectstore_dataset_scope_test.go",
         "objectstore_mirror_test.go",
         "objectstore_parser_test.go",
@@ -19,7 +20,7 @@ go_test(
         "runner_test.go",
         "volatile_test.go",
     ],
-    data = [
+    data = glob(["testdata/**"]) + [
         "//:dataset_access_data",
         "//:node_registration_data",
         "//:workflows",

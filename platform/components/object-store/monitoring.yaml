@@ -123,6 +123,15 @@ spec:
             severity: critical
           annotations:
             summary: The enabled parser dataset mirror has no successful run
+        - alert: ParserDatasetShrinking
+          expr: |
+            max by (bucket) (SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"})
+            < 0.95 * max by (bucket) (max_over_time(SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}[6h]))
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
         - alert: ObjectStoreLifecycleStalled
           expr: |
             time() - min by (service) (SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store"} > 0) / 1e9 > 172800

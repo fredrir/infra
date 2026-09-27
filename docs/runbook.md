@@ -567,6 +567,8 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Mirror memory | rclone fills one read-ahead buffer per transfer whenever the destination accepts data slower than the source serves it, so `mirror.sh` uses 4 MiB buffers and seed and restore copy with 8 transfers; `parser-dataset-seed` GOMEMLIMIT 288MiB, limit 384Mi (peak 141 MiB with eight 100 MB objects in flight to `nl` at 16 MB/s); `parser-dataset-mirror` GOMEMLIMIT 192MiB, limit 256Mi (peak 114 MiB with four) |
 | Certificates expire | 2029-09-26; `ObjectStoreCertificateExpiring` from 2029-08-27 |
 
+Every alert has promtool cases in `internal/policy/testdata/object-store-alerts.yaml`, run by the check workflow's `alerts` job.
+
 | Alert | Fires |
 | --- | --- |
 | `ObjectStoreProvisionerFailing` | No successful provisioner run for 2 h |
@@ -576,6 +578,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | `ObjectStoreLifecycleStalled` | Any shard without a lifecycle walk, or no lifecycle metrics, for 2 days |
 | `ParserDatasetMirrorFailing` | Enabled mirror without a successful run for 3 h |
 | `ParserDatasetMirrorNeverSucceeded` | Enabled mirror without any successful run for 3 h |
+| `ParserDatasetShrinking` | `parser-dataset` live bytes (`SeaweedFS_s3_bucket_size_bytes`, which drops on delete and holds on overwrite and vacuum) 5% below their maximum over the last 6 h, for 15 min; catches drains below the mirror's 90% guard and 1000-deletion cap; also fires for intended bulk deletions; a warning, since the mirror only adds delete markers that stay recoverable while AWS keeps noncurrent versions for 90 days |
 
 | Operation | Steps |
 | --- | --- |

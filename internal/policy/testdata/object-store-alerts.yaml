@@ -1,0 +1,418 @@
+rule_files:
+  - object-store-rules.yaml
+evaluation_interval: 1m
+tests:
+- name: provisioner run fails, then succeeds
+  interval: 5m
+  input_series:
+  - series: kube_cronjob_status_last_schedule_time{namespace="object-store",cronjob="object-store-provisioner"}
+    values: 0x11 3600x12 7200x12
+  - series: kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="object-store-provisioner"}
+    values: 0x11 0x12 7200x12
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ObjectStoreProvisionerRunFailed
+    exp_alerts: []
+  - eval_time: 90m
+    alertname: ObjectStoreProvisionerRunFailed
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        namespace: object-store
+        cronjob: object-store-provisioner
+      exp_annotations:
+        summary: The latest object store provisioner run failed, for example after restoring drift on a locked bucket; read its log
+  - eval_time: 125m
+    alertname: ObjectStoreProvisionerRunFailed
+    exp_alerts: []
+- name: nl cell metrics absent
+  interval: 1m
+  input_series:
+  - series: up{namespace="object-store",service="seaweedfs-hel1",endpoint="metrics"}
+    values: 1x30
+  - series: up{namespace="object-store",service="seaweedfs-hel1",endpoint="worker-metrics"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ObjectStoreDown
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        namespace: object-store
+        service: seaweedfs-nl
+        endpoint: metrics
+      exp_annotations:
+        summary: A SeaweedFS object store cell is down
+  - eval_time: 20m
+    alertname: ObjectStoreWorkerDown
+    exp_alerts: []
+- name: nl cell down and hel1 worker down
+  interval: 1m
+  input_series:
+  - series: up{namespace="object-store",service="seaweedfs-hel1",endpoint="metrics"}
+    values: 1x30
+  - series: up{namespace="object-store",service="seaweedfs-nl",endpoint="metrics"}
+    values: '0x30'
+  - series: up{namespace="object-store",service="seaweedfs-hel1",endpoint="worker-metrics"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ObjectStoreDown
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        namespace: object-store
+        service: seaweedfs-nl
+        endpoint: metrics
+      exp_annotations:
+        summary: A SeaweedFS object store cell is down
+  - eval_time: 20m
+    alertname: ObjectStoreWorkerDown
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        namespace: object-store
+        service: seaweedfs-hel1
+        endpoint: worker-metrics
+      exp_annotations:
+        summary: The object store lifecycle worker is not reporting; expiry and upload cleanup stop while it is down
+- name: lifecycle never walks
+  interval: 1m
+  input_series:
+  - series: SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store",service="seaweedfs-hel1",shard="0"}
+    values: '0x3600'
+  alert_rule_test:
+  - eval_time: 20h
+    alertname: ObjectStoreLifecycleStalled
+    exp_alerts: []
+  - eval_time: 55h
+    alertname: ObjectStoreLifecycleStalled
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        service: seaweedfs-hel1
+      exp_annotations:
+        summary: Object store lifecycle has not walked its buckets for two days; expiry and cleanup are stalled
+- name: enabled mirror never succeeds
+  interval: 1m
+  input_series:
+  - series: kube_cronjob_info{namespace="object-store",cronjob="parser-dataset-mirror"}
+    values: 1x400
+  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="parser-dataset-mirror"}
+    values: '0x400'
+  - series: kube_cronjob_info{namespace="object-store",cronjob="parser-dataset-seed"}
+    values: 1x400
+  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="parser-dataset-seed"}
+    values: 1x400
+  alert_rule_test:
+  - eval_time: 6h
+    alertname: ParserDatasetMirrorNeverSucceeded
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        namespace: object-store
+        cronjob: parser-dataset-mirror
+      exp_annotations:
+        summary: The enabled parser dataset mirror has no successful run
+- name: hel1 answers 10% of requests with 5xx
+  interval: 1m
+  input_series:
+  - series: SeaweedFS_s3_request_total{namespace="object-store",service="seaweedfs-hel1",type="GET",code="200"}
+    values: 0+90x60
+  - series: SeaweedFS_s3_request_total{namespace="object-store",service="seaweedfs-hel1",type="PUT",code="500"}
+    values: 0+10x60
+  - series: SeaweedFS_s3_request_total{namespace="object-store",service="seaweedfs-nl",type="GET",code="200"}
+    values: 0+98x60
+  - series: SeaweedFS_s3_request_total{namespace="object-store",service="seaweedfs-nl",type="PUT",code="503"}
+    values: 0+2x60
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: ObjectStoreS3Errors
+    exp_alerts: []
+  - eval_time: 40m
+    alertname: ObjectStoreS3Errors
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        service: seaweedfs-hel1
+      exp_annotations:
+        summary: More than 5% of S3 requests to an object store cell fail
+- name: a bucket at 95% of its quota turns read-only
+  interval: 1m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="ci-nsql-main"}
+    values: 95x60
+  - series: SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="ci-nsql-main"}
+    values: 100x60
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="toolchains"}
+    values: 80x60
+  - series: SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="toolchains"}
+    values: 100x60
+  - series: SeaweedFS_s3_bucket_read_only{namespace="object-store",service="seaweedfs-hel1",bucket="ci-nsql-main"}
+    values: 0x5 1x55
+  - series: SeaweedFS_s3_bucket_read_only{namespace="object-store",service="seaweedfs-hel1",bucket="toolchains"}
+    values: '0x60'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ObjectStoreBucketNearQuota
+    exp_alerts: []
+  - eval_time: 40m
+    alertname: ObjectStoreBucketNearQuota
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        service: seaweedfs-hel1
+        bucket: ci-nsql-main
+      exp_annotations:
+        summary: An object store bucket is above 90% of its quota
+  - eval_time: 10m
+    alertname: ObjectStoreBucketReadOnly
+    exp_alerts: []
+  - eval_time: 20m
+    alertname: ObjectStoreBucketReadOnly
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        service: seaweedfs-hel1
+        bucket: ci-nsql-main
+      exp_annotations:
+        summary: An object store bucket rejects writes, usually after exceeding its quota
+- name: hel1 node disk at 15% free
+  interval: 1m
+  input_series:
+  - series: SeaweedFS_volumeServer_resource{namespace="object-store",service="seaweedfs-hel1",name="/data",type="avail"}
+    values: 30x10 15x50
+  - series: SeaweedFS_volumeServer_resource{namespace="object-store",service="seaweedfs-hel1",name="/data",type="all"}
+    values: 100x60
+  - series: SeaweedFS_volumeServer_resource{namespace="object-store",service="seaweedfs-nl",name="/data",type="avail"}
+    values: 50x60
+  - series: SeaweedFS_volumeServer_resource{namespace="object-store",service="seaweedfs-nl",name="/data",type="all"}
+    values: 100x60
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ObjectStoreDiskLow
+    exp_alerts: []
+  - eval_time: 30m
+    alertname: ObjectStoreDiskLow
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        service: seaweedfs-hel1
+      exp_annotations:
+        summary: An object store cell's node has less than 20% free disk; volumes turn read-only at 15%
+- name: provisioner and mirror stop succeeding
+  interval: 5m
+  input_series:
+  - series: kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="object-store-provisioner"}
+    values: '0x40'
+  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="object-store-provisioner"}
+    values: '0x40'
+  - series: kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="parser-dataset-mirror"}
+    values: '0x40'
+  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="parser-dataset-mirror"}
+    values: '0x40'
+  alert_rule_test:
+  - eval_time: 2h
+    alertname: ObjectStoreProvisionerFailing
+    exp_alerts: []
+  - eval_time: 2h15m
+    alertname: ObjectStoreProvisionerFailing
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        namespace: object-store
+        cronjob: object-store-provisioner
+      exp_annotations:
+        summary: Object store provisioner is failing; its log names the bucket and setting
+  - eval_time: 3h
+    alertname: ParserDatasetMirrorFailing
+    exp_alerts: []
+  - eval_time: 3h15m
+    alertname: ParserDatasetMirrorFailing
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        namespace: object-store
+        cronjob: parser-dataset-mirror
+      exp_annotations:
+        summary: The parser dataset has no off-host copy newer than three hours; see the parser-dataset-mirror job log
+- name: suspended mirror and a provisioner that never succeeded
+  interval: 5m
+  input_series:
+  - series: kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="parser-dataset-mirror"}
+    values: '0x40'
+  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="parser-dataset-mirror"}
+    values: 1x40
+  - series: kube_cronjob_info{namespace="object-store",cronjob="object-store-provisioner"}
+    values: 1x40
+  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="object-store-provisioner"}
+    values: '0x40'
+  alert_rule_test:
+  - eval_time: 3h15m
+    alertname: ParserDatasetMirrorFailing
+    exp_alerts: []
+  - eval_time: 80m
+    alertname: ObjectStoreProvisionerNeverSucceeded
+    exp_alerts: []
+  - eval_time: 100m
+    alertname: ObjectStoreProvisionerNeverSucceeded
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        namespace: object-store
+        cronjob: object-store-provisioner
+      exp_annotations:
+        summary: Object store provisioner has no successful run; buckets may lack encryption, lifecycle or quota
+- name: certificates far from expiry
+  interval: 1m
+  input_series:
+  - series: up{namespace="object-store",service="seaweedfs-hel1",endpoint="metrics"}
+    values: 1x60
+  alert_rule_test:
+  - eval_time: 1h
+    alertname: ObjectStoreCertificateExpiring
+    exp_alerts: []
+- name: parser-dataset loses 18% of its bytes at once
+  interval: 5m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
+    values: 17100000000x24 14022000000x120
+  alert_rule_test:
+  - eval_time: 2h10m
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+  - eval_time: 2h20m
+    alertname: ParserDatasetShrinking
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        bucket: parser-dataset
+      exp_annotations:
+        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+  - eval_time: 7h55m
+    alertname: ParserDatasetShrinking
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        bucket: parser-dataset
+      exp_annotations:
+        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+  - eval_time: 8h10m
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+- name: parser-dataset drains 1.6% of its bytes an hour
+  interval: 5m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
+    values: 17100000000-22800000x120
+  alert_rule_test:
+  - eval_time: 2h
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+  - eval_time: 3h30m
+    alertname: ParserDatasetShrinking
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        bucket: parser-dataset
+      exp_annotations:
+        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+- name: parser-dataset loses 4% of its bytes
+  interval: 5m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
+    values: 17100000000x24 16416000000x60
+  alert_rule_test:
+  - eval_time: 2h30m
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+  - eval_time: 6h
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+- name: parser-dataset dips 6% for ten minutes
+  interval: 5m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
+    values: 17100000000x24 16074000000x2 17100000000x40
+  alert_rule_test:
+  - eval_time: 2h14m
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+  - eval_time: 3h
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+- name: seaweedfs-nl metrics missing for fifteen minutes
+  interval: 5m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
+    values: 17100000000x24 _x3 17100000000x40
+  alert_rule_test:
+  - eval_time: 2h30m
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+  - eval_time: 4h
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+- name: parser-dataset recreated empty
+  interval: 5m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
+    values: 17100000000x24 0x60
+  alert_rule_test:
+  - eval_time: 2h30m
+    alertname: ParserDatasetShrinking
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        bucket: parser-dataset
+      exp_annotations:
+        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+- name: other cells and buckets shrink
+  interval: 5m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
+    values: 17100000000x24 16587000000x60
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="parser-dataset"}
+    values: 17100000000x24 0x60
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="ci-nsql-main"}
+    values: 17100000000x24 0x60
+  alert_rule_test:
+  - eval_time: 3h
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+- name: another cell holds more bytes
+  interval: 5m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
+    values: 17100000000x24 15390000000x60
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="parser-dataset"}
+    values: 34200000000x84
+  alert_rule_test:
+  - eval_time: 3h
+    alertname: ParserDatasetShrinking
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        bucket: parser-dataset
+      exp_annotations:
+        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+- name: 'lab replay: seed, three churn rounds, vacuum, cell restart, then 30 PDFs deleted'
+  interval: 1m
+  input_series:
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
+    values: 153717416 153717416 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162758646 164369759 164369759 164369759 164369759 164403356 164215795 158511134 158511134 158511134 158511134 158543590 161419784 161419784 161419784 161419784 161363568 161363568 161363568 161363568 161363568 _ _ 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 141755126 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242
+  alert_rule_test:
+  - eval_time: 42m
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+  - eval_time: 62m
+    alertname: ParserDatasetShrinking
+    exp_alerts: []
+  - eval_time: 72m
+    alertname: ParserDatasetShrinking
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        bucket: parser-dataset
+      exp_annotations:
+        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS

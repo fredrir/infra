@@ -188,6 +188,57 @@ jobs:
         env:
           INFRA_HOST_ACCESS_TEST: required
         run: bazel run --repository_cache="$HOME/.cache/infra-bazel-repository" @rules_go//go -- test ./internal/reconcile/ -run '^TestFleetPlaybooksNeverListADeclaredReconciler$' -count=1 -v
+  alerts:
+    if: ${{ !cancelled() && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select the alert rule test
+        id: affected
+        env:
+          PUSH_BASE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="$PUSH_BASE"
+          if [ -n "$PR_BASE" ]; then
+            base=$(git merge-base "$PR_BASE" HEAD)
+          fi
+          run=true
+          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null && git diff --quiet "$base" HEAD -- platform/components/object-store/ platform/versions.yaml internal/policy/objectstore_alerts_test.go internal/policy/testdata/object-store-alerts.yaml .github/workflows/check.yml; then
+            run=false
+          fi
+          printf 'run=%s\n' "$run" >> "$GITHUB_OUTPUT"
+      - name: Install checksum-pinned native Bazel
+        if: steps.affected.outputs.run == 'true'
+        run: |
+          version=$(jq -er '.bazel' build/toolchain.json)
+          checksum=$(jq -er '.bazel_sha256' build/toolchain.json)
+          mkdir -p "$RUNNER_TEMP/bazel/bin"
+          curl --fail --silent --show-error --location --retry 2 --max-time 60 "https://github.com/bazelbuild/bazel/releases/download/$version/bazel-$version-linux-x86_64" --output "$RUNNER_TEMP/bazel/bin/bazel"
+          printf '%s  %s\n' "$checksum" "$RUNNER_TEMP/bazel/bin/bazel" | sha256sum --check --strict
+          chmod 755 "$RUNNER_TEMP/bazel/bin/bazel"
+          printf '%s\n' "$RUNNER_TEMP/bazel/bin" >> "$GITHUB_PATH"
+      - name: Take promtool from the pinned Prometheus image
+        if: steps.affected.outputs.run == 'true'
+        run: |
+          image=$(sed -n 's/^  prometheus: //p' platform/versions.yaml)
+          [[ "$image" =~ ^docker\.io/prom/prometheus:v[0-9.]+@sha256:[a-f0-9]{64}$ ]]
+          container=$(docker create "$image")
+          mkdir -p "$RUNNER_TEMP/promtool"
+          docker cp "$container:/bin/promtool" "$RUNNER_TEMP/promtool/promtool"
+          docker rm "$container"
+          printf '%s\n' "$RUNNER_TEMP/promtool" >> "$GITHUB_PATH"
+      - name: Fire object store alerts only on their conditions
+        if: steps.affected.outputs.run == 'true'
+        env:
+          GOTOOLCHAIN: local
+          INFRA_PROMTOOL_TEST: required
+        run: bazel run @rules_go//go -- test ./internal/policy/ -run '^TestObjectStoreAlertsFireOnlyOnTheirConditions$' -count=1 -v
   validate:
     needs: cli
     if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.repository_owner_id == '114402558' && github.repository_id == '1328085692' && github.ref_protected && github.actor != 'octo-sts[bot]' && github.triggering_actor != 'fredrir-infra-verification[bot]' }}
