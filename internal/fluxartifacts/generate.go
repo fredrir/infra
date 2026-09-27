@@ -21,9 +21,10 @@ type object = map[string]any
 const directory = "build/rollout/flux-artifacts"
 
 var projectComponents = map[string][]string{
-	"portfolio":       {"backup-job", "repository-maintenance", "backup-primary"},
-	"y":               {"backup-job", "repository-maintenance", "backup-primary"},
-	"llunde-pyparser": {"backup-job", "repository-maintenance", "backup-primary", "object-store-trust"},
+	"llunde":          {"netpol-gate/egress"},
+	"portfolio":       {"backup-job", "repository-maintenance", "backup-primary", "netpol-gate/egress"},
+	"y":               {"backup-job", "repository-maintenance", "backup-primary", "netpol-gate/egress"},
+	"llunde-pyparser": {"backup-job", "repository-maintenance", "backup-primary", "object-store-trust", "netpol-gate/egress"},
 }
 
 func Run(root string, check bool) error {
