@@ -555,6 +555,8 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Image update | Publish, confirm an anonymous pull, re-pin the canary and both `netpol-gate` policies in one commit |
 | Emergency bypass | `flux suspend kustomization platform-policy`, `kubectl delete mutatingadmissionpolicybinding netpol-gate`, `kubectl delete validatingadmissionpolicybinding netpol-gate`; resume after the fix lands |
 | Tightened policy | Established connections survive a NetworkPolicy change; restart the affected pods |
+| Removal trigger | A k3s release that exposes kube-router's `--netpol-default-deny` ([k3s#14711](https://github.com/k3s-io/k3s/issues/14711)) |
+| Removal | Upgrade to that release with the flag enabled on every server and qualify the start race in a k3d lab (gVisor and runc pods, 2 s API lag, held connections). Then, in one commit, delete `platform/components/policy/netpol-gate.yaml`, `platform/components/netpol-gate`, Flux `platform-netpol-gate`, every `netpol-gate/egress` component reference and its `internal/fluxartifacts` entries, the canary clause in `project-network-boundary`, `netpol-gate` in `project-baseline-owner`, the gate init-container rule in `ci-job-credentials`, the `ghcr.io/fredrir/netpol-gate` catalog entry, `images/netpol-gate`, `cmd/netpol-gate`, `internal/netpolgate`, their tests and this section. The host link-local drop stays |
 
 ## Object store
 

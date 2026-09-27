@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-27T21:20:00Z",
+  "question": "Can a new pod reach destinations its NetworkPolicy denies before k3s's embedded kube-router programs its egress rules, do connections opened then outlive enforcement, and does an admission-injected egress gate close both without stalling ci and project workloads?",
+  "finding": {
+    "engine": "k3s v1.36.3+k3s1 embedded network policy controller, kube-router v2.6.3-k3s1, flannel wireguard-native over tailscale0; no k3s flag closes the window or flushes conntrack (also true of v1.36.4+k3s1 and v1.37.0+k3s1)",
+    "production_window": {
+      "observed_at_utc": "2026-09-27T15:53:00Z",
+      "namespace": "object-store (default-deny egress, DNS only)",
+      "node": "fredrir-04",
+      "runs": 5,
+      "denied_destinations": [
+        "10.43.0.1:443 (API VIP)",
+        "100.87.168.66:10250 (fredrir-09 kubelet)"
+      ],
+      "reached_per_run": "14 of 14 connects in every run",
+      "last_open_seconds": [0.15, 0.16, 0.15, 0.16, 0.18],
+      "first_blocked_seconds": [0.3, 0.31, 0.31, 0.31, 0.32]
+    },
+    "held_connection": "lab (k3d, same k3s): a TCP connection opened at t=0 to a denied server still carried requests at 5 s and 60 s while fresh connections were refused, because KUBE-NWPLCY-COMMON accepts ESTABLISHED,RELATED ahead of the policy chains",
+    "gvisor": "no protection: runsc network=sandbox traffic crosses the same host netfilter; 16 of 18 gVisor lab pods raced and kept held connections",
+    "exposure": "C2 or exfiltration from pods isolated from the internet, cloud metadata, unauthenticated API server and kubelets (401), node metrics over the tailnet, kube-system pods; CI PR steps start after enforcement and cannot reach the window",
+    "report": "~/.cache/infra-ops/optimization/netpol-start-race.md"
+  },
+  "mitigation": {
+    "host_rule": {
+      "commit": "80aab7c4",
+      "rule": "platform_host forward: ip saddr 10.42.0.0/16 ip daddr 169.254.0.0/16 drop",
+      "verification": "from a pod after apply: cloud metadata times out, cluster DNS resolves"
+    },
+    "gate": {
+      "commits": {
+        "efbf9688": "gate program and image",
+        "56d7e15f": "canary and canary egress policy in every ci and project namespace",
+        "c199d6c7": "project Flux artifacts carry the netpol-gate/egress component",
+        "74bdd743": "MutatingAdmissionPolicy, ValidatingAdmissionPolicies, ci-job-credentials, runbook"
+      },
+      "image": "ghcr.io/fredrir/netpol-gate@sha256:b5ba08135d0e3a2a2429c7697ff00c98501940d031916c50b326310ca33d45f4",
+      "anonymous_pull": 200,
+      "canary": {
+        "10.43.0.21": "canary-0 on fredrir-04",
+        "10.43.0.22": "canary-1 on fredrir-09"
+      },
+      "proof": "on one canary: 8080 open, 8081 refused with ECONNREFUSED, 8080 open; timeouts and other errors hold; no deadline",
+      "scope": "ci and project tier namespaces: ci-infra, ci-nsql, ci-packages, llunde, llunde-pyparser, portfolio, y"
+    }
+  },
+  "canary_verification": {
+    "applied_revision": "c199d6c7",
+    "from": "portfolio",
+    "10.43.0.21": "egress policy enforced in 306ms after 5 attempts; held 4x because a canary accepts its denied port",
+    "10.43.0.22": "egress policy enforced in 298ms after 3 attempts; held 2x because a canary accepts its denied port"
+  },
+  "production_verification": {
+    "revision": "74bdd743",
+    "admission_live_utc": "2026-09-27T21:10:18Z",
+    "project_tier": {
+      "workload": "portfolio/web rollout restart",
+      "pod": "web-546c95cb45-rh74b on fredrir-04",
+      "gate": "egress policy enforced in 382ms after 5 attempts; held 4x because a canary accepts its denied port",
+      "ready": true
+    },
+    "ci_tier": {
+      "pod": "check-amd64-dmp89-runner-vktvc on fredrir-04, runtime gvisor",
+      "gate": "egress policy enforced in 393ms after 5 attempts; held 4x because a canary accepts its denied port",
+      "ready": true,
+      "job": "check.yml validate, run 36350999555, job 108709567079, success on the gated runner",
+      "also_gated": "deploy-amd64-f7gzh-runner-tmk8q Running"
+    },
+    "flux": "every Kustomization Ready; platform-projects suspended by the Flux artifact cutover, unrelated",
+    "canary": "both replicas Ready throughout",
+    "stalled_gated_pods": 0
+  },
+  "lab_qualification": {
+    "cluster": "k3d, k3s v1.36.3+k3s1, gVisor release-20260907.0, runc and gVisor pods",
+    "without_gate": "44-48 failed checks; every pod reached the API VIP, a kubelet and an unpoliced pod and kept its held connection",
+    "with_gate": "0 failed checks; gates held 1-2 attempts (21-91 ms) before passing",
+    "api_lag_2s": "ungated 3 of 3 raced; gated, hostAliases and custom-nameserver pods 0 of 9 raced (held 7-16 s); 20 s of dropped probes to 8081 held 3 of 3, then 0 raced",
+    "standalone_kube_router_v2_11_1_netpol_default_deny": "0 of 12 pods raced; each pod's DNS refused for its first ~55 ms"
+  },
+  "review": {
+    "record": "~/.cache/infra-ops/optimization/review-netpol.md",
+    "findings_fixed": [
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F10",
+      "R1",
+      "R2"
+    ],
+    "rollout_step": ["F1"],
+    "accepted": ["F9", "R3", "R4"],
+    "informational": ["F11", "F12"],
+    "approved_before_rebase": ["09216283", "f95742b3", "ad51a4b7"],
+    "landed_as": ["efbf9688", "56d7e15f", "74bdd743"]
+  },
+  "tests": [
+    "internal/netpolgate/gate_test.go",
+    "internal/policy/netpolgate_test.go",
+    "internal/policy/netpolcanary_test.go",
+    "internal/contracts/netpol_gate_test.go",
+    "internal/contracts/firewall_test.go",
+    "internal/fluxartifacts/generate_test.go"
+  ],
+  "mutations": "48 of 48 killed, including the reviewer's F10 list and the R1 survivors",
+  "limitations": [
+    "A MutatingAdmissionPolicy or ValidatingAdmissionPolicy takes about a second to take effect after creation; pods created in that second start ungated",
+    "F9: a new pod that reuses a gated pod's IP before kube-router's delete sync can inherit that pod's chain and pass the gate early",
+    "A commit that changes go.mod or MODULE.bazel starts infra-fast from a cold test cache and can overrun its 10 s budget (74bdd743: 10.23 s, rerun 5.39 s)",
+    "Established connections survive any later NetworkPolicy change on running pods",
+    "Platform-tier pods keep the start window",
+    "Removal trigger: k3s#14711, a k3s release exposing kube-router --netpol-default-deny; see the runbook's Egress policy gate removal row"
+  ]
+}
