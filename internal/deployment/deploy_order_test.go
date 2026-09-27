@@ -1,4 +1,4 @@
-package ci
+package deployment
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 func TestProvenanceVerifierFailuresNameTheirCause(t *testing.T) {
 	trust := fstest.MapFS{".github/chainguard/deploy-1.sts.yaml": {Data: []byte("claim_pattern:\n  job_workflow_sha: '^" + strings.Repeat("d", 40) + "$'\n")}}
-	mapping := DeploymentMapping{Repository: "fredrir/example", Visibility: "public"}
+	mapping := Mapping{Repository: "fredrir/example", Visibility: "public"}
 	for _, test := range []struct {
 		name   string
 		result process.Result
@@ -26,7 +26,7 @@ func TestProvenanceVerifierFailuresNameTheirCause(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			runner := process.Runner{Env: []string{"GH_TOKEN=ghs_attestationsecret"}, Execute: func(context.Context, process.Options) (process.Result, error) { return test.result, test.err }}
-			_, err := VerifyDeploymentProvenance(context.Background(), runner, trust, "1", mapping, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40))
+			_, err := VerifyProvenance(context.Background(), runner, trust, "1", mapping, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40))
 			if err == nil || !strings.Contains(err.Error(), test.want) || strings.Contains(err.Error(), "ghs_attestationsecret") {
 				t.Fatalf("verifier failure reported as %v", err)
 			}
@@ -57,7 +57,7 @@ func TestAttestedDeploymentOrders(t *testing.T) {
 				t.Fatalf("orders=%+v err=%v", orders, err)
 			}
 			for index, order := range orders {
-				if order != (DeploymentOrder{Schema: 1, Image: image, Revision: revision, Digest: digest, RunID: test.runs[index][0], Attempt: test.runs[index][1]}) {
+				if order != (Order{Schema: 1, Image: image, Revision: revision, Digest: digest, RunID: test.runs[index][0], Attempt: test.runs[index][1]}) {
 					t.Fatalf("order %d = %+v", index, order)
 				}
 			}
@@ -69,7 +69,7 @@ func TestAttestedDeploymentOrders(t *testing.T) {
 }
 
 func TestDeploymentOrderRejectsRollbackAndConflictingIdentity(t *testing.T) {
-	accepted := DeploymentOrder{Schema: 1, Image: "ghcr.io/fredrir/example", Revision: strings.Repeat("a", 40), Digest: "sha256:" + strings.Repeat("b", 64), RunID: 20, Attempt: 2}
+	accepted := Order{Schema: 1, Image: "ghcr.io/fredrir/example", Revision: strings.Repeat("a", 40), Digest: "sha256:" + strings.Repeat("b", 64), RunID: 20, Attempt: 2}
 	for _, scenario := range []string{"older-run", "older-attempt", "different-revision", "different-digest"} {
 		t.Run(scenario, func(t *testing.T) {
 			candidate := accepted
@@ -103,7 +103,7 @@ func TestDeploymentOrderRejectsRollbackAndConflictingIdentity(t *testing.T) {
 
 func TestDeployRejectsOlderQueuedRunWithoutMutation(t *testing.T) {
 	f := newDeployFixture(t, "kustomize", "private", false)
-	f.receipt(f.root, DeploymentOrder{Schema: 1, Image: f.options.Image, Revision: f.options.Revision, Digest: f.options.Digest, RunID: 101, Attempt: 1})
+	f.receipt(f.root, Order{Schema: 1, Image: f.options.Image, Revision: f.options.Revision, Digest: f.options.Digest, RunID: 101, Attempt: 1})
 	f.commit("Accept newer run")
 	f.git("push", "--quiet", "origin", "HEAD:main")
 	before := f.deployed()
@@ -119,7 +119,7 @@ func TestDeployRejectsNewerRunDuringPushRace(t *testing.T) {
 	f := newDeployFixture(t, "kustomize", "public", false)
 	other := filepath.Join(t.TempDir(), "other")
 	f.git("clone", "--quiet", "--branch", "main", f.remote, other)
-	f.receipt(other, DeploymentOrder{Schema: 1, Image: f.options.Image, Revision: f.options.Revision, Digest: f.options.Digest, RunID: 101, Attempt: 1})
+	f.receipt(other, Order{Schema: 1, Image: f.options.Image, Revision: f.options.Revision, Digest: f.options.Digest, RunID: 101, Attempt: 1})
 	for _, args := range [][]string{{"add", "."}, {"-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--quiet", "-m", "Accept newer deployment"}, {"push", "--quiet", "origin", "HEAD:main"}} {
 		f.git(append([]string{"-C", other}, args...)...)
 	}
@@ -140,7 +140,7 @@ func TestDeploymentReceiptRejectsSymlink(t *testing.T) {
 	if err := os.Symlink(t.TempDir(), filepath.Join(root, "platform/projects/example/.deployments")); err != nil {
 		t.Fatal(err)
 	}
-	if err := checkLocalDeploymentOrder(os.DirFS(root), deploymentReceiptPath("platform/projects/example", "ghcr.io/fredrir/example"), DeploymentOrder{}); err == nil {
+	if err := checkLocalDeploymentOrder(os.DirFS(root), deploymentReceiptPath("platform/projects/example", "ghcr.io/fredrir/example"), Order{}); err == nil {
 		t.Fatal("symlink accepted")
 	}
 }
@@ -148,7 +148,7 @@ func TestDeploymentReceiptRejectsSymlink(t *testing.T) {
 func TestFetchedOrderAllowsUnrelatedRemoteChanges(t *testing.T) {
 	f := newDeployFixture(t, "kustomize", "public", false)
 	f.git("fetch", "--quiet", "origin", "main")
-	if err := checkFetchedDeploymentOrder(context.Background(), f.runner, "platform/projects/example/.deployments/example.json", DeploymentOrder{}); err != nil {
+	if err := checkFetchedDeploymentOrder(context.Background(), f.runner, "platform/projects/example/.deployments/example.json", Order{}); err != nil {
 		t.Fatal(err)
 	}
 }

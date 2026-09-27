@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/deployment"
 	"github.com/google/go-github/v88/github"
 	"github.com/hmarr/codeowners"
 )
@@ -71,7 +71,7 @@ func apiUnavailable(err error) error {
 	default:
 		return err
 	}
-	return ci.Unavailable(err)
+	return deployment.Unavailable(err)
 }
 
 func collect[T any](items iter.Seq2[T, error]) ([]T, error) {
@@ -287,8 +287,8 @@ func (r *reviewGate) present(ctx context.Context, head string) error {
 	}
 	if _, err := r.verifier.git(ctx, nil, "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "origin", head); err != nil {
 		err = fmt.Errorf("fetch the head %s: %w", head[:12], err)
-		if ci.UnavailableOutput(err.Error()) {
-			return ci.Unavailable(err)
+		if deployment.UnavailableOutput(err.Error()) {
+			return deployment.Unavailable(err)
 		}
 		return err
 	}

@@ -19,7 +19,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/deployment"
 	"github.com/google/go-github/v88/github"
 )
 
@@ -658,7 +658,7 @@ func TestPullRequestAPIOutagesAreUnavailable(t *testing.T) {
 		"forbidden":     {err: response(http.StatusForbidden)},
 		"plain failure": {err: errors.New("decode pull request")},
 	} {
-		if got := errors.Is(apiUnavailable(test.err), ci.ErrSourceUnavailable); got != test.want {
+		if got := errors.Is(apiUnavailable(test.err), deployment.ErrSourceUnavailable); got != test.want {
 			t.Errorf("%s: unavailable = %v, want %v", name, got, test.want)
 		}
 	}

@@ -1,4 +1,4 @@
-package ci
+package deployment
 
 import (
 	"cmp"
@@ -14,24 +14,25 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/fredrir/infra/internal/kustomize"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
 
-type DeployOptions struct{ Root, RepositoryID, Revision, Image, Digest, Token string }
-type DeploymentTarget struct{ Path, Mode, Workload string }
-type DeploymentMapping struct {
+type Options struct{ Root, RepositoryID, Revision, Image, Digest, Token string }
+type Target struct{ Path, Mode, Workload string }
+type Mapping struct {
 	Repository, Visibility string
-	Images                 map[string]DeploymentTarget
+	Images                 map[string]Target
 }
 
+var revisionPattern = regexp.MustCompile(`^[a-f0-9]{40}$`)
+var imageReferencePattern = regexp.MustCompile(`^ghcr\.io/(fredrir/[a-z0-9][a-z0-9._/-]*)@(sha256:[a-f0-9]{64})$`)
 var repositoryPattern = regexp.MustCompile(`^fredrir/[A-Za-z0-9_.-]+$`)
 var projectPattern = regexp.MustCompile(`^platform/projects/[a-z][a-z0-9-]*$`)
 var workloadPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 var repositoryIDPattern = regexp.MustCompile(`^[0-9]+$`)
 
-func Deploy(ctx context.Context, runner process.Runner, options DeployOptions) error {
+func Deploy(ctx context.Context, runner process.Runner, options Options, render func(directory string) error) error {
 	if !repositoryIDPattern.MatchString(options.RepositoryID) || !revisionPattern.MatchString(options.Revision) || !imageReferencePattern.MatchString(options.Image+"@"+options.Digest) || options.Token == "" {
 		return fmt.Errorf("invalid deployment identity or credentials")
 	}
@@ -58,7 +59,7 @@ func Deploy(ctx context.Context, runner process.Runner, options DeployOptions) e
 	if len(status) != 0 {
 		return fmt.Errorf("deployment requires a clean checkout")
 	}
-	var mapping DeploymentMapping
+	var mapping Mapping
 	if err := readYAML(filepath.Join(root, ".github/deployments", options.RepositoryID+".yaml"), &mapping); err != nil {
 		return err
 	}
@@ -74,12 +75,12 @@ func Deploy(ctx context.Context, runner process.Runner, options DeployOptions) e
 	if project != resolved {
 		return fmt.Errorf("deployment project must not traverse symlinks")
 	}
-	attested, err := VerifyDeploymentProvenance(ctx, runner, os.DirFS(root), options.RepositoryID, mapping, options.Image, options.Digest, options.Revision)
+	attested, err := VerifyProvenance(ctx, runner, os.DirFS(root), options.RepositoryID, mapping, options.Image, options.Digest, options.Revision)
 	if err != nil {
 		return err
 	}
 	order := attested[len(attested)-1]
-	files, err := DeploymentFiles(os.DirFS(root), target, order)
+	files, err := Files(os.DirFS(root), target, order)
 	if err != nil {
 		return err
 	}
@@ -92,12 +93,12 @@ func Deploy(ctx context.Context, runner process.Runner, options DeployOptions) e
 			return err
 		}
 		if filepath.Base(path) == "kustomization.yaml" {
-			if err := renderDeployment(filepath.Dir(path)); err != nil {
+			if err := render(filepath.Dir(path)); err != nil {
 				return err
 			}
 		}
 	}
-	if err := renderDeployment(project); err != nil {
+	if err := render(project); err != nil {
 		return err
 	}
 	relativeReceipt := deploymentReceiptPath(target.Path, options.Image)
@@ -148,7 +149,7 @@ func Deploy(ctx context.Context, runner process.Runner, options DeployOptions) e
 	return fmt.Errorf("deployment push failed after three attempts")
 }
 
-func VerifyDeploymentProvenance(ctx context.Context, runner process.Runner, root fs.FS, repositoryID string, mapping DeploymentMapping, image, digest, revision string) ([]DeploymentOrder, error) {
+func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, repositoryID string, mapping Mapping, image, digest, revision string) ([]Order, error) {
 	if !repositoryIDPattern.MatchString(repositoryID) {
 		return nil, fmt.Errorf("invalid deployment repository ID")
 	}
@@ -170,7 +171,7 @@ func VerifyDeploymentProvenance(ctx context.Context, runner process.Runner, root
 		return nil, err
 	}
 	environment := append(os.Environ(), runner.Env...)
-	var attested []DeploymentOrder
+	var attested []Order
 	failure := errors.New("no attestation names a deployment run")
 	unavailable := false
 	for _, workflowRevision := range revisions {
@@ -237,7 +238,7 @@ func ProvenanceCommand(visibility, repository, workflowRevision, revision, image
 	}
 }
 
-func DeploymentFiles(root fs.FS, target DeploymentTarget, order DeploymentOrder) (map[string][]byte, error) {
+func Files(root fs.FS, target Target, order Order) (map[string][]byte, error) {
 	if !projectPattern.MatchString(target.Path) {
 		return nil, fmt.Errorf("image has no valid deployment mapping")
 	}
@@ -374,10 +375,6 @@ func WorkflowRevisions(pattern string) ([]string, error) {
 		return pair[1:], nil
 	}
 	return nil, fmt.Errorf("workflow trust requires one or two anchored exact revisions")
-}
-func renderDeployment(directory string) error {
-	_, err := kustomize.Build(directory)
-	return err
 }
 func pinImage(data []byte, image, digest string) ([]byte, error) {
 	var document yaml.Node

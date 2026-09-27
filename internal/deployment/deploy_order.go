@@ -1,4 +1,4 @@
-package ci
+package deployment
 
 import (
 	"cmp"
@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-type DeploymentOrder struct {
+type Order struct {
 	Schema   int    `json:"schema"`
 	Image    string `json:"image"`
 	Revision string `json:"revision"`
@@ -22,7 +22,7 @@ type DeploymentOrder struct {
 	Attempt  uint64 `json:"attempt"`
 }
 
-func attestedDeploymentOrders(data []byte, visibility, repository, image, digest, revision string) ([]DeploymentOrder, error) {
+func attestedDeploymentOrders(data []byte, visibility, repository, image, digest, revision string) ([]Order, error) {
 	if visibility != "public" && visibility != "private" {
 		return nil, fmt.Errorf("unsupported deployment visibility")
 	}
@@ -39,7 +39,7 @@ func attestedDeploymentOrders(data []byte, visibility, repository, image, digest
 	if err := json.Unmarshal(data, &results); err != nil {
 		return nil, fmt.Errorf("decode verified deployment provenance: %w", err)
 	}
-	var orders []DeploymentOrder
+	var orders []Order
 	for _, result := range results {
 		var run, attempt string
 		switch visibility {
@@ -63,17 +63,17 @@ func attestedDeploymentOrders(data []byte, visibility, repository, image, digest
 		if e1 != nil || e2 != nil || id == 0 || number == 0 {
 			continue
 		}
-		orders = append(orders, DeploymentOrder{Schema: 1, Image: image, Revision: revision, Digest: digest, RunID: id, Attempt: number})
+		orders = append(orders, Order{Schema: 1, Image: image, Revision: revision, Digest: digest, RunID: id, Attempt: number})
 	}
 	return orders, nil
 }
 
-func compareDeploymentRuns(a, b DeploymentOrder) int {
+func compareDeploymentRuns(a, b Order) int {
 	return cmp.Or(cmp.Compare(a.RunID, b.RunID), cmp.Compare(a.Attempt, b.Attempt))
 }
 
-func DecodeDeploymentOrder(data []byte) (DeploymentOrder, error) {
-	var order DeploymentOrder
+func DecodeOrder(data []byte) (Order, error) {
+	var order Order
 	if err := json.Unmarshal(data, &order); err != nil {
 		return order, err
 	}
@@ -83,7 +83,7 @@ func DecodeDeploymentOrder(data []byte) (DeploymentOrder, error) {
 	return order, nil
 }
 
-func checkDeploymentOrder(candidate, accepted DeploymentOrder) error {
+func checkDeploymentOrder(candidate, accepted Order) error {
 	if candidate.Image != accepted.Image {
 		return fmt.Errorf("deployment receipt image mismatch")
 	}
@@ -103,7 +103,7 @@ func deploymentReceiptPath(project, image string) string {
 	return path.Join(project, ".deployments", image[strings.LastIndex(image, "/")+1:]+".json")
 }
 
-func checkLocalDeploymentOrder(root fs.FS, receipt string, candidate DeploymentOrder) error {
+func checkLocalDeploymentOrder(root fs.FS, receipt string, candidate Order) error {
 	for _, name := range []string{path.Dir(receipt), receipt} {
 		info, err := fs.Lstat(root, name)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -123,19 +123,19 @@ func checkLocalDeploymentOrder(root fs.FS, receipt string, candidate DeploymentO
 	if err != nil {
 		return err
 	}
-	accepted, err := DecodeDeploymentOrder(data)
+	accepted, err := DecodeOrder(data)
 	if err != nil {
 		return err
 	}
 	return checkDeploymentOrder(candidate, accepted)
 }
 
-func encodeDeploymentOrder(order DeploymentOrder) ([]byte, error) {
+func encodeDeploymentOrder(order Order) ([]byte, error) {
 	data, err := json.MarshalIndent(order, "", "  ")
 	return append(data, '\n'), err
 }
 
-func checkFetchedDeploymentOrder(ctx context.Context, runner process.Runner, path string, candidate DeploymentOrder) error {
+func checkFetchedDeploymentOrder(ctx context.Context, runner process.Runner, path string, candidate Order) error {
 	listed, err := runner.Output(ctx, "git", "ls-tree", "--name-only", "FETCH_HEAD", "--", path)
 	if err != nil {
 		return err
@@ -147,7 +147,7 @@ func checkFetchedDeploymentOrder(ctx context.Context, runner process.Runner, pat
 	if err != nil {
 		return err
 	}
-	accepted, err := DecodeDeploymentOrder(data)
+	accepted, err := DecodeOrder(data)
 	if err != nil {
 		return err
 	}

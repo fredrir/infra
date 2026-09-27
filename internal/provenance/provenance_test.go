@@ -17,7 +17,7 @@ import (
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/deployment"
 	"github.com/fredrir/infra/internal/process"
 	"github.com/google/go-github/v88/github"
 )
@@ -335,9 +335,9 @@ func (f *provenanceFixture) attestation(ctx context.Context, options process.Opt
 func (f *provenanceFixture) deploy(image string, run int) string {
 	f.t.Helper()
 	repository := map[string]string{deployedImage: "1", releasedImage: "2"}[image]
-	options := ci.DeployOptions{Root: f.root, RepositoryID: repository, Revision: fmt.Sprintf("%040x", run), Image: image, Digest: fmt.Sprintf("sha256:%064x", run), Token: "token"}
+	options := deployment.Options{Root: f.root, RepositoryID: repository, Revision: fmt.Sprintf("%040x", run), Image: image, Digest: fmt.Sprintf("sha256:%064x", run), Token: "token"}
 	f.attested[image+"@"+options.Digest] = []int{run}
-	if err := ci.Deploy(context.Background(), process.Runner{Dir: f.root, Stdout: io.Discard, Stderr: io.Discard, Execute: f.attestation}, options); err != nil {
+	if err := deployment.Deploy(context.Background(), process.Runner{Dir: f.root, Stdout: io.Discard, Stderr: io.Discard, Execute: f.attestation}, options, func(string) error { return nil }); err != nil {
 		f.t.Fatal(err)
 	}
 	return f.head()

@@ -1,0 +1,32 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "deployment",
+    srcs = [
+        "deploy.go",
+        "deploy_order.go",
+        "unavailable.go",
+    ],
+    importpath = "github.com/fredrir/infra/internal/deployment",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/process",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)
+
+go_test(
+    name = "deployment_test",
+    srcs = [
+        "deploy_integration_test.go",
+        "deploy_order_test.go",
+        "deploy_test.go",
+        "unavailable_test.go",
+    ],
+    embed = [":deployment"],
+    deps = [
+        "//internal/kustomize",
+        "//internal/process",
+        "@in_yaml_go_yaml_v3//:yaml",
+    ],
+)

@@ -1,4 +1,4 @@
-package ci
+package deployment
 
 import (
 	"context"
@@ -20,7 +20,7 @@ type deployFixture struct {
 	t                     *testing.T
 	root, remote, project string
 	runner                process.Runner
-	options               DeployOptions
+	options               Options
 	calls                 []process.Options
 	verify                func(process.Options) error
 }
@@ -40,7 +40,7 @@ func newDeployFixture(t *testing.T, mode, visibility string, nested bool) *deplo
 	f.git("config", "user.email", "test@example.invalid")
 	f.git("remote", "add", "origin", "https://github.com/fredrir/infra")
 	f.git("config", "url."+f.remote+".insteadOf", "https://github.com/fredrir/infra")
-	f.options = DeployOptions{Root: f.root, RepositoryID: "123", Revision: strings.Repeat("b", 40), Image: "ghcr.io/fredrir/example", Digest: "sha256:" + strings.Repeat("a", 64), Token: "deployment-secret"}
+	f.options = Options{Root: f.root, RepositoryID: "123", Revision: strings.Repeat("b", 40), Image: "ghcr.io/fredrir/example", Digest: "sha256:" + strings.Repeat("a", 64), Token: "deployment-secret"}
 	f.write(".github/chainguard/deploy-123.sts.yaml", "claim_pattern:\n  job_workflow_sha: '^"+strings.Repeat("d", 40)+"$'\n")
 	f.writeMapping(mode, visibility, "platform/projects/example")
 	if mode == "helmrelease" {
@@ -103,7 +103,7 @@ func (f *deployFixture) write(path, text string) {
 		f.t.Fatal(err)
 	}
 }
-func (f *deployFixture) receipt(root string, order DeploymentOrder) {
+func (f *deployFixture) receipt(root string, order Order) {
 	f.t.Helper()
 	data, err := encodeDeploymentOrder(order)
 	if err != nil {
@@ -124,7 +124,12 @@ func (f *deployFixture) commit(message string) {
 func (f *deployFixture) deployed() string {
 	return f.git("--git-dir="+f.remote, "rev-parse", "refs/heads/main")
 }
-func (f *deployFixture) run() error { return Deploy(context.Background(), f.runner, f.options) }
+func (f *deployFixture) run() error {
+	return Deploy(context.Background(), f.runner, f.options, func(directory string) error {
+		_, err := kustomize.Build(directory)
+		return err
+	})
+}
 func (f *deployFixture) writeMapping(mode, visibility, path string) {
 	f.write(".github/deployments/123.yaml", fmt.Sprintf("repository: fredrir/example\nvisibility: %s\nimages:\n  ghcr.io/fredrir/example:\n    path: %s\n    mode: %s\n    workload: web\n", visibility, path, mode))
 }

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing/fstest"
 
-	"github.com/fredrir/infra/internal/ci"
+	"github.com/fredrir/infra/internal/deployment"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
@@ -144,7 +144,7 @@ func (g provenanceGate) verify(ctx context.Context, commits []provenanceCommit) 
 	for _, commit := range commits {
 		if reason, ok := pending[commit.hash]; ok {
 			unverified = append(unverified, fmt.Sprintf("%s %q: %s", commit.hash[:12], commit.subject, strings.ReplaceAll(reason.Error(), "\n", "; ")))
-			unavailable = unavailable && errors.Is(reason, ci.ErrSourceUnavailable)
+			unavailable = unavailable && errors.Is(reason, deployment.ErrSourceUnavailable)
 		}
 	}
 	if len(unverified) > 0 {
@@ -161,11 +161,11 @@ type unverifiedCommits struct {
 func (u unverifiedCommits) Error() string { return u.message }
 
 func (u unverifiedCommits) Is(target error) bool {
-	return u.unavailable && target == ci.ErrSourceUnavailable
+	return u.unavailable && target == deployment.ErrSourceUnavailable
 }
 
 func ProvenanceUnavailable(err error) bool {
-	return errors.Is(err, ci.ErrSourceUnavailable)
+	return errors.Is(err, deployment.ErrSourceUnavailable)
 }
 
 type ProvenanceOutcome struct {
@@ -284,7 +284,7 @@ func (g provenanceGate) deployment(ctx context.Context, commit provenanceCommit)
 	if err != nil {
 		return err
 	}
-	order, err := ci.DecodeDeploymentOrder(receipt.Stdout)
+	order, err := deployment.DecodeOrder(receipt.Stdout)
 	if err != nil {
 		return fmt.Errorf("not a deployment: %s: %w", receipts[0], err)
 	}
@@ -307,8 +307,8 @@ func (g provenanceGate) deployment(ctx context.Context, commit provenanceCommit)
 	return errors.Join(mismatches...)
 }
 
-func (g provenanceGate) deployedBy(ctx context.Context, commit string, changed map[string]bool, tree fstest.MapFS, source deploymentSource, order ci.DeploymentOrder) error {
-	written, err := ci.DeploymentFiles(tree, source.target, order)
+func (g provenanceGate) deployedBy(ctx context.Context, commit string, changed map[string]bool, tree fstest.MapFS, source deploymentSource, order deployment.Order) error {
+	written, err := deployment.Files(tree, source.target, order)
 	if err != nil {
 		return err
 	}
@@ -324,7 +324,7 @@ func (g provenanceGate) deployedBy(ctx context.Context, commit string, changed m
 	attestations := g.verifier.Runner
 	attestations.Env = append(slices.Clone(attestations.Env), g.verifier.Env...)
 	attestations.Stdout = nil
-	attested, err := ci.VerifyDeploymentProvenance(ctx, attestations, tree, source.repositoryID, source.mapping, order.Image, order.Digest, order.Revision)
+	attested, err := deployment.VerifyProvenance(ctx, attestations, tree, source.repositoryID, source.mapping, order.Image, order.Digest, order.Revision)
 	if err != nil {
 		return fmt.Errorf("%s at %s: %w", order.Image+"@"+order.Digest, order.Revision, err)
 	}
@@ -336,8 +336,8 @@ func (g provenanceGate) deployedBy(ctx context.Context, commit string, changed m
 
 type deploymentSource struct {
 	repositoryID string
-	mapping      ci.DeploymentMapping
-	target       ci.DeploymentTarget
+	mapping      deployment.Mapping
+	target       deployment.Target
 }
 
 func deploymentSources(tree fstest.MapFS, image string) ([]deploymentSource, error) {
@@ -347,7 +347,7 @@ func deploymentSources(tree fstest.MapFS, image string) ([]deploymentSource, err
 	}
 	var sources []deploymentSource
 	for _, name := range mappings {
-		var mapping ci.DeploymentMapping
+		var mapping deployment.Mapping
 		if err := yaml.Unmarshal(tree[name].Data, &mapping); err != nil {
 			return nil, fmt.Errorf("decode %s: %w", name, err)
 		}

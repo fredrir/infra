@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/fredrir/infra/internal/process"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var repositoryPattern = regexp.MustCompile(`^fredrir/[A-Za-z0-9_.-]+$`)
 
 type TimelineStep struct {
 	Name       string     `json:"name"`

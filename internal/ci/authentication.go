@@ -11,16 +11,22 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/fredrir/infra/internal/deployment"
+	"github.com/fredrir/infra/internal/kustomize"
 )
 
-func DeployAuthenticated(ctx context.Context, runner process.Runner, options DeployOptions, actor, token string) error {
+func DeployAuthenticated(ctx context.Context, runner process.Runner, options deployment.Options, actor, token string) error {
 	directory, err := RegistryConfig(actor, token)
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(directory)
 	runner.Env = append(runner.Env, "DOCKER_CONFIG="+directory, "REGISTRY_TOKEN=")
-	return Deploy(ctx, runner, options)
+	return deployment.Deploy(ctx, runner, options, func(directory string) error {
+		_, err := kustomize.Build(directory)
+		return err
+	})
 }
 
 func RegistryConfig(actor, token string) (string, error) {
