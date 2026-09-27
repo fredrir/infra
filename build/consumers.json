@@ -18,7 +18,7 @@
       "repository": "fredrir/llunde-pyparser",
       "workflow": ".github/workflows/dependencies.yml",
       "infra_workflow": "build-image.yml",
-      "revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af"
+      "revision": "4d2cbb6ad1723868c46cc878f710d637cb2e732b"
     },
     {
       "repository": "fredrir/llunde-pyparser",
