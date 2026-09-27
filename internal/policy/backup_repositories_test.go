@@ -3,12 +3,71 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
 var primaryBackupProjects = map[string]string{"llunde-pyparser": "parser", "y": "y", "portfolio": "portfolio"}
+
+func TestBackupJobsUseOnlyTheirDeclaredRepositories(t *testing.T) {
+	jobs := map[string]bool{}
+	for _, path := range []string{"platform/components/cache", "platform/components/backups", "platform/projects/llunde-pyparser", "platform/projects/y", "platform/projects/portfolio"} {
+		for _, resource := range renderedTree(t, "platform", path) {
+			name := at(resource, "metadata", "name")
+			if resource["kind"] != "CronJob" || (name != "data-backup" && name != "repository-maintenance") {
+				continue
+			}
+			namespace := at(resource, "metadata", "namespace").(string)
+			job := namespace + "/" + name.(string)
+			jobs[job] = true
+			container := at(resource, "spec", "jobTemplate", "spec", "template", "spec", "containers", 0).(object)
+			var sources []string
+			for _, source := range container["envFrom"].([]any) {
+				sources = append(sources, fmt.Sprint(lookup(source, "prefix"), lookup(source, "secretRef", "name")))
+			}
+			settings := map[string]string{}
+			for _, entry := range container["env"].([]any) {
+				value, _ := lookup(entry, "value").(string)
+				if reference := lookup(entry, "valueFrom", "secretKeyRef"); reference != nil {
+					value = fmt.Sprint("secret:", lookup(reference, "name"), "/", lookup(reference, "key"))
+				}
+				settings[at(entry, "name").(string)] = value
+			}
+			want := map[string]string{"BACKUP_REPOSITORIES": "offsite"}
+			wantSources := []string{"OFFSITE_backup-repository"}
+			if _, ok := primaryBackupProjects[namespace]; ok {
+				want = map[string]string{"BACKUP_REPOSITORIES": "primary offsite", "PRIMARY_RESTIC_CACERT": "/usr/local/share/object-store/ca.crt", "PRIMARY_AWS_DEFAULT_REGION": "hel1"}
+				wantSources = []string{"PRIMARY_backup-primary-repository", "OFFSITE_backup-repository"}
+			}
+			if name == "data-backup" {
+				want["BACKUP_HEARTBEAT_TOKEN"] = "secret:backup-repository/BACKUP_HEARTBEAT_TOKEN"
+			}
+			if deadline, _ := lookup(resource, "spec", "jobTemplate", "spec", "activeDeadlineSeconds").(int); name == "data-backup" && deadline < len(wantSources)*(120+900)+180+600 {
+				t.Errorf("%s ends after %d s, before its preflights, quiesce, export and uploads can time out", job, deadline)
+			}
+			if !slices.Equal(sources, wantSources) {
+				t.Errorf("%s loads %v, want %v", job, sources, wantSources)
+			}
+			for key, value := range want {
+				if settings[key] != value {
+					t.Errorf("%s sets %s=%q, want %q", job, key, settings[key], value)
+				}
+			}
+			for _, key := range []string{"RESTIC_REPOSITORY", "RESTIC_PASSWORD", "RESTIC_CACERT", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"} {
+				if _, ok := settings[key]; ok {
+					t.Errorf("%s sets unprefixed repository setting %s", job, key)
+				}
+			}
+		}
+	}
+	want := []string{"llunde-pyparser/data-backup", "llunde-pyparser/repository-maintenance", "nix-cache/data-backup", "nix-cache/repository-maintenance", "platform-backups/repository-maintenance", "portfolio/data-backup", "portfolio/repository-maintenance", "y/data-backup", "y/repository-maintenance"}
+	if got := slices.Sorted(maps.Keys(jobs)); !slices.Equal(got, want) {
+		t.Fatalf("backup jobs %v, want %v", got, want)
+	}
+}
 
 func TestPrimaryBackupBucketsKeepHistoryFromTheirWriters(t *testing.T) {
 	var spec struct {

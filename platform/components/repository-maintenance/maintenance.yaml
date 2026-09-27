@@ -41,9 +41,12 @@ spec:
                 - platform
                 - repository-maintenance
               envFrom:
-                - secretRef:
+                - prefix: OFFSITE_
+                  secretRef:
                     name: backup-repository
               env:
+                - name: BACKUP_REPOSITORIES
+                  value: offsite
                 - name: RESTIC_CACHE_DIR
                   value: /cache
               resources:

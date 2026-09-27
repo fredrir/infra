@@ -226,12 +226,14 @@ kubectl get cronjobs --all-namespaces
 | Portfolio             | Hourly             | PostgreSQL logical dump; existing AWS media retained                                                                   |
 | Control plane         | Every 6 hours      | Native etcd snapshot, exact server/agent tokens, K3s configuration and encrypted repository copy of Kubernetes Secrets |
 | Attic                 | Hourly             | Consistent SQLite export including signing identity                                                                    |
-| Restic maintenance    | Weekly             | Full repository read/integrity checks and retention                                                                    |
+| Restic maintenance    | Weekly             | Repository read/integrity checks and retention on every repository of the job                                         |
 | AWS application media | Preserved in place | Independent user-managed Google Drive copy                                                                             |
 
 | Recovery boundary  | Value                                                                                                                                                                        |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backup storage     | Encrypted Restic repositories outside the cluster; interchangeable backend tooling                                                                                           |
+| Backup storage     | Encrypted Restic repositories; parser, Y and portfolio: primary `restic-<project>` on `seaweedfs-hel1` (`fredrir-04`) and off-site AWS `restic/platform/`; Attic and control plane: off-site only |
+| Upload order       | Writers resume after the export; the job then uploads to the primary and the off-site repository; either failing fails the job and withholds the heartbeat, while the other still receives the snapshot |
+| Primary history    | COMPLIANCE lock 30 days; writers cannot change bucket settings or delete versions; pruned data stays 31 days |
 | Retired host repos | `restic/llunde-*` expire 2026-12-25; versions deleted 90 days later; lifecycle changes require an administrator apply                                                        |
 | Pruned versions    | Noncurrent `restic/platform/` versions expire after 90 days; writers cannot delete versions; lifecycle changes require an administrator apply |
 | Credentials        | Separate project prefixes and separate maintenance authority; SOPS recovery available from Macie or Archie                                                                   |
@@ -244,7 +246,7 @@ kubectl get cronjobs --all-namespaces
 | Disposable data    | Main Llunde seeded database and observability history                                                                                                                        |
 | Recovery time      | Provider provisioning plus restore time; no automatic cross-provider failover claim                                                                                          |
 
-Use native `restic snapshots`, `restic restore` and database restore tools with the matching encrypted credentials. Restore PostgreSQL with `pg_restore`, MongoDB with `mongorestore`, and K3s with its matching version and server token. Etcd snapshots contain no application volume data.
+Use native `restic snapshots`, `restic restore` and database restore tools with the matching encrypted credentials; primary repositories are reachable only from the project's `repository-maintenance` pods, with `RESTIC_CACERT=/usr/local/share/object-store/ca.crt` from the tools image. Restore PostgreSQL with `pg_restore`, MongoDB with `mongorestore`, and K3s with its matching version and server token. Etcd snapshots contain no application volume data.
 
 ## Provider resources
 

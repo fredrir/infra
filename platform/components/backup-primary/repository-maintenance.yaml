@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: repository-maintenance
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: maintenance
+              envFrom:
+                - prefix: PRIMARY_
+                  secretRef:
+                    name: backup-primary-repository
+                - prefix: OFFSITE_
+                  secretRef:
+                    name: backup-repository
+              env:
+                - name: BACKUP_REPOSITORIES
+                  value: primary offsite
+                - name: PRIMARY_RESTIC_CACERT
+                  value: /usr/local/share/object-store/ca.crt
+                - name: PRIMARY_AWS_DEFAULT_REGION
+                  value: hel1

@@ -41,9 +41,17 @@ spec:
                 - platform
                 - backup
               envFrom:
-                - secretRef:
+                - prefix: OFFSITE_
+                  secretRef:
                     name: backup-repository
               env:
+                - name: BACKUP_REPOSITORIES
+                  value: offsite
+                - name: BACKUP_HEARTBEAT_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-repository
+                      key: BACKUP_HEARTBEAT_TOKEN
                 - name: BACKUP_PROJECT
                   value: attic
                 - name: BACKUP_KIND
