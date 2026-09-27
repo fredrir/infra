@@ -586,9 +586,10 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Resolve versioning or lock drift on a cache bucket | Remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |
 | Failed provisioner run | Read `kubectl -n object-store logs job/<job>`; for drift restored on a locked bucket, find who changed it, since the filter admits bucket configuration only from the provisioner key |
 | Any `seaweedfs-nl` incident | Suspend the mirror first (commands below), before investigating |
-| Restore the parser dataset | Commands below: suspend the mirror, run `parser-dataset-seed`, resume |
+| Restore the parser dataset | Commands below: suspend the mirror, stop the parser writers, run `parser-dataset-seed`, which overwrites every object that differs from AWS, start the writers, resume |
+| Bring back missing parser dataset objects | Commands below: suspend the mirror, run `mirror.sh restore` from the seed job template, which copies only objects absent from `parser-dataset` and leaves the sentinel alone, resume; safe while the parser runs |
 | Resolve versioning or lock drift on `parser-dataset` | Suspend the mirror; forced `weed shell` cleanup below with `parser-dataset`; provisioner run; seed; resume |
-| Undo mirror deletions in AWS | Administrator only (`platform-dataset-parser` cannot delete versions): remove the delete markers the mirror wrote since the incident, commands below |
+| Undo mirror deletions in AWS | Administrator only (`platform-dataset-parser` cannot delete versions): remove the delete markers the mirror wrote since the incident, commands below; this also brings back objects the parser deleted legitimately after `SINCE`, so set `SINCE` as late as the incident allows |
 
 | Leaf | Subject | SAN | Usage |
 | --- | --- | --- | --- |
@@ -664,13 +665,32 @@ flux suspend kustomization platform-object-store
 kubectl -n object-store patch cronjob parser-dataset-mirror --type=merge -p '{"spec":{"suspend":true}}'
 ```
 
-Seed or restore `parser-dataset` from AWS, then resume:
+Seed or restore `parser-dataset` from AWS with the parser writers stopped, then resume:
 
 ```sh
+flux suspend kustomization project-llunde-pyparser
+kubectl -n llunde-pyparser patch cronjob data-backup --type=merge -p '{"spec":{"suspend":true}}'
+until [ -z "$(kubectl -n llunde-pyparser get cronjob data-backup -o jsonpath='{.status.active}')" ]; do sleep 10; done
+kubectl -n llunde-pyparser scale deployment review worker-extract worker-light --replicas=0
+kubectl -n llunde-pyparser wait --for=delete pod -l 'app.kubernetes.io/name in (review,worker-extract,worker-light)' --timeout=5m
 kubectl -n object-store create job parser-dataset-seed-now --from=cronjob/parser-dataset-seed
-kubectl -n object-store wait --for=condition=complete job/parser-dataset-seed-now --timeout=2h
+until kubectl -n object-store get job parser-dataset-seed-now -o jsonpath='{.status.succeeded}{.status.failed}' | grep -q .; do sleep 10; done
 kubectl -n object-store logs job/parser-dataset-seed-now
 kubectl -n object-store delete job parser-dataset-seed-now
+kubectl -n llunde-pyparser scale deployment review worker-extract worker-light --replicas=1
+flux resume kustomization project-llunde-pyparser
+flux resume kustomization platform-object-store
+```
+
+Bring back only the objects missing from `parser-dataset`, with the mirror suspended, then resume:
+
+```sh
+kubectl -n object-store get cronjob parser-dataset-seed -o json \
+  | jq '{apiVersion: "batch/v1", kind: "Job", metadata: {name: "parser-dataset-restore", namespace: "object-store"}, spec: (.spec.jobTemplate.spec | .template.spec.containers[0].args = ["restore"])}' \
+  | kubectl create -f -
+until kubectl -n object-store get job parser-dataset-restore -o jsonpath='{.status.succeeded}{.status.failed}' | grep -q .; do sleep 10; done
+kubectl -n object-store logs job/parser-dataset-restore
+kubectl -n object-store delete job parser-dataset-restore
 flux resume kustomization platform-object-store
 ```
 

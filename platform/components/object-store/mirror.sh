@@ -30,7 +30,10 @@ case "${1:-}" in
     dataset check "$aws" "$store" --one-way --size-only
     rclone touch "$store/$sentinel"
     ;;
+  restore)
+    dataset copy "$aws" "$store" --ignore-existing --transfers=16 --log-level=NOTICE
+    ;;
   *)
-    refuse "usage: mirror.sh sync|seed"
+    refuse "usage: mirror.sh sync|seed|restore"
     ;;
 esac

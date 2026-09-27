@@ -114,6 +114,17 @@ func TestParserDatasetSeedMarksTheSourceOnlyAfterACheck(t *testing.T) {
 	}
 }
 
+func TestParserDatasetRestoreKeepsEveryExistingObject(t *testing.T) {
+	calls, err := runMirrorScript(t, "restore", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"copy aws:llunde-pyparser-bucket store:parser-dataset --ignore-existing --transfers=16 --log-level=NOTICE " + datasetFilters}
+	if !slices.Equal(calls, want) {
+		t.Fatalf("restore ran\n%s\nwant\n%s", strings.Join(calls, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 func TestParserDatasetMirrorJobsKeepTheirBlastRadius(t *testing.T) {
 	image := at(load(t, "platform/versions.yaml"), "images", "rclone")
 	script, err := os.ReadFile(filepath.Join(repoRoot(t), objectStore, "mirror.sh"))
