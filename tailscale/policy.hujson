@@ -1069,15 +1069,6 @@
       ]
     },
     {
-      "src": "tag:infra-apply",
-      "proto": "tcp",
-      "deny": [
-        "bazel-cache:9092",
-        "bazel-cache:9093",
-        "bazel-cache:9095"
-      ]
-    },
-    {
       "src": "tag:infra-reconciler",
       "proto": "tcp",
       "deny": [

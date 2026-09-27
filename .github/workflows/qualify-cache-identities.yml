@@ -6,5 +6,4 @@ permissions:
   id-token: write
 jobs:
   deny:
-    if: github.triggering_actor != 'fredrir-infra-verification[bot]'
     uses: ./.github/workflows/cache-identity-negative.yml
