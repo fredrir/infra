@@ -8,6 +8,15 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+func TestPodsNeverReachLinkLocalServicesThroughTheHost(t *testing.T) {
+	template := string(read(t, filepath.Join(root(t), "ansible/roles/firewall/templates/platform-host.nft.j2")))
+	_, forward, found := strings.Cut(template, "chain forward {")
+	forward, _, _ = strings.Cut(forward, "\n  }")
+	if !found || !strings.Contains(forward, "type filter hook forward priority -5; policy accept;") || !strings.Contains(forward, "ip saddr {{ firewall_pod_cidr }} ip daddr 169.254.0.0/16 drop") {
+		t.Fatal("pods reach cloud metadata whenever their egress policy is missing or not yet enforced")
+	}
+}
+
 func TestTailscaleUnderlayNeverEntersThePodNetwork(t *testing.T) {
 	repository := root(t)
 	var firewall struct {
