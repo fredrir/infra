@@ -502,7 +502,7 @@ Native signed S3 state requests retain conditional lease creation, takeover and 
 | Runner admission | Value |
 | --- | --- |
 | Capacity | `build_runner_job_slots` complete jobs across all repository listeners while `build_runner_admission_enabled` is true |
-| Broker | `infra-runner-admission.socket`: `/run/infra-runner-admission.sock`, `0666`, so listeners reach it without restarting; the broker admits only callers inside a runner listener unit; one sandboxed `infra platform runner-admission serve` daemon, restarted when its unit or the installed CLI changes; callers retry refused, full or unanswered connections until their timeout |
+| Broker | `infra-runner-admission.socket`: one socket per repository, `/run/infra-runner-admission.d/<repository>/admission.sock` in a `root:runner-<repository>` `0750` directory, so one repository's connections cannot fill another's queue; one sandboxed `infra platform runner-admission serve` daemon, restarted when its unit or the installed CLI changes; callers retry refused, full or unanswered connections until their timeout |
 | Identity | Caller PID from `SO_PEERCRED`; listener unit from its cgroup below `infra-runners.slice`; nearest `Runner.Worker` ancestor of the same account; one lease per listener unit, replaced by its next acquire; at most two open requests per unit, 5 s to send the request |
 | Leases | `/run/infra-runner-admission`, root `0700`; later requests reclaim leases of exited workers; a disconnected waiter stops waiting |
 | Hooks | Start hook `acquire` waits within the job timeout and reports its wait; completion hook `release --timeout=30s` |
@@ -518,7 +518,8 @@ Drain active jobs before changing runner service overrides.
 | Drain deadline   | `build_runner_drain_minutes` (50), shared by all runners in one play                                      |
 | Busy at deadline | Play fails; runner keeps its job and binaries                                                             |
 | Labels restored  | After its replacement, including failed replacements                                                      |
-| Retirement       | Undeclared runners lose their labels, drain like replacements and are deregistered before their root is removed |
+| Retirement       | Listener roots under `/home` other than the declared `/home/runner-<repository>/<name>` lose their labels, drain like replacements and are deregistered before any registration; their root is removed afterwards |
+| Engines          | Undeclared `infra-dagger*` units, containers, cache volumes and configuration are removed after the listeners converge |
 | Job routing      | `dagger-amd64` or `infra-trusted`; `self-hosted`, `Linux` and `X64` stay during a drain                   |
 
 A changed digest for an unchanged version is not proposed; investigate it before editing the pin.

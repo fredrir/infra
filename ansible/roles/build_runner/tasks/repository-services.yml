@@ -16,14 +16,23 @@
     content: |
       [Service]
       Slice=infra-runners.slice
-      Environment=DOCKER_CONFIG=/home/runner/{{ item | regex_replace('^actions[.]runner[.].+[.]' ~ (inventory_hostname | regex_escape) ~ '-', '') | regex_replace('[.]service$', '') }}/.docker
-      Environment=GH_CONFIG_DIR=/home/runner/{{ item | regex_replace('^actions[.]runner[.].+[.]' ~ (inventory_hostname | regex_escape) ~ '-', '') | regex_replace('[.]service$', '') }}/.config/gh
+      UMask=0077
+      PrivateTmp=true
+      ProtectProc=invisible
+      ProtectHome=tmpfs
+      BindPaths=/home/runner-{{ build_runner_service_slug }}
+      NoNewPrivileges=true
+      RestrictSUIDSGID=true
+      EnvironmentFile=/etc/infra-dagger/{{ build_runner_service_slug }}.env
+      Environment=INFRA_SCANNER_DATABASES={{ build_runner_scanner_databases }}
+      Environment=INFRA_RUNNER_ADMISSION_SOCKET=/run/infra-runner-admission.d/{{ build_runner_service_slug }}/admission.sock
       Environment=ACTIONS_RUNNER_HOOK_JOB_STARTED=/usr/local/libexec/infra-runner-hook.sh
       {% if build_runner_admission_enabled | bool %}
       Environment=ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/usr/local/libexec/infra-runner-completed.sh
       {% endif %}
       Environment=CI_POOL=main
-      Environment=_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger
+  vars:
+    build_runner_service_slug: "{{ build_runner_instances | selectattr('name', 'equalto', item | regex_replace('^actions[.]runner[.].+[.]' ~ (inventory_hostname | regex_escape) ~ '-', '') | regex_replace('[.]service$', '')) | map(attribute='slug') | first }}"
   loop: '{{ build_runner_state_services }}'
   register: build_runner_service_override
 
@@ -39,9 +48,10 @@
   ansible.builtin.shell: |
     set -eu
     for unit in {{ build_runner_state_services | map('quote') | join(' ') }}; do
+      slug=$(sed -n 's|^EnvironmentFile=/etc/infra-dagger/\(.*\)[.]env$|\1|p' "/etc/systemd/system/$unit.d/resources.conf")
       started=$(systemctl show --timestamp=us+utc --property=ActiveEnterTimestamp --value "$unit")
       if [ -z "$started" ] || [ "$(systemctl show --property=NeedDaemonReload --value "$unit")" = yes ] ||
-        [ -n "$(find "/etc/systemd/system/$unit.d/resources.conf" -newermt "$started")" ]; then
+        [ -n "$(find "/etc/systemd/system/$unit.d/resources.conf" "/etc/infra-dagger/$slug.env" -newermt "$started")" ]; then
         echo "$unit"
       fi
     done

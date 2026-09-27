@@ -151,18 +151,19 @@ git diff -- platform
 | Guest egress                    | nftables `inet infra_build_vm` (`infra-build-vm-egress.service`, required by the guest): connections the QEMU account opens (new or untracked) to host addresses, RFC 1918, CGNAT/tailnet, link-local and ULA ranges dropped; host resolver `127.0.0.53:53` allowed; inbound SSH and metrics forwards unaffected; [qualification](../build/evidence/build-vm-guest-egress.json) |
 | Guest metrics                   | Node exporter `:9100`; `infra_cgroup_*` for `infra-engine.slice` and `infra-runners.slice`; Prometheus job `build-vm`                      |
 | Activation gates                | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true`                                                       |
-| Runner registration             | `build/runners.json` counts per repository, named `infra-build-09-<repository>-<n>`; protected main pushes or manual runs only              |
+| Runner registration | `build/runners.json` counts per repository, named `infra-build-09-<repository>-<n>`; protected main pushes or manual runs only; listener roots `/home/runner-<repository>/<name>` (repository lowercased), `0700` |
 | Runner slice                    | Eight CPUs / 4 GiB aggregate for runner services and native child processes                                                                 |
-| Production Dagger ceiling       | Eight CPUs / 10 GiB RAM / 3,072 processes / three parallel operations                                                                     |
+| Production Dagger ceiling | One engine per repository in `infra-engine.slice`: eight CPUs / 10 GiB RAM / 3,072 tasks for all engines together; three parallel operations per engine |
 | Standalone engine defaults      | Four CPUs / 8 GiB RAM / one parallel operation; configurable within host capacity                                                         |
-| Dagger connection               | Local `docker-container://infra-dagger`; no published engine port                                                                           |
-| Persistent caches               | `infra-dagger-cache` Docker volume; engine-local Bazel action cache                                                                         |
-| Runner environment              | `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger`                                                                          |
-| Runner enforcement              | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected                                            |
-| Cache collection                | `/etc/infra-dagger.toml` at `/etc/dagger/engine.toml`, the path the engine entrypoint reads; Dagger ordinary layers first; named caches preferred for 48 h; 25 GiB target / 32 GiB ceiling; 8 GiB / 4 GiB emergency free space |
+| Dagger connection | `unix:///run/infra-dagger/<repository>/engine.sock`, `root:infra-dagger-<repository>` `0660`; jobs have no Docker access; no published engine port; `/etc/infra-dagger/engine.json` refuses privileged executions |
+| Persistent caches | `infra-dagger-cache-<repository>` Docker volume per engine; engine-local Bazel action cache |
+| Runner environment | `/etc/infra-dagger/<repository>.env`: `_EXPERIMENTAL_DAGGER_RUNNER_HOST`, `INFRA_ENGINE_CPUS`, `INFRA_ENGINE_MEMORY_BYTES`, `INFRA_ENGINE_PARALLELISM`; `INFRA_SCANNER_DATABASES=/var/lib/infra-scanner/databases` |
+| Runner enforcement | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected; listener units: account `runner-<repository>` outside `docker`, `ProtectProc=invisible`, `PrivateTmp`, `ProtectHome=tmpfs` with only its own home, `NoNewPrivileges`, `UMask=0077` |
+| Cache collection | `/etc/infra-dagger/<repository>.toml` at `/etc/dagger/engine.toml`, the path the engine entrypoint reads; ceiling `build_engine_cache_gib` per repository (default `build_engine_default_cache_gib`), 80 % target; Dagger ordinary layers first; named caches preferred for 48 h; 8 GiB / 4 GiB emergency free space |
+| Scanner databases | `infra-scanner-refresh.timer` (hourly) as `infra-scanner` publishes read-only generations to `/var/lib/infra-scanner/databases`; jobs link them into their own analysis caches |
 | Verified tooling                | CLI release checksum and revision; pinned GitHub runner archive                                                                             |
 | Warm ARC capacity               | One deploy runner and one declaration-check runner                                                                                          |
-| Pool isolation                  | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines                                                           |
+| Pool isolation | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines; one account, engine, cache and socket group per repository |
 
 ```sh
 ansible-playbook -i ansible/inventory/production.yml \
@@ -182,7 +183,7 @@ ansible-playbook -i ansible/inventory/production.yml \
 | Verify latency        | Measure queue, setup, checks, publication and revision readiness independently                                            |
 | Roll back routing     | Disable qualification variables before stopping services; retain guest disk and cache volumes                             |
 
-The reservation and dedicated guest are provisioned and natively qualified; workflow routing remains separately gated by release identity and qualified-pool variables. The guest shares physical CPUs with Kubernetes; reservations constrain schedulable capacity rather than guaranteeing latency. Runner registrations share one capped engine, so concurrent repositories may queue. Cache thresholds are retention targets rather than filesystem quotas, except for the guest disk's virtual capacity.
+The reservation and dedicated guest are provisioned and natively qualified; workflow routing remains separately gated by release identity and qualified-pool variables. The guest shares physical CPUs with Kubernetes; reservations constrain schedulable capacity rather than guaranteeing latency. Repository engines share the engine slice's CPU and memory but no cache or session. Cache thresholds are retention targets rather than filesystem quotas, except for the guest disk's virtual capacity.
 
 Only trusted repositories and protected branches may use this VM.
 

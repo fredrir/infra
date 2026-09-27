@@ -1,0 +1,170 @@
+{
+ "schema": 1,
+ "recorded_at_utc": "2026-09-27T04:30:00Z",
+ "question": "What do one account and one Dagger engine per repository cost on the build VM, and do jobs of one repository still reach another's credentials, environment, engine, Docker or caches?",
+ "lab": {
+  "guest": "pinned noble cloud image (kernel 6.8.0-139, systemd 255) under KVM with 8 vCPUs and 11 GiB, provisioned first at the shared-account layout and then migrated by ansible/build-runners.yml with a stub GitHub CLI and a runner archive whose registration and service process are stubbed",
+  "deviations": "engine slice MemoryMax 8G and runner slice 2G instead of 10G and 4G, because the host had about 12 GB free; the host ran other workloads, including a k3d cluster, throughout"
+ },
+ "migration": {
+  "seconds": 197,
+  "listeners_retired_and_deregistered": 11,
+  "listeners_registered": 11,
+  "shared_runner_account": "removed",
+  "shared_engine_and_cache_volume": "removed",
+  "docker_group_members": "none",
+  "second_apply": "changed=0 after the controller clock skew passed",
+  "verify_runners": "changed=0"
+ },
+ "shared_account_baseline": {
+  "job_reads_other_listener_environ": true,
+  "job_reads_other_listener_credentials": true,
+  "job_reaches_docker_api": true
+ },
+ "isolation_after_migration": {
+  "pairs": [
+   "y\u2192infra",
+   "infra\u2192llunde-backend",
+   "llunde-backend\u2192portfolio"
+  ],
+  "each_pair": {
+   "visible_process_owners": "own account only",
+   "other_listener_proc_entry": "absent",
+   "other_listener_environ": "unreadable",
+   "visible_homes": "own home only",
+   "other_listener_credentials": "unreadable",
+   "docker_api": "unreachable",
+   "other_engine_socket": "refused",
+   "own_engine": "answers",
+   "privileged_exec_in_own_engine": "security.insecure is not allowed",
+   "scanner_databases": "read-only",
+   "admission_leases": "unreadable",
+   "other_listener_sees_job_tmp": false
+  }
+ },
+ "admission": {
+  "round_trip_ms": {
+   "acquire": 21,
+   "release": 13
+  },
+  "broker": "one socket-activated daemon (Accept=no) serving one socket per repository in a root:runner-<repository> 0750 directory",
+  "fake_workers": "six escaped processes named Runner.Worker in one listener held one lease; a job of another repository was admitted in 49 ms",
+  "flood": "32 threads connecting and closing on Y's socket for 20 s: five infra acquire and release round trips took 20-23 ms each, a Y acquire during its own flood 38 ms, no failed units, no broker restarts, broker memory 8 MiB",
+  "restart": "the broker restarted while a Y job waited with four slots held; the job was admitted 3.0 s later, when a slot was released",
+  "systemd_limit": "MaxConnectionsPerSource= is not enforced for AF_UNIX peers by systemd 255; the broker bounds open requests per listener unit itself and each repository gets its own socket queue"
+ },
+ "scanner": {
+  "prepare_seconds": 0.0074,
+  "scan_seconds": 0.9,
+  "steady_mib": 2847,
+  "peak_mib_both_databases_refreshing": 6161,
+  "layout": "db-v2 and java-db-v1 symlinks to one generation each"
+ },
+ "concurrent_cold_builds": {
+  "builds": {
+   "runner-check": "images/runner-check/Containerfile",
+   "runner-rust": "images/runner-rust/Containerfile",
+   "backup-tools": "platform/components/backups/tools.Dockerfile",
+   "backend": "llunde-backend Containerfile, target checks"
+  },
+  "method": "infra pipeline image --check-only with the injected CLI, all four at once on empty caches; Go build arguments from the runner environment",
+  "shared_engine_parallelism_3": [
+   {
+    "wall_seconds": 384,
+    "seconds": {
+     "backup-tools": 177,
+     "runner-rust": 298,
+     "backend": 323,
+     "runner-check": 384
+    },
+    "engine_cpu_seconds": 837,
+    "anon_and_kernel_peak_mib": 3572,
+    "oom_kills": 0
+   },
+   {
+    "wall_seconds": 376,
+    "seconds": {
+     "backup-tools": 189,
+     "runner-rust": 268,
+     "backend": 296,
+     "runner-check": 375
+    },
+    "engine_cpu_seconds": 827,
+    "anon_and_kernel_peak_mib": 3146,
+    "oom_kills": 0
+   }
+  ],
+  "one_engine_per_build_parallelism_3": [
+   {
+    "wall_seconds": 430,
+    "seconds": {
+     "backup-tools": 222,
+     "runner-rust": 356,
+     "backend": 361,
+     "runner-check": 430
+    },
+    "engine_cpu_seconds": 861,
+    "anon_and_kernel_peak_mib": 3570,
+    "oom_kills": 0
+   },
+   {
+    "wall_seconds": 419,
+    "seconds": {
+     "backup-tools": 245,
+     "runner-rust": 347,
+     "backend": 368,
+     "runner-check": 419
+    },
+    "engine_cpu_seconds": 851,
+    "anon_and_kernel_peak_mib": 3803,
+    "oom_kills": 0
+   },
+   {
+    "wall_seconds": 418,
+    "engine_cpu_seconds": 850,
+    "anon_and_kernel_peak_mib": 3855,
+    "oom_kills": 0
+   }
+  ],
+  "one_engine_per_build_parallelism_2": [
+   {
+    "wall_seconds": 417,
+    "seconds": {
+     "backup-tools": 253,
+     "runner-rust": 322,
+     "backend": 367,
+     "runner-check": 417
+    },
+    "engine_cpu_seconds": 874,
+    "anon_and_kernel_peak_mib": 4084,
+    "oom_kills": 0
+   }
+  ],
+  "reading": "Cold, four repositories building at once take 9-12 % longer on their own engines, because each engine pulls and unpacks its own base images; engine CPU and the anonymous plus kernel peak stay within 3 % and 0.7 GiB; parallelism 2 is not faster and peaks higher, so parallelism 3 stays"
+ },
+ "concurrent_warm_rebuilds": {
+  "shared_engine": {
+   "wall_seconds": 8,
+   "seconds": {
+    "backend": 2,
+    "backup-tools": 2,
+    "runner-check": 2,
+    "runner-rust": 8
+   }
+  },
+  "one_engine_per_build": {
+   "wall_seconds": 6,
+   "seconds": {
+    "backend": 0,
+    "backup-tools": 0,
+    "runner-check": 0,
+    "runner-rust": 5
+   }
+  }
+ },
+ "idle_engine_memory_mib": {
+  "never_used": "13 anonymous + 24 kernel",
+  "after_builds": "107-497 anonymous"
+ },
+ "cache_disk_after_four_cold_builds_gb": 20.1
+}

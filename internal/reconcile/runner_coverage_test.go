@@ -299,6 +299,10 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 		"roles/infra_binary/tasks/main.yml: Download verified compiled binary",
 		"roles/infra_binary/tasks/main.yml: Activate verified binary",
 		"roles/build_runner/tasks/remove.yml: Remove retired runner",
+		"roles/build_engine/tasks/remove.yml: Stop undeclared build engines",
+		"roles/build_engine/tasks/remove.yml: Remove undeclared build engine units",
+		"roles/build_engine/tasks/remove.yml: Reload systemd without undeclared build engines",
+		"roles/build_engine/tasks/remove.yml: Remove undeclared build engine configuration",
 	}
 	applyOnlyTasks := []string{
 		"roles/infra_binary/tasks/main.yml: Remove superseded binary revisions",
@@ -313,6 +317,9 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 		"roles/build_runner/tasks/remove.yml: Stop retired runner service",
 		"roles/build_runner/tasks/remove.yml: Remove retired runner unit and resource override",
 		"roles/build_runner/tasks/remove.yml: Reload systemd without retired runner",
+		"roles/build_runner/tasks/main.yml: Remove the shared runner account",
+		"roles/build_runner/tasks/main.yml: Remove the shared admission group",
+		"roles/build_engine/tasks/remove.yml: Remove the shared engine policy",
 	}
 	hostReads := []string{
 		"verify-runners.yml: Probe observed runner host",
@@ -322,7 +329,8 @@ func TestRunnerVerificationComparesEveryAppliedDeclaration(t *testing.T) {
 		"roles/build_runner/tasks/state.yml: Require the installed CLI's admission broker",
 		"roles/build_runner/tasks/state.yml: Find stale runner admission units",
 		"roles/build_runner/tasks/repository-services.yml: Find stale runner services",
-		"roles/build_engine/tasks/state.yml: Find stale build engine",
+		"roles/build_engine/tasks/state.yml: Find stale build engines",
+		"roles/build_engine/tasks/undeclared.yml: Find undeclared build engines",
 	}
 	applied := map[string]bool{}
 	walkAnsiblePlays(t, root, "build-runners.yml", func(task ansibleTask) {

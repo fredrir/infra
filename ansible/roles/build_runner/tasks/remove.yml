@@ -1,11 +1,11 @@
 - name: Read retired runner registration
   ansible.builtin.slurp:
-    src: '/home/runner/{{ build_runner_retired }}/.runner'
+    src: '{{ build_runner_retired }}/.runner'
   register: build_runner_retired_registration
 
 - name: Read retired runner service registration
   ansible.builtin.stat:
-    path: '/home/runner/{{ build_runner_retired }}/.service'
+    path: '{{ build_runner_retired }}/.service'
   register: build_runner_retired_service_registration
 
 - name: Retire the runner from GitHub and its host
@@ -14,23 +14,24 @@
     build_runner_retired_repository: "{{ build_runner_retired_identity.gitHubUrl | default('') | regex_replace('^https://github[.]com/' ~ build_runner_owner ~ '/', '') }}"
     build_runner_retired_api: 'repos/{{ build_runner_owner }}/{{ build_runner_retired_repository }}/actions/runners/{{ build_runner_retired_identity.agentId | default(0) }}'
     build_runner_retired_unit: '{{ build_runner_retired_service.content | b64decode | trim }}'
+    build_runner_retired_name: '{{ build_runner_retired | basename }}'
   block:
     - name: Require the retired runner's own registration
       ansible.builtin.assert:
         that:
-        - build_runner_retired_identity.agentName | default('') == inventory_hostname ~ '-' ~ build_runner_retired
+        - build_runner_retired_identity.agentName | default('') == inventory_hostname ~ '-' ~ build_runner_retired_name
         - build_runner_retired_identity.agentId | default(0) | int > 0
         - build_runner_retired_repository is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
 
     - name: Read retired runner service
       ansible.builtin.slurp:
-        src: '/home/runner/{{ build_runner_retired }}/.service'
+        src: '{{ build_runner_retired }}/.service'
       register: build_runner_retired_service
       when: build_runner_retired_service_registration.stat.exists
 
     - name: Require the retired runner's own service
       ansible.builtin.assert:
-        that: build_runner_retired_unit == 'actions.runner.' ~ build_runner_owner ~ '-' ~ build_runner_retired_repository ~ '.' ~ inventory_hostname ~ '-' ~ build_runner_retired ~ '.service'
+        that: build_runner_retired_unit == 'actions.runner.' ~ build_runner_owner ~ '-' ~ build_runner_retired_repository ~ '.' ~ inventory_hostname ~ '-' ~ build_runner_retired_name ~ '.service'
       when: build_runner_retired_service_registration.stat.exists
 
     - name: Withdraw retired runner from new jobs
@@ -59,7 +60,7 @@
 
     - name: Wait for the retired runner to finish its job
       ansible.builtin.command:
-        argv: [pgrep, --full, "{{ ('/home/runner/' ~ build_runner_retired ~ '/bin/Runner.Worker') | regex_escape }}( |$)"]
+        argv: [pgrep, --full, "{{ (build_runner_retired ~ '/bin/Runner.Worker') | regex_escape }}( |$)"]
       register: build_runner_retired_worker
       changed_when: false
       failed_when: build_runner_retired_worker.rc not in [0, 1]
@@ -109,5 +110,5 @@
 
 - name: Remove retired runner
   ansible.builtin.file:
-    path: '/home/runner/{{ build_runner_retired }}'
+    path: '{{ build_runner_retired }}'
     state: absent

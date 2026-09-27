@@ -1,16 +1,15 @@
 - name: Probe repository runners
   ansible.builtin.shell: |
     set -eu
-    cd /home/runner
-    for name in {{ build_runner_instances | map(attribute='name') | map('quote') | join(' ') }}; do
+    for root in {{ build_runner_instances | map(attribute='root') | map('quote') | join(' ') }}; do
       (
-        version=$("./$name/bin/Runner.Listener" --version 2>/dev/null) || version=-
-        service=$(head -n 1 "$name/.service" 2>/dev/null) || service=-
+        version=$("$root/bin/Runner.Listener" --version 2>/dev/null) || version=-
+        service=$(head -n 1 "$root/.service" 2>/dev/null) || service=-
         registration=unregistered
-        if [ -e "$name/.runner" ]; then registration=registered; fi
+        if [ -e "$root/.runner" ]; then registration=registered; fi
         replacement=complete
-        if [ -e "$name/.infra-runner-pending" ]; then replacement=pending; fi
-        printf '%s %s %s %s %s\n' "$name" "$registration" "$replacement" "${version:--}" "${service:--}"
+        if [ -e "$root/.infra-runner-pending" ]; then replacement=pending; fi
+        printf '%s %s %s %s %s\n' "${root##*/}" "$registration" "$replacement" "${version:--}" "${service:--}"
       ) &
     done
     wait
@@ -36,7 +35,7 @@
 - name: Declare converged repository runner directories
   ansible.builtin.import_tasks: repository-directories.yml
   vars:
-    build_runner_state_repositories: "{{ build_runner_converged | map(attribute='name') | list }}"
+    build_runner_state_repositories: "{{ build_runner_instances | selectattr('name', 'in', build_runner_converged | map(attribute='name') | list) | list }}"
 
 - name: Declare converged repository runner services
   ansible.builtin.import_tasks: repository-services.yml

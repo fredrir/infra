@@ -1,44 +1,122 @@
-- name: Install bounded engine cache retention
-  ansible.builtin.template:
-    src: infra-dagger.toml.j2
-    dest: /etc/infra-dagger.toml
-    owner: root
-    group: root
-    mode: '0644'
-
-- name: Install Dagger unit
-  ansible.builtin.template:
-    src: infra-dagger.service.j2
-    dest: /etc/systemd/system/infra-dagger.service
-    owner: root
-    group: root
-    mode: '0644'
-  register: build_engine_dagger_unit
-
-- name: Start build engine
+- name: Start dedicated Docker engine
   ansible.builtin.systemd_service:
-    name: infra-dagger
-    daemon_reload: '{{ build_engine_dagger_unit.changed }}'
+    name: docker
     enabled: true
     state: started
 
-- name: Find stale build engine
+- name: Create engine socket groups
+  ansible.builtin.group:
+    name: '{{ item.group }}'
+    system: true
+  loop: '{{ build_engine_repositories }}'
+  loop_control:
+    label: '{{ item.group }}'
+
+- name: Read engine socket groups
+  ansible.builtin.getent:
+    database: group
+
+- name: Create engine configuration directory
+  ansible.builtin.file:
+    path: /etc/infra-dagger
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Refuse privileged executions in the engines
+  ansible.builtin.copy:
+    dest: /etc/infra-dagger/engine.json
+    owner: root
+    group: root
+    mode: '0644'
+    content: '{{ {"security": {"insecureRootCapabilities": false}} | to_nice_json }}'
+
+- name: Install bounded engine cache retention
+  ansible.builtin.template:
+    src: infra-dagger.toml.j2
+    dest: '/etc/infra-dagger/{{ build_engine.slug }}.toml'
+    owner: root
+    group: root
+    mode: '0644'
+  loop: '{{ build_engine_repositories }}'
+  loop_control:
+    loop_var: build_engine
+    label: '{{ build_engine.slug }}'
+
+- name: Declare the runner environment of each engine
+  ansible.builtin.copy:
+    dest: '/etc/infra-dagger/{{ item.slug }}.env'
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      _EXPERIMENTAL_DAGGER_RUNNER_HOST=unix:///run/infra-dagger/{{ item.slug }}/engine.sock
+      INFRA_ENGINE_CPUS={{ build_engine_cpus | int }}
+      INFRA_ENGINE_MEMORY_BYTES={{ build_engine_memory_bytes }}
+      INFRA_ENGINE_PARALLELISM={{ build_engine_parallelism | int }}
+  loop: '{{ build_engine_repositories }}'
+  loop_control:
+    label: '{{ item.slug }}'
+
+- name: Install aggregate engine resource limits
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/infra-engine.slice
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Slice]
+      CPUQuota={{ build_engine_cpus | int * 100 }}%
+      MemoryMax={{ build_engine_memory | upper }}
+      TasksMax={{ build_engine_pids }}
+  register: build_engine_slice
+
+- name: Install engine units
+  ansible.builtin.template:
+    src: infra-dagger.service.j2
+    dest: '/etc/systemd/system/{{ build_engine.name }}.service'
+    owner: root
+    group: root
+    mode: '0644'
+  vars:
+    build_engine_gid: '{{ ansible_facts.getent_group[build_engine.group][1] }}'
+  loop: '{{ build_engine_repositories }}'
+  loop_control:
+    loop_var: build_engine
+    label: '{{ build_engine.name }}'
+  register: build_engine_units
+
+- name: Start build engines
+  ansible.builtin.systemd_service:
+    name: '{{ item.name }}'
+    daemon_reload: '{{ build_engine_units.changed or build_engine_slice.changed }}'
+    enabled: true
+    state: started
+  loop: '{{ build_engine_repositories }}'
+  loop_control:
+    label: '{{ item.name }}'
+
+- name: Find stale build engines
   ansible.builtin.shell: |
     set -eu
-    started=$(systemctl show --timestamp=us+utc --property=ActiveEnterTimestamp --value infra-dagger)
-    image=$(docker container inspect --format '{{ "{{.Config.Image}}" }}' {{ build_engine_dagger_name | quote }} 2>/dev/null || true)
-    if [ -z "$started" ] || [ "$(systemctl show --property=NeedDaemonReload --value infra-dagger)" = yes ] ||
-      { [ -n "$image" ] && [ "$image" != {{ build_engine_image | quote }} ]; } ||
-      [ -n "$(find /etc/infra-dagger.toml /etc/systemd/system/infra-dagger.service -newermt "$started")" ]; then
-      echo infra-dagger
-    fi
+    for slug in {{ build_engine_repositories | map(attribute='slug') | map('quote') | join(' ') }}; do
+      unit="infra-dagger-$slug"
+      started=$(systemctl show --timestamp=us+utc --property=ActiveEnterTimestamp --value "$unit")
+      image=$(docker container inspect --format '{{ "{{.Config.Image}}" }}' "$unit" 2>/dev/null || true)
+      if [ -z "$started" ] || [ "$(systemctl show --property=NeedDaemonReload --value "$unit")" = yes ] ||
+        { [ -n "$image" ] && [ "$image" != {{ build_engine_image | quote }} ]; } ||
+        [ -n "$(find /etc/infra-dagger/engine.json "/etc/infra-dagger/$slug.toml" "/etc/systemd/system/$unit.service" -newermt "$started")" ]; then
+        echo "$unit"
+      fi
+    done
   register: build_engine_stale
   changed_when: false
   check_mode: false
 
-- name: Restart stale build engine
+- name: Restart stale build engines
   ansible.builtin.systemd_service:
-    name: infra-dagger
+    name: '{{ item }}'
     daemon_reload: true
     state: restarted
-  when: build_engine_stale.stdout_lines | length > 0
+  loop: '{{ build_engine_stale.stdout_lines }}'

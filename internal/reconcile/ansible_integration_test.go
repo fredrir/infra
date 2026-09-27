@@ -81,6 +81,10 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	var put func(path, data string, executable bool)
+	var get func(path string) string
+	var drop func(path string)
+	var present func(path string) bool
 	fleet, err := LoadRunnerFleet(root)
 	if err != nil {
 		t.Fatal(err)
@@ -102,9 +106,6 @@ func TestAnsibleScopeWithLocalContainers(t *testing.T) {
 	write("vars.json", fmt.Sprintf(`{"build_runner_cli":{"sha256":"%x"}}`, sha256.Sum256([]byte(cli))), false)
 	write("inventory.yml", "all:\n  children:\n    build_engines:\n      hosts:\n        localhost:\n          ansible_connection: local\n          ansible_user: root\n          ansible_python_interpreter: /usr/bin/python3\n          build_runner_repositories: {infra: 1, Y: 1}\n          build_runner_packages: [dpkg, tar]\n", false)
 	for _, repository := range []string{"infra", "Y"} {
-		write("runners/"+repository+"-1/.runner", "{}\n", false)
-		write("runners/"+repository+"-1/.service", runnerUnit(repository)+"\n", false)
-		write("runners/"+repository+"-1/bin/Runner.Listener", "#!/bin/sh\ncat /fixture/state/version-"+repository+"\n", true)
 		write("state/version-"+repository, version, false)
 	}
 	write("bin/systemctl", `#!/bin/sh
@@ -122,7 +123,7 @@ show)
   esac ;;
 is-enabled) if listed disabled-units "$2"; then echo disabled; exit 1; fi; echo enabled ;;
 start) started "$2" ;;
-restart) echo "$2" >> "$state/restarted"; started "$2"; if [ "$2" = infra-dagger ]; then cp "$state/engine-pinned" "$state/engine"; fi ;;
+restart) echo "$2" >> "$state/restarted"; started "$2"; case "$2" in infra-dagger-*) cp "$state/engine-pinned" "$state/engine" ;; esac ;;
 stop) echo "$2" >> "$state/stopped"; if pgrep --full '/bin/Runner[.]Worker' > /dev/null; then echo "$2" >> "$state/stopped-mid-job"; fi ;;
 disable) echo "$2" >> "$state/disabled" ;;
 daemon-reload) if rm "$state/reload-failure" 2>/dev/null; then exit 1; fi; rm -f "$state/reload-units"; echo reload >> "$state/reloaded" ;;
@@ -138,25 +139,54 @@ esac
     build_engine_toolchain: "{{ lookup('ansible.builtin.file', '/source/build/toolchain.json') | from_json }}"
   tasks:
   - ansible.builtin.import_role:
+      name: build_engine
+      tasks_from: state.yml
+  - ansible.builtin.import_role:
       name: build_runner
       tasks_from: state.yml
   - ansible.builtin.include_role:
       name: build_runner
+      tasks_from: retire.yml
+  - ansible.builtin.include_role:
+      name: build_runner
       tasks_from: repositories.yml
-  - ansible.builtin.import_role:
-      name: build_engine
-      tasks_from: state.yml
 `, false)
 	name := fmt.Sprintf("infra-ansible-scope-%d", time.Now().UnixNano())
-	command("docker", "run", "-d", "--name", name, "--network=none", "-v", root+":/source:ro", "-v", fixture+":/fixture", "-v", filepath.Join(fixture, "runners")+":/home/runner", "-v", packages+":/opt/ansible:ro", "-e", "PYTHONPATH=/opt/ansible", "-e", "ANSIBLE_CONFIG=/source/ansible/ansible.cfg", "-e", "PATH=/fixture/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", image, "sleep", "infinity")
+	command("docker", "run", "-d", "--name", name, "--network=none", "-v", root+":/source:ro", "-v", fixture+":/fixture", "-v", packages+":/opt/ansible:ro", "-e", "PYTHONPATH=/opt/ansible", "-e", "ANSIBLE_CONFIG=/source/ansible/ansible.cfg", "-e", "PATH=/fixture/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", image, "sleep", "infinity")
 	t.Cleanup(func() {
 		_ = exec.Command("docker", "exec", name, "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "/fixture").Run()
 		_ = exec.Command("docker", "rm", "-f", name).Run()
 	})
-	command("docker", "exec", name, "useradd", "--non-unique", "--uid", fmt.Sprint(os.Getuid()), "--no-create-home", "runner")
-	running := map[string]string{"runner": strings.TrimSpace(string(command("docker", "exec", name, "id", "-G", "runner")))}
+	running := map[string]string{}
 	command("docker", "exec", name, "groupadd", "docker")
-	command("docker", "exec", name, "mkdir", "-p", "/etc/tmpfiles.d")
+	command("docker", "exec", name, "mkdir", "-p", "/etc/tmpfiles.d", "/var/lib/infra-scanner/databases/"+strings.Repeat("0", 64)+"/db")
+	command("docker", "exec", name, "touch", "/var/lib/infra-scanner/databases/"+strings.Repeat("0", 64)+"/db/metadata.json")
+	put = func(path, data string, executable bool) {
+		t.Helper()
+		mode := "0644"
+		if executable {
+			mode = "0755"
+		}
+		script := exec.CommandContext(ctx, "docker", "exec", "-i", name, "sh", "-c", `mkdir -p "$(dirname "$1")" && cat > "$1" && chmod "$2" "$1"`, "put", "/home/"+path, mode)
+		script.Stdin = strings.NewReader(data)
+		if output, err := script.CombinedOutput(); err != nil {
+			t.Fatalf("put %s: %v\n%s", path, err, output)
+		}
+	}
+	get = func(path string) string {
+		t.Helper()
+		return string(command("docker", "exec", name, "cat", "/home/"+path))
+	}
+	drop = func(path string) { t.Helper(); command("docker", "exec", name, "rm", "-rf", "/home/"+path) }
+	present = func(path string) bool {
+		return exec.CommandContext(ctx, "docker", "exec", name, "test", "-e", "/home/"+path).Run() == nil
+	}
+	homes := map[string]string{"infra": "runner-infra", "Y": "runner-y"}
+	for repository, home := range homes {
+		put(home+"/"+repository+"-1/.runner", "{}\n", false)
+		put(home+"/"+repository+"-1/.service", runnerUnit(repository)+"\n", false)
+		put(home+"/"+repository+"-1/bin/Runner.Listener", "#!/bin/sh\ncat /fixture/state/version-"+repository+"\n", true)
+	}
 	command("docker", "exec", name, "ln", "-s", "/fixture/infra", "/usr/local/bin/infra")
 	playbookArgs := func(playbook string, extra ...string) []string {
 		return append([]string{"exec", "-e", "PYTHONUNBUFFERED=1", name, "python3", "-m", "ansible.cli.playbook", "-i", "/fixture/inventory.yml", playbook, "--extra-vars", "@/fixture/vars.json"}, extra...)
@@ -242,7 +272,7 @@ esac
 			}
 		}
 	}
-	command("docker", "exec", name, "sh", "-c", "mkdir -p /run/infra-runner-admission && echo [] > /run/infra-runner-admission/leases.json && chown -R runner:runner /run/infra-runner-admission")
+	command("docker", "exec", name, "sh", "-c", "mkdir -p /run/infra-runner-admission && echo [] > /run/infra-runner-admission/leases.json && chown -R 1000:1000 /run/infra-runner-admission")
 	write("infra", "#!/bin/sh\necho fixture\n", true)
 	if output := run("/fixture/converge.yml", false); !strings.Contains(output, "Require the installed CLI's admission broker") {
 		t.Fatalf("a CLI without the admission broker did not stop the play at its check:\n%s", output)
@@ -285,10 +315,13 @@ esac
 		t.Fatalf("job hook does not ask the admission broker:\n%s", hook)
 	}
 	socket, broker := inspect("cat", "/etc/systemd/system/infra-runner-admission.socket"), inspect("cat", "/etc/systemd/system/infra-runner-admission.service")
-	for _, want := range []string{"ListenStream=/run/infra-runner-admission.sock", "SocketMode=0666"} {
+	for _, want := range []string{"ListenStream=/run/infra-runner-admission.d/infra/admission.sock", "ListenStream=/run/infra-runner-admission.d/y/admission.sock", "SocketMode=0666"} {
 		if !strings.Contains(socket, want+"\n") {
 			t.Errorf("admission socket lacks %s:\n%s", want, socket)
 		}
+	}
+	if strings.Count(socket, "ListenStream=") != 2 {
+		t.Errorf("admission listens on sockets other than one per repository:\n%s", socket)
 	}
 	if strings.Contains(socket, "Accept=yes") || !strings.Contains(broker, "runner-admission serve --capacity=1 --directory=/run/infra-runner-admission\n") || !strings.Contains(broker, "Restart=always\n") {
 		t.Errorf("admission is not one daemon serving the declared capacity:\n%s\n%s", socket, broker)
@@ -297,15 +330,68 @@ esac
 	if listen, hook := strings.Index(tasks, "Listen for runner admission"), strings.Index(tasks, "Install immutable trusted-job hook adapter"); listen < 0 || hook < listen {
 		t.Errorf("job hooks switch to the broker before its socket listens:\n%s", tasks)
 	}
-	placeholder("/run/infra-runner-admission.sock", socket)
-	if !reachable("runner", "/run/infra-runner-admission.sock") {
-		t.Errorf("a listener started before the play, with groups %q, cannot open the admission socket:\n%s", running["runner"], socket)
-	}
 	t.Log("admission runs through a root broker whose leases jobs cannot write")
+	for repository, home := range homes {
+		slug := strings.ToLower(repository)
+		if groups := " " + inspect("id", "-nG", home) + " "; !strings.Contains(groups, " infra-dagger-"+slug+" ") || strings.Contains(groups, " docker ") || strings.Contains(groups, " infra-runners ") {
+			t.Errorf("%s has groups %q, want its own engine group and no Docker or shared admission access", home, groups)
+		}
+		if admission := inspect("stat", "-c", "%U %G %a", "/run/infra-runner-admission.d", "/run/infra-runner-admission.d/"+slug); admission != "root root 755\nroot "+home+" 750" {
+			t.Errorf("%s admission socket directory is %q, want root:%s 0750", repository, admission, home)
+		}
+		if mode := inspect("stat", "-c", "%U %a", "/home/"+home, "/home/"+home+"/"+repository+"-1"); mode != home+" 700\n"+home+" 700" {
+			t.Errorf("%s keeps its listener readable to other accounts: %q", home, mode)
+		}
+		dropIn := inspect("cat", "/etc/systemd/system/"+runnerUnit(repository)+".d/resources.conf")
+		for _, want := range []string{"UMask=0077", "PrivateTmp=true", "ProtectProc=invisible", "ProtectHome=tmpfs", "BindPaths=/home/" + home, "NoNewPrivileges=true", "EnvironmentFile=/etc/infra-dagger/" + slug + ".env", "Environment=INFRA_SCANNER_DATABASES=/var/lib/infra-scanner/databases", "Environment=INFRA_RUNNER_ADMISSION_SOCKET=/run/infra-runner-admission.d/" + slug + "/admission.sock"} {
+			if !strings.Contains(dropIn, want+"\n") {
+				t.Errorf("%s listener lacks %s:\n%s", repository, want, dropIn)
+			}
+		}
+		if environment := inspect("cat", "/etc/infra-dagger/"+slug+".env"); !strings.Contains(environment, "_EXPERIMENTAL_DAGGER_RUNNER_HOST=unix:///run/infra-dagger/"+slug+"/engine.sock\n") || !strings.Contains(environment, "INFRA_ENGINE_PARALLELISM=") {
+			t.Errorf("%s engine environment:\n%s", repository, environment)
+		}
+		unit := inspect("cat", "/etc/systemd/system/infra-dagger-"+slug+".service")
+		gid := inspect("getent", "group", "infra-dagger-"+slug)
+		for _, want := range []string{"Group=infra-dagger-" + slug + "\n", "RuntimeDirectory=infra-dagger/" + slug + "\n", "--volume infra-dagger-cache-" + slug + ":/var/lib/dagger ", "--volume /run/infra-dagger/" + slug + ":/run/dagger ", "--addr unix:///run/dagger/engine.sock --group " + strings.Split(gid, ":")[2] + " "} {
+			if !strings.Contains(unit, want) {
+				t.Errorf("%s engine unit lacks %q:\n%s", repository, want, unit)
+			}
+		}
+		command("docker", "exec", name, "sh", "-c", "install -d -m 0750 -g infra-dagger-"+slug+" /run/infra-dagger/"+slug+" && install -m 0660 -g infra-dagger-"+slug+" /dev/null /run/infra-dagger/"+slug+"/engine.sock")
+		placeholder("/run/infra-runner-admission.d/"+slug+"/admission.sock", socket)
+		running[home] = inspect("id", "-G", home)
+	}
+	sockets := func(slug string) []string {
+		return []string{"/run/infra-dagger/" + slug + "/engine.sock", "/run/infra-runner-admission.d/" + slug + "/admission.sock"}
+	}
+	for repository, home := range homes {
+		for _, path := range sockets(strings.ToLower(repository)) {
+			if !reachable(home, path) {
+				t.Errorf("a %s listener started after its account, with groups %q, cannot open %s", repository, running[home], path)
+			}
+		}
+		for other := range homes {
+			for _, path := range sockets(strings.ToLower(other)) {
+				if other != repository && reachable(home, path) {
+					t.Errorf("a %s listener can open %s of %s", repository, path, other)
+				}
+			}
+		}
+	}
+	if policy := inspect("cat", "/etc/infra-dagger/engine.json"); !strings.Contains(policy, `"insecureRootCapabilities": false`) {
+		t.Errorf("engines accept privileged executions:\n%s", policy)
+	}
+	t.Log("each repository runs its listeners as its own sandboxed account with its own engine")
 	if output := run("/fixture/converge.yml", true); !strings.Contains(output, "changed=0") || restarted() != steady {
 		t.Fatalf("declared runner state does not converge without restarts:\n%s", output)
 	} else if strings.Contains(output, "tasks/repository.yml") {
 		t.Fatalf("converged runners entered the per-runner replacement path:\n%s", output)
+	}
+	for _, home := range homes {
+		if groups := inspect("id", "-G", home); groups != running[home] {
+			t.Errorf("a converged play changed the groups of %s from %q to %q, which its running listeners keep", home, running[home], groups)
+		}
 	}
 	t.Log("declared runner state converges idempotently without restarting services or per-runner replacement")
 	if output := run("/fixture/converge.yml", true, "--extra-vars", `{"build_runner_restart":["Y-1"]}`); restarted() != steady+runnerUnit("Y")+"\n" {
@@ -324,14 +410,14 @@ case "$*" in
 *) echo 7 ;;
 esac
 `, true)
-	write("runners/Y-1/config.sh", "#!/bin/sh\nset -eu\necho \"$*\" >> /fixture/state/registered\nfor file in .runner .credentials .credentials_rsaparams; do echo registered > \"$file\"; done\n", true)
+	put("runner-y/Y-1/config.sh", "#!/bin/sh\nset -eu\necho \"$*\" >> /fixture/state/registered\nfor file in .runner .credentials .credentials_rsaparams; do echo registered > \"$file\"; done\n", true)
 	for _, file := range identity {
-		write("runners/Y-1/"+file, "stale\n", false)
+		put("runner-y/Y-1/"+file, "stale\n", false)
 	}
 	write("state/token-failure", "", false)
 	run("/fixture/converge.yml", false, "--extra-vars", reregisterY)
 	for _, file := range identity {
-		if kept := string(read(filepath.Join(fixture, "runners/Y-1", file))); kept != "stale\n" || record("registered") != "" {
+		if kept := get("runner-y/Y-1/" + file); kept != "stale\n" || record("registered") != "" {
 			t.Fatalf("failed registration token replaced %s with %q", file, kept)
 		}
 	}
@@ -344,7 +430,7 @@ esac
 		t.Fatalf("missing registration did not re-register only Y with --replace: %q\n%s", registration, reregistered)
 	}
 	for _, file := range identity {
-		if current := string(read(filepath.Join(fixture, "runners/Y-1", file))); current != "registered\n" {
+		if current := get("runner-y/Y-1/" + file); current != "registered\n" {
 			t.Fatalf("re-registration kept stale %s %q", file, current)
 		}
 	}
@@ -381,9 +467,9 @@ esac
 		{name: "valid"},
 		{
 			name:      "stopped engine",
-			introduce: func() { write("state/inactive-units", "infra-dagger\n", false) },
+			introduce: func() { write("state/inactive-units", "infra-dagger-infra\n", false) },
 			restore:   func() { remove("state/inactive-units") },
-			changed:   []string{"build_engine : Start build engine"},
+			changed:   []string{"build_engine : Start build engines"},
 			failed:    drift,
 		},
 		{
@@ -411,16 +497,16 @@ esac
 		},
 		{
 			name:      "edited engine configuration",
-			introduce: func() { command("docker", "exec", name, "sh", "-c", "echo >> /etc/infra-dagger.toml") },
+			introduce: func() { command("docker", "exec", name, "sh", "-c", "echo >> /etc/infra-dagger/infra.toml") },
 			restore:   converge,
-			changed:   []string{"build_engine : Install bounded engine cache retention", "build_engine : Restart stale build engine"},
+			changed:   []string{"build_engine : Install bounded engine cache retention", "build_engine : Restart stale build engines"},
 			failed:    drift,
 		},
 		{
 			name:      "stale engine",
-			introduce: func() { command("docker", "exec", name, "touch", "/etc/infra-dagger.toml") },
-			restore:   repairs("infra-dagger"),
-			changed:   []string{"build_engine : Restart stale build engine"},
+			introduce: func() { command("docker", "exec", name, "touch", "/etc/infra-dagger/y.toml") },
+			restore:   repairs("infra-dagger-y"),
+			changed:   []string{"build_engine : Restart stale build engines"},
 			failed:    drift,
 		},
 		{
@@ -443,7 +529,7 @@ esac
 		{
 			name:      "engine running an unpinned image",
 			introduce: func() { write("state/engine", "true registry.dagger.io/engine:v0.0.1\n", false) },
-			restore:   repairs("infra-dagger"),
+			restore:   repairs("infra-dagger-infra\ninfra-dagger-y"),
 			failed:    observed,
 		},
 		{
@@ -464,39 +550,57 @@ esac
 		{
 			name: "undeclared runner",
 			introduce: func() {
-				write("runners/Z/.runner", "{}\n", false)
-				write("runners/Z/.service", runnerUnit("Z")+"\n", false)
+				put("runner-y/Z/.runner", "{}\n", false)
+				put("runner-y/Z/.service", runnerUnit("Z")+"\n", false)
 			},
-			restore: func() { remove("runners/Z") },
+			restore: func() { drop("runner-y/Z") },
 			failed:  observed,
 		},
 		{
 			name:      "pending runner replacement",
-			introduce: func() { write("runners/Y-1/.infra-runner-pending", version+"\n", false) },
-			restore:   func() { remove("runners/Y-1/.infra-runner-pending") },
+			introduce: func() { put("runner-y/Y-1/.infra-runner-pending", version+"\n", false) },
+			restore:   func() { drop("runner-y/Y-1/.infra-runner-pending") },
 			failed:    observed,
 		},
 		{
 			name:      "foreign runner service",
-			introduce: func() { write("runners/Y-1/.service", runnerUnit("infra")+"\n", false) },
-			restore:   func() { write("runners/Y-1/.service", runnerUnit("Y")+"\n", false) },
+			introduce: func() { put("runner-y/Y-1/.service", runnerUnit("infra")+"\n", false) },
+			restore:   func() { put("runner-y/Y-1/.service", runnerUnit("Y")+"\n", false) },
 			failed:    []string{"Verify registered runner services"},
 		},
 		{
 			name:      "foreign owner runner service",
-			introduce: func() { write("runners/Y-1/.service", "actions.runner.someone-Y.localhost-Y-1.service\n", false) },
-			restore:   func() { write("runners/Y-1/.service", runnerUnit("Y")+"\n", false) },
+			introduce: func() { put("runner-y/Y-1/.service", "actions.runner.someone-Y.localhost-Y-1.service\n", false) },
+			restore:   func() { put("runner-y/Y-1/.service", runnerUnit("Y")+"\n", false) },
 			failed:    []string{"Verify registered runner services"},
 		},
 		{
 			name: "no registered runners",
 			introduce: func() {
-				remove("runners/infra-1/.runner")
-				remove("runners/Y-1/.runner")
+				drop("runner-infra/infra-1/.runner")
+				drop("runner-y/Y-1/.runner")
 			},
 			restore: func() {
-				write("runners/infra-1/.runner", "{}\n", false)
-				write("runners/Y-1/.runner", "{}\n", false)
+				put("runner-infra/infra-1/.runner", "{}\n", false)
+				put("runner-y/Y-1/.runner", "{}\n", false)
+			},
+			failed: observed,
+		},
+		{
+			name:      "another repository's engine socket opened to every account",
+			introduce: func() { command("docker", "exec", name, "chmod", "-R", "o+rwx", "/run/infra-dagger/y") },
+			restore: func() {
+				command("docker", "exec", name, "sh", "-c", "chmod 0750 /run/infra-dagger/y && chmod 0660 /run/infra-dagger/y/engine.sock")
+			},
+			failed: observed,
+		},
+		{
+			name: "listener account with Docker access",
+			introduce: func() {
+				command("docker", "exec", name, "sh", "-c", "install -m 0660 -g docker /dev/null /run/docker.sock && usermod -aG docker runner-infra")
+			},
+			restore: func() {
+				command("docker", "exec", name, "sh", "-c", "gpasswd -d runner-infra docker && rm /run/docker.sock")
 			},
 			failed: observed,
 		},
@@ -556,8 +660,8 @@ esac
 	}
 	untouched := func(scenario, since string) {
 		t.Helper()
-		if _, err := os.Stat(filepath.Join(fixture, "runners/infra-1/.infra-runner-pending")); record("stopped") != "" || !os.IsNotExist(err) {
-			t.Fatalf("%s interrupted the runner: stopped %q, pending marker %v", scenario, record("stopped"), err)
+		if record("stopped") != "" || present("runner-infra/infra-1/.infra-runner-pending") {
+			t.Fatalf("%s interrupted the runner: stopped %q", scenario, record("stopped"))
 		}
 		if calls := github(since); !returned(calls) {
 			t.Fatalf("%s did not return the runner to its jobs:\n%s", scenario, calls)
@@ -575,9 +679,9 @@ esac
 	untouched("job accepted before withdrawal", calls)
 	remove("state/github-busy")
 	t.Log("a job GitHub already assigned keeps its runner before its worker starts")
-	write("runners/infra-1/bin/Runner.Worker", "#!/bin/sh\nwhile [ -e /fixture/state/job-infra ]; do sleep 0.1; done\n", true)
+	put("runner-infra/infra-1/bin/Runner.Worker", "#!/bin/sh\nwhile [ -e /fixture/state/job-infra ]; do sleep 0.1; done\n", true)
 	write("state/job-infra", "", false)
-	command("docker", "exec", "-d", name, "/home/runner/infra-1/bin/Runner.Worker", "spawnclient", "1", "2")
+	command("docker", "exec", "-d", name, "/home/runner-infra/infra-1/bin/Runner.Worker", "spawnclient", "1", "2")
 	calls = record("gh")
 	run("/fixture/converge.yml", false, "--extra-vars", `{"build_runner_drain_minutes":0,"build_runner_drain_interval":1}`)
 	untouched("drain deadline", calls)
@@ -627,35 +731,35 @@ esac
 		t.Fatalf("runner replacement is not idempotent:\n%s", output)
 	}
 	t.Log("runner upgrade stops only its own service and converges idempotently")
-	write("runners/infra-1/bin/Runner.Listener", "#!/bin/sh\necho 0.0.0\n", true)
+	put("runner-infra/infra-1/bin/Runner.Listener", "#!/bin/sh\necho 0.0.0\n", true)
 	write("runner.tar.gz", "invalid archive", false)
 	calls = record("gh")
 	run("/fixture/converge.yml", false)
-	pending := filepath.Join(fixture, "runners/infra-1/.infra-runner-pending")
-	if _, err := os.Stat(pending); err != nil {
-		t.Fatal("partial replacement lost its recovery marker", err)
+	if !present("runner-infra/infra-1/.infra-runner-pending") {
+		t.Fatal("partial replacement lost its recovery marker")
 	}
 	if failed := github(calls); !returned(failed) {
 		t.Fatalf("failed replacement did not return the runner to new jobs:\n%s", failed)
 	}
 	archive()
 	converge()
-	if _, err := os.Stat(pending); !os.IsNotExist(err) {
-		t.Fatal("successful recovery left its pending marker", err)
+	if present("runner-infra/infra-1/.infra-runner-pending") {
+		t.Fatal("successful recovery left its pending marker")
 	}
 	t.Log("partial extraction failure retains recovery proof and retries successfully")
 	var roleTasks []map[string]any
 	if err := yaml.Unmarshal(read(filepath.Join(root, "ansible/roles/build_runner/tasks/main.yml")), &roleTasks); err != nil {
 		t.Fatal(err)
 	}
+	retire := slices.IndexFunc(roleTasks, func(task map[string]any) bool { return task["name"] == "Retire listeners outside their declared roots" })
 	configure := slices.IndexFunc(roleTasks, func(task map[string]any) bool { return task["name"] == "Configure repository runners" })
-	if configure < 0 {
-		t.Fatal("repository runner loop not found")
+	if retire < 0 || configure < retire {
+		t.Fatal("listener retirement does not precede repository runner registration")
 	}
-	removalTasks := roleTasks[configure+1:]
+	removalTasks := roleTasks[retire:configure]
 	for _, task := range removalTasks {
-		if path, ok := task["ansible.builtin.include_tasks"].(string); ok {
-			task["ansible.builtin.include_tasks"] = "/source/ansible/roles/build_runner/tasks/" + path
+		if path, ok := task["ansible.builtin.import_tasks"].(string); ok {
+			task["ansible.builtin.import_tasks"] = "/source/ansible/roles/build_runner/tasks/" + path
 		}
 	}
 	removal, err := yaml.Marshal([]any{map[string]any{"hosts": "build_engines", "gather_facts": false, "vars": map[string]any{"build_runner_fleet": "{{ lookup('ansible.builtin.file', '/source/build/runners.json') | from_json }}", "build_runner_drain_interval": 1}, "vars_files": []string{"/source/ansible/roles/build_runner/defaults/main.yml"}, "tasks": removalTasks}})
@@ -675,8 +779,8 @@ esac
 	}
 	remove("state/stopped")
 	remove("state/reloaded")
-	write("runners/infra.bak/.runner", "{}", false)
-	write("runners/infra.bak/.service", string(read(filepath.Join(fixture, "runners/infra-1/.service"))), false)
+	put("runner-infra/infra.bak/.runner", "{}", false)
+	put("runner-infra/infra.bak/.service", get("runner-infra/infra-1/.service"), false)
 	if output := run("/fixture/removal.yml", false); !strings.Contains(output, "Assertion failed") {
 		t.Fatalf("copied runner root did not fail its service identity check:\n%s", output)
 	}
@@ -688,15 +792,13 @@ esac
 	if !exists(declaredUnit) || !exists(declaredUnit+".d/resources.conf") {
 		t.Fatal("copied runner root removed the declared unit")
 	}
-	if _, err := os.Stat(filepath.Join(fixture, "runners/infra.bak/.service")); err != nil {
-		t.Fatal("copied runner root was removed", err)
+	if !present("runner-infra/infra.bak/.service") {
+		t.Fatal("copied runner root was removed")
 	}
 	t.Log("copied runner root naming a declared service fails closed")
-	if err := os.RemoveAll(filepath.Join(fixture, "runners/infra.bak")); err != nil {
-		t.Fatal(err)
-	}
-	write("runners/retired/.runner", runnerRegistration("retired", "retired", 11), false)
-	write("runners/retired/.service", "actions.runner.someone-retired.localhost-retired.service", false)
+	drop("runner-infra/infra.bak")
+	put("runner-y/retired/.runner", runnerRegistration("retired", "retired", 11), false)
+	put("runner-y/retired/.service", "actions.runner.someone-retired.localhost-retired.service", false)
 	if output := run("/fixture/removal.yml", false); !strings.Contains(output, "Assertion failed") {
 		t.Fatalf("runner root naming another owner's service did not fail its identity check:\n%s", output)
 	}
@@ -708,18 +810,18 @@ esac
 	if len(outside) == 0 {
 		t.Fatal("fleet declares no repository outside the host subset")
 	}
-	kept := []string{"runners/.runner", "runners/.hidden/.runner", "runners/infra-1/_work/x/.runner", "runners/unregistered/config.sh", "runners/" + outside[0] + "-1/.runner", "runners/infra-1/.runner", "runners/Y-1/.runner"}
+	kept := []string{"runner-y/.runner", "runner-y/.hidden/.runner", "runner-infra/infra-1/_work/x/.runner", "runner-y/unregistered/config.sh", "runner-" + strings.ToLower(outside[0]) + "/" + outside[0] + "-1/.runner", "runner-infra/infra-1/.runner", "runner-y/Y-1/.runner"}
 	for _, path := range kept {
-		write(path, "{}", false)
+		put(path, "{}", false)
 	}
-	write("runners/retired/.runner", runnerRegistration("retired", "retired", 11), false)
-	write("runners/retired/.service", retiredService, false)
-	write("runners/infra/.runner", runnerRegistration("infra", "infra", 12), false)
+	put("runner-y/retired/.runner", runnerRegistration("retired", "retired", 11), false)
+	put("runner-y/retired/.service", retiredService, false)
+	put("runner-infra/infra/.runner", runnerRegistration("infra", "infra", 12), false)
 	calls = record("gh")
 	write("state/reload-failure", "", false)
 	run("/fixture/removal.yml", false)
-	if _, err := os.Stat(filepath.Join(fixture, "runners/retired/.service")); err != nil {
-		t.Fatal("interrupted removal lost the retired service name", err)
+	if !present("runner-y/retired/.service") {
+		t.Fatal("interrupted removal lost the retired service name")
 	}
 	run("/fixture/removal.yml", true)
 	for record, want := range map[string]string{"stopped": retiredService + "\n", "disabled": retiredService + "\n", "reloaded": "reload\n"} {
@@ -730,9 +832,9 @@ esac
 	if exists(retiredUnit) || exists(retiredUnit+".d") {
 		t.Fatal("retired runner unit remains")
 	}
-	for _, retired := range []string{"retired", "infra"} {
-		if _, err := os.Stat(filepath.Join(fixture, "runners", retired)); !os.IsNotExist(err) {
-			t.Fatal("retired runner root remains", err)
+	for _, retired := range []string{"runner-y/retired", "runner-infra/infra"} {
+		if present(retired) {
+			t.Fatal("retired runner root remains", retired)
 		}
 	}
 	for _, call := range []string{"api --method DELETE --silent repos/" + fleet.Owner + "/retired/actions/runners/11/labels", "api repos/" + fleet.Owner + "/retired/actions/runners/11 --jq .busy", "api --method DELETE --silent repos/" + fleet.Owner + "/retired/actions/runners/11\n", "api --method DELETE --silent repos/" + fleet.Owner + "/infra/actions/runners/12\n"} {
@@ -744,29 +846,41 @@ esac
 		t.Fatal("runner removal removed the declared unit")
 	}
 	for _, path := range kept {
-		if _, err := os.Stat(filepath.Join(fixture, path)); err != nil {
-			t.Fatal("runner removal touched a kept path", err)
+		if !present(path) {
+			t.Fatal("runner removal touched a kept path", path)
 		}
 	}
 	if output := run("/fixture/removal.yml", true); !strings.Contains(output, "changed=0") {
 		t.Fatalf("runner removal is not idempotent:\n%s", output)
 	}
 	t.Log("undeclared runner removal resumes after interruption and keeps declared and unregistered paths")
-	write("runners/Y/.runner", runnerRegistration("Y", "Y", 13), false)
-	write("runners/Y/bin/Runner.Worker", "#!/bin/sh\nwhile [ -e /fixture/state/job-Y ]; do sleep 0.1; done\n", true)
+	put("runner-y/Y/.runner", runnerRegistration("Y", "Y", 13), false)
+	put("runner-y/Y/bin/Runner.Worker", "#!/bin/sh\nwhile [ -e /fixture/state/job-Y ]; do sleep 0.1; done\n", true)
 	write("state/job-Y", "", false)
-	command("docker", "exec", "-d", name, "/home/runner/Y/bin/Runner.Worker", "spawnclient", "1", "2")
+	command("docker", "exec", "-d", name, "/home/runner-y/Y/bin/Runner.Worker", "spawnclient", "1", "2")
 	calls = record("gh")
 	run("/fixture/removal.yml", false, "--extra-vars", `{"build_runner_drain_minutes":0}`)
-	if _, err := os.Stat(filepath.Join(fixture, "runners/Y/.runner")); err != nil || strings.Contains(github(calls), "repos/"+fleet.Owner+"/Y/actions/runners/13\n") || !strings.Contains(github(calls), "repos/"+fleet.Owner+"/Y/actions/runners/13/labels") {
-		t.Fatalf("retired runner busy at the drain deadline lost its job or kept taking new jobs: %v\n%s", err, github(calls))
+	if !present("runner-y/Y/.runner") || strings.Contains(github(calls), "repos/"+fleet.Owner+"/Y/actions/runners/13\n") || !strings.Contains(github(calls), "repos/"+fleet.Owner+"/Y/actions/runners/13/labels") {
+		t.Fatalf("retired runner busy at the drain deadline lost its job or kept taking new jobs:\n%s", github(calls))
 	}
 	remove("state/job-Y")
 	run("/fixture/removal.yml", true)
-	if _, err := os.Stat(filepath.Join(fixture, "runners/Y")); !os.IsNotExist(err) || !strings.Contains(github(calls), "api --method DELETE --silent repos/"+fleet.Owner+"/Y/actions/runners/13\n") {
-		t.Fatalf("retired runner was not removed after its job: %v\n%s", err, github(calls))
+	if present("runner-y/Y") || !strings.Contains(github(calls), "api --method DELETE --silent repos/"+fleet.Owner+"/Y/actions/runners/13\n") {
+		t.Fatalf("retired runner was not removed after its job:\n%s", github(calls))
 	}
 	t.Log("a retired runner stops taking jobs, keeps its running job and is deregistered after it finishes")
+	shared := "actions.runner." + fleet.Owner + "-Y.localhost-Y-2.service"
+	command("docker", "exec", name, "useradd", "--create-home", "runner")
+	put("runner/Y-2/.runner", runnerRegistration("Y-2", "Y", 21), false)
+	put("runner/Y-2/.service", shared+"\n", false)
+	command("docker", "exec", name, "mkdir", "-p", "/etc/systemd/system/"+shared+".d")
+	command("docker", "exec", name, "touch", "/etc/systemd/system/"+shared, "/etc/systemd/system/"+shared+".d/resources.conf")
+	calls = record("gh")
+	run("/fixture/removal.yml", true)
+	if present("runner") || exec.CommandContext(ctx, "docker", "exec", name, "id", "runner").Run() == nil || exists("/etc/systemd/system/"+shared) || !strings.Contains(github(calls), "api --method DELETE --silent repos/"+fleet.Owner+"/Y/actions/runners/21\n") {
+		t.Fatalf("the shared runner account or its listener outlived the migration:\n%s", github(calls))
+	}
+	t.Log("listeners of the shared runner account are drained and deregistered before the account is removed")
 	write("packages.yml", "- hosts: build_engines\n  gather_facts: false\n  module_defaults:\n    ansible.builtin.apt:\n      update_cache_retries: 1\n  roles:\n  - role: host_packages\n    vars:\n      host_packages_required: '{{ packages }}'\n", false)
 	installed := `{"packages":["dpkg","tar"]}`
 	if output := run("/fixture/packages.yml", true, "--extra-vars", installed); !strings.Contains(output, "changed=0") {

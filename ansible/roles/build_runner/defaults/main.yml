@@ -1,20 +1,29 @@
 build_runner_repositories: '{{ build_runner_fleet.repositories }}'
+build_runner_accounts: >-
+  {%- set accounts = [] -%}
+  {%- for repository in build_runner_repositories.keys() | sort -%}
+  {%- set slug = repository | lower -%}
+  {%- set _ = accounts.append({'repository': repository, 'slug': slug, 'account': 'runner-' ~ slug, 'home': '/home/runner-' ~ slug, 'engine_group': 'infra-dagger-' ~ slug}) -%}
+  {%- endfor -%}
+  {{ accounts }}
 build_runner_instances: >-
   {%- set instances = [] -%}
-  {%- for repository, count in build_runner_repositories.items() -%}
-  {%- for index in range(1, count | int + 1) -%}
-  {%- set _ = instances.append({'repository': repository, 'name': repository ~ '-' ~ index}) -%}
+  {%- for account in build_runner_accounts -%}
+  {%- for index in range(1, build_runner_repositories[account.repository] | int + 1) -%}
+  {%- set name = account.repository ~ '-' ~ index -%}
+  {%- set _ = instances.append({'repository': account.repository, 'slug': account.slug, 'account': account.account, 'name': name, 'root': account.home ~ '/' ~ name}) -%}
   {%- endfor -%}
   {%- endfor -%}
   {{ instances }}
-build_runner_fleet_names: >-
-  {%- set names = [] -%}
+build_runner_fleet_roots: >-
+  {%- set roots = [] -%}
   {%- for repository, count in build_runner_fleet.repositories.items() -%}
   {%- for index in range(1, count | int + 1) -%}
-  {%- set _ = names.append(repository ~ '-' ~ index) -%}
+  {%- set _ = roots.append('/home/runner-' ~ (repository | lower) ~ '/' ~ repository ~ '-' ~ index) -%}
   {%- endfor -%}
   {%- endfor -%}
-  {{ names }}
+  {{ roots }}
+build_runner_scanner_databases: /var/lib/infra-scanner/databases
 build_runner_owner: '{{ build_runner_fleet.owner }}'
 build_runner_version: '{{ build_runner_fleet.version }}'
 build_runner_sha256: '{{ build_runner_fleet.sha256 }}'

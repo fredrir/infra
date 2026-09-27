@@ -8,7 +8,9 @@ import (
 
 func TestBuildEngineMountsItsCachePolicyWhereTheEngineReadsIt(t *testing.T) {
 	unit := string(read(t, filepath.Join(root(t), "ansible/roles/build_engine/templates/infra-dagger.service.j2")))
-	if mount := "--volume /etc/infra-dagger.toml:/etc/dagger/engine.toml:ro "; !strings.Contains(unit, mount) {
-		t.Fatalf("build engine unit does not mount its cache policy with %q, the configuration the pinned engine entrypoint passes to dagger-engine:\n%s", mount, unit)
+	for _, mount := range []string{"--volume /etc/infra-dagger/{{ build_engine.slug }}.toml:/etc/dagger/engine.toml:ro ", "--volume /etc/infra-dagger/engine.json:/etc/dagger/engine.json:ro "} {
+		if !strings.Contains(unit, mount) {
+			t.Fatalf("build engine unit does not mount %q, where the pinned engine reads its configuration:\n%s", mount, unit)
+		}
 	}
 }

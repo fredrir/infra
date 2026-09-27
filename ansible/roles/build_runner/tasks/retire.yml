@@ -1,0 +1,14 @@
+- name: Find repository runner registrations
+  ansible.builtin.find:
+    paths: /home
+    patterns: .runner
+    hidden: true
+    recurse: true
+    depth: 3
+  register: build_runner_registrations
+
+- name: Remove undeclared repository runners
+  ansible.builtin.include_tasks: remove.yml
+  loop: "{{ build_runner_registrations.files | map(attribute='path') | map('dirname') | select('match', '^/home/[a-z][a-z0-9_-]*/[A-Za-z0-9][A-Za-z0-9_.-]*$') | difference(build_runner_fleet_roots) }}"
+  loop_control:
+    loop_var: build_runner_retired

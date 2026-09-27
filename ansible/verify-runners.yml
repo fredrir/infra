@@ -7,8 +7,14 @@
     build_runner_cli: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/cli-release.json') | from_json }}"
     build_runner_fleet: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/runners.json') | from_json }}"
     build_runner_probed_registrations: "{{ build_runner_probe.stdout_lines | select('match', '^runner ') | map('split') | list }}"
-    build_runner_state_repositories: "{{ build_runner_instances | map(attribute='name') | list }}"
+    build_runner_state_repositories: '{{ build_runner_instances }}'
     build_runner_state_services: "{{ build_runner_probed_registrations | map('last') | list }}"
+    build_runner_expected_isolation: >-
+      {%- set lines = [] -%}
+      {%- for account in build_runner_accounts -%}
+      {%- set _ = lines.append('isolation ' ~ account.account ~ ' docker=no own-engine=yes foreign-engines=no foreign-homes=no own-admission=yes foreign-admission=no processes=own') -%}
+      {%- endfor -%}
+      {{ lines }}
   tasks:
   - name: Validate declared engine pin
     ansible.builtin.import_role:
@@ -20,35 +26,69 @@
       set -eu
       printf 'cli %s\n' "$(sha256sum < /usr/local/bin/infra | cut -d ' ' -f 1)"
       printf 'slice-reload %s\n' "$(systemctl show --property=NeedDaemonReload --value infra-runners.slice)"
-      printf 'engine %s\n' "$(docker inspect --format '{{ "{{.State.Running}} {{.Config.Image}}" }}' {{ build_engine_dagger_name | quote }})"
-      cd /home/runner
-      for root in *; do
-        if [ -e "$root/.runner" ]; then
-          printf 'runner %s %s\n' "$root" "$(awk 'NR == 1' "$root/.service" 2>/dev/null || echo -)"
-        fi
-        if [ -e "$root/.infra-runner-pending" ]; then
-          printf 'pending %s\n' "$root"
-        fi
+      printf 'engine-slice-reload %s\n' "$(systemctl show --property=NeedDaemonReload --value infra-engine.slice)"
+      for slug in {{ build_engine_repositories | map(attribute='slug') | map('quote') | join(' ') }}; do
+        printf 'engine %s %s\n' "$slug" "$(docker inspect --format '{{ "{{.State.Running}} {{.Config.Image}}" }}' "infra-dagger-$slug" 2>/dev/null || echo missing)"
+      done
+      for path in /home/*/*/.runner; do
+        [ -e "$path" ] || continue
+        root=${path%/.runner}
+        printf 'runner %s %s %s\n' "$root" "$(stat -c %U "$root")" "$(awk 'NR == 1' "$root/.service" 2>/dev/null || echo -)"
+      done
+      for path in /home/*/*/.infra-runner-pending; do
+        if [ -e "$path" ]; then printf 'pending %s\n' "${path%/*}"; fi
+      done
+      accounts="{{ build_runner_accounts | map(attribute='account') | join(' ') }}"
+      for account in $accounts; do
+        slug=${account#runner-}
+        allowed() { if setpriv --reuid="$account" --regid="$account" --init-groups sh -c 'test "$1" "$2"' allowed "$@"; then echo yes; else echo no; fi; }
+        foreign_engines=no
+        foreign_homes=no
+        foreign_admission=no
+        for other in $accounts; do
+          [ "$other" = "$account" ] && continue
+          if [ "$(allowed -w "/run/infra-dagger/${other#runner-}/engine.sock")" = yes ]; then foreign_engines=yes; fi
+          if [ "$(allowed -x "/home/$other")" = yes ]; then foreign_homes=yes; fi
+          if [ "$(allowed -x "/run/infra-runner-admission.d/${other#runner-}")" = yes ]; then foreign_admission=yes; fi
+        done
+        processes=own
+        for unit in $(systemctl list-units --all --plain --no-legend 'actions.runner.*' | awk '{print $1}'); do
+          [ "$(systemctl show -p User --value "$unit")" = "$account" ] || continue
+          [ "$(systemctl show -p ProtectProc --value "$unit")" = invisible ] || processes=visible
+        done
+        printf 'isolation %s docker=%s own-engine=%s foreign-engines=%s foreign-homes=%s own-admission=%s foreign-admission=%s processes=%s\n' "$account" \
+          "$(allowed -w /run/docker.sock)" "$(allowed -w "/run/infra-dagger/$slug/engine.sock")" "$foreign_engines" "$foreign_homes" \
+          "$(allowed -x "/run/infra-runner-admission.d/$slug")" "$foreign_admission" "$processes"
       done
     register: build_runner_probe
     changed_when: false
     check_mode: false
 
+  - name: Find undeclared build engines
+    ansible.builtin.import_role:
+      name: build_engine
+      tasks_from: undeclared.yml
+
   - name: Verify observed runner host
     ansible.builtin.assert:
       that:
       - ('cli ' ~ build_runner_cli.sha256) in build_runner_probe.stdout_lines
-      - ('engine true ' ~ build_engine_image) in build_runner_probe.stdout_lines
+      - build_engine_repositories | map(attribute='slug') | map('regex_replace', '^(.*)$', 'engine \\1 true ' ~ build_engine_image) | difference(build_runner_probe.stdout_lines) == []
       - build_runner_probe.stdout_lines | select('match', '^pending ') | list == []
       - "'slice-reload no' in build_runner_probe.stdout_lines"
+      - "'engine-slice-reload no' in build_runner_probe.stdout_lines"
       - build_runner_probed_registrations | length > 0
-      - build_runner_probed_registrations | map(attribute='1') | sort == build_runner_instances | map(attribute='name') | sort
+      - build_runner_probed_registrations | map(attribute='1') | sort == build_runner_instances | map(attribute='root') | sort
+      - build_runner_expected_isolation | difference(build_runner_probe.stdout_lines) == []
+      - build_engine_undeclared.stdout_lines == []
       fail_msg: "The build VM differs from its declared runner host:\n{{ build_runner_probe.stdout }}"
 
   - name: Verify registered runner services
     ansible.builtin.assert:
-      that: item | length == 3 and item[2] == 'actions.runner.' ~ build_runner_owner ~ '-' ~ (build_runner_instances | selectattr('name', 'equalto', item[1]) | map(attribute='repository') | first | default('')) ~ '.' ~ inventory_hostname ~ '-' ~ item[1] ~ '.service'
-      fail_msg: "{{ item[1] }} is registered as {{ item[2:] | join(' ') }} instead of its own runner service"
+      that: item | length == 4 and item[2] == (build_runner_instance.account | default('')) and item[3] == 'actions.runner.' ~ build_runner_owner ~ '-' ~ (build_runner_instance.repository | default('')) ~ '.' ~ inventory_hostname ~ '-' ~ (build_runner_instance.name | default('')) ~ '.service'
+      fail_msg: "{{ item[1] }} is registered as {{ item[2:] | join(' ') }} instead of its own account and runner service"
+    vars:
+      build_runner_instance: "{{ build_runner_instances | selectattr('root', 'equalto', item[1]) | first | default({}) }}"
     loop: '{{ build_runner_probed_registrations }}'
     loop_control:
       label: '{{ item[1] }}'

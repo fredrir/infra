@@ -13,5 +13,10 @@
   roles:
   - role: infra_binary
     tags: [infra_binary]
-  - build_runner
   - build_engine
+  - build_runner
+  tasks:
+  - name: Remove undeclared build engines
+    ansible.builtin.import_role:
+      name: build_engine
+      tasks_from: remove.yml

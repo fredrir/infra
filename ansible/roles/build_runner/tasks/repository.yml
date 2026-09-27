@@ -1,11 +1,11 @@
 - name: Declare repository runner directory
   ansible.builtin.import_tasks: repository-directories.yml
   vars:
-    build_runner_state_repositories: ['{{ build_runner_instance.name }}']
+    build_runner_state_repositories: ['{{ build_runner_instance }}']
 
 - name: Read runner registration
   ansible.builtin.stat:
-    path: '/home/runner/{{ build_runner_instance.name }}/.runner'
+    path: '{{ build_runner_instance.root }}/.runner'
   register: build_runner_registration
 
 - name: Select runner registration
@@ -14,12 +14,12 @@
 
 - name: Read installed runner executable
   ansible.builtin.stat:
-    path: '/home/runner/{{ build_runner_instance.name }}/bin/Runner.Listener'
+    path: '{{ build_runner_instance.root }}/bin/Runner.Listener'
   register: build_runner_executable
 
 - name: Read installed runner version
   ansible.builtin.command:
-    argv: ['/home/runner/{{ build_runner_instance.name }}/bin/Runner.Listener', --version]
+    argv: ['{{ build_runner_instance.root }}/bin/Runner.Listener', --version]
   register: build_runner_installed_version
   changed_when: false
   failed_when: false
@@ -28,7 +28,7 @@
 
 - name: Read incomplete runner replacement
   ansible.builtin.stat:
-    path: '/home/runner/{{ build_runner_instance.name }}/.infra-runner-pending'
+    path: '{{ build_runner_instance.root }}/.infra-runner-pending'
   register: build_runner_pending
 
 - name: Select runner replacement
@@ -37,13 +37,13 @@
 
 - name: Read existing runner service registration
   ansible.builtin.stat:
-    path: '/home/runner/{{ build_runner_instance.name }}/.service'
+    path: '{{ build_runner_instance.root }}/.service'
   register: build_runner_existing_service
   when: build_runner_replace
 
 - name: Read service before runner replacement
   ansible.builtin.slurp:
-    src: '/home/runner/{{ build_runner_instance.name }}/.service'
+    src: '{{ build_runner_instance.root }}/.service'
   register: build_runner_previous_service
   when: build_runner_replace and build_runner_existing_service.stat.exists
 
@@ -89,7 +89,7 @@
 
   - name: Wait for the runner to finish its job
     ansible.builtin.command:
-      argv: [pgrep, --full, "{{ ('/home/runner/' ~ build_runner_instance.name ~ '/bin/Runner.Worker') | regex_escape }}( |$)"]
+      argv: [pgrep, --full, "{{ (build_runner_instance.root ~ '/bin/Runner.Worker') | regex_escape }}( |$)"]
     register: build_runner_worker
     changed_when: false
     failed_when: build_runner_worker.rc not in [0, 1]
@@ -106,7 +106,7 @@
 
   - name: Record incomplete runner replacement
     ansible.builtin.copy:
-      dest: '/home/runner/{{ build_runner_instance.name }}/.infra-runner-pending'
+      dest: '{{ build_runner_instance.root }}/.infra-runner-pending'
       content: '{{ build_runner_version }}\n'
       owner: root
       group: root
@@ -121,16 +121,16 @@
   - name: Extract pinned runner
     ansible.builtin.unarchive:
       src: '/var/cache/actions-runner-{{ build_runner_version }}.tar.gz'
-      dest: '/home/runner/{{ build_runner_instance.name }}'
+      dest: '{{ build_runner_instance.root }}'
       remote_src: true
-      owner: runner
-      group: runner
+      owner: '{{ build_runner_instance.account }}'
+      group: '{{ build_runner_instance.account }}'
       extra_opts: [--no-overwrite-dir]
     when: build_runner_replace
 
   - name: Complete runner replacement
     ansible.builtin.file:
-      path: '/home/runner/{{ build_runner_instance.name }}/.infra-runner-pending'
+      path: '{{ build_runner_instance.root }}/.infra-runner-pending'
       state: absent
     when: build_runner_replace
 
@@ -146,16 +146,16 @@
 
   - name: Remove unregistered runner identity
     ansible.builtin.file:
-      path: '/home/runner/{{ build_runner_instance.name }}/{{ item }}'
+      path: '{{ build_runner_instance.root }}/{{ item }}'
       state: absent
     loop: [.runner, .credentials, .credentials_rsaparams]
     when: build_runner_instance.name in build_runner_reregister | default([])
 
   - name: Register trusted repository runner
-    become_user: runner
+    become_user: '{{ build_runner_instance.account }}'
     ansible.builtin.command:
       argv:
-      - '/home/runner/{{ build_runner_instance.name }}/config.sh'
+      - '{{ build_runner_instance.root }}/config.sh'
       - --unattended
       - --replace
       - --disableupdate
@@ -169,20 +169,20 @@
       - '{{ build_runner_labels | join(",") }}'
       - --work
       - _work
-      chdir: '/home/runner/{{ build_runner_instance.name }}'
+      chdir: '{{ build_runner_instance.root }}'
     no_log: true
     when: build_runner_register
 
   - name: Install repository runner service
     ansible.builtin.command:
-      argv: ['/home/runner/{{ build_runner_instance.name }}/svc.sh', install, runner]
-      chdir: '/home/runner/{{ build_runner_instance.name }}'
-      creates: '/home/runner/{{ build_runner_instance.name }}/.service'
+      argv: ['{{ build_runner_instance.root }}/svc.sh', install, '{{ build_runner_instance.account }}']
+      chdir: '{{ build_runner_instance.root }}'
+      creates: '{{ build_runner_instance.root }}/.service'
     register: build_runner_service_install
 
   - name: Read installed service name
     ansible.builtin.slurp:
-      src: '/home/runner/{{ build_runner_instance.name }}/.service'
+      src: '{{ build_runner_instance.root }}/.service'
     register: build_runner_service_file
 
   - name: Select runner service

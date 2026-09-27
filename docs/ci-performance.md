@@ -43,6 +43,7 @@
 | Embedded-CLI image identity, 72 push revisions | Runner-check / runner-rust / backup-tools rebuilds 50 / 51 / 50 → 28 / 29 / 27; revisions without an embedded-CLI image build 21 → 42; Bazel CLI byte-identical across test-only revisions and in a local rebuild of `infra-v0.2.13` | [Image identity](../build/evidence/image-input-identity.json) |
 | Build-VM runner convergence, 11 converged runners | Task results 165 → 8; 4.6 → 1.5 seconds over a local connection; only differing runners enter the per-runner replacement path | [Runner probe](../build/evidence/build-runner-probe.json) |
 | Fourth build-VM slot, empty engine cache | Engine anonymous and kernel peak 2.5–2.9 GiB with three jobs → 3.0–4.1 GiB with four (two of them compiling every runner-check Go tool), of 10 GiB; four concurrent cold image scans 0.7 GiB anonymous in a 4 GiB scope; no OOM kills; build times unchanged | [Fourth slot](../build/evidence/build-vm-fourth-slot.json) |
+| Engine per repository, four concurrent builds, emulated build VM | Cold 376–384 s on one engine → 418–430 s on four engines (each pulls its own base images); engine CPU 827–837 → 850–861 s; anonymous and kernel peak 3.1–3.6 → 3.6–3.9 GiB; no OOM kills; warm rebuilds 8 → 6 s; parallelism 2 per engine 417 s and 4.1 GiB, so three stays | [Isolation qualification](../build/evidence/build-vm-repository-isolation.json) |
 | Frontend deployment below 15 seconds | Unqualified | [Previous observed timeline](../build/rollout/flux-artifacts/rollout.json) |
 
 | Accounting | Rule |
@@ -82,7 +83,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Scanner database | Value |
 | --- | --- |
 | Publication | Immutable generation per database schema, `<shared>/db-v2` and `<shared>/java-db-v1` symlinks replaced atomically, files `0444`; open readers keep the replaced generation, which is deleted once replaced; entries of other schemas are deleted after seven days |
-| Refresh | Only the owner of the shared directory refreshes it, under the shared lock; jobs of other accounts only read it |
+| Refresh | Only the owner of the shared directory refreshes it, under the shared lock; build VM: hourly `infra-scanner-refresh.timer` as `infra-scanner`; hosted runners: preparation refreshes the job's own directory; jobs of other accounts only read it |
 | Freshness | Pinned Trivy metadata policy; readers accept until the later of the next update and the download time plus the database grace (1 h vulnerability, 24 h Java); refresh starts two hours before the next update, at most once per grace; failed or stale refresh blocks preparation |
 | Families | `trivy-v4/<family>` analysis cache per image family; `db` and `java-db` link to the shared generation; per-family scan lock |
 | Analysis warm-up | `scanner-analysis` preparation stage, 5 m budget, exact `vulnerability-scan` arguments; the 10 s check then reads a warm analysis cache |

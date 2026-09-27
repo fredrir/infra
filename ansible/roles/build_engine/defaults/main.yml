@@ -4,11 +4,20 @@ build_engine_trust: trusted
 build_engine_cpus: 4
 build_engine_memory: 8g
 build_engine_pids: 1024
-build_engine_dagger_cache_gib: 20
+build_engine_cache_gib: {}
+build_engine_default_cache_gib: 4
 build_engine_named_cache_hours: 48
 build_engine_gc_free_gib: 8
 build_engine_gc_emergency_free_gib: 4
 build_engine_parallelism: 4
-build_engine_dagger_name: infra-dagger
 build_engine_toolchain: "{{ lookup('ansible.builtin.file', playbook_dir + '/../build/toolchain.json') | from_json }}"
 build_engine_image: '{{ build_engine_toolchain.engine_image }}'
+build_engine_repositories: >-
+  {%- set engines = [] -%}
+  {%- for repository in (build_runner_repositories | default(build_runner_fleet.repositories)).keys() | sort -%}
+  {%- set slug = repository | lower -%}
+  {%- set _ = engines.append({'repository': repository, 'slug': slug, 'name': 'infra-dagger-' ~ slug, 'group': 'infra-dagger-' ~ slug,
+    'cache_gib': build_engine_cache_gib.get(slug, build_engine_default_cache_gib) | int}) -%}
+  {%- endfor -%}
+  {{ engines }}
+build_engine_memory_bytes: '{{ build_engine_memory[:-1] | int * 1024 * 1024 * 1024 }}'

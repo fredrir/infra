@@ -8,18 +8,27 @@
   ansible.builtin.import_role:
     name: host_patching
 
-- name: Start dedicated Docker engine
-  ansible.builtin.systemd_service:
-    name: docker
-    enabled: true
-    state: started
-
-- name: Create trusted runner account
+- name: Create repository runner accounts
   ansible.builtin.user:
-    name: runner
-    groups: docker
+    name: '{{ item.account }}'
+    home: '{{ item.home }}'
+    groups: ['{{ item.engine_group }}']
     shell: /bin/bash
     create_home: true
+  loop: '{{ build_runner_accounts }}'
+  loop_control:
+    label: '{{ item.account }}'
+
+- name: Keep repository runner homes private
+  ansible.builtin.file:
+    path: '{{ item.home }}'
+    state: directory
+    owner: '{{ item.account }}'
+    group: '{{ item.account }}'
+    mode: '0700'
+  loop: '{{ build_runner_accounts }}'
+  loop_control:
+    label: '{{ item.home }}'
 
 - name: Install aggregate runner resource limits
   ansible.builtin.copy:
@@ -62,13 +71,37 @@
     group: root
     mode: '0755'
 
-- name: Install runner admission runtime directory
+- name: Install runner admission runtime directories
   ansible.builtin.copy:
     dest: /etc/tmpfiles.d/infra-runner-admission.conf
-    content: "d /run/infra-runner-admission 0700 root root -\n"
+    content: |
+      d /run/infra-runner-admission 0700 root root -
+      d /run/infra-runner-admission.d 0755 root root -
+      {% for account in build_runner_accounts %}
+      d /run/infra-runner-admission.d/{{ account.slug }} 0750 root {{ account.account }} -
+      {% endfor %}
     owner: root
     group: root
     mode: '0644'
+
+- name: Create runner admission socket root
+  ansible.builtin.file:
+    path: /run/infra-runner-admission.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create runner admission socket directories
+  ansible.builtin.file:
+    path: '/run/infra-runner-admission.d/{{ item.slug }}'
+    state: directory
+    owner: root
+    group: '{{ item.account }}'
+    mode: '0750'
+  loop: '{{ build_runner_accounts }}'
+  loop_control:
+    label: '{{ item.slug }}'
 
 - name: Create runner admission runtime directory
   ansible.builtin.file:
@@ -97,7 +130,9 @@
   - name: infra-runner-admission.socket
     content: |
       [Socket]
-      ListenStream=/run/infra-runner-admission.sock
+      {% for account in build_runner_accounts %}
+      ListenStream=/run/infra-runner-admission.d/{{ account.slug }}/admission.sock
+      {% endfor %}
       SocketMode=0666
 
       [Install]
@@ -178,6 +213,82 @@
     content: |
       #!/bin/sh
       exec /usr/local/bin/infra platform runner-admission release --timeout=30s
+
+- name: Create scanner database account
+  ansible.builtin.user:
+    name: infra-scanner
+    system: true
+    home: /var/lib/infra-scanner
+    create_home: false
+    shell: /usr/sbin/nologin
+
+- name: Install scanner database refresh
+  ansible.builtin.copy:
+    dest: '/etc/systemd/system/{{ item.name }}'
+    owner: root
+    group: root
+    mode: '0644'
+    content: '{{ item.content }}'
+  loop:
+  - name: infra-scanner-refresh.service
+    content: |
+      [Unit]
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      User=infra-scanner
+      Group=infra-scanner
+      StateDirectory=infra-scanner
+      StateDirectoryMode=0755
+      UMask=0022
+      Environment=HOME=/var/lib/infra-scanner
+      Environment=INFRA_TOOL_CACHE=/var/lib/infra-scanner/tools
+      Environment=PATH=/var/lib/infra-scanner/tools:/usr/local/bin:/usr/bin:/bin
+      ExecStart=/usr/local/bin/infra ci install-tools --temporary /tmp trivy
+      ExecStart=/usr/local/bin/infra ci scanner refresh --shared {{ build_runner_scanner_databases }} --java
+      NoNewPrivileges=true
+      PrivateTmp=true
+      PrivateDevices=true
+      ProtectHome=true
+      ProtectSystem=strict
+      CapabilityBoundingSet=
+      RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+      CPUQuota=200%
+      MemoryMax=2G
+      TimeoutStartSec=15min
+  - name: infra-scanner-refresh.timer
+    content: |
+      [Timer]
+      OnActiveSec=0
+      OnCalendar=hourly
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  loop_control:
+    label: '{{ item.name }}'
+  register: build_runner_scanner_units
+
+- name: Schedule scanner database refresh
+  ansible.builtin.systemd_service:
+    name: infra-scanner-refresh.timer
+    enabled: true
+    daemon_reload: '{{ build_runner_scanner_units.changed }}'
+    state: started
+
+- name: Wait for a published scanner database
+  ansible.builtin.find:
+    paths: '{{ build_runner_scanner_databases }}'
+    patterns: metadata.json
+    recurse: true
+    follow: true
+    depth: 3
+  register: build_runner_scanner_database
+  until: build_runner_scanner_database.matched > 0
+  retries: 60
+  delay: 5
 
 - name: Create guest metric directory
   ansible.builtin.file:

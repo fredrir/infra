@@ -11,6 +11,8 @@
     - build_runner_repositories.keys() | difference(build_runner_fleet.repositories.keys()) | length == 0
     - build_runner_repositories.values() | min >= 1
     - build_runner_repositories.values() | max <= 8
+    - build_runner_accounts | map(attribute='slug') | unique | length == build_runner_accounts | length
+    - build_runner_accounts | map(attribute='slug') | select('match', '^[a-z][a-z0-9-]{0,24}$') | list | length == build_runner_accounts | length
     - build_runner_memory is match('^[1-9][0-9]*G$')
     - build_runner_job_slots | int >= 1
     - build_runner_job_slots | int <= 8
@@ -64,20 +66,19 @@
     label: '{{ item.path }}'
   when: build_runner_archive.changed
 
+- name: Retire listeners outside their declared roots
+  ansible.builtin.import_tasks: retire.yml
+
+- name: Remove the shared runner account
+  ansible.builtin.user:
+    name: runner
+    state: absent
+    remove: true
+
+- name: Remove the shared admission group
+  ansible.builtin.group:
+    name: infra-runners
+    state: absent
+
 - name: Configure repository runners
   ansible.builtin.import_tasks: repositories.yml
-
-- name: Find repository runner registrations
-  ansible.builtin.find:
-    paths: /home/runner
-    patterns: .runner
-    hidden: true
-    recurse: true
-    depth: 2
-  register: build_runner_registrations
-
-- name: Remove undeclared repository runners
-  ansible.builtin.include_tasks: remove.yml
-  loop: "{{ build_runner_registrations.files | map(attribute='path') | map('dirname') | select('match', '^/home/runner/[A-Za-z0-9][A-Za-z0-9_.-]*$') | map('basename') | difference(build_runner_fleet_names) }}"
-  loop_control:
-    loop_var: build_runner_retired

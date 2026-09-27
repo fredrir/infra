@@ -15,12 +15,15 @@
     - build_engine_pids | int <= 8192
     - build_engine_parallelism | int >= 1
     - build_engine_parallelism | int <= build_engine_cpus | int
-    - build_engine_dagger_cache_gib | int >= 4
+    - build_engine_repositories | length >= 1
+    - build_engine_repositories | map(attribute='slug') | unique | length == build_engine_repositories | length
+    - build_engine_repositories | map(attribute='slug') | select('match', '^[a-z][a-z0-9-]{0,24}$') | list | length == build_engine_repositories | length
+    - build_engine_cache_gib.keys() | difference(build_engine_repositories | map(attribute='slug')) | length == 0
+    - build_engine_repositories | map(attribute='cache_gib') | min >= 2
     - build_engine_named_cache_hours | int >= 1
     - build_engine_named_cache_hours | int <= 168
     - build_engine_gc_emergency_free_gib | int >= 1
     - build_engine_gc_free_gib | int > build_engine_gc_emergency_free_gib | int
-    - build_engine_dagger_name == 'infra-dagger'
 
 - name: Validate declared engine pin
   ansible.builtin.import_tasks: pin.yml

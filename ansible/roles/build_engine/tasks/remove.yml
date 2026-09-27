@@ -1,0 +1,42 @@
+- name: Find undeclared build engines
+  ansible.builtin.import_tasks: undeclared.yml
+
+- name: Stop undeclared build engines
+  ansible.builtin.systemd_service:
+    name: '{{ item.split()[1] }}'
+    state: stopped
+    enabled: false
+  loop: "{{ build_engine_undeclared.stdout_lines | select('match', '^unit ') | list }}"
+
+- name: Remove undeclared build engine units
+  ansible.builtin.file:
+    path: '/etc/systemd/system/{{ item.split()[1] }}.service'
+    state: absent
+  loop: "{{ build_engine_undeclared.stdout_lines | select('match', '^unit ') | list }}"
+  register: build_engine_removed_units
+
+- name: Reload systemd without undeclared build engines
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: build_engine_removed_units.changed
+
+- name: Remove undeclared build engine containers
+  ansible.builtin.command:
+    argv: [docker, rm, --force, '{{ item.split()[1] }}']
+  loop: "{{ build_engine_undeclared.stdout_lines | select('match', '^container ') | list }}"
+
+- name: Remove undeclared build engine caches
+  ansible.builtin.command:
+    argv: [docker, volume, rm, '{{ item.split()[1] }}']
+  loop: "{{ build_engine_undeclared.stdout_lines | select('match', '^volume ') | list }}"
+
+- name: Remove undeclared build engine configuration
+  ansible.builtin.file:
+    path: '{{ item.split()[1] }}'
+    state: absent
+  loop: "{{ build_engine_undeclared.stdout_lines | select('match', '^file ') | list }}"
+
+- name: Remove the shared engine policy
+  ansible.builtin.file:
+    path: /etc/infra-dagger.toml
+    state: absent
