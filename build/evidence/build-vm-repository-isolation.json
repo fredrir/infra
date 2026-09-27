@@ -166,5 +166,64 @@
   "never_used": "13 anonymous + 24 kernel",
   "after_builds": "107-497 anonymous"
  },
- "cache_disk_after_four_cold_builds_gb": 20.1
+ "cache_disk_after_four_cold_builds_gb": 20.1,
+ "production_rollout": {
+  "steps": [
+   {
+    "revision": "0cd3960247e7e4da12198487f22d5e12758679b8",
+    "change": "guest egress filter, runner-provided engine, job-scoped registry login, socket engine sizing",
+    "outcome": "applied 09:50:35Z; four VM image builds succeeded; check failed only on gazelle_test source order, fixed in ee56bac7"
+   },
+   {
+    "revision": "53c004752fc7d31e79c4ab1ffae5fd4f93e22a15",
+    "change": "gazelle order and read-only scanner generations",
+    "outcome": "evaluated; push pipeline green"
+   },
+   {
+    "revision": "b28a5c3dbd91cc4bd5a62fcefea50325bb8679e6",
+    "change": "admission broker, released as infra-v0.2.19",
+    "outcome": "evaluated; release built, SHA256SUMS verified for infra-linux-amd64 15d1082087de1d43154b4110292b2338fc45a3fe9bb469d5cb839ca7ddf6ca61"
+   },
+   {
+    "revision": "01669862",
+    "change": "admission role and infra-v0.2.19 pin, pool unqualified",
+    "outcome": "applied; jobs could not open the root:infra-runners 0660 socket because running listeners never gained the new group; no VM job ran in the window"
+   },
+   {
+    "revision": "26a6fa55",
+    "change": "single admission socket 0666",
+    "outcome": "applied 11:54:18Z without listener or engine restarts; caddy job 108614100038 admitted in 0.052 s and released in 0.002 s"
+   },
+   {
+    "revision": "5f8d5dbc",
+    "change": "per-repository accounts, engines and admission sockets, pool unqualified",
+    "outcome": "applied 12:27:56-12:43:20Z, ok=480 changed=179 failed=0; 11 listeners retired and re-registered under runner-<repository>; shared engine and cache removed"
+   },
+   {
+    "revision": "ddc86178",
+    "change": "reset engine units left loaded after removal",
+    "outcome": "applied 12:57:09Z; the removed infra-dagger.service no longer shows as failed; verification changed=0"
+   }
+  ],
+  "isolation_probe": {
+   "probed_utc": "2026-09-27T12:43:39Z",
+   "shared_runner_account": "absent",
+   "docker_group_members": "builder",
+   "admission_group": "absent",
+   "admission": "socket and service active; lease directory root:root 0700; hook exec /usr/local/bin/infra platform runner-admission acquire",
+   "scanner": "db-v2 and java-db-v1 published 12:30 and 12:31Z; not writable by any listener account",
+   "engines": "seven infra-dagger-<repository> engines and caches; old engine and cache absent; insecureRootCapabilities false",
+   "listeners": "11 active, each as runner-<repository>, ProtectProc invisible, PrivateTmp, ProtectHome tmpfs, NoNewPrivileges",
+   "per_account": "for all seven accounts: only own processes and home visible; other listeners' environ, credentials, engine and admission sockets unreachable; docker unreachable; own engine and admission sockets reachable; leases unreadable",
+   "disk_free_mib": 60385,
+   "deviation": "infra-dagger.service failed after its removal; reset by ddc86178"
+  },
+  "admission_after_cutover": {
+   "job": 108623869876,
+   "runner": "infra-build-09-infra-1",
+   "acquire_seconds": 0.003,
+   "release_seconds": 0.002
+  },
+  "pool_variable": "INFRA_VM_POOL_QUALIFIED false in the seven repositories for the admission role and the cutover applies; restored to true after verification"
+ }
 }
