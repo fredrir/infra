@@ -84,7 +84,7 @@ jobs:
       - name: Withhold OIDC token requests from later steps
         run: test -z "${ACTIONS_ID_TOKEN_REQUEST_URL-}${ACTIONS_ID_TOKEN_REQUEST_TOKEN-}"
       - name: Qualify cache identity and RPC access
-        if: vars.BAZEL_CACHE_QUALIFICATION_NONCE != '' && env.BAZEL_CACHE_IDENTITY != ''
+        if: vars.BAZEL_CACHE_QUALIFICATION_NONCE != '' && env.BAZEL_CACHE_IDENTITY != '' && steps.affected.outputs.expression != 'set()'
         env:
           ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
           NONCE: ${{ vars.BAZEL_CACHE_QUALIFICATION_NONCE }}
@@ -98,7 +98,7 @@ jobs:
           test "$ENDPOINT" = "grpc://100.87.168.66:$port"
           python3 -B .github/scripts/cache_qualification.py "$role" --nonce "$NONCE" --report "$RUNNER_TEMP/cache-qualification.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always() && vars.BAZEL_CACHE_QUALIFICATION_NONCE != '' && env.BAZEL_CACHE_IDENTITY != ''
+        if: always() && vars.BAZEL_CACHE_QUALIFICATION_NONCE != '' && env.BAZEL_CACHE_IDENTITY != '' && steps.affected.outputs.expression != 'set()'
         with:
           name: cache-qualification-check-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/cache-qualification.json
