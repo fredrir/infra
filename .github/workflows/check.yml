@@ -152,7 +152,8 @@ jobs:
           ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
         run: |
           mkdir -p dist/reports/cold-diagnostic
-          timeout 120s bazel test --config=ci \
+          env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" LANG="${LANG:-C.UTF-8}" \
+            timeout --kill-after=10s 120s bazel test --config=ci \
             --action_env="INFRA_BUILD_IMAGE=$(jq -er '.image' build/toolchain.json)" \
             --repository_cache="$HOME/.cache/infra-bazel-repository" \
             --remote_cache="$ENDPOINT" --remote_cache_compression --remote_timeout=10s --jobs=100 \
