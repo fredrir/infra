@@ -41,7 +41,7 @@ func sopsRecipients(t *testing.T, path string) []string {
 	return recipients
 }
 
-func TestHostSecretsMatchTheirCreationRules(t *testing.T) {
+func TestOperatorAndHostSecretsMatchTheirCreationRules(t *testing.T) {
 	repository := root(t)
 	var config struct {
 		CreationRules []sopsCreationRule `yaml:"creation_rules"`
@@ -53,6 +53,7 @@ func TestHostSecretsMatchTheirCreationRules(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no host secrets: %v", err)
 	}
+	files = append(files, filepath.Join(repository, "secrets/operator.sops.yaml"))
 	for _, file := range files {
 		relative, err := filepath.Rel(repository, file)
 		if err != nil {
@@ -72,6 +73,25 @@ func TestHostSecretsMatchTheirCreationRules(t *testing.T) {
 		slices.Sort(declared)
 		if encrypted := sopsRecipients(t, file); !slices.Equal(encrypted, declared) {
 			t.Errorf("%s is encrypted to %v but .sops.yaml declares %v; run sops updatekeys %s", relative, encrypted, declared, relative)
+		}
+	}
+}
+
+func TestOperatorSecretsAreRestrictedToAdministrators(t *testing.T) {
+	path := filepath.Join(root(t), "secrets/operator.sops.yaml")
+	want := []string{"age1mxszcn7gs8gnvhpq8ku748szqe8u6raferefg986slu83r3zkcmswe29zs", "age1wflp6cynwm97wndq5zxmpaxwz59h62a7dku8qdyue5zm9g4djfnqwj9n0m"}
+	if got := sopsRecipients(t, path); !slices.Equal(got, want) {
+		t.Fatalf("operator recipients %v, want Macie and Archie", got)
+	}
+	var values map[string]any
+	if err := yaml.Unmarshal(read(t, path), &values); err != nil {
+		t.Fatal(err)
+	}
+	delete(values, "sops")
+	for name, value := range values {
+		ciphertext, ok := value.(string)
+		if !ok || !strings.HasPrefix(ciphertext, "ENC[AES256_GCM,") {
+			t.Errorf("operator credential %s is not encrypted", name)
 		}
 	}
 }

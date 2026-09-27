@@ -29,7 +29,7 @@ func (provider *fixtureProvider) Repository(context.Context, string) (Identity, 
 	provider.calls++
 	return provider.identity, nil
 }
-func (provider *fixtureProvider) Credentials(context.Context) (map[string]string, error) {
+func (provider *fixtureProvider) Credentials(context.Context, string) (map[string]string, error) {
 	return map[string]string{"github_app_id": "1", "github_app_installation_id": "2", "github_app_private_key": "private-key"}, nil
 }
 func (provider *fixtureProvider) Encrypt(_ context.Context, plaintext []byte, _ []string) ([]byte, error) {

@@ -2,9 +2,10 @@
 
 | Scope                                 | Location                                                                                                                                                                               |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Operator infrastructure APIs, runner App, mail | Doppler `infra → ops`                                                                                                                                                           |
+| Operator infrastructure APIs, runner App, mail | `secrets/operator.sops.yaml`, Macie and Archie only                                                                                                                                                           |
 | CI reconciliation                    | Pull request plans: `infrastructure-plan` environment secrets; applies and verification: reconciler SOPS maps |
-| Package signing and AUR keys          | Doppler `infra → ops` (`PACKAGES_GPG_KEY`, `PACKAGES_APK_KEY`, `AUR_SSH_KEY`); `fredrir/packages` environment `publish`                                                                |
+| Package signing and AUR keys          | `secrets/operator.sops.yaml`, Macie and Archie only (`PACKAGES_GPG_KEY`, `PACKAGES_APK_KEY`, `AUR_SSH_KEY`); `fredrir/packages` environment `publish`                                                                |
+| Private image preflight | `GHCR_READ_PACKAGES_TOKEN` in `secrets/operator.sops.yaml`; dedicated classic `read:packages` token |
 | Build cache keys                      | `platform/components/runners/<project>/sccache-*.secret.sops.yaml`, `platform/components/object-store/ci/<project>.secret.sops.yaml` |
 | Object store                          | `platform/components/object-store/<cell>.secret.sops.yaml` (JWT, SSE KEK, TLS keys), `<cell>-identities.secret.sops.yaml` (S3 credentials), `restic.secret.sops.yaml` (primary backup repository credentials, consumer copies `platform/projects/<namespace>/backup-primary.secret.sops.yaml`), `parser-dataset-aws.secret.sops.yaml` (AWS `platform-dataset-parser` for the parser dataset copy); CA key `pki/ca.sops.yaml`, Macie and Archie only |
 | Flux deploy receiver                  | `platform/components/sources/deploy-receiver.secret.sops.yaml`                                                                                                                         |
@@ -32,8 +33,10 @@
 | Env | Value |
 | --- | --- |
 | `SOPS_AGE_KEY_FILE` | `$HOME/.config/age/keys.txt`; set by `.envrc` |
+| Operator environment | `.envrc` imports `secrets/operator.sops.yaml` with `sops exec-env`; `onboard-rust --root` reads that checkout's encrypted file |
 
 ```sh
+sops secrets/operator.sops.yaml
 sops platform/projects/<project>/<name>.secret.sops.yaml
 sops rotate -i --add-age "$NEW" --rm-age "$OLD" platform/projects/<project>/<name>.secret.sops.yaml
 ```
@@ -73,7 +76,7 @@ jq -Rs 'rtrimstr("\n")' < NEW_PASSWORD | sops set --value-stdin ansible/roles/co
 | Verification heartbeat | `credentials.sops.yaml` `token`; Gatus `GATUS_TOKEN_RECONCILIATION_VERIFICATION` | None | Next hourly verification reports; the previous token gets 401 | Revert |
 | Backup heartbeat `<name>` | Gatus `GATUS_TOKEN_BACKUPS_<NAME>`; the producer's `BACKUP_HEARTBEAT_TOKEN`: `control.sops.yaml` and `platform/components/backups`, `platform/projects/{llunde-pyparser,y,portfolio}` or `platform/components/cache` for `attic` | None | `kubectl -n <namespace> create job --from=cronjob/data-backup <name>` or a control backup reports success; the previous token gets 401 | Revert |
 | Apply heartbeat | `ansible/roles/reconciler/files/credentials.sops.yaml` `["apply"]["gatus-token"]`; Gatus `GATUS_TOKEN_RECONCILIATION_APPLY` | None | `infra reconcile run request` and `systemctl start infra-reconcile-apply.service` on `fredrir-11` report; the previous token gets 401 | Revert |
-| SMTP | Gatus `GATUS_SMTP_*`; `platform/components/observability/alertmanager.secret.sops.yaml`; Doppler `infra/ops` `PLATFORM_WATCHDOG_SMTP_*` | Administrator IAM: second access key on `fredrir-platform-alerts-smtp`, [SES SMTP derivation](https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html) | SMTP login from `fredrir-06`; Alertmanager delivers; then deactivate and delete the previous key | Reactivate the previous key; revert |
+| SMTP | Gatus `GATUS_SMTP_*`; `platform/components/observability/alertmanager.secret.sops.yaml`; `secrets/operator.sops.yaml` `PLATFORM_WATCHDOG_SMTP_*` | Administrator IAM: second access key on `fredrir-platform-alerts-smtp`, [SES SMTP derivation](https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html) | SMTP login from `fredrir-06`; Alertmanager delivers; then deactivate and delete the previous key | Reactivate the previous key; revert |
 | Control backup access key | `control.sops.yaml` and `platform/components/backups/backup.secret.sops.yaml` `AWS_*` | Administrator IAM: second access key on `platform-restic-control` | Control backup and `repository-maintenance` job succeed; `aws iam get-access-key-last-used`; then deactivate and delete the previous key | Reactivate the previous key; revert |
 | Control repository password | `control.sops.yaml` and `platform/components/backups/backup.secret.sops.yaml` `RESTIC_PASSWORD` | Repository access with the current password | `restic key add`; control backup and `repository-maintenance` job succeed with the new password; then `restic key remove` the previous key | Revert until the previous key is removed |
 | Primary repository key `<project>` | `platform/components/object-store/restic.secret.sops.yaml` `RESTIC_<PROJECT>_*` and `platform/projects/<namespace>/backup-primary.secret.sops.yaml` `AWS_*` | None | Merge; `kubectl -n object-store rollout restart statefulset/seaweedfs-hel1`; `kubectl -n <namespace> create job --from=cronjob/data-backup <name>` succeeds | Revert, then restart the cell |

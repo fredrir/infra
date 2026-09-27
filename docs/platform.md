@@ -10,7 +10,7 @@
 | Cluster                    | K3s; three embedded-etcd servers and two shared workers                                                                                                                                                                 |
 | Host configuration         | Ansible, native K3s `config.yaml`, systemd and nftables                                                                                                                                                                 |
 | Cluster configuration      | Flux, HelmRelease, Kustomize and ordinary YAML                                                                                                                                                                          |
-| Infrastructure credentials | Doppler `infra → ops`                                                                                                                                                                                                   |
+| Infrastructure credentials | `secrets/operator.sops.yaml`, Macie and Archie only                                                                                                                                                                                                   |
 | Runtime secrets            | SOPS + age; separate Macie, Archie and Flux recipients                                                                                                                                                                  |
 | Scheduling                 | Kubernetes requests, limits, quotas, priorities, protected runtime capability labels and per-worker CI slots                                                                                                            |
 | Images                     | GHCR, immutable digests                                                                                                                                                                                                 |
@@ -203,7 +203,7 @@ uv run --frozen --group ci ansible-playbook ansible/external.yml --limit fredrir
 | SSH                    | Verified host key, administrator public keys, root or passwordless sudo                                                    |
 | Transport              | Enrolled Tailscale role; native OpenSSH, embedded Tailscale SSH disabled                                                   |
 | New-node enrollment    | `infra operations enrollment`; verified `infra` binary on target; [bootstrap playbook](../ansible/tailscale-bootstrap.yml) |
-| Enrollment credentials | Doppler `infra/ops/TAILSCALE_ENROLL_CLIENT_ID` and `TAILSCALE_ENROLL_CLIENT_SECRET`; owner tag `tag:platform-enrollment`   |
+| Enrollment credentials | `secrets/operator.sops.yaml` `TAILSCALE_ENROLL_CLIENT_ID` and `TAILSCALE_ENROLL_CLIENT_SECRET`; owner tag `tag:platform-enrollment`   |
 | K3s credentials        | Separate server/agent tokens in private `/etc/rancher/k3s/` files                                                          |
 | Registration seed      | Healthy, already clustered control server; default fresh-cluster initializer `fredrir-07`                                  |
 | Control network        | `10.60.0.5`, `10.60.0.7`, `10.60.0.8`; etcd stays private                                                                  |

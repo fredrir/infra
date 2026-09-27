@@ -3,10 +3,10 @@
 | Setting              | Value                                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------- |
 | Sender               | `alerts@fredrir.com`                                                                              |
-| Recipient            | Doppler `infra/ops/PLATFORM_ALERT_RECIPIENT`                                                      |
+| Recipient            | `secrets/operator.sops.yaml` `PLATFORM_ALERT_RECIPIENT`                                                      |
 | SMTP                 | `email-smtp.eu-north-1.amazonaws.com:587`, verified STARTTLS                                      |
 | IAM                  | OpenTofu `module.platform_mail`, restricted `fredrir-platform-alerts-smtp` user                   |
-| Credentials          | Doppler `infra/ops/PLATFORM_WATCHDOG_SMTP_USERNAME` and `PLATFORM_WATCHDOG_SMTP_PASSWORD`         |
+| Credentials          | `secrets/operator.sops.yaml` `PLATFORM_WATCHDOG_SMTP_USERNAME` and `PLATFORM_WATCHDOG_SMTP_PASSWORD`         |
 | Cluster alerts       | Alertmanager; `platform/components/observability/alertmanager.secret.sops.yaml`                   |
 | Independent monitor  | Gatus on Ubuntu `fredrir-06`, outside Kubernetes                                                  |
 | Monitor settings     | `ansible/roles/gatus/templates/config.yaml.j2`; `${NAME}` secrets from `ansible/roles/gatus/files/secrets.sops.yaml` |
@@ -40,6 +40,6 @@ ssh -o HostKeyAlias=fredrir-06 root@100.86.241.75 systemctl status gatus --no-pa
 curl --fail http://100.86.241.75:8080/health
 ```
 
-SMTP passwords use the [SES regional derivation](https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html); they are different from IAM secret access keys. Rotate the restricted IAM credential, update Doppler and both encrypted consumers, reconcile Alertmanager and Gatus, verify SMTP authentication, then retire the old access key. Keep credentials out of command arguments and logs.
+SMTP passwords use the [SES regional derivation](https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html); they are different from IAM secret access keys. Rotate the restricted IAM credential, update the operator SOPS file and both encrypted consumers, reconcile Alertmanager and Gatus, verify SMTP authentication, then retire the old access key. Keep credentials out of command arguments and logs.
 
 [Gatus configuration](https://github.com/TwiN/gatus/blob/v5.36.0/README.md) covers native email alerts, SQLite retention and authenticated external heartbeats.

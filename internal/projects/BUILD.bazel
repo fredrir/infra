@@ -18,6 +18,7 @@ go_library(
 go_test(
     name = "projects_test",
     srcs = [
+        "credentials_test.go",
         "integration_test.go",
         "onboard_test.go",
     ],

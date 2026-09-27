@@ -22,29 +22,31 @@ const registryPath = ".github/rust-projects.yaml"
 
 type RustProvider interface {
 	RepositoryResolver
-	Credentials(context.Context) (map[string]string, error)
+	Credentials(context.Context, string) (map[string]string, error)
 	Encrypt(context.Context, []byte, []string) ([]byte, error)
 }
 type RustOptions struct{ Repository, Project, WorkflowRef, Output, Root string }
 
-func (provider NativeProvider) Credentials(ctx context.Context) (map[string]string, error) {
+func (provider NativeProvider) Credentials(ctx context.Context, root string) (map[string]string, error) {
 	fields := map[string]string{"github_app_id": "ARC_GITHUB_APP_ID", "github_app_installation_id": "ARC_GITHUB_APP_INSTALLATION_ID", "github_app_private_key": "ARC_GITHUB_APP_PRIVATE_KEY"}
-	data, err := provider.Runner.Output(ctx, "doppler", "secrets", "get", "ARC_GITHUB_APP_ID", "ARC_GITHUB_APP_INSTALLATION_ID", "ARC_GITHUB_APP_PRIVATE_KEY", "--project", "infra", "--config", "ops", "--json")
+	path, err := filepath.Abs(filepath.Join(root, "secrets/operator.sops.yaml"))
 	if err != nil {
 		return nil, err
 	}
-	var values map[string]struct {
-		Computed string `json:"computed"`
+	data, err := provider.Runner.Output(ctx, "sops", "decrypt", "--output-type", "json", path)
+	if err != nil {
+		return nil, err
 	}
+	var values map[string]string
 	if err := json.Unmarshal(data, &values); err != nil {
 		return nil, fmt.Errorf("invalid application credential response")
 	}
 	result := map[string]string{}
 	for key, name := range fields {
-		if values[name].Computed == "" {
+		if values[name] == "" {
 			return nil, fmt.Errorf("missing application credential %s", name)
 		}
-		result[key] = values[name].Computed
+		result[key] = values[name]
 	}
 	return result, nil
 }
@@ -225,7 +227,7 @@ func OnboardRust(ctx context.Context, provider RustProvider, options RustOptions
 	if err != nil {
 		return err
 	}
-	credentials, err := provider.Credentials(ctx)
+	credentials, err := provider.Credentials(ctx, options.Root)
 	if err != nil {
 		return err
 	}
