@@ -502,7 +502,7 @@ Native signed S3 state requests retain conditional lease creation, takeover and 
 | Runner admission | Value |
 | --- | --- |
 | Capacity | `build_runner_job_slots` complete jobs across all repository listeners while `build_runner_admission_enabled` is true |
-| Broker | `infra-runner-admission.socket`: `/run/infra-runner-admission.sock`, `root:infra-runners` `0660`; one sandboxed `infra platform runner-admission serve` daemon, restarted when its unit or the installed CLI changes; callers retry refused, full or unanswered connections until their timeout |
+| Broker | `infra-runner-admission.socket`: `/run/infra-runner-admission.sock`, `0666`, so listeners reach it without restarting; the broker admits only callers inside a runner listener unit; one sandboxed `infra platform runner-admission serve` daemon, restarted when its unit or the installed CLI changes; callers retry refused, full or unanswered connections until their timeout |
 | Identity | Caller PID from `SO_PEERCRED`; listener unit from its cgroup below `infra-runners.slice`; nearest `Runner.Worker` ancestor of the same account; one lease per listener unit, replaced by its next acquire; at most two open requests per unit, 5 s to send the request |
 | Leases | `/run/infra-runner-admission`, root `0700`; later requests reclaim leases of exited workers; a disconnected waiter stops waiting |
 | Hooks | Start hook `acquire` waits within the job timeout and reports its wait; completion hook `release --timeout=30s` |

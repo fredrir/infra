@@ -14,15 +14,10 @@
     enabled: true
     state: started
 
-- name: Create runner admission group
-  ansible.builtin.group:
-    name: infra-runners
-    system: true
-
 - name: Create trusted runner account
   ansible.builtin.user:
     name: runner
-    groups: [docker, infra-runners]
+    groups: docker
     shell: /bin/bash
     create_home: true
 
@@ -103,9 +98,7 @@
     content: |
       [Socket]
       ListenStream=/run/infra-runner-admission.sock
-      SocketUser=root
-      SocketGroup=infra-runners
-      SocketMode=0660
+      SocketMode=0666
 
       [Install]
       WantedBy=sockets.target
