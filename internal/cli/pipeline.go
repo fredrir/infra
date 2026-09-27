@@ -41,13 +41,8 @@ func newBuildCommand(name, operation string) *cobra.Command {
 	cmd := &cobra.Command{Use: name + " [targets...]", Short: "Run Bazel through the pinned build environment", Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, targets []string) error {
 			opts.Targets, opts.Log = targets, cmd.ErrOrStderr()
-			if opts.RemoteCache != "" {
-				if !cmd.Flags().Changed("disk-cache") {
-					opts.DiskCache = ""
-				}
-				if !cmd.Flags().Changed("repository-cache") {
-					opts.RepositoryCache = ""
-				}
+			if opts.RemoteCache != "" && !cmd.Flags().Changed("disk-cache") {
+				opts.DiskCache = ""
 			}
 			if timeout <= 0 {
 				return errors.New("timeout must be positive")

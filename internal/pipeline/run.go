@@ -43,6 +43,7 @@ type Report struct {
 	Success         bool      `json:"success"`
 	Error           string    `json:"error,omitempty"`
 	TraceURL        string    `json:"trace_url,omitempty"`
+	RemoteCache     string    `json:"remote_cache,omitempty"`
 }
 
 const diskCachePath = "/root/.cache/infra-bazel-actions"
@@ -105,6 +106,15 @@ func Run(ctx context.Context, opts Options) (report Report, err error) {
 	if opts.Operation == "prepare-check" || (opts.GeneratedBuildCheck && (opts.Base == "" || GeneratedBuildInputsChanged(opts.Root, paths))) {
 		extra = []string{generatedBuildCheck}
 	}
+	if opts.Local && opts.RemoteCache != "" {
+		report.RemoteCache = "used"
+		if probeErr := probeRemoteCache(ctx, opts.RemoteCache); probeErr != nil {
+			report.RemoteCache, opts.RemoteCache = "unavailable", ""
+			if opts.Log != nil {
+				fmt.Fprintf(opts.Log, "remote cache unavailable, continuing without it: %v\n", probeErr)
+			}
+		}
+	}
 	if opts.Local {
 		err = runLocal(ctx, opts, config, expression, extra, &report)
 	} else {
@@ -137,7 +147,7 @@ func buildArgs(opts Options, config Toolchain, targets []string, reports string)
 		}
 	}
 	if opts.RemoteCache != "" {
-		args = append(args, "--remote_cache="+opts.RemoteCache)
+		args = append(args, "--remote_cache="+opts.RemoteCache, "--remote_cache_compression", "--remote_timeout="+remoteCacheTimeout)
 	}
 	if opts.RemoteExecutor != "" {
 		args = append(args, "--remote_executor="+opts.RemoteExecutor)

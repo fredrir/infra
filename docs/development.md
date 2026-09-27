@@ -119,6 +119,8 @@ infra pipeline check --remote-cache "$BAZEL_REMOTE_CACHE" --read-only-cache
 infra pipeline check --remote-executor "$BAZEL_REMOTE_EXECUTOR"
 ```
 
+A local run first asks the remote cache for its capabilities with a 2 s deadline; an unreachable cache is left out of the Bazel invocation and recorded as `remote_cache: unavailable` in `report.json`.
+
 ## Execution boundaries
 
 | Workload              | Execution                                                                       |

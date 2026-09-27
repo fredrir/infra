@@ -11,6 +11,7 @@ go_library(
         "fast.go",
         "image.go",
         "metrics.go",
+        "remote.go",
         "run.go",
     ],
     importpath = "github.com/fredrir/infra/internal/pipeline",
@@ -30,6 +31,7 @@ go_test(
         "image_test.go",
         "metrics_test.go",
         "pipeline_test.go",
+        "remote_test.go",
     ],
     embed = [":pipeline"],
 )
