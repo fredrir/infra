@@ -246,3 +246,21 @@ metadata:
   annotations:
     kubernetes.io/service-account.name: infrastructure-verify
 type: kubernetes.io/service-account-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infrastructure-plan-token
+  namespace: flux-system
+  annotations:
+    kubernetes.io/service-account.name: infrastructure-plan
+type: kubernetes.io/service-account-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infrastructure-apply-token
+  namespace: flux-system
+  annotations:
+    kubernetes.io/service-account.name: infrastructure-apply
+type: kubernetes.io/service-account-token

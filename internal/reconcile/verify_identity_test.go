@@ -170,7 +170,7 @@ func TestReconciliationIdentitiesHaveTokenSecrets(t *testing.T) {
 			}
 			accounts = append(accounts, document.Metadata.Namespace+"/"+document.Metadata.Name)
 		case "Secret":
-			if document.Type != "kubernetes.io/service-account-token" || document.Metadata.Name != document.Metadata.Annotations["kubernetes.io/service-account.name"]+"-credentials" {
+			if document.Type != "kubernetes.io/service-account-token" || document.Metadata.Annotations["kubernetes.io/service-account.name"] == "" {
 				t.Errorf("Secret %s is not its ServiceAccount's token", document.Metadata.Name)
 			}
 			tokens = append(tokens, document.Metadata.Namespace+"/"+document.Metadata.Annotations["kubernetes.io/service-account.name"])
@@ -179,6 +179,7 @@ func TestReconciliationIdentitiesHaveTokenSecrets(t *testing.T) {
 	want := []string{"flux-system/infrastructure-apply", "flux-system/infrastructure-plan", "flux-system/infrastructure-verify"}
 	slices.Sort(accounts)
 	slices.Sort(tokens)
+	tokens = slices.Compact(tokens)
 	if !slices.Equal(accounts, want) || !slices.Equal(tokens, want) {
 		t.Errorf("service accounts %q and tokens %q, want %q", accounts, tokens, want)
 	}

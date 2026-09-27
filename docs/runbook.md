@@ -172,7 +172,7 @@ GH_TOKEN="$(gh auth token)" PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" go
 | Run report retention | `reconciliation/production/runs/` objects expire after 30 days; noncurrent versions under `reconciliation/production/` after 7 days |
 | AWS workload boundary | `policy/boundary/infra-workload-boundary` on every OpenTofu-managed IAM user outside `/automation/`; dataset S3 objects except `tofu-state/` and `reconciliation/`, SES from the alert sender; the apply identity cannot edit, remove or bypass it |
 | Kubernetes identities | `platform/components/policy/reconciliation.yaml` |
-| Kubernetes tokens | Controller-populated `infrastructure-plan-credentials`, `infrastructure-apply-credentials` and `infrastructure-verify-credentials` Secrets in `flux-system` |
+| Kubernetes tokens | Controller-populated token Secrets in `flux-system`, bound to the service accounts declared in `platform/components/policy/reconciliation.yaml` |
 | Kubernetes API address | Reachable control-plane Tailnet address with a matching certificate; include its CA in each kubeconfig |
 | Kubernetes verify scope | Read Flux resources, workloads, runner sets, listener pods and artifacts; no writes |
 | Kubernetes apply scope | Verify scope; patch reconciliation annotations; admission rejects spec changes |
@@ -353,7 +353,7 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | `cloudflare-api-token` | `tofu -chdir=tofu/reconciler output -raw apply_cloudflare_api_token` |
 | `hcloud-token` | Read/write token of the fleet Hetzner project |
 | `platform-mail-recipient` | Same value as `verify` |
-| `kubernetes-token` | `flux-system/infrastructure-apply-credentials` |
+| `kubernetes-token` | `flux-system/infrastructure-apply-token` |
 | `runner-app-key` | Runner App private key |
 | `publisher-app-key` | [Publisher App](#publishing) private key |
 | `provenance-token` | [Provenance token](Secrets.md#provenance-token) |
