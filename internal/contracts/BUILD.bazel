@@ -5,6 +5,7 @@ go_test(
     srcs = [
         "alerts_workflow_test.go",
         "arc_test.go",
+        "bazel_cache_test.go",
         "bazel_test.go",
         "build_engine_test.go",
         "build_vm_egress_test.go",
@@ -40,6 +41,7 @@ go_test(
         "//:renovate_pin_data",
         "//:tailnet_policy_data",
         "//platform:arc_chart_data",
+        "//platform:bazel_cache_data",
         "//platform:s3_filter_module",
         "//platform:sops_data",
     ],

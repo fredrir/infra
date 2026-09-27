@@ -363,3 +363,82 @@ spec:
   policyName: project-baseline-owner
   validationActions:
   - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: bazel-cache-host-network
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ''
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - pods
+      - pods/ephemeralcontainers
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: bazel-cache
+  variables:
+  - name: containers
+    expression: >-
+      dyn(object.spec.containers)
+      + (has(object.spec.initContainers) ? dyn(object.spec.initContainers) : [])
+      + (has(object.spec.ephemeralContainers) ? dyn(object.spec.ephemeralContainers) : [])
+  validations:
+  - expression: '(!has(object.spec.hostPID) || !object.spec.hostPID) && (!has(object.spec.hostIPC) || !object.spec.hostIPC)'
+    message: Host PID and IPC namespaces are forbidden
+  - expression: '!has(object.spec.volumes) || object.spec.volumes.all(v, has(v.configMap) || has(v.emptyDir) || has(v.persistentVolumeClaim))'
+    message: Only ConfigMap, emptyDir and PersistentVolumeClaim volumes are allowed
+  - expression: has(object.spec.automountServiceAccountToken) && !object.spec.automountServiceAccountToken
+    message: Service account tokens are forbidden
+  - expression: >-
+      has(object.spec.securityContext) && has(object.spec.securityContext.runAsNonRoot) && object.spec.securityContext.runAsNonRoot
+      && (!has(object.spec.securityContext.runAsUser) || object.spec.securityContext.runAsUser != 0)
+      && has(object.spec.securityContext.seccompProfile) && object.spec.securityContext.seccompProfile.type == "RuntimeDefault"
+      && (!has(object.spec.securityContext.appArmorProfile) || object.spec.securityContext.appArmorProfile.type == "RuntimeDefault")
+      && !has(object.spec.securityContext.seLinuxOptions) && !has(object.spec.securityContext.sysctls)
+    message: Pods must run as non-root under the runtime default seccomp and AppArmor profiles without SELinux options or sysctls
+  - expression: >-
+      variables.containers.all(c, has(c.securityContext) && (!has(c.securityContext.privileged) || !c.securityContext.privileged)
+      && has(c.securityContext.allowPrivilegeEscalation) && !c.securityContext.allowPrivilegeEscalation
+      && has(c.securityContext.readOnlyRootFilesystem) && c.securityContext.readOnlyRootFilesystem
+      && has(c.securityContext.capabilities) && has(c.securityContext.capabilities.drop) && "ALL" in c.securityContext.capabilities.drop
+      && !has(c.securityContext.capabilities.add))
+    message: Containers must be unprivileged, drop every capability and keep a read-only root filesystem
+  - expression: >-
+      variables.containers.all(c, has(c.securityContext) && (!has(c.securityContext.runAsNonRoot) || c.securityContext.runAsNonRoot)
+      && (!has(c.securityContext.runAsUser) || c.securityContext.runAsUser != 0)
+      && (!has(c.securityContext.seccompProfile) || c.securityContext.seccompProfile.type == "RuntimeDefault")
+      && (!has(c.securityContext.appArmorProfile) || c.securityContext.appArmorProfile.type == "RuntimeDefault")
+      && !has(c.securityContext.seLinuxOptions))
+    message: Containers must not override the pod's non-root user, seccomp, AppArmor or SELinux settings
+  - expression: >-
+      variables.containers.all(c, c.image in [
+      "docker.io/buchgr/bazel-remote-cache:v2.6.2@sha256:8109f1f39eb17d898cf51e08b41e4eabaaaeb1f584c2f22c1be45b7568fcc512",
+      "docker.io/library/nginx:1.30.5-alpine-slim@sha256:32463212baf0e7d91aded2e9b843a4f2b9e017804b8c9d5bae7b51dcef64389c"])
+    message: Only the pinned cache and filter images may run
+  - expression: variables.containers.all(c, !has(c.ports) || c.ports.all(p, !has(p.hostPort)))
+    message: Host ports are forbidden
+  - expression: >-
+      (!has(object.spec.shareProcessNamespace) || !object.spec.shareProcessNamespace)
+      && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, !has(c.volumeMounts) && !has(c.targetContainerName)))
+    message: Debug containers must not mount the cache volumes or share another container's processes
+  - expression: >-
+      object.spec.containers.all(c, has(c.resources) && has(dyn(c.resources).requests) && has(dyn(c.resources).limits) && "cpu" in dyn(c.resources).requests && "memory" in dyn(c.resources).requests && "cpu" in dyn(c.resources).limits && "memory" in dyn(c.resources).limits)
+    message: CPU and memory requests and limits are required
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: bazel-cache-host-network
+spec:
+  policyName: bazel-cache-host-network
+  validationActions:
+  - Deny

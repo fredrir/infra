@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 
@@ -203,7 +204,18 @@ func rustRunner(t *testing.T, variant string) object {
 	return p
 }
 
-type evaluator struct{ programs map[string][]cel.Program }
+type variable struct {
+	name    string
+	program cel.Program
+}
+
+type compiledPolicy struct {
+	rules       []any
+	variables   []variable
+	validations []cel.Program
+}
+
+type evaluator struct{ policies map[string]compiledPolicy }
 
 var evaluators sync.Map
 
@@ -219,7 +231,7 @@ func newEvaluator(t *testing.T) evaluator {
 }
 
 func compileEvaluator(root string) (evaluator, error) {
-	env, e := cel.NewEnv(cel.Variable("object", cel.DynType), cel.Variable("oldObject", cel.DynType), cel.Variable("request", cel.DynType))
+	env, e := cel.NewEnv(cel.Variable("object", cel.DynType), cel.Variable("oldObject", cel.DynType), cel.Variable("request", cel.DynType), cel.Variable("variables", cel.DynType))
 	if e != nil {
 		return evaluator{}, e
 	}
@@ -235,38 +247,71 @@ func compileEvaluator(root string) (evaluator, error) {
 		}
 		docs = append(docs, decoded...)
 	}
-	v := evaluator{programs: map[string][]cel.Program{}}
+	compile := func(name string, expr string) (cel.Program, error) {
+		if _, issues := env.Compile(expr); issues.Err() != nil {
+			return nil, fmt.Errorf("compile %s: %w", name, issues.Err())
+		}
+		ast, issues := env.Parse(expr)
+		if issues.Err() != nil {
+			return nil, fmt.Errorf("compile %s: %w", name, issues.Err())
+		}
+		return env.Program(ast)
+	}
+	v := evaluator{policies: map[string]compiledPolicy{}}
 	for _, doc := range docs {
 		if doc["kind"] != "ValidatingAdmissionPolicy" {
 			continue
 		}
 		name := at(doc, "metadata", "name").(string)
-		for _, item := range at(doc, "spec", "validations").([]any) {
-			expr := at(item, "expression").(string)
-			if _, issues := env.Compile(expr); issues.Err() != nil {
-				return evaluator{}, fmt.Errorf("compile %s: %w", name, issues.Err())
-			}
-			ast, issues := env.Parse(expr)
-			if issues.Err() != nil {
-				return evaluator{}, fmt.Errorf("compile %s: %w", name, issues.Err())
-			}
-			p, e := env.Program(ast)
+		policy := compiledPolicy{}
+		policy.rules, _ = at(doc, "spec", "matchConstraints", "resourceRules").([]any)
+		variables, _ := at(doc, "spec", "variables").([]any)
+		for _, item := range variables {
+			p, e := compile(name, at(item, "expression").(string))
 			if e != nil {
 				return evaluator{}, e
 			}
-			v.programs[name] = append(v.programs[name], p)
+			policy.variables = append(policy.variables, variable{name: at(item, "name").(string), program: p})
 		}
+		for _, item := range at(doc, "spec", "validations").([]any) {
+			p, e := compile(name, at(item, "expression").(string))
+			if e != nil {
+				return evaluator{}, e
+			}
+			policy.validations = append(policy.validations, p)
+		}
+		v.policies[name] = policy
 	}
 	return v, nil
 }
+func (e evaluator) intercepts(name, resource, operation string) bool {
+	for _, rule := range e.policies[name].rules {
+		resources, _ := at(rule, "resources").([]any)
+		operations, _ := at(rule, "operations").([]any)
+		if slices.Contains(resources, any(resource)) && (slices.Contains(operations, any(operation)) || slices.Contains(operations, any("*"))) {
+			return true
+		}
+	}
+	return false
+}
 func (e evaluator) admitted(names []string, obj object, namespace, user, operation string, old any) bool {
 	for _, name := range names {
-		programs := e.programs[name]
-		if len(programs) == 0 {
+		policy := e.policies[name]
+		if len(policy.validations) == 0 {
 			panic(fmt.Sprintf("missing policy %s", name))
 		}
-		for _, p := range programs {
-			value, _, err := p.Eval(map[string]any{"object": clone(obj), "oldObject": clone(old), "request": object{"namespace": namespace, "operation": operation, "userInfo": object{"username": user}}})
+		activation := map[string]any{"object": clone(obj), "oldObject": clone(old), "request": object{"namespace": namespace, "operation": operation, "userInfo": object{"username": user}}}
+		variables := map[string]any{}
+		activation["variables"] = variables
+		for _, v := range policy.variables {
+			value, _, err := v.program.Eval(activation)
+			if err != nil {
+				return false
+			}
+			variables[v.name] = value
+		}
+		for _, p := range policy.validations {
+			value, _, err := p.Eval(activation)
 			if err != nil || value != types.True {
 				return false
 			}

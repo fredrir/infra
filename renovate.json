@@ -51,6 +51,22 @@
         "(?<depName>docker\\.io/(?:chrislusf/seaweedfs|rclone/rclone)):(?<currentValue>[0-9][0-9.]*)@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^platform/versions\\.yaml$/", "/^platform/components/bazel-cache/[^/]+\\.yaml$/", "/^platform/components/policy/admission\\.yaml$/"],
+      "matchStrings": [
+        "(?<depName>docker\\.io/buchgr/bazel-remote-cache):(?<currentValue>v[0-9][0-9.]*)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^platform/versions\\.yaml$/", "/^platform/components/bazel-cache/[^/]+\\.yaml$/", "/^platform/components/policy/admission\\.yaml$/"],
+      "matchStrings": [
+        "(?<depName>docker\\.io/library/nginx):(?<currentValue>[0-9][0-9.]*-alpine-slim)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker"
     }
   ],
   "customDatasources": {
@@ -110,6 +126,11 @@
     {
       "matchDatasources": ["docker"],
       "pinDigests": true
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["docker.io/library/nginx"],
+      "allowedVersions": "/^1\\.[0-9]*[02468]\\.[0-9]+-alpine-slim$/"
     },
     {
       "matchUpdateTypes": ["major"],

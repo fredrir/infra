@@ -159,3 +159,30 @@ spec:
     default:
       cpu: '1'
       memory: 512Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: namespace-budget
+  namespace: bazel-cache
+spec:
+  hard:
+    requests.cpu: 200m
+    requests.memory: 384Mi
+    pods: '1'
+    requests.storage: 80Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: defaults
+  namespace: bazel-cache
+spec:
+  limits:
+  - type: Container
+    defaultRequest:
+      cpu: 50m
+      memory: 64Mi
+    default:
+      cpu: '1'
+      memory: 512Mi

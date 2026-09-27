@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: bazel-cache
+  namespace: bazel-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bazel-cache
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bazel-cache
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      hostNetwork: true
+      dnsPolicy: Default
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-09
+        node-restriction.kubernetes.io/stateful: 'true'
+      priorityClassName: batch
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bazel-remote
+          image: docker.io/buchgr/bazel-remote-cache:v2.6.2@sha256:8109f1f39eb17d898cf51e08b41e4eabaaaeb1f584c2f22c1be45b7568fcc512
+          command:
+            - /bazel-remote-linux-amd64
+          args:
+            - --dir=/data
+            - --max_size=60
+            - --max_blob_size=268435456
+            - --storage_mode=zstd
+            - --grpc_address=unix:///run/bazel-remote/grpc.sock
+            - --http_address=unix:///run/bazel-remote/http.sock
+            - --access_log_level=none
+          env:
+            - name: GOMEMLIMIT
+              value: 768MiB
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: '2'
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: sockets
+              mountPath: /run/bazel-remote
+          startupProbe:
+            grpc:
+              port: 9095
+            periodSeconds: 5
+            failureThreshold: 120
+          readinessProbe:
+            grpc:
+              port: 9095
+            periodSeconds: 10
+          livenessProbe:
+            grpc:
+              port: 9095
+            periodSeconds: 30
+            failureThreshold: 4
+        - name: filter
+          image: docker.io/library/nginx:1.30.5-alpine-slim@sha256:32463212baf0e7d91aded2e9b843a4f2b9e017804b8c9d5bae7b51dcef64389c
+          command:
+            - nginx
+            - -e
+            - stderr
+            - -c
+            - /etc/nginx/filter/nginx.conf
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: filter
+              mountPath: /etc/nginx/filter
+              readOnly: true
+            - name: sockets
+              mountPath: /run/bazel-remote
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            tcpSocket:
+              port: 9095
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: sockets
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+        - name: filter
+          configMap:
+            name: bazel-cache-filter
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: ${STORAGE_CLASS}
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 80Gi

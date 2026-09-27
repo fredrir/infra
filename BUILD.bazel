@@ -4,6 +4,7 @@ load("@gazelle//:def.bzl", "gazelle", "gazelle_test")
 # gazelle:exclude dist
 # gazelle:exclude .infra
 # gazelle:exclude platform/components/object-store/filtertest
+# gazelle:exclude platform/components/bazel-cache/filtertest
 
 gazelle(name = "gazelle")
 

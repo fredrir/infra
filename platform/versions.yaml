@@ -45,6 +45,8 @@ images:
   node-local-dns: registry.k8s.io/dns/k8s-dns-node-cache:1.26.8@sha256:bc6e64e2c85956af2fcc0aa720086410d41b4f31f378c9a92646fecc85cd4739
   seaweedfs: docker.io/chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
   rclone: docker.io/rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5
+  bazel-remote: docker.io/buchgr/bazel-remote-cache:v2.6.2@sha256:8109f1f39eb17d898cf51e08b41e4eabaaaeb1f584c2f22c1be45b7568fcc512
+  nginx: docker.io/library/nginx:1.30.5-alpine-slim@sha256:32463212baf0e7d91aded2e9b843a4f2b9e017804b8c9d5bae7b51dcef64389c
 sources:
 - https://grafana.github.io/helm-charts/index.yaml
 - https://prometheus-community.github.io/helm-charts/index.yaml
@@ -55,6 +57,7 @@ sources:
 - https://github.com/cloudflare/cloudflared/releases/tag/2026.9.1
 - https://github.com/kubernetes-sigs/node-local-dns/tree/1.26.8
 - https://github.com/seaweedfs/seaweedfs/releases/tag/4.47
+- https://github.com/buchgr/bazel-remote/releases/tag/v2.6.2
 fluxManifest:
   url: https://github.com/fluxcd/flux2/releases/download/v2.9.5/install.yaml
   sha256: cc3dcd743af16215838b6937e1fce83745bf24c0dcc6c59737c59df15429caaf

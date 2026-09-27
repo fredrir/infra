@@ -4,6 +4,7 @@ filegroup(
         "clusters/production/flux-system/*.yaml",
         "clusters/production/root.yaml",
         "components/**/*.yaml",
+        "components/bazel-cache/nginx.conf",
         "components/object-store/**",
         "components/object-store-trust/**",
         "projects/**/*.yaml",
@@ -58,4 +59,10 @@ filegroup(
     name = "renovate_pin_data",
     srcs = ["versions.yaml"] + glob(["components/object-store/*.yaml"]),
     visibility = ["//:__pkg__"],
+)
+
+filegroup(
+    name = "bazel_cache_data",
+    srcs = glob(["components/bazel-cache/**"]),
+    visibility = ["//internal/contracts:__pkg__"],
 )

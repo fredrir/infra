@@ -559,6 +559,23 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Removal trigger | A k3s release that exposes kube-router's `--netpol-default-deny` ([k3s#14711](https://github.com/k3s-io/k3s/issues/14711)) |
 | Removal | Upgrade to that release with the flag enabled on every server and qualify the start race in a k3d lab (gVisor and runc pods, 2 s API lag, held connections). Then, in one commit, delete `platform/components/policy/netpol-gate.yaml`, `platform/components/netpol-gate`, Flux `platform-netpol-gate`, every `netpol-gate/egress` component reference and its `internal/fluxartifacts` entries, the canary clause in `project-network-boundary`, `netpol-gate` in `project-baseline-owner`, the gate init-container rule in `ci-job-credentials`, the `ghcr.io/fredrir/netpol-gate` catalog entry, `images/netpol-gate`, `cmd/netpol-gate`, `internal/netpolgate`, their tests and this section. The host link-local drop stays |
 
+## Bazel cache
+
+| Setting | Value |
+| --- | --- |
+| Server | bazel-remote in StatefulSet `bazel-cache/bazel-cache` on `fredrir-09`; `max_size` 60 GiB LRU on an 80 Gi `local-retain` PVC; blobs up to 256 MiB; zstd storage; loss costs speed only |
+| Listeners | `hostNetwork`; nginx `filter` binds only `fredrir-09`'s tailnet address: 9092 read-only gRPC, 9093 read-write gRPC, 9095 gRPC health; bazel-remote serves only Unix sockets inside the pod |
+| Filter | [`nginx.conf`](../platform/components/bazel-cache/nginx.conf): HTTP/2 gRPC only; exact unnormalized request paths, POST and `application/grpc` or `application/grpc+proto` content; sources in `100.64.0.0/10` except the node itself; every other request 403 |
+| Admission | Namespace pod security `privileged` for `hostNetwork`; `bazel-cache-host-network` checks pods and `kubectl debug` containers for the two pinned images, non-root users, runtime-default seccomp and AppArmor, no SELinux options, sysctls, capabilities, host paths, ports, PID or IPC, and read-only roots; debug containers mount no volumes and share no processes; a cache nginx or bazel-remote bump updates `bazel-cache.yaml` and `admission.yaml` together |
+| Behavioural test | [`bazel-cache-filter.yml`](../.github/workflows/bazel-cache-filter.yml): bazel-remote behind the shipped nginx configuration; every write, execution, asset and health RPC on each port, path, method, content-type and protocol variants, cache-miss status through the proxy |
+| Logs | nginx access log for every write-port request and every refused read-port request |
+
+| Operation | Steps |
+| --- | --- |
+| Wipe | `kubectl -n bazel-cache scale statefulset/bazel-cache --replicas=0`; delete PVC `data-bazel-cache-0` and its released PV; scale to 1 |
+| Resize | Change `--max_size` and the PVC request together; `--max_size` stays at most three quarters of the volume |
+| Readiness | `kubectl -n bazel-cache get pod bazel-cache-0`; bazel-remote's probes call its health RPC through the filter; the filter's liveness probe opens TCP port 9095 |
+
 ## Object store
 
 | Setting | Value |
