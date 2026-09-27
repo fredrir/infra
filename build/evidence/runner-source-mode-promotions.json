@@ -1,0 +1,62 @@
+{
+  "verified_at": "2026-09-27T22:50:20.955323+00:00",
+  "source_revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af",
+  "github_repository_id": "1328085692",
+  "github_owner_id": "114402558",
+  "verification": {
+    "issuer": "https://token.actions.githubusercontent.com",
+    "signer_ref": "refs/heads/main",
+    "source_ref": "refs/heads/main",
+    "source_and_signer_digest_match": true,
+    "subject_digest_match": true,
+    "negative_wrong_source_revision_rejected": true
+  },
+  "images": {
+    "check": {
+      "reference": "ghcr.io/fredrir/infra-runner-check@sha256:fe7b8563b3f2531a7234523bee0eef32bf7ac35723ff8d714c37674bcb2dfa4c",
+      "source_revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af",
+      "platform": "linux/amd64",
+      "signer": "https://github.com/fredrir/infra/.github/workflows/build-image.yml@refs/heads/main",
+      "build": "https://github.com/fredrir/infra/actions/runs/36355822422/attempts/1",
+      "verified_timestamps": [
+        {
+          "type": "Tlog",
+          "uri": "https://rekor.sigstore.dev",
+          "timestamp": "2026-09-28T00:44:30+02:00"
+        }
+      ],
+      "catalog_smoke": {
+        "result": "passed",
+        "command_source": "images/catalog.yaml",
+        "network": "none",
+        "capabilities": "none",
+        "no_new_privileges": true,
+        "embedded_infra_cli_command": "infra version",
+        "embedded_infra_cli_result": "passed"
+      }
+    },
+    "rust": {
+      "reference": "ghcr.io/fredrir/infra-runner-rust@sha256:1df48e3f7153dd7acd547791b102125de01492ba7b2b18088b560f3f8ac84267",
+      "source_revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af",
+      "platform": "linux/amd64",
+      "signer": "https://github.com/fredrir/infra/.github/workflows/build-image.yml@refs/heads/main",
+      "build": "https://github.com/fredrir/infra/actions/runs/36355822422/attempts/1",
+      "verified_timestamps": [
+        {
+          "type": "Tlog",
+          "uri": "https://rekor.sigstore.dev",
+          "timestamp": "2026-09-28T00:42:57+02:00"
+        }
+      ],
+      "catalog_smoke": {
+        "result": "passed",
+        "command_source": "images/catalog.yaml",
+        "network": "none",
+        "capabilities": "none",
+        "no_new_privileges": true,
+        "embedded_infra_cli_command": "infra version",
+        "embedded_infra_cli_result": "passed"
+      }
+    }
+  }
+}
