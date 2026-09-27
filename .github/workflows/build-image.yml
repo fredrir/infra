@@ -87,8 +87,6 @@ jobs:
     if: ${{ !cancelled() && (needs.cli.result == 'success' || (needs.cli.result == 'skipped' && ((github.repository == 'fredrir/infra' && inputs.cli-artifact != '') || (github.repository != 'fredrir/infra' && inputs.cli-artifact == '') || (github.repository == 'fredrir/infra' && inputs.release-cli)))) && (!inputs.release-cli || (github.repository == 'fredrir/infra' && contains(fromJSON('["ghcr.io/fredrir/infra-runner-deploy","ghcr.io/fredrir/infra-source-watcher"]'), inputs.image) && inputs.cli-artifact == '')) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected }}
     runs-on: ${{ !inputs.hosted && contains(fromJSON('["fredrir/infra","fredrir/Y","fredrir/portfolio","fredrir/llunde-frontend","fredrir/llunde-backend","fredrir/llunde-pyparser"]'), github.repository) && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
-    env:
-      _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
     permissions:
       contents: read
       packages: write
@@ -148,17 +146,21 @@ jobs:
           else
             printf 'changed=true\nreason=unconfigured\n' >> "$GITHUB_OUTPUT"
           fi
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+      - name: Authenticate the registry for this job
         if: steps.affected.outputs.changed == 'true'
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          umask 077
+          mkdir "$RUNNER_TEMP/registry"
+          jq -n '{auths:{"ghcr.io":{username:env.GITHUB_ACTOR,password:env.REGISTRY_TOKEN}}}' > "$RUNNER_TEMP/registry/config.json"
+          printf 'DOCKER_CONFIG=%s\n' "$RUNNER_TEMP/registry" >> "$GITHUB_ENV"
       - name: Start isolated Dagger engine
         if: steps.affected.outputs.changed == 'true' && (runner.environment == 'github-hosted')
         run: |
           engine_memory="$(awk '/^MemTotal:/ { print int($2 * 3 / 4 / 1024) "m" }' /proc/meminfo)"
           docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --cpus="$(nproc)" --memory="$engine_memory" --memory-swap="$engine_memory" --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+          printf '_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger\n' >> "$GITHUB_ENV"
       - name: Verify dedicated engine
         if: steps.affected.outputs.changed == 'true' && (runner.environment == 'self-hosted')
         run: infra doctor --root .infra-build-recipe --engine-only
@@ -289,7 +291,6 @@ jobs:
           IMAGE_TEST_COMMAND: ${{ inputs.image-test-command }}
           IMAGE_TEST_SHELL: ${{ inputs.image-test-shell }}
           BUILD_TIMEOUT: ${{ inputs.timeout-minutes }}
-          _EXPERIMENTAL_DAGGER_RUNNER_HOST: docker-container://infra-dagger
         run: |
           if [[ -n "$DEPENDENCY_IMAGE" ]]; then
             [[ "$DEPENDENCY_IMAGE" =~ ^ghcr\.io/fredrir/pyparser-dependencies@sha256:[a-f0-9]{64}$ ]]
