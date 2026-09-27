@@ -1,0 +1,9 @@
+name: Qualify cache writer identity restrictions
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  deny:
+    uses: ./.github/workflows/cache-identity-negative.yml

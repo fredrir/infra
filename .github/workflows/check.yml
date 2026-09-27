@@ -83,6 +83,27 @@ jobs:
           client-id: ${{ env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && vars.TAILSCALE_BAZEL_CACHE_CHECK_WRITER_CLIENT_ID || vars.TAILSCALE_BAZEL_CACHE_READER_CLIENT_ID }}
       - name: Withhold OIDC token requests from later steps
         run: test -z "${ACTIONS_ID_TOKEN_REQUEST_URL-}${ACTIONS_ID_TOKEN_REQUEST_TOKEN-}"
+      - name: Qualify cache identity and RPC access
+        if: vars.BAZEL_CACHE_QUALIFICATION_NONCE != '' && env.BAZEL_CACHE_IDENTITY != ''
+        env:
+          ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
+          NONCE: ${{ vars.BAZEL_CACHE_QUALIFICATION_NONCE }}
+        run: |
+          role=reader
+          port=9092
+          if [ "$BAZEL_CACHE_IDENTITY" = bazel-cache-check-writer ]; then
+            role=writer
+            port=9093
+          fi
+          test "$ENDPOINT" = "grpc://100.87.168.66:$port"
+          python3 -B .github/scripts/cache_qualification.py "$role" --nonce "$NONCE" --report "$RUNNER_TEMP/cache-qualification.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always() && vars.BAZEL_CACHE_QUALIFICATION_NONCE != '' && env.BAZEL_CACHE_IDENTITY != ''
+        with:
+          name: cache-qualification-check-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cache-qualification.json
+          retention-days: 30
+          if-no-files-found: error
       - name: Install checksum-pinned native Bazel
         if: steps.affected.outputs.expression != 'set()'
         run: |
