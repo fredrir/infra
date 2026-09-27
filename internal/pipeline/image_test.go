@@ -116,3 +116,91 @@ func TestDaggerImageBuildSelectsStageAndPreservesLiteralBuildArguments(t *testin
 		t.Fatal(err)
 	}
 }
+
+func TestDaggerImageNormalizesSourceModesWithoutChangingRuntimeOrHostFiles(t *testing.T) {
+	root := os.Getenv("INFRA_DAGGER_IMAGE_TEST_ROOT")
+	if root == "" {
+		t.Skip("INFRA_DAGGER_IMAGE_TEST_ROOT enables the isolated engine integration")
+	}
+	root, err := filepath.Abs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	toolchain, err := ReadToolchain(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	work := t.TempDir()
+	t.Chdir(work)
+	write := func(path, content string, mode os.FileMode) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), mode); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("Dockerfile", "FROM "+toolchain.Image+" AS runtime\nRUN mkdir /runtime && printf runtime > /runtime/private && chmod 0600 /runtime/private\nFROM scratch\nCOPY . /source/\nCOPY --from=runtime /runtime/private /runtime/private\n", 0600)
+	outside := filepath.Join(work, "outside-secret")
+	write(outside, "outside", 0600)
+	write("infra", "injected", 0600)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	for _, modes := range []struct {
+		name             string
+		file, executable os.FileMode
+	}{
+		{"restricted", 0600, 0700}, {"readable", 0644, 0755},
+	} {
+		t.Run(modes.name, func(t *testing.T) {
+			source := filepath.Join(work, modes.name)
+			write(filepath.Join(source, "nested/readable"), "source", modes.file)
+			write(filepath.Join(source, "executable"), "#!/bin/sh\n", modes.executable)
+			write(filepath.Join(source, ".env"), "root-secret", 0600)
+			write(filepath.Join(source, "nested/.env.private"), "nested-secret", 0600)
+			write(filepath.Join(source, ".infra-artifacts/secret"), "artifact-secret", 0600)
+			if err := os.Chmod(filepath.Join(source, "nested"), modes.executable); err != nil {
+				t.Fatal(err)
+			}
+			for name, target := range map[string]string{"alias": "executable", "outside": outside} {
+				if err := os.Symlink(target, filepath.Join(source, name)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			export := filepath.Join(work, "export-"+modes.name)
+			if _, err := Image(ctx, ImageOptions{Root: root, Context: source, Dockerfile: "Dockerfile", InfraBinary: "infra", Platform: "linux/amd64", ExportDirectory: export, Log: io.Discard}); err != nil {
+				t.Fatal(err)
+			}
+			for name, mode := range map[string]os.FileMode{"source/nested": 0755, "source/nested/readable": 0644, "source/executable": 0755, "source/.infra.Containerfile": 0644, "source/.infra-artifacts/infra": 0755, "runtime/private": 0600} {
+				info, err := os.Stat(filepath.Join(export, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if info.Mode().Perm() != mode {
+					t.Errorf("%s mode %04o, want %04o", name, info.Mode().Perm(), mode)
+				}
+			}
+			for name, target := range map[string]string{"alias": "executable", "outside": outside} {
+				actual, err := os.Readlink(filepath.Join(export, "source", name))
+				if err != nil || actual != target {
+					t.Errorf("symlink %s changed to %q: %v", name, actual, err)
+				}
+			}
+			for _, excluded := range []string{".env", "nested/.env.private", ".infra-artifacts/secret"} {
+				if _, err := os.Stat(filepath.Join(export, "source", excluded)); !os.IsNotExist(err) {
+					t.Errorf("private build input %s exported: %v", excluded, err)
+				}
+			}
+			for path, mode := range map[string]os.FileMode{filepath.Join(source, "nested/readable"): modes.file, filepath.Join(source, "executable"): modes.executable, "infra": 0600, outside: 0600} {
+				info, err := os.Stat(path)
+				if err != nil || info.Mode().Perm() != mode {
+					t.Errorf("host file %s changed: %+v %v", path, info, err)
+				}
+			}
+		})
+	}
+}

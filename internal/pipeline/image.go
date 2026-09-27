@@ -93,7 +93,12 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		args = append(args, dagger.BuildArg{Name: name, Value: value})
 	}
 	sort.Slice(args, func(i, j int) bool { return args[i].Name < args[j].Name })
-	source := client.Host().Directory(opts.Context, dagger.HostDirectoryOpts{Gitignore: true, Exclude: []string{".git", "dist", "bazel-*", ".cache", ".direnv", ".venv", "**/.terraform", ".env", ".env.*"}}).WithFile(".infra.Containerfile", client.Host().File(opts.Dockerfile))
+	source := client.Host().Directory(opts.Context, dagger.HostDirectoryOpts{Gitignore: true, Exclude: []string{".git", "dist", "bazel-*", ".cache", ".direnv", ".venv", ".infra-artifacts", "**/.terraform", ".env", ".env.*", "**/.env", "**/.env.*"}})
+	source = client.Container().From(config.Image).
+		WithDirectory("/infra-source", source).
+		WithExec([]string{"chmod", "-R", "u=rwX,go=rX,a-s,a-t", "/infra-source"}).
+		Directory("/infra-source").
+		WithFile(".infra.Containerfile", client.Host().File(opts.Dockerfile), dagger.DirectoryWithFileOpts{Permissions: 0o644})
 	if opts.InfraBinary != "" {
 		source = source.WithFile(".infra-artifacts/infra", client.Host().File(opts.InfraBinary), dagger.DirectoryWithFileOpts{Permissions: 0o755})
 	}
