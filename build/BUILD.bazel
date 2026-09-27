@@ -2,6 +2,7 @@ exports_files([
     "BUILD.bazel",
     "dagger-embed.patch",
     "publisher.json",
+    "rollout/flux-artifacts/cutover/kustomization.yaml",
     "runners.json",
     "toolchain.json",
 ])

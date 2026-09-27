@@ -15,28 +15,8 @@ import (
 )
 
 func TestProductionFluxPreservesArtifactOwnershipAndReadiness(t *testing.T) {
-	production := filepath.Join(root(t), "platform/clusters/production")
 	fixture := t.TempDir()
-	if err := filepath.WalkDir(production, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		relative, err := filepath.Rel(production, path)
-		if err != nil {
-			return err
-		}
-		destination := filepath.Join(fixture, relative)
-		if entry.IsDir() {
-			return os.MkdirAll(destination, 0755)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(destination, data, 0600)
-	}); err != nil {
-		t.Fatal(err)
-	}
+	copyFluxTree(t, filepath.Join(root(t), "platform/clusters/production"), fixture)
 	rendered, err := kustomize.Build(fixture)
 	if err != nil {
 		t.Fatal(err)
@@ -121,5 +101,49 @@ func TestProductionFluxPreservesArtifactOwnershipAndReadiness(t *testing.T) {
 		if owner.Spec.SourceRef.Kind != "ExternalArtifact" || owner.Spec.SourceRef.Name != "project-llunde-pyparser" || len(owner.Spec.DependsOn) != 1 || owner.Spec.DependsOn[0].Name != parent {
 			t.Errorf("parser sequencing changed: %s: %+v", child, owner.Spec)
 		}
+	}
+}
+
+func copyFluxTree(t *testing.T, source, destination string) {
+	t.Helper()
+	if err := filepath.WalkDir(source, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		relative, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(destination, relative)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0755)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0600)
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFluxCutoverEntrypointConvergesToProduction(t *testing.T) {
+	fixture := t.TempDir()
+	production := "platform/clusters/production"
+	cutover := "build/rollout/flux-artifacts/cutover"
+	for _, tree := range []string{production, cutover} {
+		copyFluxTree(t, filepath.Join(root(t), tree), filepath.Join(fixture, tree))
+	}
+	canonical, err := kustomize.Build(filepath.Join(fixture, production))
+	if err != nil {
+		t.Fatal(err)
+	}
+	transition, err := kustomize.Build(filepath.Join(fixture, cutover))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(transition, canonical) {
+		t.Fatal("cutover entrypoint does not declare the canonical root and identical resources")
 	}
 }
