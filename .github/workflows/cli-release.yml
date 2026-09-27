@@ -57,6 +57,22 @@ jobs:
           client-id: ${{ vars.TAILSCALE_BAZEL_CACHE_RELEASE_READER_CLIENT_ID }}
       - name: Withhold OIDC token requests from later steps
         run: test -z "${ACTIONS_ID_TOKEN_REQUEST_URL-}${ACTIONS_ID_TOKEN_REQUEST_TOKEN-}"
+      - name: Qualify release cache identity and RPC access
+        if: matrix.platform == 'linux_amd64' && vars.BAZEL_CACHE_QUALIFICATION_NONCE != ''
+        env:
+          BAZEL_CACHE_IDENTITY: bazel-cache-release-reader
+          ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
+          NONCE: ${{ vars.BAZEL_CACHE_QUALIFICATION_NONCE }}
+        run: |
+          test "$ENDPOINT" = grpc://100.87.168.66:9092
+          python3 -B .github/scripts/cache_qualification.py reader --nonce "$NONCE" --report "$RUNNER_TEMP/cache-qualification.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always() && matrix.platform == 'linux_amd64' && vars.BAZEL_CACHE_QUALIFICATION_NONCE != ''
+        with:
+          name: cache-qualification-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cache-qualification.json
+          retention-days: 30
+          if-no-files-found: error
       - name: Prepare native check artifacts
         if: matrix.platform == 'linux_amd64'
         env:
