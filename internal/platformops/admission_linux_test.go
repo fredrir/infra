@@ -159,6 +159,7 @@ type testBroker struct {
 	t       *testing.T
 	socket  string
 	sockets []string
+	stop    func()
 	*admissionBroker
 }
 
@@ -198,13 +199,99 @@ func startAdmissionBrokers(t *testing.T, capacity, count int) *testBroker {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- broker.run(ctx, listeners...) }()
+	broker.stop = sync.OnceFunc(func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Error(err)
+		}
+	})
+	t.Cleanup(broker.stop)
+	return broker
+}
+
+func TestRunnerAdmissionCanceledCallerProcess(t *testing.T) {
+	socket := os.Getenv("INFRA_ADMISSION_TEST_CANCELED_SOCKET")
+	if socket == "" {
+		t.Skip("runs as a queued worker with a canceled request")
+	}
+	if err := os.WriteFile("/proc/self/comm", []byte("Runner.Worker"), 0); err != nil {
+		t.Fatal(err)
+	}
+	connection, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: socket, Net: "unix"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	if err := connection.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fmt.Fprintln(connection, "acquire"); err != nil {
+		t.Fatal(err)
+	}
+	if err := connection.CloseWrite(); err != nil {
+		t.Fatal(err)
+	}
+	if reply, err := bufio.NewReader(connection).ReadString('\n'); reply != "" || !errors.Is(err, io.EOF) {
+		t.Fatalf("canceled queue request returned %q, %v instead of closing unanswered", reply, err)
+	}
+}
+
+func TestRunnerAdmissionCancellationIsNotADenial(t *testing.T) {
+	broker := startAdmissionBroker(t, 1)
+	worker := broker.worker("actions.runner.fredrir-first.host-first-1.service", "")
+	broker.await(func(leases []runnerLease) bool { return len(leases) == 1 }, "first worker was not admitted")
+	before := broker.leases()
+	caller := exec.Command(os.Args[0], "-test.run=^TestRunnerAdmissionCanceledCallerProcess$")
+	caller.Env = append(os.Environ(), "INFRA_ADMISSION_TEST_CANCELED_SOCKET="+broker.socket, "INFRA_ADMISSION_TEST_UNIT=actions.runner.fredrir-queued.host-queued-1.service")
+	if output, err := caller.CombinedOutput(); err != nil {
+		t.Fatalf("canceled queued caller failed: %v\n%s", err, output)
+	}
+	if after := broker.leases(); !slices.Equal(before, after) || after[0].PID != worker.Process.Pid {
+		t.Fatalf("canceled caller changed the admitted lease: before=%+v after=%+v", before, after)
+	}
+}
+
+func TestRunnerAdmissionQueuedJobSurvivesBrokerRestart(t *testing.T) {
+	broker := startAdmissionBroker(t, 1)
+	signal := filepath.Join(t.TempDir(), "release")
+	first := broker.worker("actions.runner.fredrir-first.host-first-1.service", signal)
+	broker.await(func(leases []runnerLease) bool { return len(leases) == 1 }, "first worker was not admitted")
+	before := broker.leases()
+	queuedUnit := "actions.runner.fredrir-queued.host-queued-1.service"
+	queued := broker.worker(queuedUnit, "")
+	for deadline := time.Now().Add(5 * time.Second); broker.openRequests()[queuedUnit] != 1; time.Sleep(time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("second worker did not queue behind the admitted worker")
+		}
+	}
+	broker.stop()
+	broker.awaitQuiet()
+	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: broker.socket, Net: "unix"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	restarted := &admissionBroker{directory: broker.directory, capacity: broker.capacity, log: io.Discard, open: map[string]int{}}
+	go func() { done <- restarted.run(ctx, listener) }()
 	t.Cleanup(func() {
 		cancel()
 		if err := <-done; err != nil {
 			t.Error(err)
 		}
 	})
-	return broker
+	if after := broker.leases(); !slices.Equal(before, after) {
+		t.Fatalf("broker restart changed an admitted lease: before=%+v after=%+v", before, after)
+	}
+	if err := first.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Fatalf("broker restart stopped the admitted worker: %v", err)
+	}
+	if err := os.WriteFile(signal, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	broker.await(func(leases []runnerLease) bool {
+		return len(leases) == 1 && leases[0].PID == queued.Process.Pid
+	}, "queued worker did not retry and acquire the released slot after restart")
 }
 
 func (b *testBroker) on(index int) *testBroker {

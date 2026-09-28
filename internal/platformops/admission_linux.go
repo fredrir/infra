@@ -180,6 +180,9 @@ func (b *admissionBroker) serve(ctx context.Context, connection *net.UnixConn) {
 	defer stop()
 	defer connection.Close()
 	unit, verb, err := b.request(ctx, connection)
+	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
+		return
+	}
 	message := "ok"
 	if err != nil {
 		message = "denied: " + err.Error()
