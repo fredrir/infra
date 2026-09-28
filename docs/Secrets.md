@@ -89,7 +89,7 @@ jq -Rs 'rtrimstr("\n")' < NEW_PASSWORD | sops set --value-stdin ansible/roles/co
 
 | Rotate | Change together | Authority | Verify | Roll back |
 | --- | --- | --- | --- | --- |
-| Verification heartbeat | `credentials.sops.yaml` `token`; Gatus `GATUS_TOKEN_RECONCILIATION_VERIFICATION` | None | Next hourly verification reports; the previous token gets 401 | Revert |
+| Verification heartbeat | `ansible/roles/reconciler/files/credentials.sops.yaml` `["verify"]["gatus-token"]`; Gatus `GATUS_TOKEN_RECONCILIATION_VERIFICATION` | None | Next hourly verification reports; the previous token gets 401 | Revert |
 | Backup heartbeat `<name>` | Gatus `GATUS_TOKEN_BACKUPS_<NAME>`; the producer's `BACKUP_HEARTBEAT_TOKEN`: `control.sops.yaml` and `platform/components/backups`, `platform/projects/{llunde-pyparser,y,portfolio}` or `platform/components/cache` for `attic` | None | `kubectl -n <namespace> create job --from=cronjob/data-backup <name>` or a control backup reports success; the previous token gets 401 | Revert |
 | Apply heartbeat | `ansible/roles/reconciler/files/credentials.sops.yaml` `["apply"]["gatus-token"]`; Gatus `GATUS_TOKEN_RECONCILIATION_APPLY` | None | `infra reconcile run request` and `systemctl start infra-reconcile-apply.service` on `fredrir-11` report; the previous token gets 401 | Revert |
 | SMTP | Gatus `GATUS_SMTP_*`; `platform/components/observability/alertmanager.secret.sops.yaml`; `secrets/operator.sops.yaml` `PLATFORM_WATCHDOG_SMTP_*` | Administrator IAM: second access key on `fredrir-platform-alerts-smtp`, [SES SMTP derivation](https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html) | Verify installed Gatus and mounted Alertmanager credentials, then STARTTLS AUTH from `fredrir-06`; deactivate and delete the previous key | Reactivate the previous key; revert |
@@ -109,11 +109,11 @@ jq -Rs 'rtrimstr("\n")' < NEW_PASSWORD | sops set --value-stdin ansible/roles/co
 | Location | `ansible/roles/reconciler/files/credentials.sops.yaml` `["apply"]["provenance-token"]` |
 | Lifetime | No expiry |
 | Alert | Gatus `reconciliation_apply` fails daily from 30 days before an expiring token's expiry |
-| Rotate | Generate a replacement with the same scope; `sops set`; `ansible-playbook ansible/reconciler.yml`; confirm the next readiness check or apply; revoke the previous token |
+| Rotate | Generate a replacement with the same scope; `sops set`; `(cd ansible && ansible-playbook reconciler.yml --tags host_key,reconciler_credentials)`; confirm the next readiness check or apply; revoke the previous token |
 
 ## Credential rotation
 
-Keep the previous credential active until every consumer authenticates with the replacement; then revoke it at its issuer and confirm it is rejected. Reconciler credentials require `ansible-playbook ansible/reconciler.yml`; ordinary reconciliation does not install that role.
+Keep the previous credential active until every consumer authenticates with the replacement; then revoke it at its issuer and confirm it is rejected. Reconciler credentials require `(cd ansible && ansible-playbook reconciler.yml --tags host_key,reconciler_credentials)`; ordinary reconciliation does not install that role.
 
 | Credential | Consumers | Replacement and verification |
 | --- | --- | --- |
@@ -136,7 +136,7 @@ Keep the previous credential active until every consumer authenticates with the 
 
 ```sh
 jq -Rs 'rtrimstr("\n")' < NEW.pem | sops set --value-stdin ansible/roles/reconciler/files/credentials.sops.yaml '["apply"]["runner-app-key"]'
-ansible-playbook ansible/reconciler.yml
+(cd ansible && ansible-playbook reconciler.yml --tags host_key,reconciler_credentials)
 gh secret set HCLOUD_TOKEN --env infrastructure-plan < NEW_TOKEN
 ```
 
