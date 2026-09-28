@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "observed_at": "2026-09-28T00:13:54.599271+00:00",
+  "observed_at": "2026-09-28T00:15:53.295304+00:00",
   "server_revision": "05b18fb1bc3d99c3b24739132fd4f73996b3487a",
   "client_revision": "d64513f84897261a441b0e189c80f89216f8685d",
   "deployment": {
@@ -549,7 +549,20 @@
       "actions_enabled": true,
       "workflow_state": "active",
       "schedule": "7,22,37,52 * * * *"
-    }
+    },
+    "manual_apply_run": "https://github.com/fredrir/infra/actions/runs/36355982559",
+    "manual_apply": {
+      "schema": 1,
+      "writer_tag": "tag:ci-bazel-writer",
+      "at": "2026-09-27T22:38:40.811479+00:00",
+      "apply": true,
+      "minimum_age_seconds": 3600,
+      "devices": [],
+      "examined": 13,
+      "eligible": 0,
+      "deferred": 0
+    },
+    "live_deletion": "Not exercised: both manual modes examined 13 devices and found zero eligible devices; zero devices were deleted."
   },
   "release_reader": {
     "live_enrollment": "not_exercised",
@@ -561,7 +574,7 @@
     "A forced uncached full hosted suite exceeded the unchanged ten-second fast-check budget in all three probes. The final run stopped at 10.200 seconds with 23 of 30 shard results emitted and no cached results; full declarations took 5.723 seconds and the aggregate gate did not pass. Ordinary writer and reader qualifications are recorded separately.",
     "The local WAN replay used four distinct physical Ryzen cores; the hosted runner provides four logical threads on two EPYC cores. The local timing is not equivalent hosted budget proof.",
     "The release-reader identity is installed and constrained to protected release tags; no release was published for this qualification.",
-    "No scheduled cleanup execution has been observed. The manual preview succeeded and repository/workflow schedule controls are enabled.",
+    "No scheduled cleanup execution has been observed. Manual preview and apply both succeeded with zero eligible devices and zero deletions; live DELETE execution was not exercised. Repository/workflow schedule controls are enabled.",
     "PR153 remains open for a full infrastructure plan after credential rotation; temporary qualification workflows and nonce require removal after that validation."
   ],
   "local_hosted_cpu_comparison": {
