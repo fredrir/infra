@@ -1,0 +1,372 @@
+{
+  "schema": 1,
+  "workflow_revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af",
+  "observed_at": "2026-09-28T00:14:16.727764+00:00",
+  "qualification": {
+    "consumer_repositories": 5,
+    "successful_build_runs": 5,
+    "immutable_images": 8,
+    "available_deployments": 10,
+    "all_images_checked_as_production_uid": true,
+    "source_mode_rollout_complete": true
+  },
+  "builds": [
+    {
+      "repository": "fredrir/llunde-frontend",
+      "run_id": 36358434000,
+      "source_revision": "26a5f7b3bc6415803a87a9b808e4e2dd763293de",
+      "conclusion": "success"
+    },
+    {
+      "repository": "fredrir/llunde-backend",
+      "run_id": 36358865699,
+      "source_revision": "0ca0426a83f53f59fa26d3920a8c57ed606522b4",
+      "conclusion": "success"
+    },
+    {
+      "repository": "fredrir/Y",
+      "run_id": 36358866437,
+      "source_revision": "9542fc865cc07d08d5b2683a88dd40ca154e9588",
+      "conclusion": "success"
+    },
+    {
+      "repository": "fredrir/portfolio",
+      "run_id": 36358867467,
+      "source_revision": "e51a9d8fe96a01dbce530bdf1ca03f226266267e",
+      "conclusion": "success"
+    },
+    {
+      "repository": "fredrir/llunde-pyparser",
+      "run_id": 36358868601,
+      "source_revision": "5ac086276daf59457f74668f423aa09050d198d2",
+      "conclusion": "success"
+    }
+  ],
+  "images": [
+    {
+      "infra_revision": "0e0f72555c52843cf531a5592a0643473081c996",
+      "committed_at": "2026-09-27T23:54:34Z",
+      "image": "ghcr.io/fredrir/portfolio-web@sha256:252c39d97c28db06868671ddc91d2fabf0291499008c10684b8312e3d6ddee4e",
+      "repository": "fredrir/portfolio",
+      "source_revision": "e51a9d8fe96a01dbce530bdf1ca03f226266267e",
+      "build_run": 36358867467,
+      "preflight": {
+        "uid": 10001,
+        "gid": 10001,
+        "network": "none",
+        "capabilities": "none",
+        "read_only_root": true,
+        "readable_files": 180,
+        "directories_readable_and_traversable": true,
+        "smoke": "Node server syntax validated as production UID",
+        "checked_at": "2026-09-28T00:08:15.331436+00:00"
+      }
+    },
+    {
+      "infra_revision": "dde0a4cbbf56a8848923e643ab8468b503d5536a",
+      "committed_at": "2026-09-27T23:52:22Z",
+      "image": "ghcr.io/fredrir/portfolio-worker@sha256:5ebb8225a341deaf0e385e3198cce0b0600b2a60ea2cc0b6ab69a80559648c8a",
+      "repository": "fredrir/portfolio",
+      "source_revision": "e51a9d8fe96a01dbce530bdf1ca03f226266267e",
+      "build_run": 36358867467,
+      "preflight": {
+        "uid": 10001,
+        "gid": 10001,
+        "network": "none",
+        "capabilities": "none",
+        "read_only_root": true,
+        "binary_modes": {
+          "/usr/local/bin/portfolio-worker": "0o755",
+          "/usr/local/bin/backfill-exif": "0o755"
+        },
+        "smoke": "Binary executes as production UID and stops at missing database configuration",
+        "startup_exit_code": 1,
+        "checked_at": "2026-09-28T00:08:15.331436+00:00"
+      }
+    },
+    {
+      "infra_revision": "5fe6433636e065a8aa8c763b614e9c9283830e81",
+      "committed_at": "2026-09-27T23:52:15Z",
+      "image": "ghcr.io/fredrir/portfolio-api@sha256:345250eba47abd77007f771316de707c3ad85d077c0f7390124a1dfdb4d7c2a3",
+      "repository": "fredrir/portfolio",
+      "source_revision": "e51a9d8fe96a01dbce530bdf1ca03f226266267e",
+      "build_run": 36358867467,
+      "preflight": {
+        "uid": 10001,
+        "gid": 10001,
+        "network": "none",
+        "capabilities": "none",
+        "read_only_root": true,
+        "binary_modes": {
+          "/usr/local/bin/portfolio-api": "0o755"
+        },
+        "smoke": "Binary executes as production UID and stops at missing database configuration",
+        "startup_exit_code": 1,
+        "checked_at": "2026-09-28T00:08:15.331436+00:00"
+      }
+    },
+    {
+      "infra_revision": "a15f4cf67aa467fc050f3f27f5f685166a2c707f",
+      "committed_at": "2026-09-27T23:38:33Z",
+      "image": "ghcr.io/fredrir/pyparser-review@sha256:8a7cf6a83853658ebf595e3daf8c387c870627e22b0f36940de8fe5ea14fbdf7",
+      "repository": "fredrir/llunde-pyparser",
+      "source_revision": "5ac086276daf59457f74668f423aa09050d198d2",
+      "build_run": 36358868601,
+      "preflight": {
+        "checked_at": "2026-09-27T23:40:31.778630+00:00",
+        "authenticated_pull": true,
+        "uid": 10001,
+        "gid": 10001,
+        "permission_checks": {
+          "/app": {
+            "files_readable": 547,
+            "directories_traversable": 50
+          },
+          "/opt/docling-models": {
+            "files_readable": 143,
+            "directories_traversable": 53
+          },
+          "modes": {
+            "/app/pyproject.toml": "0o644",
+            "/app/uv.lock": "0o644",
+            "/app/alembic.ini": "0o644",
+            "/app/llm-providers.toml": "0o644",
+            "/app/src/pyparser/__init__.py": "0o644",
+            "/app/src/pyparser/review/static/index.html": "0o644"
+          },
+          "python_import_and_ui_entrypoint": "pass"
+        },
+        "network": "none",
+        "capabilities": "none",
+        "read_only_root": true,
+        "limits": [
+          "No database-backed worker startup or model generation was run locally."
+        ]
+      }
+    },
+    {
+      "infra_revision": "ac372cda2369cff96ca2bd654e01403c00298854",
+      "committed_at": "2026-09-27T23:33:36Z",
+      "image": "ghcr.io/fredrir/y-web@sha256:06d27b9451be553f380cb50ca95e887ed5f2b060ce12a56cfc06312e72ea5c68",
+      "repository": "fredrir/Y",
+      "source_revision": "9542fc865cc07d08d5b2683a88dd40ca154e9588",
+      "build_run": 36358866437,
+      "preflight": {
+        "uid": 1000,
+        "gid": 1000,
+        "readable_files": 6,
+        "directories_readable_and_traversable": true,
+        "smoke": "Caddy serves byte-identical index",
+        "network": "none",
+        "capabilities": "none",
+        "read_only_root": true,
+        "checked_at": "2026-09-27T23:39:54.775598+00:00"
+      }
+    },
+    {
+      "infra_revision": "00259e14606ba1b865fd3ff90fe4bd063ebf6a87",
+      "committed_at": "2026-09-27T23:33:06Z",
+      "image": "ghcr.io/fredrir/y-api@sha256:3cf95ef691241de49f62564b30dec0accc510addb1a08cb7475c791505c48b4a",
+      "repository": "fredrir/Y",
+      "source_revision": "9542fc865cc07d08d5b2683a88dd40ca154e9588",
+      "build_run": 36358866437,
+      "preflight": {
+        "uid": 1000,
+        "gid": 1000,
+        "readable_files": 5401,
+        "directories_readable_and_traversable": true,
+        "smoke": "node syntax and package JSON",
+        "network": "none",
+        "capabilities": "none",
+        "read_only_root": true,
+        "checked_at": "2026-09-27T23:39:54.775598+00:00"
+      }
+    },
+    {
+      "infra_revision": "4d6f04d2df29bd6fa8419afc90e1035e2298b4d3",
+      "committed_at": "2026-09-27T23:31:16Z",
+      "image": "ghcr.io/fredrir/llunde-backend@sha256:2c27ba5ec3e22189291b6595287e31bf64e6bec1ea6c158320d9808dac15e4fa",
+      "repository": "fredrir/llunde-backend",
+      "source_revision": "0ca0426a83f53f59fa26d3920a8c57ed606522b4",
+      "build_run": 36358865699,
+      "preflight": {
+        "checked_at": "2026-09-27T23:35:55.253272+00:00",
+        "authenticated_pull": true,
+        "uid": 10001,
+        "gid": 10001,
+        "readable_application_files": 172,
+        "directories_readable_and_traversable": true,
+        "entrypoint_mode": "0755",
+        "entrypoint_executable": true,
+        "java_version_passed": true,
+        "network": "none",
+        "capabilities": "none",
+        "read_only_root": true,
+        "limits": [
+          "No database-backed application startup was run locally."
+        ]
+      }
+    },
+    {
+      "infra_revision": "7798c062bfd31d1d59b17c9ba90760b2247b775a",
+      "committed_at": "2026-09-27T23:23:37Z",
+      "image": "ghcr.io/fredrir/llunde-frontend@sha256:5604c51be0ca9668d5a4a640a9348ab127c9b5d97a204c0df8344243136ef871",
+      "repository": "fredrir/llunde-frontend",
+      "source_revision": "26a5f7b3bc6415803a87a9b808e4e2dd763293de",
+      "build_run": 36358434000,
+      "preflight": {
+        "checked_at": "2026-09-27T23:27:50.319498+00:00",
+        "authenticated_pull": true,
+        "uid": 10001,
+        "gid": 10001,
+        "readable_static_files": 159,
+        "directories_readable_and_traversable": true,
+        "index_mode": "0644",
+        "caddyfile_mode": "0644",
+        "exact_index_and_revision_served": true,
+        "network": "none",
+        "capabilities": "none",
+        "read_only_root": true
+      }
+    }
+  ],
+  "deployments": [
+    {
+      "namespace": "llunde-pyparser",
+      "name": "review",
+      "image": "ghcr.io/fredrir/pyparser-review@sha256:8a7cf6a83853658ebf595e3daf8c387c870627e22b0f36940de8fe5ea14fbdf7",
+      "generation": 136,
+      "observed_generation": 136,
+      "desired": 1,
+      "available": 1
+    },
+    {
+      "namespace": "llunde-pyparser",
+      "name": "worker-extract",
+      "image": "ghcr.io/fredrir/pyparser-review@sha256:8a7cf6a83853658ebf595e3daf8c387c870627e22b0f36940de8fe5ea14fbdf7",
+      "generation": 136,
+      "observed_generation": 136,
+      "desired": 1,
+      "available": 1
+    },
+    {
+      "namespace": "llunde-pyparser",
+      "name": "worker-light",
+      "image": "ghcr.io/fredrir/pyparser-review@sha256:8a7cf6a83853658ebf595e3daf8c387c870627e22b0f36940de8fe5ea14fbdf7",
+      "generation": 136,
+      "observed_generation": 136,
+      "desired": 1,
+      "available": 1
+    },
+    {
+      "namespace": "llunde",
+      "name": "api",
+      "image": "ghcr.io/fredrir/llunde-backend@sha256:2c27ba5ec3e22189291b6595287e31bf64e6bec1ea6c158320d9808dac15e4fa",
+      "generation": 22,
+      "observed_generation": 22,
+      "desired": 1,
+      "available": 1
+    },
+    {
+      "namespace": "llunde",
+      "name": "web",
+      "image": "ghcr.io/fredrir/llunde-frontend@sha256:5604c51be0ca9668d5a4a640a9348ab127c9b5d97a204c0df8344243136ef871",
+      "generation": 32,
+      "observed_generation": 32,
+      "desired": 1,
+      "available": 1
+    },
+    {
+      "namespace": "portfolio",
+      "name": "api",
+      "image": "ghcr.io/fredrir/portfolio-api@sha256:345250eba47abd77007f771316de707c3ad85d077c0f7390124a1dfdb4d7c2a3",
+      "generation": 17,
+      "observed_generation": 17,
+      "desired": 1,
+      "available": 1
+    },
+    {
+      "namespace": "portfolio",
+      "name": "web",
+      "image": "ghcr.io/fredrir/portfolio-web@sha256:252c39d97c28db06868671ddc91d2fabf0291499008c10684b8312e3d6ddee4e",
+      "generation": 21,
+      "observed_generation": 21,
+      "desired": 1,
+      "available": 1
+    },
+    {
+      "namespace": "portfolio",
+      "name": "worker",
+      "image": "ghcr.io/fredrir/portfolio-worker@sha256:5ebb8225a341deaf0e385e3198cce0b0600b2a60ea2cc0b6ab69a80559648c8a",
+      "generation": 17,
+      "observed_generation": 17,
+      "desired": 1,
+      "available": 1
+    },
+    {
+      "namespace": "y",
+      "name": "api",
+      "image": "ghcr.io/fredrir/y-api@sha256:3cf95ef691241de49f62564b30dec0accc510addb1a08cb7475c791505c48b4a",
+      "generation": 129,
+      "observed_generation": 129,
+      "desired": 1,
+      "available": 1
+    },
+    {
+      "namespace": "y",
+      "name": "web",
+      "image": "ghcr.io/fredrir/y-web@sha256:06d27b9451be553f380cb50ca95e887ed5f2b060ce12a56cfc06312e72ea5c68",
+      "generation": 18,
+      "observed_generation": 18,
+      "desired": 1,
+      "available": 1
+    }
+  ],
+  "private_registry_checks": {
+    "credential": "dedicated GHCR_READ_PACKAGES_TOKEN",
+    "scope": "read:packages",
+    "images": [
+      "llunde-frontend",
+      "llunde-backend",
+      "pyparser-review"
+    ],
+    "temporary_docker_config": true
+  },
+  "packages": {
+    "changed": false,
+    "reason": "Package publication does not use the image build pipeline."
+  },
+  "parser_dependency_publication": {
+    "run_id": 36358868612,
+    "status": "failed before pinning",
+    "reason": "Reusable image output included a tag before the immutable digest; strict digest verification rejected it.",
+    "canonical_output_fix": "4d2cbb6ad1723868c46cc878f710d637cb2e732b",
+    "followup_live_qualified": false
+  },
+  "limits": [
+    "Local backend and worker smokes do not start database-backed services; production deployment availability is recorded separately.",
+    "Portfolio API and worker binaries execute under UID10001 and stop at missing database configuration in the isolated local smoke."
+  ],
+  "source_receipts": [
+    {
+      "file": "frontend-d41-preflight.json",
+      "sha256": "63d25e8bd3cf299adc95e9e4c309aa1f2f451c26425a4e0949409f3596272d86"
+    },
+    {
+      "file": "backend-d41-preflight.json",
+      "sha256": "31f12bc1ac4bd721b7c09da2883c36e8543b3e1d2966489d8fd8df05a301b267"
+    },
+    {
+      "file": "parser-d41-preflight.json",
+      "sha256": "01db74ec2efc496be88b5844e989cbd8e805042350b49c716031fb9bee4ee7c0"
+    },
+    {
+      "file": "y-d41-preflight.json",
+      "sha256": "98d0b05cc79993c867f5c4520f909523bc625210cd9ea8141933d6b75215889e"
+    },
+    {
+      "file": "portfolio-d41-preflight.json",
+      "sha256": "c60bf7e775206390456f088cb1d2e173cf0dde770a73e1aed71a4d46727db671"
+    }
+  ]
+}
