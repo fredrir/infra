@@ -337,11 +337,229 @@
     "reason": "Package publication does not use the image build pipeline."
   },
   "parser_dependency_publication": {
-    "run_id": 36358868612,
-    "status": "failed before pinning",
-    "reason": "Reusable image output included a tag before the immutable digest; strict digest verification rejected it.",
+    "status": "qualified",
+    "observed_at": "2026-09-28T11:25:04.682518+00:00",
     "canonical_output_fix": "4d2cbb6ad1723868c46cc878f710d637cb2e732b",
-    "followup_live_qualified": false
+    "followup_live_qualified": true,
+    "initial_canonical_output_failure": {
+      "run_id": 36358868612,
+      "reason": "Reusable image output included a tag before the immutable digest; strict digest verification rejected it."
+    },
+    "dependency_build": {
+      "run_id": 36411665897,
+      "source_revision": "5413a07678a5254f618d5b313a86078ddc29845a",
+      "conclusion": "success",
+      "workflow_revision": "4d2cbb6ad1723868c46cc878f710d637cb2e732b",
+      "image": "ghcr.io/fredrir/pyparser-dependencies@sha256:9d8163d7b18ba17af3f61a2159cc6b189e83665155f856862358415ffc6230c0",
+      "inputs_sha256": "99fd99b41f182b09186c866a065a386e1966b0b8e8c8a89eecad9c574a799f06",
+      "build_contract_sha256": "7f88b271d7de7dc9a9d313f4db6ca5d152850d8ea86c77d78915c6f5bdf3e1ff"
+    },
+    "direct_main_pin": {
+      "revision": "a5967052592b908d855b1e7ed8ffab4e3cfaaccb",
+      "parent": "5413a07678a5254f618d5b313a86078ddc29845a",
+      "changed_files": [
+        "ci/dependencies.json"
+      ],
+      "push_actor": "octo-sts[bot]",
+      "associated_pull_requests": [],
+      "publisher_workflow_revision": "9fce58f7d47b127f82170071dba11fce5eee4eac",
+      "bot_commit_signature_verified": false,
+      "signature_scope": "The existing dependency publisher uses unsigned bot commits; prepared human commits are owner-signed.",
+      "main_pull_request_ruleset_id": 24109613,
+      "integration_bypass_app_id": 801323,
+      "other_classic_controls_preserved": true
+    },
+    "application": {
+      "run_id": 36413527046,
+      "attempt": 2,
+      "source_revision": "a5967052592b908d855b1e7ed8ffab4e3cfaaccb",
+      "workflow_revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af",
+      "conclusion": "success",
+      "image": "ghcr.io/fredrir/pyparser-review@sha256:9717c178e5a87cdb51b4dbd0b0d2559606848bb46bd488aacd8ac7fb10c58eea",
+      "infra_revision": "c034148ae6ca913585e0b0720a38803b8ef8e81b",
+      "check_budget_seconds": 10,
+      "aggregate_check_seconds": 9.836192857,
+      "stages": [
+        {
+          "name": "parser-python",
+          "duration_seconds": 2.612356891,
+          "started": "2026-09-28T11:09:26.134367253Z",
+          "success": true
+        },
+        {
+          "name": "parser-ui",
+          "duration_seconds": 2.958983788,
+          "started": "2026-09-28T11:09:28.992252456Z",
+          "success": true
+        },
+        {
+          "name": "vulnerability-scan",
+          "duration_seconds": 1.527523711,
+          "started": "2026-09-28T11:16:23.108946848Z",
+          "success": true
+        },
+        {
+          "name": "provenance-verification",
+          "duration_seconds": 2.737328467,
+          "started": "2026-09-28T11:16:31.82399768Z",
+          "success": true
+        }
+      ],
+      "reused_same_source_test_results": [
+        "parser-python",
+        "parser-ui"
+      ],
+      "qualification_scope": "One targeted warm retry passed with the same source, checks and ten-second aggregate budget."
+    },
+    "failed_application_attempts": [
+      {
+        "run_id": 36411665644,
+        "attempt": 1,
+        "source_revision": "5413a07678a5254f618d5b313a86078ddc29845a",
+        "aggregate_check_seconds": 10.017788816,
+        "budget_seconds": 10,
+        "failed_stage": "provenance-verification",
+        "reason": "Verification exhausted the remaining aggregate budget.",
+        "deployment_requested": false
+      },
+      {
+        "run_id": 36413527046,
+        "attempt": 1,
+        "source_revision": "a5967052592b908d855b1e7ed8ffab4e3cfaaccb",
+        "aggregate_check_seconds": 10.0119456,
+        "budget_seconds": 10,
+        "failed_stage": "provenance-verification",
+        "reason": "Verification exhausted the remaining aggregate budget.",
+        "deployment_requested": false
+      }
+    ],
+    "private_image_preflight": {
+      "checked_at": "2026-09-28T11:19:43.624242+00:00",
+      "authenticated_pull": true,
+      "uid": 10001,
+      "gid": 10001,
+      "permission_checks": {
+        "/app": {
+          "files_readable": 547,
+          "directories_traversable": 50
+        },
+        "/opt/docling-models": {
+          "files_readable": 143,
+          "directories_traversable": 53
+        },
+        "modes": {
+          "/app/pyproject.toml": "0o644",
+          "/app/uv.lock": "0o644",
+          "/app/alembic.ini": "0o644",
+          "/app/llm-providers.toml": "0o644",
+          "/app/src/pyparser/__init__.py": "0o644",
+          "/app/src/pyparser/review/static/index.html": "0o644"
+        },
+        "python_import_and_ui_entrypoint": "pass"
+      },
+      "network": "none",
+      "capabilities": "none",
+      "read_only_root": true,
+      "limits": [
+        "No database-backed worker startup or model generation ran locally."
+      ]
+    },
+    "production": {
+      "observed_at": "2026-09-28T11:25:04.682518+00:00",
+      "deployments": [
+        {
+          "name": "review",
+          "generation": 143,
+          "observed_generation": 143,
+          "desired": 1,
+          "replicas": 1,
+          "updated": 1,
+          "ready": 1,
+          "available": 1,
+          "unavailable": 0
+        },
+        {
+          "name": "worker-extract",
+          "generation": 143,
+          "observed_generation": 143,
+          "desired": 1,
+          "replicas": 1,
+          "updated": 1,
+          "ready": 1,
+          "available": 1,
+          "unavailable": 0
+        },
+        {
+          "name": "worker-light",
+          "generation": 143,
+          "observed_generation": 143,
+          "desired": 1,
+          "replicas": 1,
+          "updated": 1,
+          "ready": 1,
+          "available": 1,
+          "unavailable": 0
+        }
+      ],
+      "pods": [
+        {
+          "deployment": "review",
+          "name": "review-688ccfb74d-t48rx",
+          "uid": "9b631e07-3501-4c5e-add8-d791a0d73c5c",
+          "created_at": "2026-09-28T11:23:15Z",
+          "phase": "Running",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "ghcr.io/fredrir/pyparser-review@sha256:9717c178e5a87cdb51b4dbd0b0d2559606848bb46bd488aacd8ac7fb10c58eea"
+        },
+        {
+          "deployment": "worker-extract",
+          "name": "worker-extract-846bf75757-m7lqt",
+          "uid": "d844d413-3f8b-4b19-ba48-40041c29c764",
+          "created_at": "2026-09-28T11:23:16Z",
+          "phase": "Running",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "ghcr.io/fredrir/pyparser-review@sha256:9717c178e5a87cdb51b4dbd0b0d2559606848bb46bd488aacd8ac7fb10c58eea"
+        },
+        {
+          "deployment": "worker-light",
+          "name": "worker-light-c7b59f97b-x2cx9",
+          "uid": "53cc9b96-b03a-4ce5-8b7a-6f7adeef1f71",
+          "created_at": "2026-09-28T11:23:16Z",
+          "phase": "Running",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "ghcr.io/fredrir/pyparser-review@sha256:9717c178e5a87cdb51b4dbd0b0d2559606848bb46bd488aacd8ac7fb10c58eea"
+        }
+      ],
+      "flux": {
+        "observed_at": "2026-09-28T11:26:16.648567+00:00",
+        "kustomizations": [
+          {
+            "name": "llunde-pyparser-application",
+            "generation": 2,
+            "observed_generation": 2,
+            "ready": "True",
+            "revision": "latest@sha256:7323b7f74d31443bf8e2dc56230f7f2ebcb9a3481e4369ec83be9e428f898881"
+          },
+          {
+            "name": "llunde-pyparser-migration",
+            "generation": 2,
+            "observed_generation": 2,
+            "ready": "True",
+            "revision": "latest@sha256:7323b7f74d31443bf8e2dc56230f7f2ebcb9a3481e4369ec83be9e428f898881"
+          },
+          {
+            "name": "project-llunde-pyparser",
+            "generation": 28,
+            "observed_generation": 28,
+            "ready": "True",
+            "revision": "latest@sha256:7323b7f74d31443bf8e2dc56230f7f2ebcb9a3481e4369ec83be9e428f898881"
+          }
+        ]
+      }
+    }
   },
   "limits": [
     "Local backend and worker smokes do not start database-backed services; production deployment availability is recorded separately.",
