@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "observed_at": "2026-09-27T23:22:26.889682+00:00",
+  "observed_at": "2026-09-28T00:13:54.599271+00:00",
   "server_revision": "05b18fb1bc3d99c3b24739132fd4f73996b3487a",
   "client_revision": "d64513f84897261a441b0e189c80f89216f8685d",
   "deployment": {
@@ -538,7 +538,18 @@
       "eligible": 0,
       "deferred": 0
     },
-    "scheduled_execution": "pending"
+    "scheduled_execution": "pending",
+    "reconcile_schedule_history": {
+      "removed_commit": "b238659f",
+      "removed_at": "2026-09-25T19:45:55Z",
+      "meaning": "Later absence of reconcile schedule events is expected and does not establish a repository scheduling outage."
+    },
+    "controls_verified": {
+      "repository_default_branch": "main",
+      "actions_enabled": true,
+      "workflow_state": "active",
+      "schedule": "7,22,37,52 * * * *"
+    }
   },
   "release_reader": {
     "live_enrollment": "not_exercised",
@@ -547,8 +558,478 @@
     "ruleset_enforcement": "active"
   },
   "limitations": [
-    "The qualified hosted fast check includes 17 remote hits; the earlier d41 fully cold 25-test run exceeded 10 seconds. A separate local four-CPU 160ms cold 25-test run passed in 4.894 seconds.",
+    "A forced uncached full hosted suite exceeded the unchanged ten-second fast-check budget in all three probes. The final run stopped at 10.200 seconds with 23 of 30 shard results emitted and no cached results; full declarations took 5.723 seconds and the aggregate gate did not pass. Ordinary writer and reader qualifications are recorded separately.",
+    "The local WAN replay used four distinct physical Ryzen cores; the hosted runner provides four logical threads on two EPYC cores. The local timing is not equivalent hosted budget proof.",
     "The release-reader identity is installed and constrained to protected release tags; no release was published for this qualification.",
+    "No scheduled cleanup execution has been observed. The manual preview succeeded and repository/workflow schedule controls are enabled.",
     "PR153 remains open for a full infrastructure plan after credential rotation; temporary qualification workflows and nonce require removal after that validation."
-  ]
+  ],
+  "local_hosted_cpu_comparison": {
+    "local_model": "AMD Ryzen 7 9800X3D",
+    "prior_wan_replay_affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "prior_wan_replay_physical_cores": 4,
+    "prior_wan_replay_logical_cpus": 4,
+    "hosted_model": "AMD EPYC 7763",
+    "hosted_physical_cores": 2,
+    "hosted_logical_cpus": 4,
+    "hosted_cgroup_cpu_quota": "unlimited",
+    "conclusion": "Equal logical CPU counts did not provide equal physical cores or processor performance; local WAN replay is not hosted budget proof."
+  },
+  "host_playbook_graph": {
+    "source_commit": "d5866207539a346ac4445458df77bcebdc60bd49",
+    "landed_commit": "fdba921e7a4899daf5ff1215fb33ea26e9c6b51b",
+    "evidence": "build/evidence/host-playbook-graph-cost.json",
+    "change": "Read each role dependency once within one graph load; later graph loads still reread changed files.",
+    "local_twenty_execution_median_wall_seconds": {
+      "before": 2.539177157999802,
+      "after": 1.59495703399989
+    },
+    "budget_seconds": 10,
+    "budget_changed": false,
+    "hosted_diagnostic": {
+      "before_run": "https://github.com/fredrir/infra/actions/runs/36360165796",
+      "after_run": "https://github.com/fredrir/infra/actions/runs/36360819123",
+      "role_closure_seconds": {
+        "before": 1.68,
+        "after": 0.29
+      },
+      "external_input_mapping_seconds": {
+        "before": 0.6,
+        "after": 0.35
+      },
+      "mutation_regression": "passed",
+      "scope": "Separate post-failure diagnostic subset; scheduling differs and these timings do not replace the failed full-suite budget receipts."
+    }
+  },
+  "hosted_cold_checks": [
+    {
+      "run": "https://github.com/fredrir/infra/actions/runs/36359333091",
+      "forced_uncached_test_results": true,
+      "host": {
+        "schema": 1,
+        "nproc": 4,
+        "affinity": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "cpu": {
+          "CPU(s)": "4",
+          "On-line CPU(s) list": "0-3",
+          "Model name": "AMD EPYC 7763 64-Core Processor",
+          "Thread(s) per core": "2",
+          "Core(s) per socket": "2",
+          "Socket(s)": "1"
+        },
+        "cgroup_limits_nearest_first": [
+          {
+            "cpu.max": "max 100000",
+            "cpuset.cpus.effective": "0-3"
+          },
+          {
+            "cpu.max": "max 100000",
+            "cpuset.cpus.effective": "0-3"
+          },
+          {
+            "cpuset.cpus.effective": "0-3"
+          }
+        ]
+      },
+      "qualification": {
+        "schema": 1,
+        "targets": [
+          "//:gazelle_test",
+          "//internal/artifact:artifact_test",
+          "//internal/ci:ci_test",
+          "//internal/cli:cli_test",
+          "//internal/contracts:contracts_test",
+          "//internal/deployment:deployment_test",
+          "//internal/dev:dev_test",
+          "//internal/enrollment:enrollment_test",
+          "//internal/fluxartifacts:fluxartifacts_test",
+          "//internal/images:images_test",
+          "//internal/kata:kata_test",
+          "//internal/kustomize:kustomize_test",
+          "//internal/netpolgate:netpolgate_test",
+          "//internal/objectstore:objectstore_test",
+          "//internal/operations:operations_test",
+          "//internal/packages:packages_test",
+          "//internal/pipeline:pipeline_test",
+          "//internal/platformops:platformops_test",
+          "//internal/policy:policy_test",
+          "//internal/process:process_test",
+          "//internal/projects:projects_test",
+          "//internal/provenance:provenance_test",
+          "//internal/reconcile:reconcile_test",
+          "//internal/reconciler:reconciler_test",
+          "//internal/release:release_test"
+        ],
+        "test_results": 21,
+        "cached_results": 0,
+        "duration_seconds": 10.253040433,
+        "passed": false
+      },
+      "fast_ledger": {
+        "schema": 1,
+        "stage": "infra-fast",
+        "revision": "a0df2427d79e34d46d3dc5e6552230dedd2fd0c7",
+        "started": "2026-09-27T23:38:53.491681621Z",
+        "duration_seconds": 10.253040433,
+        "budget_seconds": 10,
+        "budget_exceeded": true,
+        "success": false,
+        "exit_code": 1,
+        "cpu_seconds": 0.049663,
+        "peak_memory_bytes": 24231936,
+        "error": "infra failed: context deadline exceeded\ninfra-fast exceeded 10s budget"
+      },
+      "declarations_ledger": {
+        "schema": 1,
+        "stage": "declarations",
+        "revision": "a0df2427d79e34d46d3dc5e6552230dedd2fd0c7",
+        "started": "2026-09-27T23:38:55.125137662Z",
+        "duration_seconds": 5.544668779,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 14.98,
+        "peak_memory_bytes": 587669504
+      },
+      "aggregate_gate": "skipped_after_failed_fast_check"
+    },
+    {
+      "run": "https://github.com/fredrir/infra/actions/runs/36360165796",
+      "forced_uncached_test_results": true,
+      "host": {
+        "schema": 1,
+        "nproc": 4,
+        "affinity": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "cpu": {
+          "CPU(s)": "4",
+          "On-line CPU(s) list": "0-3",
+          "Model name": "AMD EPYC 7763 64-Core Processor",
+          "Thread(s) per core": "2",
+          "Core(s) per socket": "2",
+          "Socket(s)": "1"
+        },
+        "cgroup_limits_nearest_first": [
+          {
+            "cpu.max": "max 100000",
+            "cpuset.cpus.effective": "0-3"
+          },
+          {
+            "cpu.max": "max 100000",
+            "cpuset.cpus.effective": "0-3"
+          },
+          {
+            "cpuset.cpus.effective": "0-3"
+          }
+        ]
+      },
+      "qualification": {
+        "schema": 1,
+        "targets": [
+          "//:gazelle_test",
+          "//internal/artifact:artifact_test",
+          "//internal/ci:ci_test",
+          "//internal/cli:cli_test",
+          "//internal/contracts:contracts_test",
+          "//internal/deployment:deployment_test",
+          "//internal/dev:dev_test",
+          "//internal/enrollment:enrollment_test",
+          "//internal/fluxartifacts:fluxartifacts_test",
+          "//internal/images:images_test",
+          "//internal/kata:kata_test",
+          "//internal/kustomize:kustomize_test",
+          "//internal/netpolgate:netpolgate_test",
+          "//internal/objectstore:objectstore_test",
+          "//internal/operations:operations_test",
+          "//internal/packages:packages_test",
+          "//internal/pipeline:pipeline_test",
+          "//internal/platformops:platformops_test",
+          "//internal/policy:policy_test",
+          "//internal/process:process_test",
+          "//internal/projects:projects_test",
+          "//internal/provenance:provenance_test",
+          "//internal/reconcile:reconcile_test",
+          "//internal/reconciler:reconciler_test",
+          "//internal/release:release_test"
+        ],
+        "test_results": 24,
+        "cached_results": 0,
+        "duration_seconds": 10.248634716,
+        "passed": false
+      },
+      "fast_ledger": {
+        "schema": 1,
+        "stage": "infra-fast",
+        "revision": "e9ca0e58315d8053ace081c1c91611b6afbee21b",
+        "started": "2026-09-27T23:54:38.884327713Z",
+        "duration_seconds": 10.248634716,
+        "budget_seconds": 10,
+        "budget_exceeded": true,
+        "success": false,
+        "exit_code": 1,
+        "cpu_seconds": 0.048213,
+        "peak_memory_bytes": 23695360,
+        "error": "infra failed: context deadline exceeded\ninfra-fast exceeded 10s budget"
+      },
+      "declarations_ledger": {
+        "schema": 1,
+        "stage": "declarations",
+        "revision": "e9ca0e58315d8053ace081c1c91611b6afbee21b",
+        "started": "2026-09-27T23:53:59.483351459Z",
+        "duration_seconds": 5.658315332,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 15.34,
+        "peak_memory_bytes": 595603456
+      },
+      "aggregate_gate": "skipped_after_failed_fast_check"
+    },
+    {
+      "run": "https://github.com/fredrir/infra/actions/runs/36360819123",
+      "forced_uncached_test_results": true,
+      "host": {
+        "schema": 1,
+        "nproc": 4,
+        "affinity": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "cpu": {
+          "CPU(s)": "4",
+          "On-line CPU(s) list": "0-3",
+          "Model name": "AMD EPYC 7763 64-Core Processor",
+          "Thread(s) per core": "2",
+          "Core(s) per socket": "2",
+          "Socket(s)": "1"
+        },
+        "cgroup_limits_nearest_first": [
+          {
+            "cpu.max": "max 100000",
+            "cpuset.cpus.effective": "0-3"
+          },
+          {
+            "cpu.max": "max 100000",
+            "cpuset.cpus.effective": "0-3"
+          },
+          {
+            "cpuset.cpus.effective": "0-3"
+          }
+        ]
+      },
+      "qualification": {
+        "schema": 1,
+        "targets": [
+          "//:gazelle_test",
+          "//internal/artifact:artifact_test",
+          "//internal/ci:ci_test",
+          "//internal/cli:cli_test",
+          "//internal/contracts:contracts_test",
+          "//internal/deployment:deployment_test",
+          "//internal/dev:dev_test",
+          "//internal/enrollment:enrollment_test",
+          "//internal/fluxartifacts:fluxartifacts_test",
+          "//internal/images:images_test",
+          "//internal/kata:kata_test",
+          "//internal/kustomize:kustomize_test",
+          "//internal/netpolgate:netpolgate_test",
+          "//internal/objectstore:objectstore_test",
+          "//internal/operations:operations_test",
+          "//internal/packages:packages_test",
+          "//internal/pipeline:pipeline_test",
+          "//internal/platformops:platformops_test",
+          "//internal/policy:policy_test",
+          "//internal/process:process_test",
+          "//internal/projects:projects_test",
+          "//internal/provenance:provenance_test",
+          "//internal/reconcile:reconcile_test",
+          "//internal/reconciler:reconciler_test",
+          "//internal/release:release_test"
+        ],
+        "test_results": 23,
+        "cached_results": 0,
+        "duration_seconds": 10.200030289,
+        "passed": false
+      },
+      "fast_ledger": {
+        "schema": 1,
+        "stage": "infra-fast",
+        "revision": "fdba921e7a4899daf5ff1215fb33ea26e9c6b51b",
+        "started": "2026-09-28T00:06:22.91315406Z",
+        "duration_seconds": 10.200030289,
+        "budget_seconds": 10,
+        "budget_exceeded": true,
+        "success": false,
+        "exit_code": 1,
+        "cpu_seconds": 0.048031,
+        "peak_memory_bytes": 24305664,
+        "error": "infra failed: context deadline exceeded\ninfra-fast exceeded 10s budget"
+      },
+      "declarations_ledger": {
+        "schema": 1,
+        "stage": "declarations",
+        "revision": "fdba921e7a4899daf5ff1215fb33ea26e9c6b51b",
+        "started": "2026-09-28T00:06:13.28462862Z",
+        "duration_seconds": 5.722948591,
+        "budget_seconds": 10,
+        "budget_exceeded": false,
+        "success": true,
+        "exit_code": 0,
+        "cpu_seconds": 15.14,
+        "peak_memory_bytes": 587259904
+      },
+      "aggregate_gate": "skipped_after_failed_fast_check"
+    }
+  ],
+  "ordinary_main_after_graph_memo": {
+    "run": "https://github.com/fredrir/infra/actions/runs/36360812868",
+    "revision": "fdba921e7a4899daf5ff1215fb33ea26e9c6b51b",
+    "attempt": 1,
+    "conclusion": "success",
+    "rerun": false,
+    "jobs": {
+      "cli": 108737510096,
+      "check": 108737648117,
+      "aggregate_budget": 108737931096
+    },
+    "cli": {
+      "elapsed_seconds": 22.227,
+      "remote_cache_hits": 740,
+      "internal_actions": 84,
+      "local_executions": 3,
+      "cache_warnings": 0
+    },
+    "prepare": {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 953,
+        "remote_cache_hits": 834,
+        "system_network_bytes_sent": 6595959,
+        "system_network_bytes_received": 623352001
+      },
+      "operation": "prepare-check",
+      "targets": [
+        "//cmd/infra:infra",
+        "//cmd/infra:infra_lib",
+        "//internal/cli:cli",
+        "//internal/cli:cli_test",
+        "//internal/reconcile:reconcile",
+        "//internal/reconcile:reconcile_test",
+        "//internal/reconciler:reconciler",
+        "//internal/reconciler:reconciler_test",
+        "//:gazelle_test"
+      ],
+      "started": "2026-09-28T00:05:42.251597684Z",
+      "duration_seconds": 57.883257344,
+      "success": true,
+      "remote_cache": "used"
+    },
+    "fast": {
+      "schema": 1,
+      "metrics": {
+        "actions_executed": 7,
+        "local_cache_hits": 6,
+        "remote_cache_hits": 2,
+        "system_network_bytes_sent": 7181647,
+        "system_network_bytes_received": 623711535
+      },
+      "operation": "test",
+      "targets": [
+        "//cmd/infra:infra",
+        "//cmd/infra:infra_lib",
+        "//internal/cli:cli",
+        "//internal/cli:cli_test",
+        "//internal/reconcile:reconcile",
+        "//internal/reconcile:reconcile_test",
+        "//internal/reconciler:reconciler",
+        "//internal/reconciler:reconciler_test",
+        "//:gazelle_test"
+      ],
+      "started": "2026-09-28T00:06:40.158426356Z",
+      "duration_seconds": 4.288800633,
+      "success": true,
+      "remote_cache": "used"
+    },
+    "fast_ledger": {
+      "schema": 1,
+      "stage": "infra-fast",
+      "revision": "fdba921e7a4899daf5ff1215fb33ea26e9c6b51b",
+      "started": "2026-09-28T00:06:40.153706614Z",
+      "duration_seconds": 4.295206736,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.081417,
+      "peak_memory_bytes": 24195072
+    },
+    "declarations_ledger": {
+      "schema": 1,
+      "stage": "declarations",
+      "revision": "fdba921e7a4899daf5ff1215fb33ea26e9c6b51b",
+      "started": "2026-09-28T00:05:33.361206073Z",
+      "duration_seconds": 0.032762972,
+      "budget_seconds": 10,
+      "budget_exceeded": false,
+      "success": true,
+      "exit_code": 0,
+      "cpu_seconds": 0.03,
+      "peak_memory_bytes": 39784448
+    },
+    "aggregate": {
+      "schema": 1,
+      "accounting": "sum-of-recorded-check-durations",
+      "budget_seconds": 10,
+      "duration_seconds": 4.3279697079999995,
+      "remaining_seconds": 5.6720302920000005,
+      "success": true,
+      "stages": [
+        {
+          "schema": 1,
+          "stage": "declarations",
+          "revision": "fdba921e7a4899daf5ff1215fb33ea26e9c6b51b",
+          "started": "2026-09-28T00:05:33.361206073Z",
+          "duration_seconds": 0.032762972,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.03,
+          "peak_memory_bytes": 39784448
+        },
+        {
+          "schema": 1,
+          "stage": "infra-fast",
+          "revision": "fdba921e7a4899daf5ff1215fb33ea26e9c6b51b",
+          "started": "2026-09-28T00:06:40.153706614Z",
+          "duration_seconds": 4.295206736,
+          "budget_seconds": 10,
+          "budget_exceeded": false,
+          "success": true,
+          "exit_code": 0,
+          "cpu_seconds": 0.081417,
+          "peak_memory_bytes": 24195072
+        }
+      ]
+    },
+    "scope": "Ordinary push selection with reusable test results; this successful run does not replace the failed forced-cold full-suite measurements."
+  }
 }
