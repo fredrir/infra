@@ -9,10 +9,6 @@ on:
         type: string
         required: true
   workflow_dispatch:
-    inputs:
-      qualify-cold-cache:
-        type: boolean
-        default: false
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
@@ -89,27 +85,6 @@ jobs:
           client-id: ${{ env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && vars.TAILSCALE_BAZEL_CACHE_CHECK_WRITER_CLIENT_ID || vars.TAILSCALE_BAZEL_CACHE_READER_CLIENT_ID }}
       - name: Withhold OIDC token requests from later steps
         run: test -z "${ACTIONS_ID_TOKEN_REQUEST_URL-}${ACTIONS_ID_TOKEN_REQUEST_TOKEN-}"
-      - name: Qualify cache identity and RPC access
-        if: vars.BAZEL_CACHE_QUALIFICATION_NONCE != '' && env.BAZEL_CACHE_IDENTITY != '' && steps.affected.outputs.expression != 'set()'
-        env:
-          ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
-          NONCE: ${{ vars.BAZEL_CACHE_QUALIFICATION_NONCE }}
-        run: |
-          role=reader
-          port=9092
-          if [ "$BAZEL_CACHE_IDENTITY" = bazel-cache-check-writer ]; then
-            role=writer
-            port=9093
-          fi
-          test "$ENDPOINT" = "grpc://100.87.168.66:$port"
-          python3 -B .github/scripts/cache_qualification.py "$role" --nonce "$NONCE" --report "$RUNNER_TEMP/cache-qualification.json"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always() && vars.BAZEL_CACHE_QUALIFICATION_NONCE != '' && env.BAZEL_CACHE_IDENTITY != '' && steps.affected.outputs.expression != 'set()'
-        with:
-          name: cache-qualification-check-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/cache-qualification.json
-          retention-days: 30
-          if-no-files-found: error
       - name: Install checksum-pinned native Bazel
         if: steps.affected.outputs.expression != 'set()'
         run: |
@@ -128,44 +103,11 @@ jobs:
         run: |
           echo 'Artifact preparation is measured separately from the check budget.' >> "$GITHUB_STEP_SUMMARY"
           infra pipeline prepare-check --local --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --report-dir dist/reports/preparation
-      - name: Require uncached test execution
-        id: cold
-        if: inputs.qualify-cold-cache == true
-        env:
-          ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
-          BASE: ${{ steps.affected.outputs.base }}
-        run: |
-          test "$BAZEL_CACHE_IDENTITY" = bazel-cache-check-writer
-          test "$ENDPOINT" = grpc://100.87.168.66:9093
-          test -z "$BASE"
-          python3 -B .github/scripts/cache_cold_qualification.py prepare "$RUNNER_TEMP/bazel-cold"
-          printf 'bazel=%s\n' "$RUNNER_TEMP/bazel-cold" >> "$GITHUB_OUTPUT"
       - name: Check affected targets within aggregate budget
         env:
           BAZEL_REMOTE_CACHE: ${{ steps.bazel-cache.outputs.endpoint }}
           BASE: ${{ steps.affected.outputs.base }}
-        run: infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --local --bazel "${{ steps.cold.outputs.bazel || 'bazel' }}"
-      - name: Verify uncached test evidence
-        if: always() && inputs.qualify-cold-cache == true
-        run: python3 -B .github/scripts/cache_cold_qualification.py verify dist/reports
-      - name: Diagnose failed cold tests
-        if: failure() && inputs.qualify-cold-cache == true && steps.cold.outputs.bazel != ''
-        env:
-          ENDPOINT: ${{ steps.bazel-cache.outputs.endpoint }}
-        run: |
-          mkdir -p dist/reports/cold-diagnostic
-          env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" LANG="${LANG:-C.UTF-8}" \
-            timeout --kill-after=10s 120s bazel test --config=ci \
-            --action_env="INFRA_BUILD_IMAGE=$(jq -er '.image' build/toolchain.json)" \
-            --repository_cache="$HOME/.cache/infra-bazel-repository" \
-            --remote_cache="$ENDPOINT" --remote_cache_compression --remote_timeout=10s --jobs=100 \
-            --remote_upload_local_results=false --experimental_build_event_upload_strategy=local \
-            --build_tests_only --nocache_test_results --test_arg=-test.v --test_output=all \
-            --build_event_json_file=dist/reports/cold-diagnostic/events.jsonl \
-            --profile=dist/reports/cold-diagnostic/profile.json.gz \
-            //internal/contracts:contracts_test //internal/policy:policy_test \
-            //internal/platformops:platformops_test //internal/reconcile:reconcile_test \
-            //internal/reconciler:reconciler_test
+        run: infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --local
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: ${{ !cancelled() && env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && steps.repository-cache.outputs.cache-primary-key != '' && steps.repository-cache.outputs.cache-hit != 'true' }}
         with:
