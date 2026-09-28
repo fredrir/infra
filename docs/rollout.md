@@ -1,85 +1,51 @@
 # Infrastructure rollout
 
-| Stage            | Requirement                                                                | Repository action                                                                   |
-| ---------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Source           | Go, Bazel, native policy and workflow checks pass                          | Merge the reviewed source revision                                                  |
-| CLI release      | Protected `infra-v*` tags; tag commit belongs to `main`                    | Apply [tag rules](../.github/cli-tags-ruleset.json), then publish an `infra-v*` tag |
-| Binary trust     | Release attestation, source revision and manifest SHA-256 agree            | Install the exact platform artifact; retain the previous binary                     |
-| Images           | Published digest, scan and provenance; compiled CLI included               | Promote tools and runner image pins                                                 |
-| External callers | Exact reviewed workflow SHA; matching OctoSTS policy; native test commands | Apply each repository patch from `build/rollout` after its expected blobs match     |
-| VM engines       | Dedicated trusted VM, native qualification and registered runner           | Apply `ansible/build-runners.yml`; enable the qualified pool explicitly             |
-| Retirement       | All callers moved; old jobs drained; rollback data retained                | Remove legacy runner and Attic service resources                                    |
+| Stage | Requirement | Action |
+| --- | --- | --- |
+| Source | Reviewed, owner-signed changes; relevant local checks pass | Push to `main` |
+| Reconciliation | Hosted checks and images pass; provenance and apply gates pass | `fredrir-11` reconciles `main` and publishes `production`; [runbook](runbook.md#reconciler-host) |
+| CLI release | Source belongs to `main`; protected, signed `infra-v*` tag | Publish four platform binaries through `cli-release.yml` |
+| Binary trust | Hosted provenance binds the asset to the expected workflow, source and tag; SHA-256 matches | Verify before installation; retain a verified recovery copy until qualification completes |
+| CLI pin | Verified tag, revision, Linux amd64 SHA-256 and matching input digest | Update [`build/cli-release.json`](../build/cli-release.json); use the [input producer](../.github/actions/cli-inputs/action.yml) |
+| Build VM | Per-repository accounts, engines and caches | Normal reconciliation installs the CLI and converges runner services |
+| Reconciler CLI | Reviewed release pin | Administrator applies only `infra_binary` on `fredrir-11` |
+| Images | Published digest, vulnerability checks and provenance | Promote immutable image pins and verify ready workloads |
+| External callers | Exact reviewed workflow SHA and matching OctoSTS claims | Update each caller and trust policy together; verify its actual build and deployment |
 
-## Applied cutover
+## CLI installation
 
-| Name              | Value                                                                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Source revision   | `b2c97f0c98c09099d19696089e55f1e95bd6ac1d`                                                                                     |
-| External patches  | Applied to ten repositories: nine caller workflows and five trust policies; [receipt](../build/evidence/consumer-cutover.json) |
-| Concurrency guard | Expected Git blob for every external file; refresh mismatches before applying                                                  |
-| Test migration    | Native Dagger stage checks replace the removed shell helper                                                                    |
-| Rollback overlap  | Exact previous and new workflow SHAs accepted; remove previous SHAs after old jobs drain and rollback closes                   |
+The release manifest and checksums must be authenticated before these commands. Read the revision and Linux amd64 digest from the verified pin; a checksum beside an unauthenticated binary is insufficient.
 
 ```sh
-git -C "$CONSUMER_CHECKOUT" apply --check "$INFRA_CHECKOUT/build/rollout/$REPOSITORY.patch"
+infra artifact install \
+  --url "$INFRA_BINARY_URL" \
+  --revision "$INFRA_REVISION" \
+  --sha256 "$INFRA_SHA256" \
+  --platform linux/amd64 \
+  --destination "$HOME/.local/bin/infra"
+
+(cd ansible && ansible-playbook reconciler.yml --limit fredrir-11 --tags infra_binary)
 ```
 
-## Production receipts
+The reconciler playbook is an administrator operation; ordinary reconciliation does not install that role. The binary role removes superseded cache revisions. Pause the timers during an administrative replacement, let active services finish, then restore their prior state and verify a subsequent apply and full verification.
 
-| Name              | Value                                                                                                                           |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Released CLI      | [`infra-v0.1.1`](https://github.com/fredrir/infra/releases/tag/infra-v0.1.1); source `a284f912fa9c5febe375a5b6743db4598b29477c` |
-| Backup host CLI   | [`infra-v0.1.0`](https://github.com/fredrir/infra/releases/tag/infra-v0.1.0); source `73a5ca2e6b88b40a6f8c55deae12af4a3e058c78` |
-| Linux host binary | SHA-256 `c37acf10dd13009f61374b9fce811877b2a40c33b34a600a67e0c9e9dc39d0c1`                                                      |
-| Control backup    | `fredrir-07`; Go command completed successfully on 2026-09-20 at 17:05:08 UTC                                                   |
-| Go tools image    | `ghcr.io/fredrir/platform-backup-tools@sha256:fae5ec1e022274171e39c2b999c49a7f04668aa772db5d8a8cefe7ecab2b5107`                 |
-| Monitoring        | Gatus healthy; retired cache endpoint removed; backup heartbeats retained                                                       |
-| Build execution   | GitHub-hosted Dagger; dedicated VM pool awaits native qualification                                                             |
-
-## Tools and hosts
+## Image promotion
 
 ```sh
 infra platform promote-tools --image "$VERIFIED_TOOLS_IMAGE"
 infra platform promote-tools --image "$VERIFIED_TOOLS_IMAGE" --apply
 git diff -- platform
-
-ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook \
-  -i "$HOST_INVENTORY" ansible/infra-cli.yml \
-  -e "infra_binary_url=$INFRA_BINARY_URL" \
-  -e "infra_binary_revision=$INFRA_REVISION" \
-  -e "infra_binary_sha256=$INFRA_SHA256"
 ```
 
-`VERIFIED_TOOLS_IMAGE` must be a published `ghcr.io/fredrir/platform-backup-tools@sha256:...` reference. Local OCI exports demonstrate build behavior; their digests are not published deployment artifacts.
+`VERIFIED_TOOLS_IMAGE` must be a published `ghcr.io/fredrir/platform-backup-tools@sha256:...` reference. For private images, use the dedicated registry reader for preflight checks; validate application files and entry points under the production UID before deployment.
 
-## Legacy retirement
+## Qualification records
 
-| Resource                                  | Cutover condition                                                                | Retention                                                                   |
-| ----------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Attic reader credentials                  | Infrastructure checks use Bazel; no remaining Nix callers                        | Previous workflow/image pins for rollback                                   |
-| Attic StatefulSet, Service and tunnel     | StatefulSet scaled to zero; Service and tunnel retired                           | Attic namespace, PVC, local data and backups until rollback window closes   |
-| Attic monitoring                          | Service retirement approved                                                      | Re-encrypt Gatus configuration with SOPS; keep its integrity metadata valid |
-| Attic provider resources                  | Reviewed OpenTofu plan                                                           | Preserve backup objects; resolve `prevent_destroy` explicitly               |
-| Legacy platform scripts                   | Published Go tools image promoted with commands                                  | Remove their ConfigMap generators and source files in the same change       |
+| Check | Evidence |
+| --- | --- |
+| Cache access, protected release, ordinary checks and uncached limits | [Bazel cache qualification](../build/evidence/bazel-cache-ci.json) |
+| Build VM isolation | [Repository isolation](../build/evidence/build-vm-repository-isolation.json) |
+| Application file permissions, images and parser publication | [Consumer rollout](../build/evidence/consumer-source-mode-rollout.json) |
+| Flux ownership and measured deployment latency | [Flux qualification](../build/evidence/flux-artifact-qualification.json) |
 
-The current Flux cache Kustomization uses `prune: true`. Retain the `nix-cache` namespace, PVC and backup objects; remove workload, network and tunnel resources separately.
-
-## Evidence
-
-| Check                                   | Evidence                                                                                                                                        |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hosted Bazel and declarations           | [Full check](https://github.com/fredrir/infra/actions/runs/35526426207): 16 tests, generated BUILD files and infrastructure declarations passed |
-| Production health and native operations | [Production receipt](../build/evidence/production-rollout.json)                                                                                 |
-| CLI cross-compilation                   | [Four-platform build receipts](../build/evidence/cli-crossbuild.json)                                                                           |
-| Changed-source Dagger reuse             | [Persistent action-cache experiment](../build/evidence/dagger-disk-cache-linux-amd64.json)                                                      |
-| Independent Bazel cache reuse           | [Cold and warm action-cache experiment](../build/evidence/bazel-cache-linux-amd64.json)                                                         |
-| Native Linux quality                    | [Race tests and vet at the recorded revision](../build/evidence/go-validation-linux-amd64.json)                                                 |
-| Signed package installation             | [Debian, Fedora and Alpine qualification](../build/evidence/packages-linux-amd64.json)                                                          |
-| External source state                   | [Applied consumer cutover](../build/evidence/consumer-cutover.json); original [consumer inventory](../build/consumers.json)                     |
-
-| Deferred validation                                 | Gate                                                       |
-| --------------------------------------------------- | ---------------------------------------------------------- |
-| Full Kata/QEMU/kernel rebuild                       | Dedicated engine and explicit time budget                  |
-| Native ARM execution                                | Qualified ARM host                                         |
-| Full production restore and Kata runtime activation | Restore evidence and qualified runtime host                |
-| VM pool activation                                  | Qualified dedicated VM; hosted execution remains available |
+The receipts distinguish successful ordinary checks from forced uncached timings, and observed rollout latency from target latency. Native ARM execution, full production restore and Kata runtime activation require their own qualification.
