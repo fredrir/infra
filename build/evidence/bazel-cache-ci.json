@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "observed_at": "2026-09-28T00:15:53.295304+00:00",
+  "observed_at": "2026-09-28T11:01:28.402571+00:00",
   "server_revision": "05b18fb1bc3d99c3b24739132fd4f73996b3487a",
   "client_revision": "d64513f84897261a441b0e189c80f89216f8685d",
   "deployment": {
@@ -30,7 +30,9 @@
     "protected_main": "https://github.com/fredrir/infra/actions/runs/36358000034",
     "reader_pull_request": "https://github.com/fredrir/infra/actions/runs/36358067877",
     "wrong_writer_workflow": "https://github.com/fredrir/infra/actions/runs/36358055840",
-    "reader_pr": "https://github.com/fredrir/infra/pull/153"
+    "reader_pr": "https://github.com/fredrir/infra/pull/153",
+    "protected_release": "https://github.com/fredrir/infra/actions/runs/36412438856",
+    "rotated_reader_pull_request": "https://github.com/fredrir/infra/actions/runs/36409189205"
   },
   "writer_receipts": [
     {
@@ -290,6 +292,85 @@
       "blob_bytes": 58,
       "read_matches": true,
       "passed": true
+    },
+    {
+      "schema": 1,
+      "role": "reader",
+      "nonce": "bc6eb71ef8645468d204cad9965bceb7",
+      "rpc": [
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/Write",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/QueryWriteStatus",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult",
+          "http": "403",
+          "grpc": [],
+          "curl_exit": 0,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9093",
+          "path": "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
+          "http": "000",
+          "grpc": [],
+          "curl_exit": 28,
+          "passed": true
+        },
+        {
+          "address": "100.87.168.66:9092",
+          "path": "/google.bytestream.ByteStream/Read",
+          "http": "200",
+          "grpc": [
+            "0"
+          ],
+          "curl_exit": 0,
+          "passed": true
+        }
+      ],
+      "identity": "bazel-cache-release-reader",
+      "endpoint": "grpc://100.87.168.66:9092",
+      "run_id": "36412438856",
+      "attempt": "1",
+      "revision": "47482af47a5432d68e8de7d961d89ea82cbdc842",
+      "at": "2026-09-28T10:56:46.394791+00:00",
+      "tailnet_ip": "100.84.190.45",
+      "oidc_request_environment_absent": true,
+      "blob_sha256": "e844317d11afa0a0433e6a10abcb5fa6dfbe0526ab37b73c9d66feca492e4370",
+      "blob_bytes": 58,
+      "read_matches": true,
+      "passed": true
     }
   ],
   "negative_writer_workflows": {
@@ -538,7 +619,7 @@
       "eligible": 0,
       "deferred": 0
     },
-    "scheduled_execution": "pending",
+    "scheduled_execution": "verified",
     "reconcile_schedule_history": {
       "removed_commit": "b238659f",
       "removed_at": "2026-09-25T19:45:55Z",
@@ -562,20 +643,156 @@
       "eligible": 0,
       "deferred": 0
     },
-    "live_deletion": "Not exercised: both manual modes examined 13 devices and found zero eligible devices; zero devices were deleted."
+    "live_deletion": "Not exercised: manual preview, manual apply, and both scheduled applies found zero eligible devices and deleted zero devices.",
+    "scheduled_runs": [
+      {
+        "run": "https://github.com/fredrir/infra/actions/runs/36364957359",
+        "id": 36364957359,
+        "event": "schedule",
+        "revision": "46207a5d645a15dab9f4ebbec157709e717fc5ac",
+        "branch": "main",
+        "attempt": 1,
+        "created_at": "2026-09-28T01:10:21Z",
+        "updated_at": "2026-09-28T01:11:12Z",
+        "conclusion": "success",
+        "receipt": {
+          "schema": 1,
+          "writer_tag": "tag:ci-bazel-writer",
+          "at": "2026-09-28T01:11:08.721289+00:00",
+          "apply": true,
+          "minimum_age_seconds": 3600,
+          "devices": [],
+          "examined": 12,
+          "eligible": 0,
+          "deferred": 0
+        }
+      },
+      {
+        "run": "https://github.com/fredrir/infra/actions/runs/36389626171",
+        "id": 36389626171,
+        "event": "schedule",
+        "revision": "46207a5d645a15dab9f4ebbec157709e717fc5ac",
+        "branch": "main",
+        "attempt": 1,
+        "created_at": "2026-09-28T07:03:56Z",
+        "updated_at": "2026-09-28T07:04:14Z",
+        "conclusion": "success",
+        "receipt": {
+          "schema": 1,
+          "writer_tag": "tag:ci-bazel-writer",
+          "at": "2026-09-28T07:04:10.517098+00:00",
+          "apply": true,
+          "minimum_age_seconds": 3600,
+          "devices": [],
+          "examined": 13,
+          "eligible": 0,
+          "deferred": 0
+        }
+      }
+    ],
+    "scheduled_delivery_limit": "Two successful scheduled executions were observed about six hours apart; these receipts do not establish reliable fifteen-minute delivery."
   },
   "release_reader": {
-    "live_enrollment": "not_exercised",
+    "live_enrollment": "qualified",
     "protected_tag_ruleset": 23732515,
     "protected_tag_pattern": "refs/tags/infra-v*",
-    "ruleset_enforcement": "active"
+    "ruleset_enforcement": "active",
+    "tag": "infra-v0.2.20",
+    "revision": "47482af47a5432d68e8de7d961d89ea82cbdc842",
+    "run": "https://github.com/fredrir/infra/actions/runs/36412438856",
+    "run_attempt": 1,
+    "all_four_platforms_passed": true,
+    "published_at": "2026-09-28T10:57:51Z",
+    "release": "https://github.com/fredrir/infra/releases/tag/infra-v0.2.20",
+    "reader_artifact": {
+      "id": 10965460944,
+      "sha256": "c2e348ef8c558c9f35d87016352e84f8143d64fe38db5f468c6262a9abf6a40d"
+    },
+    "server_denials": {
+      "tailnet_ip": "100.84.190.45",
+      "matching_requests": 4,
+      "denied_methods": [
+        "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult",
+        "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs",
+        "/google.bytestream.ByteStream/QueryWriteStatus",
+        "/google.bytestream.ByteStream/Write"
+      ],
+      "reader_positive_control": "verified by RPC receipt; successful reader requests are not logged",
+      "passed": true
+    },
+    "manifest_binaries": [
+      {
+        "platform": "darwin/amd64",
+        "file": "infra-darwin-amd64",
+        "sha256": "675b261c7fe36361c585584d6c9f569b22563f156082f764534461cb19df8a0e"
+      },
+      {
+        "platform": "darwin/arm64",
+        "file": "infra-darwin-arm64",
+        "sha256": "b488df4cb5c4f33c4e1059208414c89285d5d2f4c52995a5cb130e026c4f104f"
+      },
+      {
+        "platform": "linux/amd64",
+        "file": "infra-linux-amd64",
+        "sha256": "34e9b709e841feafaff66baa809b08f05e234af3a5a2edc817de0887a8d98a3c"
+      },
+      {
+        "platform": "linux/arm64",
+        "file": "infra-linux-arm64",
+        "sha256": "1d51cbb15e9f5c89428abc80734d7ba6b841ea53380c5f9142e3719a511065e0"
+      }
+    ],
+    "asset_verification": {
+      "checksums": "all four binaries and manifest verified against SHA256SUMS",
+      "attestations": [
+        {
+          "file": "SHA256SUMS",
+          "verified": true
+        },
+        {
+          "file": "infra-darwin-amd64",
+          "verified": true
+        },
+        {
+          "file": "infra-darwin-arm64",
+          "verified": true
+        },
+        {
+          "file": "infra-linux-amd64",
+          "verified": true
+        },
+        {
+          "file": "infra-linux-arm64",
+          "verified": true
+        },
+        {
+          "file": "manifest.json",
+          "verified": true
+        }
+      ],
+      "signer_workflow": "fredrir/infra/.github/workflows/cli-release.yml",
+      "source_digest": "47482af47a5432d68e8de7d961d89ea82cbdc842",
+      "source_ref": "refs/tags/infra-v0.2.20",
+      "self_hosted_runners_rejected": true
+    },
+    "native_build_and_checks": {
+      "cold_binary_build_before_cache_join": true,
+      "repository_contents_cache_disabled": true,
+      "binary_build_bazel_elapsed_seconds": 129.421,
+      "binary_build_processes": 827,
+      "binary_build_sandboxed_processes": 743,
+      "preparation_remote_cache_hits": 1185,
+      "fast_check_remote_cache_hits": 29,
+      "fast_check_bazel_elapsed_seconds": 1.375,
+      "tests_passed": 25,
+      "tests_executed": 1,
+      "read_only_cache": true,
+      "passed": true
+    }
   },
   "limitations": [
     "A forced uncached full hosted suite exceeded the unchanged ten-second fast-check budget in all three probes. The final run stopped at 10.200 seconds with 23 of 30 shard results emitted and no cached results; full declarations took 5.723 seconds and the aggregate gate did not pass. Ordinary writer and reader qualifications are recorded separately.",
-    "The local WAN replay used four distinct physical Ryzen cores; the hosted runner provides four logical threads on two EPYC cores. The local timing is not equivalent hosted budget proof.",
-    "The release-reader identity is installed and constrained to protected release tags; no release was published for this qualification.",
-    "No scheduled cleanup execution has been observed. Manual preview and apply both succeeded with zero eligible devices and zero deletions; live DELETE execution was not exercised. Repository/workflow schedule controls are enabled.",
-    "PR153 remains open for a full infrastructure plan after credential rotation; temporary qualification workflows and nonce require removal after that validation."
+    "The local WAN replay used four distinct physical Ryzen cores; the hosted runner provides four logical threads on two EPYC cores. The local timing is not equivalent hosted budget proof."
   ],
   "local_hosted_cpu_comparison": {
     "local_model": "AMD Ryzen 7 9800X3D",
@@ -1044,5 +1261,154 @@
       ]
     },
     "scope": "Ordinary push selection with reusable test results; this successful run does not replace the failed forced-cold full-suite measurements."
+  },
+  "post_retirement_ci": {
+    "initial_run": "https://github.com/fredrir/infra/actions/runs/36408634728",
+    "initial_revision": "3a76653c930102351a98e01ae6e07b94e1f21330",
+    "initial_attempt": {
+      "attempt": 1,
+      "conclusion": "failure",
+      "reason": "aggregate budget exceeded",
+      "infra_fast_seconds": 7.739365141,
+      "declarations_seconds": 5.271296271,
+      "aggregate_seconds": 13.010661412
+    },
+    "warm_retry": {
+      "attempt": 2,
+      "conclusion": "success",
+      "infra_fast_seconds": 2.311942561,
+      "declarations_seconds": 5.271296271,
+      "aggregate_seconds": 7.583238832,
+      "unchanged_declarations_reused": true,
+      "fresh_build_artifact_id": 10963168708
+    },
+    "arc_validation_retry": {
+      "attempt": 3,
+      "conclusion": "success",
+      "infra_fast_seconds": 2.311942561,
+      "declarations_seconds": 5.988581075,
+      "aggregate_seconds": 8.300523636,
+      "unchanged_fast_check_reused": true,
+      "fresh_declaration_artifact_id": 10965425108
+    },
+    "main": {
+      "run": "https://github.com/fredrir/infra/actions/runs/36411499053",
+      "revision": "47482af47a5432d68e8de7d961d89ea82cbdc842",
+      "attempt": 1,
+      "conclusion": "success",
+      "aggregate": {
+        "schema": 1,
+        "accounting": "sum-of-recorded-check-durations",
+        "budget_seconds": 10,
+        "duration_seconds": 7.7409211419999995,
+        "remaining_seconds": 2.2590788580000005,
+        "success": true,
+        "stages": [
+          {
+            "schema": 1,
+            "stage": "declarations",
+            "revision": "47482af47a5432d68e8de7d961d89ea82cbdc842",
+            "started": "2026-09-28T10:46:11.975709749Z",
+            "duration_seconds": 1.572088632,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 3.07,
+            "peak_memory_bytes": 75780096
+          },
+          {
+            "schema": 1,
+            "stage": "infra-fast",
+            "revision": "47482af47a5432d68e8de7d961d89ea82cbdc842",
+            "started": "2026-09-28T10:46:30.994399522Z",
+            "duration_seconds": 6.16883251,
+            "budget_seconds": 10,
+            "budget_exceeded": false,
+            "success": true,
+            "exit_code": 0,
+            "cpu_seconds": 0.074609,
+            "peak_memory_bytes": 24547328
+          }
+        ]
+      },
+      "reports": [
+        {
+          "artifact_id": 10964896257,
+          "name": "build-reports-47482af47a5432d68e8de7d961d89ea82cbdc842-1",
+          "created_at": "2026-09-28T10:46:38Z",
+          "zip_sha256": "d749e00d6819a0f91d26f82b545f7165e64a783423071db552082769fba89ee4"
+        },
+        {
+          "artifact_id": 10964229007,
+          "name": "declaration-check-reports-47482af47a5432d68e8de7d961d89ea82cbdc842-1",
+          "created_at": "2026-09-28T10:46:15Z",
+          "zip_sha256": "905ef6046a7f86041c39f22c82426cf6a05e0a3191414aad99fae06466ad6381"
+        }
+      ],
+      "exact_dependency_artifact_ids_verified": true,
+      "production": {
+        "observed_at": "2026-09-28T10:53:28.830100+00:00",
+        "ledger": {
+          "revision": "47482af47a5432d68e8de7d961d89ea82cbdc842",
+          "outcome": "applied",
+          "started_at": "2026-09-28T10:45:02.027814632Z",
+          "finished_at": "2026-09-28T10:52:00.667074637Z",
+          "checked_at": "2026-09-28T10:52:00.667074637Z"
+        },
+        "production": "47482af47a5432d68e8de7d961d89ea82cbdc842",
+        "unit": {
+          "ActiveState": "inactive",
+          "SubState": "dead",
+          "ExecMainStatus": "0"
+        },
+        "complete": true
+      }
+    },
+    "artifact_freshness": {
+      "fix_revision": "47482af47a5432d68e8de7d961d89ea82cbdc842",
+      "selection": "Upload-produced artifact IDs from each dependency job, with separate names per attempt.",
+      "historical_originals": "Both initial3a report ZIPs and metadata were archived before their exact stale artifact IDs were removed for the two targeted reruns.",
+      "future_attempts": "Reports are retained; no overwrite or deletion is required.",
+      "budget_seconds": 10
+    }
+  },
+  "rotated_pull_request_plan": {
+    "repository": "fredrir/infra",
+    "pull_request": 153,
+    "run_id": 36409189205,
+    "run_url": "https://github.com/fredrir/infra/actions/runs/36409189205",
+    "event": "pull_request",
+    "head_sha": "20528112dacf04d7dcdf97958d53b77dd3852fa2",
+    "base_sha": "3a76653c930102351a98e01ae6e07b94e1f21330",
+    "merge_sha": "3d0c351990b80cda30547e6d7c44d5d3969cbd97",
+    "conclusion": "success",
+    "plan_job_id": 108885082816,
+    "cache": {
+      "cli": {
+        "passed": true,
+        "rpc_count": 7,
+        "read_matches": true,
+        "oidc_request_environment_absent": true,
+        "artifact_sha256": "a468425255865f0ab127ad10f0ab5e384127cd628580db22eba918c6f076816e"
+      },
+      "check": {
+        "passed": true,
+        "rpc_count": 7,
+        "read_matches": true,
+        "oidc_request_environment_absent": true,
+        "artifact_sha256": "e8a085057bcf9b2a5b3d24bee64c088cb3247810d4430c23fec3c64f077d2ad7"
+      }
+    },
+    "provider_plan": {
+      "full_plan_command_executed": true,
+      "provider_refresh_counts": {
+        "aws_": 72,
+        "hcloud_": 26,
+        "cloudflare_": 60
+      },
+      "outcome": "no changes",
+      "live_kubernetes_authentication_proved": false
+    }
   }
 }
