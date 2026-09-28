@@ -76,14 +76,24 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
-        - name: AWS_ENDPOINT_URL_S3
+        - name: PYPARSER_STORAGE_ENDPOINT
           value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
-        - name: AWS_CA_BUNDLE
+        - name: PYPARSER_STORAGE_CA_BUNDLE
           value: /etc/object-store/ca.crt
-        - name: AWS_DEFAULT_REGION
+        - name: PYPARSER_STORAGE_REGION
           value: nl
-        - name: PYPARSER_S3_DATASET_BUCKET
+        - name: PYPARSER_STORAGE_BUCKET
           value: parser-dataset
+        - name: PYPARSER_STORAGE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: application
+              key: AWS_ACCESS_KEY_ID
+        - name: PYPARSER_STORAGE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: application
+              key: AWS_SECRET_ACCESS_KEY
         resources:
           requests:
             cpu: 50m
@@ -216,14 +226,24 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
-        - name: AWS_ENDPOINT_URL_S3
+        - name: PYPARSER_STORAGE_ENDPOINT
           value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
-        - name: AWS_CA_BUNDLE
+        - name: PYPARSER_STORAGE_CA_BUNDLE
           value: /etc/object-store/ca.crt
-        - name: AWS_DEFAULT_REGION
+        - name: PYPARSER_STORAGE_REGION
           value: nl
-        - name: PYPARSER_S3_DATASET_BUCKET
+        - name: PYPARSER_STORAGE_BUCKET
           value: parser-dataset
+        - name: PYPARSER_STORAGE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: application
+              key: AWS_ACCESS_KEY_ID
+        - name: PYPARSER_STORAGE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: application
+              key: AWS_SECRET_ACCESS_KEY
         resources:
           requests:
             cpu: 250m
@@ -326,14 +346,24 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
-        - name: AWS_ENDPOINT_URL_S3
+        - name: PYPARSER_STORAGE_ENDPOINT
           value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
-        - name: AWS_CA_BUNDLE
+        - name: PYPARSER_STORAGE_CA_BUNDLE
           value: /etc/object-store/ca.crt
-        - name: AWS_DEFAULT_REGION
+        - name: PYPARSER_STORAGE_REGION
           value: nl
-        - name: PYPARSER_S3_DATASET_BUCKET
+        - name: PYPARSER_STORAGE_BUCKET
           value: parser-dataset
+        - name: PYPARSER_STORAGE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: application
+              key: AWS_ACCESS_KEY_ID
+        - name: PYPARSER_STORAGE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: application
+              key: AWS_SECRET_ACCESS_KEY
         resources:
           requests:
             cpu: 100m
