@@ -132,6 +132,21 @@ esac
 	write("bin/docker", "#!/bin/sh\ncase \"$*\" in\n*State.Running*) cat /fixture/state/engine ;;\n*) cut -d ' ' -f 2 /fixture/state/engine ;;\nesac\n", true)
 	write("state/engine", engine, false)
 	write("state/engine-pinned", engine, false)
+	write("engine-sockets.py", `import pathlib, selectors, socket
+selector = selectors.DefaultSelector()
+for slug in ("infra", "y"):
+    path = pathlib.Path("/run/infra-dagger") / slug / "engine.sock"
+    path.parent.mkdir(parents=True)
+    listener = socket.socket(socket.AF_UNIX)
+    listener.bind(str(path))
+    listener.listen()
+    selector.register(listener, selectors.EVENT_READ)
+pathlib.Path("/fixture/state/sockets-ready").touch()
+while True:
+    for key, _ in selector.select():
+        connection, _ = key.fileobj.accept()
+        connection.close()
+`, false)
 	write("converge.yml", `- hosts: build_engines
   gather_facts: false
   vars:
@@ -161,6 +176,8 @@ esac
 	command("docker", "exec", name, "groupadd", "docker")
 	command("docker", "exec", name, "mkdir", "-p", "/etc/tmpfiles.d", "/var/lib/infra-scanner/databases/"+strings.Repeat("0", 64)+"/db")
 	command("docker", "exec", name, "touch", "/var/lib/infra-scanner/databases/"+strings.Repeat("0", 64)+"/db/metadata.json")
+	command("docker", "exec", "-d", name, "python3", "/fixture/engine-sockets.py")
+	command("docker", "exec", name, "sh", "-c", "for attempt in $(seq 1 100); do [ -e /fixture/state/sockets-ready ] && exit 0; sleep 0.01; done; exit 1")
 	put = func(path, data string, executable bool) {
 		t.Helper()
 		mode := "0644"
@@ -243,10 +260,17 @@ esac
 	for _, tasks := range listed(run("/source/ansible/build-runners.yml", true, "--list-tasks", "--tags=infra_binary")) {
 		binary = append(binary, tasks...)
 	}
-	if len(binary) < 2 || !strings.HasPrefix(binary[0], "Gather runner host facts\t") || slices.ContainsFunc(binary[1:], func(task string) bool { return !strings.HasPrefix(task, "infra_binary : ") }) {
-		t.Fatalf("binary-only runner convergence selects more than facts and the binary: %q", binary)
+	var nonBinary []string
+	for _, task := range binary {
+		if !strings.HasPrefix(task, "infra_binary : ") {
+			name, _, _ := strings.Cut(task, "\t")
+			nonBinary = append(nonBinary, name)
+		}
 	}
-	t.Log("skipping runners removes only the runner play and the binary tag selects only facts and the binary")
+	if len(binary) <= len(nonBinary) || !slices.Equal(nonBinary, []string{"Gather runner host facts", "build_runner : Find stale runner admission units", "build_runner : Restart stale runner admission units"}) {
+		t.Fatalf("binary-only runner convergence must select facts, the binary and its admission refresh: %q", binary)
+	}
+	t.Log("skipping runners removes only the runner play and the binary tag selects only facts, the binary and its admission refresh")
 	record := func(name string) string {
 		data, err := os.ReadFile(filepath.Join(fixture, "state", name))
 		if err != nil && !os.IsNotExist(err) {
@@ -286,6 +310,31 @@ esac
 		return strings.TrimSpace(string(command(append([]string{"docker", "exec", name}, args...)...)))
 	}
 	converge()
+	beforePromotion, stoppedBeforePromotion := restarted(), record("stopped")
+	put("runner-infra/infra-1/bin/Runner.Worker", "#!/bin/sh\necho $$ > /fixture/state/promotion-worker\nwhile [ -e /fixture/state/promotion-job ]; do sleep 0.1; done\n", true)
+	write("state/promotion-job", "", false)
+	command("docker", "exec", "-d", name, "/home/runner-infra/infra-1/bin/Runner.Worker")
+	command("docker", "exec", name, "sh", "-c", "for attempt in $(seq 1 100); do [ -s /fixture/state/promotion-worker ] && exit 0; sleep 0.01; done; exit 1")
+	worker := inspect("cat", "/fixture/state/promotion-worker")
+	command("docker", "exec", name, "python3", "-c", `import json, pathlib, sys; pid=int(sys.argv[1]); start=pathlib.Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19]; pathlib.Path("/run/infra-runner-admission/leases.json").write_text(json.dumps([{"unit":sys.argv[2], "pid":pid, "start":start}]))`, worker, runnerUnit("infra"))
+	leases := inspect("cat", "/run/infra-runner-admission/leases.json")
+	command("docker", "exec", name, "sh", "-c", `printf '%s\n' "$1" > /fixture/state/started-infra-runner-admission.service`, "stale", "Sat 2000-01-01 00:00:00.000000 UTC")
+	write("infra", cli, true)
+	run("/fixture/converge.yml", true, "--tags=infra_binary")
+	if got := strings.TrimPrefix(restarted(), beforePromotion); got != "infra-runner-admission.service\n" || record("stopped") != stoppedBeforePromotion {
+		t.Fatalf("binary promotion restarted %q or stopped %q, want only the admission service refreshed", got, strings.TrimPrefix(record("stopped"), stoppedBeforePromotion))
+	}
+	if got := inspect("cat", "/run/infra-runner-admission/leases.json"); got != leases {
+		t.Fatalf("binary promotion changed the running worker's persisted lease: %q, want %q", got, leases)
+	}
+	command("docker", "exec", name, "kill", "-0", worker)
+	promoted := restarted()
+	if output := run("/fixture/converge.yml", true, "--tags=infra_binary"); restarted() != promoted || !strings.Contains(output, "changed=0") {
+		t.Fatalf("binary promotion is not idempotent:\n%s", output)
+	}
+	remove("state/promotion-job")
+	command("docker", "exec", name, "sh", "-c", "echo [] > /run/infra-runner-admission/leases.json")
+	t.Log("binary promotion refreshes only the admission service, preserves a running worker and its lease, and converges idempotently")
 	steady := restarted()
 	placeholder := func(path, unit string) {
 		t.Helper()
@@ -370,7 +419,7 @@ esac
 				t.Errorf("%s engine unit lacks %q:\n%s", repository, want, unit)
 			}
 		}
-		command("docker", "exec", name, "sh", "-c", "install -d -m 0750 -g infra-dagger-"+slug+" /run/infra-dagger/"+slug+" && install -m 0660 -g infra-dagger-"+slug+" /dev/null /run/infra-dagger/"+slug+"/engine.sock")
+		command("docker", "exec", name, "sh", "-c", "chgrp -R infra-dagger-"+slug+" /run/infra-dagger/"+slug+" && chmod 0750 /run/infra-dagger/"+slug+" && chmod 0660 /run/infra-dagger/"+slug+"/engine.sock")
 		placeholder("/run/infra-runner-admission.d/"+slug+"/admission.sock", socket)
 		running[home] = inspect("id", "-G", home)
 	}

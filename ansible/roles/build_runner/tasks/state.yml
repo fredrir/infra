@@ -168,6 +168,7 @@
     state: started
 
 - name: Find stale runner admission units
+  tags: [infra_binary]
   ansible.builtin.shell: |
     set -eu
     for unit in infra-runner-admission.socket infra-runner-admission.service; do
@@ -184,6 +185,7 @@
   check_mode: false
 
 - name: Restart stale runner admission units
+  tags: [infra_binary]
   ansible.builtin.systemd_service:
     name: '{{ item }}'
     daemon_reload: true
