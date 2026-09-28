@@ -82,6 +82,9 @@ func TestCLIInputDigestIgnoresOnlyTestSources(t *testing.T) {
 	base := digest()
 	write("internal/check/check_test.go", "package check\n\nconst covered = true\n")
 	write("internal/check/new_test.go", "package check\n")
+	write("external/filter_test.go", "package filter\n")
+	write("build/cli-release.json", "{\"inputs_sha256\": \"published\"}\n")
+	write("README.md", "documentation\n")
 	commit()
 	if got := digest(); got != base {
 		t.Fatalf("test-only change altered the CLI input digest: %s != %s", got, base)
@@ -93,5 +96,23 @@ func TestCLIInputDigestIgnoresOnlyTestSources(t *testing.T) {
 			t.Fatalf("%s did not alter the CLI input digest", change)
 		}
 		base = digest()
+	}
+	write("external/feature.go", "package feature\n")
+	commit()
+	if got := digest(); got == base {
+		t.Fatal("external production Go did not trigger the conservative source fallback")
+	}
+	base = digest()
+	write("README.md", "changed fallback input\n")
+	commit()
+	if got := digest(); got == base {
+		t.Fatal("external production Go did not include other repository inputs")
+	}
+	base = digest()
+	write("build/cli-release.json", "{\"inputs_sha256\": \"updated\"}\n")
+	write("external/filter_test.go", "package filter\n\nconst covered = true\n")
+	commit()
+	if got := digest(); got != base {
+		t.Fatalf("release pin or test-only change altered fallback digest: %s != %s", got, base)
 	}
 }

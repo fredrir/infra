@@ -14,6 +14,7 @@ runs:
         sources=(cmd internal go.mod go.sum MODULE.bazel MODULE.bazel.lock BUILD.bazel .bazelrc .bazelversion build/toolchain.json build/dagger-embed.patch build/BUILD.bazel)
         while IFS= read -r path; do
           case "$path" in
+            *_test.go) continue ;;
             cmd/*|internal/*) ;;
             platform/generate/*.go|tests/infra/*.go|ansible/tests/*.go)
               if grep -qx 'package main' "$path"; then
@@ -23,7 +24,7 @@ runs:
             *) sources=(.); break ;;
           esac
         done < <(git ls-files -- '*.go')
-        digest=$(git ls-tree -r HEAD -- "${sources[@]}" | sed '/_test\.go$/d' | sha256sum | cut -d' ' -f1)
+        digest=$(git ls-tree -r HEAD -- "${sources[@]}" | sed -e '/_test\.go$/d' -e '/[[:space:]]build\/cli-release\.json$/d' | sha256sum | cut -d' ' -f1)
         printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
         if [ "$digest" = "$(jq -r '.inputs_sha256 // ""' build/cli-release.json)" ]; then
           printf 'released=true\n' >> "$GITHUB_OUTPUT"
