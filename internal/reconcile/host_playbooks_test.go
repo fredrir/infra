@@ -167,6 +167,36 @@ func TestHostPlaybookGraphRejectsUnresolvableReferences(t *testing.T) {
 	}
 }
 
+func TestHostPlaybookGraphReadsRoleChangesBetweenSelections(t *testing.T) {
+	t.Parallel()
+	root := writeAnsibleTree(t, map[string]string{
+		"reconcile.yml":             "- import_playbook: facts.yml\n- import_playbook: first.yml\n",
+		"facts.yml":                 "- name: Gather\n  hosts: all\n",
+		"first.yml":                 "- name: First\n  hosts: all\n  roles: [base]\n",
+		"external.yml":              "- name: Monitor\n  hosts: all\n  roles: [leaf]\n",
+		"volatile.yml":              "- name: Volatile\n  hosts: all\n  roles: [base]\n",
+		"roles/base/tasks/main.yml": "- name: Base\n  ansible.builtin.debug:\n",
+		"roles/leaf/tasks/main.yml": "- name: Leaf\n  ansible.builtin.debug:\n",
+	})
+	changed := []string{"ansible/roles/leaf/tasks/main.yml"}
+	if selected, err := scopedHostPlaybooks(root, changed); err != nil || !slices.Equal(selected, []string{"external.yml"}) {
+		t.Fatalf("initial leaf users %q: %v", selected, err)
+	}
+	base := filepath.Join(root, "ansible/roles/base/tasks/main.yml")
+	if err := os.WriteFile(base, []byte("- name: Include leaf\n  ansible.builtin.include_role:\n    name: leaf\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if selected, err := scopedHostPlaybooks(root, changed); err != nil || !slices.Equal(selected, []string{"first.yml", "external.yml", "volatile.yml"}) {
+		t.Fatalf("changed leaf users %q: %v", selected, err)
+	}
+	if err := os.WriteFile(base, []byte("- name: Missing role\n  ansible.builtin.include_role:\n    name: missing\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scopedHostPlaybooks(root, changed); err == nil {
+		t.Fatal("invalid changed dependency accepted")
+	}
+}
+
 var (
 	playbookLookupPattern = regexp.MustCompile(`playbook_dir \+ '/\.\./([^']+)'`)
 	untrackedReadPattern  = regexp.MustCompile(`\b(role_path|inventory_dir)\b|roles/`)

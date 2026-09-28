@@ -39,11 +39,12 @@ func loadHostPlaybookGraph(root string) (hostPlaybookGraph, error) {
 		return hostPlaybookGraph{}, fmt.Errorf("%s must import %s first and once", convergencePlaybook, factsPlaybook)
 	}
 	graph := hostPlaybookGraph{order: slices.Concat(leaves[1:], []string{monitorPlaybook, volatilePlaybook}), roles: map[string]map[string]bool{}}
+	references := map[string][]string{}
 	for _, playbook := range graph.order {
 		if graph.roles[playbook] != nil {
 			return hostPlaybookGraph{}, fmt.Errorf("%s is converged more than once", playbook)
 		}
-		if graph.roles[playbook], err = playbookRoles(ansible, playbook); err != nil {
+		if graph.roles[playbook], err = playbookRoles(ansible, playbook, references); err != nil {
 			return hostPlaybookGraph{}, err
 		}
 	}
@@ -155,7 +156,7 @@ func importedPlaybooks(ansible, file string, visiting map[string]bool) ([]string
 	}
 }
 
-func playbookRoles(ansible, file string) (map[string]bool, error) {
+func playbookRoles(ansible, file string, references map[string][]string) (map[string]bool, error) {
 	plays, err := loadPlaybook(ansible, file)
 	if err != nil {
 		return nil, err
@@ -192,11 +193,15 @@ func playbookRoles(ansible, file string) (map[string]bool, error) {
 			continue
 		}
 		closure[role] = true
-		references, err := roleReferences(ansible, role)
-		if err != nil {
-			return nil, err
+		dependencies, found := references[role]
+		if !found {
+			dependencies, err = roleReferences(ansible, role)
+			if err != nil {
+				return nil, err
+			}
+			references[role] = dependencies
 		}
-		pending = append(pending, references...)
+		pending = append(pending, dependencies...)
 	}
 	return closure, nil
 }

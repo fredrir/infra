@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "test": "TestHostPlaybooksFollowRoleClosures",
+  "repetitions_per_sample": 20,
+  "affinity": [
+    0,
+    1,
+    8,
+    9
+  ],
+  "physical_cores": 2,
+  "samples": [
+    {
+      "variant": "before",
+      "wall_seconds": 2.539177157999802,
+      "user_seconds": 2.776831,
+      "system_seconds": 0.173845,
+      "peak_rss_kib": 31608
+    },
+    {
+      "variant": "after",
+      "wall_seconds": 1.59495703399989,
+      "user_seconds": 1.755979,
+      "system_seconds": 0.10686699999999999,
+      "peak_rss_kib": 31392
+    },
+    {
+      "variant": "before",
+      "wall_seconds": 2.5370726569999533,
+      "user_seconds": 2.791535,
+      "system_seconds": 0.153445,
+      "peak_rss_kib": 31752
+    },
+    {
+      "variant": "after",
+      "wall_seconds": 1.5956516619989998,
+      "user_seconds": 1.764577,
+      "system_seconds": 0.099621,
+      "peak_rss_kib": 31384
+    },
+    {
+      "variant": "before",
+      "wall_seconds": 2.546438818999377,
+      "user_seconds": 2.80736,
+      "system_seconds": 0.149702,
+      "peak_rss_kib": 31652
+    },
+    {
+      "variant": "after",
+      "wall_seconds": 1.591303749999497,
+      "user_seconds": 1.740087,
+      "system_seconds": 0.114883,
+      "peak_rss_kib": 31640
+    }
+  ],
+  "median": {
+    "before": {
+      "wall_seconds": 2.539177157999802,
+      "user_seconds": 2.791535,
+      "system_seconds": 0.153445,
+      "peak_rss_kib": 31652
+    },
+    "after": {
+      "wall_seconds": 1.59495703399989,
+      "user_seconds": 1.755979,
+      "system_seconds": 0.10686699999999999,
+      "peak_rss_kib": 31392
+    }
+  },
+  "observed_at": "2026-09-28T00:01:11.813834+00:00",
+  "source_base": "a15f4cf67aa467fc050f3f27f5f685166a2c707f",
+  "change": "Reuse role dependencies only within one loadHostPlaybookGraph call.",
+  "cpu_model": "AMD Ryzen 7 9800X3D",
+  "measurement": "Three alternating before/after samples of twenty complete TestHostPlaybooksFollowRoleClosures executions; wait4 reports CPU and peak RSS.",
+  "limitations": [
+    "This local benchmark is not a hosted aggregate check-budget receipt.",
+    "Hosted full cold checks exceeded the unchanged ten-second budget on an AMD EPYC7763 with two physical cores and four logical threads.",
+    "The earlier local four-CPU WAN replay used four distinct physical Ryzen cores and is not equivalent to the hosted CPU allocation."
+  ],
+  "go_version": "go version go1.27.1-X:nodwarf5 linux/amd64"
+}
