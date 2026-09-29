@@ -8,7 +8,7 @@ spec:
     rules:
     - alert: HourlyBackupOverdue
       expr: |
-        (time() - kube_cronjob_status_last_successful_time{namespace=~"portfolio|nix-cache",cronjob="data-backup"} > 7200)
+        (time() - kube_cronjob_status_last_successful_time{namespace="nix-cache",cronjob="data-backup"} > 7200)
         and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
       for: 10m
       labels:
@@ -17,7 +17,7 @@ spec:
         summary: Hourly application backup is overdue
     - alert: ApplicationBackupOverdue
       expr: |
-        (time() - kube_cronjob_status_last_successful_time{namespace=~"llunde-pyparser|y",cronjob="data-backup"} > 28800)
+        (time() - kube_cronjob_status_last_successful_time{namespace=~"llunde-pyparser|y|portfolio",cronjob="data-backup"} > 93600)
         and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
       for: 10m
       labels:
@@ -36,13 +36,20 @@ spec:
         summary: Enabled backup schedule has no successful run
     - alert: BackupWriterLeftScaledDown
       expr: |
-        kube_deployment_spec_replicas{namespace="llunde-pyparser",deployment=~"review|worker-extract|worker-light"} == 0
-        or kube_deployment_spec_replicas{namespace="y",deployment="api"} == 0
+        kube_deployment_spec_replicas{namespace="y",deployment="api"} == 0
       for: 15m
       labels:
         severity: critical
       annotations:
         summary: Backup writer deployment stayed scaled to zero after a backup window
+    - alert: ParserBackupWriterLeftScaledDown
+      expr: |
+        kube_deployment_spec_replicas{namespace="llunde-pyparser",deployment=~"review|worker-extract|worker-light"} == 0
+      for: 35m
+      labels:
+        severity: critical
+      annotations:
+        summary: Parser writer deployment stayed scaled to zero after its dataset export window
     - alert: BackupIntegrityOverdue
       expr: |
         (time() - kube_cronjob_status_last_successful_time{cronjob="repository-maintenance"} > 691200)
@@ -54,7 +61,7 @@ spec:
         summary: Weekly backup integrity check is overdue
     - alert: ControlRecoveryBackupOverdue
       expr: |
-        time() - platform_control_backup_last_success_timestamp_seconds{node="fredrir-07"} > 28800
+        time() - platform_control_backup_last_success_timestamp_seconds{node="fredrir-07"} > 93600
         or absent(platform_control_backup_last_success_timestamp_seconds{node="fredrir-07"})
       for: 10m
       labels:

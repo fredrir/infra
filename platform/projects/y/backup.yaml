@@ -86,7 +86,7 @@ metadata:
   name: data-backup
   namespace: 'y'
 spec:
-  schedule: 35 */6 * * *
+  schedule: 35 3 * * *
   timeZone: Etc/UTC
   suspend: false
   concurrencyPolicy: Forbid

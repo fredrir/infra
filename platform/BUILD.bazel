@@ -57,7 +57,7 @@ filegroup(
 
 filegroup(
     name = "renovate_pin_data",
-    srcs = ["versions.yaml"] + glob(["components/object-store/*.yaml"]),
+    srcs = ["versions.yaml", "components/backups/tools.Dockerfile"] + glob(["components/object-store/*.yaml"]),
     visibility = ["//:__pkg__"],
 )
 

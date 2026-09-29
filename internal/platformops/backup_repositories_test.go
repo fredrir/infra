@@ -2,11 +2,13 @@ package platformops
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -230,5 +232,180 @@ func TestSlowRepositoryMaintenanceLeavesTheOthersTheirTime(t *testing.T) {
 	}
 	if !slices.Equal(calls, []string{"primary check", "offsite check", "offsite forget"}) || time.Since(started) > time.Second {
 		t.Fatalf("maintenance ran %v in %v", calls, time.Since(started))
+	}
+}
+
+func TestBackupRepositoryInterval(t *testing.T) {
+	now := time.Date(2026, 9, 29, 0, 15, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name      string
+		inventory string
+		due       bool
+		fails     bool
+	}{
+		{"empty", `[]`, true, false},
+		{"recent", `[{"time":"2026-09-16T00:15:00Z"}]`, false, false},
+		{"due", `[{"time":"2026-09-15T00:15:00Z"}]`, true, false},
+		{"due despite export duration", `[{"time":"2026-09-15T00:45:00Z"}]`, true, false},
+		{"newest controls interval", `[{"time":"2026-09-01T00:15:00Z"},{"time":"2026-09-28T00:15:00Z"}]`, false, false},
+		{"unreadable", `{`, false, true},
+		{"missing timestamp", `[{}]`, false, true},
+		{"future timestamp", `[{"time":"2026-10-01T00:15:00Z"}]`, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			restic := func(context.Context, Repository, ...string) ([]byte, error) { return []byte(tc.inventory), nil }
+			due, err := repositoryDue(context.Background(), restic, Repository{IntervalDays: 14}, now)
+			if due != tc.due || (err != nil) != tc.fails {
+				t.Fatalf("due=%v error=%v", due, err)
+			}
+		})
+	}
+}
+
+func TestBackupPrunesOnlyAfterSuccessfulReplacement(t *testing.T) {
+	for _, failed := range []bool{false, true} {
+		t.Run(fmt.Sprint(failed), func(t *testing.T) {
+			trace := new(backupTrace)
+			c := tracedBackup(t, trace, nil)
+			c.Repositories = []Repository{{Name: "offsite", KeepLast: 1}}
+			var operations []string
+			c.Restic = func(_ context.Context, _ Repository, args ...string) ([]byte, error) {
+				op := args[0]
+				if op == "--retry-lock" {
+					op = args[2]
+				}
+				operations = append(operations, op)
+				if op == "backup" && failed {
+					return nil, errors.New("upload failed")
+				}
+				if op == "forget" && !slices.Equal(args, []string{"--retry-lock", "10m", "forget", "--group-by", "", "--keep-last", "1", "--prune"}) {
+					t.Fatalf("retention: %v", args)
+				}
+				return nil, nil
+			}
+			err := Backup(context.Background(), c, false)
+			if (err != nil) != failed {
+				t.Fatal(err)
+			}
+			want := []string{"cat", "backup", "forget", "check"}
+			if failed {
+				want = want[:2]
+			}
+			if !slices.Equal(operations, want) {
+				t.Fatalf("operations=%v", operations)
+			}
+		})
+	}
+}
+
+func TestRecentOffsiteBackupDoesNotPreventPrimaryBackup(t *testing.T) {
+	trace := new(backupTrace)
+	c := tracedBackup(t, trace, nil)
+	c.Repositories[1].IntervalDays = 14
+	c.Now = func() time.Time { return time.Date(2026, 9, 29, 0, 15, 0, 0, time.UTC) }
+	run := c.Restic
+	c.Restic = func(ctx context.Context, r Repository, args ...string) ([]byte, error) {
+		if args[0] == "snapshots" {
+			return []byte(`[{"time":"2026-09-28T00:15:00Z"}]`), nil
+		}
+		return run(ctx, r, args...)
+	}
+	if err := Backup(context.Background(), c, false); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(trace.events, "primary backup") || slices.Contains(trace.events, "offsite backup") {
+		t.Fatalf("events=%v", trace.events)
+	}
+}
+
+func TestDatasetExportFailurePreventsUploadAndPruning(t *testing.T) {
+	for _, failure := range []string{"empty", "oversize", "copy", "check"} {
+		t.Run(failure, func(t *testing.T) {
+			trace := new(backupTrace)
+			c := tracedBackup(t, trace, nil)
+			c.Dataset = "dataset:parser-dataset"
+			c.DatasetMaxBytes = 100
+			run := c.Run
+			c.Run = func(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
+				if name != "rclone" {
+					return run(ctx, dir, name, args...)
+				}
+				switch args[0] {
+				case "size":
+					if failure == "empty" {
+						return []byte(`{"count":0,"bytes":0}`), nil
+					}
+					if failure == "oversize" {
+						return []byte(`{"count":1,"bytes":101}`), nil
+					}
+					return []byte(`{"count":1,"bytes":10}`), nil
+				case failure:
+					return nil, errors.New("dataset failed")
+				}
+				return nil, nil
+			}
+			if err := Backup(context.Background(), c, false); err == nil {
+				t.Fatal("incomplete dataset accepted")
+			}
+			if !slices.Contains(trace.events, "scale 1") || slices.Contains(trace.events, "primary backup") || slices.Contains(trace.events, "offsite backup") {
+				t.Fatalf("events=%v", trace.events)
+			}
+		})
+	}
+}
+
+func TestResticRetentionRestoresNewestSnapshots(t *testing.T) {
+	binary, err := exec.LookPath("restic")
+	if err != nil {
+		t.Skip("restic is unavailable")
+	}
+	for _, keep := range []int{1, 3} {
+		t.Run(fmt.Sprint(keep), func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			repository := Repository{Name: "test", KeepLast: keep}
+			run := func(ctx context.Context, _ Repository, args ...string) ([]byte, error) {
+				cmd := exec.CommandContext(ctx, binary, args...)
+				cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + root, "TZ=UTC", "RESTIC_REPOSITORY=" + filepath.Join(root, "repository"), "RESTIC_PASSWORD=test-password", "RESTIC_CACHE_DIR=" + filepath.Join(root, "cache")}
+				return cmd.CombinedOutput()
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+			must := func(args ...string) []byte {
+				t.Helper()
+				out, err := run(ctx, repository, args...)
+				if err != nil {
+					t.Fatalf("restic %v: %v\n%s", args, err, out)
+				}
+				return out
+			}
+			must("init")
+			source := filepath.Join(root, "source.txt")
+			for day := 1; day <= 4; day++ {
+				if err := os.WriteFile(source, fmt.Appendf(nil, "snapshot %d", day), 0600); err != nil {
+					t.Fatal(err)
+				}
+				must("backup", source, "--time", fmt.Sprintf("2020-01-%02d 00:00:00", day), "--host", fmt.Sprintf("host-%d", day), "--tag", fmt.Sprintf("tag-%d", day))
+			}
+			must(retentionArguments(repository)...)
+			var snapshots []struct {
+				Time time.Time `json:"time"`
+			}
+			if err := json.Unmarshal(must("snapshots", "--json"), &snapshots); err != nil {
+				t.Fatal(err)
+			}
+			if len(snapshots) != keep {
+				t.Fatalf("kept %d snapshots instead of %d", len(snapshots), keep)
+			}
+			for _, snapshot := range snapshots {
+				if snapshot.Time.Day() < 5-keep {
+					t.Fatalf("old snapshot retained: %s", snapshot.Time)
+				}
+			}
+			if got := string(must("dump", "latest", source)); got != "snapshot 4" {
+				t.Fatalf("restore: %q", got)
+			}
+			must("check", "--read-data")
+		})
 	}
 }

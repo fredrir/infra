@@ -22,7 +22,7 @@ locals {
   reconciler_source         = ["${var.reconciler_ipv4}/32"]
   reconciliation_iam        = "arn:aws:iam::${data.aws_caller_identity.reconciliation.account_id}"
   reconciliation_users      = ["${local.reconciliation_iam}:user/platform/*"]
-  reconciliation_policies   = [for policy in ["platform/*", "pyparser-dataset-*"] : "${local.reconciliation_iam}:policy/${policy}"]
+  reconciliation_policies   = ["${local.reconciliation_iam}:policy/platform/*"]
   iam_policy_writes = [
     "iam:CreatePolicy", "iam:DeletePolicy", "iam:CreatePolicyVersion", "iam:DeletePolicyVersion",
     "iam:SetDefaultPolicyVersion", "iam:TagPolicy", "iam:UntagPolicy",
@@ -38,12 +38,12 @@ resource "aws_iam_policy" "workload_boundary" {
       {
         Effect   = "Allow"
         Action   = ["s3:ListBucket", "s3:GetBucketLocation"]
-        Resource = [data.aws_s3_bucket.dataset.arn]
+        Resource = [data.aws_s3_bucket.dataset.arn, aws_s3_bucket.application_backups.arn]
       },
       {
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload"]
-        Resource = ["${data.aws_s3_bucket.dataset.arn}/*"]
+        Resource = ["${data.aws_s3_bucket.dataset.arn}/*", "${aws_s3_bucket.application_backups.arn}/*"]
       },
       {
         Effect   = "Deny"
@@ -81,7 +81,7 @@ resource "aws_iam_policy" "reconciliation" {
       {
         Effect   = "Allow"
         Action   = ["s3:ListBucket", "s3:GetBucketLocation", "s3:GetBucketVersioning", "s3:GetEncryptionConfiguration", "s3:GetBucketPublicAccessBlock", "s3:GetLifecycleConfiguration"]
-        Resource = [data.aws_s3_bucket.dataset.arn]
+        Resource = [data.aws_s3_bucket.dataset.arn, aws_s3_bucket.application_backups.arn]
       },
       {
         Effect   = "Allow"
@@ -120,7 +120,7 @@ resource "aws_iam_policy" "reconciliation" {
         {
           Effect   = "Allow"
           Action   = ["s3:PutBucketVersioning", "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock"]
-          Resource = [data.aws_s3_bucket.dataset.arn]
+          Resource = [data.aws_s3_bucket.dataset.arn, aws_s3_bucket.application_backups.arn]
         },
         {
           Effect = "Allow"

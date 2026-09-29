@@ -3,25 +3,21 @@ cells:
     endpoint: https://seaweedfs-hel1.object-store.svc.cluster.local:8333
     buckets:
       - name: ci-nsql-main
-        quotaGiB: 20
+        quotaGiB: 10
         expireDays: 14
       - name: ci-nsql-release
-        quotaGiB: 10
+        quotaGiB: 5
         expireDays: 14
       - name: toolchains
         quotaGiB: 5
-      - name: restic-parser
-        quotaGiB: 10
-        lockDays: 30
-        noncurrentDays: 31
-      - name: restic-y
-        quotaGiB: 10
-        lockDays: 30
-        noncurrentDays: 31
-      - name: restic-portfolio
+      - name: backup-parser
+        quotaGiB: 30
+      - name: backup-y
+        quotaGiB: 5
+      - name: backup-portfolio
         quotaGiB: 1
-        lockDays: 30
-        noncurrentDays: 31
+      - name: backup-attic
+        quotaGiB: 1
   - name: nl
     endpoint: https://seaweedfs-nl.object-store.svc.cluster.local:8333
     buckets:

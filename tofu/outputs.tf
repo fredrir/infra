@@ -14,8 +14,3 @@ output "dataset_bucket" {
   description = "The pyparser dataset bucket."
   value       = data.aws_s3_bucket.dataset.bucket
 }
-
-output "dataset_access_policy_arn" {
-  description = "IAM policy granting read/write to the dataset bucket."
-  value       = aws_iam_policy.dataset_access.arn
-}

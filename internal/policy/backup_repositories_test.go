@@ -42,6 +42,15 @@ func TestBackupJobsUseOnlyTheirDeclaredRepositories(t *testing.T) {
 			if _, ok := primaryBackupProjects[namespace]; ok {
 				want = map[string]string{"BACKUP_REPOSITORIES": "primary offsite", "PRIMARY_RESTIC_CACERT": "/usr/local/share/object-store/ca.crt", "PRIMARY_AWS_DEFAULT_REGION": "hel1"}
 				wantSources = []string{"PRIMARY_backup-primary-repository", "OFFSITE_backup-repository"}
+				want["PRIMARY_BACKUP_KEEP_LAST"] = "3"
+				want["OFFSITE_BACKUP_KEEP_LAST"] = "1"
+				if name == "data-backup" {
+					want["OFFSITE_BACKUP_INTERVAL_DAYS"] = "14"
+				}
+			}
+			if namespace == "nix-cache" {
+				want = map[string]string{"BACKUP_REPOSITORIES": "primary", "PRIMARY_RESTIC_CACERT": "/usr/local/share/object-store/ca.crt"}
+				wantSources = []string{"PRIMARY_backup-repository"}
 			}
 			if name == "data-backup" {
 				want["BACKUP_HEARTBEAT_TOKEN"] = "secret:backup-repository/BACKUP_HEARTBEAT_TOKEN"
@@ -74,7 +83,7 @@ func TestBackupJobsUseOnlyTheirDeclaredRepositories(t *testing.T) {
 	}
 }
 
-func TestPrimaryBackupBucketsKeepHistoryFromTheirWriters(t *testing.T) {
+func TestPrimaryBackupBucketsPermitPruning(t *testing.T) {
 	var spec struct {
 		Cells []struct {
 			Name    string
@@ -96,17 +105,17 @@ func TestPrimaryBackupBucketsKeepHistoryFromTheirWriters(t *testing.T) {
 	if err := json.Unmarshal(encoded, &spec); err != nil {
 		t.Fatal(err)
 	}
-	locked := map[string]bool{}
+	prunable := map[string]bool{}
 	for _, cell := range spec.Cells {
 		for _, bucket := range cell.Buckets {
-			if cell.Name == "hel1" && bucket.LockDays >= 30 && bucket.NoncurrentDays > bucket.LockDays {
-				locked[bucket.Name] = true
+			if cell.Name == "hel1" && bucket.LockDays == 0 && bucket.NoncurrentDays == 0 {
+				prunable[bucket.Name] = true
 			}
 		}
 	}
 	for _, project := range primaryBackupProjects {
-		if !locked["restic-"+project] {
-			t.Errorf("restic-%s is not a COMPLIANCE-locked hel1 bucket holding 30 days of history", project)
+		if !prunable["backup-"+project] {
+			t.Errorf("backup-%s must permit permanent pruning without retained versions", project)
 		}
 	}
 }

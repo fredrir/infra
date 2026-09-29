@@ -4,7 +4,7 @@ metadata:
   name: data-backup
   namespace: portfolio
 spec:
-  schedule: 5 * * * *
+  schedule: 5 4 * * *
   timeZone: Etc/UTC
   suspend: false
   concurrencyPolicy: Forbid

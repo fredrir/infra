@@ -1,3 +1,5 @@
+FROM docker.io/rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5 AS rclone
+
 FROM docker.io/library/golang:1.27.1-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125 AS restic
 RUN apk add --no-cache git
 WORKDIR /src
@@ -14,6 +16,7 @@ RUN sed -i 's|http://|https://|g' /etc/apk/repositories \
     && apk upgrade --no-cache \
     && apk add --no-cache bash ca-certificates coreutils curl jq mongodb-tools postgresql17-client sqlite tar
 COPY --from=restic /usr/local/bin/restic /usr/local/bin/restic
+COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 COPY .infra-artifacts/infra /usr/local/bin/infra
 COPY platform/components/object-store-trust/ca.crt /usr/local/share/object-store/ca.crt
 RUN curl -fsSLo /usr/local/bin/kubectl https://dl.k8s.io/release/v1.37.0/bin/linux/amd64/kubectl \

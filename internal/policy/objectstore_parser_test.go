@@ -24,10 +24,10 @@ func TestParserReachesItsDatasetOnlyThroughTheNLCell(t *testing.T) {
 		t.Fatal("parser application does not publish the object store CA under a content-hashed name")
 	}
 	want := map[string]string{
-		"AWS_ENDPOINT_URL_S3":        "https://seaweedfs-nl.object-store.svc.cluster.local:8333",
-		"AWS_CA_BUNDLE":              "/etc/object-store/ca.crt",
-		"AWS_DEFAULT_REGION":         "nl",
-		"PYPARSER_S3_DATASET_BUCKET": "parser-dataset",
+		"PYPARSER_STORAGE_ENDPOINT":  "https://seaweedfs-nl.object-store.svc.cluster.local:8333",
+		"PYPARSER_STORAGE_CA_BUNDLE": "/etc/object-store/ca.crt",
+		"PYPARSER_STORAGE_REGION":    "nl",
+		"PYPARSER_STORAGE_BUCKET":    "parser-dataset",
 	}
 	writers := map[string]bool{}
 	for _, resource := range resources {

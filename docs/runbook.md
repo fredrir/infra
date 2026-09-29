@@ -522,51 +522,38 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Configuration drift | Versioning or a lock on a bucket that declares neither fails the provisioner; on an existing locked bucket the provisioner restores changed or deleted versioning, lock or lifecycle and fails the run, which a declared change to such a bucket also does once |
 | Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; `seaweedfs-nl` has no admin or worker and no lifecycle buckets; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
 | Logs | stderr only (`-logtostderr=true`) |
-| Parser dataset | `llunde-pyparser` application pods use `parser-dataset` on `seaweedfs-nl` via `AWS_ENDPOINT_URL_S3` and `AWS_CA_BUNDLE` (the object store CA only, so every botocore client in those pods trusts only `seaweedfs-nl`; other HTTPS clients keep their own roots); stored `s3://` URLs keep their original bucket name, since the parser resolves objects by key |
-| Parser dataset copy | `parser-dataset-mirror` hourly at :23 on `fredrir-04` runs `mirror.sh sync`: `rclone sync` of `nl` `parser-dataset` to the versioned AWS bucket `llunde-pyparser-bucket`, prefixes `files/`, `extract/`, `assets/`, `convert/` only; at most 1000 deletions per run; `platform-dataset-parser` cannot delete versions |
-| Mirror guard | The sync runs only when `parser-dataset/.mirror-seeded` exists and `parser-dataset` holds at least 90% of the AWS object count in the four prefixes; `parser-dataset-seed` (suspended, run on demand) copies AWS into `nl`, checks every AWS object arrived and only then writes the sentinel; a recreated or emptied bucket has no sentinel; `mirror.sh unseed` removes it on purpose and fails unless a listing confirms it is gone; the sync also refuses a sentinel older than `SEED_NOT_BEFORE` in the unmanaged ConfigMap `parser-dataset-mirror-fence`, which a parser rollback writes, so after a rollback only a fresh seed re-enables the mirror, even if the sentinel survived |
-| AWS prefixes | Mirror-only: an object written straight to the four AWS prefixes is delete-markered by the next sync; write through `seaweedfs-nl` |
-| Backup primaries | `restic-parser`, `restic-y`, `restic-portfolio` on `seaweedfs-hel1`: COMPLIANCE lock 30 days, noncurrent versions kept 31 days, quotas 10, 10 and 1 GiB; identity `restic-<project>`, consumer copy `platform/projects/<namespace>/backup-primary.secret.sops.yaml`; reached only by the `data-backup` and `repository-maintenance` pods of `llunde-pyparser`, `y` and `portfolio` |
+| Parser dataset | `parser-dataset` on `seaweedfs-nl`; application credentials and endpoint use `PYPARSER_STORAGE_*`; backups include every dataset object alongside PostgreSQL and local files |
+| Backup primaries | `backup-parser`, `backup-y`, `backup-portfolio`, `backup-attic` on `seaweedfs-hel1`; unversioned, encrypted Restic repositories; quotas in `buckets.yaml`; first successful preflight initializes an empty repository |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
 | Disk guard | 1 GiB volumes; `hel1` `-volume.max=76` (76 GiB), `nl` `-volume.max=200` (200 GiB); every cell keeps its quota sum × 1.3 within `-volume.max` (per-bucket partial volumes and garbage below the 30% vacuum threshold) and `-volume.max` + 4 GiB within its `data` PVC (one compaction copy, writes past the 1 GiB volume limit, filer store and indexes); read-only below 15% free node disk |
 | Memory | `hel1` server GOMEMLIMIT 512MiB, request 384Mi, limit 768Mi; `nl` server GOMEMLIMIT 320MiB, request 224Mi, limit 512Mi; `meta-backup` GOMEMLIMIT 160MiB, request 64Mi, limit 256Mi; `s3-filter` GOMEMLIMIT 96MiB, request 32Mi, limit 128Mi |
-| Mirror memory | rclone fills one read-ahead buffer per transfer whenever the destination accepts data slower than the source serves it, so `mirror.sh` uses 4 MiB buffers and seed and restore copy with 8 transfers; `parser-dataset-seed` GOMEMLIMIT 288MiB, limit 384Mi (peak 141 MiB with eight 100 MB objects in flight to `nl` at 16 MB/s); `parser-dataset-mirror` GOMEMLIMIT 192MiB, limit 256Mi (peak 114 MiB with four) |
 | Certificates expire | 2029-09-26; `ObjectStoreCertificateExpiring` from 2029-08-27 |
 
 Every alert has promtool cases in `internal/policy/testdata/object-store-alerts.yaml`, run by the check workflow's `alerts` job.
 
 | Alert | Fires |
 | --- | --- |
-| `ObjectStoreBackupBucketFilling` | A `restic-*` bucket above 70% of its quota for 1 h |
+| `ObjectStoreBackupBucketFilling` | A `backup-*` bucket above 70% of its quota for 1 h |
 | `ObjectStoreVolumesNearLimit` | A cell above 85% of its volume slots for 30 min |
 | `ObjectStoreProvisionerFailing` | No successful provisioner run for 2 h |
 | `ObjectStoreProvisionerNeverSucceeded` | Enabled provisioner without any successful run for 90 min |
 | `ObjectStoreProvisionerRunFailed` | The latest provisioner run failed for 30 min; clears after the next successful run |
 | `ObjectStoreWorkerDown` | Lifecycle worker metrics unreachable for 15 min |
 | `ObjectStoreLifecycleStalled` | Any shard without a lifecycle walk, or no lifecycle metrics, for 2 days |
-| `ParserDatasetMirrorFailing` | Enabled mirror without a successful run for 3 h |
-| `ParserDatasetMirrorNeverSucceeded` | Enabled mirror without any successful run for 3 h |
-| `ParserDatasetShrinking` | `parser-dataset` live bytes (`SeaweedFS_s3_bucket_size_bytes`, which drops on delete and holds on overwrite and vacuum) 5% below their maximum over the last 6 h, for 15 min; catches drains below the mirror's 90% guard and 1000-deletion cap; also fires for intended bulk deletions; a warning, since the mirror only adds delete markers that stay recoverable while AWS keeps noncurrent versions for 90 days |
+| `ParserDatasetShrinking` | Live dataset bytes fall 5% below their six-hour maximum for 15 minutes; investigate unintended deletions before the next backup |
 
 | Operation | Steps |
 | --- | --- |
 | Add an identity | Entry in `<cell>-identities.json`; credentials through `sops set`; merge; the identity ConfigMap hash restarts the cell |
 | Rotate a credential | `sops set` the cell credential and its consumer copy; merge; `kubectl -n object-store rollout restart statefulset/seaweedfs-<cell>` |
 | Add a bucket | Entry in `buckets.yaml`; merge; provisioner applies within an hour |
-| Raise a `restic-*` quota | The bucket cannot be emptied: pruned data stays locked 30 days, then noncurrent 31 days. Raise `quotaGiB` in `buckets.yaml` on `ObjectStoreBackupBucketFilling`, before `ObjectStoreBucketReadOnly`; keep the cell's quota sum × 1.3 within `-volume.max`, raising it within the PVC first if needed; merge; run the provisioner |
-| Volume slots near the limit | `volume.list` in `weed shell` shows which collections hold them; lower a cache bucket's quota or raise `-volume.max` within the PVC; restic buckets only shrink as their versions expire |
+| Raise a backup quota | Update `quotaGiB` in `buckets.yaml`; keep total quota × 1.3 within volume slots and the PVC capacity |
+| Volume slots near the limit | `volume.list` in `weed shell` shows which collections hold them; lower a cache bucket's quota or raise `-volume.max` within the PVC; prune unused backup data before increasing capacity |
 | Restore the filer store | Commands below: scale to 0, copy `/meta/filerldb` over `/data/filerldb` in a helper pod that mounts both PVCs, scale to 1 |
 | Reissue certificates | Decrypt the CA key on Macie or Archie; issue each cell's two leaves with the SANs below; replace `pki/<cell>-*.crt` and the `s3.key`/`internal.key` values; update the alert threshold |
 | Resolve versioning or lock drift on a cache bucket | Remove the bucket with the forced `weed shell` commands below, which skip lock checks; the provisioner recreates it empty |
 | Failed provisioner run | Read `kubectl -n object-store logs job/<job>`; for drift restored on a locked bucket, find who changed it, since the filter admits bucket configuration only from the provisioner key |
-| Drift restored on a `restic-<project>` bucket | Never remove the bucket; find who changed it as above, then run `repository-maintenance` in the project namespace to check both repositories |
-| Any `seaweedfs-nl` incident | Suspend the mirror first (commands below), before investigating |
-| Restore the parser dataset | Commands below: suspend the mirror, stop the parser writers, run `parser-dataset-seed`, which overwrites every object that differs from AWS, start the writers, resume |
-| Bring back missing parser dataset objects | Commands below: suspend the mirror, run `mirror.sh restore` from the seed job template, which copies only objects absent from `parser-dataset` and leaves the sentinel alone, resume; safe while the parser runs |
-| Take the parser off `parser-dataset` | Suspend the mirror, wait until no `parser-dataset-mirror` sync Job runs, set the fence (command below), then run `mirror.sh unseed` from the seed job template (commands below with `MODE=unseed`); the fence alone keeps the mirror refused if `nl` is unreachable |
-| Re-enable the mirror after the parser left `nl` | Stop the parser writers, run `parser-dataset-seed` (commands below), which writes a fresh sentinel, then resume the mirror; the fence can stay |
-| Resolve versioning or lock drift on `parser-dataset` | Suspend the mirror; forced `weed shell` cleanup below with `parser-dataset`; provisioner run; seed; resume |
-| Undo mirror deletions in AWS | Administrator only (`platform-dataset-parser` cannot delete versions): remove the delete markers the mirror wrote since the incident, commands below; this also brings back objects the parser deleted legitimately after `SINCE`, so set `SINCE` as late as the incident allows |
+| Restore the parser dataset | Stop production and development writers; restore the selected Restic snapshot; verify `SHA256SUMS`; restore PostgreSQL and local files, then `rclone copy /restore/work/source/dataset dataset:parser-dataset --checksum` and `rclone check` before resuming writers |
 | Run restic on a primary repository | Job below in the project namespace with the `repository-maintenance` label, which carries the egress to `seaweedfs-hel1`; `ARGS` such as `[init]`, `[snapshots]` or `[check]` |
 
 | Leaf | Subject | SAN | Usage |
@@ -581,7 +568,7 @@ kubectl -n object-store create job --from=cronjob/object-store-provisioner provi
 kubectl -n object-store exec -i seaweedfs-hel1-0 -c server -- /usr/bin/weed shell -master=127.0.0.1:9333 <<<'s3.bucket.list'
 ```
 
-Remove a drifted bucket, even while it holds locked objects (`parser-dataset` only with the mirror suspended):
+Remove a drifted bucket, even while it holds locked objects:
 
 ```sh
 CELL=hel1 BUCKET=ci-nsql-main
@@ -678,59 +665,4 @@ EOF
 kubectl -n object-store wait --for=jsonpath='{.status.phase}'=Succeeded pod/meta-restore --timeout=300s
 kubectl -n object-store delete pod meta-restore
 kubectl -n object-store scale statefulset/seaweedfs-hel1 --replicas=1
-```
-
-Suspend the mirror; Flux would otherwise unsuspend it within 10 minutes:
-
-```sh
-flux suspend kustomization platform-object-store
-kubectl -n object-store patch cronjob parser-dataset-mirror --type=merge -p '{"spec":{"suspend":true}}'
-```
-
-Seed or restore `parser-dataset` from AWS with the parser writers stopped, then resume:
-
-```sh
-flux suspend kustomization project-llunde-pyparser
-kubectl -n llunde-pyparser patch cronjob data-backup --type=merge -p '{"spec":{"suspend":true}}'
-until [ -z "$(kubectl -n llunde-pyparser get cronjob data-backup -o jsonpath='{.status.active}')" ]; do sleep 10; done
-kubectl -n llunde-pyparser scale deployment review worker-extract worker-light --replicas=0
-kubectl -n llunde-pyparser wait --for=delete pod -l 'app.kubernetes.io/name in (review,worker-extract,worker-light)' --timeout=5m
-kubectl -n object-store create job parser-dataset-seed-now --from=cronjob/parser-dataset-seed
-until kubectl -n object-store get job parser-dataset-seed-now -o jsonpath='{.status.succeeded}{.status.failed}' | grep -q .; do sleep 10; done
-kubectl -n object-store logs job/parser-dataset-seed-now
-kubectl -n object-store delete job parser-dataset-seed-now
-kubectl -n llunde-pyparser scale deployment review worker-extract worker-light --replicas=1
-flux resume kustomization project-llunde-pyparser
-flux resume kustomization platform-object-store
-```
-
-Fence the mirror at the moment the parser leaves `nl`; Flux does not manage this ConfigMap:
-
-```sh
-kubectl -n object-store create configmap parser-dataset-mirror-fence --from-literal=SEED_NOT_BEFORE="$(date -u '+%Y-%m-%d %H:%M:%S')" --dry-run=client -o yaml | kubectl apply -f -
-```
-
-Run `mirror.sh restore` (bring back only the objects missing from `parser-dataset`) or `mirror.sh unseed` (remove the sentinel) with the mirror suspended, then resume:
-
-```sh
-MODE=restore
-kubectl -n object-store get cronjob parser-dataset-seed -o json \
-  | jq --arg mode "$MODE" '{apiVersion: "batch/v1", kind: "Job", metadata: {name: ("parser-dataset-" + $mode), namespace: "object-store"}, spec: (.spec.jobTemplate.spec | .template.spec.containers[0].args = [$mode])}' \
-  | kubectl create -f -
-until kubectl -n object-store get job "parser-dataset-$MODE" -o jsonpath='{.status.succeeded}{.status.failed}' | grep -q .; do sleep 10; done
-kubectl -n object-store logs "job/parser-dataset-$MODE"
-kubectl -n object-store delete job "parser-dataset-$MODE"
-flux resume kustomization platform-object-store
-```
-
-Remove the delete markers the mirror wrote in AWS since `SINCE` (UTC), with administrator credentials:
-
-```sh
-SINCE=2026-09-27T12:00:00Z
-for prefix in files/ extract/ assets/ convert/; do
-  aws s3api list-object-versions --bucket llunde-pyparser-bucket --prefix "$prefix" \
-    --query "DeleteMarkers[?IsLatest && LastModified>='$SINCE'].{Key: Key, VersionId: VersionId}" --output json \
-    | jq -c '. // [] | range(0; length; 1000) as $start | {Objects: .[$start:$start + 1000], Quiet: true}' \
-    | while read -r batch; do aws s3api delete-objects --bucket llunde-pyparser-bucket --delete "$batch"; done
-done
 ```

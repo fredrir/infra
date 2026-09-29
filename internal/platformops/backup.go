@@ -24,8 +24,11 @@ import (
 type Command func(context.Context, string, string, ...string) ([]byte, error)
 
 type Repository struct {
-	Name string
-	Env  []string
+	Name         string
+	Env          []string
+	KeepLast     int
+	IntervalDays int
+	Initialize   bool
 }
 
 type ResticCommand func(ctx context.Context, repository Repository, args ...string) ([]byte, error)
@@ -50,6 +53,27 @@ func RepositoriesFromEnvironment(names []string, lookup func(string) (string, bo
 			return nil, fmt.Errorf("invalid backup repository %q", name)
 		}
 		repository := Repository{Name: name}
+		if value, ok := lookup(RepositoryPrefix(name) + "BACKUP_INITIALIZE"); ok {
+			initialize, err := strconv.ParseBool(value)
+			if err != nil {
+				return nil, fmt.Errorf("invalid initialization setting for backup repository %s", name)
+			}
+			repository.Initialize = initialize
+		}
+		if value, ok := lookup(RepositoryPrefix(name) + "BACKUP_KEEP_LAST"); ok {
+			count, err := strconv.Atoi(value)
+			if err != nil || count < 1 {
+				return nil, fmt.Errorf("invalid retention for backup repository %s", name)
+			}
+			repository.KeepLast = count
+		}
+		if value, ok := lookup(RepositoryPrefix(name) + "BACKUP_INTERVAL_DAYS"); ok {
+			days, err := strconv.Atoi(value)
+			if err != nil || days <= 0 {
+				return nil, fmt.Errorf("invalid interval for backup repository %s", name)
+			}
+			repository.IntervalDays = days
+		}
 		for _, key := range repositorySettings {
 			if value, ok := lookup(RepositoryPrefix(name) + key); ok && value != "" {
 				repository.Env = append(repository.Env, key+"="+value)
@@ -97,12 +121,19 @@ func MaintainRepositories(ctx context.Context, restic ResticCommand, repositorie
 func maintainRepository(ctx context.Context, restic ResticCommand, repository Repository, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	for _, args := range [][]string{{"--retry-lock", "10m", "check", "--read-data-subset=10%"}, {"--retry-lock", "10m", "forget", "--group-by", "host,tags", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune"}} {
+	for _, args := range [][]string{{"--retry-lock", "10m", "check", "--read-data-subset=10%"}, retentionArguments(repository)} {
 		if _, err := restic(ctx, repository, args...); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func retentionArguments(repository Repository) []string {
+	if repository.KeepLast > 0 {
+		return []string{"--retry-lock", "10m", "forget", "--group-by", "", "--keep-last", strconv.Itoa(repository.KeepLast), "--prune"}
+	}
+	return []string{"--retry-lock", "10m", "forget", "--group-by", "host,tags", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune"}
 }
 
 type BackupConfig struct {
@@ -117,6 +148,8 @@ type BackupConfig struct {
 	LocalFiles         bool
 	LocalFilesMaxBytes int64
 	LocalFilesExclude  string
+	Dataset            string
+	DatasetMaxBytes    int64
 	PreflightTimeout   time.Duration
 	ExportTimeout      time.Duration
 	UploadTimeout      time.Duration
@@ -128,6 +161,7 @@ type BackupConfig struct {
 	Run                Command
 	Restic             ResticCommand
 	Log                io.Writer
+	Now                func() time.Time
 }
 
 type writerState struct {
@@ -141,6 +175,9 @@ func Backup(ctx context.Context, c BackupConfig, exportOnly bool) error {
 	}
 	if c.Log == nil {
 		c.Log = io.Discard
+	}
+	if c.Now == nil {
+		c.Now = time.Now
 	}
 	if c.Work == "" || c.Files == "" {
 		return fmt.Errorf("backup directories required")
@@ -161,6 +198,9 @@ func Backup(ctx context.Context, c BackupConfig, exportOnly bool) error {
 	}
 	if c.LocalFiles && c.LocalFilesMaxBytes <= 0 {
 		return fmt.Errorf("local file budget required")
+	}
+	if c.Dataset != "" && c.DatasetMaxBytes <= 0 {
+		return fmt.Errorf("dataset budget required")
 	}
 	source := filepath.Join(c.Work, "source")
 	if err := os.MkdirAll(c.Work, 0700); err != nil {
@@ -195,9 +235,19 @@ func Backup(ctx context.Context, c BackupConfig, exportOnly bool) error {
 		for _, repository := range c.Repositories {
 			preflight, cancel := context.WithTimeout(ctx, c.PreflightTimeout)
 			_, err := c.Restic(preflight, repository, "cat", "config")
+			if err != nil && repository.Initialize {
+				_, err = c.Restic(preflight, repository, "init")
+			}
+			due := true
+			if err == nil && repository.IntervalDays > 0 {
+				due, err = repositoryDue(preflight, c.Restic, repository, c.Now())
+			}
 			cancel()
 			if err != nil {
 				failures = append(failures, fmt.Errorf("backup preflight of %s: %w", repository.Name, err))
+				continue
+			}
+			if !due {
 				continue
 			}
 			available = append(available, repository)
@@ -218,9 +268,15 @@ func Backup(ctx context.Context, c BackupConfig, exportOnly bool) error {
 	for _, repository := range available {
 		upload, cancel := context.WithTimeout(ctx, c.UploadTimeout)
 		_, err := c.Restic(upload, repository, "--retry-lock", "10m", "backup", source, "--host", "platform", "--tag", c.Project, "--tag", c.Kind, "--json")
+		if err == nil && repository.KeepLast > 0 {
+			_, err = c.Restic(upload, repository, retentionArguments(repository)...)
+			if err == nil {
+				_, err = c.Restic(upload, repository, "--retry-lock", "10m", "check", "--read-data-subset=10%")
+			}
+		}
 		cancel()
 		if err != nil {
-			failures = append(failures, fmt.Errorf("backup upload to %s: %w", repository.Name, err))
+			failures = append(failures, fmt.Errorf("backup to %s: %w", repository.Name, err))
 		}
 	}
 	if len(failures) > 0 {
@@ -230,6 +286,29 @@ func Backup(ctx context.Context, c BackupConfig, exportOnly bool) error {
 		fmt.Fprintln(c.Log, "backup heartbeat failed")
 	}
 	return nil
+}
+
+func repositoryDue(ctx context.Context, restic ResticCommand, repository Repository, now time.Time) (bool, error) {
+	data, err := restic(ctx, repository, "snapshots", "--json")
+	if err != nil {
+		return false, err
+	}
+	var snapshots []struct {
+		Time time.Time `json:"time"`
+	}
+	if err := json.Unmarshal(data, &snapshots); err != nil {
+		return false, fmt.Errorf("invalid snapshot inventory: %w", err)
+	}
+	var latest time.Time
+	for _, snapshot := range snapshots {
+		if snapshot.Time.IsZero() || snapshot.Time.After(now) {
+			return false, fmt.Errorf("invalid snapshot time")
+		}
+		if snapshot.Time.After(latest) {
+			latest = snapshot.Time
+		}
+	}
+	return latest.IsZero() || int(now.UTC().Truncate(24*time.Hour).Sub(latest.UTC().Truncate(24*time.Hour))/(24*time.Hour)) >= repository.IntervalDays, nil
 }
 
 func exportBackup(ctx context.Context, c BackupConfig) (result error) {
@@ -370,6 +449,11 @@ func exportBackup(ctx context.Context, c BackupConfig) (result error) {
 			return err
 		}
 	}
+	if c.Dataset != "" {
+		if err := exportDataset(ctx, c, filepath.Join(source, "dataset")); err != nil {
+			return err
+		}
+	}
 	quiet, err := writersQuiet(ctx, c)
 	if err != nil {
 		return err
@@ -378,6 +462,27 @@ func exportBackup(ctx context.Context, c BackupConfig) (result error) {
 		return fmt.Errorf("writer resumed during export")
 	}
 	return WriteChecksums(source)
+}
+
+func exportDataset(ctx context.Context, c BackupConfig, destination string) error {
+	output, err := c.Run(ctx, "", "rclone", "size", c.Dataset, "--json", "--log-level=ERROR")
+	if err != nil {
+		return err
+	}
+	var size struct {
+		Bytes *int64 `json:"bytes"`
+		Count *int64 `json:"count"`
+	}
+	if err := json.Unmarshal(output, &size); err != nil || size.Bytes == nil || size.Count == nil || *size.Bytes < 0 || *size.Count <= 0 || *size.Bytes > c.DatasetMaxBytes {
+		return fmt.Errorf("dataset is empty, unreadable or exceeds scratch budget")
+	}
+	if _, err := c.Run(ctx, "", "rclone", "copy", c.Dataset, destination, "--checksum", "--transfers=8", "--buffer-size=4M", "--max-transfer="+strconv.FormatInt(c.DatasetMaxBytes, 10), "--cutoff-mode=hard", "--log-level=ERROR"); err != nil {
+		return fmt.Errorf("dataset export: %w", err)
+	}
+	if _, err := c.Run(ctx, "", "rclone", "check", c.Dataset, destination, "--log-level=ERROR"); err != nil {
+		return fmt.Errorf("dataset verification: %w", err)
+	}
+	return nil
 }
 
 func deployment(ctx context.Context, c BackupConfig, name string) (int, string, error) {

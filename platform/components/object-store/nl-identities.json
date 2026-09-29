@@ -33,11 +33,11 @@
       ],
       "credentials": [
         {
-          "accessKey": "${PARSER_MIRROR_ACCESS_KEY_ID}",
-          "secretKey": "${PARSER_MIRROR_SECRET_ACCESS_KEY}"
+          "accessKey": "${PARSER_BACKUP_ACCESS_KEY_ID}",
+          "secretKey": "${PARSER_BACKUP_SECRET_ACCESS_KEY}"
         }
       ],
-      "name": "parser-mirror"
+      "name": "parser-backup"
     }
   ]
 }

@@ -88,7 +88,7 @@ metadata:
   name: data-backup
   namespace: llunde-pyparser
 spec:
-  schedule: 15 */6 * * *
+  schedule: 15 0 * * *
   timeZone: Etc/UTC
   suspend: false
   concurrencyPolicy: Forbid
@@ -131,6 +131,38 @@ spec:
                   secretRef:
                     name: backup-repository
               env:
+                - name: BACKUP_DATASET
+                  value: dataset:parser-dataset
+                - name: BACKUP_DATASET_MAX_BYTES
+                  value: '107374182400'
+                - name: BACKUP_EXPORT_TIMEOUT
+                  value: '1800'
+                - name: BACKUP_UPLOAD_TIMEOUT
+                  value: '4800'
+                - name: GOMEMLIMIT
+                  value: 384MiB
+                - name: RCLONE_CONFIG_DATASET_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_DATASET_PROVIDER
+                  value: SeaweedFS
+                - name: RCLONE_CONFIG_DATASET_ENDPOINT
+                  value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
+                - name: RCLONE_CONFIG_DATASET_REGION
+                  value: nl
+                - name: RCLONE_CONFIG_DATASET_NO_CHECK_BUCKET
+                  value: 'true'
+                - name: RCLONE_CA_CERT
+                  value: /usr/local/share/object-store/ca.crt
+                - name: RCLONE_CONFIG_DATASET_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-dataset
+                      key: ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_DATASET_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-dataset
+                      key: SECRET_ACCESS_KEY
                 - name: BACKUP_REPOSITORIES
                   value: offsite
                 - name: BACKUP_HEARTBEAT_TOKEN
@@ -173,7 +205,7 @@ spec:
                 limits:
                   cpu: '1'
                   memory: 512Mi
-                  ephemeral-storage: 56Gi
+                  ephemeral-storage: 160Gi
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
@@ -198,7 +230,7 @@ spec:
           volumes:
             - name: work
               emptyDir:
-                sizeLimit: 48Gi
+                sizeLimit: 152Gi
             - name: tmp
               emptyDir:
                 sizeLimit: 128Mi

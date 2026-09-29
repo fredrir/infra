@@ -13,8 +13,6 @@ resources:
 - ci/nsql.secret.sops.yaml
 - restic.secret.sops.yaml
 - provisioner.yaml
-- mirror.yaml
-- parser-dataset-aws.secret.sops.yaml
 - network.yaml
 - monitoring.yaml
 configMapGenerator:
@@ -39,9 +37,6 @@ configMapGenerator:
 - name: seaweedfs-s3-filter
   files:
   - s3-filter.caddyfile
-- name: parser-dataset-mirror
-  files:
-  - mirror.sh
 - name: object-store-buckets
   files:
   - buckets.yaml

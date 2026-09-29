@@ -12,9 +12,18 @@ resources:
 - tunnel.secret.sops.yaml
 - ghcr.secret.sops.yaml
 - backup.yaml
+- backup-dataset.secret.sops.yaml
 - backup.secret.sops.yaml
 - backup-primary.secret.sops.yaml
 components:
 - ../../components/backup-job
 - ../../components/backup-primary
 - ../../components/netpol-gate/egress
+patches:
+- target:
+    kind: CronJob
+    name: data-backup
+  patch: |-
+    - op: replace
+      path: /spec/jobTemplate/spec/activeDeadlineSeconds
+      value: 12300

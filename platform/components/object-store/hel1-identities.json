@@ -71,9 +71,9 @@
     },
     {
       "actions": [
-        "Read:restic-parser",
-        "Write:restic-parser/*",
-        "List:restic-parser"
+        "Read:backup-parser",
+        "Write:backup-parser/*",
+        "List:backup-parser"
       ],
       "credentials": [
         {
@@ -85,9 +85,9 @@
     },
     {
       "actions": [
-        "Read:restic-y",
-        "Write:restic-y/*",
-        "List:restic-y"
+        "Read:backup-y",
+        "Write:backup-y/*",
+        "List:backup-y"
       ],
       "credentials": [
         {
@@ -99,9 +99,9 @@
     },
     {
       "actions": [
-        "Read:restic-portfolio",
-        "Write:restic-portfolio/*",
-        "List:restic-portfolio"
+        "Read:backup-portfolio",
+        "Write:backup-portfolio/*",
+        "List:backup-portfolio"
       ],
       "credentials": [
         {
@@ -110,6 +110,20 @@
         }
       ],
       "name": "restic-portfolio"
+    },
+    {
+      "actions": [
+        "Read:backup-attic",
+        "Write:backup-attic/*",
+        "List:backup-attic"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${RESTIC_ATTIC_ACCESS_KEY_ID}",
+          "secretKey": "${RESTIC_ATTIC_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "restic-attic"
     }
   ]
 }

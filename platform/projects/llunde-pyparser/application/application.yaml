@@ -88,12 +88,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: application
-              key: AWS_ACCESS_KEY_ID
+              key: PYPARSER_STORAGE_ACCESS_KEY
         - name: PYPARSER_STORAGE_SECRET_KEY
           valueFrom:
             secretKeyRef:
               name: application
-              key: AWS_SECRET_ACCESS_KEY
+              key: PYPARSER_STORAGE_SECRET_KEY
         resources:
           requests:
             cpu: 50m
@@ -238,12 +238,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: application
-              key: AWS_ACCESS_KEY_ID
+              key: PYPARSER_STORAGE_ACCESS_KEY
         - name: PYPARSER_STORAGE_SECRET_KEY
           valueFrom:
             secretKeyRef:
               name: application
-              key: AWS_SECRET_ACCESS_KEY
+              key: PYPARSER_STORAGE_SECRET_KEY
         resources:
           requests:
             cpu: 250m
@@ -358,12 +358,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: application
-              key: AWS_ACCESS_KEY_ID
+              key: PYPARSER_STORAGE_ACCESS_KEY
         - name: PYPARSER_STORAGE_SECRET_KEY
           valueFrom:
             secretKeyRef:
               name: application
-              key: AWS_SECRET_ACCESS_KEY
+              key: PYPARSER_STORAGE_SECRET_KEY
         resources:
           requests:
             cpu: 100m

@@ -202,3 +202,27 @@ spec:
     ports:
     - port: 8000
       protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backup-dataset-egress
+  namespace: llunde-pyparser
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: data-backup
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: object-store
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: seaweedfs
+          app.kubernetes.io/instance: nl
+    ports:
+    - port: 8333
+      protocol: TCP

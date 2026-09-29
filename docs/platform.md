@@ -220,27 +220,26 @@ kubectl get cronjobs --all-namespaces
 
 ## Backups and recovery
 
-| Data                  | Cadence            | Contents                                                                                                               |
-| --------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| Parser                | Every 6 hours      | PostgreSQL logical dump and local files; writers quiesced together                                                     |
-| Y                     | Every 6 hours      | MongoDB dump and local media; writers quiesced together                                                                |
-| Portfolio             | Hourly             | PostgreSQL logical dump; existing AWS media retained                                                                   |
-| Control plane         | Every 6 hours      | Native etcd snapshot, exact server/agent tokens, K3s configuration and encrypted repository copy of Kubernetes Secrets |
-| Attic                 | Hourly             | Consistent SQLite export including signing identity                                                                    |
-| Restic maintenance    | Weekly             | Repository read/integrity checks and retention on every repository of the job                                         |
-| AWS application media | Preserved in place | Independent user-managed Google Drive copy                                                                             |
+| Data | Frequency | Destination | Retention |
+| --- | --- | --- | --- |
+| Parser PostgreSQL, local files and dataset | Daily, 00:15 UTC | SeaweedFS `hel1` | Latest 3 snapshots |
+| Y MongoDB and media | Daily, 03:35 UTC | SeaweedFS `hel1` | Latest 3 snapshots |
+| Portfolio PostgreSQL | Daily, 04:05 UTC | SeaweedFS `hel1` | Latest 3 snapshots |
+| Parser, Y and portfolio | Every 14 UTC calendar days since the last successful snapshot | AWS S3 | Latest snapshot |
+| Attic SQLite, including cache signing identity | Hourly, :45 UTC | SeaweedFS `hel1` | 7 daily, 4 weekly, 12 monthly |
+| Control-plane recovery data | Daily, 05:55 UTC | AWS S3 | 7 daily, 4 weekly, 12 monthly |
+| Repository integrity checks | Weekly | Each configured repository | Prunes according to that repository's policy |
 
 | Recovery boundary  | Value                                                                                                                                                                        |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backup storage     | Encrypted Restic repositories; parser, Y and portfolio: primary `restic-<project>` on `seaweedfs-hel1` (`fredrir-04`) and off-site AWS `restic/platform/`; Attic and control plane: off-site only |
-| Upload order       | Writers resume after the export; the job then uploads to the primary and the off-site repository; either failing fails the job and withholds the heartbeat, while the other still receives the snapshot |
-| Primary history    | COMPLIANCE lock 30 days; writers cannot change bucket settings or delete versions; pruned data stays 31 days |
-| Retired host repos | `restic/llunde-*` expire 2026-12-25; versions deleted 90 days later; lifecycle changes require an administrator apply                                                        |
-| Pruned versions    | Noncurrent `restic/platform/` versions expire after 90 days; writers cannot delete versions; lifecycle changes require an administrator apply |
+| Backup storage | Encrypted Restic; primary buckets `backup-<project>` on SeaweedFS `hel1`; AWS application repositories in unversioned `llunde-pyparser-bucket-backups`, one prefix per project; control recovery in `llunde-pyparser-bucket/restic/platform/control` |
+| Upload order | Preflight each repository and check AWS snapshot age; quiesce writers, export once, verify, resume writers, then upload to repositories that are due; prune only after successful upload; a failed destination does not prevent the other upload |
+| Snapshot limits | Primary application repositories retain the latest 3 snapshots; AWS application repositories retain 1; no versioning or object lock retains deleted application backup data |
+| Control history | Noncurrent control recovery object versions expire after 90 days |
 | Credentials        | Separate project prefixes and separate maintenance authority; SOPS recovery available from Macie or Archie                                                                   |
 | Independent copies | Verified migration archives on Macie and Archie                                                                                                                              |
 | Volume policy      | Retained local volumes; important application data currently resides on `fredrir-09`                                                                                         |
-| Writer quiescence  | Backup jobs scale writers to zero and back; writer Deployments omit `replicas` so Flux does not resume them mid-export; `BackupWriterLeftScaledDown` alerts after 15 minutes |
+| Writer quiescence  | Backup jobs scale writers to zero and back; writer Deployments omit `replicas` so Flux does not resume them mid-export; Writer alerts allow 35 minutes for parser dataset export and 15 minutes for Y |
 | Node loss          | Local volumes do not migrate automatically; restore to replacement storage after fencing the old writer                                                                      |
 | Verification       | Parser, Y, portfolio, Attic and native K3s datastore restored independently; row/file checks passed                                                                          |
 | Cache recovery     | Builds can bootstrap independently; cache objects may be rebuilt                                                                                                             |

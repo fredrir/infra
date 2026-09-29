@@ -62,13 +62,13 @@ spec:
             summary: An object store bucket is above 90% of its quota
         - alert: ObjectStoreBackupBucketFilling
           expr: |
-            max by (service, bucket) (SeaweedFS_s3_bucket_size_bytes{namespace="object-store",bucket=~"restic-.+"})
-            / max by (service, bucket) (SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",bucket=~"restic-.+"}) > 0.7
+            max by (service, bucket) (SeaweedFS_s3_bucket_size_bytes{namespace="object-store",bucket=~"backup-.+"})
+            / max by (service, bucket) (SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",bucket=~"backup-.+"}) > 0.7
           for: 1h
           labels:
             severity: warning
           annotations:
-            summary: A locked restic bucket is above 70% of its quota and cannot be emptied; raise quotaGiB in buckets.yaml before it turns read-only
+            summary: A backup bucket is above 70% of its quota; check pruning and capacity before it turns read-only
         - alert: ObjectStoreVolumesNearLimit
           expr: |
             sum by (service) (SeaweedFS_volumeServer_volumes{namespace="object-store",type="volume"})
@@ -122,25 +122,6 @@ spec:
             severity: warning
           annotations:
             summary: The latest object store provisioner run failed, for example after restoring drift on a locked bucket; read its log
-        - alert: ParserDatasetMirrorFailing
-          expr: |
-            (time() - kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="parser-dataset-mirror"} > 10800)
-            and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
-          for: 10m
-          labels:
-            severity: critical
-          annotations:
-            summary: The parser dataset has no off-host copy newer than three hours; see the parser-dataset-mirror job log
-        - alert: ParserDatasetMirrorNeverSucceeded
-          expr: |
-            (kube_cronjob_info{namespace="object-store",cronjob="parser-dataset-mirror"}
-            unless on(namespace,cronjob) kube_cronjob_status_last_successful_time)
-            and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
-          for: 3h
-          labels:
-            severity: critical
-          annotations:
-            summary: The enabled parser dataset mirror has no successful run
         - alert: ParserDatasetShrinking
           expr: |
             max by (bucket) (SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"})
@@ -149,7 +130,7 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+            summary: parser-dataset holds 5% fewer live bytes than within the last six hours; check for unintended deletions before the next backup
         - alert: ObjectStoreLifecycleStalled
           expr: |
             time() - min by (service) (SeaweedFS_s3_lifecycle_daily_run_last_walked_ns{namespace="object-store"} > 0) / 1e9 > 172800

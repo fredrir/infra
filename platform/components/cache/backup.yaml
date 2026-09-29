@@ -59,11 +59,7 @@ spec:
                 - name: BACKUP_WRITERS
                   value: ''
                 - name: BACKUP_LOCAL_FILES
-                  value: 'true'
-                - name: BACKUP_LOCAL_FILES_MAX_BYTES
-                  value: '8589934592'
-                - name: BACKUP_LOCAL_FILES_EXCLUDE
-                  value: './metadata.db*'
+                  value: 'false'
                 - name: RESTIC_CACHE_DIR
                   value: /cache
                 - name: TMPDIR
@@ -76,7 +72,7 @@ spec:
                 limits:
                   cpu: '1'
                   memory: 512Mi
-                  ephemeral-storage: 16Gi
+                  ephemeral-storage: 4Gi
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
@@ -97,7 +93,7 @@ spec:
           volumes:
             - name: work
               emptyDir:
-                sizeLimit: 12Gi
+                sizeLimit: 2Gi
             - name: tmp
               emptyDir:
                 sizeLimit: 128Mi

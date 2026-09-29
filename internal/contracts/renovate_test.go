@@ -155,8 +155,16 @@ func TestRenovateUpdatesEveryPinWithItsDigest(t *testing.T) {
 			}
 			images = append(images, found...)
 		}
+		if image == "docker.io/rclone/rclone" {
+			content := string(read(t, filepath.Join(repository, "platform/components/backups/tools.Dockerfile")))
+			match := regexp.MustCompile(`(?m)^FROM docker\.io/rclone/rclone:([^@]+)@(sha256:[a-f0-9]{64}) AS rclone$`).FindStringSubmatch(content)
+			if match == nil {
+				t.Fatal("backup tools lack a digest-pinned rclone stage")
+			}
+			images = append(images, renovatePin{groups: map[string]string{"currentValue": match[1], "currentDigest": match[2]}})
+		}
 		if len(images) < 2 {
-			t.Errorf("%s is not pinned in platform/versions.yaml and an object store manifest", image)
+			t.Errorf("%s is not pinned in platform/versions.yaml and its consumer", image)
 			continue
 		}
 		for _, pin := range images {

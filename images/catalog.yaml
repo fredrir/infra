@@ -47,7 +47,7 @@
   inputs:
   - platform/components/backups/tools.Dockerfile
   - platform/components/object-store-trust/ca.crt
-  check: restic version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version; test ! -e /etc/ssl/certs/object-store.pem; grep -q "BEGIN CERTIFICATE" /usr/local/share/object-store/ca.crt
+  check: restic version; rclone version; mongodump --version; pg_dump --version; kubectl version --client; sqlite3 --version; test ! -e /etc/ssl/certs/object-store.pem; grep -q "BEGIN CERTIFICATE" /usr/local/share/object-store/ca.crt
 - image: ghcr.io/fredrir/netpol-gate
   dockerfile: images/netpol-gate/Containerfile
   inputs:

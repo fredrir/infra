@@ -80,7 +80,7 @@
     content: |
       [Unit]
       [Timer]
-      OnCalendar=*-*-* 00,06,12,18:55:00 UTC
+      OnCalendar=*-*-* 05:55:00 UTC
       Persistent=true
       RandomizedDelaySec=300
       [Install]

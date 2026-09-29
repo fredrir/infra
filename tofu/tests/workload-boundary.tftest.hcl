@@ -1,4 +1,9 @@
 mock_provider "aws" {
+  mock_resource "aws_s3_bucket" {
+    defaults = {
+      arn = "arn:aws:s3:::dataset-backups"
+    }
+  }
   mock_data "aws_caller_identity" {
     defaults = { account_id = "123456789012" }
   }
@@ -44,7 +49,7 @@ run "workload_boundary" {
   command = plan
 
   plan_options {
-    target = [aws_iam_policy.reconciliation, aws_iam_user.platform_backup, aws_iam_user_policy_attachment.platform_backup, aws_iam_user.dataset, module.platform_mail, aws_s3_bucket_lifecycle_configuration.dataset]
+    target = [aws_iam_policy.reconciliation, aws_iam_user.platform_backup, aws_iam_user_policy_attachment.platform_backup, module.platform_mail, aws_s3_bucket_lifecycle_configuration.dataset]
   }
 
   assert {
@@ -66,7 +71,7 @@ run "workload_boundary" {
   assert {
     condition = (
       alltrue([
-        for user in concat(values(aws_iam_user.platform_backup), [aws_iam_user.dataset]) :
+        for user in values(aws_iam_user.platform_backup) :
         user.permissions_boundary == aws_iam_policy.workload_boundary.arn
       ]) &&
       output.platform_mail.iam_user_boundary == aws_iam_policy.workload_boundary.arn &&

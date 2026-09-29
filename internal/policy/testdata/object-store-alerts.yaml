@@ -1,5 +1,5 @@
 rule_files:
-  - object-store-rules.yaml
+- object-store-rules.yaml
 evaluation_interval: 1m
 tests:
 - name: provisioner run fails, then succeeds
@@ -21,7 +21,8 @@ tests:
         namespace: object-store
         cronjob: object-store-provisioner
       exp_annotations:
-        summary: The latest object store provisioner run failed, for example after restoring drift on a locked bucket; read its log
+        summary: The latest object store provisioner run failed, for example after
+          restoring drift on a locked bucket; read its log
   - eval_time: 125m
     alertname: ObjectStoreProvisionerRunFailed
     exp_alerts: []
@@ -75,7 +76,8 @@ tests:
         service: seaweedfs-hel1
         endpoint: worker-metrics
       exp_annotations:
-        summary: The object store lifecycle worker is not reporting; expiry and upload cleanup stop while it is down
+        summary: The object store lifecycle worker is not reporting; expiry and upload
+          cleanup stop while it is down
 - name: lifecycle never walks
   interval: 1m
   input_series:
@@ -92,28 +94,8 @@ tests:
         severity: warning
         service: seaweedfs-hel1
       exp_annotations:
-        summary: Object store lifecycle has not walked its buckets for two days; expiry and cleanup are stalled
-- name: enabled mirror never succeeds
-  interval: 1m
-  input_series:
-  - series: kube_cronjob_info{namespace="object-store",cronjob="parser-dataset-mirror"}
-    values: 1x400
-  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="parser-dataset-mirror"}
-    values: '0x400'
-  - series: kube_cronjob_info{namespace="object-store",cronjob="parser-dataset-seed"}
-    values: 1x400
-  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="parser-dataset-seed"}
-    values: 1x400
-  alert_rule_test:
-  - eval_time: 6h
-    alertname: ParserDatasetMirrorNeverSucceeded
-    exp_alerts:
-    - exp_labels:
-        severity: critical
-        namespace: object-store
-        cronjob: parser-dataset-mirror
-      exp_annotations:
-        summary: The enabled parser dataset mirror has no successful run
+        summary: Object store lifecycle has not walked its buckets for two days; expiry
+          and cleanup are stalled
 - name: hel1 answers 10% of requests with 5xx
   interval: 1m
   input_series:
@@ -176,7 +158,8 @@ tests:
         service: seaweedfs-hel1
         bucket: ci-nsql-main
       exp_annotations:
-        summary: An object store bucket rejects writes, usually after exceeding its quota
+        summary: An object store bucket rejects writes, usually after exceeding its
+          quota
 - name: hel1 node disk at 15% free
   interval: 1m
   input_series:
@@ -199,17 +182,14 @@ tests:
         severity: warning
         service: seaweedfs-hel1
       exp_annotations:
-        summary: An object store cell's node has less than 20% free disk; volumes turn read-only at 15%
-- name: provisioner and mirror stop succeeding
+        summary: An object store cell's node has less than 20% free disk; volumes
+          turn read-only at 15%
+- name: provisioner stops succeeding
   interval: 5m
   input_series:
   - series: kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="object-store-provisioner"}
     values: '0x40'
   - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="object-store-provisioner"}
-    values: '0x40'
-  - series: kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="parser-dataset-mirror"}
-    values: '0x40'
-  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="parser-dataset-mirror"}
     values: '0x40'
   alert_rule_test:
   - eval_time: 2h
@@ -223,34 +203,16 @@ tests:
         namespace: object-store
         cronjob: object-store-provisioner
       exp_annotations:
-        summary: Object store provisioner is failing; its log names the bucket and setting
-  - eval_time: 3h
-    alertname: ParserDatasetMirrorFailing
-    exp_alerts: []
-  - eval_time: 3h15m
-    alertname: ParserDatasetMirrorFailing
-    exp_alerts:
-    - exp_labels:
-        severity: critical
-        namespace: object-store
-        cronjob: parser-dataset-mirror
-      exp_annotations:
-        summary: The parser dataset has no off-host copy newer than three hours; see the parser-dataset-mirror job log
-- name: suspended mirror and a provisioner that never succeeded
+        summary: Object store provisioner is failing; its log names the bucket and
+          setting
+- name: provisioner never succeeds
   interval: 5m
   input_series:
-  - series: kube_cronjob_status_last_successful_time{namespace="object-store",cronjob="parser-dataset-mirror"}
-    values: '0x40'
-  - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="parser-dataset-mirror"}
-    values: 1x40
   - series: kube_cronjob_info{namespace="object-store",cronjob="object-store-provisioner"}
     values: 1x40
   - series: kube_cronjob_spec_suspend{namespace="object-store",cronjob="object-store-provisioner"}
     values: '0x40'
   alert_rule_test:
-  - eval_time: 3h15m
-    alertname: ParserDatasetMirrorFailing
-    exp_alerts: []
   - eval_time: 80m
     alertname: ObjectStoreProvisionerNeverSucceeded
     exp_alerts: []
@@ -262,7 +224,8 @@ tests:
         namespace: object-store
         cronjob: object-store-provisioner
       exp_annotations:
-        summary: Object store provisioner has no successful run; buckets may lack encryption, lifecycle or quota
+        summary: Object store provisioner has no successful run; buckets may lack
+          encryption, lifecycle or quota
 - name: certificates far from expiry
   interval: 1m
   input_series:
@@ -275,13 +238,13 @@ tests:
 - name: a restic bucket above 70% of its quota
   interval: 5m
   input_series:
-  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="restic-y"}
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="backup-y"}
     values: 650x6 750x30
-  - series: SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="restic-y"}
+  - series: SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="backup-y"}
     values: 1000x36
-  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="restic-portfolio"}
+  - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="backup-portfolio"}
     values: 650x36
-  - series: SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="restic-portfolio"}
+  - series: SeaweedFS_s3_bucket_quota_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="backup-portfolio"}
     values: 1000x36
   - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-hel1",bucket="ci-nsql-main"}
     values: 850x36
@@ -297,17 +260,17 @@ tests:
     - exp_labels:
         severity: warning
         service: seaweedfs-hel1
-        bucket: restic-y
+        bucket: backup-y
       exp_annotations:
-        summary: A locked restic bucket is above 70% of its quota and cannot be emptied; raise quotaGiB in buckets.yaml before it turns read-only
+        summary: A backup bucket is above 70% of its quota; check pruning and capacity before it turns read-only
 - name: hel1 volume slots at 87%
   interval: 1m
   input_series:
   - series: SeaweedFS_volumeServer_volumes{namespace="object-store",service="seaweedfs-hel1",collection="ci-nsql-main",type="volume"}
     values: 40x5 46x60
-  - series: SeaweedFS_volumeServer_volumes{namespace="object-store",service="seaweedfs-hel1",collection="restic-parser",type="volume"}
+  - series: SeaweedFS_volumeServer_volumes{namespace="object-store",service="seaweedfs-hel1",collection="backup-parser",type="volume"}
     values: 20x65
-  - series: SeaweedFS_volumeServer_volumes{namespace="object-store",service="seaweedfs-hel1",collection="restic-parser",type="ec"}
+  - series: SeaweedFS_volumeServer_volumes{namespace="object-store",service="seaweedfs-hel1",collection="backup-parser",type="ec"}
     values: 30x65
   - series: SeaweedFS_volumeServer_max_volumes{namespace="object-store",service="seaweedfs-hel1"}
     values: 76x65
@@ -326,7 +289,8 @@ tests:
         severity: warning
         service: seaweedfs-hel1
       exp_annotations:
-        summary: An object store cell uses more than 85% of its volume slots; when they run out every bucket stops taking writes, even under its quota
+        summary: An object store cell uses more than 85% of its volume slots; when
+          they run out every bucket stops taking writes, even under its quota
 - name: parser-dataset loses 18% of its bytes at once
   interval: 5m
   input_series:
@@ -343,7 +307,8 @@ tests:
         severity: warning
         bucket: parser-dataset
       exp_annotations:
-        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+        summary: parser-dataset holds 5% fewer live bytes than within the last six
+          hours; check for unintended deletions before the next backup
   - eval_time: 7h55m
     alertname: ParserDatasetShrinking
     exp_alerts:
@@ -351,7 +316,8 @@ tests:
         severity: warning
         bucket: parser-dataset
       exp_annotations:
-        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+        summary: parser-dataset holds 5% fewer live bytes than within the last six
+          hours; check for unintended deletions before the next backup
   - eval_time: 8h10m
     alertname: ParserDatasetShrinking
     exp_alerts: []
@@ -371,7 +337,8 @@ tests:
         severity: warning
         bucket: parser-dataset
       exp_annotations:
-        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+        summary: parser-dataset holds 5% fewer live bytes than within the last six
+          hours; check for unintended deletions before the next backup
 - name: parser-dataset loses 4% of its bytes
   interval: 5m
   input_series:
@@ -421,7 +388,8 @@ tests:
         severity: warning
         bucket: parser-dataset
       exp_annotations:
-        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+        summary: parser-dataset holds 5% fewer live bytes than within the last six
+          hours; check for unintended deletions before the next backup
 - name: other cells and buckets shrink
   interval: 5m
   input_series:
@@ -450,12 +418,23 @@ tests:
         severity: warning
         bucket: parser-dataset
       exp_annotations:
-        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
-- name: 'lab replay: seed, three churn rounds, vacuum, cell restart, then 30 PDFs deleted'
+        summary: parser-dataset holds 5% fewer live bytes than within the last six
+          hours; check for unintended deletions before the next backup
+- name: 'lab replay: seed, three churn rounds, vacuum, cell restart, then 30 PDFs
+    deleted'
   interval: 1m
   input_series:
   - series: SeaweedFS_s3_bucket_size_bytes{namespace="object-store",service="seaweedfs-nl",bucket="parser-dataset"}
-    values: 153717416 153717416 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162745552 162758646 164369759 164369759 164369759 164369759 164403356 164215795 158511134 158511134 158511134 158511134 158543590 161419784 161419784 161419784 161419784 161363568 161363568 161363568 161363568 161363568 _ _ 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568 141755126 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242
+    values: 153717416 153717416 162745552 162745552 162745552 162745552 162745552
+      162745552 162745552 162745552 162745552 162745552 162745552 162758646 164369759
+      164369759 164369759 164369759 164403356 164215795 158511134 158511134 158511134
+      158511134 158543590 161419784 161419784 161419784 161419784 161363568 161363568
+      161363568 161363568 161363568 _ _ 161363568 161363568 161363568 161363568 161363568
+      161363568 161363568 161363568 161363568 161363568 161363568 161363568 161363568
+      161363568 161363568 161363568 161363568 161363568 161363568 141755126 131077242
+      131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242
+      131077242 131077242 131077242 131077242 131077242 131077242 131077242 131077242
+      131077242 131077242 131077242 131077242 131077242 131077242
   alert_rule_test:
   - eval_time: 42m
     alertname: ParserDatasetShrinking
@@ -470,4 +449,5 @@ tests:
         severity: warning
         bucket: parser-dataset
       exp_annotations:
-        summary: parser-dataset holds 5% fewer live bytes than within the last six hours; unless the deletions were intended, suspend the mirror before it delete-markers them in AWS
+        summary: parser-dataset holds 5% fewer live bytes than within the last six
+          hours; check for unintended deletions before the next backup

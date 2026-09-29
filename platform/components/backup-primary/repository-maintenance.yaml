@@ -20,6 +20,10 @@ spec:
               env:
                 - name: BACKUP_REPOSITORIES
                   value: primary offsite
+                - name: PRIMARY_BACKUP_KEEP_LAST
+                  value: '3'
+                - name: OFFSITE_BACKUP_KEEP_LAST
+                  value: '1'
                 - name: PRIMARY_RESTIC_CACERT
                   value: /usr/local/share/object-store/ca.crt
                 - name: PRIMARY_AWS_DEFAULT_REGION

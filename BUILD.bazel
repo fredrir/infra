@@ -119,11 +119,7 @@ filegroup(
     visibility = ["//internal/policy:__pkg__"],
 )
 
-filegroup(
-    name = "dataset_access_data",
-    srcs = ["tofu/parser-aws.tf"],
-    visibility = ["//internal/policy:__pkg__"],
-)
+
 
 filegroup(
     name = "tailnet_policy_data",

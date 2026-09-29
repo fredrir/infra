@@ -194,6 +194,13 @@ func newBackupCommand() *cobra.Command {
 				return fmt.Errorf("invalid local files budget")
 			}
 		}
+		if c.Dataset = os.Getenv("BACKUP_DATASET"); c.Dataset != "" {
+			var err error
+			c.DatasetMaxBytes, err = strconv.ParseInt(os.Getenv("BACKUP_DATASET_MAX_BYTES"), 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid dataset budget")
+			}
+		}
 		if len(c.Writers) > 0 || resumeOnly {
 			var err error
 			c.Kubernetes, c.Namespace, err = platformops.KubernetesAPI(os.Getenv("KUBERNETES_API_URL"), os.Getenv("BACKUP_SERVICE_ACCOUNT_DIR"))
