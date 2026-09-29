@@ -232,7 +232,7 @@ kubectl get cronjobs --all-namespaces
 
 | Recovery boundary  | Value                                                                                                                                                                        |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backup storage | Encrypted Restic; primary buckets `backup-<project>` on SeaweedFS `hel1`; AWS application repositories in unversioned `llunde-pyparser-bucket-backups`, one prefix per project; control recovery in `llunde-pyparser-bucket/restic/platform/control` |
+| Backup storage | Encrypted Restic; primary buckets `backup-<project>` on SeaweedFS `hel1`; AWS application repositories in the administrator-created unversioned `llunde-pyparser-bucket-backups`, one prefix per project; control recovery in `llunde-pyparser-bucket/restic/platform/control` |
 | Upload order | Preflight each repository and check AWS snapshot age; quiesce writers, export once, verify, resume writers, then upload to repositories that are due; prune only after successful upload; a failed destination does not prevent the other upload |
 | Snapshot limits | Primary application repositories retain the latest 3 snapshots; AWS application repositories retain 1; no versioning or object lock retains deleted application backup data |
 | Control history | Noncurrent control recovery object versions expire after 90 days |

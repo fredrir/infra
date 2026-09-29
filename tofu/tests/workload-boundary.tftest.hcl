@@ -1,9 +1,4 @@
 mock_provider "aws" {
-  mock_resource "aws_s3_bucket" {
-    defaults = {
-      arn = "arn:aws:s3:::dataset-backups"
-    }
-  }
   mock_data "aws_caller_identity" {
     defaults = { account_id = "123456789012" }
   }
@@ -27,6 +22,11 @@ mock_provider "aws" {
 mock_provider "hcloud" {}
 
 mock_provider "cloudflare" {}
+
+override_data {
+  target = data.aws_s3_bucket.application_backups
+  values = { arn = "arn:aws:s3:::dataset-backups" }
+}
 
 override_resource {
   target = aws_iam_policy.workload_boundary

@@ -1,19 +1,16 @@
 locals {
   platform_backup_projects    = toset(["parser", "y", "portfolio", "control", "attic"])
   application_backup_projects = toset(["parser", "y", "portfolio"])
-  backup_bucket_arns          = { for project in local.platform_backup_projects : project => contains(local.application_backup_projects, project) ? aws_s3_bucket.application_backups.arn : data.aws_s3_bucket.dataset.arn }
+  backup_bucket_arns          = { for project in local.platform_backup_projects : project => contains(local.application_backup_projects, project) ? data.aws_s3_bucket.application_backups.arn : data.aws_s3_bucket.dataset.arn }
   backup_prefixes             = { for project in local.platform_backup_projects : project => contains(local.application_backup_projects, project) ? project : "restic/platform/${project}" }
 }
 
-resource "aws_s3_bucket" "application_backups" {
+data "aws_s3_bucket" "application_backups" {
   bucket = "${var.dataset_bucket_name}-backups"
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_s3_bucket_public_access_block" "application_backups" {
-  bucket                  = aws_s3_bucket.application_backups.id
+  bucket                  = data.aws_s3_bucket.application_backups.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -21,7 +18,7 @@ resource "aws_s3_bucket_public_access_block" "application_backups" {
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "application_backups" {
-  bucket = aws_s3_bucket.application_backups.id
+  bucket = data.aws_s3_bucket.application_backups.id
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
@@ -30,7 +27,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "application_backu
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "application_backups" {
-  bucket = aws_s3_bucket.application_backups.id
+  bucket = data.aws_s3_bucket.application_backups.id
   rule {
     id     = "abort-incomplete-uploads"
     status = "Enabled"
