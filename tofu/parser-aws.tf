@@ -94,4 +94,35 @@ resource "aws_s3_bucket_lifecycle_configuration" "dataset" {
       expired_object_delete_marker = true
     }
   }
+
+  dynamic "rule" {
+    for_each = toset(["assets", "convert", "extract", "files"])
+    content {
+      id     = "expire-retired-dataset-${rule.value}"
+      status = "Enabled"
+      filter {
+        prefix = "${rule.value}/"
+      }
+      expiration {
+        date = "2026-10-13T00:00:00Z"
+      }
+      noncurrent_version_expiration {
+        noncurrent_days = 90
+      }
+    }
+  }
+
+  dynamic "rule" {
+    for_each = toset(["assets", "convert", "extract", "files"])
+    content {
+      id     = "remove-retired-dataset-${rule.value}-delete-markers"
+      status = "Enabled"
+      filter {
+        prefix = "${rule.value}/"
+      }
+      expiration {
+        expired_object_delete_marker = true
+      }
+    }
+  }
 }

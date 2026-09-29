@@ -157,9 +157,13 @@ run "workload_boundary" {
         startswith(rule.filter[0].prefix, "restic/llunde-") ||
         (rule.filter[0].prefix == "reconciliation/production/runs/" && rule.expiration[0].days == 30 && length(rule.noncurrent_version_expiration) == 0) ||
         (rule.filter[0].prefix == "reconciliation/production/" && rule.noncurrent_version_expiration[0].noncurrent_days == 7 && rule.expiration[0].expired_object_delete_marker && coalesce(rule.expiration[0].days, 0) == 0) ||
-        (rule.filter[0].prefix == "restic/platform/" && rule.noncurrent_version_expiration[0].noncurrent_days >= 90 && rule.expiration[0].expired_object_delete_marker && coalesce(rule.expiration[0].days, 0) == 0)
+        (rule.filter[0].prefix == "restic/platform/" && rule.noncurrent_version_expiration[0].noncurrent_days >= 90 && rule.expiration[0].expired_object_delete_marker && coalesce(rule.expiration[0].days, 0) == 0) ||
+        (contains(["assets/", "convert/", "extract/", "files/"], rule.filter[0].prefix) && coalesce(rule.expiration[0].days, 0) == 0 && (
+          (rule.expiration[0].date != null && rule.noncurrent_version_expiration[0].noncurrent_days >= 90) ||
+          (rule.expiration[0].expired_object_delete_marker && length(rule.noncurrent_version_expiration) == 0)
+        ))
       )
     ])
-    error_message = "Lifecycle expiration must stay scoped to the retired host repositories, reconciliation run reports, superseded reconciliation state and pruned platform backup versions older than 90 days."
+    error_message = "Lifecycle expiration must stay scoped to the retired host repositories, reconciliation run reports, superseded reconciliation state, the retired dataset copy and pruned platform backup versions older than 90 days."
   }
 }

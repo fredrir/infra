@@ -1,5 +1,5 @@
 locals {
-  platform_backup_projects    = toset(["parser", "y", "portfolio", "control", "attic"])
+  platform_backup_projects    = toset(["parser", "y", "portfolio", "control"])
   application_backup_projects = toset(["parser", "y", "portfolio"])
   backup_bucket_arns          = { for project in local.platform_backup_projects : project => contains(local.application_backup_projects, project) ? data.aws_s3_bucket.application_backups.arn : data.aws_s3_bucket.dataset.arn }
   backup_prefixes             = { for project in local.platform_backup_projects : project => contains(local.application_backup_projects, project) ? project : "restic/platform/${project}" }
