@@ -26,7 +26,7 @@
 | `fredrir-07`          | K3s control plane and etcd                           | 24/7                                                           |
 | `fredrir-08`          | K3s control plane and etcd                           | 24/7                                                           |
 | `fredrir-09`          | Shared production and CI worker; retained local data | 24/7                                                           |
-| `fredrir-10`          | Volatile CI worker (tainted K3s agent)               | Volatile; third-party NTNU host, no SLA; fleet runs without it |
+| `fredrir-10`          | Volatile CI worker (tainted K3s agent)               | 24/7; Volatile |
 | `fredrir-11`          | Infrastructure reconciler; hourly cloud verification | 24/7; dedicated Hetzner project; outside every fleet play      |
 
 | Capacity         | Value                                                                                         |
