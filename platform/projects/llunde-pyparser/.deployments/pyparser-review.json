@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "image": "ghcr.io/fredrir/pyparser-review",
-  "revision": "d5a7db8cbb42c136e7df404f4fbd03ed2b6757c5",
-  "digest": "sha256:9226985bf88fe8dac3976272a0af912ba557994bd3b76303d8e522ea0b71fbfd",
-  "run_id": 36542672251,
+  "revision": "02e5208ab4dea0dfc9fdfbf856848a7c09241ce2",
+  "digest": "sha256:ae30058a1c8499c192dce2d9b187529dc66a9e5832771ae793d6156be2e38601",
+  "run_id": 36545106382,
   "attempt": 1
 }
