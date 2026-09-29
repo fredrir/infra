@@ -40,6 +40,8 @@ type ImageOptions struct {
 	Log             io.Writer
 }
 
+const layerCompression = dagger.ImageLayerCompressionZstd
+
 func Image(ctx context.Context, opts ImageOptions) (string, error) {
 	if opts.Image == "" && opts.Export == "" && opts.ExportDirectory == "" && !opts.CheckOnly {
 		return "", errors.New("image reference or export path required")
@@ -159,7 +161,7 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		return "", err
 	}
 	if opts.Export != "" {
-		if _, err := container.Export(ctx, opts.Export); err != nil {
+		if _, err := container.Export(ctx, opts.Export, dagger.ContainerExportOpts{ForcedCompression: layerCompression}); err != nil {
 			return "", err
 		}
 	}
@@ -178,5 +180,5 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		}
 		container = container.WithRegistryAuth(host, opts.RegistryUser, client.SetSecret("registry-token", opts.RegistryToken))
 	}
-	return container.Publish(ctx, opts.Image)
+	return container.Publish(ctx, opts.Image, dagger.ContainerPublishOpts{ForcedCompression: layerCompression})
 }

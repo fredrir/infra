@@ -150,7 +150,7 @@ all:
           build_engine_memory: 10g
           build_engine_pids: 3072
           build_engine_default_cache_gib: 5
-          build_engine_cache_gib: {infra: 16, llunde-backend: 8}
+          build_engine_cache_gib: {infra: 16, llunde-backend: 8, llunde-pyparser: 16}
           build_engine_parallelism: 3
           build_runner_cpus_percent: 800
           build_runner_memory: 4G

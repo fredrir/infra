@@ -91,9 +91,20 @@ func TestDaggerImageBuildSelectsStageAndPreservesLiteralBuildArguments(t *testin
 	if err := json.Unmarshal(entries["index.json"], &index); err != nil || len(index.Manifests) != 1 {
 		t.Fatalf("invalid OCI index: %v", err)
 	}
-	var manifest struct{ Config struct{ Digest string } }
+	var manifest struct {
+		Config struct{ Digest string }
+		Layers []struct{ MediaType string }
+	}
 	if err := json.Unmarshal(entries["blobs/"+strings.ReplaceAll(index.Manifests[0].Digest, ":", "/")], &manifest); err != nil {
 		t.Fatal(err)
+	}
+	if len(manifest.Layers) == 0 {
+		t.Fatal("exported image has no layers")
+	}
+	for _, layer := range manifest.Layers {
+		if layer.MediaType != "application/vnd.oci.image.layer.v1.tar+zstd" {
+			t.Fatalf("layer compressed as %s, want zstd", layer.MediaType)
+		}
 	}
 	var config struct {
 		Config struct{ Labels map[string]string }
