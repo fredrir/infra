@@ -48,7 +48,7 @@
       "customType": "regex",
       "managerFilePatterns": ["/^platform/versions\\.yaml$/", "/^platform/components/object-store/[^/]+\\.yaml$/"],
       "matchStrings": [
-        "(?<depName>docker\\.io/(?:chrislusf/seaweedfs|rclone/rclone)):(?<currentValue>[0-9][0-9.]*)@(?<currentDigest>sha256:[a-f0-9]{64})"
+        "(?<depName>docker\\.io/chrislusf/seaweedfs):(?<currentValue>[0-9][0-9.]*)@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],
       "datasourceTemplate": "docker"
     },

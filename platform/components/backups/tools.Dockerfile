@@ -1,4 +1,14 @@
-FROM docker.io/rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5 AS rclone
+FROM docker.io/library/golang:1.27.1-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125 AS rclone
+RUN apk add --no-cache git
+WORKDIR /src
+RUN git init -q . \
+    && git remote add origin https://github.com/rclone/rclone.git \
+    && git fetch -q --depth 1 origin tag v1.75.1 \
+    && git checkout -q v1.75.1 \
+    && test "$(git rev-parse HEAD)" = 687d264b689b8c49a67e2e52a8a5e0caa01c04ce
+RUN go get google.golang.org/grpc@v1.84.0-dev.0.20260825144003-d5a41119e0e3 \
+    && go mod tidy
+RUN CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -X github.com/rclone/rclone/fs.Version=v1.75.1' -o /usr/local/bin/rclone .
 
 FROM docker.io/library/golang:1.27.1-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125 AS restic
 RUN apk add --no-cache git

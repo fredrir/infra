@@ -140,37 +140,27 @@ func TestRenovateUpdatesEveryPinWithItsDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 	manifests = append(manifests, filepath.Join(repository, "platform/versions.yaml"))
-	for _, image := range []string{"docker.io/chrislusf/seaweedfs", "docker.io/rclone/rclone"} {
-		var images []renovatePin
-		for _, manifest := range manifests {
-			relative, err := filepath.Rel(repository, manifest)
-			if err != nil {
-				t.Fatal(err)
-			}
-			content, found := pins(relative)
-			references := strings.Count(content, image+":")
-			found = slices.DeleteFunc(found, func(pin renovatePin) bool { return pin.groups["depName"] != image })
-			if len(found) != references {
-				t.Errorf("%s: Renovate updates %d of %d %s image references", relative, len(found), references, image)
-			}
-			images = append(images, found...)
+	image := "docker.io/chrislusf/seaweedfs"
+	var images []renovatePin
+	for _, manifest := range manifests {
+		relative, err := filepath.Rel(repository, manifest)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if image == "docker.io/rclone/rclone" {
-			content := string(read(t, filepath.Join(repository, "platform/components/backups/tools.Dockerfile")))
-			match := regexp.MustCompile(`(?m)^FROM docker\.io/rclone/rclone:([^@]+)@(sha256:[a-f0-9]{64}) AS rclone$`).FindStringSubmatch(content)
-			if match == nil {
-				t.Fatal("backup tools lack a digest-pinned rclone stage")
-			}
-			images = append(images, renovatePin{groups: map[string]string{"currentValue": match[1], "currentDigest": match[2]}})
+		content, found := pins(relative)
+		references := strings.Count(content, image+":")
+		found = slices.DeleteFunc(found, func(pin renovatePin) bool { return pin.groups["depName"] != image })
+		if len(found) != references {
+			t.Errorf("%s: Renovate updates %d of %d %s image references", relative, len(found), references, image)
 		}
-		if len(images) < 2 {
-			t.Errorf("%s is not pinned in platform/versions.yaml and its consumer", image)
-			continue
-		}
-		for _, pin := range images {
-			if pin.groups["currentValue"] != images[0].groups["currentValue"] || pin.groups["currentDigest"] != images[0].groups["currentDigest"] {
-				t.Errorf("%s pins disagree: %s@%s and %s@%s", image, pin.groups["currentValue"], pin.groups["currentDigest"], images[0].groups["currentValue"], images[0].groups["currentDigest"])
-			}
+		images = append(images, found...)
+	}
+	if len(images) < 2 {
+		t.Fatalf("%s is not pinned in platform/versions.yaml and its consumer", image)
+	}
+	for _, pin := range images {
+		if pin.groups["currentValue"] != images[0].groups["currentValue"] || pin.groups["currentDigest"] != images[0].groups["currentDigest"] {
+			t.Errorf("%s pins disagree: %s@%s and %s@%s", image, pin.groups["currentValue"], pin.groups["currentDigest"], images[0].groups["currentValue"], images[0].groups["currentDigest"])
 		}
 	}
 }

@@ -119,8 +119,6 @@ filegroup(
     visibility = ["//internal/policy:__pkg__"],
 )
 
-
-
 filegroup(
     name = "tailnet_policy_data",
     srcs = [
