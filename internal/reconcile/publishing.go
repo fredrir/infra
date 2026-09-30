@@ -22,6 +22,9 @@ const (
 	publishedBranch = "production"
 	gitToken        = "INFRA_GIT_TOKEN"
 	GitHubAPI       = "https://api.github.com"
+	gitFatal        = 128
+	pushAttempts    = 3
+	pushRetryDelay  = 2 * time.Second
 )
 
 type Publisher struct {
@@ -163,5 +166,17 @@ func (c *Commands) push(ctx context.Context, revision string) error {
 			fmt.Fprintln(c.Runner.Stderr, "revoke publisher token:", revoked)
 		}
 	}()
-	return tokenGit(c.Runner, token).Run(ctx, "git", "push", "--no-verify", c.Publisher.Remote, revision+":refs/heads/"+publishedBranch)
+	git := tokenGit(c.Runner, token)
+	push := process.Options{Name: "git", Args: []string{"push", "--no-verify", c.Publisher.Remote, revision + ":refs/heads/" + publishedBranch}, Dir: git.Dir, Env: append(os.Environ(), git.Env...), Stdout: git.Stdout, Stderr: git.Stderr}
+	for attempt := 1; ; attempt++ {
+		result, err := git.Invoke(ctx, push)
+		if err == nil || result.ExitCode != gitFatal || attempt == pushAttempts {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return errors.Join(err, ctx.Err())
+		case <-time.After(time.Duration(attempt) * pushRetryDelay):
+		}
+	}
 }

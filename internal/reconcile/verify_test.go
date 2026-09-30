@@ -496,3 +496,67 @@ func TestRunnerSetsWithoutRunningListenersFailVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func fluxResource(t *testing.T, generation, observed int, conditions string) resource {
+	t.Helper()
+	var item resource
+	data := fmt.Sprintf(`{"metadata":{"name":"platform-controllers","namespace":"flux-system","generation":%d},"status":{"observedGeneration":%d,"conditions":[%s]}}`, generation, observed, conditions)
+	if err := json.Unmarshal([]byte(data), &item); err != nil {
+		t.Fatal(err)
+	}
+	return item
+}
+
+func TestReadinessSeparatesProgressFromFailure(t *testing.T) {
+	for name, test := range map[string]struct {
+		item                 resource
+		ready, inProgression bool
+	}{
+		"ready":            {item: fluxResource(t, 2, 2, `{"type":"Ready","status":"True","observedGeneration":2}`), ready: true},
+		"health checks":    {item: fluxResource(t, 2, 2, `{"type":"Reconciling","status":"True","message":"Running health checks"},{"type":"Ready","status":"Unknown","observedGeneration":2}`), inProgression: true},
+		"unobserved":       {item: fluxResource(t, 3, 2, `{"type":"Ready","status":"True","observedGeneration":2}`), inProgression: true},
+		"stalled":          {item: fluxResource(t, 2, 2, `{"type":"Reconciling","status":"True"},{"type":"Stalled","status":"True","message":"invalid"}`)},
+		"failed checks":    {item: fluxResource(t, 2, 2, `{"type":"Ready","status":"False","message":"health check failed","observedGeneration":2}`)},
+		"stale conditions": {item: fluxResource(t, 2, 2, `{"type":"Ready","status":"True","observedGeneration":1}`)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := ready(test.item)
+			if (err == nil) != test.ready {
+				t.Fatalf("ready = %v", err)
+			}
+			if got := errors.As(err, new(progressing)); got != test.inProgression {
+				t.Fatalf("progressing = %v for %v", got, err)
+			}
+		})
+	}
+}
+
+func TestSettleWaitsOnlyForProgress(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		checks := 0
+		err := settle(t.Context(), time.Minute, 10*time.Second, func() error {
+			checks++
+			if checks < 3 {
+				return errors.Join(errors.New("unrelated"), progressing{errors.New("reconciling")})
+			}
+			return nil
+		})
+		if err != nil || checks != 3 {
+			t.Fatalf("settled after %d checks: %v", checks, err)
+		}
+	})
+	synctest.Test(t, func(t *testing.T) {
+		checks := 0
+		failure := errors.New("health check failed")
+		if err := settle(t.Context(), time.Minute, 10*time.Second, func() error { checks++; return failure }); err != failure || checks != 1 {
+			t.Fatalf("waited %d checks on a failure: %v", checks, err)
+		}
+	})
+	synctest.Test(t, func(t *testing.T) {
+		start := time.Now()
+		err := settle(t.Context(), time.Minute, 10*time.Second, func() error { return progressing{errors.New("reconciling")} })
+		if !errors.As(err, new(progressing)) || time.Since(start) != time.Minute {
+			t.Fatalf("gave up after %s with %v", time.Since(start), err)
+		}
+	})
+}

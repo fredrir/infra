@@ -79,17 +79,31 @@ type resource struct {
 	}
 }
 
+const (
+	settleWindow   = 20 * time.Minute
+	settleInterval = 10 * time.Second
+)
+
+type progressing struct{ error }
+
+func (p progressing) Unwrap() error { return p.error }
+
 func ready(item resource) error {
 	name := item.Metadata.Namespace + "/" + item.Metadata.Name
 	if item.Spec.Suspend {
 		return nil
 	}
+	for _, condition := range item.Status.Conditions {
+		if condition.Type == "Stalled" && condition.Status == "True" {
+			return fmt.Errorf("%s: %s", name, condition.Message)
+		}
+	}
 	if item.Status.ObservedGeneration != item.Metadata.Generation {
-		return fmt.Errorf("%s has unobserved configuration", name)
+		return progressing{fmt.Errorf("%s has unobserved configuration", name)}
 	}
 	for _, condition := range item.Status.Conditions {
-		if (condition.Type == "Reconciling" || condition.Type == "Stalled") && condition.Status == "True" {
-			return fmt.Errorf("%s: %s", name, condition.Message)
+		if condition.Type == "Reconciling" && condition.Status == "True" {
+			return progressing{fmt.Errorf("%s: %s", name, condition.Message)}
 		}
 	}
 	for _, condition := range item.Status.Conditions {
@@ -473,7 +487,7 @@ func (c *Commands) verifyRenderedCluster(ctx context.Context, plan Plan) error {
 	if err := c.RenderKubernetes(ctx, plan); err != nil {
 		return err
 	}
-	return c.verifyDeployment(ctx, plan)
+	return settle(ctx, settleWindow, settleInterval, func() error { return c.verifyDeployment(ctx, plan) })
 }
 
 func (c *Commands) verifyDeployment(ctx context.Context, plan Plan) error {
@@ -644,6 +658,24 @@ func verifyGrafana(ctx context.Context, client *http.Client, base string) error 
 		}
 	}
 	return nil
+}
+
+func settle(ctx context.Context, window, interval time.Duration, check func() error) error {
+	wait, cancel := context.WithTimeout(ctx, window)
+	defer cancel()
+	for {
+		err := check()
+		if !errors.As(err, new(progressing)) {
+			return err
+		}
+		timer := time.NewTimer(interval)
+		select {
+		case <-wait.Done():
+			timer.Stop()
+			return err
+		case <-timer.C:
+		}
+	}
 }
 
 func poll(ctx context.Context, check func() error) error {

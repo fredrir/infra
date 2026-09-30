@@ -73,6 +73,7 @@ type authenticatedGit struct {
 	mu             sync.Mutex
 	authorizations []string
 	urls           []string
+	forbidden      int
 	backend        http.Handler
 }
 
@@ -84,6 +85,16 @@ func (g *authenticatedGit) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if user, password, ok := r.BasicAuth(); !ok || user != "x-access-token" || password != publisherSecret {
 		w.Header().Set("WWW-Authenticate", `Basic realm="git"`)
 		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	g.mu.Lock()
+	forbidden := g.forbidden > 0 && r.URL.Query().Get("service") == "git-receive-pack"
+	if forbidden {
+		g.forbidden--
+	}
+	g.mu.Unlock()
+	if forbidden {
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 	g.backend.ServeHTTP(w, r)
@@ -301,6 +312,27 @@ func TestPublisherKeyFileIsConsumedOnce(t *testing.T) {
 	}
 }
 
+func (f *publishingFixture) pushes() int {
+	return len(slices.DeleteFunc(slices.Clone(f.executed), func(options process.Options) bool {
+		return options.Name != "git" || len(options.Args) == 0 || options.Args[0] != "push"
+	}))
+}
+
+func TestPublishRetriesATransientlyForbiddenPush(t *testing.T) {
+	f := newPublishingFixture(t)
+	f.git.forbidden = 1
+	revision := f.run(f.checkout, "rev-parse", "HEAD")
+	if err := f.commands.Publish(context.Background(), revision); err != nil {
+		t.Fatalf("publish: %v\n%s", err, f.logs.String())
+	}
+	if production := f.production(); production != revision {
+		t.Fatalf("production at %q, want %s", production, revision)
+	}
+	if pushes := f.pushes(); pushes != 2 {
+		t.Fatalf("pushed %d times, want 2", pushes)
+	}
+}
+
 func TestPublishNeverForcesProduction(t *testing.T) {
 	f := newPublishingFixture(t)
 	revision := f.run(f.checkout, "rev-parse", "HEAD")
@@ -310,6 +342,9 @@ func TestPublishNeverForcesProduction(t *testing.T) {
 	}
 	if production := f.production(); production != rogue {
 		t.Fatalf("production moved to %q", production)
+	}
+	if pushes := f.pushes(); pushes != 1 {
+		t.Fatalf("retried a rejected push %d times", pushes-1)
 	}
 	f.assertTokenConfinedToThePush()
 }
