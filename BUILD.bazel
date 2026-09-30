@@ -200,6 +200,12 @@ filegroup(
 )
 
 filegroup(
+    name = "workflow_trust_data",
+    srcs = glob([".github/chainguard/*.sts.yaml"]),
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "publishing_data",
     srcs = glob([".github/*-ruleset.json"]) + ["//build:publisher.json"],
     visibility = [
