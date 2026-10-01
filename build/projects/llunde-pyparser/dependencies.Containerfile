@@ -32,7 +32,7 @@ FROM base AS runtime-lock
 WORKDIR /lock
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=bind,from=uv,source=/uv,target=/usr/local/bin/uv \
-  UV_NO_CONFIG=1 uv export --frozen --extra fixtures --no-dev --no-emit-project --format pylock.toml --no-header --quiet --output-file /pylock.toml
+  UV_NO_CONFIG=1 uv export --frozen --no-dev --no-emit-project --format pylock.toml --no-header --quiet --output-file /pylock.toml
 
 FROM base AS deps
 COPY --from=runtime-lock /pylock.toml /usr/local/share/pyparser/pylock.toml

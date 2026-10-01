@@ -26,7 +26,7 @@ func TestRuntimeDependencyKeyIgnoresDevLockChangesButTracksRecipeAndRuntime(t *t
 	}
 	lock := "lock-version = '1.0'\n[[packages]]\nname='runtime'\nversion='1.0'\n"
 	runner := process.Runner{Dir: root, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
-		if options.Name != "uv" || !slices.Contains(options.Args, "--no-dev") || !slices.Contains(options.Args, "fixtures") || !slices.Contains(options.Env, "UV_NO_CONFIG=1") {
+		if options.Name != "uv" || !slices.Contains(options.Args, "--no-dev") || !slices.Contains(options.Env, "UV_NO_CONFIG=1") {
 			t.Error("runtime export changed")
 		}
 		return process.Result{Stdout: []byte(lock)}, nil

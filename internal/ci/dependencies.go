@@ -65,7 +65,7 @@ func PlanDependencies(ctx context.Context, runner process.Runner, infraRoot stri
 		}
 	}
 	runner.Env = append(runner.Env, "UV_NO_CONFIG=1")
-	lock, err := runner.Output(ctx, "uv", "export", "--frozen", "--extra", "fixtures", "--no-dev", "--no-emit-project", "--format", "pylock.toml", "--no-header", "--quiet")
+	lock, err := runner.Output(ctx, "uv", "export", "--frozen", "--no-dev", "--no-emit-project", "--format", "pylock.toml", "--no-header", "--quiet")
 	if err != nil {
 		return DependencyPlan{}, err
 	}
