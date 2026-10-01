@@ -21,7 +21,7 @@ components:
     - ../../components/backup-primary
     - ../../components/netpol-gate/egress
 images:
-    - digest: sha256:345250eba47abd77007f771316de707c3ad85d077c0f7390124a1dfdb4d7c2a3
+    - digest: sha256:fc2fc09b9555ec37283b210f813983ada6059ecceadb45fc2404252aa09fdf33
       name: ghcr.io/fredrir/portfolio-api
       newName: ghcr.io/fredrir/portfolio-api
     - digest: sha256:252c39d97c28db06868671ddc91d2fabf0291499008c10684b8312e3d6ddee4e
