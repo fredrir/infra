@@ -34,4 +34,7 @@ jobs:
       - name: Propose channel promotion
         env:
           GH_TOKEN: ${{ github.token }}
-        run: go run ./cmd/infra ci channel propose
+          CI_RELEASE: ci-v1.0.${{ github.event.workflow_run.run_number }}
+        run: |
+          go run ./cmd/infra ci channel prepare --release "$CI_RELEASE"
+          go run ./cmd/infra ci channel propose
