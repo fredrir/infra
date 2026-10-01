@@ -39,23 +39,10 @@ COPY --from=runtime-lock /pylock.toml /usr/local/share/pyparser/pylock.toml
 RUN --mount=type=bind,from=uv,source=/uv,target=/usr/local/bin/uv \
   --mount=type=cache,id=pyparser-uv,target=/root/.cache/uv \
   pip install --upgrade pip "setuptools>=84.0.0" "wheel>=0.48.0" \
-  && uv pip install --system --require-hashes --no-deps -r /usr/local/share/pyparser/pylock.toml \
-  && python -c "from doctr.models import ocr_predictor; ocr_predictor(pretrained=True)"
-
-FROM deps AS models
-ENV DOCLING_ARTIFACTS_PATH=/opt/docling-models
-RUN --mount=type=cache,id=pyparser-docling-models,target=/var/cache/docling \
-    docling-tools models download -o /var/cache/docling \
-      layout tableformer tableformerv2 code_formula picture_classifier granitedocling rapidocr \
-    && mkdir -p "$DOCLING_ARTIFACTS_PATH" \
-    && cp -aL /var/cache/docling/. "$DOCLING_ARTIFACTS_PATH/" \
-    && python -m pip uninstall -y pip
-
-ARG PUBLIC_PARSER_DEPENDENCY_KEY
-LABEL io.llunde.parser.dependencies.key="${PUBLIC_PARSER_DEPENDENCY_KEY}"
+  && uv pip install --system --require-hashes --no-deps -r /usr/local/share/pyparser/pylock.toml
 
 FROM docker.io/library/postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0 AS postgres
-FROM models AS python
+FROM deps AS python
 COPY --from=postgres /usr/lib/postgresql/17 /usr/lib/postgresql/17
 COPY --from=postgres /usr/share/postgresql /usr/share/postgresql
 COPY --from=postgres /usr/lib/x86_64-linux-gnu/libpq.so.5* /usr/lib/x86_64-linux-gnu/
