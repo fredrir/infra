@@ -9,7 +9,6 @@ resources:
     - network.yaml
     - database.secret.sops.yaml
     - application.secret.sops.yaml
-    - ghcr.secret.sops.yaml
     - tunnel.yaml
     - tunnel.secret.sops.yaml
     - backup.yaml

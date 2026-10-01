@@ -29,8 +29,6 @@ spec:
         kubernetes.io/hostname: fredrir-09
         kubernetes.io/arch: amd64
       terminationGracePeriodSeconds: 30
-      imagePullSecrets:
-      - name: ghcr
       containers:
       - name: cloudflared
         image: docker.io/cloudflare/cloudflared@sha256:b392761b711c0e5649d9b64e1fc9a10ba0563fa3e712ed7c26bde5cc1fbe9059
