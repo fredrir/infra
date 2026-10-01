@@ -14,27 +14,33 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      contents: write
-      pull-requests: write
-      checks: read
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: main
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: go.mod
+      - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
+        id: release-token
+        with:
+          scope: fredrir/infra
+          identity: ci-release
       - name: Publish qualified release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
           CI_RELEASE: ci-v1.0.${{ github.event.workflow_run.run_number }}
           CANDIDATE_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: go run ./cmd/infra ci channel release --release "$CI_RELEASE" --revision "$CANDIDATE_REVISION"
       - name: Propose channel promotion
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
           CI_RELEASE: ci-v1.0.${{ github.event.workflow_run.run_number }}
         run: |
+          gh auth setup-git
           go run ./cmd/infra ci channel prepare --release "$CI_RELEASE"
           go run ./cmd/infra ci channel propose
