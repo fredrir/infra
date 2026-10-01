@@ -40,7 +40,6 @@ spec:
       automountServiceAccountToken: false
       dnsConfig:
         options: [{name: ndots, value: "2"}]
-      imagePullSecrets: [{name: ghcr}]
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -96,7 +95,6 @@ spec:
       automountServiceAccountToken: false
       dnsConfig:
         options: [{name: ndots, value: "2"}]
-      imagePullSecrets: [{name: ghcr}]
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -147,7 +145,6 @@ spec:
       automountServiceAccountToken: false
       dnsConfig:
         options: [{name: ndots, value: "2"}]
-      imagePullSecrets: [{name: ghcr}]
       terminationGracePeriodSeconds: 120
       securityContext:
         runAsNonRoot: true
