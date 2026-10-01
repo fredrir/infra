@@ -44,10 +44,29 @@ func TestChannelPromotionRequiresImmutableQualifiedReleaseAndPreparedTrust(t *te
 		t.Fatal("promotion lost accepted deployment revision")
 	}
 	immutable, qualified := true, true
+	channelExists := true
 	promotions := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/git/ref/tags/ci-v1") && !channelExists:
+			w.WriteHeader(http.StatusNotFound)
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/git/refs"):
+			var payload struct {
+				Ref string `json:"ref"`
+				SHA string `json:"sha"`
+			}
+			json.NewDecoder(r.Body).Decode(&payload)
+			if payload.Ref != "refs/tags/ci-v1" || payload.SHA != revision {
+				t.Error("incorrect initial channel revision")
+			}
+			channelExists = true
+			promotions++
+			w.WriteHeader(http.StatusCreated)
 		case r.Method == http.MethodPatch:
+			if !channelExists {
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				return
+			}
 			promotions++
 			var payload struct {
 				SHA   string `json:"sha"`
@@ -87,10 +106,14 @@ func TestChannelPromotionRequiresImmutableQualifiedReleaseAndPreparedTrust(t *te
 	if err := api.Promote(context.Background(), root); err != nil || promotions != 1 {
 		t.Fatalf("qualified release not promoted: %v", err)
 	}
+	channelExists = false
+	if err := api.Promote(context.Background(), root); err != nil || promotions != 2 || !channelExists {
+		t.Fatalf("qualified initial channel not created: %v", err)
+	}
 	channel.Revision = old
 	encoded, _ := json.Marshal(channel)
 	os.WriteFile(filepath.Join(root, "build/ci-channel.json"), encoded, 0644)
-	if err := api.Promote(context.Background(), root); err == nil || promotions != 1 {
+	if err := api.Promote(context.Background(), root); err == nil || promotions != 2 {
 		t.Fatal("mismatched release revision promoted")
 	}
 }

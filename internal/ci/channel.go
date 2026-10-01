@@ -335,9 +335,11 @@ func (api ChannelAPI) Promote(ctx context.Context, root string) error {
 			return errors.New("CI channel deployment identity missing")
 		}
 	}
-	status, err := api.request(ctx, http.MethodPatch, "git/refs/tags/ci-v1", map[string]any{"sha": revision, "force": true}, nil)
+	status, err := api.request(ctx, http.MethodGet, "git/ref/tags/ci-v1", nil, nil)
 	if status == 404 {
 		_, err = api.request(ctx, http.MethodPost, "git/refs", map[string]string{"ref": "refs/tags/ci-v1", "sha": revision}, nil)
+	} else if err == nil {
+		_, err = api.request(ctx, http.MethodPatch, "git/refs/tags/ci-v1", map[string]any{"sha": revision, "force": true}, nil)
 	}
 	return err
 }
