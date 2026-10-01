@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "repository": "fredrir/nsql",
+  "repository_id": "1269406277",
+  "inputs": {
+    "schema": 1,
+    "shared": [
+      "Cargo.toml",
+      "Cargo.lock",
+      "rust-toolchain.toml",
+      ".cargo/",
+      ".github/"
+    ],
+    "ignored": [
+      "docs/",
+      "README.md",
+      "LICENSE"
+    ],
+    "targets": {
+      "nsql": [
+        "crates/",
+        "src/",
+        "tests/",
+        "benches/"
+      ]
+    }
+  },
+  "images": [],
+  "checks": [
+    {
+      "name": "rust-deep",
+      "recipe": "build/projects/nsql/checks.Containerfile",
+      "target": "rust-deep",
+      "timeout": 150,
+      "scheduled": true
+    }
+  ],
+  "rust": {
+    "clippy": "--all-features",
+    "test": "-- --skip embed_drives_real_nvim_and_reads_back --skip embed_captures_highlight_colors --skip run_keymap_round_trips_via_rpcnotify",
+    "fast_test": "-- --skip embed_drives_real_nvim_and_reads_back --skip embed_captures_highlight_colors --skip run_keymap_round_trips_via_rpcnotify",
+    "postgres_env": "NSQL_TEST_PG_URL",
+    "build_output_cache": false
+  }
+}

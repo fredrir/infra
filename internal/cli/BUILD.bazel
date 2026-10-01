@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "artifact.go",
         "automation.go",
+        "channel.go",
         "cli.go",
         "dev.go",
         "enrollment.go",
@@ -17,6 +18,7 @@ go_library(
         "pipeline.go",
         "platform.go",
         "prefetch.go",
+        "project_ci.go",
         "projects.go",
         "reconcile.go",
         "scanner.go",

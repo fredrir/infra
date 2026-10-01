@@ -10,7 +10,7 @@
 | Build VM | Per-repository accounts, engines and caches | Normal reconciliation installs the CLI and converges runner services |
 | Reconciler CLI | Reviewed release pin | Administrator applies only `infra_binary` on `fredrir-11` |
 | Images | Published digest, vulnerability checks and provenance | Promote immutable image pins and verify ready workloads |
-| External callers | Exact reviewed workflow SHA and matching OctoSTS claims | Update each caller and trust policy together; verify its actual build and deployment |
+| External callers | Protected `ci-v1` channel and centrally approved exact workflow revisions | Qualify an immutable release, approve central trust, then promote the channel |
 
 ## CLI installation
 

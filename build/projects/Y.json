@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "repository": "fredrir/Y",
+  "repository_id": "900286164",
+  "inputs": {
+    "schema": 1,
+    "shared": [
+      ".github/",
+      ".dockerignore"
+    ],
+    "ignored": [
+      "docs/",
+      "README.md",
+      "LICENSE"
+    ],
+    "targets": {
+      "y-api": [
+        "backend/"
+      ],
+      "y-web": [
+        "frontend/"
+      ]
+    }
+  },
+  "images": [
+    {
+      "image": "ghcr.io/fredrir/y-api",
+      "dockerfile": "Dockerfile",
+      "target": "",
+      "check_target": "",
+      "timeout": 90,
+      "scanner_java": false,
+      "recipe": "y-api",
+      "smoke": "",
+      "build_args": ""
+    },
+    {
+      "image": "ghcr.io/fredrir/y-web",
+      "dockerfile": "Dockerfile",
+      "target": "",
+      "check_target": "check-reports",
+      "timeout": 90,
+      "scanner_java": false,
+      "recipe": "y-web",
+      "smoke": "",
+      "build_args": ""
+    }
+  ],
+  "checks": [
+    {
+      "name": "api",
+      "recipe": "build/projects/Y/checks.Containerfile",
+      "target": "api-tests",
+      "timeout": 45
+    },
+    {
+      "name": "web",
+      "recipe": "build/projects/Y/checks.Containerfile",
+      "target": "web-tests",
+      "timeout": 45
+    }
+  ]
+}

@@ -1,3 +1,9 @@
+filegroup(
+    name = "project_ci_data",
+    srcs = glob(["projects/**"]),
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
 exports_files([
     "BUILD.bazel",
     "dagger-embed.patch",

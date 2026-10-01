@@ -1,0 +1,112 @@
+name: Project CI
+on:
+  workflow_call:
+    inputs:
+      cli-artifact:
+        type: string
+        default: ''
+      cli-sha256:
+        type: string
+        default: ''
+      cli-revision:
+        type: string
+        default: ''
+permissions:
+  contents: read
+concurrency:
+  group: project-ci-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  cli:
+    if: inputs.cli-artifact == ''
+    uses: ./.github/workflows/project-cli.yml
+  plan:
+    needs: cli
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      checks: ${{ steps.plan.outputs.checks }}
+      has-checks: ${{ steps.plan.outputs.has-checks }}
+      rust: ${{ steps.plan.outputs.rust }}
+      clippy: ${{ steps.plan.outputs.clippy }}
+      test: ${{ steps.plan.outputs.test }}
+      fast-test: ${{ steps.plan.outputs.fast-test }}
+      postgres-env: ${{ steps.plan.outputs.postgres-env }}
+      build-output-cache: ${{ steps.plan.outputs.build-output-cache }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .infra-build-recipe
+          persist-credentials: false
+      - uses: ./.infra-build-recipe/.github/actions/use-cli
+        with:
+          artifact: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
+          sha256: ${{ inputs.cli-sha256 || needs.cli.outputs.sha256 }}
+          revision: ${{ inputs.cli-revision || needs.cli.outputs.revision }}
+      - id: plan
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: infra ci project plan --infra-root .infra-build-recipe
+  check:
+    needs: [cli, plan]
+    if: ${{ !cancelled() && needs.plan.outputs.has-checks == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.check.timeout }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        check: ${{ fromJSON(needs.plan.outputs.checks) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .infra-build-recipe
+          persist-credentials: false
+      - uses: ./.infra-build-recipe/.github/actions/use-cli
+        with:
+          artifact: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
+          sha256: ${{ inputs.cli-sha256 || needs.cli.outputs.sha256 }}
+          revision: ${{ inputs.cli-revision || needs.cli.outputs.revision }}
+      - name: Start Dagger
+        run: |
+          docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --memory=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+          printf '_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger\n' >> "$GITHUB_ENV"
+      - name: Run shared suite
+        env:
+          SUITE: ${{ matrix.check.name }}
+        run: infra ci project run --infra-root .infra-build-recipe --suite "$SUITE" --infra-binary "$INFRA_BINARY" --report-dir "$RUNNER_TEMP/reports"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: checks-${{ matrix.check.name }}
+          path: ${{ runner.temp }}/reports
+          if-no-files-found: ignore
+      - name: Stop Dagger
+        if: always()
+        run: docker rm --force --volumes infra-dagger
+  rust:
+    needs: [cli, plan]
+    if: ${{ !cancelled() && needs.plan.outputs.rust == 'true' }}
+    uses: ./.github/workflows/rust-ci.yml
+    with:
+      cli-artifact: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
+      cli-sha256: ${{ inputs.cli-sha256 || needs.cli.outputs.sha256 }}
+      cli-revision: ${{ inputs.cli-revision || needs.cli.outputs.revision }}
+      clippy-args: ${{ needs.plan.outputs.clippy }}
+      test-args: ${{ needs.plan.outputs.test }}
+      fast-test-args: ${{ needs.plan.outputs.fast-test }}
+      postgres: ${{ needs.plan.outputs.postgres-env != '' }}
+      postgres-url-env: ${{ needs.plan.outputs.postgres-env }}
+      build-output-cache: ${{ needs.plan.outputs.build-output-cache == 'true' }}

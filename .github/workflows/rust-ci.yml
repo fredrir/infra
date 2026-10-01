@@ -2,6 +2,15 @@ name: Rust CI
 on:
   workflow_call:
     inputs:
+      cli-artifact:
+        type: string
+        default: ''
+      cli-sha256:
+        type: string
+        default: ''
+      cli-revision:
+        type: string
+        default: ''
       clippy-args:
         type: string
         default: --all-features
@@ -31,8 +40,12 @@ env:
 permissions:
   contents: read
 jobs:
+  cli:
+    if: inputs.cli-artifact == ''
+    uses: ./.github/workflows/project-cli.yml
   check:
-    if: github.repository_owner_id == '114402558' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    needs: cli
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || inputs.cli-artifact != '') && github.repository_owner_id == '114402558' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ${{ github.event_name == 'pull_request' && 'rust-pr-amd64' || 'rust-amd64' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
@@ -45,13 +58,11 @@ jobs:
         ref: ${{ job.workflow_sha }}
         path: .infra-build-recipe
         persist-credentials: false
-        sparse-checkout-cone-mode: false
-        sparse-checkout: |
-          .github/actions/setup-infra
-          build/cli-release.json
-    - uses: ./.infra-build-recipe/.github/actions/setup-infra
+    - uses: ./.infra-build-recipe/.github/actions/use-cli
       with:
-        root: .infra-build-recipe
+        artifact: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
+        sha256: ${{ inputs.cli-sha256 || needs.cli.outputs.sha256 }}
+        revision: ${{ inputs.cli-revision || needs.cli.outputs.revision }}
     - name: Prepare
       env:
         CLIPPY_ARGS: ${{ inputs.clippy-args }}
@@ -61,10 +72,26 @@ jobs:
     - name: Restore build outputs
       if: inputs.build-output-cache
       run: infra ci measure --stage rust-cache-restore --budget '${{ inputs.timeout-minutes }}m' --report-dir "$RUNNER_TEMP/performance" -- infra ci rust cache restore
+    - name: Start test database
+      if: inputs.postgres
+      env:
+        URL_ENV: ${{ inputs.postgres-url-env }}
+      run: infra ci postgres start
     - name: Prepare changed test executables
       run: infra ci measure --stage rust-preparation --budget '${{ inputs.timeout-minutes }}m' --report-dir "$RUNNER_TEMP/performance" -- infra ci rust check prepare-fast
     - name: Check within aggregate budget
       run: infra ci measure --stage checks --budget 10s --report-dir "$RUNNER_TEMP/performance" -- infra ci rust check fast
+    - name: Check Rust analysis and integration tests
+      run: |
+        infra ci rust check lint
+        infra ci rust check test
+        infra ci rust check docs
+    - name: Check minimal feature build
+      if: inputs.minimal-build
+      run: infra ci rust check minimal
+    - name: Stop test database
+      if: always() && inputs.postgres
+      run: infra ci postgres stop
     - name: Save build outputs
       if: inputs.build-output-cache
       run: infra ci measure --stage rust-cache-save --budget '${{ inputs.timeout-minutes }}m' --report-dir "$RUNNER_TEMP/performance" -- infra ci rust cache save

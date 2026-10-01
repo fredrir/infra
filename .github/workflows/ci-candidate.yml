@@ -1,0 +1,107 @@
+name: Qualify shared CI
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - internal/**
+      - cmd/infra/**
+      - go.mod
+      - go.sum
+      - build/toolchain.json
+      - build/projects/**
+      - .github/workflows/**
+      - .github/actions/**
+      - platform/projects/y/*.Dockerfile
+      - platform/projects/y/Caddyfile
+permissions:
+  contents: read
+concurrency:
+  group: ci-candidate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cli:
+    uses: ./.github/workflows/project-cli.yml
+  fixtures:
+    needs: cli
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - repository: llunde-frontend
+            id: '1328144104'
+            suites: web
+          - repository: llunde-backend
+            id: '1327945675'
+            suites: integration
+          - repository: llunde-pyparser
+            id: '1328252868'
+            suites: python ui
+          - repository: portfolio
+            id: '773018612'
+            suites: rust web quality
+          - repository: Y
+            id: '900286164'
+            suites: api web
+          - repository: nsql
+            id: '1269406277'
+            suites: rust-deep
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
+        id: source-token
+        with:
+          scope: fredrir/${{ matrix.repository }}
+          identity: ci-candidate
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: fredrir/${{ matrix.repository }}
+          ref: main
+          token: ${{ steps.source-token.outputs.token }}
+          path: source
+          persist-credentials: false
+      - uses: ./.github/actions/use-cli
+        with:
+          artifact: ${{ needs.cli.outputs.artifact }}
+          sha256: ${{ needs.cli.outputs.sha256 }}
+          revision: ${{ needs.cli.outputs.revision }}
+      - name: Start Dagger
+        run: |
+          docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --memory=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
+          printf '_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger\n' >> "$GITHUB_ENV"
+      - name: Exercise consumer suites
+        env:
+          SOURCE_REPOSITORY: fredrir/${{ matrix.repository }}
+          SOURCE_ID: ${{ matrix.id }}
+          SUITES: ${{ matrix.suites }}
+        run: |
+          for suite in $SUITES; do
+            infra ci project run --repository "$SOURCE_REPOSITORY" --repository-id "$SOURCE_ID" --root source --infra-root . --suite "$suite" --infra-binary "$INFRA_BINARY" --report-dir "$RUNNER_TEMP/reports/$suite"
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: candidate-${{ matrix.repository }}
+          path: ${{ runner.temp }}/reports
+          if-no-files-found: ignore
+      - name: Stop Dagger
+        if: always()
+        run: docker rm --force --volumes infra-dagger
+  qualified:
+    name: CI candidate
+    needs: fixtures
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - env:
+          FIXTURES_RESULT: ${{ needs.fixtures.result }}
+        run: test "$FIXTURES_RESULT" = success

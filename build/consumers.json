@@ -1,66 +1,82 @@
 {
   "schema": 1,
-  "checked": "2026-09-28",
   "consumers": [
     {
       "repository": "fredrir/llunde-frontend",
       "workflow": ".github/workflows/images.yml",
-      "infra_workflow": "build-image.yml",
-      "revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af"
+      "infra_workflow": "project-images.yml",
+      "ref": "ci-v1"
     },
     {
       "repository": "fredrir/llunde-backend",
       "workflow": ".github/workflows/images.yml",
-      "infra_workflow": "build-image.yml",
-      "revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af"
-    },
-    {
-      "repository": "fredrir/llunde-pyparser",
-      "workflow": ".github/workflows/dependencies.yml",
-      "infra_workflow": "build-image.yml",
-      "revision": "cf1bda7e11cf1e5983a5e5500e16d59ea8690479"
+      "infra_workflow": "project-images.yml",
+      "ref": "ci-v1"
     },
     {
       "repository": "fredrir/llunde-pyparser",
       "workflow": ".github/workflows/images.yml",
-      "infra_workflow": "build-image.yml",
-      "revision": "cf1bda7e11cf1e5983a5e5500e16d59ea8690479"
+      "infra_workflow": "project-images.yml",
+      "ref": "ci-v1"
     },
     {
       "repository": "fredrir/portfolio",
       "workflow": ".github/workflows/images.yml",
-      "infra_workflow": "build-image.yml",
-      "revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af"
+      "infra_workflow": "project-images.yml",
+      "ref": "ci-v1"
     },
     {
       "repository": "fredrir/Y",
       "workflow": ".github/workflows/images.yml",
-      "infra_workflow": "build-image.yml",
-      "revision": "d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af"
+      "infra_workflow": "project-images.yml",
+      "ref": "ci-v1",
+      "checkout": ".infra/ci-migration/Y"
     },
     {
       "repository": "fredrir/nsql",
       "workflow": ".github/workflows/auto-tag.yml",
       "infra_workflow": "rust-auto-tag.yml",
-      "revision": "28d058b9ebe39c22f64b5fbef9cc2f0de7362ab0"
+      "ref": "ci-v1"
     },
     {
       "repository": "fredrir/nsql",
       "workflow": ".github/workflows/ci.yml",
-      "infra_workflow": "rust-ci.yml",
-      "revision": "36c2709cbba520c695d6c302dfdca68869907fe7"
+      "infra_workflow": "project-ci.yml",
+      "ref": "ci-v1"
     },
     {
       "repository": "fredrir/nsql",
       "workflow": ".github/workflows/release.yml",
       "infra_workflow": "rust-release.yml",
-      "revision": "a57b0e15d5ca1c3180fba6a16cedbc7595e90610"
+      "ref": "ci-v1"
     },
     {
       "repository": "fredrir/packages",
       "workflow": ".github/workflows/publish.yml",
       "infra_workflow": "packages-publish.yml",
-      "revision": "607c305882e59a3ebbd70422a818594a98a50845"
+      "ref": "ci-v1",
+      "checkout": ".infra/ci-migration/packages"
+    }
+  ],
+  "state": "prepared",
+  "publisher_trust": [
+    {
+      "repository": "fredrir/homebrew-tap",
+      "policy": ".github/chainguard/publisher.sts.yaml",
+      "ref": "ci-v1",
+      "checkout": ".infra/ci-migration/homebrew-tap"
+    },
+    {
+      "repository": "fredrir/homebrew-nsql",
+      "policy": ".github/chainguard/publisher.sts.yaml",
+      "ref": "ci-v1",
+      "checkout": ".infra/ci-migration/homebrew-nsql"
+    },
+    {
+      "repository": "fredrir/nur-packages",
+      "policy": ".github/chainguard/publisher.sts.yaml",
+      "ref": "ci-v1",
+      "checkout": ".infra/ci-migration/nur-packages"
     }
   ]
 }

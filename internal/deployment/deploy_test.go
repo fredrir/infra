@@ -20,7 +20,7 @@ func TestProvenanceRequiresExactSourceAndWorkflow(t *testing.T) {
 			if name != "gh" || !slices.Contains(args, workflow) || !slices.Contains(args, revision) || !slices.Contains(args, "oci://"+image) {
 				t.Fatalf("wrong verification command: %s %v", name, args)
 			}
-		} else if name != "cosign" || !slices.Contains(args, "https://github.com/fredrir/infra/.github/workflows/build-image.yml@"+workflow) || !slices.Contains(args, "source-revision="+revision) || args[len(args)-1] != image {
+		} else if name != "cosign" || !slices.Contains(args, "workflow-revision="+workflow) || !slices.Contains(args, "--certificate-identity-regexp") || !slices.Contains(args, "source-revision="+revision) || args[len(args)-1] != image {
 			t.Fatalf("wrong verification command: %s %v", name, args)
 		}
 	}

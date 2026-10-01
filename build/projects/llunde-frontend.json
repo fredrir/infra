@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "repository": "fredrir/llunde-frontend",
+  "repository_id": "1328144104",
+  "inputs": {
+    "schema": 1,
+    "shared": [
+      "package.json",
+      "bun.lock",
+      "Containerfile",
+      ".dockerignore",
+      ".github/"
+    ],
+    "ignored": [
+      "docs/",
+      "README.md",
+      "LICENSE"
+    ],
+    "targets": {
+      "llunde-frontend": [
+        "src/",
+        "public/",
+        "docker/",
+        "index.html",
+        "vite.config.ts",
+        "tsconfig.json",
+        "tsconfig.app.json",
+        "tsconfig.node.json",
+        "postcss.config.cjs",
+        ".oxlintrc.json"
+      ]
+    }
+  },
+  "images": [
+    {
+      "image": "ghcr.io/fredrir/llunde-frontend",
+      "dockerfile": "Containerfile",
+      "target": "",
+      "check_target": "check-reports",
+      "timeout": 45,
+      "scanner_java": false,
+      "recipe": "",
+      "smoke": "",
+      "build_args": "",
+      "variables": [
+        "VITE_API_URL",
+        "VITE_TURNSTILE_SITE_KEY"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "name": "web",
+      "recipe": "build/projects/llunde-frontend/checks.Containerfile",
+      "target": "web",
+      "timeout": 45
+    }
+  ],
+  "doppler": {
+    "project": "llunde",
+    "config": "prd",
+    "public": [
+      "VITE_API_URL",
+      "VITE_TURNSTILE_SITE_KEY"
+    ]
+  }
+}

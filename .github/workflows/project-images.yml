@@ -1,0 +1,100 @@
+name: Project images
+on:
+  workflow_call:
+    secrets:
+      doppler-token:
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: project-images-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  cli:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/infra-cli.yml
+    with:
+      sign-cli: true
+  check:
+    needs: cli
+    uses: ./.github/workflows/project-ci.yml
+    with:
+      cli-artifact: ${{ needs.cli.outputs.artifact }}
+      cli-sha256: ${{ needs.cli.outputs.sha256 }}
+      cli-revision: ${{ needs.cli.outputs.revision }}
+  plan:
+    needs: cli
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      images: ${{ steps.plan.outputs.images }}
+      has-images: ${{ steps.plan.outputs.has-images }}
+      dependency: ${{ steps.plan.outputs.dependency }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .infra-build-recipe
+          persist-credentials: false
+      - uses: ./.infra-build-recipe/.github/actions/use-cli
+        with:
+          artifact: ${{ needs.cli.outputs.artifact }}
+          sha256: ${{ needs.cli.outputs.sha256 }}
+          revision: ${{ needs.cli.outputs.revision }}
+      - id: plan
+        env:
+          DOPPLER_TOKEN: ${{ secrets.doppler-token }}
+          BASE: ${{ github.event.before }}
+          VITE_RECAPTCHA_SITE_KEY: ${{ vars.VITE_RECAPTCHA_SITE_KEY }}
+          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST }}
+        run: infra ci project plan --infra-root .infra-build-recipe --purpose images
+  dependencies:
+    needs: [cli, plan]
+    if: needs.plan.outputs.dependency == 'true' && needs.plan.outputs.has-images == 'true'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/project-dependencies.yml
+    with:
+      cli-artifact: ${{ needs.cli.outputs.artifact }}
+      cli-sha256: ${{ needs.cli.outputs.sha256 }}
+      cli-revision: ${{ needs.cli.outputs.revision }}
+  build:
+    needs: [cli, plan, dependencies, check]
+    if: ${{ !cancelled() && needs.check.result == 'success' && needs.plan.outputs.has-images == 'true' && (needs.dependencies.result == 'success' || needs.dependencies.result == 'skipped') }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        image: ${{ fromJSON(needs.plan.outputs.images) }}
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image: ${{ matrix.image.image }}
+      dockerfile: ${{ matrix.image.dockerfile }}
+      target: ${{ matrix.image.target }}
+      check-target: ${{ matrix.image.check_target }}
+      timeout-minutes: ${{ matrix.image.timeout }}
+      scanner-java: ${{ matrix.image.scanner_java }}
+      recipe: ${{ matrix.image.recipe }}
+      image-test-command: ${{ matrix.image.smoke }}
+      test-command: ${{ matrix.image.precheck }}
+      build-args: ${{ matrix.image.build_args }}
+      dependency-image: ${{ needs.dependencies.outputs.image }}
+      cli-artifact: ${{ needs.cli.outputs.artifact }}
+      cli-sha256: ${{ needs.cli.outputs.sha256 }}
+      cli-revision: ${{ needs.cli.outputs.revision }}

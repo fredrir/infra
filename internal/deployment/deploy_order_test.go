@@ -34,6 +34,28 @@ func TestProvenanceVerifierFailuresNameTheirCause(t *testing.T) {
 	}
 }
 
+func TestManualDeploymentRequiresExplicitTriggerTrust(t *testing.T) {
+	for _, allowed := range []bool{false, true} {
+		claims := "claim_pattern:\n  job_workflow_sha: '^" + strings.Repeat("d", 40) + "$'\n"
+		if allowed {
+			claims += "  event_name: '^(push|workflow_dispatch)$'\n"
+		}
+		trust := fstest.MapFS{".github/chainguard/deploy-1.sts.yaml": {Data: []byte(claims)}}
+		runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+			for index, value := range options.Args {
+				if value == "--certificate-github-workflow-trigger" && options.Args[index+1] == "workflow_dispatch" {
+					return process.Result{Stdout: []byte(`[{"optional":{"source-run-id":"7","source-run-attempt":"1"}}]`)}, nil
+				}
+			}
+			return process.Result{ExitCode: 1}, errors.New("trigger mismatch")
+		}}
+		orders, err := VerifyProvenance(context.Background(), runner, trust, "1", Mapping{Repository: "fredrir/example", Visibility: "private"}, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40))
+		if (err == nil) != allowed || (allowed && len(orders) != 1) {
+			t.Fatalf("manual trigger trust %v: %v", allowed, err)
+		}
+	}
+}
+
 func TestAttestedDeploymentOrders(t *testing.T) {
 	image, revision, digest := "ghcr.io/fredrir/example", strings.Repeat("b", 40), "sha256:"+strings.Repeat("a", 64)
 	cases := []struct {

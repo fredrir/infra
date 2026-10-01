@@ -125,6 +125,9 @@ func TestHostedWorkflowsOnlyPlanInfrastructure(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, forbidden := range []string{"reconcile apply", "reconcile verify", "doppler", "infrastructure-apply", "fredrir-infra-verification", "RUNNER_APP", "PUBLISHER_APP_PRIVATE_KEY", "gh workflow run reconcile.yml", "schedule:"} {
+			if forbidden == "doppler" && filepath.Base(path) == "project-images.yml" {
+				continue
+			}
 			if strings.Contains(string(data), forbidden) && (forbidden != "schedule:" || strings.HasPrefix(filepath.Base(path), "reconcile")) {
 				t.Errorf("%s contains %q", filepath.Base(path), forbidden)
 			}

@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -44,7 +45,12 @@ func TestBuildEngineReadinessRequiresAListeningSocket(t *testing.T) {
 	if len(arguments) == 0 {
 		t.Fatal("build engine startup has no socket readiness probe")
 	}
-	socket := filepath.Join(t.TempDir(), "engine.sock")
+	directory, err := os.MkdirTemp("/tmp", "infra-socket-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(directory) })
+	socket := filepath.Join(directory, "engine.sock")
 	arguments[len(arguments)-1] = socket
 	probe := func() error { return exec.Command("python3", arguments...).Run() }
 	if err := probe(); err == nil {

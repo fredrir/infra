@@ -16,7 +16,7 @@ import (
 )
 
 func registerAutomationCommands(root, ciCommand *cobra.Command) {
-	ciCommand.AddCommand(newTimelineCommand(), newScannerCommand())
+	ciCommand.AddCommand(newTimelineCommand(), newScannerCommand(), newProjectCICommand(), newDependenciesCommand(), newCIChannelCommand())
 	root.AddCommand(newPackagesCommand())
 	root.AddCommand(newProjectCommands()...)
 	tag := &cobra.Command{Use: "tag-image", Short: "Tag a checksum-verified OCI manifest", Args: cobra.NoArgs}

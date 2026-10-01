@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "repository": "fredrir/portfolio",
+  "repository_id": "773018612",
+  "inputs": {
+    "schema": 1,
+    "shared": [
+      "Cargo.toml",
+      "Cargo.lock",
+      "Containerfile",
+      ".dockerignore",
+      "package.json",
+      "bun.lock",
+      ".github/"
+    ],
+    "ignored": [
+      "docs/",
+      "README.md",
+      "LICENSE"
+    ],
+    "targets": {
+      "portfolio-api": [
+        "apps/api/"
+      ],
+      "portfolio-worker": [
+        "apps/worker/"
+      ],
+      "portfolio-web": [
+        "apps/web/",
+        "apps/edge/",
+        "packages/api-client/",
+        "biome.jsonc",
+        "tsconfig.json"
+      ]
+    }
+  },
+  "images": [
+    {
+      "image": "ghcr.io/fredrir/portfolio-api",
+      "dockerfile": "Containerfile",
+      "target": "api",
+      "check_target": "check-reports",
+      "timeout": 150,
+      "scanner_java": false,
+      "recipe": "",
+      "smoke": "",
+      "build_args": "",
+      "arguments": {
+        "APP_VERSION": "$revision"
+      }
+    },
+    {
+      "image": "ghcr.io/fredrir/portfolio-web",
+      "dockerfile": "apps/web/Dockerfile",
+      "target": "",
+      "check_target": "check-reports",
+      "timeout": 150,
+      "scanner_java": false,
+      "recipe": "",
+      "smoke": "",
+      "build_args": "",
+      "arguments": {
+        "VITE_APP_VERSION": "$revision"
+      },
+      "variables": [
+        "VITE_RECAPTCHA_SITE_KEY",
+        "VITE_POSTHOG_KEY",
+        "VITE_POSTHOG_HOST"
+      ]
+    },
+    {
+      "image": "ghcr.io/fredrir/portfolio-worker",
+      "dockerfile": "Containerfile",
+      "target": "worker",
+      "check_target": "check-reports",
+      "timeout": 150,
+      "scanner_java": false,
+      "recipe": "",
+      "smoke": "",
+      "build_args": "",
+      "arguments": {
+        "APP_VERSION": "$revision"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "name": "rust",
+      "recipe": "build/projects/portfolio/checks.Containerfile",
+      "target": "rust-tests",
+      "timeout": 150
+    },
+    {
+      "name": "web",
+      "recipe": "build/projects/portfolio/checks.Containerfile",
+      "target": "web-tests",
+      "timeout": 150
+    },
+    {
+      "name": "quality",
+      "recipe": "build/projects/portfolio/checks.Containerfile",
+      "target": "quality-tests",
+      "timeout": 150
+    },
+    {
+      "name": "mutation",
+      "recipe": "build/projects/portfolio/checks.Containerfile",
+      "target": "mutation-results",
+      "timeout": 120,
+      "scheduled": true
+    },
+    {
+      "name": "fuzz-sanitize",
+      "recipe": "build/projects/portfolio/checks.Containerfile",
+      "target": "fuzz-results",
+      "timeout": 120,
+      "scheduled": true,
+      "arguments": {
+        "PUBLIC_FUZZ_SUITE": "fuzz-sanitize"
+      }
+    },
+    {
+      "name": "fuzz-contact",
+      "recipe": "build/projects/portfolio/checks.Containerfile",
+      "target": "fuzz-results",
+      "timeout": 120,
+      "scheduled": true,
+      "arguments": {
+        "PUBLIC_FUZZ_SUITE": "fuzz-contact"
+      }
+    },
+    {
+      "name": "fuzz-s3",
+      "recipe": "build/projects/portfolio/checks.Containerfile",
+      "target": "fuzz-results",
+      "timeout": 120,
+      "scheduled": true,
+      "arguments": {
+        "PUBLIC_FUZZ_SUITE": "fuzz-s3"
+      }
+    },
+    {
+      "name": "security",
+      "recipe": "build/projects/portfolio/checks.Containerfile",
+      "target": "security",
+      "timeout": 5,
+      "scheduled": true
+    }
+  ]
+}

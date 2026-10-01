@@ -122,6 +122,8 @@ func ignoredGoInput(path string) bool {
 
 func dataLabels(path string) []string {
 	switch {
+	case strings.HasPrefix(path, "build/projects/"):
+		return []string{"//build:project_ci_data"}
 	case strings.HasPrefix(path, "images/"), strings.HasPrefix(path, ".github/workflows/"):
 		return []string{"//:image_contract_data"}
 	case strings.HasPrefix(path, "platform/components/policy/"), strings.HasPrefix(path, "platform/components/runners/"):

@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/fredrir/infra/internal/ci"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -25,7 +26,7 @@ type RustProvider interface {
 	Credentials(context.Context, string) (map[string]string, error)
 	Encrypt(context.Context, []byte, []string) ([]byte, error)
 }
-type RustOptions struct{ Repository, Project, WorkflowRef, Output, Root string }
+type RustOptions struct{ Repository, Project, Output, Root string }
 
 func (provider NativeProvider) Credentials(ctx context.Context, root string) (map[string]string, error) {
 	fields := map[string]string{"github_app_id": "ARC_GITHUB_APP_ID", "github_app_installation_id": "ARC_GITHUB_APP_INSTALLATION_ID", "github_app_private_key": "ARC_GITHUB_APP_PRIVATE_KEY"}
@@ -116,17 +117,17 @@ func secret(name, namespace string, data map[string]string, labels map[string]st
 	}
 	return map[string]any{"apiVersion": "v1", "kind": "Secret", "metadata": metadata, "type": "Opaque", "stringData": data}
 }
-func RustCallers(identity Identity, reference string) (map[string][]byte, error) {
-	if !revisionPattern.MatchString(reference) || validateIdentity(identity, identity.FullName) != nil {
+func RustCallers(identity Identity) (map[string][]byte, error) {
+	if validateIdentity(identity, identity.FullName) != nil {
 		return nil, fmt.Errorf("invalid caller identity or revision")
 	}
-	workflow := func(name string) string { return "fredrir/infra/.github/workflows/" + name + ".yml@" + reference }
-	documents := map[string]any{"project/.github/workflows/ci.yml": map[string]any{"name": "CI", "on": map[string]any{"push": map[string]any{"branches": []string{"main"}}, "pull_request": map[string]any{}}, "permissions": map[string]string{"contents": "read"}, "concurrency": map[string]any{"group": "ci-${{ github.ref }}", "cancel-in-progress": "${{ github.event_name == 'pull_request' }}"}, "jobs": map[string]any{"rust": map[string]string{"uses": workflow("rust-ci")}}}}
+	workflow := func(name string) string { return "fredrir/infra/.github/workflows/" + name + ".yml@ci-v1" }
+	documents := map[string]any{"project/.github/workflows/ci.yml": map[string]any{"name": "CI", "on": map[string]any{"push": map[string]any{"branches": []string{"main"}}, "pull_request": map[string]any{}}, "permissions": map[string]string{"contents": "read"}, "concurrency": map[string]any{"group": "ci-${{ github.ref }}", "cancel-in-progress": "${{ github.event_name == 'pull_request' }}"}, "jobs": map[string]any{"rust": map[string]string{"uses": workflow("project-ci")}}}}
 	if !identity.Private {
 		documents["project/.github/workflows/auto-tag.yml"] = map[string]any{"name": "Tag release", "on": map[string]any{"push": map[string]any{"branches": []string{"main"}, "paths-ignore": []string{".github/**", "**.md", "cliff.toml"}}, "workflow_dispatch": map[string]any{}}, "permissions": map[string]string{"contents": "read", "id-token": "write"}, "concurrency": map[string]any{"group": "auto-tag", "cancel-in-progress": false}, "jobs": map[string]any{"tag": map[string]string{"uses": workflow("rust-auto-tag")}}}
 		documents["project/.github/workflows/release.yml"] = map[string]any{"name": "Release", "on": map[string]any{"push": map[string]any{"tags": []string{"v*"}}, "workflow_dispatch": map[string]any{}}, "permissions": map[string]string{"contents": "write", "id-token": "write", "attestations": "write"}, "concurrency": map[string]any{"group": "release-${{ github.ref }}", "cancel-in-progress": false}, "jobs": map[string]any{"release": map[string]string{"uses": workflow("rust-release")}}}
-		documents["project/.github/chainguard/auto-tag.sts.yaml"] = TrustPolicy(identity, "ref:refs/heads/main", "self-hosted", map[string]string{"ref": "^refs/heads/main$", "event_name": "^(push|workflow_dispatch)$", "job_workflow_ref": `^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@[0-9a-f]{40}$`}, map[string]string{"contents": "write"})
-		documents[fmt.Sprintf("packages/.github/chainguard/dispatch-%d.sts.yaml", identity.ID)] = TrustPolicy(identity, "environment:release", "self-hosted", map[string]string{"ref": `^refs/tags/v[0-9A-Za-z.+-]+$`, "event_name": "^push$", "environment": "^release$", "job_workflow_ref": `^fredrir/infra/\.github/workflows/rust-release\.yml@[0-9a-f]{40}$`}, map[string]string{"actions": "write"})
+		documents["project/.github/chainguard/auto-tag.sts.yaml"] = TrustPolicy(identity, "ref:refs/heads/main", "self-hosted", map[string]string{"ref": "^refs/heads/main$", "event_name": "^(push|workflow_dispatch)$", "job_workflow_ref": `^fredrir/infra/\.github/workflows/rust-auto-tag\.yml@refs/tags/ci-v1$`}, map[string]string{"contents": "write"})
+		documents[fmt.Sprintf("packages/.github/chainguard/dispatch-%d.sts.yaml", identity.ID)] = TrustPolicy(identity, "environment:release", "self-hosted", map[string]string{"ref": `^refs/tags/v[0-9A-Za-z.+-]+$`, "event_name": "^push$", "environment": "^release$", "job_workflow_ref": `^fredrir/infra/\.github/workflows/rust-release\.yml@refs/tags/ci-v1$`}, map[string]string{"actions": "write"})
 	}
 	files := map[string][]byte{}
 	for path, document := range documents {
@@ -166,7 +167,7 @@ func AppendResource(data []byte, entry string) ([]byte, error) {
 	return nil, fmt.Errorf("kustomization has no resources list")
 }
 func OnboardRust(ctx context.Context, provider RustProvider, options RustOptions) error {
-	if !repositoryPattern.MatchString(options.Repository) || !rustProjectPattern.MatchString(options.Project) || !revisionPattern.MatchString(options.WorkflowRef) || options.Root == "" || options.Output == "" {
+	if !repositoryPattern.MatchString(options.Repository) || !rustProjectPattern.MatchString(options.Project) || options.Root == "" || options.Output == "" {
 		return fmt.Errorf("invalid Rust onboarding options")
 	}
 	if err := requireAbsent(options.Output); err != nil {
@@ -308,7 +309,12 @@ func OnboardRust(ctx context.Context, provider RustProvider, options RustOptions
 	if err != nil {
 		return err
 	}
-	callers, err := RustCallers(identity, options.WorkflowRef)
+	profile := ci.Project{Schema: 1, Repository: identity.FullName, RepositoryID: fmt.Sprint(identity.ID), Inputs: ci.ProjectInputs{Schema: 1, Shared: []string{"Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo/", ".github/"}, Targets: map[string][]string{}}, Images: []ci.ProjectImage{}, Checks: []ci.ProjectCheck{}, Rust: &ci.ProjectRust{BuildOutputCache: true}}
+	files["build/projects/"+strings.SplitN(identity.FullName, "/", 2)[1]+".json"], err = json.MarshalIndent(profile, "", "  ")
+	if err != nil {
+		return err
+	}
+	callers, err := RustCallers(identity)
 	if err != nil {
 		return err
 	}

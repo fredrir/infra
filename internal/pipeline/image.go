@@ -47,7 +47,11 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		return "", errors.New("image reference or export path required")
 	}
 	if !filepath.IsLocal(opts.Dockerfile) {
-		return "", errors.New("Dockerfile must be relative to the working directory")
+		root, err := filepath.Abs(opts.Root)
+		relative, relativeErr := filepath.Rel(root, opts.Dockerfile)
+		if !filepath.IsAbs(opts.Dockerfile) || err != nil || relativeErr != nil || !filepath.IsLocal(relative) {
+			return "", errors.New("Dockerfile must be relative to the working directory or inside the infrastructure checkout")
+		}
 	}
 	for _, target := range []string{opts.Target, opts.CheckTarget} {
 		if target != "" && !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`).MatchString(target) {
@@ -95,7 +99,7 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		args = append(args, dagger.BuildArg{Name: name, Value: value})
 	}
 	sort.Slice(args, func(i, j int) bool { return args[i].Name < args[j].Name })
-	source := client.Host().Directory(opts.Context, dagger.HostDirectoryOpts{Gitignore: true, Exclude: []string{".git", "dist", "bazel-*", ".cache", ".direnv", ".venv", ".infra-artifacts", "**/.terraform", ".env", ".env.*", "**/.env", "**/.env.*"}})
+	source := client.Host().Directory(opts.Context, dagger.HostDirectoryOpts{Gitignore: true, Exclude: []string{".git", "dist", "bazel-*", ".cache", ".direnv", ".venv", ".infra-artifacts", ".infra-build-recipe", ".infra-reports", ".infra-deploy", "**/.terraform", ".env", ".env.*", "**/.env", "**/.env.*"}})
 	source = client.Container().From(config.Image).
 		WithDirectory("/infra-source", source).
 		WithExec([]string{"chmod", "-R", "u=rwX,go=rX,a-s,a-t", "/infra-source"}).

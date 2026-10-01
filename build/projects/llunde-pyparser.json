@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "repository": "fredrir/llunde-pyparser",
+  "repository_id": "1328252868",
+  "inputs": {
+    "schema": 1,
+    "shared": [
+      "pyproject.toml",
+      "uv.lock",
+      "Dockerfile",
+      ".dockerignore",
+      ".github/"
+    ],
+    "ignored": [
+      "README.md",
+      "docs/",
+      "LICENSE"
+    ],
+    "targets": {
+      "pyparser-review": [
+        "src/",
+        "sql/",
+        "tests/",
+        "review-ui/",
+        "alembic.ini"
+      ]
+    }
+  },
+  "images": [
+    {
+      "image": "ghcr.io/fredrir/pyparser-review",
+      "dockerfile": "Dockerfile",
+      "target": "",
+      "check_target": "check-reports",
+      "timeout": 120,
+      "scanner_java": false,
+      "recipe": "",
+      "smoke": "/tmp/infra-measure ci project check --project llunde-pyparser --suite smoke",
+      "build_args": ""
+    }
+  ],
+  "checks": [
+    {
+      "name": "python",
+      "recipe": "build/projects/llunde-pyparser/checks.Containerfile",
+      "target": "python",
+      "timeout": 120
+    },
+    {
+      "name": "ui",
+      "recipe": "build/projects/llunde-pyparser/checks.Containerfile",
+      "target": "ui",
+      "timeout": 45
+    }
+  ],
+  "dependency_recipe": "build/projects/llunde-pyparser/dependencies.Containerfile"
+}

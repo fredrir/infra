@@ -1,0 +1,30 @@
+name: Use infrastructure CLI
+description: Verify a CLI artifact from the executing workflow revision.
+inputs:
+  artifact:
+    description: CLI artifact name.
+    required: true
+  sha256:
+    description: CLI checksum.
+    required: true
+  revision:
+    description: CLI workflow revision.
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ inputs.artifact }}
+        path: ${{ runner.temp }}/infra-cli
+    - shell: bash
+      env:
+        CLI_SHA256: ${{ inputs.sha256 }}
+        CLI_REVISION: ${{ inputs.revision }}
+        WORKFLOW_REVISION: ${{ job.workflow_sha }}
+      run: |
+        test "$CLI_REVISION" = "$WORKFLOW_REVISION"
+        printf '%s  %s\n' "$CLI_SHA256" "$RUNNER_TEMP/infra-cli/infra" | sha256sum --check --strict
+        chmod 755 "$RUNNER_TEMP/infra-cli/infra"
+        printf '%s\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_PATH"
+        printf 'INFRA_BINARY=%s/infra\n' "$RUNNER_TEMP/infra-cli" >> "$GITHUB_ENV"

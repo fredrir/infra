@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -187,7 +188,7 @@ func TestDeployVerifiesExactProvenanceAndPushesOnce(t *testing.T) {
 					t.Fatal(command.Name)
 				}
 			} else {
-				args = []string{"verify", "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com", "--certificate-identity", "https://github.com/fredrir/infra/.github/workflows/build-image.yml@" + strings.Repeat("d", 40), "--certificate-github-workflow-repository", "fredrir/example", "--certificate-github-workflow-sha", f.options.Revision, "--certificate-github-workflow-ref", "refs/heads/main", "--certificate-github-workflow-trigger", "push", "--annotations", "source-repository=fredrir/example", "--annotations", "source-revision=" + f.options.Revision, "--annotations", "workflow-revision=" + strings.Repeat("d", 40), f.options.Image + "@" + f.options.Digest}
+				args = []string{"verify", "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com", "--certificate-identity-regexp", "^https://github.com/fredrir/infra/\\.github/workflows/build-image\\.yml@(" + strings.Repeat("d", 40) + "|refs/tags/ci-v1)$", "--certificate-github-workflow-repository", "fredrir/example", "--certificate-github-workflow-sha", f.options.Revision, "--certificate-github-workflow-ref", "refs/heads/main", "--certificate-github-workflow-trigger", "push", "--annotations", "source-repository=fredrir/example", "--annotations", "source-revision=" + f.options.Revision, "--annotations", "workflow-revision=" + strings.Repeat("d", 40), f.options.Image + "@" + f.options.Digest}
 				if command.Name != "cosign" {
 					t.Fatal(command.Name)
 				}
@@ -372,7 +373,7 @@ func TestDeployBoundedWorkflowOverlapVerifiesBeforeMutation(t *testing.T) {
 					t.Fatalf("expected two exact candidate checks, got%d", len(f.calls))
 				}
 				for i, want := range []string{old, newRevision} {
-					if !strings.Contains(strings.Join(f.calls[i].Args, " "), want) || strings.Contains(strings.Join(f.calls[i].Args, " "), "|") {
+					if !strings.Contains(strings.Join(f.calls[i].Args, " "), want) || !slices.Contains(f.calls[i].Args, "workflow-revision="+want) && visibility == "private" {
 						t.Fatal("candidate not exact", f.calls[i].Args)
 					}
 				}
@@ -386,12 +387,12 @@ func TestDeployBoundedWorkflowOverlapVerifiesBeforeMutation(t *testing.T) {
 
 func TestWorkflowTrustAcceptsOnlyAnchoredExactCandidates(t *testing.T) {
 	a, b := strings.Repeat("a", 40), strings.Repeat("b", 40)
-	for _, valid := range []string{"^" + a + "$", "^(" + a + "|" + b + ")$"} {
+	for _, valid := range []string{"^" + a + "$", "^(" + a + "|" + b + ")$", "^(" + a + "|" + b + "|" + strings.Repeat("c", 40) + ")$"} {
 		if _, err := WorkflowRevisions(valid); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, invalid := range []string{a, "^" + a, "" + a + "$", "^.*$", "^(" + a + "|" + b + "|" + strings.Repeat("c", 40) + ")$", "^(" + a + "|" + a + ")$", "^" + a + "|" + b + "$", "^(?:" + a + "|" + b + ")$", "^" + strings.Repeat("A", 40) + "$", "^" + a + "$\n"} {
+	for _, invalid := range []string{a, "^" + a, "" + a + "$", "^.*$", "^(" + a + "|" + a + ")$", "^" + a + "|" + b + "$", "^(?:" + a + "|" + b + ")$", "^" + strings.Repeat("A", 40) + "$", "^" + a + "$\n"} {
 		if _, err := WorkflowRevisions(invalid); err == nil {
 			t.Fatal("unconstrained trust accepted", invalid)
 		}

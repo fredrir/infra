@@ -1,0 +1,76 @@
+name: Project runtime dependencies
+on:
+  workflow_call:
+    inputs:
+      cli-artifact:
+        type: string
+        required: true
+      cli-sha256:
+        type: string
+        required: true
+      cli-revision:
+        type: string
+        required: true
+    outputs:
+      image:
+        value: ${{ jobs.lookup.outputs.image || jobs.build.outputs.image }}
+permissions:
+  contents: read
+jobs:
+  lookup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      image: ${{ steps.lookup.outputs.image }}
+      build: ${{ steps.lookup.outputs.build }}
+      tag: ${{ steps.lookup.outputs.tag }}
+      dockerfile: ${{ steps.lookup.outputs.dockerfile }}
+      build-args: ${{ steps.lookup.outputs.build-args }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .infra-build-recipe
+          persist-credentials: false
+      - uses: ./.infra-build-recipe/.github/actions/use-cli
+        with:
+          artifact: ${{ inputs.cli-artifact }}
+          sha256: ${{ inputs.cli-sha256 }}
+          revision: ${{ inputs.cli-revision }}
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
+        with:
+          version: 0.12.20
+          enable-cache: false
+      - name: Install verifier
+        run: infra ci install-tools cosign
+      - id: lookup
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: infra ci dependencies lookup --infra-root .infra-build-recipe
+  build:
+    needs: lookup
+    if: needs.lookup.outputs.build == 'true'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image: ghcr.io/fredrir/pyparser-dependencies
+      dockerfile: .infra-build-recipe/${{ needs.lookup.outputs.dockerfile }}
+      build-args: ${{ needs.lookup.outputs.build-args }}
+      verified-tag: ${{ needs.lookup.outputs.tag }}
+      deploy: false
+      timeout-minutes: 120
+      cli-artifact: ${{ inputs.cli-artifact }}
+      cli-sha256: ${{ inputs.cli-sha256 }}
+      cli-revision: ${{ inputs.cli-revision }}

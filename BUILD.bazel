@@ -201,7 +201,10 @@ filegroup(
 
 filegroup(
     name = "workflow_trust_data",
-    srcs = glob([".github/chainguard/*.sts.yaml"]),
+    srcs = glob([
+        ".github/chainguard/*.sts.yaml",
+        ".github/deployments/*.yaml",
+    ]),
     visibility = ["//internal/contracts:__pkg__"],
 )
 

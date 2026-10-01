@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
@@ -116,12 +117,12 @@ func ProjectFiles(options OnboardOptions, identity Identity) (map[string][]byte,
 		{"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": map[string]string{"name": "default-deny", "namespace": namespace}, "spec": map[string]any{"podSelector": map[string]any{}, "policyTypes": []string{"Ingress", "Egress"}}},
 		{"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": map[string]string{"name": "dns", "namespace": namespace}, "spec": map[string]any{"podSelector": map[string]any{}, "policyTypes": []string{"Egress"}, "egress": []any{map[string]any{"to": []any{map[string]any{"namespaceSelector": map[string]any{"matchLabels": map[string]string{"kubernetes.io/metadata.name": "kube-system"}}, "podSelector": map[string]any{"matchLabels": map[string]string{"k8s-app": "kube-dns"}}}}, "ports": []any{map[string]any{"port": 53, "protocol": "UDP"}, map[string]any{"port": 53, "protocol": "TCP"}}}}}},
 	}
-	caller := map[string]any{"name": "Build", "on": map[string]any{"push": map[string]any{"branches": []string{"main"}}}, "permissions": map[string]string{"contents": "read", "packages": "write", "id-token": "write", "attestations": "write"}, "jobs": map[string]any{"build": map[string]any{"if": fmt.Sprintf("github.event_name == 'push' && github.ref_protected && github.repository_id == '%d' && github.repository_owner_id == '%d'", identity.ID, OwnerID), "uses": imageWorkflow + "@" + options.WorkflowRef, "with": map[string]string{"image": strings.SplitN(options.Image, "@", 2)[0], "test-command": options.TestCommand}}}}
+	caller := map[string]any{"name": "Build", "on": map[string]any{"push": map[string]any{"branches": []string{"main"}}}, "permissions": map[string]string{"contents": "read", "packages": "write", "id-token": "write", "attestations": "write"}, "jobs": map[string]any{"build": map[string]any{"uses": "fredrir/infra/.github/workflows/project-images.yml@ci-v1"}}}
 	visibility := "public"
 	if identity.Private {
 		visibility = "private"
 	}
-	policy := TrustPolicy(identity, "ref:refs/heads/main", "github-hosted", map[string]string{"event_name": "^push$", "ref": "^refs/heads/main$", "job_workflow_ref": "^" + regexp.QuoteMeta(imageWorkflow+"@"+options.WorkflowRef) + "$", "job_workflow_sha": "^" + options.WorkflowRef + "$"}, map[string]string{"actions": "write"})
+	policy := TrustPolicy(identity, "ref:refs/heads/main", "github-hosted", map[string]string{"event_name": "^(push|workflow_dispatch)$", "ref": "^refs/heads/main$", "job_workflow_ref": "^" + regexp.QuoteMeta(imageWorkflow) + "@refs/tags/ci-v1$", "job_workflow_sha": "^" + options.WorkflowRef + "$"}, map[string]string{"actions": "write"})
 	documents := map[string]any{
 		"project/release.yaml": release, "project/kustomization.yaml": map[string]any{"apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "namespace": namespace, "resources": []string{"baseline.yaml", "release.yaml"}}, "caller/.github/workflows/build.yaml": caller,
 		fmt.Sprintf("infrastructure/.github/deployments/%d.yaml", identity.ID): map[string]any{"repository": identity.FullName, "visibility": visibility, "images": map[string]any{strings.SplitN(options.Image, "@", 2)[0]: map[string]string{"path": "platform/projects/" + options.Project, "mode": "helmrelease", "workload": "web"}}}, fmt.Sprintf("infrastructure/.github/chainguard/deploy-%d.sts.yaml", identity.ID): policy,
@@ -145,6 +146,13 @@ func ProjectFiles(options OnboardOptions, identity Identity) (map[string][]byte,
 		return nil, err
 	}
 	files["project/baseline.yaml"] = []byte(baseline.String())
+	image := strings.SplitN(options.Image, "@", 2)[0]
+	profile := ci.Project{Schema: 1, Repository: identity.FullName, RepositoryID: fmt.Sprint(identity.ID), Inputs: ci.ProjectInputs{Schema: 1, Shared: []string{"Containerfile", ".dockerignore", ".github/"}, Targets: map[string][]string{strings.TrimPrefix(image, "ghcr.io/fredrir/"): {"src/"}}}, Images: []ci.ProjectImage{{Image: image, Dockerfile: "Containerfile", Timeout: 45, Precheck: options.TestCommand}}, Checks: []ci.ProjectCheck{}}
+	data, err := json.MarshalIndent(profile, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	files["infrastructure/build/projects/"+strings.SplitN(identity.FullName, "/", 2)[1]+".json"] = append(data, '\n')
 	return files, nil
 }
 

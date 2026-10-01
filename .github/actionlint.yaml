@@ -14,6 +14,9 @@ paths:
     - 'property "workflow_(sha|repository)" is not defined in object type'
   .github/workflows/build-image.yml:
     ignore:
+    - 'property "workflow_(sha|repository|ref)" is not defined in object type'
+  .github/workflows/project-*.yml:
+    ignore:
     - 'property "workflow_(sha|repository)" is not defined in object type'
   .github/workflows/test-image.yml:
     ignore:

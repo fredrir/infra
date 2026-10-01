@@ -77,12 +77,12 @@ func TestProjectOnboardingEmitsZeroReplicaWorkloadAndExactHostedTrust(t *testing
 		t.Fatal("generated workload lost its initial scale or immutable image")
 	}
 	caller := readDocument(t, filepath.Join(output, "caller/.github/workflows/build.yaml"))
-	if nested(caller, "jobs", "build", "uses") != imageWorkflow+"@"+options.WorkflowRef {
-		t.Fatal("caller is not pinned")
+	if nested(caller, "jobs", "build", "uses") != "fredrir/infra/.github/workflows/project-images.yml@ci-v1" {
+		t.Fatal("caller does not use the CI channel")
 	}
 	policy := readDocument(t, filepath.Join(output, "infrastructure/.github/chainguard/deploy-123.sts.yaml"))
 	claims := policy["claim_pattern"].(map[string]any)
-	for field, wanted := range map[string]string{"runner_environment": "github-hosted", "repository_id": "123", "repository_owner_id": "114402558", "job_workflow_sha": options.WorkflowRef, "job_workflow_ref": imageWorkflow + "@" + options.WorkflowRef} {
+	for field, wanted := range map[string]string{"runner_environment": "github-hosted", "repository_id": "123", "repository_owner_id": "114402558", "job_workflow_sha": options.WorkflowRef, "job_workflow_ref": imageWorkflow + "@refs/tags/ci-v1"} {
 		pattern := regexp.MustCompile(claims[field].(string))
 		if !pattern.MatchString(wanted) || pattern.MatchString(wanted+"x") {
 			t.Fatalf("weak %s claim: %s", field, pattern)
@@ -142,7 +142,7 @@ func rustFixture(t *testing.T) (RustOptions, map[string][]byte) {
 			t.Fatal(err)
 		}
 	}
-	return RustOptions{Repository: "fredrir/example", Project: "example", WorkflowRef: strings.Repeat("a", 40), Root: root, Output: filepath.Join(t.TempDir(), "output")}, files
+	return RustOptions{Repository: "fredrir/example", Project: "example", Root: root, Output: filepath.Join(t.TempDir(), "output")}, files
 }
 func TestRustOnboardingSeparatesPoolCredentialsAndRegistersResources(t *testing.T) {
 	options, _ := rustFixture(t)
@@ -254,7 +254,7 @@ func TestPlatformRecipientDisagreementFailsBeforeCredentialsAreGenerated(t *test
 func TestPrivateRustProjectsEmitOnlyReadOnlyCI(t *testing.T) {
 	identity := identityFixture()
 	identity.Private = true
-	files, err := RustCallers(identity, strings.Repeat("f", 40))
+	files, err := RustCallers(identity)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +315,7 @@ func TestRustOnboardingRejectsDuplicateRepositoryAndSymlinkEscape(t *testing.T) 
 	}
 }
 func TestRustCallerTrustRejectsWrongIdentityEnvironmentAndWorkflow(t *testing.T) {
-	files, err := RustCallers(identityFixture(), strings.Repeat("a", 40))
+	files, err := RustCallers(identityFixture())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +324,7 @@ func TestRustCallerTrustRejectsWrongIdentityEnvironmentAndWorkflow(t *testing.T)
 		t.Fatal(err)
 	}
 	claims := policy["claim_pattern"].(map[string]any)
-	for field, values := range map[string][]string{"repository_id": {"123", "1234"}, "repository_owner_id": {"114402558", "1"}, "runner_environment": {"self-hosted", "github-hosted"}, "job_workflow_ref": {"fredrir/infra/.github/workflows/rust-auto-tag.yml@" + strings.Repeat("a", 40), "evil/infra/.github/workflows/rust-auto-tag.yml@" + strings.Repeat("a", 40)}} {
+	for field, values := range map[string][]string{"repository_id": {"123", "1234"}, "repository_owner_id": {"114402558", "1"}, "runner_environment": {"self-hosted", "github-hosted"}, "job_workflow_ref": {"fredrir/infra/.github/workflows/rust-auto-tag.yml@refs/tags/ci-v1", "evil/infra/.github/workflows/rust-auto-tag.yml@" + strings.Repeat("a", 40)}} {
 		pattern := regexp.MustCompile(claims[field].(string))
 		if !pattern.MatchString(values[0]) || pattern.MatchString(values[1]) {
 			t.Fatalf("unsafe %s trust: %s", field, pattern)

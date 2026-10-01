@@ -87,7 +87,7 @@ jobs:
       group: image-${{ github.repository }}-${{ inputs.image }}
       cancel-in-progress: ${{ github.workflow != 'Reconcile infrastructure' }}
     needs: cli
-    if: ${{ !cancelled() && (needs.cli.result == 'success' || (needs.cli.result == 'skipped' && ((github.repository == 'fredrir/infra' && inputs.cli-artifact != '') || (github.repository != 'fredrir/infra' && inputs.cli-artifact == '') || (github.repository == 'fredrir/infra' && inputs.release-cli)))) && (!inputs.release-cli || (github.repository == 'fredrir/infra' && contains(fromJSON('["ghcr.io/fredrir/infra-runner-deploy","ghcr.io/fredrir/infra-source-watcher"]'), inputs.image) && inputs.cli-artifact == '')) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected }}
+    if: ${{ !cancelled() && (needs.cli.result == 'success' || (needs.cli.result == 'skipped' && (inputs.cli-artifact != '' || github.repository != 'fredrir/infra' || inputs.release-cli))) && (!inputs.release-cli || (github.repository == 'fredrir/infra' && contains(fromJSON('["ghcr.io/fredrir/infra-runner-deploy","ghcr.io/fredrir/infra-source-watcher"]'), inputs.image) && inputs.cli-artifact == '')) && github.repository_owner_id == '114402558' && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && github.ref == 'refs/heads/main' && github.ref_protected }}
     runs-on: ${{ !inputs.hosted && contains(fromJSON('["fredrir/infra","fredrir/Y","fredrir/portfolio","fredrir/llunde-frontend","fredrir/llunde-backend","fredrir/llunde-pyparser"]'), github.repository) && github.ref == 'refs/heads/main' && github.ref_protected && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && vars.INFRA_VM_POOL_QUALIFIED == 'true' && 'dagger-amd64' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
@@ -120,15 +120,28 @@ jobs:
         with:
           root: .infra-build-recipe
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        if: github.repository == 'fredrir/infra' && !inputs.release-cli
+        if: inputs.cli-artifact != '' || (github.repository == 'fredrir/infra' && !inputs.release-cli)
         with:
-          name: ${{ github.repository == 'fredrir/infra' && inputs.cli-artifact || needs.cli.outputs.artifact }}
+          name: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
           path: ${{ runner.temp }}/infra-cli
-      - name: Verify CLI
-        if: github.repository == 'fredrir/infra' && !inputs.release-cli
+      - name: Verify shared CLI signer
+        if: github.repository != 'fredrir/infra' && inputs.cli-artifact != ''
         env:
-          CLI_SHA256: ${{ github.repository == 'fredrir/infra' && inputs.cli-sha256 || needs.cli.outputs.sha256 }}
-          CLI_REVISION: ${{ github.repository == 'fredrir/infra' && inputs.cli-revision || needs.cli.outputs.revision }}
+          WORKFLOW_REVISION: ${{ job.workflow_sha }}
+          CLI_SHA256: ${{ inputs.cli-sha256 }}
+        run: |
+          infra ci install-tools cosign
+          cosign verify-blob --bundle "$RUNNER_TEMP/infra-cli/identity.sigstore.json" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "^https://github.com/fredrir/infra/\\.github/workflows/infra-cli\\.yml@($WORKFLOW_REVISION|refs/tags/ci-v1)$" \
+            --certificate-github-workflow-repository "$GITHUB_REPOSITORY" \
+            --certificate-github-workflow-sha "$GITHUB_SHA" "$RUNNER_TEMP/infra-cli/identity.json"
+          jq -e --arg revision "$WORKFLOW_REVISION" --arg sha256 "$CLI_SHA256" '.schema == 1 and .workflow_revision == $revision and .sha256 == $sha256' "$RUNNER_TEMP/infra-cli/identity.json"
+      - name: Verify CLI
+        if: inputs.cli-artifact != '' || (github.repository == 'fredrir/infra' && !inputs.release-cli)
+        env:
+          CLI_SHA256: ${{ inputs.cli-sha256 || needs.cli.outputs.sha256 }}
+          CLI_REVISION: ${{ inputs.cli-revision || needs.cli.outputs.revision }}
           WORKFLOW_REVISION: ${{ job.workflow_sha }}
         run: |
           test "$CLI_REVISION" = "$WORKFLOW_REVISION"
@@ -144,11 +157,7 @@ jobs:
         run: |
           printf 'report-id=%s-%s\n' "${IMAGE##*/}" "$(cat /proc/sys/kernel/random/uuid)" >> "$GITHUB_OUTPUT"
           printf '/.infra-build-recipe/\n' >> .git/info/exclude
-          if [ -f ci/targets.json ]; then
-            infra ci affected-project --base "$BASE" --target "${IMAGE##*/}"
-          else
-            printf 'changed=true\nreason=unconfigured\n' >> "$GITHUB_OUTPUT"
-          fi
+          printf 'changed=true\nreason=shared-plan\n' >> "$GITHUB_OUTPUT"
       - name: Authenticate the registry for this job
         if: steps.affected.outputs.changed == 'true'
         env:
@@ -359,6 +368,7 @@ jobs:
         env:
           IMAGE: ${{ steps.build.outputs.image }}
           WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REF: ${{ job.workflow_ref }}
           REGISTRY_TOKEN: ${{ github.token }}
         run: |
           export DOCKER_CONFIG="$RUNNER_TEMP/signature-registry"
@@ -379,7 +389,7 @@ jobs:
           fi
           infra ci measure-check --stage provenance-verification --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- \
             cosign verify "${verified_root[@]}" --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            --certificate-identity "https://github.com/fredrir/infra/.github/workflows/build-image.yml@$WORKFLOW_SHA" \
+            --certificate-identity "https://github.com/$WORKFLOW_REF" \
             --certificate-github-workflow-repository "$GITHUB_REPOSITORY" \
             --certificate-github-workflow-sha "$GITHUB_SHA" \
             --certificate-github-workflow-ref refs/heads/main \

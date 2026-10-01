@@ -156,6 +156,7 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 	var identity struct {
 		ClaimPattern struct {
 			WorkflowSHA string `yaml:"job_workflow_sha"`
+			Event       string `yaml:"event_name"`
 		} `yaml:"claim_pattern"`
 	}
 	trust := path.Join(".github/chainguard", "deploy-"+repositoryID+".sts.yaml")
@@ -183,6 +184,16 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 			arguments = append(arguments, "--format", "json")
 		}
 		result, err := runner.Invoke(ctx, process.Options{Name: name, Args: arguments, Dir: runner.Dir, Env: environment, Stderr: runner.Stderr})
+		if err != nil && mapping.Visibility == "private" && identity.ClaimPattern.Event == "^(push|workflow_dispatch)$" && ctx.Err() == nil {
+			arguments = slices.Clone(arguments)
+			for index, argument := range arguments {
+				if argument == "--certificate-github-workflow-trigger" {
+					arguments[index+1] = "workflow_dispatch"
+					break
+				}
+			}
+			result, err = runner.Invoke(ctx, process.Options{Name: name, Args: arguments, Dir: runner.Dir, Env: environment, Stderr: runner.Stderr})
+		}
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -232,7 +243,8 @@ func ProvenanceCommand(visibility, repository, workflowRevision, revision, image
 	case "public":
 		return "gh", []string{"attestation", "verify", "oci://" + image, "--repo", repository, "--signer-workflow", workflow, "--signer-digest", workflowRevision, "--source-ref", "refs/heads/main", "--source-digest", revision}, nil
 	case "private":
-		return "cosign", []string{"verify", "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com", "--certificate-identity", "https://github.com/" + workflow + "@" + workflowRevision, "--certificate-github-workflow-repository", repository, "--certificate-github-workflow-sha", revision, "--certificate-github-workflow-ref", "refs/heads/main", "--certificate-github-workflow-trigger", "push", "--annotations", "source-repository=" + repository, "--annotations", "source-revision=" + revision, "--annotations", "workflow-revision=" + workflowRevision, image}, nil
+		identity := "^https://github.com/" + regexp.QuoteMeta(workflow) + "@(" + workflowRevision + "|refs/tags/ci-v1)$"
+		return "cosign", []string{"verify", "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com", "--certificate-identity-regexp", identity, "--certificate-github-workflow-repository", repository, "--certificate-github-workflow-sha", revision, "--certificate-github-workflow-ref", "refs/heads/main", "--certificate-github-workflow-trigger", "push", "--annotations", "source-repository=" + repository, "--annotations", "source-revision=" + revision, "--annotations", "workflow-revision=" + workflowRevision, image}, nil
 	default:
 		return "", nil, fmt.Errorf("unsupported repository visibility")
 	}
@@ -366,15 +378,25 @@ func readYAML(path string, destination any) error {
 }
 
 func WorkflowRevisions(pattern string) ([]string, error) {
-	single := regexp.MustCompile(`^\^([a-f0-9]{40})\$$`).FindStringSubmatch(pattern)
-	if single != nil {
-		return single[1:], nil
+	if len(pattern) > 32768 || !strings.HasPrefix(pattern, "^") || !strings.HasSuffix(pattern, "$") {
+		return nil, fmt.Errorf("workflow trust requires anchored exact revisions")
 	}
-	pair := regexp.MustCompile(`^\^\(([a-f0-9]{40})\|([a-f0-9]{40})\)\$$`).FindStringSubmatch(pattern)
-	if pair != nil && pair[1] != pair[2] {
-		return pair[1:], nil
+	body := strings.TrimSuffix(strings.TrimPrefix(pattern, "^"), "$")
+	if strings.HasPrefix(body, "(") && strings.HasSuffix(body, ")") {
+		body = body[1 : len(body)-1]
 	}
-	return nil, fmt.Errorf("workflow trust requires one or two anchored exact revisions")
+	revisions := strings.Split(body, "|")
+	seen := map[string]bool{}
+	for _, revision := range revisions {
+		if !revisionPattern.MatchString(revision) || seen[revision] {
+			return nil, fmt.Errorf("workflow trust requires unique exact revisions")
+		}
+		seen[revision] = true
+	}
+	if len(revisions) > 1 && !strings.HasPrefix(pattern, "^(") {
+		return nil, fmt.Errorf("workflow alternatives require grouping")
+	}
+	return revisions, nil
 }
 func pinImage(data []byte, image, digest string) ([]byte, error) {
 	var document yaml.Node

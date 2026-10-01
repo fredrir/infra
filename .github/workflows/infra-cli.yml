@@ -1,9 +1,13 @@
 name: Build infrastructure CLI
 on:
   workflow_call:
+    inputs:
+      sign-cli:
+        type: boolean
+        default: false
     outputs:
       artifact:
-        value: ${{ jobs.build.outputs.artifact }}
+        value: ${{ jobs.sign.outputs.artifact || jobs.build.outputs.artifact }}
       sha256:
         value: ${{ jobs.build.outputs.sha256 }}
       revision:
@@ -121,6 +125,49 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ steps.bundle.outputs.artifact }}
+          path: ${{ runner.temp }}/infra-cli
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 1
+  sign:
+    needs: build
+    if: inputs.sign-cli
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      artifact: ${{ steps.artifact.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-infra
+        with:
+          root: .
+      - name: Install artifact signer
+        run: infra ci install-tools cosign
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: ${{ runner.temp }}/infra-cli
+      - name: Sign CLI identity
+        env:
+          WORKFLOW_REVISION: ${{ job.workflow_sha }}
+          CLI_SHA256: ${{ needs.build.outputs.sha256 }}
+        run: |
+          jq -n --arg revision "$WORKFLOW_REVISION" --arg sha256 "$CLI_SHA256" '{schema:1, workflow_revision:$revision, sha256:$sha256}' > "$RUNNER_TEMP/infra-cli/identity.json"
+          cosign sign-blob --yes --timeout 2m --bundle "$RUNNER_TEMP/infra-cli/identity.sigstore.json" "$RUNNER_TEMP/infra-cli/identity.json"
+      - id: artifact
+        env:
+          ARTIFACT: ${{ needs.build.outputs.artifact }}
+        run: printf 'artifact=%s-signed\n' "$ARTIFACT" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ${{ steps.artifact.outputs.artifact }}
           path: ${{ runner.temp }}/infra-cli
           if-no-files-found: error
           retention-days: 7

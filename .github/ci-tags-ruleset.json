@@ -1,0 +1,8 @@
+{
+  "name": "ci-channel",
+  "target": "tag",
+  "enforcement": "active",
+  "conditions": {"ref_name": {"include": ["refs/tags/ci-v1"], "exclude": []}},
+  "bypass_actors": [{"actor_id": 801323, "actor_type": "Integration", "bypass_mode": "always"}],
+  "rules": [{"type": "creation"}, {"type": "update"}, {"type": "deletion"}]
+}

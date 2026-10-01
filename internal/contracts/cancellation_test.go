@@ -30,7 +30,7 @@ func TestImageBuildCancellationPreservesVerifiedArtifactReuse(t *testing.T) {
 		{"cancelled artifact reuse", "fredrir/infra", "skipped", "verified-artifact", "", true, true, false, false},
 		{"consumer released CLI", "fredrir/example", "skipped", "", "", false, true, false, true},
 		{"consumer bootstrap", "fredrir/example", "success", "", "", false, true, false, true},
-		{"consumer artifact substitution", "fredrir/example", "skipped", "caller-artifact", "", false, true, false, false},
+		{"consumer signed artifact", "fredrir/example", "skipped", "caller-artifact", "", false, true, false, true},
 		{"failed consumer bootstrap", "fredrir/example", "failure", "", "", false, true, false, false},
 		{"unprotected source", "fredrir/infra", "success", "", "", false, false, false, false},
 		{"thin runner released CLI", "fredrir/infra", "skipped", "", "ghcr.io/fredrir/infra-runner-deploy", false, true, true, true},

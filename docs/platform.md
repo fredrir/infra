@@ -80,15 +80,15 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Shared images         | [`images/catalog.yaml`](../images/catalog.yaml): Rust and check runner images, backup tools and Caddy; [`images.yml`](../.github/workflows/images.yml) selects changed declared inputs and injected `infra` binary digests, scans and attests before setting content tags; Monday schedule and manual dispatch rebuild all |
 | Fork PRs              | Never run: job-level guard, pool job-started hook and approval required for every external contributor                                                                                                                                                                                         |
 | Approved source       | Protected `main` pushes; same-repository PRs on `rust-pr-amd64`; protected `v*` tags and `main` dry runs on `rust-release-amd64`; matching numeric repository and owner identities                                                                                                             |
-| Workflow reuse        | Immutable `fredrir/infra/.github/workflows/{build-image,rust-ci,rust-auto-tag,rust-release,packages-publish}.yml@<commit>`                                                                                                                                                                     |
-| Pin changes           | A new shared workflow or shared recipe commit re-pins all callers and the OctoSTS policies to that commit together                                                                                                                                                                             |
+| Workflow reuse        | `fredrir/infra/.github/workflows/{project-ci,project-images,rust-auto-tag,rust-release,packages-publish}.yml@ci-v1`                                                                                                                                                                     |
+| Pin changes           | Qualified immutable CI releases advance `ci-v1` after the central deployment trust update is merged                                                                                                                                                                             |
 | Release authorization | OctoSTS on `infra`, onboarded projects, `packages`, `homebrew-tap`, `homebrew-nsql` and `nur-packages`; policies pin workflow path, repository id, ref and environment; project deploy identities hold `actions: write` on `infra`, only `deploy.yml` on `main` holds `contents: write`        |
 | Deployment mappings   | [Repository image mappings](../.github/deployments)                                                                                                                                                                                                                                            |
-| Promotion             | `build-image.yml` dispatches [`deploy.yml`](../.github/workflows/deploy.yml); it verifies the GitHub attestation (public) or keyless Cosign signature (private) against the pinned workflow commit, pushes the digest to `main` and notifies the Flux `deploy` receiver                        |
+| Promotion             | `build-image.yml` dispatches [`deploy.yml`](../.github/workflows/deploy.yml); it verifies the GitHub attestation (public) or keyless Cosign signature (private) against an approved exact workflow revision, pushes the digest to `main` and notifies the Flux `deploy` receiver                        |
 | Rollback              | Revert the deployment commit; check database schema compatibility first                                                                                                                                                                                                                        |
 | Native ARM            | Rust targets cross-compile with cargo-zigbuild; container images and native tests stay amd64 until an ARM worker passes qualification                                                                                                                                                          |
 
-A project caller contains only its build inputs and a pinned reusable workflow. The infrastructure repository owns authentication, publication and verified deployment commits.
+Project callers declare triggers, permissions and the shared workflow. [Project profiles](../build/projects) own checks, affected inputs and image matrices.
 
 ```yaml
 name: Build
@@ -102,10 +102,7 @@ permissions:
   attestations: write
 jobs:
   build:
-    uses: fredrir/infra/.github/workflows/build-image.yml@<reviewed-40-character-commit>
-    with:
-      image: ghcr.io/fredrir/example
-      test-command: <native-project-test-command>
+    uses: fredrir/infra/.github/workflows/project-images.yml@ci-v1
 ```
 
 ## Rust projects
@@ -113,7 +110,7 @@ jobs:
 | Name           | Value                                                                                                                                                          |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Registry       | [Rust projects](../.github/rust-projects.yaml)                                                                                                                 |
-| CI             | [`rust-ci.yml`](../.github/workflows/rust-ci.yml): fmt, clippy, nextest, doc tests, minimal build, MSRV, cargo audit                                           |
+| CI             | [`project-ci.yml`](../.github/workflows/project-ci.yml): central checks; Rust formatting, lint, tests and minimal builds; scheduled MSRV and audit                                           |
 | Versioning     | [`rust-auto-tag.yml`](../.github/workflows/rust-auto-tag.yml): patch bump, git-cliff, `v*` tag                                                                 |
 | Release        | [`rust-release.yml`](../.github/workflows/rust-release.yml): GoReleaser OSS and cargo-zigbuild                                                                 |
 | Targets        | `x86_64`/`aarch64` Linux gnu (glibc 2.28) and musl (static); `x86_64`/`aarch64` macOS (SDK in `toolchains`)                                                    |
@@ -127,7 +124,6 @@ jobs:
 ```sh
 infra onboard-rust fredrir/example \
   --project example \
-  --workflow-ref "$workflow_revision" \
   --output .infra/onboarding/example
 ```
 
@@ -135,7 +131,7 @@ infra onboard-rust fredrir/example \
 | ------------------------------------------- | ----------------------------------------------- |
 | `platform/components/runners/example/`      | Written in place; three pools and cache secrets |
 | `platform/components/object-store/`         | Written in place; cache credentials, identities and buckets |
-| `.github/rust-projects.yaml`                | Written in place                                |
+| `build/projects/example.json`, `.github/rust-projects.yaml` | Written in place                                |
 | `project/.github/`                          | Project repository callers and auto-tag policy  |
 | `packages/.github/chainguard/`              | `fredrir/packages`                              |
 
@@ -170,6 +166,7 @@ infra onboard fredrir/example \
 | Generated files                       | Destination                                                                                |
 | ------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `project/`                            | `platform/projects/example/`; include it in the projects Kustomization and regenerate selective Flux artifacts                     |
+| `infrastructure/build/projects/`      | Shared CI profile                                                                          |
 | `infrastructure/.github/`             | Infrastructure deployment mapping (`visibility`, image paths) and OctoSTS trust policy     |
 | `caller/.github/workflows/build.yaml` | Project repository                                                                         |
 | Application credentials               | Add encrypted `project-registry` and `project-runtime` Secrets                             |

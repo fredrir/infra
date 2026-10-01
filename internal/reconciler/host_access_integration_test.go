@@ -145,7 +145,11 @@ func TestHostAccessReachesHostsThroughARealSSHHopAndProxyJump(t *testing.T) {
       ansible_host: 127.0.0.1
       ansible_ssh_common_args: -o ProxyJump=%[1]s@127.0.0.2:%[2]d -o HostKeyAlias=fixture-target -o StrictHostKeyChecking=yes -o ConnectTimeout=10
 `, account.Username, port)
-	for path, content := range map[string]string{"inventory.yml": inventory, "play.yml": "- hosts: all\n  gather_facts: false\n  tasks:\n  - ansible.builtin.command: /bin/true\n    changed_when: false\n"} {
+	truePath, err := exec.LookPath("true")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, content := range map[string]string{"inventory.yml": inventory, "play.yml": fmt.Sprintf("- hosts: all\n  gather_facts: false\n  tasks:\n  - ansible.builtin.command: %s\n    changed_when: false\n", truePath)} {
 		if err := os.WriteFile(filepath.Join(work, path), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}

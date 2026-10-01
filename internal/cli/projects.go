@@ -25,7 +25,7 @@ func newProjectCommands() []*cobra.Command {
 	flags.StringVar(&options.Project, "project", "", "Project name")
 	flags.StringVar(&options.Image, "image", "", "Immutable image reference")
 	flags.StringVar(&options.SourceRevision, "source-revision", "", "Source commit")
-	flags.StringVar(&options.WorkflowRef, "workflow-ref", "", "Infrastructure workflow commit")
+	flags.StringVar(&options.WorkflowRef, "workflow-ref", "", "Approved CI channel revision")
 	flags.IntVar(&options.Port, "port", 8080, "Application port")
 	flags.StringVar(&options.HealthPath, "health-path", "/healthz", "Health endpoint")
 	flags.StringVar(&options.Domain, "domain", "", "Shared gateway hostname")
@@ -36,7 +36,7 @@ func newProjectCommands() []*cobra.Command {
 		_ = onboard.MarkFlagRequired(name)
 	}
 	var rustOptions projects.RustOptions
-	rust := &cobra.Command{Use: "onboard-rust REPOSITORY", Short: "Provision isolated Rust runner credentials and pinned callers", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
+	rust := &cobra.Command{Use: "onboard-rust REPOSITORY", Short: "Provision isolated Rust runner credentials and shared CI", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
 		rustOptions.Repository = args[0]
 		if err := projects.OnboardRust(command.Context(), provider(command), rustOptions); err != nil {
 			return err
@@ -45,10 +45,9 @@ func newProjectCommands() []*cobra.Command {
 		return err
 	}}
 	rust.Flags().StringVar(&rustOptions.Project, "project", "", "Project name")
-	rust.Flags().StringVar(&rustOptions.WorkflowRef, "workflow-ref", "", "Infrastructure workflow commit")
 	rust.Flags().StringVar(&rustOptions.Output, "output", "", "Fresh caller output directory")
 	rust.Flags().StringVar(&rustOptions.Root, "root", ".", "Infrastructure checkout")
-	for _, name := range []string{"project", "workflow-ref", "output"} {
+	for _, name := range []string{"project", "output"} {
 		_ = rust.MarkFlagRequired(name)
 	}
 	return []*cobra.Command{onboard, rust}

@@ -117,7 +117,7 @@ func toolingInput(path string) bool {
 	if !canonicalPath(path) {
 		return false
 	}
-	for _, prefix := range []string{"cmd/", "internal/", ".github/", "build/tools/", "build/release/"} {
+	for _, prefix := range []string{"cmd/", "internal/", ".github/", "build/tools/", "build/release/", "build/projects/"} {
 		if strings.HasPrefix(path, prefix) {
 			return true
 		}
@@ -126,7 +126,7 @@ func toolingInput(path string) bool {
 		return true
 	}
 	switch path {
-	case "build/BUILD.bazel", "build/consumers.json", "build/dagger-embed.patch", "build/publisher.json", "go.mod", "go.sum", "BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelignore", ".bazelrc", ".bazelversion", ".dockerignore", ".envrc", ".gitignore":
+	case "build/BUILD.bazel", "build/ci-channel.json", "build/consumers.json", "build/dagger-embed.patch", "build/publisher.json", "go.mod", "go.sum", "BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelignore", ".bazelrc", ".bazelversion", ".dockerignore", ".envrc", ".gitignore":
 		return true
 	default:
 		return false
