@@ -69,7 +69,7 @@ func withDatabase(ctx context.Context, runner process.Runner, database Database,
 		}
 		return runner.Run(ctx, name, arguments...)
 	}
-	if err := postgres(ctx, "initdb", "-D", directory, "-U", database.User, "--auth=trust"); err != nil {
+	if err := postgres(ctx, "initdb", "-D", directory, "-U", database.User, "--auth=trust", "--encoding=UTF8", "--locale=C"); err != nil {
 		return err
 	}
 	defer func() {

@@ -192,4 +192,7 @@ func TestParserDatabaseNameAndEnvironmentReachTests(t *testing.T) {
 	if len(commands) != 5 || commands[2].Name != "createdb" || !slices.Contains(commands[2].Args, "pyparser_ci") || commands[3].Name != "python" || !slices.Contains(commands[3].Env, "PYPARSER_DATABASE_URL=postgresql://pyparser@127.0.0.1:5433/pyparser_ci") {
 		t.Fatalf("parser database lifecycle: %+v", commands)
 	}
+	if !slices.Contains(commands[0].Args, "--encoding=UTF8") || !slices.Contains(commands[0].Args, "--locale=C") {
+		t.Fatal("test database depends on installed locale")
+	}
 }
