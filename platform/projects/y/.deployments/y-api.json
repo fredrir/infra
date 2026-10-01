@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "image": "ghcr.io/fredrir/y-api",
-  "revision": "49fc7ea6b75e782cf7049f8aaf53403e3bd5052c",
-  "digest": "sha256:351ec027b7a8f864dd9df819012dd2bfd9da67c620f47668fd402725a3041153",
-  "run_id": 36856457343,
+  "revision": "e94ef5f7b43a9f49f26491262802dbe54dceca60",
+  "digest": "sha256:33bccb623b01a6c0d912fdc5b08cb54496e6bda0054e8518f7c8633267e6fb39",
+  "run_id": 36866120815,
   "attempt": 1
 }
