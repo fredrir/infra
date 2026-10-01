@@ -1,12 +1,12 @@
-issuer: https://token.actions.githubusercontent.com
-subject_pattern: ^repo:fredrir(@114402558)?/portfolio(@773018612)?:ref:refs/heads/main$
 claim_pattern:
-  repository_id: ^773018612$
-  repository_owner_id: ^114402558$
-  event_name: ^push$
-  ref: ^refs/heads/main$
-  runner_environment: ^(self-hosted|github-hosted)$
-  job_workflow_ref: ^fredrir/infra/\.github/workflows/build-image\.yml@(607c305882e59a3ebbd70422a818594a98a50845|d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af)$
-  job_workflow_sha: ^(607c305882e59a3ebbd70422a818594a98a50845|d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af)$
+    event_name: ^(push|workflow_dispatch)$
+    job_workflow_ref: ^fredrir/infra/\.github/workflows/build-image\.yml@(refs/tags/ci-v1|607c305882e59a3ebbd70422a818594a98a50845|d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af|eddd530a3f717dd5d3261097cd175254e7fe9a43)$
+    job_workflow_sha: ^(607c305882e59a3ebbd70422a818594a98a50845|d41c9acc3e6608a4b5cb98a66a3150d35bd5d6af|eddd530a3f717dd5d3261097cd175254e7fe9a43)$
+    ref: ^refs/heads/main$
+    repository_id: ^773018612$
+    repository_owner_id: ^114402558$
+    runner_environment: ^(self-hosted|github-hosted)$
+issuer: https://token.actions.githubusercontent.com
 permissions:
-  actions: write
+    actions: write
+subject_pattern: ^repo:fredrir(@114402558)?/portfolio(@773018612)?:ref:refs/heads/main$
