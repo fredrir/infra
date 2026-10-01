@@ -58,7 +58,7 @@
       "checkout": ".infra/ci-migration/packages"
     }
   ],
-  "state": "prepared",
+  "state": "active",
   "publisher_trust": [
     {
       "repository": "fredrir/homebrew-tap",
