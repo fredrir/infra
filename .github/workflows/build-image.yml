@@ -124,13 +124,15 @@ jobs:
         with:
           name: ${{ inputs.cli-artifact || needs.cli.outputs.artifact }}
           path: ${{ runner.temp }}/infra-cli
+      - name: Install shared CLI verifier
+        if: github.repository != 'fredrir/infra' && inputs.cli-artifact != ''
+        run: infra ci install-tools cosign
       - name: Verify shared CLI signer
         if: github.repository != 'fredrir/infra' && inputs.cli-artifact != ''
         env:
           WORKFLOW_REVISION: ${{ job.workflow_sha }}
           CLI_SHA256: ${{ inputs.cli-sha256 }}
         run: |
-          infra ci install-tools cosign
           cosign verify-blob --bundle "$RUNNER_TEMP/infra-cli/identity.sigstore.json" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --certificate-identity-regexp "^https://github.com/fredrir/infra/\\.github/workflows/infra-cli\\.yml@($WORKFLOW_REVISION|refs/tags/ci-v1)$" \
