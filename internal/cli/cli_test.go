@@ -26,7 +26,7 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 	root := t.TempDir()
 	for path, content := range map[string]string{
 		"images/catalog.yaml":          "- image: ghcr.io/fredrir/example\n  dockerfile: Containerfile\n  cli: true\n  check: example --version\n  inputs: [Containerfile]\n",
-		".github/workflows/images.yml": "name: Images\n", ".github/workflows/build-image.yml": "name: Build\n", ".dockerignore": ".git\n", "Containerfile": "FROM scratch\n", "infra": "binary\n",
+		".github/workflows/images.yml": "name: Images\n", ".github/workflows/build-image.yml": "name: Build\n", ".dockerignore": ".git\n", "Containerfile": "FROM scratch\n", "build/cli-release.json": "{}\n",
 	} {
 		path = filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -51,10 +51,7 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 	t.Setenv("REFRESH", "true")
 	t.Setenv("REGISTRY_URL", "http://127.0.0.1:1")
 	var stdout, stderr bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"ci", "plan-images", "--root", root}, &stdout, &stderr); err == nil || stdout.Len() != 0 {
-		t.Fatal("planned an image that embeds the infra binary without reading it")
-	}
-	if err := cli.Run(context.Background(), []string{"ci", "plan-images", "--root", root, "--infra-binary", filepath.Join(root, "infra")}, &stdout, &stderr); err != nil {
+	if err := cli.Run(context.Background(), []string{"ci", "plan-images", "--root", root}, &stdout, &stderr); err != nil {
 		t.Fatal(err)
 	}
 	var entries []map[string]any
@@ -72,7 +69,7 @@ func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
 		t.Fatalf("unexpected Actions output: %s", data)
 	}
 	stdout.Reset()
-	if err := cli.Run(context.Background(), []string{"ci", "plan-images", "--root", root, "--infra-binary", filepath.Join(root, "infra"), "--github-output", root}, &stdout, &stderr); err == nil || stdout.Len() != 0 {
+	if err := cli.Run(context.Background(), []string{"ci", "plan-images", "--root", root, "--github-output", root}, &stdout, &stderr); err == nil || stdout.Len() != 0 {
 		t.Fatal("output write failure must fail without printing a successful matrix")
 	}
 }

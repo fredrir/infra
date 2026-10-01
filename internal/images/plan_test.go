@@ -37,7 +37,7 @@ func repository(t *testing.T) string {
 	root := t.TempDir()
 	for path, content := range map[string]string{
 		"images/catalog.yaml": catalog, ".github/workflows/images.yml": "name: Images\n", ".github/workflows/build-image.yml": "name: Build\n", ".github/workflows/infra-cli.yml": "name: CLI\n",
-		".dockerignore": ".git\n", "pins.lock": "one\n", "go.mod": "module example\n", "internal/cli/cli.go": "package cli\n", "internal/cli/cli_test.go": "package cli\n",
+		".dockerignore": ".git\n", "build/cli-release.json": "{\"sha256\": \"v1\"}\n", "pins.lock": "one\n", "go.mod": "module example\n", "internal/cli/cli.go": "package cli\n", "internal/cli/cli_test.go": "package cli\n",
 		"images/one/Containerfile": "FROM scratch\nCOPY .infra-artifacts/infra /usr/local/bin/infra\n", "images/two/Containerfile": "FROM scratch\n",
 	} {
 		write(t, root, path, content)
@@ -77,16 +77,7 @@ func planner(t *testing.T, handler http.HandlerFunc) images.Planner {
 	t.Helper()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
-	return images.Planner{Root: repository(t), Registry: server.URL, InfraBinary: infraBinary(t, "infra v1"), Client: server.Client(), Log: io.Discard}
-}
-
-func infraBinary(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "infra")
-	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return path
+	return images.Planner{Root: repository(t), Registry: server.URL, Client: server.Client(), Log: io.Discard}
 }
 
 func plan(t *testing.T, p images.Planner) []images.Image {
@@ -120,6 +111,9 @@ func TestOnlyUnpublishedImagesArePlanned(t *testing.T) {
 	before := plan(t, p)
 	if len(before) != 2 || before[0].Image != "ghcr.io/fredrir/one" || before[1].Image != "ghcr.io/fredrir/two" {
 		t.Fatalf("unexpected matrix: %+v", before)
+	}
+	if !before[0].CLI || before[1].CLI {
+		t.Fatalf("matrix must expose which images embed the released CLI: %+v", before)
 	}
 	if before[0].Inputs != nil || before[0].ScanSkipDirs != "/nix" || before[0].Shell != `["/bin/sh", "-euc"]` || before[0].Check != "one --version" || before[0].Dockerfile != "images/one/Containerfile" {
 		t.Fatalf("matrix lost catalog metadata or exposed inputs: %+v", before[0])
@@ -207,7 +201,7 @@ func TestRegistryFailuresPlanImages(t *testing.T) {
 	}
 	t.Run("connection-refused", func(t *testing.T) {
 		refusing := &http.Client{Transport: &http.Transport{DialContext: func(context.Context, string, string) (net.Conn, error) { return nil, syscall.ECONNREFUSED }}}
-		p := images.Planner{Root: repository(t), Registry: "http://registry.invalid", InfraBinary: infraBinary(t, "infra v1"), Client: refusing, Log: io.Discard}
+		p := images.Planner{Root: repository(t), Registry: "http://registry.invalid", Client: refusing, Log: io.Discard}
 		if len(plan(t, p)) != 2 {
 			t.Fatal("connection failure did not plan all images")
 		}
@@ -255,7 +249,7 @@ func TestCancellationStopsPlanning(t *testing.T) {
 	}
 }
 
-func TestCLIImagesTrackTheInjectedBinaryInsteadOfItsSources(t *testing.T) {
+func TestCLIImagesTrackTheReleasedCLIInsteadOfItsSources(t *testing.T) {
 	p := planner(t, http.NotFound)
 	p.Refresh = true
 	before := plan(t, p)
@@ -263,37 +257,31 @@ func TestCLIImagesTrackTheInjectedBinaryInsteadOfItsSources(t *testing.T) {
 		write(t, p.Root, path, content)
 		commit(t, p.Root)
 		if after := plan(t, p); !reflect.DeepEqual(before, after) {
-			t.Fatalf("%s changed image tags without changing the injected binary", path)
+			t.Fatalf("%s changed image tags without a CLI release", path)
 		}
 	}
-	p.InfraBinary = infraBinary(t, "infra v1")
-	if after := plan(t, p); !reflect.DeepEqual(before, after) {
-		t.Fatal("an identical binary at another path changed image tags")
-	}
-	p.InfraBinary = infraBinary(t, "infra v2")
+	write(t, p.Root, "build/cli-release.json", "{\"sha256\": \"v2\"}\n")
+	commit(t, p.Root)
 	after := plan(t, p)
 	if after[0].Tag == before[0].Tag || after[1].Tag != before[1].Tag {
-		t.Fatal("binary change did not invalidate exactly the images that embed it")
+		t.Fatal("CLI release did not invalidate exactly the images that embed it")
 	}
 }
 
-func TestCLIImagesRequireTheInjectedBinary(t *testing.T) {
-	for name, binary := range map[string]string{"unset": "", "missing": filepath.Join(t.TempDir(), "infra")} {
-		t.Run(name, func(t *testing.T) {
-			p := planner(t, func(w http.ResponseWriter, r *http.Request) {
-				t.Error("planning without the binary contacted the registry")
-			})
-			p.InfraBinary = binary
-			if _, err := p.Plan(context.Background(), "images/catalog.yaml"); err == nil {
-				t.Fatal("planned a cli image without its binary")
-			}
-		})
+func TestCLIImagesRequireTheReleasedCLI(t *testing.T) {
+	p := planner(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Error("planning without the CLI release contacted the registry")
+	})
+	git(t, p.Root, "rm", "--quiet", "build/cli-release.json")
+	commit(t, p.Root)
+	if _, err := p.Plan(context.Background(), "images/catalog.yaml"); err == nil {
+		t.Fatal("planned a cli image without its CLI release")
 	}
-	p := planner(t, http.NotFound)
-	p.InfraBinary = ""
+	p = planner(t, http.NotFound)
+	git(t, p.Root, "rm", "--quiet", "build/cli-release.json")
 	write(t, p.Root, "images/catalog.yaml", strings.Replace(catalog, "  cli: true\n", "", 1))
 	commit(t, p.Root)
 	if got := len(plan(t, p)); got != 2 {
-		t.Fatalf("images without cli required the binary, planned %d", got)
+		t.Fatalf("images without cli required the CLI release, planned %d", got)
 	}
 }

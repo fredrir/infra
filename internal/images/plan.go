@@ -21,7 +21,7 @@ import (
 type Image struct {
 	Image        string   `yaml:"image" json:"image"`
 	Dockerfile   string   `yaml:"dockerfile" json:"dockerfile"`
-	CLI          bool     `yaml:"cli,omitempty" json:"-"`
+	CLI          bool     `yaml:"cli,omitempty" json:"cli,omitempty"`
 	Inputs       []string `yaml:"inputs" json:"inputs,omitempty"`
 	Check        string   `yaml:"check" json:"check"`
 	ScanSkipDirs string   `yaml:"scan-skip-dirs,omitempty" json:"scan-skip-dirs,omitempty"`
@@ -30,13 +30,14 @@ type Image struct {
 }
 
 type Planner struct {
-	Root        string
-	Registry    string
-	InfraBinary string
-	Refresh     bool
-	Client      *http.Client
-	Log         io.Writer
+	Root     string
+	Registry string
+	Refresh  bool
+	Client   *http.Client
+	Log      io.Writer
 }
+
+const releasedCLI = "build/cli-release.json"
 
 var imageName = regexp.MustCompile(`^ghcr\.io/fredrir/[a-z0-9][a-z0-9._/-]*$`)
 
@@ -80,11 +81,8 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 		cliImages = cliImages || entry.CLI
 		paths = append(paths, entry.Inputs...)
 	}
-	var cli string
 	if cliImages {
-		if cli, err = fileDigest(p.InfraBinary); err != nil {
-			return nil, fmt.Errorf("read injected infra binary: %w", err)
-		}
+		paths = append(paths, releasedCLI)
 	}
 	objects, err := p.objects(ctx, paths)
 	if err != nil {
@@ -109,7 +107,7 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 			fmt.Fprintln(hash, objects[path])
 		}
 		if entry.CLI {
-			fmt.Fprintln(hash, "infra", cli)
+			fmt.Fprintln(hash, "infra", objects[releasedCLI])
 		}
 		entry.Tag = fmt.Sprintf("inputs-%x", hash.Sum(nil))
 		if !p.Refresh && p.published(ctx, entry) {
@@ -124,22 +122,6 @@ func (p Planner) Plan(ctx context.Context, catalog string) ([]Image, error) {
 		plan = append(plan, entry)
 	}
 	return plan, nil
-}
-
-func fileDigest(path string) (string, error) {
-	if path == "" {
-		return "", errors.New("images that declare cli require the infra binary")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 func (p Planner) objects(ctx context.Context, paths []string) (map[string]string, error) {

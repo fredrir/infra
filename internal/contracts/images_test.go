@@ -12,8 +12,6 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-var cliSources = []string{"cmd", "internal", "go.mod", "go.sum", "build/toolchain.json", "build/dagger-embed.patch", "build/BUILD.bazel", "MODULE.bazel", "MODULE.bazel.lock", ".bazelversion", ".bazelrc", "BUILD.bazel", ".github/workflows/infra-cli.yml"}
-
 func root(t *testing.T) string {
 	t.Helper()
 	directory, err := os.Getwd()
@@ -112,12 +110,58 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 			if embeds := slices.Contains(sources, ".infra-artifacts/infra"); embeds != image.CLI {
 				t.Errorf("recipe embeds the infra binary: %t, catalog declares cli: %t", embeds, image.CLI)
 			}
-			if image.CLI {
-				for _, input := range cliSources {
-					if triggered(workflow.On.Push.PathsIgnore, input+"/probe") || triggered(workflow.On.Push.PathsIgnore, input) {
-						t.Errorf("infra binary source %s does not trigger image workflow", input)
-					}
+			if image.CLI && triggered(workflow.On.Push.PathsIgnore, "build/cli-release.json") {
+				t.Error("CLI release does not trigger image workflow")
+			}
+		})
+	}
+}
+
+func TestCatalogImagesBuildWithTheirDeclaredCLI(t *testing.T) {
+	repository := root(t)
+	var catalog []images.Image
+	if err := yaml.Unmarshal(read(t, filepath.Join(repository, "images/catalog.yaml")), &catalog); err != nil {
+		t.Fatal(err)
+	}
+	var planner struct {
+		Jobs map[string]struct{ With map[string]string }
+	}
+	if err := yaml.Unmarshal(read(t, filepath.Join(repository, ".github/workflows/images.yml")), &planner); err != nil {
+		t.Fatal(err)
+	}
+	var builder struct {
+		Jobs map[string]struct{ If string }
+	}
+	if err := yaml.Unmarshal(read(t, filepath.Join(repository, ".github/workflows/build-image.yml")), &builder); err != nil {
+		t.Fatal(err)
+	}
+	build := workflowCondition(t, builder.Jobs["build"].If)
+	for _, image := range catalog {
+		t.Run(image.Image, func(t *testing.T) {
+			caller := map[string]any{
+				"matrix": map[string]any{"cli": image.CLI, "image": image.Image},
+				"inputs": map[string]any{"cli-artifact": "commit-artifact", "cli-sha256": "commit-sha256", "cli-revision": "commit-revision"},
+				"needs":  map[string]any{"cli": map[string]any{"outputs": map[string]any{}}},
+			}
+			inputs := map[string]any{}
+			for _, name := range []string{"image", "release-cli", "cli-artifact"} {
+				value, err := workflowValue(t, planner.Jobs["image"].With[name]).value(caller)
+				if err != nil {
+					t.Fatal(err)
 				}
+				inputs[name] = value
+			}
+			if inputs["release-cli"] != image.CLI || (inputs["cli-artifact"] == "") != image.CLI {
+				t.Fatalf("image embeds the released CLI: %t, but receives %v", image.CLI, inputs)
+			}
+			allowed, err := build.allows(map[string]any{
+				"github":          map[string]any{"repository": "fredrir/infra", "repository_owner_id": "114402558", "event_name": "push", "ref": "refs/heads/main", "ref_protected": true},
+				"inputs":          inputs,
+				"needs":           map[string]any{"cli": map[string]any{"result": "skipped"}},
+				"cancelledStatus": false,
+			})
+			if err != nil || !allowed {
+				t.Fatalf("build-image refuses the catalog image: %v", err)
 			}
 		})
 	}
