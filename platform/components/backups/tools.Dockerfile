@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.27.1-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125 AS rclone
+FROM docker.io/library/golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS rclone
 RUN apk add --no-cache git
 WORKDIR /src
 RUN git init -q . \
@@ -10,7 +10,7 @@ RUN go get google.golang.org/grpc@v1.84.0-dev.0.20260825144003-d5a41119e0e3 \
     && go mod tidy
 RUN CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -X github.com/rclone/rclone/fs.Version=v1.75.1' -o /usr/local/bin/rclone .
 
-FROM docker.io/library/golang:1.27.1-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125 AS restic
+FROM docker.io/library/golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS restic
 RUN apk add --no-cache git
 WORKDIR /src
 RUN git init -q . \
