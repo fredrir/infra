@@ -56,28 +56,44 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - uses: ./.github/actions/use-cli
+        with:
+          artifact: ${{ needs.cli.outputs.artifact }}
+          sha256: ${{ needs.cli.outputs.sha256 }}
+          revision: ${{ needs.cli.outputs.revision }}
+      - name: Select affected candidates
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          CANDIDATE: ${{ matrix.repository }}
+        run: |
+          base=
+          if [ "$EVENT" = push ]; then
+            base=$(jq -er '.revision | select(test("^[a-f0-9]{40}$"))' build/ci-channel.json)
+            git fetch --quiet --depth=1 origin "$base"
+          fi
+          infra ci project candidates --base "$base" --candidate "$CANDIDATE"
       - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
+        if: steps.scope.outputs.affected == 'true'
         id: source-token
         with:
           scope: fredrir/${{ matrix.repository }}
           identity: ci-candidate
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: steps.scope.outputs.affected == 'true'
         with:
           repository: fredrir/${{ matrix.repository }}
           ref: main
           token: ${{ steps.source-token.outputs.token }}
           path: source
           persist-credentials: false
-      - uses: ./.github/actions/use-cli
-        with:
-          artifact: ${{ needs.cli.outputs.artifact }}
-          sha256: ${{ needs.cli.outputs.sha256 }}
-          revision: ${{ needs.cli.outputs.revision }}
       - name: Start Dagger
+        if: steps.scope.outputs.affected == 'true'
         run: |
           docker run --detach --name infra-dagger --volume /var/lib/dagger --privileged --memory=5g --pids-limit=512 registry.dagger.io/engine:v0.21.9@sha256:3c4e0cedaea400d7e30155e050f94910ea5f381b6f5942dd2172382657628cb4
           printf '_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://infra-dagger\n' >> "$GITHUB_ENV"
       - name: Exercise consumer suites
+        if: steps.scope.outputs.affected == 'true'
         env:
           SOURCE_REPOSITORY: fredrir/${{ matrix.repository }}
           SOURCE_ID: ${{ matrix.id }}
@@ -87,13 +103,13 @@ jobs:
             infra ci project run --repository "$SOURCE_REPOSITORY" --repository-id "$SOURCE_ID" --root source --infra-root . --suite "$suite" --infra-binary "$INFRA_BINARY" --report-dir "$RUNNER_TEMP/reports/$suite"
           done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
+        if: always() && steps.scope.outputs.affected == 'true'
         with:
           name: candidate-${{ matrix.repository }}
           path: ${{ runner.temp }}/reports
           if-no-files-found: ignore
       - name: Stop Dagger
-        if: always()
+        if: always() && steps.scope.outputs.affected == 'true'
         run: docker rm --force --volumes infra-dagger
   qualified:
     name: CI candidate
