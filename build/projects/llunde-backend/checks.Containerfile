@@ -1,5 +1,5 @@
-FROM docker.io/library/eclipse-temurin@sha256:dcf835e52330939b6c9f90ecab8aafcbcaa8fbf48423db44de884cf978c10144 AS jdk25
-FROM docker.io/library/eclipse-temurin@sha256:1f79c73404fb0cccf9a3459eda22892f368d994b1028d6fb1ae871c1f49749a6 AS jdk21
+FROM docker.io/library/eclipse-temurin@sha256:8c0a84ea11c8f6ed52600fc19f1040121f2a162998e9f50a5faebbbad9172dcc AS jdk25
+FROM docker.io/library/eclipse-temurin@sha256:8c0a84ea11c8f6ed52600fc19f1040121f2a162998e9f50a5faebbbad9172dcc AS jdk21
 FROM docker.io/valkey/valkey@sha256:fea8b3e67b15729d4bb70589eb03367bab9ad1ee89c876f54327fc7c6e618571 AS valkey
 FROM docker.io/library/postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0 AS integration
 COPY --from=jdk25 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
