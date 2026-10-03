@@ -14,9 +14,6 @@ RUN sed -i 's|http://|https://|g' /etc/apt/sources.list.d/debian.sources \
   && apt-get update \
   && apt-get upgrade -y \
   && apt-get install -y --no-install-recommends \
-       tesseract-ocr \
-       tesseract-ocr-eng \
-       tesseract-ocr-nor \
        poppler-utils \
        libreoffice-core \
        libreoffice-writer \
@@ -39,16 +36,13 @@ COPY --from=runtime-lock /pylock.toml /usr/local/share/pyparser/pylock.toml
 RUN --mount=type=bind,from=uv,source=/uv,target=/usr/local/bin/uv \
   --mount=type=cache,id=pyparser-uv,target=/root/.cache/uv \
   pip install --upgrade pip "setuptools>=84.0.0" "wheel>=0.48.0" \
-  && uv pip install --system --require-hashes --no-deps -r /usr/local/share/pyparser/pylock.toml \
-  && python -c "from doctr.models import ocr_predictor; ocr_predictor(pretrained=True)"
+  && uv pip install --system --require-hashes --no-deps -r /usr/local/share/pyparser/pylock.toml
 
 FROM deps AS models
 ENV DOCLING_ARTIFACTS_PATH=/opt/docling-models
 RUN --mount=type=cache,id=pyparser-docling-models,target=/var/cache/docling \
-    docling-tools models download -o /var/cache/docling \
-      layout tableformer tableformerv2 code_formula picture_classifier granitedocling rapidocr \
-    && mkdir -p "$DOCLING_ARTIFACTS_PATH" \
-    && cp -aL /var/cache/docling/. "$DOCLING_ARTIFACTS_PATH/" \
+    python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='docling-project/docling-layout-heron', revision='8f39ad3c0b4c58e9c2d2c84a38465abf757272d8', cache_dir='/var/cache/docling', local_dir='/opt/docling-models/layout-heron-8f39ad3c0b4c58e9c2d2c84a38465abf757272d8')" \
+    && chmod -R a+rX "$DOCLING_ARTIFACTS_PATH" \
     && python -m pip uninstall -y pip
 
 ARG PUBLIC_PARSER_DEPENDENCY_KEY
