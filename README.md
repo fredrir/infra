@@ -48,7 +48,7 @@ My infrastructure, for my personal projects, services and hobbies
 | `fredrir-07`          | K3s control plane and etcd                           | 24/7                                                           |
 | `fredrir-08`          | K3s control plane and etcd                           | 24/7                                                           |
 | `fredrir-09`          | Shared production and CI worker; retained local data | 24/7                                                           |
-| `fredrir-10`          | Volatile CI worker (tainted K3s agent)               | 24/7; Volatile |
+| `fredrir-10`          | Volatile CI worker and NTNU egress relay (tainted K3s agent) | 24/7; Volatile |
 
 
 ## For More Information

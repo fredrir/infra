@@ -26,7 +26,7 @@
 | `fredrir-07`          | K3s control plane and etcd                           | 24/7                                                           |
 | `fredrir-08`          | K3s control plane and etcd                           | 24/7                                                           |
 | `fredrir-09`          | Shared production and CI worker; retained local data | 24/7                                                           |
-| `fredrir-10`          | Volatile CI worker (tainted K3s agent)               | 24/7; Volatile |
+| `fredrir-10`          | Volatile CI worker and NTNU egress relay (tainted K3s agent) | 24/7; Volatile |
 | `fredrir-11`          | Infrastructure reconciler; hourly cloud verification | 24/7; dedicated Hetzner project; outside every fleet play      |
 
 | Capacity         | Value                                                                                         |
@@ -34,7 +34,7 @@
 | Provisioned VPSs | Six                                                                                           |
 | Control plane    | Three servers in `hel1`, private etcd network and spread placement group                      |
 | Shared workers   | CCX23 and one.com XXL; Kubernetes capability-based placement                                  |
-| Volatile worker  | `fredrir-10`; CI only; see [volatile workers](runbook.md#volatile-workers)                    |
+| Volatile worker  | `fredrir-10`; CI and the NTNU egress relay; see [volatile workers](runbook.md#volatile-workers)   |
 | Additional ARM   | HidenCloud SAR-Torrent, unpurchased; provider clarification and runtime qualification pending |
 | ARM node number  | Unassigned                                                                                    |
 | Inventory        | [Ansible production inventory](../ansible/inventory/production.yml)                           |

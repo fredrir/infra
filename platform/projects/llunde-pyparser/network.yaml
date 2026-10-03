@@ -76,6 +76,15 @@ spec:
     - protocol: TCP
       port: 5432
   - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ntnu-egress
+          app.kubernetes.io/part-of: llunde-pyparser
+          app.kubernetes.io/component: egress
+    ports:
+    - protocol: TCP
+      port: 8443
+  - to:
     - ipBlock:
         cidr: 0.0.0.0/0
         except:

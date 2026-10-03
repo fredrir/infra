@@ -42,6 +42,10 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: fredrir-09
         kubernetes.io/arch: amd64
+      hostAliases:
+      - ip: 10.43.0.30
+        hostnames:
+        - llm.hpc.ntnu.no
       terminationGracePeriodSeconds: 30
       imagePullSecrets:
       - name: ghcr
@@ -180,6 +184,10 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: fredrir-09
         kubernetes.io/arch: amd64
+      hostAliases:
+      - ip: 10.43.0.30
+        hostnames:
+        - llm.hpc.ntnu.no
       terminationGracePeriodSeconds: 90
       imagePullSecrets:
       - name: ghcr
@@ -208,12 +216,6 @@ spec:
           value: '60'
         - name: PYPARSER_DOCLING_NUM_THREADS
           value: '3'
-        - name: PYPARSER_VLM_MODELS
-          value: ''
-        - name: PYPARSER_LLM_MODELS
-          value: ''
-        - name: PYPARSER_DOCTR_KEEP_RESIDENT
-          value: 'true'
         - name: HOME
           value: /tmp
         - name: USER
@@ -306,6 +308,10 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: fredrir-09
         kubernetes.io/arch: amd64
+      hostAliases:
+      - ip: 10.43.0.30
+        hostnames:
+        - llm.hpc.ntnu.no
       terminationGracePeriodSeconds: 45
       imagePullSecrets:
       - name: ghcr
@@ -328,12 +334,6 @@ spec:
           value: production
         - name: PYPARSER_WORKER_STAGES
           value: CLASSIFY,BATCH,SPLIT,STRUCTURE_TASK
-        - name: PYPARSER_REAPER_ENABLED
-          value: 'true'
-        - name: PYPARSER_VLM_MODELS
-          value: ''
-        - name: PYPARSER_LLM_MODELS
-          value: ''
         - name: HOME
           value: /tmp
         - name: USER

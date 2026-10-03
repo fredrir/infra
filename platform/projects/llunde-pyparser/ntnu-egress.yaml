@@ -1,0 +1,170 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ntnu-egress
+  namespace: llunde-pyparser
+data:
+  haproxy.cfg: |
+    global
+      log stdout format raw local0 info
+      maxconn 200
+
+    defaults
+      mode tcp
+      log global
+      option tcplog
+      timeout connect 10s
+      timeout client 15m
+      timeout server 15m
+
+    resolvers cluster
+      parse-resolv-conf
+      hold valid 60s
+      timeout resolve 2s
+      timeout retry 2s
+
+    frontend llm
+      bind :8443
+      default_backend gateway
+
+    backend gateway
+      server llm llm.hpc.ntnu.no:443 resolvers cluster init-addr last,libc,none
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ntnu-egress
+  namespace: llunde-pyparser
+spec:
+  clusterIP: 10.43.0.30
+  selector:
+    app.kubernetes.io/name: ntnu-egress
+    app.kubernetes.io/part-of: llunde-pyparser
+    app.kubernetes.io/component: egress
+  ports:
+  - name: tls
+    port: 443
+    targetPort: tls
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ntnu-egress
+  namespace: llunde-pyparser
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ntnu-egress
+      app.kubernetes.io/part-of: llunde-pyparser
+      app.kubernetes.io/component: egress
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ntnu-egress
+        app.kubernetes.io/part-of: llunde-pyparser
+        app.kubernetes.io/component: egress
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-10
+        kubernetes.io/arch: amd64
+      tolerations:
+      - key: node-restriction.kubernetes.io/volatile
+        operator: Equal
+        value: 'true'
+        effect: NoSchedule
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 99
+        runAsGroup: 99
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: haproxy
+        image: docker.io/library/haproxy:3.4.6-alpine@sha256:7af8255207ee9964ccb4eec8ce4b7a40b777769665e3ae83897fb01b24d8a43a
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - name: tls
+          containerPort: 8443
+        volumeMounts:
+        - name: config
+          mountPath: /usr/local/etc/haproxy
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 250m
+            memory: 64Mi
+        readinessProbe:
+          tcpSocket:
+            port: tls
+          periodSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: ntnu-egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ntnu-egress-ingress
+  namespace: llunde-pyparser
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ntnu-egress
+      app.kubernetes.io/part-of: llunde-pyparser
+      app.kubernetes.io/component: egress
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: application
+    ports:
+    - protocol: TCP
+      port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ntnu-egress-egress
+  namespace: llunde-pyparser
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ntnu-egress
+      app.kubernetes.io/part-of: llunde-pyparser
+      app.kubernetes.io/component: egress
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 100.64.0.0/10
+        - 169.254.0.0/16
+        - 127.0.0.0/8
+    ports:
+    - protocol: TCP
+      port: 443

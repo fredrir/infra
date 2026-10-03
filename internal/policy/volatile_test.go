@@ -54,6 +54,7 @@ func TestOnlyNodeAgentsAndUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) 
 		"platform/components/dns/node-local-dns.yaml",
 		"platform/components/observability/monitoring.yaml",
 		"platform/components/runners/infra/check-values.yaml",
+		"platform/projects/llunde-pyparser/ntnu-egress.yaml",
 	}
 	tolerating := map[string]bool{}
 	scanned := 0
@@ -222,4 +223,40 @@ func TestKubeletScrapesKeepTheMetricsPathLabel(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestVolatileRelayCarriesNoCredentials(t *testing.T) {
+	t.Parallel()
+	for _, resource := range renderedTree(t, "platform", "platform/projects/llunde-pyparser") {
+		if resource["kind"] != "Deployment" || at(resource, "metadata", "name") != "ntnu-egress" {
+			continue
+		}
+		spec := at(resource, "spec", "template", "spec").(object)
+		if !toleratesVolatile(spec["tolerations"]) || at(spec, "nodeSelector", "kubernetes.io/hostname") != "fredrir-10" {
+			t.Fatal("the NTNU relay is not pinned to the volatile worker")
+		}
+		if spec["automountServiceAccountToken"] != false || spec["imagePullSecrets"] != nil {
+			t.Error("the NTNU relay holds API or registry credentials")
+		}
+		volumes, _ := spec["volumes"].([]any)
+		for _, volume := range volumes {
+			if declared := volume.(object); declared["secret"] != nil || declared["projected"] != nil {
+				t.Errorf("the NTNU relay mounts %v", declared["name"])
+			}
+		}
+		for _, container := range spec["containers"].([]any) {
+			declared := container.(object)
+			if declared["envFrom"] != nil {
+				t.Errorf("container %v imports a Secret", declared["name"])
+			}
+			env, _ := declared["env"].([]any)
+			for _, variable := range env {
+				if from, ok := at(variable, "valueFrom").(object); ok && from["secretKeyRef"] != nil {
+					t.Errorf("container %v reads Secret %v", declared["name"], at(variable, "name"))
+				}
+			}
+		}
+		return
+	}
+	t.Fatal("the NTNU relay is not rendered")
 }
