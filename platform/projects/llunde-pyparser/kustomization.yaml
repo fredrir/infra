@@ -8,6 +8,7 @@ resources:
 - tunnel.yaml
 - network.yaml
 - ntnu-egress.yaml
+- granite.yaml
 - application.secret.sops.yaml
 - database.secret.sops.yaml
 - tunnel.secret.sops.yaml

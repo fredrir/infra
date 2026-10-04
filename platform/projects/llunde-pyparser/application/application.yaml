@@ -80,6 +80,10 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
+        - name: PYPARSER_GRANITE_ENDPOINT
+          value: http://granite:8080
+        - name: PYPARSER_GRANITE_API
+          value: chat-completions
         - name: PYPARSER_STORAGE_ENDPOINT
           value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
         - name: PYPARSER_STORAGE_CA_BUNDLE
@@ -228,6 +232,10 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
+        - name: PYPARSER_GRANITE_ENDPOINT
+          value: http://granite:8080
+        - name: PYPARSER_GRANITE_API
+          value: chat-completions
         - name: PYPARSER_STORAGE_ENDPOINT
           value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
         - name: PYPARSER_STORAGE_CA_BUNDLE
@@ -346,6 +354,10 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
+        - name: PYPARSER_GRANITE_ENDPOINT
+          value: http://granite:8080
+        - name: PYPARSER_GRANITE_API
+          value: chat-completions
         - name: PYPARSER_STORAGE_ENDPOINT
           value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
         - name: PYPARSER_STORAGE_CA_BUNDLE
