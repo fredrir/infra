@@ -1,7 +1,7 @@
-name: Release qualified CI
+name: Release shared CI
 on:
   workflow_run:
-    workflows: [Qualify shared CI]
+    workflows: [Reconcile infrastructure]
     types: [completed]
 permissions:
   contents: read
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    if: github.repository == 'fredrir/infra' && github.ref_protected && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == 'fredrir/infra'
+    if: github.repository == 'fredrir/infra' && github.ref_protected && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == 'fredrir/infra'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -22,24 +22,41 @@ jobs:
           ref: main
           fetch-depth: 0
           persist-credentials: false
+      - name: Select shared CI changes
+        id: changes
+        env:
+          CI_REVISION: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          base=$(jq -er '.revision | select(test("^[a-f0-9]{40}$"))' build/ci-channel.json)
+          git cat-file -e "$base^{commit}"
+          git cat-file -e "$CI_REVISION^{commit}"
+          changed=false
+          if ! git diff --quiet "$base" "$CI_REVISION" -- internal/ cmd/infra/ go.mod go.sum build/toolchain.json build/projects/ .github/workflows/ .github/actions/ platform/projects/y/*.Dockerfile platform/projects/y/Caddyfile; then
+            changed=true
+          fi
+          printf 'changed=%s\n' "$changed" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        if: steps.changes.outputs.changed == 'true'
         with:
           go-version-file: go.mod
       - uses: octo-sts/action@a48df0af0fefd5197a00306a77dd198cdf442a76
+        if: steps.changes.outputs.changed == 'true'
         id: release-token
         with:
           scope: fredrir/infra
           identity: ci-release
-      - name: Publish qualified release
+      - name: Publish shared CI release
+        if: steps.changes.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.release-token.outputs.token }}
-          CI_RELEASE: ci-v1.0.${{ github.event.workflow_run.run_number }}
-          CANDIDATE_REVISION: ${{ github.event.workflow_run.head_sha }}
-        run: go run ./cmd/infra ci channel release --release "$CI_RELEASE" --revision "$CANDIDATE_REVISION"
+          CI_RELEASE: ci-v1.0.${{ github.run_id }}
+          CI_REVISION: ${{ github.event.workflow_run.head_sha }}
+        run: go run ./cmd/infra ci channel release --release "$CI_RELEASE" --revision "$CI_REVISION"
       - name: Propose channel promotion
+        if: steps.changes.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.release-token.outputs.token }}
-          CI_RELEASE: ci-v1.0.${{ github.event.workflow_run.run_number }}
+          CI_RELEASE: ci-v1.0.${{ github.run_id }}
         run: |
           gh auth setup-git
           go run ./cmd/infra ci channel prepare --release "$CI_RELEASE"

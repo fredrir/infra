@@ -10,30 +10,21 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-func TestProjectProfilesMatchDeploymentAndCandidateIdentities(t *testing.T) {
+func TestProjectProfilesMatchDeploymentIdentitiesAndRecipes(t *testing.T) {
 	root := root(t)
 	profiles := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(profiles, "build/projects"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	var candidates struct {
-		Jobs map[string]struct {
-			Strategy struct {
-				Matrix struct {
-					Include []struct{ Repository, ID, Suites string }
-				}
-			}
-		}
+	paths, err := filepath.Glob(filepath.Join(root, "build/projects/*.json"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("project profiles unavailable: %v", err)
 	}
-	if err := yaml.Unmarshal(read(t, filepath.Join(root, ".github/workflows/ci-candidate.yml")), &candidates); err != nil {
-		t.Fatal(err)
-	}
-	for _, candidate := range candidates.Jobs["fixtures"].Strategy.Matrix.Include {
-		name := candidate.Repository + ".json"
-		if err := os.WriteFile(filepath.Join(profiles, "build/projects", name), read(t, filepath.Join(root, "build/projects", name)), 0644); err != nil {
+	for _, path := range paths {
+		if err := os.WriteFile(filepath.Join(profiles, "build/projects", filepath.Base(path)), read(t, path), 0644); err != nil {
 			t.Fatal(err)
 		}
-		profile, err := ci.ReadProject(profiles, "fredrir/"+candidate.Repository, candidate.ID)
+		profile, err := ci.ReadProject(profiles, "fredrir/"+strings.TrimSuffix(filepath.Base(path), ".json"), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -54,20 +45,10 @@ func TestProjectProfilesMatchDeploymentAndCandidateIdentities(t *testing.T) {
 				}
 			}
 		}
-		for _, name := range strings.Fields(candidate.Suites) {
-			found := false
-			for _, check := range profile.Checks {
-				if check.Name != name {
-					continue
-				}
-				found = true
-				data, err := os.ReadFile(filepath.Join(root, check.Recipe))
-				if err != nil || !strings.Contains(string(data), " AS "+check.Target+"\n") {
-					t.Fatalf("candidate recipe target missing: %s/%s", profile.Repository, name)
-				}
-			}
-			if !found {
-				t.Fatalf("candidate suite missing: %s/%s", profile.Repository, name)
+		for _, check := range profile.Checks {
+			data, err := os.ReadFile(filepath.Join(root, check.Recipe))
+			if err != nil || !strings.Contains(string(data), " AS "+check.Target+"\n") {
+				t.Fatalf("project recipe target missing: %s/%s", profile.Repository, check.Name)
 			}
 		}
 	}

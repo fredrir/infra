@@ -16,7 +16,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-func TestChannelPromotionRequiresImmutableQualifiedReleaseAndPreparedTrust(t *testing.T) {
+func TestChannelPromotionRequiresImmutableCheckedReleaseAndPreparedTrust(t *testing.T) {
 	old, revision := strings.Repeat("a", 40), strings.Repeat("b", 40)
 	root := t.TempDir()
 	os.MkdirAll(filepath.Join(root, "build"), 0755)
@@ -43,7 +43,7 @@ func TestChannelPromotionRequiresImmutableQualifiedReleaseAndPreparedTrust(t *te
 	if err != nil || !slices.Equal(revisions, []string{old, revision}) {
 		t.Fatal("promotion lost accepted deployment revision")
 	}
-	immutable, qualified := true, true
+	immutable, checked := true, true
 	channelExists := true
 	promotions := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -81,12 +81,12 @@ func TestChannelPromotionRequiresImmutableQualifiedReleaseAndPreparedTrust(t *te
 			json.NewEncoder(w).Encode(map[string]any{"immutable": immutable, "tag_name": channel.Release})
 		case strings.Contains(r.URL.Path, "git/ref/"):
 			json.NewEncoder(w).Encode(map[string]any{"object": map[string]string{"sha": revision, "type": "commit"}})
-		case strings.Contains(r.URL.Path, "check-runs"):
+		case strings.Contains(r.URL.Path, "actions/workflows/reconcile.yml/runs"):
 			conclusion := "failure"
-			if qualified {
+			if checked {
 				conclusion = "success"
 			}
-			json.NewEncoder(w).Encode(map[string]any{"check_runs": []any{map[string]any{"name": "CI candidate", "head_sha": revision, "status": "completed", "conclusion": conclusion, "app": map[string]string{"slug": "github-actions"}}}})
+			json.NewEncoder(w).Encode(map[string]any{"workflow_runs": []any{map[string]any{"head_branch": "main", "event": "push", "head_sha": revision, "status": "completed", "conclusion": conclusion}}})
 		default:
 			w.WriteHeader(404)
 		}
@@ -98,17 +98,17 @@ func TestChannelPromotionRequiresImmutableQualifiedReleaseAndPreparedTrust(t *te
 		t.Fatal("mutable release promoted")
 	}
 	immutable = true
-	qualified = false
+	checked = false
 	if err := api.Promote(context.Background(), root); err == nil || promotions != 0 {
-		t.Fatal("failed candidate promoted")
+		t.Fatal("failed infrastructure checks promoted")
 	}
-	qualified = true
+	checked = true
 	if err := api.Promote(context.Background(), root); err != nil || promotions != 1 {
-		t.Fatalf("qualified release not promoted: %v", err)
+		t.Fatalf("checked release not promoted: %v", err)
 	}
 	channelExists = false
 	if err := api.Promote(context.Background(), root); err != nil || promotions != 2 || !channelExists {
-		t.Fatalf("qualified initial channel not created: %v", err)
+		t.Fatalf("checked initial channel not created: %v", err)
 	}
 	channel.Revision = old
 	encoded, _ := json.Marshal(channel)
@@ -137,9 +137,9 @@ func TestChannelPreparationRejectsBroadTrustBeforeWritingFiles(t *testing.T) {
 	}
 }
 
-func TestCIReleasePublicationRefusesUnqualifiedOrMutableSettingsBeforeWrites(t *testing.T) {
+func TestCIReleasePublicationRefusesUncheckedOrMutableSettingsBeforeWrites(t *testing.T) {
 	revision := strings.Repeat("a", 40)
-	qualified, immutable := false, false
+	checked, immutable := false, false
 	writes := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -147,12 +147,12 @@ func TestCIReleasePublicationRefusesUnqualifiedOrMutableSettingsBeforeWrites(t *
 			w.WriteHeader(500)
 			return
 		}
-		if strings.Contains(r.URL.Path, "check-runs") {
+		if strings.Contains(r.URL.Path, "actions/workflows/reconcile.yml/runs") {
 			conclusion := "failure"
-			if qualified {
+			if checked {
 				conclusion = "success"
 			}
-			json.NewEncoder(w).Encode(map[string]any{"check_runs": []any{map[string]any{"name": "CI candidate", "head_sha": revision, "status": "completed", "conclusion": conclusion, "app": map[string]string{"slug": "github-actions"}}}})
+			json.NewEncoder(w).Encode(map[string]any{"workflow_runs": []any{map[string]any{"head_branch": "main", "event": "push", "head_sha": revision, "status": "completed", "conclusion": conclusion}}})
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]bool{"enabled": immutable})
@@ -160,10 +160,56 @@ func TestCIReleasePublicationRefusesUnqualifiedOrMutableSettingsBeforeWrites(t *
 	defer server.Close()
 	api := ChannelAPI{Client: server.Client(), Base: server.URL, Token: "test"}
 	if err := api.Publish(context.Background(), "ci-v1.0.1", revision); err == nil || writes != 0 {
-		t.Fatal("failed candidate created release objects")
+		t.Fatal("failed infrastructure checks created release objects")
 	}
-	qualified = true
+	checked = true
 	if err := api.Publish(context.Background(), "ci-v1.0.1", revision); err == nil || writes != 0 {
 		t.Fatal("mutable release settings created release objects")
+	}
+}
+
+func TestCIReleaseChecksRequireLatestSuccessfulMainPush(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	success := map[string]string{"head_branch": "main", "event": "push", "head_sha": revision, "status": "completed", "conclusion": "success"}
+	for _, test := range []struct {
+		name   string
+		fields map[string]string
+	}{
+		{"failed", map[string]string{"conclusion": "failure"}},
+		{"cancelled", map[string]string{"conclusion": "cancelled"}},
+		{"pending", map[string]string{"status": "in_progress"}},
+		{"pull request", map[string]string{"event": "pull_request"}},
+		{"another branch", map[string]string{"head_branch": "feature"}},
+		{"another revision", map[string]string{"head_sha": strings.Repeat("b", 40)}},
+		{"missing", nil},
+		{"successful", map[string]string{}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var runs []map[string]string
+			if test.fields != nil {
+				run := make(map[string]string)
+				for name, value := range success {
+					run[name] = value
+				}
+				for name, value := range test.fields {
+					run[name] = value
+				}
+				runs = append(runs, run)
+			}
+			if test.name == "failed" || test.name == "cancelled" || test.name == "pending" {
+				runs = append(runs, success)
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/repos/fredrir/infra/actions/workflows/reconcile.yml/runs" || r.URL.Query().Get("head_sha") != revision || r.URL.Query().Get("branch") != "main" || r.URL.Query().Get("event") != "push" {
+					t.Errorf("incorrect infrastructure check request: %s", r.URL)
+				}
+				json.NewEncoder(w).Encode(map[string]any{"workflow_runs": runs})
+			}))
+			defer server.Close()
+			api := ChannelAPI{Client: server.Client(), Base: server.URL, Token: "test"}
+			if err := api.Checked(context.Background(), revision); (err == nil) != (test.name == "successful") {
+				t.Fatalf("infrastructure check result: %v", err)
+			}
+		})
 	}
 }

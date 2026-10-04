@@ -198,11 +198,10 @@ Only trusted repositories and protected branches may use this VM.
 | Image publication | [project-images.yml](../.github/workflows/project-images.yml); shared checks gate builds |
 | Runtime dependencies | Go resolver; runtime-only lock, recipe digest, registry metadata and exact approved signature |
 | Caller reference | `@ci-v1` |
-| Qualification | [ci-candidate.yml](../.github/workflows/ci-candidate.yml); real consumer suites |
-| Release | [ci-release.yml](../.github/workflows/ci-release.yml); immutable `ci-v1.0.N` release |
+| Release | [ci-release.yml](../.github/workflows/ci-release.yml); immutable `ci-v1.0.N` release after infrastructure checks |
 | Promotion | Reviewed central trust PR, then [ci-promotion.yml](../.github/workflows/ci-promotion.yml) advances `ci-v1` |
-| Bootstrap | Publish consumer `ci-candidate` read policies and publisher trust policies; enable immutable releases and GitHub Actions PR creation, then apply [CI tag ruleset](../.github/ci-tags-ruleset.json); qualify and promote before publishing new callers |
-| Rollback | Dispatch promotion with a previously qualified immutable release |
+| Bootstrap | Publish publisher trust policies; enable immutable releases and GitHub Actions PR creation, then apply [CI tag ruleset](../.github/ci-tags-ruleset.json); release and promote before publishing new callers |
+| Rollback | Dispatch promotion with a previously checked immutable release |
 
 ```sh
 go build -o /tmp/infra ./cmd/infra

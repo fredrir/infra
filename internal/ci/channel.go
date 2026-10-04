@@ -114,37 +114,39 @@ func (api ChannelAPI) ReleaseRevision(ctx context.Context, tag string) (string, 
 	return ref.Object.SHA, nil
 }
 
-func (api ChannelAPI) Qualified(ctx context.Context, revision string) error {
+func (api ChannelAPI) Checked(ctx context.Context, revision string) error {
 	if !revisionPattern.MatchString(revision) {
-		return errors.New("invalid candidate revision")
+		return errors.New("invalid CI revision")
 	}
-	var checks struct {
+	var workflows struct {
 		Runs []struct {
-			Name       string `json:"name"`
+			Branch     string `json:"head_branch"`
+			Event      string `json:"event"`
 			Status     string `json:"status"`
 			Conclusion string `json:"conclusion"`
 			SHA        string `json:"head_sha"`
-			App        struct {
-				Slug string `json:"slug"`
-			} `json:"app"`
-		} `json:"check_runs"`
+		} `json:"workflow_runs"`
 	}
-	if _, err := api.request(ctx, http.MethodGet, "commits/"+revision+"/check-runs?filter=latest&per_page=100", nil, &checks); err != nil {
+	if _, err := api.request(ctx, http.MethodGet, "actions/workflows/reconcile.yml/runs?head_sha="+revision+"&branch=main&event=push&per_page=100", nil, &workflows); err != nil {
 		return err
 	}
-	for _, check := range checks.Runs {
-		if check.Name == "CI candidate" && check.App.Slug == "github-actions" && check.SHA == revision && check.Status == "completed" && check.Conclusion == "success" {
+	for _, workflow := range workflows.Runs {
+		if workflow.Branch != "main" || workflow.Event != "push" || workflow.SHA != revision {
+			continue
+		}
+		if workflow.Status == "completed" && workflow.Conclusion == "success" {
 			return nil
 		}
+		break
 	}
-	return errors.New("CI candidate qualification missing or failed")
+	return errors.New("infrastructure checks missing or failed")
 }
 
 func (api ChannelAPI) Publish(ctx context.Context, tag, revision string) error {
 	if !ciReleasePattern.MatchString(tag) || !revisionPattern.MatchString(revision) {
 		return errors.New("invalid CI release")
 	}
-	if err := api.Qualified(ctx, revision); err != nil {
+	if err := api.Checked(ctx, revision); err != nil {
 		return err
 	}
 	var settings struct {
@@ -173,7 +175,7 @@ func (api ChannelAPI) Publish(ctx context.Context, tag, revision string) error {
 	}
 	status, err = api.request(ctx, http.MethodGet, "releases/tags/"+tag, nil, nil)
 	if status == 404 {
-		_, err = api.request(ctx, http.MethodPost, "releases", map[string]any{"tag_name": tag, "target_commitish": revision, "name": tag, "body": "Qualified shared CI workflows.", "draft": false, "prerelease": false}, nil)
+		_, err = api.request(ctx, http.MethodPost, "releases", map[string]any{"tag_name": tag, "target_commitish": revision, "name": tag, "body": "Shared CI workflows.", "draft": false, "prerelease": false}, nil)
 	}
 	if err != nil {
 		return err
@@ -347,7 +349,7 @@ func (api ChannelAPI) Promote(ctx context.Context, root string) error {
 	if revision != channel.Revision {
 		return errors.New("CI release revision mismatch")
 	}
-	if err := api.Qualified(ctx, revision); err != nil {
+	if err := api.Checked(ctx, revision); err != nil {
 		return err
 	}
 	paths, err := filepath.Glob(filepath.Join(root, ".github/chainguard/deploy-*.sts.yaml"))

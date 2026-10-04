@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -151,29 +150,7 @@ func newProjectCICommand() *cobra.Command {
 	run.Flags().StringVar(&runSuite, "suite", "", "Check suite")
 	run.MarkFlagRequired("suite")
 	run.Flags().StringVar(&runReport, "report-dir", ".infra-reports", "Exported check reports")
-	var released, candidate, workflow string
-	candidates := &cobra.Command{Use: "candidates", Short: "Select consumer projects affected since the released CI revision", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
-		projects, err := ci.AffectedCandidates(command.Context(), process.Runner{Dir: infraRoot, Stderr: command.ErrOrStderr()}, workflow, released)
-		if err != nil {
-			return err
-		}
-		if output != "" {
-			file, err := os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-			if err != nil {
-				return err
-			}
-			_, err = fmt.Fprintf(file, "affected=%t\n", slices.Contains(projects, candidate))
-			if err := errors.Join(err, file.Close()); err != nil {
-				return err
-			}
-		}
-		return json.NewEncoder(command.OutOrStdout()).Encode(projects)
-	}}
-	candidates.Flags().StringVar(&released, "base", "", "Released CI revision; empty qualifies every project")
-	candidates.Flags().StringVar(&candidate, "candidate", "", "Candidate project reported in the workflow output")
-	candidates.Flags().StringVar(&workflow, "workflow", ".github/workflows/ci-candidate.yml", "Qualification workflow relative to the infrastructure checkout")
-	candidates.Flags().StringVar(&output, "github-output", os.Getenv("GITHUB_OUTPUT"), "Workflow output file")
-	project.AddCommand(plan, check, run, candidates)
+	project.AddCommand(plan, check, run)
 	return project
 }
 

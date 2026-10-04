@@ -10,4 +10,4 @@ claim_pattern:
   job_workflow_ref: ^fredrir/infra/\.github/workflows/ci-promotion\.yml@refs/heads/main$
 permissions:
   contents: write
-  checks: read
+  actions: read
