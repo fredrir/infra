@@ -24,11 +24,24 @@ jobs:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           persist-credentials: false
+      - uses: ./.github/actions/cli-inputs
+        id: inputs
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        if: steps.inputs.outputs.released != 'true'
         with:
           go-version-file: go.mod
           cache: true
+      - uses: ./.github/actions/setup-infra
+        if: steps.inputs.outputs.released == 'true'
+        with:
+          root: .
+      - name: Reuse the matching released CLI
+        if: steps.inputs.outputs.released == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/infra-cli"
+          cp "$INFRA_BINARY" "$RUNNER_TEMP/infra-cli/infra"
       - name: Build shared CLI
+        if: steps.inputs.outputs.released != 'true'
         env:
           CGO_ENABLED: '0'
         run: go build -trimpath -o "$RUNNER_TEMP/infra-cli/infra" ./cmd/infra

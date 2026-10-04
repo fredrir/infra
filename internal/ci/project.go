@@ -23,6 +23,7 @@ type Project struct {
 	Repository       string          `json:"repository"`
 	RepositoryID     string          `json:"repository_id"`
 	Inputs           ProjectInputs   `json:"inputs"`
+	ImageInputs      *ProjectInputs  `json:"image_inputs,omitempty"`
 	Images           []ProjectImage  `json:"images"`
 	Checks           []ProjectCheck  `json:"checks"`
 	Rust             *ProjectRust    `json:"rust,omitempty"`
@@ -40,6 +41,8 @@ type ProjectImage struct {
 	Recipe      string            `json:"recipe"`
 	Smoke       string            `json:"smoke"`
 	Precheck    string            `json:"precheck"`
+	TestSetup   string            `json:"test_setup,omitempty"`
+	TestFiles   []string          `json:"test_files,omitempty"`
 	Arguments   map[string]string `json:"arguments,omitempty"`
 	Variables   []string          `json:"variables,omitempty"`
 	BuildArgs   string            `json:"build_args"`
@@ -51,6 +54,7 @@ type ProjectCheck struct {
 	Target    string            `json:"target"`
 	Timeout   int               `json:"timeout"`
 	Scheduled bool              `json:"scheduled,omitempty"`
+	InImage   bool              `json:"in_image,omitempty"`
 	Arguments map[string]string `json:"arguments,omitempty"`
 }
 
@@ -125,6 +129,20 @@ func ReadProject(root, repository, repositoryID string) (Project, error) {
 			return Project{}, err
 		}
 	}
+	if project.ImageInputs != nil {
+		for target := range project.ImageInputs.Targets {
+			if err := validateProjectInputs(*project.ImageInputs, target); err != nil {
+				return Project{}, err
+			}
+		}
+	}
+	for _, image := range project.Images {
+		for _, path := range image.TestFiles {
+			if !validInputPath(path, false) {
+				return Project{}, errors.New("image verification files must be repository-relative")
+			}
+		}
+	}
 	return project, nil
 }
 
@@ -132,6 +150,10 @@ func PlanProject(ctx context.Context, runner process.Runner, project Project, ba
 	plan := ProjectPlan{Images: []ProjectImage{}, Checks: []ProjectCheck{}, Rust: project.Rust, Dependency: project.DependencyRecipe != ""}
 	var sourceRevision string
 	affected := allProjectInputs(project.Inputs, "missing-base")
+	imageAffected := affected
+	if project.ImageInputs != nil {
+		imageAffected = allProjectInputs(*project.ImageInputs, "missing-base")
+	}
 	if base != "" && len(project.Inputs.Targets) > 0 {
 		revision, err := runner.Output(ctx, "git", "rev-parse", "--verify", "--end-of-options", base+"^{commit}")
 		if err == nil {
@@ -140,16 +162,19 @@ func PlanProject(ctx context.Context, runner process.Runner, project Project, ba
 				return plan, err
 			}
 			affected = projectInputsForPaths(project.Inputs, "", "", strings.Split(string(paths), "\x00"))
+			imageAffected = affected
+			if project.ImageInputs != nil {
+				imageAffected = projectInputsForPaths(*project.ImageInputs, "", "", strings.Split(string(paths), "\x00"))
+			}
 		} else if ctx.Err() != nil {
 			return plan, ctx.Err()
 		}
 	}
 	if base != "" && len(project.Inputs.Targets) > 0 && len(affected.AffectedTargets) == 0 {
 		plan.Rust = nil
-		return plan, ctx.Err()
 	}
 	for _, image := range project.Images {
-		if base != "" && !slices.Contains(affected.AffectedTargets, strings.TrimPrefix(image.Image, "ghcr.io/fredrir/")) {
+		if base != "" && !slices.Contains(imageAffected.AffectedTargets, strings.TrimPrefix(image.Image, "ghcr.io/fredrir/")) {
 			continue
 		}
 		arguments := make(map[string]string)
@@ -192,6 +217,9 @@ func PlanProject(ctx context.Context, runner process.Runner, project Project, ba
 		plan.Images = append(plan.Images, image)
 	}
 	for _, check := range project.Checks {
+		if base != "" && len(affected.AffectedTargets) == 0 {
+			continue
+		}
 		if check.Scheduled && !scheduled {
 			continue
 		}

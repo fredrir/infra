@@ -114,10 +114,15 @@ func newDoctorCommand() *cobra.Command {
 func newImageCommand() *cobra.Command {
 	var opts pipeline.ImageOptions
 	var buildArgs []string
-	var argsJSON, output string
+	var argsJSON, output, testFilesJSON string
 	var timeout time.Duration
 	cmd := &cobra.Command{Use: "image", Short: "Build, verify, and publish an image with Dagger", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if testFilesJSON != "" {
+				if err := json.Unmarshal([]byte(testFilesJSON), &opts.TestFiles); err != nil {
+					return err
+				}
+			}
 			opts.BuildArgs = make(map[string]string)
 			if argsJSON != "" {
 				if err := json.Unmarshal([]byte(argsJSON), &opts.BuildArgs); err != nil {
@@ -172,6 +177,8 @@ func newImageCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&buildArgs, "build-arg", nil, "Build argument KEY=VALUE")
 	cmd.Flags().StringVar(&argsJSON, "build-args", "", "JSON object of build arguments")
 	cmd.Flags().StringVar(&opts.TestCommand, "test-command", "", "Command to verify the built image")
+	cmd.Flags().StringVar(&opts.TestSetupCommand, "test-setup-command", "", "Prepare a temporary verification container")
+	cmd.Flags().StringVar(&testFilesJSON, "test-files", "[]", "JSON array of context-relative verification files")
 	cmd.Flags().StringVar(&opts.TestShell, "test-shell", "sh", "Shell used for image verification")
 	cmd.Flags().StringVar(&opts.Export, "export", "", "Export an OCI image archive")
 	cmd.Flags().StringVar(&opts.ExportDirectory, "export-directory", "", "Export the image filesystem to a directory")

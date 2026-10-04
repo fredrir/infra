@@ -186,7 +186,7 @@ func TestDaggerImageNormalizesSourceModesWithoutChangingRuntimeOrHostFiles(t *te
 			if _, err := Image(ctx, ImageOptions{Root: root, Context: source, Dockerfile: "Dockerfile", InfraBinary: "infra", Platform: "linux/amd64", ExportDirectory: export, Log: io.Discard}); err != nil {
 				t.Fatal(err)
 			}
-			for name, mode := range map[string]os.FileMode{"source/nested": 0755, "source/nested/readable": 0644, "source/executable": 0755, "source/.infra.Containerfile": 0644, "source/.infra-artifacts/infra": 0755, "runtime/private": 0600} {
+			for name, mode := range map[string]os.FileMode{"source/nested": 0755, "source/nested/readable": 0644, "source/executable": 0755, "source/.infra.Containerfile": 0644, "runtime/private": 0600} {
 				info, err := os.Stat(filepath.Join(export, name))
 				if err != nil {
 					t.Fatal(err)
@@ -213,5 +213,59 @@ func TestDaggerImageNormalizesSourceModesWithoutChangingRuntimeOrHostFiles(t *te
 				}
 			}
 		})
+	}
+}
+
+func TestImageRejectsVerificationWithoutCommandAndEscapingFiles(t *testing.T) {
+	for _, options := range []ImageOptions{
+		{Dockerfile: "Dockerfile", CheckOnly: true, TestSetupCommand: "true"},
+		{Dockerfile: "Dockerfile", CheckOnly: true, TestFiles: []string{"input"}},
+		{Dockerfile: "Dockerfile", CheckOnly: true, TestCommand: "true", InfraBinary: "infra", CheckReportDir: t.TempDir(), TestFiles: []string{"../input"}},
+	} {
+		if _, err := Image(context.Background(), options); err == nil || !strings.Contains(err.Error(), "verification") {
+			t.Fatalf("invalid verification accepted: %v", err)
+		}
+	}
+}
+
+func TestImageVerificationDoesNotAlterExportedRuntime(t *testing.T) {
+	root, binary := os.Getenv("INFRA_DAGGER_IMAGE_TEST_ROOT"), os.Getenv("INFRA_DAGGER_IMAGE_TEST_BINARY")
+	if root == "" || binary == "" {
+		t.Skip("an isolated Dagger engine and native binary are required")
+	}
+	work := t.TempDir()
+	t.Chdir(work)
+	toolchain, err := ReadToolchain(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("Dockerfile", []byte("FROM "+toolchain.Image+"\nWORKDIR /app\nRUN touch /runtime\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("input", []byte("verification"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	options := ImageOptions{Root: root, Context: work, Dockerfile: "Dockerfile", Platform: "linux/amd64", ExportDirectory: filepath.Join(work, "runtime"), CheckReportDir: filepath.Join(work, "receipts"), InfraBinary: binary, TestSetupCommand: "touch /verification-only", TestFiles: []string{"input"}, TestCommand: "test -f /verification-only && test -f /runtime && test \"$(cat input)\" = verification", Log: io.Discard}
+	if _, err := Image(ctx, options); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(options.ExportDirectory, "runtime")); err != nil {
+		t.Fatal("runtime file missing")
+	}
+	for _, path := range []string{"verification-only", "app/input", "tmp/infra-measure"} {
+		if _, err := os.Stat(filepath.Join(options.ExportDirectory, path)); !os.IsNotExist(err) {
+			t.Fatalf("verification artifact exported: %s", path)
+		}
+	}
+	options.TestCommand = "false"
+	options.ExportDirectory = filepath.Join(work, "rejected")
+	options.CheckReportDir = filepath.Join(work, "failed-receipts")
+	if _, err := Image(ctx, options); err == nil {
+		t.Fatal("failed image verification accepted")
+	}
+	if _, err := os.Stat(options.ExportDirectory); !os.IsNotExist(err) {
+		t.Fatal("image exported after failed verification")
 	}
 }

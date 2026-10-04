@@ -18,31 +18,36 @@ import (
 )
 
 type ImageOptions struct {
-	CheckTarget     string
-	CheckReportDir  string
-	Target          string
-	CheckOnly       bool
-	InfraBinary     string
-	SourceURL       string
-	Revision        string
-	Root            string
-	Context         string
-	Dockerfile      string
-	Image           string
-	Platform        string
-	BuildArgs       map[string]string
-	TestCommand     string
-	TestShell       string
-	RegistryUser    string
-	RegistryToken   string
-	Export          string
-	ExportDirectory string
-	Log             io.Writer
+	CheckTarget      string
+	CheckReportDir   string
+	Target           string
+	CheckOnly        bool
+	InfraBinary      string
+	SourceURL        string
+	Revision         string
+	Root             string
+	Context          string
+	Dockerfile       string
+	Image            string
+	Platform         string
+	BuildArgs        map[string]string
+	TestCommand      string
+	TestShell        string
+	TestSetupCommand string
+	TestFiles        []string
+	RegistryUser     string
+	RegistryToken    string
+	Export           string
+	ExportDirectory  string
+	Log              io.Writer
 }
 
 const layerCompression = dagger.ImageLayerCompressionZstd
 
 func Image(ctx context.Context, opts ImageOptions) (string, error) {
+	if opts.Log == nil {
+		opts.Log = io.Discard
+	}
 	if opts.Image == "" && opts.Export == "" && opts.ExportDirectory == "" && !opts.CheckOnly {
 		return "", errors.New("image reference or export path required")
 	}
@@ -61,8 +66,30 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 	if (opts.CheckTarget != "" || opts.TestCommand != "") && (opts.CheckReportDir == "" || opts.InfraBinary == "") {
 		return "", errors.New("measured image checks require an infra binary and check report directory")
 	}
+	if opts.TestCommand == "" && (opts.TestSetupCommand != "" || len(opts.TestFiles) > 0) {
+		return "", errors.New("verification setup and files require a test command")
+	}
+	for _, path := range opts.TestFiles {
+		if !filepath.IsLocal(path) || filepath.Clean(path) != path {
+			return "", errors.New("verification files must be clean context-relative paths")
+		}
+		info, err := os.Lstat(filepath.Join(opts.Context, path))
+		if err != nil || !info.Mode().IsRegular() {
+			return "", fmt.Errorf("verification file must be an existing regular file: %s", path)
+		}
+		root, rootErr := filepath.Abs(opts.Context)
+		resolved, resolveErr := filepath.EvalSymlinks(filepath.Join(root, path))
+		relative, relativeErr := filepath.Rel(root, resolved)
+		if rootErr != nil || resolveErr != nil || relativeErr != nil || !filepath.IsLocal(relative) {
+			return "", errors.New("verification files must remain inside the build context")
+		}
+	}
 	if info, err := os.Stat(opts.Dockerfile); err != nil || !info.Mode().IsRegular() {
 		return "", errors.New("Dockerfile must be an existing regular file")
+	}
+	recipe, err := os.ReadFile(opts.Dockerfile)
+	if err != nil {
+		return "", err
 	}
 	config, err := ReadToolchain(opts.Root)
 	if err != nil {
@@ -105,7 +132,7 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		WithExec([]string{"chmod", "-R", "u=rwX,go=rX,a-s,a-t", "/infra-source"}).
 		Directory("/infra-source").
 		WithFile(".infra.Containerfile", client.Host().File(opts.Dockerfile), dagger.DirectoryWithFileOpts{Permissions: 0o644})
-	if opts.InfraBinary != "" {
+	if opts.InfraBinary != "" && strings.Contains(string(recipe), ".infra-artifacts/infra") {
 		source = source.WithFile(".infra-artifacts/infra", client.Host().File(opts.InfraBinary), dagger.DirectoryWithFileOpts{Permissions: 0o755})
 	}
 	if opts.CheckTarget != "" {
@@ -128,6 +155,11 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 	if opts.Revision != "" {
 		container = container.WithLabel("org.opencontainers.image.revision", opts.Revision)
 	}
+	started := time.Now()
+	if _, err := container.Sync(ctx); err != nil {
+		return "", err
+	}
+	fmt.Fprintf(opts.Log, "image-stage name=runtime-build duration_seconds=%.6f\n", time.Since(started).Seconds())
 	if opts.TestCommand != "" {
 		shell := opts.TestShell
 		if shell == "" {
@@ -137,8 +169,25 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		if shell == "bash" {
 			arguments = []string{shell, "-euo", "pipefail", "-c", opts.TestCommand}
 		}
-		if _, err := container.Sync(ctx); err != nil {
+		checked := container
+		if opts.TestSetupCommand != "" {
+			setup := []string{shell, "-euc", opts.TestSetupCommand}
+			if shell == "bash" {
+				setup = []string{shell, "-euo", "pipefail", "-c", opts.TestSetupCommand}
+			}
+			started = time.Now()
+			checked = checked.WithExec(setup)
+			if _, err := checked.Sync(ctx); err != nil {
+				return "", fmt.Errorf("prepare image verification: %w", err)
+			}
+			fmt.Fprintf(opts.Log, "image-stage name=verification-preparation duration_seconds=%.6f\n", time.Since(started).Seconds())
+		}
+		workdir, err := checked.Workdir(ctx)
+		if err != nil {
 			return "", err
+		}
+		for _, path := range opts.TestFiles {
+			checked = checked.WithMountedFile(filepath.Join(workdir, path), client.Host().File(filepath.Join(opts.Context, path)))
 		}
 		group, err := ci.CheckGroupBudget(opts.CheckReportDir, 10*time.Second, false)
 		if err != nil {
@@ -146,7 +195,8 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		}
 		budget := time.Duration(group.RemainingSeconds * float64(time.Second)).String()
 		command := append([]string{"/tmp/infra-measure", "ci", "measure", "--stage", "image-smoke", "--budget", budget, "--report-dir", "/tmp/infra-checks", "--"}, arguments...)
-		checked := container.WithMountedFile("/tmp/infra-measure", client.Host().File(opts.InfraBinary)).WithEnvVariable("GITHUB_SHA", opts.Revision).WithExec(command, dagger.ContainerWithExecOpts{Expect: dagger.ReturnTypeAny})
+		started = time.Now()
+		checked = checked.WithMountedFile("/tmp/infra-measure", client.Host().File(opts.InfraBinary)).WithEnvVariable("GITHUB_SHA", opts.Revision).WithExec(command, dagger.ContainerWithExecOpts{Expect: dagger.ReturnTypeAny})
 		code, err := checked.ExitCode(ctx)
 		if err != nil {
 			return "", fmt.Errorf("image verification: %w", err)
@@ -159,10 +209,10 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		if err := errors.Join(exportErr, checkErr); err != nil {
 			return "", err
 		}
+		fmt.Fprintf(opts.Log, "image-stage name=verification duration_seconds=%.6f\n", time.Since(started).Seconds())
 	}
 	if opts.CheckOnly {
-		_, err := container.Sync(ctx)
-		return "", err
+		return "", nil
 	}
 	if opts.Export != "" {
 		if _, err := container.Export(ctx, opts.Export, dagger.ContainerExportOpts{ForcedCompression: layerCompression}); err != nil {
@@ -184,5 +234,8 @@ func Image(ctx context.Context, opts ImageOptions) (string, error) {
 		}
 		container = container.WithRegistryAuth(host, opts.RegistryUser, client.SetSecret("registry-token", opts.RegistryToken))
 	}
-	return container.Publish(ctx, opts.Image, dagger.ContainerPublishOpts{ForcedCompression: layerCompression})
+	started = time.Now()
+	result, err := container.Publish(ctx, opts.Image, dagger.ContainerPublishOpts{ForcedCompression: layerCompression})
+	fmt.Fprintf(opts.Log, "image-stage name=publication duration_seconds=%.6f\n", time.Since(started).Seconds())
+	return result, err
 }

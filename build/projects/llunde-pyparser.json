@@ -31,27 +31,51 @@
       "image": "ghcr.io/fredrir/pyparser-review",
       "dockerfile": "Dockerfile",
       "target": "",
-      "check_target": "check-reports",
+      "check_target": "",
       "timeout": 120,
       "scanner_java": false,
       "recipe": "",
-      "smoke": "/tmp/infra-measure ci project check --project llunde-pyparser --suite smoke",
-      "build_args": ""
+      "smoke": "/tmp/infra-measure ci project check --project llunde-pyparser --suite fast && /tmp/infra-measure ci project check --project llunde-pyparser --suite smoke",
+      "build_args": "",
+      "test_setup": "python -m ensurepip --upgrade && python -m pip install --disable-pip-version-check --no-cache-dir pytest==9.1.1",
+      "test_files": [
+        "tests/conftest.py",
+        "tests/unit/test_invariants.py"
+      ]
     }
   ],
   "checks": [
     {
-      "name": "python",
-      "recipe": "build/projects/llunde-pyparser/checks.Containerfile",
-      "target": "python",
-      "timeout": 120
-    },
-    {
       "name": "ui",
       "recipe": "build/projects/llunde-pyparser/checks.Containerfile",
       "target": "ui",
-      "timeout": 45
+      "timeout": 45,
+      "in_image": true
     }
   ],
-  "dependency_recipe": "build/projects/llunde-pyparser/dependencies.Containerfile"
+  "dependency_recipe": "build/projects/llunde-pyparser/dependencies.Containerfile",
+  "image_inputs": {
+    "schema": 1,
+    "shared": [
+      "pyproject.toml",
+      "uv.lock",
+      "Dockerfile",
+      ".dockerignore",
+      ".github/"
+    ],
+    "ignored": [
+      "README.md",
+      "docs/",
+      "LICENSE",
+      "tests/"
+    ],
+    "targets": {
+      "pyparser-review": [
+        "src/",
+        "sql/",
+        "review-ui/",
+        "alembic.ini"
+      ]
+    }
+  }
 }

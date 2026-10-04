@@ -196,3 +196,38 @@ func TestParserDatabaseNameAndEnvironmentReachTests(t *testing.T) {
 		t.Fatal("test database depends on installed locale")
 	}
 }
+
+func TestProjectPlanSeparatesRuntimeInputsFromTestChanges(t *testing.T) {
+	_, project := projectFixture(t)
+	inputs := project.Inputs
+	inputs.Targets = make(map[string][]string)
+	for target, paths := range project.Inputs.Targets {
+		inputs.Targets[target] = slices.Clone(paths)
+	}
+	inputs.Ignored = append(slices.Clone(inputs.Ignored), "tests/")
+	project.ImageInputs = &inputs
+	project.Inputs.Targets["example-api"] = append(project.Inputs.Targets["example-api"], "tests/")
+	for _, test := range []struct {
+		path           string
+		images, checks int
+	}{
+		{"tests/runtime_test.go", 0, 1},
+		{"api/main.rs", 1, 1},
+		{"docs/readme.md", 0, 0},
+		{"unmapped.txt", 2, 1},
+		{"Cargo.lock", 2, 1},
+	} {
+		t.Run(test.path, func(t *testing.T) {
+			runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				if options.Args[0] == "rev-parse" {
+					return process.Result{Stdout: []byte(strings.Repeat("a", 40))}, nil
+				}
+				return process.Result{Stdout: []byte(test.path + "\x00")}, nil
+			}}
+			plan, err := PlanProject(context.Background(), runner, project, "HEAD", false, nil)
+			if err != nil || len(plan.Images) != test.images || len(plan.Checks) != test.checks {
+				t.Fatalf("plan: %+v, %v", plan, err)
+			}
+		})
+	}
+}

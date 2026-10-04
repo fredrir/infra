@@ -2,6 +2,9 @@ name: Project CI
 on:
   workflow_call:
     inputs:
+      image-build:
+        type: boolean
+        default: false
       cli-artifact:
         type: string
         default: ''
@@ -53,7 +56,7 @@ jobs:
       - id: plan
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: infra ci project plan --infra-root .infra-build-recipe
+        run: infra ci project plan --infra-root .infra-build-recipe --purpose ${{ inputs.image-build && 'image-checks' || 'checks' }}
   check:
     needs: [cli, plan]
     if: ${{ !cancelled() && needs.plan.outputs.has-checks == 'true' }}

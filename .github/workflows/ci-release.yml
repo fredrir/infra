@@ -35,6 +35,27 @@ jobs:
             changed=true
           fi
           printf 'changed=%s\n' "$changed" >> "$GITHUB_OUTPUT"
+      - name: Select the checked CI revision
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          CI_REVISION: ${{ github.event.workflow_run.head_sha }}
+        run: git checkout --detach "$CI_REVISION"
+      - uses: ./.github/actions/cli-inputs
+        id: cli-inputs
+        if: steps.changes.outputs.changed == 'true'
+      - name: Require a matching released CLI
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          CLI_RELEASED: ${{ steps.cli-inputs.outputs.released }}
+        run: |
+          test "$CLI_RELEASED" = true
+          version=$(jq -er '.tag' build/cli-release.json)
+          checksum=$(jq -er '.sha256' build/cli-release.json)
+          curl --fail --silent --show-error --location --retry 2 --max-time 60 "https://github.com/fredrir/infra/releases/download/$version/infra-linux-amd64" --output "$RUNNER_TEMP/infra-release"
+          printf '%s  %s\n' "$checksum" "$RUNNER_TEMP/infra-release" | sha256sum --check --strict
+      - name: Restore the channel checkout
+        if: steps.changes.outputs.changed == 'true'
+        run: git checkout main
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         if: steps.changes.outputs.changed == 'true'
         with:

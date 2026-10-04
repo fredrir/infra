@@ -33,8 +33,17 @@ func newProjectCICommand() *cobra.Command {
 		}
 		var variables map[string]string
 		switch purpose {
-		case "checks":
+		case "checks", "image-checks":
 			profile.Images = nil
+			if purpose == "image-checks" {
+				checks := profile.Checks[:0]
+				for _, check := range profile.Checks {
+					if !check.InImage {
+						checks = append(checks, check)
+					}
+				}
+				profile.Checks = checks
+			}
 		case "images":
 			variables = map[string]string{}
 			for _, image := range profile.Images {
@@ -53,7 +62,7 @@ func newProjectCICommand() *cobra.Command {
 			}
 			profile.Checks = nil
 		default:
-			return errors.New("purpose must be checks or images")
+			return errors.New("purpose must be checks, image-checks or images")
 		}
 		result, err := ci.PlanProject(command.Context(), process.Runner{Dir: source, Stderr: command.ErrOrStderr()}, profile, base, scheduled, variables)
 		if err != nil {

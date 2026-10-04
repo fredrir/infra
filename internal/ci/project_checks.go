@@ -69,10 +69,6 @@ func ProjectCheckCommands(ctx context.Context, runner process.Runner, project, s
 		})
 	case "llunde-backend/fast":
 		return runner.Run(ctx, "java", "-cp", "/fast-tests:/fast-tests/*", "org.junit.platform.console.ConsoleLauncher", "execute", "--disable-banner", "--details=summary", "--fail-if-no-tests", "--select-class=no.llunde.config.TwilioConfigTest", "--select-class=no.llunde.config.AppConfigTest", "--select-class=no.llunde.auth.password.PasswordPolicyTest", "--select-class=no.llunde.notifications.EmailRendererTest")
-	case "llunde-pyparser/python":
-		return WithDatabase(ctx, runner, Database{User: "pyparser", Name: "pyparser_ci", Variables: []string{"PYPARSER_DATABASE_URL", "PYPARSER_LLUNDE_DATABASE_URL"}}, func(ctx context.Context, runner process.Runner) error {
-			return run(ctx, runner, []string{"python", "-c", "from pyparser.infra.db.schema import apply_schema; apply_schema()"}, []string{"python", "-m", "pytest"})
-		})
 	case "portfolio/rust":
 		return WithDatabase(ctx, runner, Database{User: "portfolio", Name: "portfolio", Variables: []string{"DATABASE_URL"}}, func(ctx context.Context, runner process.Runner) error {
 			return run(ctx, runner, []string{"cargo", "fmt", "--all", "--check"}, []string{"cargo", "clippy", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"}, []string{"cargo", "test", "--locked", "--workspace"})
