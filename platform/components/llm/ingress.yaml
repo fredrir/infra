@@ -9,6 +9,41 @@ spec:
   - host: llm.fredrir.com
     http:
       paths:
+      - path: /
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /openapi.json
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /swagger/swagger-ui.css
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /swagger/swagger-ui-bundle.js
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /swagger/favicon.png
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
       - path: /v1/models
         pathType: Exact
         backend:

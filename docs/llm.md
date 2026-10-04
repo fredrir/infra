@@ -11,7 +11,7 @@
 | Document parsing | PaddleOCR layout detection, cropping and result assembly run in the calling pipeline |
 | Credentials | SOPS-encrypted master, salt, backend and client keys; parser key permits Granite only |
 | Cloudflare clients | OpenAI SDK and curl user agents pass; the default Python urllib user agent is rejected by Browser Integrity Check |
-| Public routes | Exact matches for models, chat completions, Responses and liveliness; administration requires port forwarding |
+| Public routes | Exact matches for Swagger at `/`, its assets, `/openapi.json`, models, chat completions, Responses and liveliness; administration requires port forwarding |
 | Database | PostgreSQL 17.10; retained 5 GiB local volume on `fredrir-04` |
 | Backup | Daily `platform-backups/llm-database-backup`; encrypted control Restic repository; `llm,postgres` tags |
 | Retention | Shared repository maintenance: 7 daily, 4 weekly and 12 monthly snapshots per host and tags |
