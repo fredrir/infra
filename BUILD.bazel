@@ -103,6 +103,12 @@ filegroup(
 )
 
 filegroup(
+    name = "k3s_sysctl_data",
+    srcs = ["ansible/roles/k3s/tasks/main.yml"],
+    visibility = ["//internal/contracts:__pkg__"],
+)
+
+filegroup(
     name = "node_local_dns_data",
     srcs = [
         "ansible/inventory/production.yml",
