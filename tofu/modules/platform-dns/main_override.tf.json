@@ -1,0 +1,11 @@
+{
+  "resource": {
+    "cloudflare_dns_record": {
+      "records": {
+        "lifecycle": {
+          "prevent_destroy": false
+        }
+      }
+    }
+  }
+}
