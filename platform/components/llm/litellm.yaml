@@ -35,6 +35,15 @@ general_settings:
   disable_error_logs: true
   health_check_details: false
   trusted_proxy_ranges: []
+  pass_through_endpoints:
+  - path: /pp-structure
+    target: http://pp-structure:8012
+    include_subpath: true
+    auth: true
+    methods:
+    - GET
+    - POST
+    timeout: 180
 litellm_settings:
   request_timeout: 180
   num_retries: 0

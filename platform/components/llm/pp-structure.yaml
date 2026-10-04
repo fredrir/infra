@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pp-structure
+  namespace: llm
+  labels:
+    app.kubernetes.io/name: pp-structure
+    app.kubernetes.io/part-of: llm
+spec:
+  selector:
+    app.kubernetes.io/name: pp-structure
+    app.kubernetes.io/part-of: llm
+  ports:
+  - name: http
+    port: 8012
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pp-structure
+  namespace: llm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pp-structure
+      app.kubernetes.io/part-of: llm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pp-structure
+        app.kubernetes.io/part-of: llm
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      dnsConfig:
+        options:
+        - name: ndots
+          value: '2'
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-04
+        kubernetes.io/arch: amd64
+      priorityClassName: production
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: seed-cache
+        image: ghcr.io/fredrir/pp-structure@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        imagePullPolicy: IfNotPresent
+        command:
+        - cp
+        - -R
+        - /models/.
+        - /var/cache/paddlex/
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        volumeMounts:
+        - name: model-cache
+          mountPath: /var/cache/paddlex
+      containers:
+      - name: pp-structure
+        image: ghcr.io/fredrir/pp-structure@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        env:
+        - name: HOME
+          value: /tmp
+        - name: PADDLE_PDX_CACHE_HOME
+          value: /var/cache/paddlex
+        - name: PP_STRUCTURE_DEVICE
+          value: cpu
+        - name: OMP_NUM_THREADS
+          value: '2'
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: '2'
+            memory: 6Gi
+        volumeMounts:
+        - name: model-cache
+          mountPath: /var/cache/paddlex
+        - name: tmp
+          mountPath: /tmp
+        ports:
+        - name: http
+          containerPort: 8012
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 4
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 60
+      volumes:
+      - name: model-cache
+        emptyDir:
+          sizeLimit: 4Gi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 512Mi

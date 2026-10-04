@@ -82,15 +82,13 @@ spec:
           value: /var/cache/pyparser/huggingface
         - name: PYPARSER_MODEL_CACHE_PATH
           value: /var/cache/pyparser/huggingface/hub
-        - name: PYPARSER_GRANITE_ENDPOINT
-          value: http://litellm.llm.svc.cluster.local:4000
-        - name: PYPARSER_GRANITE_API_KEY
+        - name: LITELLM_API_URL
+          value: http://litellm.llm.svc.cluster.local:4000/v1
+        - name: LITELLM_API_KEY
           valueFrom:
             secretKeyRef:
               name: llm-gateway
-              key: PYPARSER_GRANITE_API_KEY
-        - name: PYPARSER_GRANITE_API
-          value: chat-completions
+              key: LITELLM_API_KEY
         - name: PYPARSER_STORAGE_ENDPOINT
           value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
         - name: PYPARSER_STORAGE_CA_BUNDLE
@@ -241,15 +239,13 @@ spec:
           value: /var/cache/pyparser/huggingface
         - name: PYPARSER_MODEL_CACHE_PATH
           value: /var/cache/pyparser/huggingface/hub
-        - name: PYPARSER_GRANITE_ENDPOINT
-          value: http://litellm.llm.svc.cluster.local:4000
-        - name: PYPARSER_GRANITE_API_KEY
+        - name: LITELLM_API_URL
+          value: http://litellm.llm.svc.cluster.local:4000/v1
+        - name: LITELLM_API_KEY
           valueFrom:
             secretKeyRef:
               name: llm-gateway
-              key: PYPARSER_GRANITE_API_KEY
-        - name: PYPARSER_GRANITE_API
-          value: chat-completions
+              key: LITELLM_API_KEY
         - name: PYPARSER_STORAGE_ENDPOINT
           value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
         - name: PYPARSER_STORAGE_CA_BUNDLE
@@ -370,15 +366,13 @@ spec:
           value: /var/cache/pyparser/huggingface
         - name: PYPARSER_MODEL_CACHE_PATH
           value: /var/cache/pyparser/huggingface/hub
-        - name: PYPARSER_GRANITE_ENDPOINT
-          value: http://litellm.llm.svc.cluster.local:4000
-        - name: PYPARSER_GRANITE_API_KEY
+        - name: LITELLM_API_URL
+          value: http://litellm.llm.svc.cluster.local:4000/v1
+        - name: LITELLM_API_KEY
           valueFrom:
             secretKeyRef:
               name: llm-gateway
-              key: PYPARSER_GRANITE_API_KEY
-        - name: PYPARSER_GRANITE_API
-          value: chat-completions
+              key: LITELLM_API_KEY
         - name: PYPARSER_STORAGE_ENDPOINT
           value: https://seaweedfs-nl.object-store.svc.cluster.local:8333
         - name: PYPARSER_STORAGE_CA_BUNDLE

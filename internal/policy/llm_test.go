@@ -1,12 +1,17 @@
 package policy
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"go.yaml.in/yaml/v3"
+)
 
 func TestSharedModelsRunOnTheirReservedNodes(t *testing.T) {
 	t.Parallel()
 	e := newEvaluator(t)
 	served := map[string]bool{}
-	nodes := map[string]string{"granite": "fredrir-09", "paddleocr": "fredrir-04", "litellm": "fredrir-04"}
+	nodes := map[string]string{"granite": "fredrir-09", "paddleocr": "fredrir-04", "pp-structure": "fredrir-04", "litellm": "fredrir-04"}
 	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
 		if resource["kind"] != "Deployment" {
 			continue
@@ -39,22 +44,58 @@ func TestParserUsesTheAuthenticatedModelGateway(t *testing.T) {
 		if resource["kind"] != "Deployment" {
 			continue
 		}
-		environment := map[string]string{}
-		for _, env := range at(resource, "spec", "template", "spec", "containers", 0, "env").([]any) {
-			environment[at(env, "name").(string)], _ = lookup(env, "value").(string)
-		}
-		if environment["PYPARSER_GRANITE_ENDPOINT"] != "http://litellm.llm.svc.cluster.local:4000" || environment["PYPARSER_GRANITE_API"] != "chat-completions" {
-			t.Errorf("%s reaches granite with %v", at(resource, "metadata", "name"), environment)
-		}
+		name := at(resource, "metadata", "name")
+		var url string
 		var authenticated bool
 		for _, env := range at(resource, "spec", "template", "spec", "containers", 0, "env").([]any) {
-			if at(env, "name") == "PYPARSER_GRANITE_API_KEY" {
-				authenticated = at(env, "valueFrom", "secretKeyRef", "name") == "llm-gateway"
+			switch variable := at(env, "name").(string); {
+			case strings.HasPrefix(variable, "PYPARSER_GRANITE_"):
+				t.Fatalf("%s reaches a model outside the gateway with %s", name, variable)
+			case variable == "LITELLM_API_URL":
+				url, _ = lookup(env, "value").(string)
+			case variable == "LITELLM_API_KEY":
+				authenticated = at(env, "valueFrom", "secretKeyRef", "name") == "llm-gateway" && at(env, "valueFrom", "secretKeyRef", "key") == "LITELLM_API_KEY"
 			}
 		}
-		if !authenticated {
-			t.Fatalf("%s has no gateway credential", at(resource, "metadata", "name"))
+		if url != "http://litellm.llm.svc.cluster.local:4000/v1" {
+			t.Errorf("%s reaches the gateway at %q", name, url)
 		}
+		if !authenticated {
+			t.Fatalf("%s has no gateway credential", name)
+		}
+	}
+}
+
+func TestLayoutRouteRequiresGatewayKeys(t *testing.T) {
+	t.Parallel()
+	var config struct {
+		GeneralSettings struct {
+			PassThroughEndpoints []struct {
+				Path           string `yaml:"path"`
+				Target         string `yaml:"target"`
+				IncludeSubpath bool   `yaml:"include_subpath"`
+				Auth           bool   `yaml:"auth"`
+				ForwardHeaders bool   `yaml:"forward_headers"`
+			} `yaml:"pass_through_endpoints"`
+		} `yaml:"general_settings"`
+	}
+	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
+		if resource["kind"] == "ConfigMap" && strings.HasPrefix(at(resource, "metadata", "name").(string), "litellm") {
+			if err := yaml.Unmarshal([]byte(at(resource, "data", "config.yaml").(string)), &config); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	routes := config.GeneralSettings.PassThroughEndpoints
+	if len(routes) != 1 {
+		t.Fatalf("unexpected pass-through routes %v", routes)
+	}
+	route := routes[0]
+	if route.Path != "/pp-structure" || route.Target != "http://pp-structure:8012" || !route.IncludeSubpath {
+		t.Fatalf("layout route misrouted: %+v", route)
+	}
+	if !route.Auth || route.ForwardHeaders {
+		t.Fatal("layout route bypasses gateway keys or leaks client credentials")
 	}
 }
 
@@ -105,7 +146,7 @@ func TestParserGatewayEgressCannotEscapeItsApprovedService(t *testing.T) {
 
 func TestPublicModelIngressExcludesAdministration(t *testing.T) {
 	t.Parallel()
-	allowed := map[string]bool{"/": true, "/openapi.json": true, "/swagger/swagger-ui.css": true, "/swagger/swagger-ui-bundle.js": true, "/swagger/favicon.png": true, "/v1/models": true, "/v1/chat/completions": true, "/v1/responses": true, "/health/liveliness": true}
+	allowed := map[string]bool{"/": true, "/openapi.json": true, "/swagger/swagger-ui.css": true, "/swagger/swagger-ui-bundle.js": true, "/swagger/favicon.png": true, "/v1/models": true, "/v1/chat/completions": true, "/v1/responses": true, "/health/liveliness": true, "/pp-structure/health": true, "/pp-structure/v1/layout": true}
 	var found bool
 	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
 		if resource["kind"] != "Ingress" {

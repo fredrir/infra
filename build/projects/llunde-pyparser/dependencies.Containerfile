@@ -39,10 +39,7 @@ RUN --mount=type=bind,from=uv,source=/uv,target=/usr/local/bin/uv \
   && uv pip install --system --require-hashes --no-deps -r /usr/local/share/pyparser/pylock.toml
 
 FROM deps AS models
-ENV HF_HUB_CACHE=/opt/hf-cache
-RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='docling-project/docling-layout-heron', revision='main', cache_dir='/opt/hf-cache')" \
-    && chmod -R a+rX "$HF_HUB_CACHE" \
-    && python -m pip uninstall -y pip
+RUN python -m pip uninstall -y pip
 
 ARG PUBLIC_PARSER_DEPENDENCY_KEY
 LABEL io.llunde.parser.dependencies.key="${PUBLIC_PARSER_DEPENDENCY_KEY}"

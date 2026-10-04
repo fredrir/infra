@@ -10,6 +10,7 @@ resources:
 - gateway.secret.sops.yaml
 - granite.yaml
 - paddleocr.yaml
+- pp-structure.yaml
 - ingress.yaml
 - monitoring.yaml
 - model.secret.sops.yaml

@@ -72,3 +72,17 @@ spec:
             name: litellm
             port:
               number: 4000
+      - path: /pp-structure/health
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /pp-structure/v1/layout
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
