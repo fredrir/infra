@@ -16,6 +16,9 @@ kind: Service
 metadata:
   name: granite
   namespace: llm
+  labels:
+    app.kubernetes.io/name: granite
+    app.kubernetes.io/part-of: llm
 spec:
   selector:
     app.kubernetes.io/name: granite
