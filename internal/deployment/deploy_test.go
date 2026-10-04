@@ -1,10 +1,17 @@
 package deployment
 
 import (
+	"context"
+	"errors"
 	"slices"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"testing/fstest"
+	"time"
 
+	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -83,5 +90,57 @@ func TestPinImageUpdatesOnlyTheNamedPin(t *testing.T) {
 	}
 	if _, err := pinImage([]byte("images: ghcr.io/fredrir/example\n"), image, digest); err == nil {
 		t.Fatal("accepted image pins that are not a list")
+	}
+}
+
+func TestProvenanceChecksApprovedRevisionsConcurrentlyAndRetriesOnlyTriggerMismatches(t *testing.T) {
+	var revisions []string
+	for digit := 1; digit <= 6; digit++ {
+		revisions = append(revisions, strings.Repeat(strconv.Itoa(digit), 40))
+	}
+	trust := "claim_pattern:\n  job_workflow_sha: '^(" + strings.Join(revisions, "|") + ")$'\n  event_name: '^(push|workflow_dispatch)$'\n"
+	root := fstest.MapFS{".github/chainguard/deploy-1328252868.sts.yaml": {Data: []byte(trust)}}
+	mapping := Mapping{Repository: "fredrir/example", Visibility: "private"}
+	image, digest, revision := "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40)
+	attested := `[{"optional":{"source-run-id":"7","source-run-attempt":"1","workflow-revision":"` + revisions[4] + `"}}]`
+	var calls, retries atomic.Int32
+	runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		calls.Add(1)
+		time.Sleep(20 * time.Millisecond)
+		trigger := options.Args[slices.Index(options.Args, "--certificate-github-workflow-trigger")+1]
+		if trigger == "workflow_dispatch" {
+			retries.Add(1)
+		}
+		if slices.Contains(options.Args, "workflow-revision="+revisions[4]) && trigger == "push" {
+			return process.Result{Stdout: []byte(attested)}, nil
+		}
+		stderr := "Error: no matching attestations: missing or incorrect annotation\n"
+		if slices.Contains(options.Args, "workflow-revision="+revisions[1]) && trigger == "push" {
+			stderr = "Error: no matching attestations: failed to verify certificate identity: expected GithubWorkflowTrigger to be \"push\", got \"workflow_dispatch\"\n"
+		}
+		if options.Stderr != nil {
+			_, _ = options.Stderr.Write([]byte(stderr))
+		}
+		return process.Result{Stderr: []byte(stderr), ExitCode: 1}, errors.New("exit status 1")
+	}}
+	started := time.Now()
+	orders, err := VerifyProvenance(context.Background(), runner, root, "1328252868", mapping, image, digest, revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(orders) != 1 || orders[0].RunID != 7 || orders[0].Attempt != 1 {
+		t.Fatalf("attested orders: %+v", orders)
+	}
+	if got := calls.Load(); got != int32(len(revisions))+1 || retries.Load() != 1 {
+		t.Fatalf("%d verification calls with %d trigger retries; one retry for the single trigger mismatch expected", got, retries.Load())
+	}
+	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
+		t.Fatalf("approved revisions verified sequentially: %s", elapsed)
+	}
+	runner.Execute = func(_ context.Context, options process.Options) (process.Result, error) {
+		return process.Result{Stderr: []byte("Error: no matching attestations: missing or incorrect annotation\n"), ExitCode: 1}, errors.New("exit status 1")
+	}
+	if _, err := VerifyProvenance(context.Background(), runner, root, "1328252868", mapping, image, digest, revision); err == nil || !strings.Contains(err.Error(), "approved workflow revision") {
+		t.Fatalf("unmatched provenance accepted: %v", err)
 	}
 }

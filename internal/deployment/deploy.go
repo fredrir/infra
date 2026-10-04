@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
@@ -172,10 +174,8 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 		return nil, err
 	}
 	environment := append(os.Environ(), runner.Env...)
-	var attested []Order
-	failure := errors.New("no attestation names a deployment run")
-	unavailable := false
-	for _, workflowRevision := range revisions {
+	checks := make([]provenanceCheck, len(revisions))
+	for index, workflowRevision := range revisions {
 		name, arguments, err := ProvenanceCommand(mapping.Visibility, mapping.Repository, workflowRevision, revision, image+"@"+digest)
 		if err != nil {
 			return nil, err
@@ -183,26 +183,39 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 		if mapping.Visibility == "public" {
 			arguments = append(arguments, "--format", "json")
 		}
-		result, err := runner.Invoke(ctx, process.Options{Name: name, Args: arguments, Dir: runner.Dir, Env: environment, Stderr: runner.Stderr})
-		if err != nil && mapping.Visibility == "private" && identity.ClaimPattern.Event == "^(push|workflow_dispatch)$" && ctx.Err() == nil {
-			arguments = slices.Clone(arguments)
-			for index, argument := range arguments {
-				if argument == "--certificate-github-workflow-trigger" {
-					arguments[index+1] = "workflow_dispatch"
-					break
-				}
-			}
-			result, err = runner.Invoke(ctx, process.Options{Name: name, Args: arguments, Dir: runner.Dir, Env: environment, Stderr: runner.Stderr})
+		checks[index] = provenanceCheck{revision: workflowRevision, name: name, arguments: arguments}
+	}
+	retryTrigger := mapping.Visibility == "private" && identity.ClaimPattern.Event == "^(push|workflow_dispatch)$"
+	// Approved revisions grow with every CI promotion; checking them one at a time outlives the deployment budget.
+	var group sync.WaitGroup
+	slots := make(chan struct{}, provenanceConcurrency)
+	for index := range checks {
+		group.Add(1)
+		go func(check *provenanceCheck) {
+			defer group.Done()
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			check.run(ctx, runner, environment, retryTrigger)
+		}(&checks[index])
+	}
+	group.Wait()
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	var attested []Order
+	failure := errors.New("no attestation names a deployment run")
+	unavailable := false
+	for index := range checks {
+		check := &checks[index]
+		if runner.Stderr != nil && check.stderr.Len() > 0 {
+			_, _ = runner.Stderr.Write(check.stderr.Bytes())
 		}
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		if err != nil {
-			failure = fmt.Errorf("%s at workflow %s: %s", name, workflowRevision[:12], redacted(cmp.Or(lastLine(result.Stderr), err.Error()), environment))
-			unavailable = unavailable || UnavailableOutput(string(result.Stderr)) || result.ExitCode < 0
+		if check.err != nil {
+			failure = fmt.Errorf("%s at workflow %s: %s", check.name, check.revision[:12], redacted(cmp.Or(lastLine(check.result.Stderr), check.err.Error()), environment))
+			unavailable = unavailable || UnavailableOutput(string(check.result.Stderr)) || check.result.ExitCode < 0
 			continue
 		}
-		orders, err := attestedDeploymentOrders(result.Stdout, mapping.Visibility, mapping.Repository, image, digest, revision)
+		orders, err := attestedDeploymentOrders(check.result.Stdout, mapping.Visibility, mapping.Repository, image, digest, revision)
 		if err != nil {
 			return nil, err
 		}
@@ -217,6 +230,36 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 	}
 	slices.SortFunc(attested, compareDeploymentRuns)
 	return slices.Compact(attested), nil
+}
+
+const provenanceConcurrency = 4
+
+type provenanceCheck struct {
+	revision, name string
+	arguments      []string
+	stderr         bytes.Buffer
+	result         process.Result
+	err            error
+}
+
+func (check *provenanceCheck) run(ctx context.Context, runner process.Runner, environment []string, retryTrigger bool) {
+	check.result, check.err = runner.Invoke(ctx, process.Options{Name: check.name, Args: check.arguments, Dir: runner.Dir, Env: environment, Stderr: &check.stderr})
+	if check.err == nil || !retryTrigger || ctx.Err() != nil {
+		return
+	}
+	// Only a trigger mismatch deserves a second attempt; a wrong revision fails the same way under either trigger.
+	output := strings.ToLower(string(check.result.Stderr) + check.stderr.String() + check.err.Error())
+	if !strings.Contains(output, "trigger") {
+		return
+	}
+	arguments := slices.Clone(check.arguments)
+	for index, argument := range arguments {
+		if argument == "--certificate-github-workflow-trigger" {
+			arguments[index+1] = "workflow_dispatch"
+			break
+		}
+	}
+	check.result, check.err = runner.Invoke(ctx, process.Options{Name: check.name, Args: arguments, Dir: runner.Dir, Env: environment, Stderr: &check.stderr})
 }
 
 func lastLine(output []byte) string {

@@ -34,6 +34,7 @@ type provenanceFixture struct {
 	attested                     map[string][]int
 	attestationOutage            string
 	verifications                []process.Options
+	verificationsMutex           sync.Mutex
 	webFlow, impostor            *openpgp.Entity
 	api                          *pullRequestAPI
 	pullRequests                 PullRequests
@@ -328,7 +329,9 @@ func (f *provenanceFixture) attestation(ctx context.Context, options process.Opt
 	if options.Name != "gh" && options.Name != "cosign" {
 		return process.Run(ctx, options)
 	}
+	f.verificationsMutex.Lock()
 	f.verifications = append(f.verifications, options)
+	f.verificationsMutex.Unlock()
 	subject := strings.TrimPrefix(options.Args[slices.IndexFunc(options.Args, func(arg string) bool { return strings.Contains(arg, "ghcr.io/") })], "oci://")
 	runs := f.attested[subject]
 	if f.attestationOutage != "" {
@@ -551,6 +554,10 @@ func TestDeploymentAttestationNamesTheMappedSource(t *testing.T) {
 	var commands []string
 	for _, verification := range f.verifications {
 		commands = append(commands, verification.Name+" "+strings.Join(verification.Args, " "))
+	}
+	// Approved revisions are verified concurrently; compare the private candidates in revision order.
+	if len(commands) == 3 {
+		slices.Sort(commands[1:])
 	}
 	public := fmt.Sprintf("gh attestation verify oci://%s@sha256:%064x --repo fredrir/example --signer-workflow fredrir/infra/.github/workflows/build-image.yml --signer-digest %s --source-ref refs/heads/main --source-digest %040x --format json", deployedImage, 101, strings.Repeat("d", 40), 101)
 	private := fmt.Sprintf("--certificate-github-workflow-repository fredrir/web --certificate-github-workflow-sha %040x", 101)

@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/fredrir/infra/internal/kustomize"
@@ -23,6 +24,7 @@ type deployFixture struct {
 	runner                process.Runner
 	options               Options
 	calls                 []process.Options
+	callsMutex            sync.Mutex
 	verify                func(process.Options) error
 }
 
@@ -62,7 +64,9 @@ func newDeployFixture(t *testing.T, mode, visibility string, nested bool) *deplo
 	f.git("push", "--quiet", "origin", "HEAD:main")
 	f.runner.Execute = func(ctx context.Context, p process.Options) (process.Result, error) {
 		if p.Name == "gh" || p.Name == "cosign" {
+			f.callsMutex.Lock()
 			f.calls = append(f.calls, p)
+			f.callsMutex.Unlock()
 			if f.git("status", "--porcelain") != "" {
 				t.Error("mutation occurred before provenance verification")
 			}
@@ -372,6 +376,10 @@ func TestDeployBoundedWorkflowOverlapVerifiesBeforeMutation(t *testing.T) {
 				if len(f.calls) != 2 {
 					t.Fatalf("expected two exact candidate checks, got%d", len(f.calls))
 				}
+				// Candidates are checked concurrently; compare them in revision order.
+				slices.SortFunc(f.calls, func(a, b process.Options) int {
+					return strings.Compare(strings.Join(a.Args, " "), strings.Join(b.Args, " "))
+				})
 				for i, want := range []string{old, newRevision} {
 					if !strings.Contains(strings.Join(f.calls[i].Args, " "), want) || !slices.Contains(f.calls[i].Args, "workflow-revision="+want) && visibility == "private" {
 						t.Fatal("candidate not exact", f.calls[i].Args)
