@@ -25,7 +25,7 @@ func Heartbeat(ctx context.Context, endpoint, project, token string) error {
 	if token == "" {
 		return nil
 	}
-	if !slices.Contains([]string{"parser", "y", "portfolio", "attic", "control"}, project) || !ValidHeartbeatToken(token) {
+	if !slices.Contains([]string{"parser", "y", "portfolio", "control"}, project) || !ValidHeartbeatToken(token) {
 		return fmt.Errorf("invalid backup heartbeat")
 	}
 	return ReportHeartbeat(ctx, nil, endpoint, "backups_"+project, token, nil)

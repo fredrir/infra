@@ -6,15 +6,6 @@ spec:
   groups:
   - name: platform-backups
     rules:
-    - alert: HourlyBackupOverdue
-      expr: |
-        (time() - kube_cronjob_status_last_successful_time{namespace="nix-cache",cronjob="data-backup"} > 7200)
-        and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
-      for: 10m
-      labels:
-        severity: critical
-      annotations:
-        summary: Hourly application backup is overdue
     - alert: ApplicationBackupOverdue
       expr: |
         (time() - kube_cronjob_status_last_successful_time{namespace=~"llunde-pyparser|y|portfolio",cronjob="data-backup"} > 93600)

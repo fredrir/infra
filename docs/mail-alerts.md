@@ -23,7 +23,6 @@
 | `backups_y`         | 8 hours     |
 | `backups_control`   | 8 hours     |
 | `backups_portfolio` | 2 hours     |
-| `backups_attic`     | 2 hours     |
 
 | Verification heartbeat | Value |
 | --- | --- |

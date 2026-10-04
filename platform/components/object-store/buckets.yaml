@@ -16,8 +16,6 @@ cells:
         quotaGiB: 5
       - name: backup-portfolio
         quotaGiB: 1
-      - name: backup-attic
-        quotaGiB: 1
   - name: nl
     endpoint: https://seaweedfs-nl.object-store.svc.cluster.local:8333
     buckets:

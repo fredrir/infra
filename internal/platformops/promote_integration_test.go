@@ -94,7 +94,7 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 			}
 		}
 	}
-	for _, directory := range []string{"components/controllers", "components/object-store", "projects/y", "projects/llunde-pyparser", "projects/portfolio", "components/cache"} {
+	for _, directory := range []string{"components/controllers", "components/object-store", "projects/y", "projects/llunde-pyparser", "projects/portfolio"} {
 		t.Run(directory, func(t *testing.T) {
 			data, err := kustomize.Build(filepath.Join(root, "platform", directory))
 			if err != nil {

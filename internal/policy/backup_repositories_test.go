@@ -15,7 +15,7 @@ var primaryBackupProjects = map[string]string{"llunde-pyparser": "parser", "y": 
 
 func TestBackupJobsUseOnlyTheirDeclaredRepositories(t *testing.T) {
 	jobs := map[string]bool{}
-	for _, path := range []string{"platform/components/cache", "platform/components/backups", "platform/projects/llunde-pyparser", "platform/projects/y", "platform/projects/portfolio"} {
+	for _, path := range []string{"platform/components/backups", "platform/projects/llunde-pyparser", "platform/projects/y", "platform/projects/portfolio"} {
 		for _, resource := range renderedTree(t, "platform", path) {
 			name := at(resource, "metadata", "name")
 			if resource["kind"] != "CronJob" || (name != "data-backup" && name != "repository-maintenance") {
@@ -48,10 +48,6 @@ func TestBackupJobsUseOnlyTheirDeclaredRepositories(t *testing.T) {
 					want["OFFSITE_BACKUP_INTERVAL_DAYS"] = "14"
 				}
 			}
-			if namespace == "nix-cache" {
-				want = map[string]string{"BACKUP_REPOSITORIES": "primary", "PRIMARY_RESTIC_CACERT": "/usr/local/share/object-store/ca.crt"}
-				wantSources = []string{"PRIMARY_backup-repository"}
-			}
 			if name == "data-backup" {
 				want["BACKUP_HEARTBEAT_TOKEN"] = "secret:backup-repository/BACKUP_HEARTBEAT_TOKEN"
 			}
@@ -77,7 +73,7 @@ func TestBackupJobsUseOnlyTheirDeclaredRepositories(t *testing.T) {
 			}
 		}
 	}
-	want := []string{"llunde-pyparser/data-backup", "llunde-pyparser/repository-maintenance", "nix-cache/data-backup", "nix-cache/repository-maintenance", "platform-backups/repository-maintenance", "portfolio/data-backup", "portfolio/repository-maintenance", "y/data-backup", "y/repository-maintenance"}
+	want := []string{"llunde-pyparser/data-backup", "llunde-pyparser/repository-maintenance", "platform-backups/repository-maintenance", "portfolio/data-backup", "portfolio/repository-maintenance", "y/data-backup", "y/repository-maintenance"}
 	if got := slices.Sorted(maps.Keys(jobs)); !slices.Equal(got, want) {
 		t.Fatalf("backup jobs %v, want %v", got, want)
 	}

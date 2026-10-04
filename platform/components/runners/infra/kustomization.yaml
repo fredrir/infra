@@ -6,7 +6,6 @@ resources:
 - deploy.yaml
 - check.yaml
 - network.yaml
-- attic.secret.sops.yaml
 - github-app.secret.sops.yaml
 patches:
 - path: quota.yaml

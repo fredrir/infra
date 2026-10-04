@@ -382,15 +382,6 @@ func TestAffectedNarrowsKubernetesScopeToSelectedProjects(t *testing.T) {
 	}
 }
 
-func TestRetainedRoutesIncludeLegacyAndInterruptedTransition(t *testing.T) {
-	t.Parallel()
-	state := []byte(`{"values":{"root_module":{"resources":[{"address":"cloudflare_dns_record.grafana[\"logs.fredrir.com\"]","values":{"name":"logs.fredrir.com"}}],"child_modules":[{"resources":[{"address":"module.platform_dns.cloudflare_dns_record.records[\"grafana\"]","values":{"name":"grafana.fredrir.com"}},{"address":"module.platform_dns.cloudflare_dns_record.records[\"cache\"]","values":{"name":"cache.fredrir.com"}}]}]}}}`)
-	got, err := retainedHosts(state)
-	if err != nil || !reflect.DeepEqual(got, []string{"grafana.fredrir.com", "logs.fredrir.com"}) {
-		t.Fatalf("routes lost: %v %v", got, err)
-	}
-}
-
 func TestReadinessRejectsStaleGenerationAndRevision(t *testing.T) {
 	t.Parallel()
 	var item resource

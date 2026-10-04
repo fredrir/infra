@@ -40,15 +40,11 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 		{"platform/projects/y/backup.yaml", "backup"},
 		{"platform/projects/llunde-pyparser/backup.yaml", "backup"},
 		{"platform/projects/portfolio/backup.yaml", "backup"},
-		{"platform/components/cache/backup.yaml", "backup"},
 	}
 	var edits []Edit
 	for _, item := range paths {
 		path := filepath.Join(root, item.path)
 		resolved, err := filepath.EvalSymlinks(path)
-		if os.IsNotExist(err) && item.path == "platform/components/cache/backup.yaml" {
-			continue
-		}
 		if err != nil {
 			return nil, err
 		}
@@ -56,9 +52,6 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 			return nil, fmt.Errorf("promotion path must not traverse symlinks: %s", item.path)
 		}
 		before, err := os.ReadFile(path)
-		if os.IsNotExist(err) && item.path == "platform/components/cache/backup.yaml" {
-			continue
-		}
 		if err != nil {
 			return nil, err
 		}

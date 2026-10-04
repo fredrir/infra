@@ -248,7 +248,7 @@ func TestHostSecretsWithSystemdContainer(t *testing.T) {
 	}
 	control := map[string]string{"RESTIC_PASSWORD": "p \"q\" $HOME \\ '" + random(16), "AWS_ACCESS_KEY_ID": "AKIA" + random(8), "AWS_SECRET_ACCESS_KEY": random(20), "BACKUP_HEARTBEAT_TOKEN": random(20)}
 	gatus := map[string]string{"GATUS_SMTP_USERNAME": "AKIA" + random(8), "GATUS_SMTP_PASSWORD": base64.StdEncoding.EncodeToString(smtpPassword)}
-	for _, endpoint := range []string{"BACKUPS_PARSER", "BACKUPS_Y", "BACKUPS_PORTFOLIO", "BACKUPS_ATTIC", "BACKUPS_CONTROL", "RECONCILIATION_APPLY", "RECONCILIATION_VERIFICATION"} {
+	for _, endpoint := range []string{"BACKUPS_PARSER", "BACKUPS_Y", "BACKUPS_PORTFOLIO", "BACKUPS_CONTROL", "RECONCILIATION_APPLY", "RECONCILIATION_VERIFICATION"} {
 		gatus["GATUS_TOKEN_"+endpoint] = random(20)
 	}
 	controlSecrets := "tree/ansible/roles/control_backup/files/control.sops.yaml"

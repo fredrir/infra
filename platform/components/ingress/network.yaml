@@ -84,13 +84,6 @@ spec:
     - port: 6443
       protocol: TCP
   - to:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: nix-cache
-    ports:
-    - port: 8080
-      protocol: TCP
-  - to:
     - podSelector:
         matchLabels:
           app: keys

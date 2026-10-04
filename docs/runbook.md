@@ -525,7 +525,7 @@ Measured results and scope limits are recorded in [CI performance](ci-performanc
 | Lifecycle | `seaweedfs-hel1` worker `s3_lifecycle,admin_script`, daily; `seaweedfs-nl` has no admin or worker and no lifecycle buckets; master scripts `fs.log.purge`, `volume.deleteEmpty`, `s3.clean.uploads` |
 | Logs | stderr only (`-logtostderr=true`) |
 | Parser dataset | `parser-dataset` on `seaweedfs-nl`; application credentials and endpoint use `PYPARSER_STORAGE_*`; backups include every dataset object alongside PostgreSQL and local files |
-| Backup primaries | `backup-parser`, `backup-y`, `backup-portfolio`, `backup-attic` on `seaweedfs-hel1`; unversioned, encrypted Restic repositories; quotas in `buckets.yaml`; first successful preflight initializes an empty repository |
+| Backup primaries | `backup-parser`, `backup-y`, `backup-portfolio` on `seaweedfs-hel1`; unversioned, encrypted Restic repositories; quotas in `buckets.yaml`; first successful preflight initializes an empty repository |
 | Metadata replica | `meta-backup` container, PVC `meta-seaweedfs-<cell>-0` |
 | Disk guard | 1 GiB volumes; `hel1` `-volume.max=76` (76 GiB), `nl` `-volume.max=200` (200 GiB); every cell keeps its quota sum × 1.3 within `-volume.max` (per-bucket partial volumes and garbage below the 30% vacuum threshold) and `-volume.max` + 4 GiB within its `data` PVC (one compaction copy, writes past the 1 GiB volume limit, filer store and indexes); read-only below 15% free node disk |
 | Memory | `hel1` server GOMEMLIMIT 512MiB, request 384Mi, limit 768Mi; `nl` server GOMEMLIMIT 320MiB, request 224Mi, limit 512Mi; `meta-backup` GOMEMLIMIT 160MiB, request 64Mi, limit 256Mi; `s3-filter` GOMEMLIMIT 96MiB, request 32Mi, limit 128Mi |

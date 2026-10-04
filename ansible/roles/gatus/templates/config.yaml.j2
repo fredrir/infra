@@ -205,16 +205,6 @@ external-endpoints:
           failure-threshold: 1
           success-threshold: 1
           send-on-resolved: true
-    - name: attic
-      group: backups
-      token: "${GATUS_TOKEN_BACKUPS_ATTIC}"
-      heartbeat:
-        interval: 2h
-      alerts:
-        - type: email
-          failure-threshold: 1
-          success-threshold: 1
-          send-on-resolved: true
     - name: control
       group: backups
       token: "${GATUS_TOKEN_BACKUPS_CONTROL}"

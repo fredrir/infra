@@ -37,7 +37,6 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | ---------------------------------------- | --------------------------------------------------------------------- |
 | `fredrir.com`                            | Reserved for the future `fredrir/fredrir` application                 |
 | `grafana.fredrir.com`                    | Authenticated Grafana, Prometheus metrics, Loki logs and Tempo traces |
-| `cache.fredrir.com`                      | Retired Attic endpoint; provider resources retained                   |
 | `pkgs.fredrir.com`                       | Signed apt, rpm and apk repositories and `install.sh`                 |
 | `admin.fredrir.com`                      | Reserved for the future dashboard                                     |
 | `fredrir.no`                             | Centrally managed DNS; purpose unassigned                             |
@@ -53,7 +52,6 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Logs                   | Alloy → Loki; 7 days                                                                                                                                                                                                                                                              |
 | Traces                 | Alloy → Tempo; 7 days, bounded ingestion and sensitive attribute removal                                                                                                                                                                                                          |
 | Cluster DNS            | NodeLocal DNSCache on every node; answers on `10.43.0.10` and `169.254.20.10`; cluster zones → CoreDNS over TCP, other names → node resolvers; host firewall admits pod DNS on `cni0`; project pods use `ndots:2` |
-| Nix cache              | Attic scaled to zero; retained PVC, signing identity and hourly backups                                                                                                                                                                                                           |
 | Build cache            | Object store `seaweedfs-hel1`: `ci-<project>-main` 20 GiB (sccache, `target/` archive), `ci-<project>-release` 10 GiB, 14-day expiry; `toolchains` 5 GiB; read-only, read-write and release credentials per project |
 | Object store           | SeaweedFS cells `seaweedfs-hel1` (`fredrir-04`) and `seaweedfs-nl` (`fredrir-09`); S3 over TLS only; [operation](runbook.md#object-store) |
 | Bazel cache            | bazel-remote on `fredrir-09`, tailnet only: read-only gRPC on 9092, writes on 9093; [operation](runbook.md#bazel-cache) |
@@ -223,7 +221,6 @@ kubectl get cronjobs --all-namespaces
 | Y MongoDB and media | Daily, 03:35 UTC | SeaweedFS `hel1` | Latest 3 snapshots |
 | Portfolio PostgreSQL | Daily, 04:05 UTC | SeaweedFS `hel1` | Latest 3 snapshots |
 | Parser, Y and portfolio | Every 14 UTC calendar days since the last successful snapshot | AWS S3 | Latest snapshot |
-| Attic SQLite, including cache signing identity | Hourly, :45 UTC | SeaweedFS `hel1` | 7 daily, 4 weekly, 12 monthly |
 | Control-plane recovery data | Daily, 05:55 UTC | AWS S3 | 7 daily, 4 weekly, 12 monthly |
 | Repository integrity checks | Weekly | Each configured repository | Prunes according to that repository's policy |
 
@@ -238,7 +235,7 @@ kubectl get cronjobs --all-namespaces
 | Volume policy      | Retained local volumes; important application data currently resides on `fredrir-09`                                                                                         |
 | Writer quiescence  | Backup jobs scale writers to zero and back; writer Deployments omit `replicas` so Flux does not resume them mid-export; Writer alerts allow 35 minutes for parser dataset export and 15 minutes for Y |
 | Node loss          | Local volumes do not migrate automatically; restore to replacement storage after fencing the old writer                                                                      |
-| Verification       | Parser, Y, portfolio, Attic and native K3s datastore restored independently; row/file checks passed                                                                          |
+| Verification       | Parser, Y, portfolio and native K3s datastore restored independently; row/file checks passed                                                                          |
 | Cache recovery     | Builds can bootstrap independently; cache objects may be rebuilt                                                                                                             |
 | Disposable data    | Main Llunde seeded database and observability history                                                                                                                        |
 | Recovery time      | Provider provisioning plus restore time; no automatic cross-provider failover claim                                                                                          |

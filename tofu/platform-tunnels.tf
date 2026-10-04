@@ -10,19 +10,6 @@ locals {
         }
       ], [{ service = "http_status:404" }])
     }
-    cache = {
-      id   = "899938ad-d232-4906-8d81-f77b3b32f6c9"
-      name = "platform-attic"
-      ingress = [
-        {
-          service  = "http://attic.nix-cache.svc.cluster.local:8080"
-          hostname = "cache.fredrir.com"
-        },
-        {
-          service = "http_status:404"
-        },
-      ]
-    }
     y = {
       id   = "1c45c3ed-a9be-4011-916f-d859f5ec1d88"
       name = "platform-y"

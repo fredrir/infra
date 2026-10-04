@@ -110,20 +110,6 @@
         }
       ],
       "name": "restic-portfolio"
-    },
-    {
-      "actions": [
-        "Read:backup-attic",
-        "Write:backup-attic/*",
-        "List:backup-attic"
-      ],
-      "credentials": [
-        {
-          "accessKey": "${RESTIC_ATTIC_ACCESS_KEY_ID}",
-          "secretKey": "${RESTIC_ATTIC_SECRET_ACCESS_KEY}"
-        }
-      ],
-      "name": "restic-attic"
     }
   ]
 }

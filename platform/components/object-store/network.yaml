@@ -31,7 +31,6 @@ spec:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - nix-cache
                   - llunde-pyparser
                   - portfolio
                   - 'y'
