@@ -130,6 +130,7 @@
     {
       "matchDatasources": ["docker"],
       "matchUpdateTypes": ["digest"],
+      "matchCurrentValue": "/.+/",
       "automerge": true,
       "automergeType": "pr",
       "automergeStrategy": "merge-commit",

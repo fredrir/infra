@@ -602,6 +602,13 @@ func reviewedMergeCases(base string) []reviewedMergeCase {
 			f.automated(20, renovate, head, merge, passingChecks()...)
 			return merge
 		}},
+		{name: "digest update of an untagged image", build: func(f *provenanceFixture) string {
+			f.commit(f.owner, "Pin the database image", map[string]string{"images/db/Containerfile": "FROM docker.io/library/postgres@sha256:" + strings.Repeat("a", 64) + " AS postgres\n"})
+			head, _ := f.pullRequest(29, map[string]string{"images/db/Containerfile": "FROM docker.io/library/postgres@sha256:" + strings.Repeat("b", 64) + " AS postgres\n"})
+			merge := f.sign(f.mergeCommit(29, head), f.webFlow)
+			f.automated(29, renovate, head, merge, passingChecks()...)
+			return merge
+		}, unverified: []string{"moves the untagged image docker.io/library/postgres"}},
 		{name: "digest update that also moves the tag", build: func(f *provenanceFixture) string {
 			f.commit(f.owner, "Pin the web image", map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("a", 64) + "\n"})
 			head, _ := f.pullRequest(21, map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.21@sha256:" + strings.Repeat("b", 64) + "\n"})

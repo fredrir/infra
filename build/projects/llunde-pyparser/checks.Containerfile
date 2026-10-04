@@ -39,7 +39,7 @@ RUN --mount=type=bind,from=uv,source=/uv,target=/usr/local/bin/uv \
   pip install --upgrade pip "setuptools>=84.0.0" "wheel>=0.48.0" \
   && uv pip install --system --require-hashes --no-deps -r /usr/local/share/pyparser/pylock.toml
 
-FROM docker.io/library/postgres@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722 AS postgres
+FROM docker.io/library/postgres:17-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652 AS postgres
 FROM deps AS python
 COPY --from=postgres /usr/lib/postgresql/17 /usr/lib/postgresql/17
 COPY --from=postgres /usr/share/postgresql /usr/share/postgresql

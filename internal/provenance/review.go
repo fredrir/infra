@@ -34,7 +34,10 @@ const (
 	checksApp     = "github-actions"
 )
 
-var digestPattern = regexp.MustCompile(`[0-9a-f]{64}`)
+var (
+	digestPattern      = regexp.MustCompile(`[0-9a-f]{64}`)
+	imageDigestPattern = regexp.MustCompile(`([A-Za-z0-9][A-Za-z0-9._:/-]*)@sha256:[0-9a-f]{64}`)
+)
 
 type PullRequests interface {
 	WithCommit(ctx context.Context, commit string) ([]*github.PullRequest, error)
@@ -316,8 +319,29 @@ func (r *reviewGate) digestsOnly(ctx context.Context, pull *github.PullRequest, 
 		if !bytes.Equal(digestPattern.ReplaceAll(previous.Stdout, nil), digestPattern.ReplaceAll(updated.Stdout, nil)) {
 			return fmt.Errorf("%s changes more than digests", name)
 		}
+		if reference := untaggedDigest(previous.Stdout, updated.Stdout); reference != "" {
+			return fmt.Errorf("%s moves the untagged image %s, which may change its version", name, reference)
+		}
 	}
 	return nil
+}
+
+func untaggedDigest(previous, updated []byte) string {
+	unchanged := map[string]bool{}
+	for line := range bytes.Lines(previous) {
+		unchanged[string(line)] = true
+	}
+	for line := range bytes.Lines(updated) {
+		if unchanged[string(line)] {
+			continue
+		}
+		for _, match := range imageDigestPattern.FindAllSubmatch(line, -1) {
+			if reference := match[1]; !bytes.Contains(reference[bytes.LastIndexByte(reference, '/')+1:], []byte(":")) {
+				return string(reference)
+			}
+		}
+	}
+	return ""
 }
 
 func (r *reviewGate) promotion(ctx context.Context, pull *github.PullRequest, before, merge string) error {
