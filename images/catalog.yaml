@@ -15,6 +15,7 @@
   cli: true
   inputs:
   - images/runner-rust
+  - images/runner-check/ubuntu.sources
   - platform/components/object-store-trust/ca.crt
   check: >-
     /home/runner/run.sh --version | grep -x 2.337.0;

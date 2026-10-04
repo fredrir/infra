@@ -1,5 +1,9 @@
 FROM ghcr.io/fredrir/infra-runner-check@sha256:bfc11faad9e02ce555758e243ada83d7fabca99bb03e0e8c172dc00c7e6c97f6
 USER root
+COPY images/runner-check/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources
+RUN apt-get update -o APT::Update::Error-Mode=any \
+    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
 COPY --chmod=0555 .infra-artifacts/infra /usr/local/bin/infra
 COPY build/cli-release.json /opt/infra-cli-release.json
 ENV INFRA_TOOL_CACHE=/root/.cache/infra/tools
