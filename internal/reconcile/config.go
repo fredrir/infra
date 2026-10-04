@@ -79,6 +79,9 @@ func affectedDeployment(paths []string) Selection {
 		case strings.HasPrefix(path, "tofu/"):
 			selected.Tofu = true
 			selectHosts(&selected, HostScopeFull)
+		case path == "keys/admin_keys":
+			selected.Kubernetes = true
+			selectHosts(&selected, HostScopeFull)
 		case sharedDeploymentInput(path):
 			full := All()
 			full.Reasons = []string{"shared deployment input: " + path}

@@ -1,0 +1,27 @@
+- name: Require administrative and reconciliation public keys
+  ansible.builtin.assert:
+    that:
+    - ssh_access_public_keys | length > 1
+    - ssh_access_public_keys | select('match', '^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$') | list | length == ssh_access_public_keys | length
+
+- name: Read SSH account
+  ansible.builtin.getent:
+    database: passwd
+    key: '{{ ansible_user }}'
+
+- name: Create SSH directory
+  ansible.builtin.file:
+    path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh'
+    state: directory
+    owner: '{{ ansible_user }}'
+    mode: '0700'
+
+- name: Install host SSH identities
+  ansible.builtin.lineinfile:
+    path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh/authorized_keys'
+    regexp: '^{{ item.split()[0] }} {{ item.split()[1] | regex_escape }}(?: .*)?$'
+    line: '{{ item }}'
+    create: true
+    owner: '{{ ansible_user }}'
+    mode: '0600'
+  loop: '{{ ssh_access_public_keys }}'

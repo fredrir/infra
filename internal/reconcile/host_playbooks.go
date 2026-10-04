@@ -53,6 +53,9 @@ func loadHostPlaybookGraph(root string) (hostPlaybookGraph, error) {
 
 func (g hostPlaybookGraph) users(path string) []string {
 	var users []string
+	if path == "keys/admin_keys" {
+		path = "ansible/roles/ssh_access/"
+	}
 	if role, ok := strings.CutPrefix(path, "ansible/roles/"); ok {
 		role, _, _ = strings.Cut(role, "/")
 		for _, playbook := range g.order {

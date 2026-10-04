@@ -339,7 +339,7 @@ func TestAffectedCrossSystemInputs(t *testing.T) {
 		{"internal/../tofu/main.tf", All()},
 		{"README.md", Selection{}},
 		{"tofu/reconciler/server.tf", Selection{ReconcilerTofu: true}},
-		{"keys/admin_keys", Selection{Kubernetes: true, ReconcilerTofu: true}},
+		{"keys/admin_keys", Selection{Kubernetes: true, Ansible: true, ReconcilerTofu: true}},
 		{"ansible/reconciler.yml", Selection{}},
 		{"ansible/roles/reconciler/tasks/main.yml", Selection{}},
 		{"ansible/roles/tailscale/tasks/enrolled.yml", Selection{Ansible: true}},

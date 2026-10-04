@@ -1,0 +1,1 @@
+ssh_access_public_keys: "{{ lookup('ansible.builtin.file', playbook_dir + '/../keys/admin_keys').splitlines() + [lookup('ansible.builtin.file', playbook_dir + '/files/reconciliation.pub')] }}"

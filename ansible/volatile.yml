@@ -31,27 +31,9 @@
     ansible.builtin.setup:
       gather_subset: ['!all', '!min', network]
     when: platform_tailscale_start.changed or (platform_tailscale_restart.changed | default(false))
-  - name: Read SSH account
-    ansible.builtin.getent:
-      database: passwd
-      key: '{{ ansible_user }}'
-  - name: Create SSH directory
-    ansible.builtin.file:
-      path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh'
-      state: directory
-      owner: '{{ ansible_user }}'
-      mode: '0700'
-  - name: Require the reconciler public key
-    ansible.builtin.assert:
-      that: lookup('ansible.builtin.file', 'files/reconciliation.pub') is match('^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$')
-      fail_msg: ansible/files/reconciliation.pub must hold fredrir-11's public key
-  - name: Install reconciliation identity
-    ansible.builtin.lineinfile:
-      path: '{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh/authorized_keys'
-      line: '{{ lookup("ansible.builtin.file", "files/reconciliation.pub") }}'
-      create: true
-      owner: '{{ ansible_user }}'
-      mode: '0600'
+  - name: Maintain host SSH access
+    ansible.builtin.import_role:
+      name: ssh_access
   - name: Read the fleet flannel backends through the administrator API
     ansible.builtin.command:
       argv:
