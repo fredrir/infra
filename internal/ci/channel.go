@@ -247,7 +247,7 @@ func mergeProposal(ctx context.Context, runner process.Runner, branch string) er
 		err := runner.Run(ctx, "gh", "pr", "checks", branch, "--repo", "fredrir/infra", "--watch", "--fail-fast")
 		if err == nil {
 			data, readErr := runner.Output(ctx, "gh", "pr", "checks", branch, "--repo", "fredrir/infra", "--json", "name,state")
-			if readErr != nil {
+			if readErr != nil && len(data) == 0 {
 				return readErr
 			}
 			var checks []struct{ Name, State string }

@@ -3,6 +3,7 @@ package ci
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -238,6 +239,9 @@ func TestChannelPromotionWaitsForBudgetAndPlanBeforeMerging(t *testing.T) {
 					if !test.merge {
 						cancel()
 					}
+					if test.name == "another check queued" {
+						return process.Result{Stdout: []byte(test.checks), ExitCode: 8}, errors.New("checks pending")
+					}
 					return process.Result{Stdout: []byte(test.checks)}, nil
 				}
 				if slices.Contains(options.Args, "merge") {
@@ -248,6 +252,9 @@ func TestChannelPromotionWaitsForBudgetAndPlanBeforeMerging(t *testing.T) {
 			err := mergeProposal(ctx, runner, "ci-promotion-test")
 			if merged != test.merge || (err == nil) != test.merge {
 				t.Fatalf("merged=%t, error=%v", merged, err)
+			}
+			if !test.merge && !errors.Is(err, context.Canceled) {
+				t.Fatalf("pending checks did not wait: %v", err)
 			}
 		})
 	}
