@@ -11,7 +11,7 @@ My infrastructure, for my personal projects, services and hobbies
 | ---------------------------------------- | ----------------------------------------------- |
 | `fredrir.com`                            | WiP                                             |
 | `grafana.fredrir.com`                    | Grafana, Prometheus, Loki logs and Tempo traces |
-| `cache.fredrir.com`                      | Attic Nix cache                                 |
+| `cache.fredrir.com`                      | Retired Attic endpoint; provider resources retained |
 | `admin.fredrir.com`                      | Reserved for the future dashboard               |
 | `keys.fredrir.com`                       | Plain text administrative SSH public keys       |
 | `fredrir.no`                             | Centrally managed DNS                           |
