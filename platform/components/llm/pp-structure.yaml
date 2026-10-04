@@ -55,7 +55,7 @@ spec:
           type: RuntimeDefault
       initContainers:
       - name: seed-cache
-        image: ghcr.io/fredrir/pp-structure@sha256:20eef9e1bedac6a310a857124edf8632b0acc8c3fa30e7280027392f0886bb9d
+        image: ghcr.io/fredrir/pp-structure@sha256:1e9aeff04b2715009a25cbd4bf78becdbcd7019eb0c4691ed5f7bb1858cdf284
         imagePullPolicy: IfNotPresent
         command:
         - cp
@@ -82,7 +82,7 @@ spec:
           mountPath: /var/cache/paddlex
       containers:
       - name: pp-structure
-        image: ghcr.io/fredrir/pp-structure@sha256:20eef9e1bedac6a310a857124edf8632b0acc8c3fa30e7280027392f0886bb9d
+        image: ghcr.io/fredrir/pp-structure@sha256:1e9aeff04b2715009a25cbd4bf78becdbcd7019eb0c4691ed5f7bb1858cdf284
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -104,10 +104,10 @@ spec:
         resources:
           requests:
             cpu: 500m
-            memory: 2Gi
+            memory: 1Gi
           limits:
             cpu: '2'
-            memory: 6Gi
+            memory: 4Gi
         volumeMounts:
         - name: model-cache
           mountPath: /var/cache/paddlex
