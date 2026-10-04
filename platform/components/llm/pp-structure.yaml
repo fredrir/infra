@@ -55,7 +55,7 @@ spec:
           type: RuntimeDefault
       initContainers:
       - name: seed-cache
-        image: ghcr.io/fredrir/pp-structure@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        image: ghcr.io/fredrir/pp-structure@sha256:20eef9e1bedac6a310a857124edf8632b0acc8c3fa30e7280027392f0886bb9d
         imagePullPolicy: IfNotPresent
         command:
         - cp
@@ -82,7 +82,7 @@ spec:
           mountPath: /var/cache/paddlex
       containers:
       - name: pp-structure
-        image: ghcr.io/fredrir/pp-structure@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        image: ghcr.io/fredrir/pp-structure@sha256:20eef9e1bedac6a310a857124edf8632b0acc8c3fa30e7280027392f0886bb9d
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
