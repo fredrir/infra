@@ -7,7 +7,7 @@ on:
         type: string
   push:
     branches: [main]
-    paths: [build/ci-channel.json, internal/ci/channel.go]
+    paths: [build/ci-channel.json]
 permissions:
   contents: read
 concurrency:
