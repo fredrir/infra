@@ -1,7 +1,7 @@
 claim_pattern:
     event_name: ^(push|workflow_dispatch)$
-    job_workflow_ref: ^fredrir/infra/\.github/workflows/build-image\.yml@(refs/tags/ci-v1|5158e18a211891c1d56f928f8576b8e3a28c1b9f|82160c4b8aecfc9deea7fb1038ff63d3c41b54a6|cf1bda7e11cf1e5983a5e5500e16d59ea8690479|eddd530a3f717dd5d3261097cd175254e7fe9a43)$
-    job_workflow_sha: ^(5158e18a211891c1d56f928f8576b8e3a28c1b9f|82160c4b8aecfc9deea7fb1038ff63d3c41b54a6|cf1bda7e11cf1e5983a5e5500e16d59ea8690479|eddd530a3f717dd5d3261097cd175254e7fe9a43)$
+    job_workflow_ref: ^fredrir/infra/\.github/workflows/build-image\.yml@(refs/tags/ci-v1|51488d30f27c571b363d53e542c2b80e5dca503f|5158e18a211891c1d56f928f8576b8e3a28c1b9f|82160c4b8aecfc9deea7fb1038ff63d3c41b54a6|cf1bda7e11cf1e5983a5e5500e16d59ea8690479|eddd530a3f717dd5d3261097cd175254e7fe9a43)$
+    job_workflow_sha: ^(51488d30f27c571b363d53e542c2b80e5dca503f|5158e18a211891c1d56f928f8576b8e3a28c1b9f|82160c4b8aecfc9deea7fb1038ff63d3c41b54a6|cf1bda7e11cf1e5983a5e5500e16d59ea8690479|eddd530a3f717dd5d3261097cd175254e7fe9a43)$
     ref: ^refs/heads/main$
     repository_id: ^1328252868$
     repository_owner_id: ^114402558$
