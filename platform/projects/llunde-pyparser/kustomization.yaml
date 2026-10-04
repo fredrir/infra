@@ -8,7 +8,6 @@ resources:
 - tunnel.yaml
 - network.yaml
 - ntnu-egress.yaml
-- granite.yaml
 - application.secret.sops.yaml
 - database.secret.sops.yaml
 - tunnel.secret.sops.yaml
@@ -17,6 +16,7 @@ resources:
 - backup-dataset.secret.sops.yaml
 - backup.secret.sops.yaml
 - backup-primary.secret.sops.yaml
+- llm-gateway.secret.sops.yaml
 components:
 - ../../components/backup-job
 - ../../components/backup-primary
@@ -25,7 +25,5 @@ patches:
 - target:
     kind: CronJob
     name: data-backup
-  patch: |-
-    - op: replace
-      path: /spec/jobTemplate/spec/activeDeadlineSeconds
-      value: 12300
+  patch: "- op: replace\n  path: /spec/jobTemplate/spec/activeDeadlineSeconds\n  value:\
+    \ 12300"

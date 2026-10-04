@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llm
+  namespace: llm
+spec:
+  ingressClassName: platform
+  rules:
+  - host: llm.fredrir.com
+    http:
+      paths:
+      - path: /v1/models
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /v1/chat/completions
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /v1/responses
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /health/liveliness
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000

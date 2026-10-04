@@ -236,6 +236,16 @@ spec:
   - expression: '!has(object.spec.egress) || object.spec.egress.all(r, has(r.to) &&
       r.to.all(p, (has(p.podSelector) && !has(p.namespaceSelector) && !has(p.ipBlock))
       || (request.userInfo.username == "system:serviceaccount:flux-system:platform-reconciler"
+      && request.namespace == "llunde-pyparser" && object.metadata.name == "llm-gateway-egress"
+      && has(object.spec.podSelector.matchLabels) && !has(object.spec.podSelector.matchExpressions)
+      && object.spec.podSelector.matchLabels == {"app.kubernetes.io/component": "application"}
+      && has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels) && !has(p.namespaceSelector.matchExpressions)
+      && p.namespaceSelector.matchLabels == {"kubernetes.io/metadata.name": "llm"}
+      && has(p.podSelector) && has(p.podSelector.matchLabels) && !has(p.podSelector.matchExpressions)
+      && p.podSelector.matchLabels == {"app.kubernetes.io/name": "litellm", "app.kubernetes.io/part-of": "llm"}
+      && has(r.ports) && r.ports.size() == 1 && r.ports.all(port, has(port.port) && port.port == 4000
+      && !has(port.endPort) && (!has(port.protocol) || port.protocol == "TCP")))
+      || (request.userInfo.username == "system:serviceaccount:flux-system:platform-reconciler"
       && object.metadata.name == "backup-heartbeat-egress" && has(object.spec.podSelector.matchLabels)
       && object.spec.podSelector.matchLabels == {"app.kubernetes.io/name": "data-backup"}
       && has(p.ipBlock) && p.ipBlock.cidr == "100.86.241.75/32" && !has(p.ipBlock.except)

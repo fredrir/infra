@@ -22,8 +22,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+      maxUnavailable: 1
+      maxSurge: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: review
@@ -51,7 +51,7 @@ spec:
       - name: ghcr
       containers:
       - name: review
-        image: ghcr.io/fredrir/pyparser-review@sha256:483d94a9239189f02415541dd3828ae8e8de411d178231da3cd2596e0b1a8e4f
+        image: ghcr.io/fredrir/pyparser-review@sha256:a80e4b3b0a811659695fa1bb990c95059c2091908e874bdcbfcad2d627c9dcc6
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -83,7 +83,12 @@ spec:
         - name: PYPARSER_MODEL_CACHE_PATH
           value: /var/cache/pyparser/huggingface/hub
         - name: PYPARSER_GRANITE_ENDPOINT
-          value: http://granite:8080
+          value: http://litellm.llm.svc.cluster.local:4000
+        - name: PYPARSER_GRANITE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-gateway
+              key: PYPARSER_GRANITE_API_KEY
         - name: PYPARSER_GRANITE_API
           value: chat-completions
         - name: PYPARSER_STORAGE_ENDPOINT
@@ -199,7 +204,7 @@ spec:
       - name: ghcr
       containers:
       - name: worker-extract
-        image: ghcr.io/fredrir/pyparser-review@sha256:483d94a9239189f02415541dd3828ae8e8de411d178231da3cd2596e0b1a8e4f
+        image: ghcr.io/fredrir/pyparser-review@sha256:a80e4b3b0a811659695fa1bb990c95059c2091908e874bdcbfcad2d627c9dcc6
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -237,7 +242,12 @@ spec:
         - name: PYPARSER_MODEL_CACHE_PATH
           value: /var/cache/pyparser/huggingface/hub
         - name: PYPARSER_GRANITE_ENDPOINT
-          value: http://granite:8080
+          value: http://litellm.llm.svc.cluster.local:4000
+        - name: PYPARSER_GRANITE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-gateway
+              key: PYPARSER_GRANITE_API_KEY
         - name: PYPARSER_GRANITE_API
           value: chat-completions
         - name: PYPARSER_STORAGE_ENDPOINT
@@ -329,7 +339,7 @@ spec:
       - name: ghcr
       containers:
       - name: worker-light
-        image: ghcr.io/fredrir/pyparser-review@sha256:483d94a9239189f02415541dd3828ae8e8de411d178231da3cd2596e0b1a8e4f
+        image: ghcr.io/fredrir/pyparser-review@sha256:a80e4b3b0a811659695fa1bb990c95059c2091908e874bdcbfcad2d627c9dcc6
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -361,7 +371,12 @@ spec:
         - name: PYPARSER_MODEL_CACHE_PATH
           value: /var/cache/pyparser/huggingface/hub
         - name: PYPARSER_GRANITE_ENDPOINT
-          value: http://granite:8080
+          value: http://litellm.llm.svc.cluster.local:4000
+        - name: PYPARSER_GRANITE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-gateway
+              key: PYPARSER_GRANITE_API_KEY
         - name: PYPARSER_GRANITE_API
           value: chat-completions
         - name: PYPARSER_STORAGE_ENDPOINT

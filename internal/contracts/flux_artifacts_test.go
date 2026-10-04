@@ -96,9 +96,13 @@ func TestProductionFluxPreservesArtifactOwnershipAndReadiness(t *testing.T) {
 	if len(health) != 1 || health[0].Kind != "StatefulSet" || health[0].Name != "postgres" || health[0].Namespace != "llunde-pyparser" {
 		t.Fatalf("parser database readiness changed: %+v", health)
 	}
-	for child, parent := range map[string]string{"llunde-pyparser-migration": "project-llunde-pyparser", "llunde-pyparser-application": "llunde-pyparser-migration"} {
+	for child, parents := range map[string][]string{"llunde-pyparser-migration": {"project-llunde-pyparser"}, "llunde-pyparser-application": {"llunde-pyparser-migration", "platform-llm"}} {
 		owner := owners[child]
-		if owner.Spec.SourceRef.Kind != "ExternalArtifact" || owner.Spec.SourceRef.Name != "project-llunde-pyparser" || len(owner.Spec.DependsOn) != 1 || owner.Spec.DependsOn[0].Name != parent {
+		var dependencies []string
+		for _, dependency := range owner.Spec.DependsOn {
+			dependencies = append(dependencies, dependency.Name)
+		}
+		if owner.Spec.SourceRef.Kind != "ExternalArtifact" || owner.Spec.SourceRef.Name != "project-llunde-pyparser" || !slices.Equal(dependencies, parents) {
 			t.Errorf("parser sequencing changed: %s: %+v", child, owner.Spec)
 		}
 	}

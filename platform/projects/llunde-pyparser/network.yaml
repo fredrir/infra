@@ -85,15 +85,6 @@ spec:
     - protocol: TCP
       port: 8443
   - to:
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: granite
-          app.kubernetes.io/part-of: llunde-pyparser
-          app.kubernetes.io/component: model
-    ports:
-    - protocol: TCP
-      port: 8080
-  - to:
     - ipBlock:
         cidr: 0.0.0.0/0
         except:
@@ -244,3 +235,27 @@ spec:
     ports:
     - port: 8333
       protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: llm-gateway-egress
+  namespace: llunde-pyparser
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: application
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: llm
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: litellm
+          app.kubernetes.io/part-of: llm
+    ports:
+    - protocol: TCP
+      port: 4000

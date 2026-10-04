@@ -6,5 +6,7 @@ namespace: platform-backups
 resources:
 - backup.secret.sops.yaml
 - alerts.yaml
+- llm-database.yaml
+- llm-database.secret.sops.yaml
 components:
 - ../repository-maintenance

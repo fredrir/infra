@@ -49,6 +49,17 @@ spec:
   - to:
     - namespaceSelector:
         matchLabels:
+          kubernetes.io/metadata.name: llm
+      podSelector:
+        matchExpressions:
+        - key: app.kubernetes.io/name
+          operator: In
+          values: [granite, paddleocr]
+    ports:
+    - {port: 8080, protocol: TCP}
+  - to:
+    - namespaceSelector:
+        matchLabels:
           kubernetes.io/metadata.name: object-store
       podSelector:
         matchLabels:

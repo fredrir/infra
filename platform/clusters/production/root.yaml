@@ -292,6 +292,7 @@ spec:
   serviceAccountName: platform-reconciler
   dependsOn:
   - name: llunde-pyparser-migration
+  - name: platform-llm
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -311,3 +312,27 @@ spec:
   serviceAccountName: platform-reconciler
   dependsOn:
   - name: platform-policy
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-llm
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 15m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./platform/components/llm
+  prune: true
+  wait: true
+  serviceAccountName: platform-reconciler
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+  - name: platform-policy
+  - name: platform-observability

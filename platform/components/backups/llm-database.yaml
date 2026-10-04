@@ -1,0 +1,102 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: llm-database-backup
+spec:
+  schedule: 35 0 * * *
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: llm-database-backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          dnsConfig:
+            options: [{name: ndots, value: "2"}]
+          priorityClassName: batch
+          nodeSelector:
+            kubernetes.io/hostname: fredrir-09
+            kubernetes.io/arch: amd64
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: backup
+            image: ghcr.io/fredrir/platform-backup-tools@sha256:abc6700d00a72c4f7023bf45da37a7b75b631df17ea306e5e874dcde10a59157
+            command: [/bin/sh, -ec]
+            args:
+            - |
+              attempts=0
+              until pg_isready -h "$PGHOST" -p 5432; do
+                attempts=$((attempts + 1))
+                [ "$attempts" -lt 12 ] || exit 1
+                sleep 5
+              done
+              pg_dump --format=custom --file=/tmp/litellm.dump
+              restic --retry-lock 10m backup /tmp/litellm.dump --host platform --tag llm --tag postgres
+            envFrom:
+            - secretRef:
+                name: backup-repository
+            - secretRef:
+                name: llm-database
+            env:
+            - {name: PGHOST, value: postgres.llm.svc.cluster.local}
+            - {name: PGUSER, value: litellm}
+            - {name: PGDATABASE, value: litellm}
+            - {name: PGCONNECT_TIMEOUT, value: '10'}
+            - {name: RESTIC_CACHE_DIR, value: /cache}
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: [ALL]
+            resources:
+              requests: {cpu: 100m, memory: 128Mi}
+              limits: {cpu: '1', memory: 512Mi}
+            volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: cache, mountPath: /cache}
+          volumes:
+          - name: tmp
+            emptyDir: {sizeLimit: 1Gi}
+          - name: cache
+            emptyDir: {sizeLimit: 512Mi}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: llm-database-backup-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: llm-database-backup
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: llm
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgres
+          app.kubernetes.io/part-of: llm
+    ports:
+    - {port: 5432, protocol: TCP}
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 127.0.0.0/8]
+    ports:
+    - {port: 443, protocol: TCP}

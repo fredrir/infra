@@ -10,6 +10,13 @@ keys:
   - &fredrir-07 age1aw6w4ttxk62pxjgcgv27nqetekjxmrw538j8cqmmql4wa0577ynqxvs52d
   - &fredrir-11 age18m3q9z44kx40rw93ddrtvf97a672pz2c4gxjxe954x2zeymxuuvsqpma3g
 creation_rules:
+  - path_regex: (platform/components/llm/.*|platform/components/backups/llm-database|platform/projects/llunde-pyparser/llm-gateway)\.secret\.sops\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    key_groups:
+      - age:
+          - *macie
+          - *archie
+          - *flux
   - path_regex: secrets/operator\.sops\.yaml$
     key_groups:
       - age:

@@ -10,6 +10,7 @@
 | [Development](development.md)     | Go commands, build graph, binary distribution    |
 | [Runbook](runbook.md)             |                                                  |
 | [Platform](platform.md)           | Ownership, onboarding, validation and activation |
+| [Model serving](llm.md)           | LiteLLM, model runtimes, credentials and backups |
 | [Secrets](Secrets.md)             |                                                  |
 | [Kata Runtime](kata-runtime.md)   |                                                  |
 | [Platform Mail](platform-mail.md) |                                                  |

@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  namespace: llm
+spec:
+  selector:
+    app.kubernetes.io/name: litellm
+    app.kubernetes.io/part-of: llm
+  ports:
+  - name: http
+    port: 4000
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: llm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litellm
+      app.kubernetes.io/part-of: llm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: litellm
+        app.kubernetes.io/part-of: llm
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      dnsConfig:
+        options:
+        - name: ndots
+          value: '2'
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-04
+        kubernetes.io/arch: amd64
+      priorityClassName: production
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: litellm
+        image: ghcr.io/berriai/litellm:v1.103.3@sha256:e6e1c46cec92ab58b7ff95c790420aba9f05269b662a66c0dd11714171b9c64b
+        imagePullPolicy: IfNotPresent
+        args:
+        - --host
+        - 0.0.0.0
+        - --port
+        - '4000'
+        - --config
+        - /etc/litellm/config.yaml
+        - --num_workers
+        - '1'
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        envFrom:
+        - secretRef:
+            name: litellm
+        env:
+        - name: LITELLM_MODE
+          value: PRODUCTION
+        - name: LITELLM_LOG
+          value: ERROR
+        - name: LITELLM_NON_ROOT
+          value: 'true'
+        - name: LITELLM_MIGRATION_DIR
+          value: /tmp/migrations
+        - name: LITELLM_UI_PATH
+          value: /var/lib/litellm/ui
+        - name: LITELLM_ASSETS_PATH
+          value: /var/lib/litellm/assets
+        - name: PRISMA_BINARY_CACHE_DIR
+          value: /tmp/prisma
+        - name: XDG_CACHE_HOME
+          value: /tmp/cache
+        - name: HOME
+          value: /tmp
+        resources:
+          requests:
+            cpu: 500m
+            memory: 4Gi
+          limits:
+            cpu: '1'
+            memory: 4Gi
+        ports:
+        - name: http
+          containerPort: 4000
+        volumeMounts:
+        - name: config
+          mountPath: /etc/litellm
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: runtime
+          mountPath: /var/lib/litellm
+        startupProbe:
+          httpGet:
+            path: /health/readiness
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health/liveliness
+            port: http
+          periodSeconds: 30
+          timeoutSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: litellm
+      - name: tmp
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: runtime
+        emptyDir:
+          sizeLimit: 256Mi

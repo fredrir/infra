@@ -17,7 +17,7 @@ spec:
         summary: Application data backup is overdue
     - alert: BackupHasNeverSucceeded
       expr: |
-        (kube_cronjob_info{cronjob=~"data-backup|repository-maintenance"}
+        (kube_cronjob_info{cronjob=~"data-backup|repository-maintenance|llm-database-backup"}
         unless on(namespace,cronjob) kube_cronjob_status_last_successful_time)
         and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
       for: 30m
@@ -25,6 +25,13 @@ spec:
         severity: critical
       annotations:
         summary: Enabled backup schedule has no successful run
+    - alert: ModelServingBackupOverdue
+      expr: time() - kube_cronjob_status_last_successful_time{namespace="platform-backups",cronjob="llm-database-backup"} > 93600
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: Model serving database backup is overdue
     - alert: BackupWriterLeftScaledDown
       expr: |
         kube_deployment_spec_replicas{namespace="y",deployment="api"} == 0

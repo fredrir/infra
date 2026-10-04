@@ -1,0 +1,70 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: granite
+  namespace: llm
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: llm
+      app.kubernetes.io/name: granite
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    authorization:
+      type: Bearer
+      credentials:
+        name: model-credentials
+        key: GRANITE_API_KEY
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: paddleocr
+  namespace: llm
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: llm
+      app.kubernetes.io/name: paddleocr
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    authorization:
+      type: Bearer
+      credentials:
+        name: model-credentials
+        key: PADDLEOCR_API_KEY
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: llm
+  namespace: llm
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: llm
+    rules:
+    - alert: ModelServingUnavailable
+      expr: kube_deployment_status_replicas_available{namespace="llm"} < 1
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: Model serving deployment is unavailable
+    - alert: ModelServingDatabaseUnavailable
+      expr: kube_statefulset_status_replicas_ready{namespace="llm",statefulset="postgres"}
+        < 1
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: Model serving database is unavailable

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llm
+  labels:
+    infra.fredrir.com/tier: platform
+    infra.fredrir.com/managed: 'true'
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: namespace-budget
+  namespace: llm
+spec:
+  hard:
+    requests.cpu: '3'
+    requests.memory: 9Gi
+    limits.memory: 13Gi
+    pods: '10'
+    requests.storage: 35Gi

@@ -10,7 +10,7 @@ spec:
           to: '@artifact/platform/components/policy/'
         - from: '@repo/platform/clusters/production/settings.yaml'
           to: '@artifact/platform/clusters/production/settings.yaml'
-      name: platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc
+      name: platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf
       originRevision: '@repo'
     - copy:
         - from: '@repo/platform/projects/llunde/**'

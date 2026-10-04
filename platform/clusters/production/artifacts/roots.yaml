@@ -42,7 +42,7 @@ spec:
   retryInterval: 1m
   sourceRef:
     kind: ExternalArtifact
-    name: platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc
+    name: platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf
   timeout: 15m
   wait: true
 ---
@@ -54,7 +54,7 @@ metadata:
 spec:
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/components/dns
   prune: true
@@ -78,7 +78,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     - name: platform-sources
   interval: 10m
   path: ./platform/components/controllers
@@ -107,7 +107,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     - name: platform-sources
     - name: platform-observability
   interval: 10m
@@ -137,7 +137,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
     - name: platform-sources
   interval: 10m
   path: ./platform/components/observability
@@ -167,7 +167,7 @@ spec:
   dependsOn:
     - name: platform-controllers
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/components/runners
   postBuild:
@@ -191,7 +191,7 @@ metadata:
 spec:
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/components/bazel-cache
   postBuild:
@@ -219,7 +219,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/components/object-store
   postBuild:
@@ -247,7 +247,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/components/backups
   postBuild:
@@ -290,6 +290,7 @@ metadata:
 spec:
   dependsOn:
     - name: llunde-pyparser-migration
+    - name: platform-llm
   interval: 10m
   path: ./platform/projects/llunde-pyparser/application
   prune: true
@@ -309,9 +310,34 @@ metadata:
 spec:
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/components/netpol-gate
+  prune: true
+  retryInterval: 1m
+  serviceAccountName: platform-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  timeout: 15m
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-llm
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: platform-policy
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+    - name: platform-observability
+  interval: 10m
+  path: ./platform/components/llm
   prune: true
   retryInterval: 1m
   serviceAccountName: platform-reconciler
@@ -333,7 +359,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/projects/llunde
   postBuild:
@@ -361,7 +387,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/projects/portfolio
   postBuild:
@@ -389,7 +415,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   interval: 10m
   path: ./platform/projects/y
   postBuild:
@@ -417,7 +443,7 @@ spec:
       name: sops-age
   dependsOn:
     - name: platform-policy
-      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-d15511bbd883318c5deea21cc766e5e39a25bcdc' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+      readyExpr: dep.spec.sourceRef.kind == 'ExternalArtifact' && dep.spec.sourceRef.name == 'platform-policy-81cb25d062fe0703d00fbf448c4c061a3c84e4bf' && dep.metadata.generation == dep.status.observedGeneration && dep.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
   healthChecks:
     - apiVersion: apps/v1
       kind: StatefulSet
