@@ -80,6 +80,8 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
+        - name: PYPARSER_MODEL_CACHE_PATH
+          value: /var/cache/pyparser/huggingface/hub
         - name: PYPARSER_GRANITE_ENDPOINT
           value: http://granite:8080
         - name: PYPARSER_GRANITE_API
@@ -232,6 +234,8 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
+        - name: PYPARSER_MODEL_CACHE_PATH
+          value: /var/cache/pyparser/huggingface/hub
         - name: PYPARSER_GRANITE_ENDPOINT
           value: http://granite:8080
         - name: PYPARSER_GRANITE_API
@@ -354,6 +358,8 @@ spec:
           value: /var/cache/pyparser/doctr
         - name: HF_HOME
           value: /var/cache/pyparser/huggingface
+        - name: PYPARSER_MODEL_CACHE_PATH
+          value: /var/cache/pyparser/huggingface/hub
         - name: PYPARSER_GRANITE_ENDPOINT
           value: http://granite:8080
         - name: PYPARSER_GRANITE_API
