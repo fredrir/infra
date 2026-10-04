@@ -41,7 +41,7 @@ spec:
         - name: ndots
           value: '2'
       nodeSelector:
-        kubernetes.io/hostname: fredrir-09
+        kubernetes.io/hostname: fredrir-04
         kubernetes.io/arch: amd64
       priorityClassName: production
       terminationGracePeriodSeconds: 90
@@ -103,7 +103,7 @@ spec:
           value: '6'
         resources:
           requests:
-            cpu: '2'
+            cpu: 500m
             memory: 1Gi
           limits:
             cpu: '6'
