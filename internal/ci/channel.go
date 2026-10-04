@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/fredrir/infra/internal/deployment"
 	"github.com/fredrir/infra/internal/process"
@@ -31,6 +33,13 @@ type ChannelAPI struct {
 	Base   string
 	Token  string
 }
+
+const ChannelFile = "build/ci-channel.json"
+
+const (
+	checksStartAttempts = 10
+	checksStartInterval = 30 * time.Second
+)
 
 var ciReleasePattern = regexp.MustCompile(`^ci-v1\.[0-9]+\.[0-9]+$`)
 
@@ -180,7 +189,7 @@ func (api ChannelAPI) Publish(ctx context.Context, tag, revision string) error {
 }
 
 func ProposeChannel(ctx context.Context, runner process.Runner) error {
-	data, err := os.ReadFile(filepath.Join(runner.Dir, "build/ci-channel.json"))
+	data, err := os.ReadFile(filepath.Join(runner.Dir, ChannelFile))
 	if err != nil {
 		return err
 	}
@@ -196,7 +205,7 @@ func ProposeChannel(ctx context.Context, runner process.Runner) error {
 	if err != nil {
 		return err
 	}
-	arguments := []string{"add", "--", "build/ci-channel.json"}
+	arguments := []string{"add", "--", ChannelFile}
 	for _, path := range paths {
 		relative, err := filepath.Rel(runner.Dir, path)
 		if err != nil {
@@ -225,38 +234,59 @@ func ProposeChannel(ctx context.Context, runner process.Runner) error {
 	if err := errors.Join(writeErr, body.Close()); err != nil {
 		return err
 	}
-	return runner.Run(ctx, "gh", "pr", "create", "--repo", "fredrir/infra", "--base", "main", "--head", branch, "--title", "ci: promote "+channel.Release, "--body-file", body.Name())
+	if err := runner.Run(ctx, "gh", "pr", "create", "--repo", "fredrir/infra", "--base", "main", "--head", branch, "--title", "ci: promote "+channel.Release, "--body-file", body.Name()); err != nil {
+		return err
+	}
+	return mergeProposal(ctx, runner, branch)
 }
 
-func PrepareChannel(root string, channel CIChannel) error {
-	if channel.Schema != 1 || channel.Tag != "ci-v1" || !ciReleasePattern.MatchString(channel.Release) || !revisionPattern.MatchString(channel.Revision) {
-		return errors.New("invalid CI channel")
+func mergeProposal(ctx context.Context, runner process.Runner, branch string) error {
+	for attempt := 1; ; attempt++ {
+		err := runner.Run(ctx, "gh", "pr", "checks", branch, "--repo", "fredrir/infra", "--watch", "--fail-fast")
+		if err == nil {
+			break
+		}
+		if attempt == checksStartAttempts {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(checksStartInterval):
+		}
 	}
-	paths, err := filepath.Glob(filepath.Join(root, ".github/chainguard/deploy-*.sts.yaml"))
+	return runner.Run(ctx, "gh", "pr", "merge", branch, "--repo", "fredrir/infra", "--merge", "--delete-branch")
+}
+
+func ChannelFiles(root fs.FS, channel CIChannel) (map[string][]byte, error) {
+	if channel.Schema != 1 || channel.Tag != "ci-v1" || !ciReleasePattern.MatchString(channel.Release) || !revisionPattern.MatchString(channel.Revision) {
+		return nil, errors.New("invalid CI channel")
+	}
+	paths, err := fs.Glob(root, ".github/chainguard/deploy-*.sts.yaml")
 	if err != nil || len(paths) == 0 {
-		return errors.New("deployment trust policies missing")
+		return nil, errors.New("deployment trust policies missing")
 	}
 	updates := map[string][]byte{}
 	for _, path := range paths {
-		data, err := os.ReadFile(path)
+		data, err := fs.ReadFile(root, path)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		var policy map[string]any
 		if err := yaml.Unmarshal(data, &policy); err != nil {
-			return err
+			return nil, err
 		}
 		claims, ok := policy["claim_pattern"].(map[string]any)
 		if !ok {
-			return errors.New("deployment trust claims missing")
+			return nil, errors.New("deployment trust claims missing")
 		}
 		pattern, ok := claims["job_workflow_sha"].(string)
 		if !ok {
-			return errors.New("deployment workflow revisions missing")
+			return nil, errors.New("deployment workflow revisions missing")
 		}
 		revisions, err := deployment.WorkflowRevisions(pattern)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !slices.Contains(revisions, channel.Revision) {
 			revisions = append(revisions, channel.Revision)
@@ -266,20 +296,32 @@ func PrepareChannel(root string, channel CIChannel) error {
 		claims["job_workflow_ref"] = `^fredrir/infra/\.github/workflows/build-image\.yml@(refs/tags/ci-v1|` + strings.Join(revisions, "|") + ")$"
 		claims["event_name"] = "^(push|workflow_dispatch)$"
 		if _, err := deployment.WorkflowRevisions(claims["job_workflow_sha"].(string)); err != nil {
-			return err
+			return nil, err
 		}
 		updates[path], err = yaml.Marshal(policy)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	data, err := json.MarshalIndent(channel, "", "  ")
 	if err != nil {
+		return nil, err
+	}
+	updates[ChannelFile] = append(data, '\n')
+	return updates, nil
+}
+
+func PrepareChannel(root string, channel CIChannel) error {
+	updates, err := ChannelFiles(os.DirFS(root), channel)
+	if err != nil {
 		return err
 	}
-	updates[filepath.Join(root, "build/ci-channel.json")] = append(data, '\n')
 	for path, data := range updates {
-		if err := os.WriteFile(path, data, 0644); err != nil {
+		target := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, data, 0644); err != nil {
 			return err
 		}
 	}
@@ -287,7 +329,7 @@ func PrepareChannel(root string, channel CIChannel) error {
 }
 
 func (api ChannelAPI) Promote(ctx context.Context, root string) error {
-	data, err := os.ReadFile(filepath.Join(root, "build/ci-channel.json"))
+	data, err := os.ReadFile(filepath.Join(root, ChannelFile))
 	if err != nil {
 		return err
 	}

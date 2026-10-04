@@ -129,6 +129,14 @@
     },
     {
       "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["digest"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "merge-commit",
+      "platformAutomerge": false
+    },
+    {
+      "matchDatasources": ["docker"],
       "matchPackageNames": ["docker.io/library/nginx"],
       "allowedVersions": "/^1\\.[0-9]*[02468]\\.[0-9]+-alpine-slim$/"
     },

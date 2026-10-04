@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
 	"maps"
 	"net"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/deployment"
 	"github.com/google/go-github/v88/github"
 	"github.com/hmarr/codeowners"
@@ -24,13 +27,22 @@ const (
 	codeOwners    = ".github/CODEOWNERS"
 	reviewedBase  = "main"
 	personAccount = "User"
+	botAccount    = "Bot"
+	renovateBot   = "renovate[bot]"
+	promotionBot  = "octo-sts[bot]"
+	planCheck     = "reconcile / plan"
+	checksApp     = "github-actions"
 )
+
+var digestPattern = regexp.MustCompile(`[0-9a-f]{64}`)
 
 type PullRequests interface {
 	WithCommit(ctx context.Context, commit string) ([]*github.PullRequest, error)
 	Get(ctx context.Context, number int) (*github.PullRequest, error)
 	Reviews(ctx context.Context, number int) ([]*github.PullRequestReview, error)
 	Commits(ctx context.Context, number int) ([]*github.RepositoryCommit, error)
+	CheckRuns(ctx context.Context, ref string) ([]*github.CheckRun, error)
+	TagRevision(ctx context.Context, tag string) (string, error)
 }
 
 type GitHubPullRequests struct {
@@ -56,6 +68,30 @@ func (p GitHubPullRequests) Reviews(ctx context.Context, number int) ([]*github.
 func (p GitHubPullRequests) Commits(ctx context.Context, number int) ([]*github.RepositoryCommit, error) {
 	commits, err := collect(p.Client.PullRequests.ListCommitsIter(ctx, p.Owner, p.Name, number, &github.ListOptions{PerPage: 100}))
 	return commits, apiUnavailable(err)
+}
+
+func (p GitHubPullRequests) CheckRuns(ctx context.Context, ref string) ([]*github.CheckRun, error) {
+	results, _, err := p.Client.Checks.ListCheckRunsForRef(ctx, p.Owner, p.Name, ref, &github.ListCheckRunsOptions{Filter: github.Ptr("latest"), ListOptions: github.ListOptions{PerPage: 100}})
+	if err != nil {
+		return nil, apiUnavailable(err)
+	}
+	return results.CheckRuns, nil
+}
+
+func (p GitHubPullRequests) TagRevision(ctx context.Context, tag string) (string, error) {
+	reference, _, err := p.Client.Git.GetRef(ctx, p.Owner, p.Name, "tags/"+tag)
+	if err != nil {
+		return "", apiUnavailable(err)
+	}
+	object := reference.GetObject()
+	if object.GetType() != "tag" {
+		return object.GetSHA(), nil
+	}
+	annotated, _, err := p.Client.Git.GetTag(ctx, p.Owner, p.Name, object.GetSHA())
+	if err != nil {
+		return "", apiUnavailable(err)
+	}
+	return annotated.GetObject().GetSHA(), nil
 }
 
 func apiUnavailable(err error) error {
@@ -197,9 +233,134 @@ func (r *reviewGate) approvedMerge(ctx context.Context, number int) ([]string, e
 		return nil, err
 	}
 	if err := r.approved(ctx, pull, strings.FieldsFunc(string(paths.Stdout), func(character rune) bool { return character == 0 })); err != nil {
-		return nil, err
+		if automated := r.automated(ctx, pull, before, merge); automated != nil {
+			return nil, errors.Join(err, automated)
+		}
 	}
 	return covered, nil
+}
+
+func (r *reviewGate) automated(ctx context.Context, pull *github.PullRequest, before, merge string) error {
+	author := pull.GetUser()
+	var content func(context.Context, *github.PullRequest, string, string) error
+	switch {
+	case author.GetType() != botAccount:
+		return fmt.Errorf("not an automated pull request: %s is a %s account", author.GetLogin(), author.GetType())
+	case strings.EqualFold(author.GetLogin(), renovateBot):
+		content = r.digestsOnly
+	case strings.EqualFold(author.GetLogin(), promotionBot):
+		content = r.promotion
+	default:
+		return fmt.Errorf("not an automated pull request: %s is not a trusted bot", author.GetLogin())
+	}
+	if err := r.checksPassed(ctx, pull); err != nil {
+		return fmt.Errorf("not an automated pull request: %w", err)
+	}
+	if err := content(ctx, pull, before, merge); err != nil {
+		return fmt.Errorf("not an automated pull request: %w", err)
+	}
+	return nil
+}
+
+func (r *reviewGate) checksPassed(ctx context.Context, pull *github.PullRequest) error {
+	head := pull.GetHead().GetSHA()
+	runs, err := r.api.CheckRuns(ctx, head)
+	if err != nil {
+		return fmt.Errorf("list the checks of the head %s: %w", head[:12], err)
+	}
+	planned := false
+	for _, run := range runs {
+		switch {
+		case run.GetStatus() != "completed" || !slices.Contains([]string{"success", "skipped", "neutral"}, run.GetConclusion()):
+			return fmt.Errorf("check %q on the head %s is %s/%s", run.GetName(), head[:12], run.GetStatus(), run.GetConclusion())
+		case run.CompletedAt == nil || pull.MergedAt == nil || run.GetCompletedAt().After(pull.GetMergedAt().Time):
+			return fmt.Errorf("check %q on the head %s did not complete before the merge", run.GetName(), head[:12])
+		}
+		planned = planned || (run.GetName() == planCheck && run.GetConclusion() == "success" && run.GetApp().GetSlug() == checksApp)
+	}
+	if !planned {
+		return fmt.Errorf("no successful %q check on the head %s before the merge", planCheck, head[:12])
+	}
+	return nil
+}
+
+func (r *reviewGate) digestsOnly(ctx context.Context, pull *github.PullRequest, before, merge string) error {
+	listed, err := r.api.Commits(ctx, pull.GetNumber())
+	if err != nil {
+		return fmt.Errorf("list commits: %w", err)
+	}
+	if len(listed) == 0 || len(listed) != pull.GetCommits() {
+		return fmt.Errorf("lists %d of %d commits", len(listed), pull.GetCommits())
+	}
+	for _, commit := range listed {
+		if !strings.EqualFold(commit.GetAuthor().GetLogin(), renovateBot) {
+			return fmt.Errorf("commit %.12s is not authored by %s", commit.GetSHA(), renovateBot)
+		}
+	}
+	changed, err := r.verifier.changedFiles(ctx, before, merge)
+	if err != nil {
+		return err
+	}
+	if len(changed) == 0 {
+		return errors.New("changes no file")
+	}
+	for _, name := range slices.Sorted(maps.Keys(changed)) {
+		previous, err := r.verifier.git(ctx, nil, "show", before+":"+name)
+		if err != nil {
+			return fmt.Errorf("adds %s", name)
+		}
+		updated, err := r.verifier.git(ctx, nil, "show", merge+":"+name)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(digestPattern.ReplaceAll(previous.Stdout, nil), digestPattern.ReplaceAll(updated.Stdout, nil)) {
+			return fmt.Errorf("%s changes more than digests", name)
+		}
+	}
+	return nil
+}
+
+func (r *reviewGate) promotion(ctx context.Context, pull *github.PullRequest, before, merge string) error {
+	changed, err := r.verifier.changedFiles(ctx, before, merge)
+	if err != nil {
+		return err
+	}
+	data, err := r.verifier.git(ctx, nil, "show", merge+":"+ci.ChannelFile)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", ci.ChannelFile, err)
+	}
+	var channel ci.CIChannel
+	if err := json.Unmarshal(data.Stdout, &channel); err != nil {
+		return fmt.Errorf("%s: %w", ci.ChannelFile, err)
+	}
+	tree, err := r.verifier.tree(ctx, before, deploymentTrust, ci.ChannelFile)
+	if err != nil {
+		return err
+	}
+	files, err := ci.ChannelFiles(tree, channel)
+	if err != nil {
+		return err
+	}
+	expected := map[string][]byte{}
+	for name, content := range files {
+		if tree[name] == nil || !bytes.Equal(tree[name].Data, content) {
+			expected[name] = content
+		}
+	}
+	if err := r.verifier.matches(ctx, merge, changed, expected); err != nil {
+		return fmt.Errorf("not a promotion of %s: %w", channel.Release, err)
+	}
+	if contained, err := r.verifier.contains(ctx, before, channel.Revision); err != nil || !contained {
+		return errors.Join(fmt.Errorf("promoted revision %.12s is not on %s before the merge", channel.Revision, reviewedBase), err)
+	}
+	revision, err := r.api.TagRevision(ctx, channel.Release)
+	if err != nil {
+		return fmt.Errorf("release %s: %w", channel.Release, err)
+	}
+	if revision != channel.Revision {
+		return fmt.Errorf("release %s is at %.12s, not the promoted %.12s", channel.Release, revision, channel.Revision)
+	}
+	return nil
 }
 
 func (r *reviewGate) landed(ctx context.Context, pull *github.PullRequest) (string, []string, error) {

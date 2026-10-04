@@ -10,7 +10,8 @@
   },
   "bypass_actors": [
     {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"},
-    {"actor_id": 801323, "actor_type": "Integration", "bypass_mode": "always"}
+    {"actor_id": 801323, "actor_type": "Integration", "bypass_mode": "always"},
+    {"actor_id": 2740, "actor_type": "Integration", "bypass_mode": "pull_request"}
   ],
   "rules": [
     {"type": "deletion"},

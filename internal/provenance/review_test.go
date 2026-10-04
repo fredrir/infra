@@ -19,6 +19,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	"github.com/fredrir/infra/internal/ci"
 	"github.com/fredrir/infra/internal/deployment"
 	"github.com/google/go-github/v88/github"
 )
@@ -35,12 +36,16 @@ type pullRequestAPI struct {
 	pulls        map[int]*github.PullRequest
 	reviews      map[int][]*github.PullRequestReview
 	commits      map[int][]string
+	authors      map[int]string
+	checks       map[string][]*github.CheckRun
+	tags         map[string]string
 	associations map[string][]int
 	unavailable  string
 }
 
 func (a *pullRequestAPI) reset() {
 	a.pulls, a.reviews, a.commits, a.associations, a.unavailable = map[int]*github.PullRequest{}, map[int][]*github.PullRequestReview{}, map[int][]string{}, map[string][]int{}, ""
+	a.authors, a.checks, a.tags = map[int]string{}, map[string][]*github.CheckRun{}, map[string]string{}
 }
 
 func (a *pullRequestAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +56,13 @@ func (a *pullRequestAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	var body any
 	switch parts := strings.Split(path, "/"); {
+	case len(parts) == 3 && parts[0] == "commits" && parts[2] == "check-runs":
+		runs := append([]*github.CheckRun{}, a.checks[parts[1]]...)
+		body = &github.ListCheckRunsResults{Total: github.Ptr(len(runs)), CheckRuns: runs}
+	case len(parts) == 4 && parts[0] == "git" && parts[1] == "ref" && parts[2] == "tags":
+		if revision, ok := a.tags[parts[3]]; ok {
+			body = &github.Reference{Ref: github.Ptr("refs/tags/" + parts[3]), Object: &github.GitObject{Type: github.Ptr("commit"), SHA: github.Ptr(revision)}}
+		}
 	case len(parts) == 3 && parts[0] == "commits" && parts[2] == "pulls":
 		listed := []*github.PullRequest{}
 		for _, number := range a.associations[parts[1]] {
@@ -66,7 +78,11 @@ func (a *pullRequestAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if len(parts) == 3 && parts[2] == "commits" {
 			listed := []*github.RepositoryCommit{}
 			for _, commit := range a.commits[number] {
-				listed = append(listed, &github.RepositoryCommit{SHA: github.Ptr(commit)})
+				var author *github.User
+				if login := a.authors[number]; login != "" {
+					author = &github.User{Login: github.Ptr(login), Type: github.Ptr(botAccount)}
+				}
+				listed = append(listed, &github.RepositoryCommit{SHA: github.Ptr(commit), Author: author})
 			}
 			body = listed
 		}
@@ -200,6 +216,34 @@ func (f *provenanceFixture) associate(number int, commits ...string) {
 	for _, commit := range commits {
 		f.api.associations[commit] = append(f.api.associations[commit], number)
 	}
+}
+
+func (f *provenanceFixture) promotion(number int, channel ci.CIChannel, extra map[string]string) string {
+	f.t.Helper()
+	f.git("checkout", "--quiet", "-b", fmt.Sprintf("pull/%d", number))
+	if err := ci.PrepareChannel(f.root, channel); err != nil {
+		f.t.Fatal(err)
+	}
+	head := f.commit("", "ci: promote "+channel.Release, extra)
+	f.run(f.remote, "update-ref", fmt.Sprintf("refs/pull/%d/head", number), head)
+	f.git("checkout", "--quiet", "main")
+	f.api.commits[number] = []string{head}
+	return head
+}
+
+func (f *provenanceFixture) automated(number int, author, head, merge string, checks ...*github.CheckRun) {
+	f.t.Helper()
+	f.merged(number, author, head, merge, len(f.api.commits[number]))
+	f.api.authors[number] = author
+	f.api.checks[head] = checks
+}
+
+func check(name, conclusion string) *github.CheckRun {
+	return &github.CheckRun{Name: github.Ptr(name), Status: github.Ptr("completed"), Conclusion: github.Ptr(conclusion), CompletedAt: &github.Timestamp{Time: mergedAt.Add(-time.Minute)}, App: &github.App{Slug: github.Ptr(checksApp)}}
+}
+
+func passingChecks() []*github.CheckRun {
+	return []*github.CheckRun{check(planCheck, "success"), check("check / check", "success"), check("check / validate", "skipped")}
 }
 
 func review(login, state, commit string) *github.PullRequestReview {
@@ -551,6 +595,73 @@ func reviewedMergeCases(base string) []reviewedMergeCase {
 			f.merged(36, renovate, head, merge, 1, approval(owner, head))
 			return merge
 		}, unverified: []string{"fetch the head"}},
+		{name: "digest update merged by Renovate", build: func(f *provenanceFixture) string {
+			f.commit(f.owner, "Pin the web image", map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("a", 64) + "\n"})
+			head, _ := f.pullRequest(20, map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("b", 64) + "\n"})
+			merge := f.sign(f.mergeCommit(20, head), f.webFlow)
+			f.automated(20, renovate, head, merge, passingChecks()...)
+			return merge
+		}},
+		{name: "digest update that also moves the tag", build: func(f *provenanceFixture) string {
+			f.commit(f.owner, "Pin the web image", map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("a", 64) + "\n"})
+			head, _ := f.pullRequest(21, map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.21@sha256:" + strings.Repeat("b", 64) + "\n"})
+			merge := f.sign(f.mergeCommit(21, head), f.webFlow)
+			f.automated(21, renovate, head, merge, passingChecks()...)
+			return merge
+		}, unverified: []string{"images/web/Containerfile changes more than digests"}},
+		{name: "digest update with a failing check", build: func(f *provenanceFixture) string {
+			f.commit(f.owner, "Pin the web image", map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("a", 64) + "\n"})
+			head, _ := f.pullRequest(22, map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("b", 64) + "\n"})
+			merge := f.sign(f.mergeCommit(22, head), f.webFlow)
+			f.automated(22, renovate, head, merge, check(planCheck, "success"), check("check / check", "failure"))
+			return merge
+		}, unverified: []string{`check "check / check" on the head [0-9a-f]{12} is completed/failure`}},
+		{name: "digest update without the plan check", build: func(f *provenanceFixture) string {
+			f.commit(f.owner, "Pin the web image", map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("a", 64) + "\n"})
+			head, _ := f.pullRequest(23, map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("b", 64) + "\n"})
+			merge := f.sign(f.mergeCommit(23, head), f.webFlow)
+			f.automated(23, renovate, head, merge, check("check / check", "success"))
+			return merge
+		}, unverified: []string{`no successful "reconcile / plan" check on the head`}},
+		{name: "digest update with a commit by someone else", build: func(f *provenanceFixture) string {
+			f.commit(f.owner, "Pin the web image", map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("a", 64) + "\n"})
+			head, _ := f.pullRequest(24, map[string]string{"images/web/Containerfile": "FROM docker.io/library/alpine:3.20@sha256:" + strings.Repeat("b", 64) + "\n"})
+			merge := f.sign(f.mergeCommit(24, head), f.webFlow)
+			f.automated(24, renovate, head, merge, passingChecks()...)
+			f.api.authors[24] = "outsider[bot]"
+			return merge
+		}, unverified: []string{"is not authored by renovate\\[bot\\]"}},
+		{name: "promotion merged by the release workflow", build: func(f *provenanceFixture) string {
+			channel := ci.CIChannel{Schema: 1, Tag: "ci-v1", Release: "ci-v1.0.5", Revision: base}
+			head := f.promotion(25, channel, nil)
+			merge := f.sign(f.mergeCommit(25, head), f.webFlow)
+			f.automated(25, promotionBot, head, merge, passingChecks()...)
+			f.api.tags[channel.Release] = base
+			return merge
+		}},
+		{name: "promotion whose release tag points elsewhere", build: func(f *provenanceFixture) string {
+			channel := ci.CIChannel{Schema: 1, Tag: "ci-v1", Release: "ci-v1.0.5", Revision: base}
+			head := f.promotion(26, channel, nil)
+			merge := f.sign(f.mergeCommit(26, head), f.webFlow)
+			f.automated(26, promotionBot, head, merge, passingChecks()...)
+			f.api.tags[channel.Release] = strings.Repeat("c", 40)
+			return merge
+		}, unverified: []string{"release ci-v1.0.5 is at cccccccccccc, not the promoted"}},
+		{name: "promotion without its release tag", build: func(f *provenanceFixture) string {
+			channel := ci.CIChannel{Schema: 1, Tag: "ci-v1", Release: "ci-v1.0.5", Revision: base}
+			head := f.promotion(27, channel, nil)
+			merge := f.sign(f.mergeCommit(27, head), f.webFlow)
+			f.automated(27, promotionBot, head, merge, passingChecks()...)
+			return merge
+		}, unverified: []string{"release ci-v1.0.5: "}},
+		{name: "promotion carrying extra changes", build: func(f *provenanceFixture) string {
+			channel := ci.CIChannel{Schema: 1, Tag: "ci-v1", Release: "ci-v1.0.5", Revision: base}
+			head := f.promotion(28, channel, map[string]string{"tofu/main.tf": "# promotion\n"})
+			merge := f.sign(f.mergeCommit(28, head), f.webFlow)
+			f.automated(28, promotionBot, head, merge, passingChecks()...)
+			f.api.tags[channel.Release] = base
+			return merge
+		}, unverified: []string{"not a promotion of ci-v1.0.5: changes"}},
 	}
 }
 
