@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/fredrir/infra/internal/deployment"
+	"github.com/fredrir/infra/internal/process"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -209,6 +210,44 @@ func TestCIReleaseChecksRequireLatestSuccessfulMainPush(t *testing.T) {
 			api := ChannelAPI{Client: server.Client(), Base: server.URL, Token: "test"}
 			if err := api.Checked(context.Background(), revision); (err == nil) != (test.name == "successful") {
 				t.Fatalf("infrastructure check result: %v", err)
+			}
+		})
+	}
+}
+
+func TestChannelPromotionWaitsForBudgetAndPlanBeforeMerging(t *testing.T) {
+	for _, test := range []struct {
+		name, checks string
+		merge        bool
+	}{
+		{"checks not registered", `[{"name":"cli / build","state":"SUCCESS"}]`, false},
+		{"budget running", `[{"name":"check / budget","state":"IN_PROGRESS"},{"name":"reconcile / plan","state":"SUCCESS"}]`, false},
+		{"budget failed", `[{"name":"check / budget","state":"FAILURE"},{"name":"reconcile / plan","state":"SUCCESS"}]`, false},
+		{"plan running", `[{"name":"check / budget","state":"SKIPPED"},{"name":"reconcile / plan","state":"IN_PROGRESS"}]`, false},
+		{"plan skipped", `[{"name":"check / budget","state":"SUCCESS"},{"name":"reconcile / plan","state":"SKIPPED"}]`, false},
+		{"another check queued", `[{"name":"check / budget","state":"SKIPPED"},{"name":"reconcile / plan","state":"SUCCESS"},{"name":"check / host-access","state":"QUEUED"}]`, false},
+		{"checks passed", `[{"name":"check / budget","state":"SUCCESS"},{"name":"reconcile / plan","state":"SUCCESS"}]`, true},
+		{"bot budget skipped", `[{"name":"check / budget","state":"SKIPPED"},{"name":"reconcile / plan","state":"SUCCESS"}]`, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			merged := false
+			runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+				if slices.Contains(options.Args, "--json") {
+					if !test.merge {
+						cancel()
+					}
+					return process.Result{Stdout: []byte(test.checks)}, nil
+				}
+				if slices.Contains(options.Args, "merge") {
+					merged = true
+				}
+				return process.Result{}, nil
+			}}
+			err := mergeProposal(ctx, runner, "ci-promotion-test")
+			if merged != test.merge || (err == nil) != test.merge {
+				t.Fatalf("merged=%t, error=%v", merged, err)
 			}
 		})
 	}

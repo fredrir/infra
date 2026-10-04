@@ -246,7 +246,31 @@ func mergeProposal(ctx context.Context, runner process.Runner, branch string) er
 	for attempt := 1; ; attempt++ {
 		err := runner.Run(ctx, "gh", "pr", "checks", branch, "--repo", "fredrir/infra", "--watch", "--fail-fast")
 		if err == nil {
-			break
+			data, readErr := runner.Output(ctx, "gh", "pr", "checks", branch, "--repo", "fredrir/infra", "--json", "name,state")
+			if readErr != nil {
+				return readErr
+			}
+			var checks []struct{ Name, State string }
+			if err := json.Unmarshal(data, &checks); err != nil {
+				return err
+			}
+			for _, check := range checks {
+				if !slices.Contains([]string{"SUCCESS", "SKIPPED", "NEUTRAL"}, check.State) {
+					err = fmt.Errorf("promotion check %s is %s", check.Name, check.State)
+					break
+				}
+			}
+			for _, name := range []string{"check / budget", "reconcile / plan"} {
+				if !slices.ContainsFunc(checks, func(check struct{ Name, State string }) bool {
+					return check.Name == name && (check.State == "SUCCESS" || name == "check / budget" && check.State == "SKIPPED")
+				}) {
+					err = fmt.Errorf("promotion check %s has not completed successfully", name)
+					break
+				}
+			}
+			if err == nil {
+				break
+			}
 		}
 		if attempt == checksStartAttempts {
 			return err
