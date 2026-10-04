@@ -11,7 +11,7 @@ func TestSharedModelsRunOnTheirReservedNodes(t *testing.T) {
 	t.Parallel()
 	e := newEvaluator(t)
 	served := map[string]bool{}
-	nodes := map[string]string{"granite": "fredrir-09", "paddleocr": "fredrir-04", "pp-structure": "fredrir-04", "litellm": "fredrir-04"}
+	nodes := map[string]string{"granite": "fredrir-09", "paddleocr": "fredrir-09", "pp-structure": "fredrir-09", "litellm": "fredrir-04"}
 	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
 		if resource["kind"] != "Deployment" {
 			continue

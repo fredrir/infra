@@ -15,7 +15,7 @@ metadata:
   namespace: llm
 spec:
   hard:
-    requests.cpu: '3'
+    requests.cpu: '6'
     requests.memory: 10Gi
     limits.memory: 18Gi
     pods: '10'
