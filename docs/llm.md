@@ -23,7 +23,7 @@
 | Parser env | `LITELLM_API_URL` internal API; `LITELLM_API_KEY` from `llunde-pyparser/llm-gateway`; Doppler prod `LITELLM_*` entries are not read by the pods |
 | Cloudflare clients | Non-urllib User-Agent required; Browser Integrity Check rejects the Python urllib default; pyparser sends `pyparser/<version>` |
 | Cloudflare timeout | Proxied requests return 524 after 125 seconds without a response; only Enterprise can raise it; cluster clients use the internal API with the 180-second gateway timeout |
-| Public routes | Exact matches for Swagger at `/`, its assets, `/openapi.json`, models, chat completions, Responses, embeddings, liveliness and the layout route; administration requires port forwarding |
+| Public routes | Exact matches for Swagger at `/`, its assets, `/openapi.json`, models, chat completions, Responses, embeddings, Anthropic messages and token counting, model and model group info, liveliness and the layout route; administration requires port forwarding |
 | Database | PostgreSQL 17.10; retained 5 GiB local volume on `fredrir-04` |
 | Backup | Daily `platform-backups/llm-database-backup`; encrypted control Restic repository; `llm,postgres` tags |
 | Retention | Shared repository maintenance: 7 daily, 4 weekly and 12 monthly snapshots per host and tags |

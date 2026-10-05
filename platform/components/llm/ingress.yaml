@@ -72,6 +72,41 @@ spec:
             name: litellm
             port:
               number: 4000
+      - path: /v1/messages
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /v1/messages/count_tokens
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /v1/model/info
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /model/info
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
+      - path: /model_group/info
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
       - path: /health/liveliness
         pathType: Exact
         backend:
