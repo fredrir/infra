@@ -4,8 +4,9 @@
 | --- | --- |
 | Public API | `https://llm.fredrir.com/v1` |
 | Internal API | `http://litellm.llm.svc.cluster.local:4000/v1` |
+| Tailnet API | `http://llm.tail0b6cbe.ts.net/v1`; no Cloudflare timeout |
 | Configuration | [LiteLLM](../platform/components/llm/litellm.yaml) |
-| Gateway | LiteLLM 1.103.3; one worker and one replica on `fredrir-04`; 180-second request timeout; outbound public HTTPS |
+| Gateway | LiteLLM 1.103.3; one worker and one replica on `fredrir-04`; 600-second request timeout; outbound public HTTPS |
 | Upstream data | Image copies of the model map, Anthropic beta headers, autorouter presets, policy templates and blog posts; `LITELLM_LOCAL_*` |
 | Agent Platform | `vertex_ai/*`; project `llunde`, location `global`; Gemini, embeddings and Model Garden MaaS; Claude requires `global_online_prediction_requests_per_base_model` quota |
 | Agent Platform identity | `litellm@llunde.iam.gserviceaccount.com`; custom role `projects/llunde/roles/modelGatewayInference` with `aiplatform.endpoints.predict`; JSON key in `AGENT_PLATFORM_CREDENTIALS` |
@@ -23,7 +24,9 @@
 | Key limits | `fredrir` 16 and parser 8 parallel requests; no key RPM or TPM limits; local models bounded by deployment `max_parallel_requests` |
 | Parser env | `LITELLM_API_URL` internal API; `LITELLM_API_KEY` from `llunde-pyparser/llm-gateway`; Doppler prod `LITELLM_*` entries are not read by the pods |
 | Cloudflare clients | Non-urllib User-Agent required; Browser Integrity Check rejects the Python urllib default; pyparser sends `pyparser/<version>` |
-| Cloudflare timeout | Proxied requests return 524 after 125 seconds without a response; only Enterprise can raise it; cluster clients use the internal API with the 180-second gateway timeout |
+| Cloudflare timeout | Proxied requests return 524 after 125 seconds without a response; only Enterprise can raise it; long non-streaming calls use the tailnet or internal API |
+| Tailnet forwarder | `llm/tailnet`: unprivileged userspace Tailscale, node `llm` with `tag:llm-gateway`, TCP 80 forwarded to `litellm:4000`; state in Secret `tailnet-state`; one-time auth key in `tailnet-auth` |
+| Tailnet access | `macie` and `archie` on TCP 80; [`tailscale/policy.hujson`](../tailscale/policy.hujson) |
 | Administration | `https://llm-admin.fredrir.com/ui`; Cloudflare Access app `llm-admin` with the shared GitHub login; the tunnel validates the Access token; `PROXY_BASE_URL`; LiteLLM login with a personal proxy admin account; `disable_env_credential_login` turns off master-key UI login; the master key still authorizes API calls |
 | Public routes | Exact matches for Swagger at `/`, its assets, `/openapi.json`, models, chat completions, Responses, embeddings, Anthropic messages and token counting, model and model group info, liveliness and the layout route; administration only on `llm-admin.fredrir.com` |
 | Database | PostgreSQL 17.10; retained 5 GiB local volume on `fredrir-04` |
@@ -56,6 +59,12 @@ pbpaste | tr -d '\n' | jq -Rs . | sops set --value-stdin platform/components/llm
 pbpaste | tr -d '\n' | jq -Rs . | sops set --value-stdin platform/components/llm/gateway.secret.sops.yaml '["stringData"]["MISTRAL_API_KEY"]'
 gcloud iam service-accounts keys create key.json --iam-account litellm@llunde.iam.gserviceaccount.com
 jq @json key.json | sops set --value-stdin platform/components/llm/gateway.secret.sops.yaml '["stringData"]["AGENT_PLATFORM_CREDENTIALS"]' && rm key.json
+```
+
+```sh
+ENROLL_TOKEN="$(curl -s -d "client_id=$(sops decrypt --extract '["TAILSCALE_ENROLL_CLIENT_ID"]' secrets/operator.sops.yaml)" -d "client_secret=$(sops decrypt --extract '["TAILSCALE_ENROLL_CLIENT_SECRET"]' secrets/operator.sops.yaml)" https://api.tailscale.com/api/v2/oauth/token | jq -r .access_token)"
+curl -s -X POST -H "Authorization: Bearer $ENROLL_TOKEN" https://api.tailscale.com/api/v2/tailnet/-/keys -d '{"capabilities":{"devices":{"create":{"reusable":false,"preauthorized":true,"tags":["tag:llm-gateway"]}}},"expirySeconds":86400}' | jq .key | sops set --value-stdin platform/components/llm/tailnet.secret.sops.yaml '["stringData"]["TS_AUTHKEY"]'
+kubectl -n llm rollout restart deploy/tailnet
 ```
 
 ```sh

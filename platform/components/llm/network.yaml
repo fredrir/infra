@@ -61,6 +61,10 @@ spec:
       podSelector:
         matchLabels:
           app.kubernetes.io/name: traefik
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: tailnet
+          app.kubernetes.io/part-of: llm
     ports:
     - protocol: TCP
       port: 4000
@@ -202,3 +206,57 @@ spec:
     ports:
     - protocol: TCP
       port: 8012
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tailnet
+  namespace: llm
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tailnet
+      app.kubernetes.io/part-of: llm
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress: []
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: litellm
+          app.kubernetes.io/part-of: llm
+    ports:
+    - protocol: TCP
+      port: 4000
+  - to:
+    - ipBlock:
+        cidr: 10.43.0.1/32
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - ipBlock:
+        cidr: 10.60.0.5/32
+    - ipBlock:
+        cidr: 10.60.0.7/32
+    - ipBlock:
+        cidr: 10.60.0.8/32
+    ports:
+    - protocol: TCP
+      port: 6443
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 100.64.0.0/10
+        - 169.254.0.0/16
+        - 127.0.0.0/8
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: UDP

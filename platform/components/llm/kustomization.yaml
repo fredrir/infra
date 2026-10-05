@@ -8,6 +8,8 @@ resources:
 - database.secret.sops.yaml
 - gateway.yaml
 - gateway.secret.sops.yaml
+- tailnet.yaml
+- tailnet.secret.sops.yaml
 - granite.yaml
 - paddleocr.yaml
 - pp-structure.yaml

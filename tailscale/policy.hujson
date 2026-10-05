@@ -32,6 +32,10 @@
     ],
     "tag:ci-bazel-writer": [
       "autogroup:admin"
+    ],
+    "tag:llm-gateway": [
+      "autogroup:admin",
+      "tag:platform-enrollment"
     ]
   },
   "hosts": {
@@ -184,6 +188,17 @@
       "proto": "tcp",
       "dst": [
         "bazel-cache:9092"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "macie",
+        "archie"
+      ],
+      "proto": "tcp",
+      "dst": [
+        "tag:llm-gateway:80"
       ]
     },
     {
@@ -1138,6 +1153,40 @@
         "bazel-cache:9092",
         "bazel-cache:9093",
         "bazel-cache:9095"
+      ]
+    },
+    {
+      "src": "macie",
+      "proto": "tcp",
+      "accept": [
+        "tag:llm-gateway:80"
+      ],
+      "deny": [
+        "tag:llm-gateway:4000"
+      ]
+    },
+    {
+      "src": "fredrir@github",
+      "proto": "tcp",
+      "deny": [
+        "tag:llm-gateway:80"
+      ]
+    },
+    {
+      "src": "tag:platform-worker",
+      "proto": "tcp",
+      "deny": [
+        "tag:llm-gateway:80"
+      ]
+    },
+    {
+      "src": "tag:llm-gateway",
+      "proto": "tcp",
+      "deny": [
+        "macie:22",
+        "tag:platform-control:6443",
+        "tag:platform-worker:22",
+        "bazel-cache:9092"
       ]
     }
   ]
