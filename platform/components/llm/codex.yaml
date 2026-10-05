@@ -112,6 +112,8 @@ spec:
           value: 'true'
         - name: LITELLM_LOCAL_BLOG_POSTS
           value: 'true'
+        - name: PYTHONPATH
+          value: /etc/litellm
         - name: CHATGPT_TOKEN_DIR
           value: /var/lib/codex
         - name: CHATGPT_DEFAULT_INSTRUCTIONS

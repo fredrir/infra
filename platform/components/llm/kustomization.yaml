@@ -30,3 +30,4 @@ configMapGenerator:
 - name: codex
   files:
   - config.yaml=codex-litellm.yaml
+  - sitecustomize.py=codex-patch.py
