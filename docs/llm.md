@@ -19,6 +19,7 @@
 | Layout route | `/pp-structure/health`, `/pp-structure/v1/layout`; LiteLLM pass-through to `pp-structure:8012`; LiteLLM key required |
 | Document parsing | Cropping and result assembly run in the calling pipeline |
 | Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, PaddleOCR and the provider wildcards; parser key also permits `/pp-structure` and has a 150 USD budget per 30 days |
+| Key limits | `fredrir` 16 and parser 8 parallel requests; no key RPM or TPM limits; local models bounded by deployment `max_parallel_requests` |
 | Parser env | `LITELLM_API_URL` internal API; `LITELLM_API_KEY` from `llunde-pyparser/llm-gateway`; Doppler prod `LITELLM_*` entries are not read by the pods |
 | Cloudflare clients | Non-urllib User-Agent required; Browser Integrity Check rejects the Python urllib default; pyparser sends `pyparser/<version>` |
 | Cloudflare timeout | Proxied requests return 524 after 125 seconds without a response; only Enterprise can raise it; cluster clients use the internal API with the 180-second gateway timeout |
@@ -61,9 +62,9 @@ export PARSER_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platf
 export MODELS='["ibm-granite/granite-docling-258M", "PaddlePaddle/PaddleOCR-VL-1.6", "vertex_ai/*", "deepseek/*", "qwencloud/*"]'
 curl --fail -G localhost:4000/key/info --data-urlencode "key=$PARSER_KEY" -H "Authorization: Bearer $LITELLM_MASTER_KEY"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
-  -d "{\"key\": \"$CLIENT_KEY\", \"models\": $MODELS}"
+  -d "{\"key\": \"$CLIENT_KEY\", \"models\": $MODELS, \"max_parallel_requests\": 16, \"rpm_limit\": null, \"tpm_limit\": null}"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
-  -d "{\"key\": \"$PARSER_KEY\", \"models\": $MODELS, \"max_budget\": 150, \"budget_duration\": \"30d\", \"metadata\": {\"allowed_passthrough_routes\": [\"/pp-structure\"]}}"
+  -d "{\"key\": \"$PARSER_KEY\", \"models\": $MODELS, \"max_parallel_requests\": 8, \"rpm_limit\": null, \"tpm_limit\": null, \"max_budget\": 150, \"budget_duration\": \"30d\", \"metadata\": {\"allowed_passthrough_routes\": [\"/pp-structure\"]}}"
 curl --fail https://llm.fredrir.com/pp-structure/health -H "Authorization: Bearer $PARSER_KEY"
 ```
 
