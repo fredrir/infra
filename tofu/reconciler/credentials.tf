@@ -7,6 +7,7 @@ provider "cloudflare" {}
 locals {
   cloudflare_account = "8786559b30fcebd08d0c594b6e899eef"
   cloudflare_groups  = { for group in data.cloudflare_account_api_token_permission_groups_list.account.result : group.name => group.id... }
+  account_groups     = { for group in data.cloudflare_account_api_token_permission_groups_list.account.result : group.name => group.id if contains(group.scopes, "com.cloudflare.api.account") }
   reconciler_source  = ["${hcloud_primary_ip.reconciler.ip_address}/32"]
   managed_zones = {
     "fredrir.com" = "6a5d7959f34aa2fb76d2d5c7509b32ff"
@@ -39,7 +40,7 @@ resource "cloudflare_account_token" "verify" {
     },
     {
       effect            = "allow"
-      permission_groups = [{ id = one(local.cloudflare_groups["Cloudflare Tunnel Read"]) }]
+      permission_groups = [for name in ["Cloudflare Tunnel Read", "Access: Apps and Policies Read", "Access: Organizations, Identity Providers, and Groups Read"] : { id = local.account_groups[name] }]
       resources         = jsonencode({ "com.cloudflare.api.account.${local.cloudflare_account}" = "*" })
     },
   ]
@@ -65,7 +66,7 @@ resource "cloudflare_account_token" "apply" {
     },
     {
       effect            = "allow"
-      permission_groups = [{ id = one(local.cloudflare_groups["Cloudflare Tunnel Write"]) }]
+      permission_groups = [for name in ["Cloudflare Tunnel Write", "Access: Apps and Policies Write", "Access: Organizations, Identity Providers, and Groups Read"] : { id = local.account_groups[name] }]
       resources         = jsonencode({ "com.cloudflare.api.account.${local.cloudflare_account}" = "*" })
     },
   ]

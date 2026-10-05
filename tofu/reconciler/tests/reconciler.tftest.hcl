@@ -26,6 +26,11 @@ override_data {
       { id = "tunnel-write", name = "Cloudflare Tunnel Write", scopes = ["com.cloudflare.api.account"] },
       { id = "logs-read-account", name = "Logs Read", scopes = ["com.cloudflare.api.account"] },
       { id = "logs-read-zone", name = "Logs Read", scopes = ["com.cloudflare.api.account.zone"] },
+      { id = "access-apps-read-zone", name = "Access: Apps and Policies Read", scopes = ["com.cloudflare.api.account.zone"] },
+      { id = "access-apps-read", name = "Access: Apps and Policies Read", scopes = ["com.cloudflare.api.account"] },
+      { id = "access-apps-write-zone", name = "Access: Apps and Policies Write", scopes = ["com.cloudflare.api.account.zone"] },
+      { id = "access-apps-write", name = "Access: Apps and Policies Write", scopes = ["com.cloudflare.api.account"] },
+      { id = "access-idp-read", name = "Access: Organizations, Identity Providers, and Groups Read", scopes = ["com.cloudflare.api.account"] },
     ]
   }
 }
@@ -86,14 +91,14 @@ run "dedicated_host_without_inbound_access" {
   assert {
     condition = (
       cloudflare_account_token.verify.account_id == "8786559b30fcebd08d0c594b6e899eef" &&
-      [for policy in cloudflare_account_token.verify.policies : [for group in policy.permission_groups : group.id]] == [["zone-read", "dns-read"], ["tunnel-read"]] &&
+      [for policy in cloudflare_account_token.verify.policies : [for group in policy.permission_groups : group.id]] == [["zone-read", "dns-read"], ["tunnel-read", "access-apps-read", "access-idp-read"]] &&
       [for policy in cloudflare_account_token.verify.policies : jsondecode(policy.resources)] == [
         { "com.cloudflare.api.account.8786559b30fcebd08d0c594b6e899eef" = { "com.cloudflare.api.account.zone.*" = "*" } },
         { "com.cloudflare.api.account.8786559b30fcebd08d0c594b6e899eef" = "*" },
       ] &&
       alltrue([for policy in cloudflare_account_token.verify.policies : policy.effect == "allow"])
     )
-    error_message = "The Cloudflare token may only read zones, DNS and tunnels of the managed account."
+    error_message = "The Cloudflare token may only read zones, DNS, tunnels and Access of the managed account."
   }
 
   assert {
@@ -109,7 +114,7 @@ run "dedicated_host_without_inbound_access" {
   assert {
     condition = (
       cloudflare_account_token.apply.account_id == "8786559b30fcebd08d0c594b6e899eef" &&
-      [for policy in cloudflare_account_token.apply.policies : [for group in policy.permission_groups : group.id]] == [["zone-read", "dns-write"], ["tunnel-write"]] &&
+      [for policy in cloudflare_account_token.apply.policies : [for group in policy.permission_groups : group.id]] == [["zone-read", "dns-write"], ["tunnel-write", "access-apps-write", "access-idp-read"]] &&
       [for policy in cloudflare_account_token.apply.policies : jsondecode(policy.resources)] == [
         { "com.cloudflare.api.account.8786559b30fcebd08d0c594b6e899eef" = {
           "com.cloudflare.api.account.zone.6a5d7959f34aa2fb76d2d5c7509b32ff" = "*"
@@ -120,7 +125,7 @@ run "dedicated_host_without_inbound_access" {
       ] &&
       alltrue([for policy in cloudflare_account_token.apply.policies : policy.effect == "allow"])
     )
-    error_message = "The Cloudflare apply token may only edit DNS in the managed zones and the account's tunnels."
+    error_message = "The Cloudflare apply token may only edit DNS in the managed zones, the account's tunnels and Access applications."
   }
 }
 
