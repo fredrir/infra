@@ -4,6 +4,6 @@ namespace: llunde-pyparser
 resources:
     - migration.yaml
 images:
-    - digest: sha256:d3fe4d424f733ad16d4f98c87b8f8c5157b183b1bfc6e81c1107628e353b0d08
+    - digest: sha256:b66ef276fad18b82b5dd8f67e33136e247c4bb763adf9c9f103fd27bdc8ae70f
       name: ghcr.io/fredrir/pyparser-review
       newName: ghcr.io/fredrir/pyparser-review
