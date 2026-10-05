@@ -74,4 +74,3 @@ router_settings:
   routing_strategy: simple-shuffle
   num_retries: 0
   timeout: 600
-  max_parallel_requests: 2

@@ -5,7 +5,7 @@
 | API | `https://llm.fredrir.com/v1`; tailnet only; DNS-only `A` record to the `llm` node `100.99.249.67`; Let's Encrypt certificate `llm/llm-fredrir-com` from cert-manager |
 | Internal API | `http://litellm.llm.svc.cluster.local:4000/v1` |
 | Configuration | [LiteLLM](../platform/components/llm/litellm.yaml) |
-| Gateway | LiteLLM 1.103.3; one worker and one replica on `fredrir-04`; 600-second request timeout; outbound public HTTPS |
+| Gateway | LiteLLM 1.104.0; one worker and one replica on `fredrir-04`; 600-second request timeout; outbound public HTTPS |
 | Upstream data | Image copies of the model map, Anthropic beta headers, autorouter presets, policy templates and blog posts; `LITELLM_LOCAL_*` |
 | Agent Platform | `vertex_ai/*`; project `llunde`, location `global`; Gemini, embeddings and Model Garden MaaS; Claude requires `global_online_prediction_requests_per_base_model` quota |
 | Agent Platform identity | `litellm@llunde.iam.gserviceaccount.com`; custom role `projects/llunde/roles/modelGatewayInference` with `aiplatform.endpoints.predict`; JSON key in `AGENT_PLATFORM_CREDENTIALS` |
@@ -82,9 +82,9 @@ curl --fail https://llm.fredrir.com/pp-structure/health -H "Authorization: Beare
 | Source | Basis |
 | --- | --- |
 | [LiteLLM production practices](https://docs.litellm.ai/docs/proxy/prod) | Worker count, timeouts, PostgreSQL, persistent salt, resource bounds and Redis when scaling |
-| [LiteLLM 1.103.3](https://github.com/BerriAI/litellm/releases/tag/v1.103.3) | Stable patch release; image signature verified with the pinned upstream signing key |
+| [LiteLLM 1.104.0](https://github.com/BerriAI/litellm/releases/tag/v1.104.0) | Latest stable release; image signature verified with the upstream key pinned at commit `0112e53`; schema migration tested on a copy of the production database |
 | [PaddleOCR deployment](https://www.paddleocr.ai/main/en/version3.x/pipeline_usage/PaddleOCR-VL.html) | CPU support, llama.cpp serving and separation of the VLM from the document pipeline |
-| [LiteLLM pass-through](https://docs.litellm.ai/docs/proxy/pass_through) | Route syntax; 1.103.3 enforces `auth` without a license and requires `allowed_passthrough_routes` per key |
+| [LiteLLM pass-through](https://docs.litellm.ai/docs/proxy/pass_through) | Route syntax; 1.104.0 enforces `auth` without a license and requires `allowed_passthrough_routes` per key |
 | [LiteLLM Vertex AI](https://docs.litellm.ai/docs/providers/vertex) | `vertex_ai/` authenticates with service accounts, ADC or WIF; API keys only on `gemini/` |
 | [LiteLLM DashScope](https://docs.litellm.ai/docs/providers/dashscope) | International endpoint; `qwencloud` outside mainland China |
 | [LiteLLM DeepSeek](https://docs.litellm.ai/docs/providers/deepseek) | `deepseek/` prefix |
