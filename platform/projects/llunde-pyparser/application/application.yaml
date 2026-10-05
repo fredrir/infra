@@ -42,10 +42,6 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: fredrir-09
         kubernetes.io/arch: amd64
-      hostAliases:
-      - ip: 10.43.0.30
-        hostnames:
-        - llm.hpc.ntnu.no
       terminationGracePeriodSeconds: 30
       imagePullSecrets:
       - name: ghcr
@@ -193,10 +189,6 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: fredrir-09
         kubernetes.io/arch: amd64
-      hostAliases:
-      - ip: 10.43.0.30
-        hostnames:
-        - llm.hpc.ntnu.no
       terminationGracePeriodSeconds: 90
       imagePullSecrets:
       - name: ghcr
@@ -326,10 +318,6 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: fredrir-09
         kubernetes.io/arch: amd64
-      hostAliases:
-      - ip: 10.43.0.30
-        hostnames:
-        - llm.hpc.ntnu.no
       terminationGracePeriodSeconds: 45
       imagePullSecrets:
       - name: ghcr

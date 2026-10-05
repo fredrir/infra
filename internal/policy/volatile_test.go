@@ -54,7 +54,6 @@ func TestOnlyNodeAgentsAndTheEgressRelayTolerateVolatileWorkers(t *testing.T) {
 		"platform/components/dns/node-local-dns.yaml",
 		"platform/components/llm/ntnu-egress.yaml",
 		"platform/components/observability/monitoring.yaml",
-		"platform/projects/llunde-pyparser/ntnu-egress.yaml",
 	}
 	tolerating := map[string]bool{}
 	scanned := 0
