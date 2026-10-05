@@ -1,7 +1,52 @@
 model_list:
-- model_name: '*'
+- model_name: gpt-6.1-sol
   litellm_params:
-    model: chatgpt/*
+    model: chatgpt/gpt-6.1-sol
+  model_info:
+    mode: responses
+    supports_native_streaming: true
+- model_name: gpt-6-astra
+  litellm_params:
+    model: chatgpt/gpt-6-astra
+  model_info:
+    mode: responses
+    supports_native_streaming: true
+- model_name: gpt-6-sol
+  litellm_params:
+    model: chatgpt/gpt-6-sol
+  model_info:
+    mode: responses
+    supports_native_streaming: true
+- model_name: gpt-6-luna
+  litellm_params:
+    model: chatgpt/gpt-6-luna
+  model_info:
+    mode: responses
+    supports_native_streaming: true
+- model_name: gpt-5.6-sol
+  litellm_params:
+    model: chatgpt/gpt-5.6-sol
+  model_info:
+    mode: responses
+    supports_native_streaming: true
+- model_name: gpt-5.6-terra
+  litellm_params:
+    model: chatgpt/gpt-5.6-terra
+  model_info:
+    mode: responses
+    supports_native_streaming: true
+- model_name: gpt-5.6-luna
+  litellm_params:
+    model: chatgpt/gpt-5.6-luna
+  model_info:
+    mode: responses
+    supports_native_streaming: true
+- model_name: gpt-5.5
+  litellm_params:
+    model: chatgpt/gpt-5.5
+  model_info:
+    mode: responses
+    supports_native_streaming: true
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   disable_error_logs: true
