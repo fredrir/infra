@@ -6,6 +6,6 @@ resources:
 components:
     - ../../../components/object-store-trust
 images:
-    - digest: sha256:bd0ce9038946018a2144c97cdc043b4d839225861ab7816b20c2f4c90f821e53
+    - digest: sha256:e7787a4e110360ab8393dfc3ba9860191a58d14275c1be33f849b6387a8077ec
       name: ghcr.io/fredrir/pyparser-review
       newName: ghcr.io/fredrir/pyparser-review
