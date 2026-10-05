@@ -146,7 +146,7 @@ func TestParserGatewayEgressCannotEscapeItsApprovedService(t *testing.T) {
 
 func TestPublicModelIngressExcludesAdministration(t *testing.T) {
 	t.Parallel()
-	allowed := map[string]bool{"/": true, "/openapi.json": true, "/swagger/swagger-ui.css": true, "/swagger/swagger-ui-bundle.js": true, "/swagger/favicon.png": true, "/v1/models": true, "/v1/chat/completions": true, "/v1/responses": true, "/health/liveliness": true, "/pp-structure/health": true, "/pp-structure/v1/layout": true}
+	allowed := map[string]bool{"/": true, "/openapi.json": true, "/swagger/swagger-ui.css": true, "/swagger/swagger-ui-bundle.js": true, "/swagger/favicon.png": true, "/v1/models": true, "/v1/chat/completions": true, "/v1/responses": true, "/v1/embeddings": true, "/health/liveliness": true, "/pp-structure/health": true, "/pp-structure/v1/layout": true}
 	var found bool
 	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
 		if resource["kind"] != "Ingress" {

@@ -65,6 +65,13 @@ spec:
             name: litellm
             port:
               number: 4000
+      - path: /v1/embeddings
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000
       - path: /health/liveliness
         pathType: Exact
         backend:

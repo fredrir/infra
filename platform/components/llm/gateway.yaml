@@ -93,6 +93,16 @@ spec:
           value: /tmp/cache
         - name: HOME
           value: /tmp
+        - name: LITELLM_LOCAL_MODEL_COST_MAP
+          value: 'true'
+        - name: LITELLM_LOCAL_ANTHROPIC_BETA_HEADERS
+          value: 'true'
+        - name: LITELLM_LOCAL_AUTOROUTER_PRESETS
+          value: 'true'
+        - name: LITELLM_LOCAL_POLICY_TEMPLATES
+          value: 'true'
+        - name: LITELLM_LOCAL_BLOG_POSTS
+          value: 'true'
         resources:
           requests:
             cpu: 500m
