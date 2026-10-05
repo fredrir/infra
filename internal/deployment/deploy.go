@@ -232,7 +232,7 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 	return slices.Compact(attested), nil
 }
 
-const provenanceConcurrency = 4
+const provenanceConcurrency = 8
 
 type provenanceCheck struct {
 	revision, name string
