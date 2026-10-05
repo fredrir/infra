@@ -9,6 +9,7 @@ resources:
 - gateway.yaml
 - gateway.secret.sops.yaml
 - tailnet.yaml
+- ntnu-egress.yaml
 - tailnet.secret.sops.yaml
 - granite.yaml
 - paddleocr.yaml
@@ -22,3 +23,4 @@ configMapGenerator:
 - name: litellm
   files:
   - config.yaml=litellm.yaml
+  - ntnu-models.yaml

@@ -40,6 +40,10 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: fredrir-04
         kubernetes.io/arch: amd64
+      hostAliases:
+      - ip: 10.43.0.31
+        hostnames:
+        - llm.hpc.ntnu.no
       priorityClassName: production
       terminationGracePeriodSeconds: 90
       securityContext:

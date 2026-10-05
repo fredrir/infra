@@ -1,3 +1,5 @@
+include:
+- ntnu-models.yaml
 model_list:
 - model_name: ibm-granite/granite-docling-258M
   litellm_params:

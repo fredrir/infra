@@ -1,0 +1,288 @@
+model_list:
+- model_name: ntnu/Inferact/GLM-5.3-NVFP4
+  litellm_params:
+    model: litellm_proxy/Inferact/GLM-5.3-NVFP4
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+    chat_template_kwargs:
+      enable_thinking: true
+      reasoning_effort: max
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: false
+    max_input_tokens: 400000
+    max_output_tokens: 200000
+    supports_response_schema: true
+    supports_function_calling: true
+    supports_tool_choice: true
+    supports_system_messages: true
+    temperature: 1.0
+    top_p: 0.95
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/NbAiLab/borealis-27b
+  litellm_params:
+    model: litellm_proxy/NbAiLab/borealis-27b
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: false
+    max_input_tokens: 87380
+    max_output_tokens: 43690
+    supports_function_calling: false
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/NorwAI/NorwAI-Magistral-24B-reasoning
+  litellm_params:
+    model: litellm_proxy/NorwAI/NorwAI-Magistral-24B-reasoning
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: false
+    max_input_tokens: 27306
+    max_output_tokens: 13653
+    supports_function_calling: false
+    temperature: 0.7
+    top_p: 0.9
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/Qwen/Qwen3-Embedding-8B
+  litellm_params:
+    model: litellm_proxy/Qwen/Qwen3-Embedding-8B
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+  model_info:
+    mode: embedding
+    access_groups:
+    - ntnu
+    supports_vision: false
+    max_input_tokens: 20480
+    max_output_tokens: 20480
+    supports_response_schema: true
+    supports_function_calling: true
+    supports_tool_choice: true
+    supports_system_messages: true
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/Qwen/Qwen3.8-27B-FP8
+  litellm_params:
+    model: litellm_proxy/Qwen/Qwen3.8-27B-FP8
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+    chat_template_kwargs:
+      enable_thinking: true
+      reasoning_effort: medium
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: true
+    max_input_tokens: 174762
+    max_output_tokens: 87381
+    supports_response_schema: true
+    supports_function_calling: true
+    supports_tool_choice: true
+    supports_system_messages: true
+    temperature: 1.0
+    top_p: 0.95
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/deepseek-ai/DeepSeek-V4-Flash-Vision-Exp
+  litellm_params:
+    model: litellm_proxy/deepseek-ai/DeepSeek-V4-Flash-Vision-Exp
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+    chat_template_kwargs:
+      thinking: true
+      reasoning_effort: high
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: true
+    max_input_tokens: 699050
+    max_output_tokens: 349525
+    supports_response_schema: true
+    supports_function_calling: true
+    supports_tool_choice: true
+    supports_system_messages: true
+    temperature: 1.0
+    top_p: 0.95
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/intfloat/multilingual-e5-large-instruct
+  litellm_params:
+    model: litellm_proxy/intfloat/multilingual-e5-large-instruct
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+  model_info:
+    mode: embedding
+    access_groups:
+    - ntnu
+    supports_vision: false
+    max_input_tokens: 2000
+    max_output_tokens: 2000
+    supports_function_calling: false
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/mistralai/Mistral-Medium-3.5-128B
+  litellm_params:
+    model: litellm_proxy/mistralai/Mistral-Medium-3.5-128B
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: true
+    max_input_tokens: 174762
+    max_output_tokens: 87381
+    supports_response_schema: true
+    supports_function_calling: true
+    supports_tool_choice: true
+    supports_system_messages: true
+    temperature: 0.7
+    top_p: 1
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/moonshotai/Kimi-K2.6
+  litellm_params:
+    model: litellm_proxy/moonshotai/Kimi-K2.6
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: true
+    max_input_tokens: 174762
+    max_output_tokens: 87381
+    supports_response_schema: true
+    supports_function_calling: true
+    supports_tool_choice: true
+    supports_system_messages: true
+    temperature: 1.0
+    top_p: 0.95
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/moonshotai/Kimi-K2.6-instant
+  litellm_params:
+    model: litellm_proxy/moonshotai/Kimi-K2.6-instant
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+    chat_template_kwargs:
+      thinking: false
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: true
+    max_input_tokens: 174762
+    max_output_tokens: 87381
+    supports_response_schema: true
+    supports_function_calling: true
+    supports_tool_choice: true
+    supports_system_messages: true
+    temperature: 0.6
+    top_p: 0.95
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/norallm/normistral-11b-thinking
+  litellm_params:
+    model: litellm_proxy/norallm/normistral-11b-thinking
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: false
+    max_input_tokens: 65536
+    max_output_tokens: 32768
+    supports_function_calling: false
+    temperature: 0.3
+    top_p: 0.9
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/openai/gpt-oss-120b
+  litellm_params:
+    model: litellm_proxy/openai/gpt-oss-120b
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: false
+    max_input_tokens: 87380
+    max_output_tokens: 43690
+    supports_response_schema: true
+    supports_function_calling: true
+    supports_tool_choice: true
+    supports_system_messages: true
+    supported_openai_params:
+    - frequency_penalty
+    - logit_bias
+    - logprobs
+    - top_logprobs
+    - max_tokens
+    - max_completion_tokens
+    - modalities
+    - prediction
+    - n
+    - presence_penalty
+    - seed
+    - stop
+    - stream
+    - stream_options
+    - temperature
+    - top_p
+    - tools
+    - tool_choice
+    - function_call
+    - functions
+    - max_retries
+    - extra_headers
+    - parallel_tool_calls
+    - audio
+    - web_search_options
+    - service_tier
+    - safety_identifier
+    - prompt_cache_key
+    - prompt_cache_retention
+    - store
+    - response_format
+    - reasoning_effort
+    input_cost_per_token: 0
+    output_cost_per_token: 0
+- model_name: ntnu/zai-org/GLM-5.3-Flash
+  litellm_params:
+    model: litellm_proxy/zai-org/GLM-5.3-Flash
+    api_base: https://llm.hpc.ntnu.no/v1
+    api_key: os.environ/NTNU_API_KEY
+    chat_template_kwargs:
+      enable_thinking: true
+      reasoning_effort: high
+  model_info:
+    mode: chat
+    access_groups:
+    - ntnu
+    supports_vision: true
+    max_input_tokens: 699050
+    max_output_tokens: 349525
+    supports_response_schema: true
+    supports_function_calling: true
+    supports_tool_choice: true
+    supports_system_messages: true
+    temperature: 1.0
+    top_p: 0.95
+    input_cost_per_token: 0
+    output_cost_per_token: 0

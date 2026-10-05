@@ -12,6 +12,8 @@
 | DeepSeek | `deepseek/*`; `DEEPSEEK_API_KEY` |
 | Alibaba Model Studio | `qwencloud/*`; international `dashscope-intl.aliyuncs.com`; `QWENCLOUD_API_KEY` |
 | Mistral AI Studio | `mistral/*`; `api.mistral.ai`; `MISTRAL_API_KEY` |
+| NTNU | `ntnu/<model>` from [`ntnu-models.yaml`](../platform/components/llm/ntnu-models.yaml), access group `ntnu`, metadata copied from NTNU `/v1/model/info`; `litellm_proxy` to `https://llm.hpc.ntnu.no/v1`; `NTNU_API_KEY` |
+| NTNU egress | `llm/ntnu-egress` HAProxy TCP passthrough on `fredrir-10`; ClusterIP `10.43.0.31`, pinned by `hostAliases` in the gateway pod, so TLS ends in LiteLLM and the relay sees only SNI |
 | Model list | `/v1/models` expands wildcards from the image model map; unlisted provider models still route; bare `deepseek-*` entries are listed but not routed |
 | Granite | `ibm-granite/granite-docling-258M`; llama.cpp on `fredrir-09`; DocTags output |
 | PaddleOCR | `PaddlePaddle/PaddleOCR-VL-1.6`; llama.cpp on `fredrir-04`; task-specific image-region recognition |
@@ -68,7 +70,7 @@ kubectl -n llm rollout restart deploy/tailnet
 export LITELLM_MASTER_KEY="$(kubectl -n llm get secret litellm -o jsonpath='{.data.LITELLM_MASTER_KEY}' | base64 --decode)"
 export CLIENT_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platform/components/llm/client.secret.sops.yaml)"
 export PARSER_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platform/projects/llunde-pyparser/llm-gateway.secret.sops.yaml)"
-export MODELS='["ibm-granite/granite-docling-258M", "PaddlePaddle/PaddleOCR-VL-1.6", "vertex_ai/*", "deepseek/*", "qwencloud/*", "mistral/*"]'
+export MODELS='["ibm-granite/granite-docling-258M", "PaddlePaddle/PaddleOCR-VL-1.6", "vertex_ai/*", "deepseek/*", "qwencloud/*", "mistral/*", "ntnu"]'
 curl --fail -G localhost:4000/key/info --data-urlencode "key=$PARSER_KEY" -H "Authorization: Bearer $LITELLM_MASTER_KEY"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
   -d "{\"key\": \"$CLIENT_KEY\", \"models\": $MODELS, \"max_parallel_requests\": 16, \"rpm_limit\": null, \"tpm_limit\": null}"

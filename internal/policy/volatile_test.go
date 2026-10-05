@@ -52,6 +52,7 @@ func TestOnlyNodeAgentsAndTheEgressRelayTolerateVolatileWorkers(t *testing.T) {
 	root := repoRoot(t)
 	allowed := []string{
 		"platform/components/dns/node-local-dns.yaml",
+		"platform/components/llm/ntnu-egress.yaml",
 		"platform/components/observability/monitoring.yaml",
 		"platform/projects/llunde-pyparser/ntnu-egress.yaml",
 	}
@@ -226,7 +227,7 @@ func TestKubeletScrapesKeepTheMetricsPathLabel(t *testing.T) {
 
 func TestVolatileRelayCarriesNoCredentials(t *testing.T) {
 	t.Parallel()
-	for _, resource := range renderedTree(t, "platform", "platform/projects/llunde-pyparser") {
+	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
 		if resource["kind"] != "Deployment" || at(resource, "metadata", "name") != "ntnu-egress" {
 			continue
 		}
