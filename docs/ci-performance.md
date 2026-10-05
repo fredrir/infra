@@ -97,7 +97,7 @@ infra ci wait-revision --url https://llunde.no/.well-known/revision --revision "
 | Repository cache | `~/.cache/infra-bazel-repository` keyed by `build/toolchain.json`, `MODULE.bazel.lock` and `go.sum`, without restore keys; only the main check saves it, once per key, after passing or failed checks |
 | Release builds | Release binaries build without shared caches or the repository contents cache, re-extracting sha256-verified downloads, before the job joins the Bazel cache; the linux/amd64 release check then reads it as `bazel-cache-release-reader` |
 | CI repository rules | `--config=ci` pins the repository rule `PATH` to `/usr/bin:/bin` |
-| Check budget | The Bazel check is measured against ten seconds; declarations are validated by the pull request plan and by the reconciler before apply |
+| Check budget | The Bazel check is measured against ten seconds; declarations are validated by the pre-commit hook, the pull request plan and the reconciler before apply |
 | Generated BUILD check | `//:gazelle_test` joins the fast check's test invocation for Go, BUILD, `.bzl`, Go module and `MODULE.bazel` changes and for files below Go package directories |
 | Production validation | Apply validates declarations and live preflight before mutation; checks run alongside reconciliation; production application is serialized |
 | Application setup | Durable applied state selects tools; application-only changes skip host tooling, SSH and runner-registration credentials; recovery retains full setup |

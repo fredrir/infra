@@ -44,7 +44,8 @@ git diff --exit-code -- '*BUILD.bazel'
 | Command | Result |
 | --- | --- |
 | `infra dev doctor` | JSON diagnostics: Go, Bazel, pinned tools, Docker, KVM, QEMU, kubeconfig, cluster reachability, Ansible environment; non-zero exit on any failure |
-| `infra dev setup` | `infra` built into `.cache/dev/bin`; pinned tools installed into `.cache/dev/tools`; Ansible environment synced with `uv sync --frozen --group ci` |
+| `infra dev setup` | `infra` built into `.cache/dev/bin`; `core.hooksPath` set to `.githooks`; pinned tools installed into `.cache/dev/tools`; Ansible environment synced with `uv sync --frozen --group ci` |
+| Pre-commit hook | [`.githooks/pre-commit`](../.githooks/pre-commit): `infra ci prepare-validation` and `infra ci validate` over the working tree; output only on failure; `git commit --no-verify` skips |
 | `infra dev clean [--all]` | `.cache/dev` removed; `--all` also stops the engines, removes their cache volumes, deletes the cluster and stops the guests |
 | `infra dev render [--project P] [--out FILE]` | Offline `flux build --dry-run` with `settings.yaml` substitution; `.cache/dev/render/platform.yaml`; JSON report: document count, unsubstituted variables |
 | `infra dev diff` | `flux diff kustomization`: server-side dry-run against `KUBECONFIG`; `*.sops.yaml` ignored; exit 1 on differences |

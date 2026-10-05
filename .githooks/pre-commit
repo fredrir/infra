@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+PATH="$PWD/.venv/bin:$PWD/.cache/dev/tools:$PATH"
+export BEFORE=
+for stage in prepare-validation validate; do
+  if ! output=$(go run ./cmd/infra ci "$stage" 2>&1); then
+    printf '%s\n' "$output" >&2
+    echo "pre-commit: declaration $stage failed; git commit --no-verify skips it" >&2
+    exit 1
+  fi
+done

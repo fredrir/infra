@@ -55,6 +55,9 @@ func Setup(ctx context.Context, opts SetupOptions) error {
 		return fmt.Errorf("build infra: %w", err)
 	}
 	fmt.Fprintln(opts.Log, "Built:", binary)
+	if err := opts.Runner.Run(ctx, "git", "config", "core.hooksPath", ".githooks"); err != nil {
+		return fmt.Errorf("enable git hooks: %w", err)
+	}
 	if opts.Platform != "linux/amd64" {
 		return fmt.Errorf("pinned tools are published for linux/amd64 only; install the tools reported by infra dev doctor on %s", opts.Platform)
 	}

@@ -54,10 +54,13 @@ func TestSetupInstallsPinnedToolsAndSyncsAnsible(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(calls) != 2 || calls[0].Name != "go" || !reflect.DeepEqual(calls[0].Args, []string{"build", "-o", binary, "./cmd/infra"}) {
+	if len(calls) != 3 || calls[0].Name != "go" || !reflect.DeepEqual(calls[0].Args, []string{"build", "-o", binary, "./cmd/infra"}) {
 		t.Fatalf("infra binary not built first: %+v", calls)
 	}
-	if calls[1].Name != filepath.Join(state.Tools(), "uv") || calls[1].Dir != root || !reflect.DeepEqual(calls[1].Args, []string{"sync", "--frozen", "--group", "ci", "--no-install-project"}) {
+	if calls[1].Name != "git" || calls[1].Dir != root || !reflect.DeepEqual(calls[1].Args, []string{"config", "core.hooksPath", ".githooks"}) {
+		t.Fatalf("repository hooks not enabled: %+v", calls[1])
+	}
+	if calls[2].Name != filepath.Join(state.Tools(), "uv") || calls[2].Dir != root || !reflect.DeepEqual(calls[2].Args, []string{"sync", "--frozen", "--group", "ci", "--no-install-project"}) {
 		t.Fatalf("unexpected Ansible environment sync: %+v", calls)
 	}
 	server.Close()
@@ -66,7 +69,7 @@ func TestSetupInstallsPinnedToolsAndSyncsAnsible(t *testing.T) {
 	}
 }
 
-func TestSetupBuildsTheBinaryButRefusesToolsOnUnsupportedPlatforms(t *testing.T) {
+func TestSetupBuildsTheBinaryAndEnablesHooksButRefusesToolsOnUnsupportedPlatforms(t *testing.T) {
 	state := NewState(t.TempDir())
 	var calls []process.Options
 	runner := process.Runner{Execute: func(_ context.Context, options process.Options) (process.Result, error) {
@@ -77,8 +80,8 @@ func TestSetupBuildsTheBinaryButRefusesToolsOnUnsupportedPlatforms(t *testing.T)
 	if err == nil || !strings.Contains(err.Error(), "darwin/arm64") {
 		t.Fatalf("unsupported platform accepted: %v", err)
 	}
-	if len(calls) != 1 || calls[0].Name != "go" || calls[0].Args[0] != "build" {
-		t.Fatalf("expected only the binary build, got %+v", calls)
+	if len(calls) != 2 || calls[0].Name != "go" || calls[0].Args[0] != "build" || calls[1].Name != "git" {
+		t.Fatalf("expected the binary build and hook setup, got %+v", calls)
 	}
 	if _, err := os.Stat(state.Tools()); !os.IsNotExist(err) {
 		t.Fatal("tools directory created on unsupported platform")
