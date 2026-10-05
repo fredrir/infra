@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -144,32 +145,26 @@ func TestParserGatewayEgressCannotEscapeItsApprovedService(t *testing.T) {
 	}
 }
 
-func TestPublicModelIngressExcludesAdministration(t *testing.T) {
+func TestModelGatewayIsPublicOnlyBehindTheAdminAccessHost(t *testing.T) {
 	t.Parallel()
-	allowed := map[string]bool{"/": true, "/openapi.json": true, "/swagger/swagger-ui.css": true, "/swagger/swagger-ui-bundle.js": true, "/swagger/favicon.png": true, "/v1/models": true, "/v1/chat/completions": true, "/v1/responses": true, "/v1/embeddings": true, "/v1/messages": true, "/v1/messages/count_tokens": true, "/v1/model/info": true, "/model/info": true, "/model_group/info": true, "/health/liveliness": true, "/pp-structure/health": true, "/pp-structure/v1/layout": true}
-	hosts := map[string]string{"llm": "llm.fredrir.com", "llm-admin": "llm-admin.fredrir.com"}
-	found := map[string]bool{}
+	var ingresses []string
 	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
 		if resource["kind"] != "Ingress" {
 			continue
 		}
-		name := at(resource, "metadata", "name").(string)
-		found[name] = true
+		ingresses = append(ingresses, at(resource, "metadata", "name").(string))
 		for _, rule := range at(resource, "spec", "rules").([]any) {
-			if at(rule, "host") != hosts[name] {
-				t.Fatalf("%s serves unexpected host %v", name, at(rule, "host"))
+			if at(rule, "host") != "llm-admin.fredrir.com" {
+				t.Fatalf("model gateway served publicly on %v", at(rule, "host"))
 			}
 			for _, path := range at(rule, "http", "paths").([]any) {
-				route, kind := at(path, "path").(string), at(path, "pathType")
-				public := name == "llm" && allowed[route] && kind == "Exact"
-				admin := name == "llm-admin" && route == "/" && kind == "Prefix"
-				if !(public || admin) || at(path, "backend", "service", "name") != "litellm" {
-					t.Fatalf("%s exposes an unintended endpoint %s", name, route)
+				if at(path, "path") != "/" || at(path, "pathType") != "Prefix" || at(path, "backend", "service", "name") != "litellm" {
+					t.Fatalf("admin host exposes an unintended endpoint %v", at(path, "path"))
 				}
 			}
 		}
 	}
-	if !found["llm"] || !found["llm-admin"] {
-		t.Fatal("model ingress missing")
+	if !slices.Equal(ingresses, []string{"llm-admin"}) {
+		t.Fatalf("model ingresses %v, want only llm-admin", ingresses)
 	}
 }

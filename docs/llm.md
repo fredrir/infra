@@ -2,9 +2,8 @@
 
 | Name | Value |
 | --- | --- |
-| Public API | `https://llm.fredrir.com/v1` |
+| API | `http://llm.fredrir.com/v1`; tailnet only; DNS-only `A` record to the `llm` node `100.99.249.67`; also `llm.tail0b6cbe.ts.net` |
 | Internal API | `http://litellm.llm.svc.cluster.local:4000/v1` |
-| Tailnet API | `http://llm.tail0b6cbe.ts.net/v1`; no Cloudflare timeout |
 | Configuration | [LiteLLM](../platform/components/llm/litellm.yaml) |
 | Gateway | LiteLLM 1.103.3; one worker and one replica on `fredrir-04`; 600-second request timeout; outbound public HTTPS |
 | Upstream data | Image copies of the model map, Anthropic beta headers, autorouter presets, policy templates and blog posts; `LITELLM_LOCAL_*` |
@@ -23,12 +22,10 @@
 | Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, PaddleOCR and the provider wildcards; parser key also permits `/pp-structure` and has a 150 USD budget per 30 days |
 | Key limits | `fredrir` 16 and parser 8 parallel requests; no key RPM or TPM limits; local models bounded by deployment `max_parallel_requests` |
 | Parser env | `LITELLM_API_URL` internal API; `LITELLM_API_KEY` from `llunde-pyparser/llm-gateway`; Doppler prod `LITELLM_*` entries are not read by the pods |
-| Cloudflare clients | Non-urllib User-Agent required; Browser Integrity Check rejects the Python urllib default; pyparser sends `pyparser/<version>` |
-| Cloudflare timeout | Proxied requests return 524 after 125 seconds without a response; only Enterprise can raise it; long non-streaming calls use the tailnet or internal API |
-| Tailnet forwarder | `llm/tailnet`: unprivileged userspace Tailscale, node `llm` with `tag:llm-gateway`, TCP 80 forwarded to `litellm:4000`; state in Secret `tailnet-state`; one-time auth key in `tailnet-auth` |
+| Tailnet forwarder | `llm/tailnet`: unprivileged userspace Tailscale, node `llm` with `tag:llm-gateway`, TCP 80 forwarded to `litellm:4000`; state in Secret `tailnet-state`; one-time auth key in `tailnet-auth`; re-registration changes the node address and the `llm_tailnet` record in `tofu/production.tfvars.json` |
 | Tailnet access | `macie` and `archie` on TCP 80; [`tailscale/policy.hujson`](../tailscale/policy.hujson) |
 | Administration | `https://llm-admin.fredrir.com/ui`; Cloudflare Access app `llm-admin` with the shared GitHub login; the tunnel validates the Access token; `PROXY_BASE_URL`; LiteLLM login with a personal proxy admin account; `disable_env_credential_login` turns off master-key UI login; the master key still authorizes API calls |
-| Public routes | Exact matches for Swagger at `/`, its assets, `/openapi.json`, models, chat completions, Responses, embeddings, Anthropic messages and token counting, model and model group info, liveliness and the layout route; administration only on `llm-admin.fredrir.com` |
+| Public exposure | Only `llm-admin.fredrir.com` behind Cloudflare Access |
 | Database | PostgreSQL 17.10; retained 5 GiB local volume on `fredrir-04` |
 | Backup | Daily `platform-backups/llm-database-backup`; encrypted control Restic repository; `llm,postgres` tags |
 | Retention | Shared repository maintenance: 7 daily, 4 weekly and 12 monthly snapshots per host and tags |
@@ -44,7 +41,7 @@ kubectl -n llm port-forward service/litellm 4000:4000
 
 ```sh
 export LITELLM_API_KEY="$(kubectl -n llm get secret litellm-client -o jsonpath='{.data.LITELLM_API_KEY}' | base64 --decode)"
-curl --fail https://llm.fredrir.com/v1/models -H "Authorization: Bearer $LITELLM_API_KEY"
+curl --fail http://llm.fredrir.com/v1/models -H "Authorization: Bearer $LITELLM_API_KEY"
 kubectl -n platform-backups create job --from=cronjob/llm-database-backup llm-database-backup-manual
 ```
 
@@ -77,7 +74,7 @@ curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_
   -d "{\"key\": \"$CLIENT_KEY\", \"models\": $MODELS, \"max_parallel_requests\": 16, \"rpm_limit\": null, \"tpm_limit\": null}"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
   -d "{\"key\": \"$PARSER_KEY\", \"models\": $MODELS, \"max_parallel_requests\": 8, \"rpm_limit\": null, \"tpm_limit\": null, \"max_budget\": 150, \"budget_duration\": \"30d\", \"metadata\": {\"allowed_passthrough_routes\": [\"/pp-structure\"]}}"
-curl --fail https://llm.fredrir.com/pp-structure/health -H "Authorization: Bearer $PARSER_KEY"
+curl --fail http://llm.fredrir.com/pp-structure/health -H "Authorization: Bearer $PARSER_KEY"
 ```
 
 | Source | Basis |
@@ -91,6 +88,5 @@ curl --fail https://llm.fredrir.com/pp-structure/health -H "Authorization: Beare
 | [LiteLLM DeepSeek](https://docs.litellm.ai/docs/providers/deepseek) | `deepseek/` prefix |
 | [LiteLLM Mistral](https://docs.litellm.ai/docs/providers/mistral) | `mistral/` prefix; `MISTRAL_API_KEY` |
 | [Agent Platform name changes](https://docs.cloud.google.com/gemini-enterprise-agent-platform/vertex-ai-name-changes) | Vertex AI renamed to Gemini Enterprise Agent Platform |
-| [Cloudflare 524](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-524/) | 125-second proxy read timeout |
 | [PP-StructureV3](https://www.paddleocr.ai/main/en/version3.x/pipeline_usage/PP-StructureV3.html) | Layout detection, reading order and OCR in one CPU pipeline |
 | [PaddleOCR-VL-1.6 GGUF](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF) | Official model and vision projector |
