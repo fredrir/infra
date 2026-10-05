@@ -98,9 +98,9 @@ spec:
         - --parallel
         - '1'
         - --threads
-        - '2'
+        - '4'
         - --threads-batch
-        - '2'
+        - '4'
         - --temp
         - '0'
         - --no-webui
@@ -117,7 +117,7 @@ spec:
             cpu: 500m
             memory: 2Gi
           limits:
-            cpu: '2'
+            cpu: '4'
             memory: 4Gi
         volumeMounts:
         - name: model-cache
