@@ -39,6 +39,10 @@ model_list:
   litellm_params:
     model: qwencloud/*
     api_key: os.environ/QWENCLOUD_API_KEY
+- model_name: mistral/*
+  litellm_params:
+    model: mistral/*
+    api_key: os.environ/MISTRAL_API_KEY
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   disable_env_credential_login: true

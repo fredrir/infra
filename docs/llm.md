@@ -11,6 +11,7 @@
 | Agent Platform identity | `litellm@llunde.iam.gserviceaccount.com`; custom role `projects/llunde/roles/modelGatewayInference` with `aiplatform.endpoints.predict`; JSON key in `AGENT_PLATFORM_CREDENTIALS` |
 | DeepSeek | `deepseek/*`; `DEEPSEEK_API_KEY` |
 | Alibaba Model Studio | `qwencloud/*`; international `dashscope-intl.aliyuncs.com`; `QWENCLOUD_API_KEY` |
+| Mistral AI Studio | `mistral/*`; `api.mistral.ai`; `MISTRAL_API_KEY` |
 | Model list | `/v1/models` expands wildcards from the image model map; unlisted provider models still route; bare `deepseek-*` entries are listed but not routed |
 | Granite | `ibm-granite/granite-docling-258M`; llama.cpp on `fredrir-09`; DocTags output |
 | PaddleOCR | `PaddlePaddle/PaddleOCR-VL-1.6`; llama.cpp on `fredrir-04`; task-specific image-region recognition |
@@ -52,6 +53,7 @@ docker push ghcr.io/fredrir/pp-structure:"$(git -C ~/litellm rev-parse --short H
 ```sh
 pbpaste | tr -d '\n' | jq -Rs . | sops set --value-stdin platform/components/llm/gateway.secret.sops.yaml '["stringData"]["DEEPSEEK_API_KEY"]'
 pbpaste | tr -d '\n' | jq -Rs . | sops set --value-stdin platform/components/llm/gateway.secret.sops.yaml '["stringData"]["QWENCLOUD_API_KEY"]'
+pbpaste | tr -d '\n' | jq -Rs . | sops set --value-stdin platform/components/llm/gateway.secret.sops.yaml '["stringData"]["MISTRAL_API_KEY"]'
 gcloud iam service-accounts keys create key.json --iam-account litellm@llunde.iam.gserviceaccount.com
 jq @json key.json | sops set --value-stdin platform/components/llm/gateway.secret.sops.yaml '["stringData"]["AGENT_PLATFORM_CREDENTIALS"]' && rm key.json
 ```
@@ -60,7 +62,7 @@ jq @json key.json | sops set --value-stdin platform/components/llm/gateway.secre
 export LITELLM_MASTER_KEY="$(kubectl -n llm get secret litellm -o jsonpath='{.data.LITELLM_MASTER_KEY}' | base64 --decode)"
 export CLIENT_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platform/components/llm/client.secret.sops.yaml)"
 export PARSER_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platform/projects/llunde-pyparser/llm-gateway.secret.sops.yaml)"
-export MODELS='["ibm-granite/granite-docling-258M", "PaddlePaddle/PaddleOCR-VL-1.6", "vertex_ai/*", "deepseek/*", "qwencloud/*"]'
+export MODELS='["ibm-granite/granite-docling-258M", "PaddlePaddle/PaddleOCR-VL-1.6", "vertex_ai/*", "deepseek/*", "qwencloud/*", "mistral/*"]'
 curl --fail -G localhost:4000/key/info --data-urlencode "key=$PARSER_KEY" -H "Authorization: Bearer $LITELLM_MASTER_KEY"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
   -d "{\"key\": \"$CLIENT_KEY\", \"models\": $MODELS, \"max_parallel_requests\": 16, \"rpm_limit\": null, \"tpm_limit\": null}"
@@ -78,6 +80,7 @@ curl --fail https://llm.fredrir.com/pp-structure/health -H "Authorization: Beare
 | [LiteLLM Vertex AI](https://docs.litellm.ai/docs/providers/vertex) | `vertex_ai/` authenticates with service accounts, ADC or WIF; API keys only on `gemini/` |
 | [LiteLLM DashScope](https://docs.litellm.ai/docs/providers/dashscope) | International endpoint; `qwencloud` outside mainland China |
 | [LiteLLM DeepSeek](https://docs.litellm.ai/docs/providers/deepseek) | `deepseek/` prefix |
+| [LiteLLM Mistral](https://docs.litellm.ai/docs/providers/mistral) | `mistral/` prefix; `MISTRAL_API_KEY` |
 | [Agent Platform name changes](https://docs.cloud.google.com/gemini-enterprise-agent-platform/vertex-ai-name-changes) | Vertex AI renamed to Gemini Enterprise Agent Platform |
 | [Cloudflare 524](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-524/) | 125-second proxy read timeout |
 | [PP-StructureV3](https://www.paddleocr.ai/main/en/version3.x/pipeline_usage/PP-StructureV3.html) | Layout detection, reading order and OCR in one CPU pipeline |
