@@ -12,6 +12,7 @@ My infrastructure, for my personal projects, services and hobbies
 | `fredrir.com`                            | WiP                                             |
 | `grafana.fredrir.com`                    | Grafana, Prometheus, Loki logs and Tempo traces |
 | `llm.fredrir.com`                        | LiteLLM model gateway                           |
+| `llm-admin.fredrir.com`                  | LiteLLM administration behind Cloudflare Access |
 | `admin.fredrir.com`                      | Reserved for the future dashboard               |
 | `keys.fredrir.com`                       | Plain text administrative SSH public keys       |
 | `fredrir.no`                             | Centrally managed DNS                           |

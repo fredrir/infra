@@ -103,6 +103,8 @@ spec:
           value: 'true'
         - name: LITELLM_LOCAL_BLOG_POSTS
           value: 'true'
+        - name: PROXY_BASE_URL
+          value: https://llm-admin.fredrir.com
         resources:
           requests:
             cpu: 500m

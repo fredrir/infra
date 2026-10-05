@@ -128,3 +128,22 @@ spec:
             name: litellm
             port:
               number: 4000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llm-admin
+  namespace: llm
+spec:
+  ingressClassName: platform
+  rules:
+  - host: llm-admin.fredrir.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000

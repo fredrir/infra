@@ -147,24 +147,29 @@ func TestParserGatewayEgressCannotEscapeItsApprovedService(t *testing.T) {
 func TestPublicModelIngressExcludesAdministration(t *testing.T) {
 	t.Parallel()
 	allowed := map[string]bool{"/": true, "/openapi.json": true, "/swagger/swagger-ui.css": true, "/swagger/swagger-ui-bundle.js": true, "/swagger/favicon.png": true, "/v1/models": true, "/v1/chat/completions": true, "/v1/responses": true, "/v1/embeddings": true, "/v1/messages": true, "/v1/messages/count_tokens": true, "/v1/model/info": true, "/model/info": true, "/model_group/info": true, "/health/liveliness": true, "/pp-structure/health": true, "/pp-structure/v1/layout": true}
-	var found bool
+	hosts := map[string]string{"llm": "llm.fredrir.com", "llm-admin": "llm-admin.fredrir.com"}
+	found := map[string]bool{}
 	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
 		if resource["kind"] != "Ingress" {
 			continue
 		}
-		found = true
+		name := at(resource, "metadata", "name").(string)
+		found[name] = true
 		for _, rule := range at(resource, "spec", "rules").([]any) {
-			if at(rule, "host") != "llm.fredrir.com" {
-				t.Fatal("unexpected public model host")
+			if at(rule, "host") != hosts[name] {
+				t.Fatalf("%s serves unexpected host %v", name, at(rule, "host"))
 			}
 			for _, path := range at(rule, "http", "paths").([]any) {
-				if !allowed[at(path, "path").(string)] || at(path, "pathType") != "Exact" || at(path, "backend", "service", "name") != "litellm" {
-					t.Fatal("public ingress exposes an unintended endpoint")
+				route, kind := at(path, "path").(string), at(path, "pathType")
+				public := name == "llm" && allowed[route] && kind == "Exact"
+				admin := name == "llm-admin" && route == "/" && kind == "Prefix"
+				if !(public || admin) || at(path, "backend", "service", "name") != "litellm" {
+					t.Fatalf("%s exposes an unintended endpoint %s", name, route)
 				}
 			}
 		}
 	}
-	if !found {
-		t.Fatal("public model ingress missing")
+	if !found["llm"] || !found["llm-admin"] {
+		t.Fatal("model ingress missing")
 	}
 }

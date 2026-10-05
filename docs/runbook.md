@@ -157,7 +157,7 @@ GH_TOKEN="$(gh auth token)" PUBLISHER_APP_PRIVATE_KEY_FILE="$(publisher_key)" go
 
 | GitHub environment | Secrets |
 | --- | --- |
-| `infrastructure-plan` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (`/automation/infra-reconciliation-plan`), `CLOUDFLARE_API_TOKEN` (read managed DNS zones and account tunnels), `HCLOUD_TOKEN` (read the fleet Hetzner project), `KUBE_CONFIG` (`flux-system/infrastructure-plan`), `PLATFORM_MAIL_RECIPIENT` |
+| `infrastructure-plan` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (`/automation/infra-reconciliation-plan`), `CLOUDFLARE_API_TOKEN` (read managed DNS zones, account tunnels, Access applications, policies and identity providers), `HCLOUD_TOKEN` (read the fleet Hetzner project), `KUBE_CONFIG` (`flux-system/infrastructure-plan`), `PLATFORM_MAIL_RECIPIENT` |
 
 | Tailscale federated identity | Value |
 | --- | --- |
