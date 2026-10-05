@@ -47,13 +47,12 @@ func declaresVolatileToleration(value any) bool {
 	return false
 }
 
-func TestOnlyNodeAgentsAndUntrustedCIPoolsTolerateVolatileWorkers(t *testing.T) {
+func TestOnlyNodeAgentsAndTheEgressRelayTolerateVolatileWorkers(t *testing.T) {
 	t.Parallel()
 	root := repoRoot(t)
 	allowed := []string{
 		"platform/components/dns/node-local-dns.yaml",
 		"platform/components/observability/monitoring.yaml",
-		"platform/components/runners/infra/check-values.yaml",
 		"platform/projects/llunde-pyparser/ntnu-egress.yaml",
 	}
 	tolerating := map[string]bool{}

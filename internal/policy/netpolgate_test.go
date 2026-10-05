@@ -152,11 +152,9 @@ func normalize(v any) any {
 
 func runnerPods(t *testing.T) map[string]object {
 	t.Helper()
-	check := runner(t, "infra/check-values.yaml")
-	check["metadata"] = object{"name": "check-1", "labels": object{"actions.github.com/scale-set-name": "check-amd64"}}
 	deploy := runner(t, "infra/deploy-values.yaml")
 	deploy["metadata"] = object{"name": "deploy-1", "labels": object{"actions.github.com/scale-set-name": "deploy-amd64"}}
-	pods := map[string]object{"check": check, "deploy": deploy}
+	pods := map[string]object{"deploy": deploy}
 	for _, variant := range []string{"pr", "main", "release"} {
 		pods["rust-"+variant] = rustRunner(t, variant)
 	}
@@ -252,7 +250,7 @@ func TestGateValidationRejectsAlteredGates(t *testing.T) {
 	t.Parallel()
 	e := newEvaluator(t)
 	m := gateMutation(t)
-	pod := m.apply(t, runnerPods(t)["check"])
+	pod := m.apply(t, runnerPods(t)["deploy"])
 	for name, alter := range map[string]func(c object){
 		"name":         func(c object) { c["name"] = "setup" },
 		"image":        func(c object) { c["image"] = "docker.io/library/busybox:latest" },

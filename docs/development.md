@@ -164,7 +164,7 @@ git diff -- platform
 | Cache collection | `/etc/infra-dagger/<repository>.toml` at `/etc/dagger/engine.toml`, the path the engine entrypoint reads; ceiling `build_engine_cache_gib` per repository (default `build_engine_default_cache_gib`), 80 % target; Dagger ordinary layers first; named caches preferred for 48 h; 8 GiB / 4 GiB emergency free space |
 | Scanner databases | `infra-scanner-refresh.timer` (hourly) as `infra-scanner` publishes read-only generations to `/var/lib/infra-scanner/databases`; jobs link them into their own analysis caches |
 | Verified tooling                | CLI release checksum and revision; pinned GitHub runner archive                                                                             |
-| Warm ARC capacity               | One deploy runner and one declaration-check runner                                                                                          |
+| Warm ARC capacity               | One deploy runner                                                                                                                           |
 | Pool isolation | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines; one account, engine, cache and socket group per repository |
 
 ```sh

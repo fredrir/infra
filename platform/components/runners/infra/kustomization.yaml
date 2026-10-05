@@ -4,22 +4,14 @@ namespace: ci-infra
 resources:
 - ../ci-namespace
 - deploy.yaml
-- check.yaml
 - network.yaml
 - github-app.secret.sops.yaml
 patches:
 - path: quota.yaml
-- path: check-values.yaml
 - path: deploy-values.yaml
 configurations:
 - values-references.yaml
 configMapGenerator:
-- name: check-values
-  files:
-  - check-values.yaml
-  options:
-    annotations:
-      config.kubernetes.io/local-config: 'true'
 - name: deploy-values
   files:
   - deploy-values.yaml

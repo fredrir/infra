@@ -227,7 +227,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Setting | Value |
 | --- | --- |
 | Hosts | Inventory group `volatile`, also in `agent`: `fredrir-10` |
-| Role | `check-amd64` overflow; `ntnu-egress` relay; future backfill |
+| Role | `ntnu-egress` relay; future backfill |
 | Reconciliation | `ansible/volatile.yml`, linear strategy with SSH pipelining over a persistent master, run after the apply records `complete` and before its lease is released; fleet plays target `…:!volatile` |
 | Failing or unreachable host | Recorded as `volatile_failure` in the completed reconciliation status; requests no recovery |
 | Deep verification | `volatile.yml --check` beside the fleet; results under `degraded`; outcome and exit status unchanged |
@@ -239,7 +239,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Join credential | Per-node `k3s token create --ttl 30m`, deleted after join; the k3s role refuses the shared agent token and fails if any file under `/var/lib/rancher` matches its checksum; a joined agent keeps working across restarts and token deletion |
 | Scheduling | Taint `node-restriction.kubernetes.io/volatile=true:NoSchedule`, applied before labels `gvisor`, `volatile`, `infra.fredrir.com/ci-slots=3`; no `critical` or `stateful` |
 | Critical controllers | Flux, ARC controller and listeners, ci-slots: required `node-restriction.kubernetes.io/critical=true` |
-| CI pools | `check-amd64` tolerates it as the fallback behind the non-kata gVisor workers and leaves 30 s after not-ready or unreachable; Rust pools never run there |
+| CI pools | None tolerate it |
 | DNS cache | `node-local-dns` tolerates the taint; no API token or Secret; mounts only its Corefile ConfigMap and `/run/xtables.lock`; answers only pods on fredrir-10; the fleet scrapes it with `honorLabels: false`, `honorTimestamps: false` and sampleLimit 3000 |
 | NTNU egress | `llunde-pyparser/ntnu-egress`: HAProxy TCP passthrough to `llm.hpc.ntnu.no:443`, which NTNU serves only from its network; ClusterIP `10.43.0.30`, pinned by `hostAliases` in the pyparser pods so TLS ends in the pyparser pods and the node sees only SNI; no Secret, token or pull secret; `TestVolatileRelayCarriesNoCredentials` |
 | Monitoring | node-exporter and the DNS cache; Alloy stays off because pod-log reads cannot be scoped to one node. fredrir-10 is dropped from the fleet kubelet and node-exporter ServiceMonitors and scraped by its own `kubelet-volatile` (sampleLimit 5000, per-container cAdvisor series dropped) and `node-exporter-volatile` (sampleLimit 3000) monitors, so it cannot grow the Prometheus head. The volatile monitors set `honorLabels: false` and `honorTimestamps: false` so fredrir-10 cannot forge another node's labels or backdate samples |

@@ -1,7 +1,6 @@
 self-hosted-runner:
   labels:
   - dagger-amd64
-  - check-amd64
   - deploy-amd64
   - rust-amd64
   - rust-pr-amd64
