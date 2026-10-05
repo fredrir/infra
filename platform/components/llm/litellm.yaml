@@ -41,6 +41,7 @@ model_list:
     api_key: os.environ/QWENCLOUD_API_KEY
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
+  disable_env_credential_login: true
   database_url: os.environ/DATABASE_URL
   database_connection_pool_limit: 5
   proxy_batch_write_at: 60
