@@ -23,7 +23,7 @@
 | Parser env | `LITELLM_API_URL` internal API; `LITELLM_API_KEY` from `llunde-pyparser/llm-gateway`; Doppler prod `LITELLM_*` entries are not read by the pods |
 | Cloudflare clients | Non-urllib User-Agent required; Browser Integrity Check rejects the Python urllib default; pyparser sends `pyparser/<version>` |
 | Cloudflare timeout | Proxied requests return 524 after 125 seconds without a response; only Enterprise can raise it; cluster clients use the internal API with the 180-second gateway timeout |
-| Administration | `https://llm-admin.fredrir.com/ui`; Cloudflare Access app `llm-admin` with the shared GitHub login; the tunnel validates the Access token; `PROXY_BASE_URL` |
+| Administration | `https://llm-admin.fredrir.com/ui`; Cloudflare Access app `llm-admin` with the shared GitHub login; the tunnel validates the Access token; `PROXY_BASE_URL`; LiteLLM login `admin` with `LITELLM_MASTER_KEY` from `llm/litellm`, not the `litellm-client` key |
 | Public routes | Exact matches for Swagger at `/`, its assets, `/openapi.json`, models, chat completions, Responses, embeddings, Anthropic messages and token counting, model and model group info, liveliness and the layout route; administration only on `llm-admin.fredrir.com` |
 | Database | PostgreSQL 17.10; retained 5 GiB local volume on `fredrir-04` |
 | Backup | Daily `platform-backups/llm-database-backup`; encrypted control Restic repository; `llm,postgres` tags |
