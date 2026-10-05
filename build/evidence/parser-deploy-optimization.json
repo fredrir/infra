@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "repository": "fredrir/llunde-pyparser",
+  "source_revision": "1b803e3161f660c25ce034b723d158bdf0e99fb9",
+  "implementation_revision": "50f125ab42051f331e7de96db2f80aa6ed64d9e9",
+  "workflow_revision": "2f9caa874ded0da43254ca6a5784f7b3f8af1f81",
+  "image": "ghcr.io/fredrir/pyparser-review@sha256:9fb3a9e20c86cb7a87915b42928df25af545fd2cd08360acd1acfcf4735233b0",
+  "dependency_image": "ghcr.io/fredrir/pyparser-dependencies@sha256:4488009bff296f5782cb6b5b65d3a0a029dc80b966bf0b512be523141009c429",
+  "baseline_run": 37274760015,
+  "first_release_run": 37282772807,
+  "warm_release_run": 37283897827,
+  "deployment_run": 37283589974,
+  "promotion_check_run": 37283643692,
+  "measurements": {
+    "bootstrap_provenance_seconds": {
+      "before": 90,
+      "after": 11,
+      "method": "Reconciler journal: first provenance invocation through its completion."
+    },
+    "dependency_lookup_seconds": {
+      "before_range": [
+        34,
+        56
+      ],
+      "after_github_step": 2,
+      "after_local": 4.377,
+      "reused": true
+    },
+    "changed_source_runtime_seconds": {
+      "before": 102.567016,
+      "after": 81.497246,
+      "method": "Same archived source with an extra newline in src/pyparser/__init__.py, on the same engine under its configured 10 GiB limit; old and prepared-base Dockerfiles and dependency images."
+    },
+    "identical_source_warm_workflow_seconds": 134,
+    "identical_source_warm_runtime_seconds": 1.067651,
+    "promotion_checker": {
+      "previous_artifact_preparation_seconds": 51,
+      "cached_restore_seconds": 2,
+      "cached_test_seconds": 2.307338421,
+      "artifact_preparation_skipped": true
+    },
+    "first_application_check_budget_seconds": 10,
+    "first_application_checks_seconds": 8.114106775,
+    "mixed_trigger_promotion_seconds": 18.382354944
+  },
+  "validation": {
+    "go_test_all": true,
+    "bazel_suites": [
+      "ci",
+      "pipeline",
+      "contracts",
+      "deployment",
+      "reconciler",
+      "platformops"
+    ],
+    "actionlint": true,
+    "cached_checker_rejects_invalid_current_manifest": true,
+    "migration_completed": true,
+    "ready_deployments": [
+      "review",
+      "worker-extract",
+      "worker-light"
+    ],
+    "healthz": {
+      "ok": true
+    },
+    "chromium_version": "154.0.8037.92",
+    "review_entrypoint": "/usr/local/bin/pyparser-review-serve",
+    "static_index_present": true,
+    "mixed_trigger_promotion_success": true,
+    "final_verifier_go_suites": [
+      "deployment",
+      "provenance",
+      "reconciler"
+    ]
+  },
+  "limitations": [
+    "Single canaries and controlled build samples; no percentile claim.",
+    "The first rollout included a new dependency image and a corrected promotion provenance acknowledgement, so it is not a clean end-to-end timing comparison.",
+    "The identical-source warm run reused its prior build and smoke-test outputs; changed-source timing is recorded separately.",
+    "The temporary benchmark-prepared-78841565 registry version 1337138065 could not be deleted because the available token lacks delete:packages; it was never deployed."
+  ],
+  "cli_release": "infra-v0.2.30",
+  "provenance_concurrency_revision": "94da4147a792a18b56ac7b2fff6e8e23507104b6",
+  "manual_redeploy_run": 37284116200,
+  "manual_redeploy_attempt": 3
+}
