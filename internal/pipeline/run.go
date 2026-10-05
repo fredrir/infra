@@ -103,7 +103,7 @@ func Run(ctx context.Context, opts Options) (report Report, err error) {
 		return report, nil
 	}
 	var extra []string
-	if opts.Operation == "prepare-check" || (opts.GeneratedBuildCheck && (opts.Base == "" || GeneratedBuildInputsChanged(opts.Root, paths))) {
+	if (opts.Operation == "prepare-check" || opts.GeneratedBuildCheck) && (opts.Base == "" || GeneratedBuildInputsChanged(opts.Root, paths)) {
 		extra = []string{generatedBuildCheck}
 	}
 	if opts.Local && opts.RemoteCache != "" {

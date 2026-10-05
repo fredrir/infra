@@ -38,8 +38,16 @@ RUN --mount=type=bind,from=uv,source=/uv,target=/usr/local/bin/uv \
   pip install --upgrade pip "setuptools>=84.0.0" "wheel>=0.48.0" \
   && uv pip install --system --require-hashes --no-deps -r /usr/local/share/pyparser/pylock.toml
 
-FROM deps AS models
+FROM deps AS prepared
 RUN python -m pip uninstall -y pip
+RUN apt-get update && apt-get install -y --no-install-recommends chromium \
+  && rm -rf /var/lib/apt/lists/*
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=bind,from=uv,source=/uv,target=/usr/local/bin/uv \
+  --mount=type=cache,id=pyparser-uv,target=/root/.cache/uv \
+  mkdir -p src/pyparser && touch src/pyparser/__init__.py \
+  && uv pip install --system --no-deps --no-build-isolation -e . \
+  && rm -rf src
 
 ARG PUBLIC_PARSER_DEPENDENCY_KEY
 LABEL io.llunde.parser.dependencies.key="${PUBLIC_PARSER_DEPENDENCY_KEY}"

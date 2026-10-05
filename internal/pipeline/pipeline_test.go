@@ -112,18 +112,21 @@ func TestGeneratedBuildCheckRunsWithTheTestsOnlyForGazelleInputs(t *testing.T) {
 		_, err := pipeline.CheckFast(context.Background(), pipeline.Options{Root: root, Local: true, Bazel: bazel, Base: base, ReportDir: t.TempDir()})
 		return err
 	}
+	prepare := func() error {
+		_, err := pipeline.Run(context.Background(), pipeline.Options{Root: root, Local: true, Bazel: bazel, Base: base, Operation: "prepare-check", ReportDir: t.TempDir()})
+		return err
+	}
 	writeFile(t, filepath.Join(root, "ansible", "site.yml"), "- hosts: all\n")
 	if got := invocations(fast); len(got) != 1 || !strings.HasPrefix(got[0], "test ") || strings.Contains(got[0], "//:gazelle_test") {
 		t.Fatalf("playbook change ran %q", got)
+	}
+	if got := invocations(prepare); len(got) != 1 || !strings.HasPrefix(got[0], "build ") || strings.Contains(got[0], "//:gazelle_test") {
+		t.Fatalf("playbook preparation built unused generated BUILD checker: %q", got)
 	}
 	git("checkout", "--quiet", "--", "ansible")
 	writeFile(t, filepath.Join(root, "internal", "example", "example.go"), "package example\n\nconst changed = true\n")
 	if got := invocations(fast); len(got) != 1 || !strings.HasPrefix(got[0], "test ") || !strings.HasSuffix(got[0], " //internal/example:example_test //:gazelle_test") {
 		t.Fatalf("Go change ran %q, want one test invocation that includes the generated BUILD check", got)
-	}
-	prepare := func() error {
-		_, err := pipeline.Run(context.Background(), pipeline.Options{Root: root, Local: true, Bazel: bazel, Base: base, Operation: "prepare-check", ReportDir: t.TempDir()})
-		return err
 	}
 	if got := invocations(prepare); len(got) != 1 || !strings.HasPrefix(got[0], "build ") || !strings.HasSuffix(got[0], " //internal/example:example_test //:gazelle_test") {
 		t.Fatalf("preparation ran %q", got)

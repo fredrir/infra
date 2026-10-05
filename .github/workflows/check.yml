@@ -72,21 +72,35 @@ jobs:
           expression=$(infra pipeline affected --base "$base")
           printf 'expression=%s\n' "$expression" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        id: promotion-cache
+        if: steps.affected.outputs.expression == 'rdeps(//..., set(//platform:promotion_testdata))'
+        with:
+          path: ${{ runner.temp }}/promotion-check
+          key: promotion-check-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('internal/**', 'cmd/**', 'go.mod', 'go.sum', 'MODULE.bazel', 'MODULE.bazel.lock', '**/BUILD.bazel', '**/*.bzl', '.bazelrc', '.bazelversion', 'build/toolchain.json') }}
+      - name: Verify cached promotion checker
+        id: promotion
+        if: steps.promotion-cache.outputs.cache-hit == 'true'
+        run: |
+          cd "$RUNNER_TEMP/promotion-check"
+          sha256sum --check --strict SHA256SUMS
+          chmod 755 platformops_test
+          printf 'cached=true\n' >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         id: repository-cache
-        if: steps.affected.outputs.expression != 'set()'
+        if: steps.affected.outputs.expression != 'set()' && steps.promotion.outputs.cached != 'true'
         with:
           path: ~/.cache/infra-bazel-repository
           key: infra-bazel-repository-v1-${{ hashFiles('build/toolchain.json', 'MODULE.bazel.lock', 'go.sum') }}
       - uses: ./.github/actions/bazel-cache
         id: bazel-cache
-        if: env.BAZEL_CACHE_IDENTITY != '' && steps.affected.outputs.expression != 'set()'
+        if: env.BAZEL_CACHE_IDENTITY != '' && steps.affected.outputs.expression != 'set()' && steps.promotion.outputs.cached != 'true'
         with:
           identity: ${{ env.BAZEL_CACHE_IDENTITY }}
           client-id: ${{ env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && vars.TAILSCALE_BAZEL_CACHE_CHECK_WRITER_CLIENT_ID || vars.TAILSCALE_BAZEL_CACHE_READER_CLIENT_ID }}
       - name: Withhold OIDC token requests from later steps
         run: test -z "${ACTIONS_ID_TOKEN_REQUEST_URL-}${ACTIONS_ID_TOKEN_REQUEST_TOKEN-}"
       - name: Install checksum-pinned native Bazel
-        if: steps.affected.outputs.expression != 'set()'
+        if: steps.affected.outputs.expression != 'set()' && steps.promotion.outputs.cached != 'true'
         run: |
           version=$(jq -er '.bazel' build/toolchain.json)
           checksum=$(jq -er '.bazel_sha256' build/toolchain.json)
@@ -96,7 +110,7 @@ jobs:
           chmod 755 "$RUNNER_TEMP/bazel/bin/bazel"
           printf '%s\n' "$RUNNER_TEMP/bazel/bin" >> "$GITHUB_PATH"
       - name: Prepare affected check artifacts
-        if: steps.affected.outputs.expression != 'set()'
+        if: steps.affected.outputs.expression != 'set()' && steps.promotion.outputs.cached != 'true'
         env:
           BAZEL_REMOTE_CACHE: ${{ steps.bazel-cache.outputs.endpoint }}
           BASE: ${{ steps.affected.outputs.base }}
@@ -107,7 +121,29 @@ jobs:
         env:
           BAZEL_REMOTE_CACHE: ${{ steps.bazel-cache.outputs.endpoint }}
           BASE: ${{ steps.affected.outputs.base }}
-        run: infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --local
+        run: |
+          if [ "${{ steps.promotion.outputs.cached }}" = true ]; then
+            infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- "$RUNNER_TEMP/promotion-check/platformops_test" -test.timeout=10s
+          else
+            infra ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger -- infra pipeline check-fast --base "$BASE" --read-only-cache=${{ env.BAZEL_CACHE_IDENTITY != 'bazel-cache-check-writer' }} --local
+          fi
+      - name: Store compiled promotion checker
+        id: promotion-store
+        if: env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && steps.promotion-cache.outputs.cache-hit != 'true' && steps.promotion-cache.outputs.cache-primary-key != ''
+        run: |
+          if ! jq -e '.targets | sort == ["//internal/platformops:platformops_test", "//platform:promotion_testdata"]' dist/reports/preparation/report.json >/dev/null; then
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/promotion-check"
+          cp bazel-bin/internal/platformops/platformops_test_/platformops_test "$RUNNER_TEMP/promotion-check/platformops_test"
+          cd "$RUNNER_TEMP/promotion-check"
+          sha256sum platformops_test > SHA256SUMS
+          printf 'ready=true\n' >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && steps.promotion-store.outputs.ready == 'true'
+        with:
+          path: ${{ runner.temp }}/promotion-check
+          key: ${{ steps.promotion-cache.outputs.cache-primary-key }}
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: ${{ !cancelled() && env.BAZEL_CACHE_IDENTITY == 'bazel-cache-check-writer' && steps.repository-cache.outputs.cache-primary-key != '' && steps.repository-cache.outputs.cache-hit != 'true' }}
         with:

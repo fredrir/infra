@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -64,6 +65,12 @@ func PlanDependencies(ctx context.Context, runner process.Runner, infraRoot stri
 			return DependencyPlan{}, errors.New("runtime lock inputs must be regular files")
 		}
 	}
+	project, err := os.ReadFile(filepath.Join(runner.Dir, "pyproject.toml"))
+	if err != nil {
+		return DependencyPlan{}, err
+	}
+	projectDigest := sha256.Sum256(project)
+	inputs["pyproject.toml"] = hex.EncodeToString(projectDigest[:])
 	runner.Env = append(runner.Env, "UV_NO_CONFIG=1")
 	lock, err := runner.Output(ctx, "uv", "export", "--frozen", "--no-dev", "--no-emit-project", "--format", "pylock.toml", "--no-header", "--quiet")
 	if err != nil {
@@ -304,30 +311,56 @@ func (registry *DependencyRegistry) Verify(ctx context.Context, runner process.R
 	}
 	runner.Env = append(runner.Env, "DOCKER_CONFIG="+directory)
 	runner.Stdout = io.Discard
-	var failure error
-	for _, workflow := range revisions {
-		_, arguments, err := deployment.ProvenanceCommand("private", "fredrir/llunde-pyparser", workflow, revision, image)
-		if err != nil {
-			return err
+	return verifyDependencySignatures(ctx, runner, revisions, revision, image)
+}
+
+func verifyDependencySignatures(ctx context.Context, runner process.Runner, revisions []string, revision, image string) error {
+	_, arguments, err := deployment.ProvenanceCommand("private", "fredrir/llunde-pyparser", revisions[0], revision, image)
+	if err != nil {
+		return err
+	}
+	arguments = append([]string{"verify", "--timeout", "1m"}, arguments[1:]...)
+	for index := 0; index < len(arguments)-1; index++ {
+		switch arguments[index] {
+		case "--certificate-identity-regexp":
+			arguments[index+1] = strings.Replace(arguments[index+1], revisions[0], strings.Join(revisions, "|"), 1)
+		case "--annotations":
+			if strings.HasPrefix(arguments[index+1], "workflow-revision=") {
+				arguments = slices.Delete(arguments, index, index+2)
+				index--
+			}
 		}
-		arguments = append([]string{"verify", "--timeout", "1m"}, arguments[1:]...)
-		if failure = runner.Run(ctx, "cosign", arguments...); failure == nil {
-			return nil
+	}
+	var failure error
+	for _, trigger := range []string{"push", "workflow_dispatch"} {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		for index, argument := range arguments {
 			if argument == "--certificate-github-workflow-trigger" {
-				arguments[index+1] = "workflow_dispatch"
+				arguments[index+1] = trigger
 				break
 			}
 		}
-		if ctx.Err() == nil {
-			if failure = runner.Run(ctx, "cosign", arguments...); failure == nil {
+		var verified []byte
+		verified, failure = runner.Output(ctx, "cosign", arguments...)
+		if failure != nil {
+			continue
+		}
+		var signatures []struct {
+			Optional struct {
+				Workflow string `json:"workflow-revision"`
+			} `json:"optional"`
+		}
+		if failure = json.Unmarshal(verified, &signatures); failure != nil {
+			return fmt.Errorf("decode verified dependency signatures: %w", failure)
+		}
+		for _, signature := range signatures {
+			if slices.Contains(revisions, signature.Optional.Workflow) {
 				return nil
 			}
 		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
+		failure = errors.New("no verified signature names an approved workflow revision")
 	}
 	return errors.Join(errors.New("dependency provenance rejected"), failure)
 }
