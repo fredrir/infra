@@ -96,6 +96,14 @@ spec:
   - to:
     - podSelector:
         matchLabels:
+          app.kubernetes.io/name: codex
+          app.kubernetes.io/part-of: llm
+    ports:
+    - protocol: TCP
+      port: 4000
+  - to:
+    - podSelector:
+        matchLabels:
           app.kubernetes.io/name: postgres
           app.kubernetes.io/part-of: llm
     ports:
@@ -289,6 +297,43 @@ spec:
     ports:
     - protocol: TCP
       port: 8443
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 100.64.0.0/10
+        - 169.254.0.0/16
+        - 127.0.0.0/8
+    ports:
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: codex
+  namespace: llm
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: codex
+      app.kubernetes.io/part-of: llm
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: litellm
+          app.kubernetes.io/part-of: llm
+    ports:
+    - protocol: TCP
+      port: 4000
   egress:
   - to:
     - ipBlock:

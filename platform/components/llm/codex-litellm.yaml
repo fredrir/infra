@@ -1,0 +1,16 @@
+model_list:
+- model_name: '*'
+  litellm_params:
+    model: chatgpt/*
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  disable_error_logs: true
+  health_check_details: false
+litellm_settings:
+  request_timeout: 600
+  num_retries: 0
+  set_verbose: false
+  json_logs: true
+router_settings:
+  num_retries: 0
+  timeout: 600

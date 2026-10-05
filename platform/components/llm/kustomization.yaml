@@ -10,6 +10,8 @@ resources:
 - gateway.secret.sops.yaml
 - tailnet.yaml
 - ntnu-egress.yaml
+- codex.yaml
+- codex.secret.sops.yaml
 - tailnet.secret.sops.yaml
 - granite.yaml
 - paddleocr.yaml
@@ -24,3 +26,7 @@ configMapGenerator:
   files:
   - config.yaml=litellm.yaml
   - ntnu-models.yaml
+  - codex-models.yaml
+- name: codex
+  files:
+  - config.yaml=codex-litellm.yaml

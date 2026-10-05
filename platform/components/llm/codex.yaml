@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: codex-auth
+  namespace: llm
+spec:
+  storageClassName: local-retain
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: codex
+  namespace: llm
+spec:
+  selector:
+    app.kubernetes.io/name: codex
+    app.kubernetes.io/part-of: llm
+  ports:
+  - name: http
+    port: 4000
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: codex
+  namespace: llm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: codex
+      app.kubernetes.io/part-of: llm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: codex
+        app.kubernetes.io/part-of: llm
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      dnsConfig:
+        options:
+        - name: ndots
+          value: '2'
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-04
+        kubernetes.io/arch: amd64
+      priorityClassName: production
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: litellm
+        image: ghcr.io/berriai/litellm:v1.104.0@sha256:625981c83410a3ea68eb0697590a57ec1d764d634514d54fa5db0591077ee839
+        imagePullPolicy: IfNotPresent
+        args:
+        - --host
+        - 0.0.0.0
+        - --port
+        - '4000'
+        - --config
+        - /etc/litellm/config.yaml
+        - --num_workers
+        - '1'
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        envFrom:
+        - secretRef:
+            name: codex
+        env:
+        - name: LITELLM_MODE
+          value: PRODUCTION
+        - name: LITELLM_LOG
+          value: ERROR
+        - name: LITELLM_NON_ROOT
+          value: 'true'
+        - name: LITELLM_UI_PATH
+          value: /var/lib/litellm/ui
+        - name: LITELLM_ASSETS_PATH
+          value: /var/lib/litellm/assets
+        - name: XDG_CACHE_HOME
+          value: /tmp/cache
+        - name: HOME
+          value: /tmp
+        - name: LITELLM_LOCAL_MODEL_COST_MAP
+          value: 'true'
+        - name: LITELLM_LOCAL_ANTHROPIC_BETA_HEADERS
+          value: 'true'
+        - name: LITELLM_LOCAL_AUTOROUTER_PRESETS
+          value: 'true'
+        - name: LITELLM_LOCAL_POLICY_TEMPLATES
+          value: 'true'
+        - name: LITELLM_LOCAL_BLOG_POSTS
+          value: 'true'
+        - name: CHATGPT_TOKEN_DIR
+          value: /var/lib/codex
+        - name: CHATGPT_DEFAULT_INSTRUCTIONS
+          value: ' '
+        resources:
+          requests:
+            cpu: 50m
+            memory: 768Mi
+          limits:
+            cpu: '1'
+            memory: 768Mi
+        ports:
+        - name: http
+          containerPort: 4000
+        volumeMounts:
+        - name: config
+          mountPath: /etc/litellm
+          readOnly: true
+        - name: auth
+          mountPath: /var/lib/codex
+        - name: tmp
+          mountPath: /tmp
+        - name: runtime
+          mountPath: /var/lib/litellm
+        # Device login blocks startup for up to 15 minutes until approved in the browser.
+        startupProbe:
+          httpGet:
+            path: /health/readiness
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 100
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health/liveliness
+            port: http
+          periodSeconds: 30
+          timeoutSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: codex
+      - name: auth
+        persistentVolumeClaim:
+          claimName: codex-auth
+      - name: tmp
+        emptyDir:
+          sizeLimit: 512Mi
+      - name: runtime
+        emptyDir:
+          sizeLimit: 256Mi
