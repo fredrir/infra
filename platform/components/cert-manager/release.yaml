@@ -1,0 +1,69 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+spec:
+  releaseName: cert-manager
+  driftDetection:
+    mode: enabled
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: cert-manager
+      version: v1.21.2
+      sourceRef:
+        kind: HelmRepository
+        name: jetstack
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    crds:
+      enabled: true
+      keep: true
+    global:
+      priorityClassName: platform-critical
+    prometheus:
+      enabled: false
+    startupapicheck:
+      enabled: false
+    nodeSelector:
+      kubernetes.io/os: linux
+      node-restriction.kubernetes.io/critical: 'true'
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    webhook:
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-restriction.kubernetes.io/critical: 'true'
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 250m
+          memory: 128Mi
+    cainjector:
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-restriction.kubernetes.io/critical: 'true'
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi

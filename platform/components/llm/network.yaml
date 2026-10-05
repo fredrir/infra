@@ -61,10 +61,6 @@ spec:
       podSelector:
         matchLabels:
           app.kubernetes.io/name: traefik
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: tailnet
-          app.kubernetes.io/part-of: llm
     ports:
     - protocol: TCP
       port: 4000
@@ -223,13 +219,15 @@ spec:
   ingress: []
   egress:
   - to:
-    - podSelector:
+    - namespaceSelector:
         matchLabels:
-          app.kubernetes.io/name: litellm
-          app.kubernetes.io/part-of: llm
+          kubernetes.io/metadata.name: ingress-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
     ports:
     - protocol: TCP
-      port: 4000
+      port: 8443
   - to:
     - ipBlock:
         cidr: 10.43.0.1/32

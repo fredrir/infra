@@ -2,7 +2,7 @@
 
 | Name | Value |
 | --- | --- |
-| API | `http://llm.fredrir.com/v1`; tailnet only; DNS-only `A` record to the `llm` node `100.99.249.67`; also `llm.tail0b6cbe.ts.net` |
+| API | `https://llm.fredrir.com/v1`; tailnet only; DNS-only `A` record to the `llm` node `100.99.249.67`; Let's Encrypt certificate `llm/llm-fredrir-com` from cert-manager |
 | Internal API | `http://litellm.llm.svc.cluster.local:4000/v1` |
 | Configuration | [LiteLLM](../platform/components/llm/litellm.yaml) |
 | Gateway | LiteLLM 1.103.3; one worker and one replica on `fredrir-04`; 600-second request timeout; outbound public HTTPS |
@@ -22,8 +22,8 @@
 | Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, PaddleOCR and the provider wildcards; parser key also permits `/pp-structure` and has a 150 USD budget per 30 days |
 | Key limits | `fredrir` 16 and parser 8 parallel requests; no key RPM or TPM limits; local models bounded by deployment `max_parallel_requests` |
 | Parser env | `LITELLM_API_URL` internal API; `LITELLM_API_KEY` from `llunde-pyparser/llm-gateway`; Doppler prod `LITELLM_*` entries are not read by the pods |
-| Tailnet forwarder | `llm/tailnet`: unprivileged userspace Tailscale, node `llm` with `tag:llm-gateway`, TCP 80 forwarded to `litellm:4000`; state in Secret `tailnet-state`; one-time auth key in `tailnet-auth`; re-registration changes the node address and the `llm_tailnet` record in `tofu/production.tfvars.json` |
-| Tailnet access | `macie` and `archie` on TCP 80; [`tailscale/policy.hujson`](../tailscale/policy.hujson) |
+| Tailnet forwarder | `llm/tailnet`: unprivileged userspace Tailscale, node `llm` with `tag:llm-gateway`, TCP 443 forwarded to Traefik `websecure`, which serves only the `llm-tailnet` Ingress; state in Secret `tailnet-state`; one-time auth key in `tailnet-auth`; re-registration changes the node address and the `llm_tailnet` record in `tofu/production.tfvars.json` |
+| Tailnet access | `macie` and `archie` on TCP 443; [`tailscale/policy.hujson`](../tailscale/policy.hujson) |
 | Administration | `https://llm-admin.fredrir.com/ui`; Cloudflare Access app `llm-admin` with the shared GitHub login; the tunnel validates the Access token; `PROXY_BASE_URL`; LiteLLM login with a personal proxy admin account; `disable_env_credential_login` turns off master-key UI login; the master key still authorizes API calls |
 | Public exposure | Only `llm-admin.fredrir.com` behind Cloudflare Access |
 | Database | PostgreSQL 17.10; retained 5 GiB local volume on `fredrir-04` |
@@ -41,7 +41,7 @@ kubectl -n llm port-forward service/litellm 4000:4000
 
 ```sh
 export LITELLM_API_KEY="$(kubectl -n llm get secret litellm-client -o jsonpath='{.data.LITELLM_API_KEY}' | base64 --decode)"
-curl --fail http://llm.fredrir.com/v1/models -H "Authorization: Bearer $LITELLM_API_KEY"
+curl --fail https://llm.fredrir.com/v1/models -H "Authorization: Bearer $LITELLM_API_KEY"
 kubectl -n platform-backups create job --from=cronjob/llm-database-backup llm-database-backup-manual
 ```
 
@@ -74,7 +74,7 @@ curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_
   -d "{\"key\": \"$CLIENT_KEY\", \"models\": $MODELS, \"max_parallel_requests\": 16, \"rpm_limit\": null, \"tpm_limit\": null}"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
   -d "{\"key\": \"$PARSER_KEY\", \"models\": $MODELS, \"max_parallel_requests\": 8, \"rpm_limit\": null, \"tpm_limit\": null, \"max_budget\": 150, \"budget_duration\": \"30d\", \"metadata\": {\"allowed_passthrough_routes\": [\"/pp-structure\"]}}"
-curl --fail http://llm.fredrir.com/pp-structure/health -H "Authorization: Bearer $PARSER_KEY"
+curl --fail https://llm.fredrir.com/pp-structure/health -H "Authorization: Bearer $PARSER_KEY"
 ```
 
 | Source | Basis |

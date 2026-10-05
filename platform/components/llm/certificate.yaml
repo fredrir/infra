@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: llm-fredrir-com
+  namespace: llm
+spec:
+  secretName: llm-fredrir-com-tls
+  dnsNames:
+  - llm.fredrir.com
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt
+  privateKey:
+    algorithm: ECDSA
+    rotationPolicy: Always

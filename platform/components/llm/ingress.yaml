@@ -16,3 +16,29 @@ spec:
             name: litellm
             port:
               number: 4000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llm-tailnet
+  namespace: llm
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+spec:
+  ingressClassName: platform
+  tls:
+  - hosts:
+    - llm.fredrir.com
+    secretName: llm-fredrir-com-tls
+  rules:
+  - host: llm.fredrir.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000

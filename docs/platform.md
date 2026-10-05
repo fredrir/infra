@@ -57,6 +57,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Build cache            | Object store `seaweedfs-hel1`: `ci-<project>-main` 20 GiB (sccache, `target/` archive), `ci-<project>-release` 10 GiB, 14-day expiry; `toolchains` 5 GiB; read-only, read-write and release credentials per project |
 | Object store           | SeaweedFS cells `seaweedfs-hel1` (`fredrir-04`) and `seaweedfs-nl` (`fredrir-09`); S3 over TLS only; [operation](runbook.md#object-store) |
 | Bazel cache            | bazel-remote on `fredrir-09`, tailnet only: read-only gRPC on 9092, writes on 9093; [operation](runbook.md#bazel-cache) |
+| Certificates           | cert-manager; ClusterIssuer `letsencrypt`, DNS-01 through Cloudflare with `cert-manager/cloudflare-dns`; self-check against the zone's authoritative nameservers; Traefik `websecure` only for annotated tailnet Ingresses |
 | Independent monitoring | Gatus on `fredrir-06`; 13 endpoint checks including `production` ⊆ `main`, five authenticated backup heartbeats and the `reconciliation` deep, verification and apply heartbeats; cluster alert when unreachable                                                                                                                                    |
 | Email                  | `alerts@fredrir.com`; [credentials and operation](mail-alerts.md)                                                                                                                                                                                                                 |
 

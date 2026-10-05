@@ -14,6 +14,7 @@ resources:
 - paddleocr.yaml
 - pp-structure.yaml
 - ingress.yaml
+- certificate.yaml
 - monitoring.yaml
 - model.secret.sops.yaml
 - client.secret.sops.yaml

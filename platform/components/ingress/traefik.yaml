@@ -48,9 +48,14 @@ spec:
       web:
         port: 8000
         exposedPort: 80
+        asDefault: true
       websecure:
+        port: 8443
+        exposedPort: 443
         expose:
-          default: false
+          default: true
+        tls:
+          enabled: true
     resources:
       requests:
         cpu: 100m

@@ -62,6 +62,17 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
+          kubernetes.io/metadata.name: llm
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: tailnet
+          app.kubernetes.io/part-of: llm
+    ports:
+    - port: 8443
+      protocol: TCP
+  - from:
+    - namespaceSelector:
+        matchLabels:
           kubernetes.io/metadata.name: observability
     ports:
     - port: 9100

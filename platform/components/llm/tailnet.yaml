@@ -51,7 +51,7 @@ metadata:
   name: tailnet-serve
   namespace: llm
 data:
-  serve.json: '{"TCP":{"80":{"TCPForward":"litellm.llm.svc.cluster.local:4000"}}}'
+  serve.json: '{"TCP":{"443":{"TCPForward":"traefik.ingress-system.svc.cluster.local:443"}}}'
 ---
 apiVersion: apps/v1
 kind: Deployment

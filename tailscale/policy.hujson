@@ -198,7 +198,7 @@
       ],
       "proto": "tcp",
       "dst": [
-        "tag:llm-gateway:80"
+        "tag:llm-gateway:443"
       ]
     },
     {
@@ -1159,9 +1159,10 @@
       "src": "macie",
       "proto": "tcp",
       "accept": [
-        "tag:llm-gateway:80"
+        "tag:llm-gateway:443"
       ],
       "deny": [
+        "tag:llm-gateway:80",
         "tag:llm-gateway:4000"
       ]
     },
@@ -1169,14 +1170,14 @@
       "src": "fredrir@github",
       "proto": "tcp",
       "deny": [
-        "tag:llm-gateway:80"
+        "tag:llm-gateway:443"
       ]
     },
     {
       "src": "tag:platform-worker",
       "proto": "tcp",
       "deny": [
-        "tag:llm-gateway:80"
+        "tag:llm-gateway:443"
       ]
     },
     {

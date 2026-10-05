@@ -30,6 +30,10 @@ charts:
     version: 3.0.0
     repository: https://grafana-community.github.io/helm-charts
     sha256: 4118a1ddc4c2a5e666e8f4d9a9648d5a067bccf901ce5ddb39bcbbb9c1670721
+  cert-manager:
+    version: v1.21.2
+    repository: https://charts.jetstack.io
+    sha256: 73a56e1728edd6c99f1f31082618c3259d279a76b7ebd3d4bdc5475c2442d34a
 images:
   loki: docker.io/grafana/loki:3.7.7@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
   tempo: docker.io/grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5

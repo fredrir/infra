@@ -12,6 +12,7 @@
 | Release tokens                        | None; crates.io trusted publishing and Octo STS                                                                                                                                        |
 | Application source environments       | Each project's existing Doppler configuration                                                                                                                                          |
 | Cluster runtime secrets               | `platform/**/*.secret.sops.yaml`                                                                                                                                                       |
+| Certificate DNS token | `platform/components/cert-manager/cloudflare.secret.sops.yaml`; hand-made account token `cert-manager-dns01`: `DNS Write` and `Zone Read` on `fredrir.com` only |
 | AWS workload access keys              | Created outside OpenTofu per `/platform/` IAM user; the consuming project's `*.secret.sops.yaml`                                                                                       |
 | Independent monitoring                | Settings `ansible/roles/gatus/templates/config.yaml.j2`; secrets `ansible/roles/gatus/files/secrets.sops.yaml`; Macie, Archie and `fredrir-06` |
 | Publisher App key                     | `ansible/roles/reconciler/files/credentials.sops.yaml` `["apply"]["publisher-app-key"]`; the fredrir-11 apply engine, as a consumed `0600` file, and administrators only; [publishing](runbook.md#publishing) |
