@@ -1,9 +1,6 @@
 package platformops
 
 import (
-	"bytes"
-	"errors"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -11,10 +8,9 @@ import (
 	"testing"
 
 	"github.com/fredrir/infra/internal/kustomize"
-	"go.yaml.in/yaml/v3"
 )
 
-func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
+func TestToolsPromotionRendersUpdatedWorkloads(t *testing.T) {
 	source, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -59,42 +55,20 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 		t.Fatal(err)
 	}
 	image := "ghcr.io/fredrir/platform-backup-tools@sha256:" + strings.Repeat("c", 64)
-	expectedDeletes := 0
-	for _, path := range []string{"components/controllers/ci-slots.sh", "components/backup-job/backup.sh", "components/backup-job/heartbeat.sh"} {
-		if _, err := os.Stat(filepath.Join(root, "platform", path)); err == nil {
-			expectedDeletes++
-		} else if !os.IsNotExist(err) {
-			t.Fatal(err)
-		}
-	}
 	edits, err := ToolsPromotion(root, image)
 	if err != nil {
 		t.Fatal(err)
 	}
-	deletes := 0
 	for _, edit := range edits {
 		data, err := os.ReadFile(edit.Path)
 		if err != nil || string(data) != string(edit.Before) {
 			t.Fatalf("dry run changed %s", edit.Path)
 		}
-		if edit.Delete {
-			deletes++
-		}
-	}
-	if deletes != expectedDeletes {
-		t.Fatalf("expected %d legacy script deletions, got %d", expectedDeletes, deletes)
 	}
 	if err := ApplyEdits(edits); err != nil {
 		t.Fatal(err)
 	}
-	for _, edit := range edits {
-		if edit.Delete {
-			if _, err := os.Lstat(edit.Path); !os.IsNotExist(err) {
-				t.Fatalf("legacy script retained: %s", edit.Path)
-			}
-		}
-	}
-	for _, directory := range []string{"components/controllers", "components/object-store", "projects/y", "projects/llunde-pyparser", "projects/portfolio"} {
+	for _, directory := range []string{"components/controllers", "components/object-store", "components/repository-maintenance", "projects/y", "projects/llunde-pyparser", "projects/portfolio"} {
 		t.Run(directory, func(t *testing.T) {
 			data, err := kustomize.Build(filepath.Join(root, "platform", directory))
 			if err != nil {
@@ -103,30 +77,6 @@ func TestToolsPromotionRendersCopiedPlatformWithoutLegacyScripts(t *testing.T) {
 			text := string(data)
 			if !strings.Contains(text, image) || !strings.Contains(text, "/usr/local/bin/infra") {
 				t.Fatal("rendered workload did not select native tools image")
-			}
-			for _, legacy := range []string{"ci-slots.sh", "backup.sh", "heartbeat.sh"} {
-				if strings.Contains(text, legacy) {
-					t.Fatalf("render retained %s", legacy)
-				}
-			}
-			decoder := yaml.NewDecoder(bytes.NewReader(data))
-			for {
-				var resource struct {
-					Kind     string
-					Metadata struct{ Name string }
-				}
-				if err := decoder.Decode(&resource); errors.Is(err, io.EOF) {
-					break
-				} else if err != nil {
-					t.Fatal(err)
-				}
-				if resource.Kind == "ConfigMap" {
-					for _, legacy := range []string{"ci-slots-", "backup-hook-"} {
-						if strings.HasPrefix(resource.Metadata.Name, legacy) {
-							t.Fatalf("render retained generated legacy ConfigMap %s", resource.Metadata.Name)
-						}
-					}
-				}
 			}
 		})
 	}

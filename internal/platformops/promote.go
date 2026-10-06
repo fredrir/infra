@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -18,7 +17,6 @@ type Edit struct {
 	Path   string `json:"path"`
 	Before []byte `json:"-"`
 	After  []byte `json:"-"`
-	Delete bool   `json:"delete,omitempty"`
 }
 
 func ToolsPromotion(root, image string) ([]Edit, error) {
@@ -33,23 +31,23 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 	if !regexp.MustCompile(`^ghcr\.io/fredrir/platform-backup-tools@sha256:[a-f0-9]{64}$`).MatchString(image) {
 		return nil, fmt.Errorf("digest-pinned backup tools image required")
 	}
-	paths := []struct{ path, command string }{
-		{"platform/components/controllers/ci-slots.yaml", "ci-slots"},
-		{"platform/components/object-store/provisioner.yaml", "provision-object-store"},
-		{"platform/components/repository-maintenance/maintenance.yaml", "repository-maintenance"},
-		{"platform/projects/y/backup.yaml", "backup"},
-		{"platform/projects/llunde-pyparser/backup.yaml", "backup"},
-		{"platform/projects/portfolio/backup.yaml", "backup"},
+	paths := []string{
+		"platform/components/controllers/ci-slots.yaml",
+		"platform/components/object-store/provisioner.yaml",
+		"platform/components/repository-maintenance/maintenance.yaml",
+		"platform/projects/y/backup.yaml",
+		"platform/projects/llunde-pyparser/backup.yaml",
+		"platform/projects/portfolio/backup.yaml",
 	}
 	var edits []Edit
 	for _, item := range paths {
-		path := filepath.Join(root, item.path)
+		path := filepath.Join(root, item)
 		resolved, err := filepath.EvalSymlinks(path)
 		if err != nil {
 			return nil, err
 		}
 		if resolved != path {
-			return nil, fmt.Errorf("promotion path must not traverse symlinks: %s", item.path)
+			return nil, fmt.Errorf("promotion path must not traverse symlinks: %s", item)
 		}
 		before, err := os.ReadFile(path)
 		if err != nil {
@@ -70,31 +68,19 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 				if containers == nil {
 					return
 				}
-				changed := false
 				for _, container := range containers.Content {
 					current := mapValue(container, "image")
 					if current == nil || !strings.HasPrefix(current.Value, "ghcr.io/fredrir/platform-backup-tools@sha256:") {
 						continue
 					}
 					current.Value = image
-					setMapValue(container, "command", sequence("/usr/local/bin/infra"))
-					setMapValue(container, "args", sequence("platform", item.command))
-					if mounts := mapValue(container, "volumeMounts"); mounts != nil {
-						removeNamed(mounts, "script", "scripts", "hook")
-					}
 					matched++
-					changed = true
-				}
-				if changed {
-					if volumes := mapValue(node, "volumes"); volumes != nil {
-						removeNamed(volumes, "script", "scripts", "hook")
-					}
 				}
 			})
 			documents = append(documents, &document)
 		}
 		if matched == 0 {
-			return nil, fmt.Errorf("no tools container in %s", item.path)
+			return nil, fmt.Errorf("no tools container in %s", item)
 		}
 		var after bytes.Buffer
 		encoder := yaml.NewEncoder(&after)
@@ -111,11 +97,7 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 			edits = append(edits, Edit{Path: path, Before: before, After: after.Bytes()})
 		}
 	}
-	cleanup, err := legacyToolsCleanup(root)
-	if err != nil {
-		return nil, err
-	}
-	return append(edits, cleanup...), nil
+	return edits, nil
 }
 
 func ApplyEdits(edits []Edit) error {
@@ -130,7 +112,7 @@ func applyEdits(edits []Edit, apply func(Edit, os.FileMode) error) error {
 		if err != nil {
 			return err
 		}
-		if seen[path] || (edit.Delete && len(edit.After) != 0) {
+		if seen[path] {
 			return fmt.Errorf("invalid or duplicate promotion edit: %s", edit.Path)
 		}
 		seen[path] = true
@@ -162,9 +144,6 @@ func applyEdits(edits []Edit, apply func(Edit, os.FileMode) error) error {
 }
 
 func applyEdit(edit Edit, mode os.FileMode) error {
-	if edit.Delete {
-		return os.Remove(edit.Path)
-	}
 	return atomicFile(edit.Path, edit.After, mode)
 }
 
@@ -180,114 +159,6 @@ func atomicFile(path string, data []byte, mode os.FileMode) error {
 		return err
 	}
 	return os.Rename(f.Name(), path)
-}
-
-func legacyToolsCleanup(root string) ([]Edit, error) {
-	var edits []Edit
-	for _, generator := range []struct {
-		directory, name string
-		files           []string
-	}{
-		{"platform/components/controllers", "ci-slots", []string{"ci-slots.sh"}},
-		{"platform/components/backup-job", "backup-hook", []string{"backup.sh", "heartbeat.sh"}},
-	} {
-		path := filepath.Join(root, generator.directory, "kustomization.yaml")
-		before, err := promotionSource(path)
-		if err != nil {
-			return nil, err
-		}
-		var document yaml.Node
-		if err := yaml.Unmarshal(before, &document); err != nil {
-			return nil, err
-		}
-		if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
-			return nil, fmt.Errorf("invalid promotion kustomization: %s", path)
-		}
-		mapping := document.Content[0]
-		removed := false
-		if generators := mapValue(mapping, "configMapGenerator"); generators != nil {
-			if generators.Kind != yaml.SequenceNode {
-				return nil, fmt.Errorf("invalid configMapGenerator in %s", path)
-			}
-			var kept []*yaml.Node
-			for _, entry := range generators.Content {
-				name := mapValue(entry, "name")
-				if name == nil || name.Value != generator.name {
-					kept = append(kept, entry)
-					continue
-				}
-				files := mapValue(entry, "files")
-				var actual []string
-				if files != nil && files.Kind == yaml.SequenceNode {
-					for _, file := range files.Content {
-						actual = append(actual, file.Value)
-					}
-				}
-				slices.Sort(actual)
-				expected := slices.Clone(generator.files)
-				slices.Sort(expected)
-				if !slices.Equal(actual, expected) || mapValue(entry, "literals") != nil || mapValue(entry, "envs") != nil {
-					return nil, fmt.Errorf("legacy generator %s contains unexpected content", generator.name)
-				}
-				removed = true
-			}
-			generators.Content = kept
-			if len(kept) == 0 {
-				removeMapValue(mapping, "configMapGenerator")
-			}
-		}
-		if removed {
-			var after bytes.Buffer
-			encoder := yaml.NewEncoder(&after)
-			encoder.SetIndent(2)
-			if err := encoder.Encode(&document); err != nil {
-				return nil, err
-			}
-			if err := encoder.Close(); err != nil {
-				return nil, err
-			}
-			edits = append(edits, Edit{Path: path, Before: before, After: after.Bytes()})
-		}
-		for _, name := range generator.files {
-			path := filepath.Join(root, generator.directory, name)
-			before, err := promotionSource(path)
-			if os.IsNotExist(err) {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			edits = append(edits, Edit{Path: path, Before: before, Delete: true})
-		}
-	}
-	return edits, nil
-}
-
-func promotionSource(path string) ([]byte, error) {
-	resolved, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return nil, err
-	}
-	if resolved != path {
-		return nil, fmt.Errorf("promotion path must not traverse symlinks: %s", path)
-	}
-	info, err := os.Lstat(path)
-	if err != nil {
-		return nil, err
-	}
-	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("promotion requires regular file: %s", path)
-	}
-	return os.ReadFile(path)
-}
-
-func removeMapValue(node *yaml.Node, key string) {
-	for index := 0; index+1 < len(node.Content); index += 2 {
-		if node.Content[index].Value == key {
-			node.Content = append(node.Content[:index], node.Content[index+2:]...)
-			return
-		}
-	}
 }
 
 func walkYAML(node *yaml.Node, visit func(*yaml.Node)) {
@@ -309,39 +180,4 @@ func mapValue(node *yaml.Node, key string) *yaml.Node {
 		}
 	}
 	return nil
-}
-
-func setMapValue(node *yaml.Node, key string, value *yaml.Node) {
-	for i := 0; i+1 < len(node.Content); i += 2 {
-		if node.Content[i].Value == key {
-			node.Content[i+1] = value
-			return
-		}
-	}
-	node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, value)
-}
-
-func sequence(values ...string) *yaml.Node {
-	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
-	for _, value := range values {
-		node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value})
-	}
-	return node
-}
-
-func removeNamed(node *yaml.Node, names ...string) {
-	var kept []*yaml.Node
-	for _, child := range node.Content {
-		name := mapValue(child, "name")
-		remove := false
-		for _, candidate := range names {
-			if name != nil && name.Value == candidate {
-				remove = true
-			}
-		}
-		if !remove {
-			kept = append(kept, child)
-		}
-	}
-	node.Content = kept
 }

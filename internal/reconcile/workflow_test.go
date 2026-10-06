@@ -76,43 +76,6 @@ func readWorkflow(t *testing.T, name string) workflowFile {
 	return workflow
 }
 
-func (j workflowJob) step(t *testing.T, match func(workflowStep) bool) workflowStep {
-	t.Helper()
-	for _, step := range j.Steps {
-		if match(step) {
-			return step
-		}
-	}
-	t.Fatal("workflow step not found")
-	return workflowStep{}
-}
-
-func (j workflowJob) script() string {
-	var script strings.Builder
-	for _, step := range j.Steps {
-		script.WriteString(step.Run)
-	}
-	return script.String()
-}
-
-func conjunction(t *testing.T, condition string, facts map[string]bool) bool {
-	t.Helper()
-	expression := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(condition), "${{"), "}}"))
-	if strings.Contains(expression, "||") {
-		t.Fatalf("condition %q is not a conjunction", condition)
-	}
-	for _, term := range strings.Split(expression, "&&") {
-		value, ok := facts[strings.TrimSpace(term)]
-		if !ok {
-			t.Fatalf("condition %q has unclassified term %q", condition, strings.TrimSpace(term))
-		}
-		if !value {
-			return false
-		}
-	}
-	return true
-}
-
 func TestHostedWorkflowsOnlyPlanInfrastructure(t *testing.T) {
 	t.Parallel()
 	paths, err := filepath.Glob(filepath.Join("..", "..", ".github/workflows", "*.yml"))

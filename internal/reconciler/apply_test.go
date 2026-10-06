@@ -171,7 +171,6 @@ type applyHarness struct {
 	gatus       *applyHeartbeats
 	mu          sync.Mutex
 	commands    []string
-	secrets     []string
 	selection   reconcile.Selection
 	gate        func(t *testing.T, call engineCall) (int, string)
 	engine      func(t *testing.T, call engineCall) (int, string)

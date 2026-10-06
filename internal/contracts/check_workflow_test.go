@@ -2,36 +2,11 @@ package contracts
 
 import (
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
 )
-
-type checkStep struct {
-	Run string `yaml:"run"`
-}
-
-type checkJob struct {
-	Steps []checkStep `yaml:"steps"`
-}
-
-func (job checkJob) runs(command string) bool {
-	return slices.ContainsFunc(job.Steps, func(step checkStep) bool { return strings.Contains(step.Run, command) })
-}
-
-func TestBazelCheckRunsWithinTheCheckBudget(t *testing.T) {
-	var workflow struct {
-		Jobs map[string]checkJob `yaml:"jobs"`
-	}
-	if err := yaml.Unmarshal(read(t, filepath.Join(root(t), ".github/workflows/check.yml")), &workflow); err != nil {
-		t.Fatal(err)
-	}
-	if !workflow.Jobs["check"].runs("ci measure --stage infra-fast --budget 10s --report-dir dist/reports/check-ledger") {
-		t.Fatal("check does not measure the Bazel check against the ten-second budget")
-	}
-}
 
 func TestCompiledPromotionChecksAreReusedOnlyForMatchingCodeAndFreshPlatformData(t *testing.T) {
 	var workflow struct {

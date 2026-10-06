@@ -103,7 +103,7 @@ func newRunnerAdmissionCommand() *cobra.Command {
 func newToolsPromotionCommand() *cobra.Command {
 	var root, image string
 	var apply bool
-	cmd := &cobra.Command{Use: "promote-tools", Short: "Update tools image pins and commands together", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	cmd := &cobra.Command{Use: "promote-tools", Short: "Update tools image pins", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		edits, err := platformops.ToolsPromotion(root, image)
 		if err != nil {
 			return err

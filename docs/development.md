@@ -170,7 +170,7 @@ infra platform promote-tools --image "$VERIFIED_TOOLS_IMAGE" --apply
 git diff -- platform
 ```
 
-`promote-tools` pairs the published tools digest with native commands, removes the obsolete script ConfigMap generators and deletes their four source scripts; it does not publish images or apply cluster resources.
+`promote-tools` updates the backup-tools image digest in workload manifests.
 
 | Dedicated VM setting            | Value                                                                                                                                       |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |

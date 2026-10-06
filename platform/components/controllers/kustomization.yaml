@@ -5,6 +5,3 @@ metadata:
 resources:
   - releases.yaml
   - ci-slots.yaml
-generatorOptions:
-  annotations:
-    kustomize.toolkit.fluxcd.io/substitute: disabled

@@ -10,10 +10,6 @@ import (
 	"github.com/fredrir/infra/internal/process"
 )
 
-func SmokeInstall(ctx context.Context, runner process.Runner, format, name, binary string) error {
-	return SmokeInstallBatch(ctx, runner, format, []string{name, binary})
-}
-
 func SmokeInstallBatch(ctx context.Context, runner process.Runner, format string, identities []string) error {
 	return smokeInstallBatch(ctx, runner, format, identities, "/")
 }

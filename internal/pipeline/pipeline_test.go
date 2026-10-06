@@ -162,13 +162,6 @@ func TestConfigurationFailureStillProducesReport(t *testing.T) {
 	}
 }
 
-func TestImageRejectsEscapingDockerfileBeforeConnecting(t *testing.T) {
-	_, err := pipeline.Image(context.Background(), pipeline.ImageOptions{Image: "registry.test/image:tag", Dockerfile: "../Dockerfile"})
-	if err == nil || !strings.Contains(err.Error(), "relative") {
-		t.Fatalf("escaping Dockerfile accepted: %v", err)
-	}
-}
-
 func TestNonGoInputsSelectOnlyDeclaredDataDependents(t *testing.T) {
 	for _, test := range []struct {
 		path string

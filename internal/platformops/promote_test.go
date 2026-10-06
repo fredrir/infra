@@ -4,39 +4,22 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
-func TestToolsPromotionChangesPinsAndCommandsTogether(t *testing.T) {
+func TestToolsPromotionChangesOnlyImagePins(t *testing.T) {
 	root := t.TempDir()
 	for _, path := range []string{"platform/components/controllers/ci-slots.yaml", "platform/components/object-store/provisioner.yaml", "platform/components/repository-maintenance/maintenance.yaml", "platform/projects/y/backup.yaml", "platform/projects/llunde-pyparser/backup.yaml", "platform/projects/portfolio/backup.yaml"} {
 		full := filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		data := "spec:\n  containers:\n  - name: backup\n    image: ghcr.io/fredrir/platform-backup-tools@sha256:" + strings.Repeat("a", 64) + "\n    args: [/hooks/backup.sh]\n    volumeMounts:\n    - name: hook\n      mountPath: /hooks\n    - name: files\n      mountPath: /files\n  volumes:\n  - name: hook\n    configMap: {name: backup-hook}\n  - name: files\n    emptyDir: {}\n"
+		data := "spec:\n  containers:\n  - name: backup\n    image: ghcr.io/fredrir/platform-backup-tools@sha256:" + strings.Repeat("a", 64) + "\n    command: [/usr/local/bin/infra]\n    args: [platform, backup]\n    volumeMounts:\n    - name: data\n      mountPath: /data\n    - name: files\n      mountPath: /files\n  volumes:\n  - name: data\n    emptyDir: {}\n  - name: files\n    emptyDir: {}\n"
 		if err := os.WriteFile(full, []byte(data), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, fixture := range []struct{ directory, generator, files string }{
-		{"controllers", "ci-slots", "ci-slots.sh"},
-		{"backup-job", "backup-hook", "backup.sh heartbeat.sh"},
-	} {
-		directory := filepath.Join(root, "platform/components", fixture.directory)
-		if err := os.MkdirAll(directory, 0755); err != nil {
-			t.Fatal(err)
-		}
-		manifest := "resources: [keep.yaml]\nconfigMapGenerator:\n- name: " + fixture.generator + "\n  files:\n"
-		for _, name := range strings.Fields(fixture.files) {
-			manifest += "  - " + name + "\n"
-			if err := os.WriteFile(filepath.Join(directory, name), []byte("legacy script"), 0750); err != nil {
-				t.Fatal(err)
-			}
-		}
-		manifest += "- name: unrelated\n  literals: [keep=value]\n"
-		if err := os.WriteFile(filepath.Join(directory, "kustomization.yaml"), []byte(manifest), 0640); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -45,16 +28,19 @@ func TestToolsPromotionChangesPinsAndCommandsTogether(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(edits) != 11 {
-		t.Fatalf("expected eleven changes, got %d", len(edits))
+	if len(edits) != 6 {
+		t.Fatalf("expected six changes, got %d", len(edits))
 	}
 	for _, edit := range edits {
-		text := string(edit.After)
-		if strings.Contains(string(edit.Before), "containers:") && (!strings.Contains(text, image) || !strings.Contains(text, "/usr/local/bin/infra") || !strings.Contains(text, "platform") || strings.Contains(text, "name: hook") || !strings.Contains(text, "name: files")) {
-			t.Fatalf("invalid promotion: %s", text)
+		var want, got any
+		if err := yaml.Unmarshal([]byte(strings.ReplaceAll(string(edit.Before), strings.Repeat("a", 64), strings.Repeat("b", 64))), &want); err != nil {
+			t.Fatal(err)
 		}
-		if strings.HasSuffix(edit.Path, "kustomization.yaml") && (!strings.Contains(text, "name: unrelated") || !strings.Contains(text, "keep.yaml") || strings.Contains(text, ".sh")) {
-			t.Fatalf("unrelated generator or resource changed: %s", text)
+		if err := yaml.Unmarshal(edit.After, &got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("promotion changed more than the image pin: %s", edit.After)
 		}
 		current, _ := os.ReadFile(edit.Path)
 		if string(current) != string(edit.Before) {
@@ -70,10 +56,10 @@ func TestToolsPromotionChangesPinsAndCommandsTogether(t *testing.T) {
 	}
 }
 
-func TestPromotionRollbackRestoresDeletedFilesContentsAndModes(t *testing.T) {
+func TestPromotionRollbackRestoresContentsAndModes(t *testing.T) {
 	root := t.TempDir()
 	var edits []Edit
-	for index, name := range []string{"update.yaml", "delete.sh", "fail.yaml"} {
+	for index, name := range []string{"update.yaml", "executable", "fail.yaml"} {
 		path := filepath.Join(root, name)
 		mode := os.FileMode(0640)
 		if index == 1 {
@@ -83,9 +69,6 @@ func TestPromotionRollbackRestoresDeletedFilesContentsAndModes(t *testing.T) {
 			t.Fatal(err)
 		}
 		edit := Edit{Path: path, Before: []byte(name), After: []byte("promoted")}
-		if index == 1 {
-			edit.Delete, edit.After = true, nil
-		}
 		edits = append(edits, edit)
 	}
 	failure := errors.New("injected write failure")
@@ -114,7 +97,7 @@ func TestPromotionRollbackRestoresDeletedFilesContentsAndModes(t *testing.T) {
 	}
 }
 
-func TestPromotionPreflightsEveryDeletionBeforeChangingFiles(t *testing.T) {
+func TestPromotionPreflightsEveryEditBeforeChangingFiles(t *testing.T) {
 	for _, scenario := range []string{"changed", "symlink", "directory"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
@@ -134,28 +117,14 @@ func TestPromotionPreflightsEveryDeletionBeforeChangingFiles(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := ApplyEdits([]Edit{{Path: first, Before: []byte("original"), Delete: true}, {Path: last, Before: []byte("original"), Delete: true}}); err == nil {
-				t.Fatal("invalid deletion accepted")
+			if err := ApplyEdits([]Edit{{Path: first, Before: []byte("original"), After: []byte("promoted")}, {Path: last, Before: []byte("original"), After: []byte("promoted")}}); err == nil {
+				t.Fatal("invalid edit accepted")
 			}
 			data, err := os.ReadFile(first)
 			if err != nil || string(data) != "original" {
-				t.Fatal("preflight failure removed an earlier file")
+				t.Fatal("preflight failure changed an earlier file")
 			}
 		})
-	}
-}
-
-func TestPromotionRejectsConcurrentEditsBeforeWriting(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(path, []byte("changed"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := ApplyEdits([]Edit{{Path: path, Before: []byte("old"), After: []byte("new")}}); err == nil {
-		t.Fatal("concurrent change overwritten")
-	}
-	data, _ := os.ReadFile(path)
-	if string(data) != "changed" {
-		t.Fatal("file changed")
 	}
 }
 

@@ -4,6 +4,3 @@ components:
   - ../repository-maintenance
 resources:
   - heartbeat.yaml
-generatorOptions:
-  annotations:
-    kustomize.toolkit.fluxcd.io/substitute: disabled
