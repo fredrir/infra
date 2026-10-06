@@ -216,19 +216,19 @@ func TestCIReleaseChecksRequireLatestSuccessfulMainPush(t *testing.T) {
 	}
 }
 
-func TestChannelPromotionWaitsForBudgetAndPlanBeforeMerging(t *testing.T) {
+func TestChannelPromotionWaitsForCheckAndPlanBeforeMerging(t *testing.T) {
 	for _, test := range []struct {
 		name, checks string
 		merge        bool
 	}{
 		{"checks not registered", `[{"name":"cli / build","state":"SUCCESS"}]`, false},
-		{"budget running", `[{"name":"check / budget","state":"IN_PROGRESS"},{"name":"reconcile / plan","state":"SUCCESS"}]`, false},
-		{"budget failed", `[{"name":"check / budget","state":"FAILURE"},{"name":"reconcile / plan","state":"SUCCESS"}]`, false},
-		{"plan running", `[{"name":"check / budget","state":"SKIPPED"},{"name":"reconcile / plan","state":"IN_PROGRESS"}]`, false},
-		{"plan skipped", `[{"name":"check / budget","state":"SUCCESS"},{"name":"reconcile / plan","state":"SKIPPED"}]`, false},
-		{"another check queued", `[{"name":"check / budget","state":"SKIPPED"},{"name":"reconcile / plan","state":"SUCCESS"},{"name":"check / host-access","state":"QUEUED"}]`, false},
-		{"checks passed", `[{"name":"check / budget","state":"SUCCESS"},{"name":"reconcile / plan","state":"SUCCESS"}]`, true},
-		{"bot budget skipped", `[{"name":"check / budget","state":"SKIPPED"},{"name":"reconcile / plan","state":"SUCCESS"}]`, true},
+		{"check running", `[{"name":"check / check","state":"IN_PROGRESS"},{"name":"reconcile / plan","state":"SUCCESS"}]`, false},
+		{"check failed", `[{"name":"check / check","state":"FAILURE"},{"name":"reconcile / plan","state":"SUCCESS"}]`, false},
+		{"plan running", `[{"name":"check / check","state":"SKIPPED"},{"name":"reconcile / plan","state":"IN_PROGRESS"}]`, false},
+		{"plan skipped", `[{"name":"check / check","state":"SUCCESS"},{"name":"reconcile / plan","state":"SKIPPED"}]`, false},
+		{"another check queued", `[{"name":"check / check","state":"SKIPPED"},{"name":"reconcile / plan","state":"SUCCESS"},{"name":"check / host-access","state":"QUEUED"}]`, false},
+		{"checks passed", `[{"name":"check / check","state":"SUCCESS"},{"name":"reconcile / plan","state":"SUCCESS"}]`, true},
+		{"bot check skipped", `[{"name":"check / check","state":"SKIPPED"},{"name":"reconcile / plan","state":"SUCCESS"}]`, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

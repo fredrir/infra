@@ -260,9 +260,9 @@ func mergeProposal(ctx context.Context, runner process.Runner, branch string) er
 					break
 				}
 			}
-			for _, name := range []string{"check / budget", "reconcile / plan"} {
+			for _, name := range []string{"check / check", "reconcile / plan"} {
 				if !slices.ContainsFunc(checks, func(check struct{ Name, State string }) bool {
-					return check.Name == name && (check.State == "SUCCESS" || name == "check / budget" && check.State == "SKIPPED")
+					return check.Name == name && (check.State == "SUCCESS" || name == "check / check" && check.State == "SKIPPED")
 				}) {
 					err = fmt.Errorf("promotion check %s has not completed successfully", name)
 					break
