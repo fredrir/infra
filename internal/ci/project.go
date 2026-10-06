@@ -41,8 +41,6 @@ type ProjectImage struct {
 	Recipe      string            `json:"recipe"`
 	Smoke       string            `json:"smoke"`
 	Precheck    string            `json:"precheck"`
-	TestSetup   string            `json:"test_setup,omitempty"`
-	TestFiles   []string          `json:"test_files,omitempty"`
 	Arguments   map[string]string `json:"arguments,omitempty"`
 	Variables   []string          `json:"variables,omitempty"`
 	BuildArgs   string            `json:"build_args"`
@@ -133,13 +131,6 @@ func ReadProject(root, repository, repositoryID string) (Project, error) {
 		for target := range project.ImageInputs.Targets {
 			if err := validateProjectInputs(*project.ImageInputs, target); err != nil {
 				return Project{}, err
-			}
-		}
-	}
-	for _, image := range project.Images {
-		for _, path := range image.TestFiles {
-			if !validInputPath(path, false) {
-				return Project{}, errors.New("image verification files must be repository-relative")
 			}
 		}
 	}

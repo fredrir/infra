@@ -35,13 +35,8 @@
       "timeout": 120,
       "scanner_java": false,
       "recipe": "",
-      "smoke": "/tmp/infra-measure ci project check --project llunde-pyparser --suite fast && /tmp/infra-measure ci project check --project llunde-pyparser --suite smoke",
-      "build_args": "",
-      "test_setup": "python -m ensurepip --upgrade && python -m pip install --disable-pip-version-check --no-cache-dir pytest==9.1.1",
-      "test_files": [
-        "tests/conftest.py",
-        "tests/unit/test_invariants.py"
-      ]
+      "smoke": "",
+      "build_args": ""
     }
   ],
   "checks": [

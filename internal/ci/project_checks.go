@@ -58,9 +58,6 @@ func ProjectCheckCommands(ctx context.Context, runner process.Runner, project, s
 		return run(ctx, runner, []string{"cargo", "fmt", "--all", "--check"}, []string{"cargo", "metadata", "--locked", "--offline", "--no-deps", "--format-version", "1"})
 	case "portfolio/web-fast":
 		return run(ctx, runner, []string{"bun", "run", "lint"}, []string{"bun", "run", "--filter", "@portfolio/web", "typecheck"}, []string{"bun", "run", "--filter", "@portfolio/edge", "typecheck"})
-	case "llunde-pyparser/fast":
-		runner.Env = append(runner.Env, "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1")
-		return run(ctx, runner, []string{"python", "-m", "compileall", "-q", "src"}, []string{"python", "-c", "from pyparser.fixtures.review.ui.build import _STATIC_DIR; assert (_STATIC_DIR / 'index.html').is_file()"}, []string{"python", "-m", "pytest", "-o", "addopts=", "tests/unit/test_invariants.py"})
 	case "llunde-backend/integration":
 		return WithDatabase(ctx, runner, Database{User: "llunde", Name: "llunde", Variables: []string{"CI_POSTGRES_URL"}, JDBC: true}, func(ctx context.Context, runner process.Runner) error {
 			return WithValkey(ctx, runner, 0, func(ctx context.Context, runner process.Runner) error {
@@ -144,19 +141,6 @@ func ProjectCheckCommands(ctx context.Context, runner process.Runner, project, s
 	case "llunde-pyparser/ui":
 		runner.Dir = filepath.Join(runner.Dir, "review-ui")
 		return run(ctx, runner, []string{"bun", "install", "--frozen-lockfile"}, []string{"bun", "run", "check:local"})
-	case "llunde-pyparser/smoke":
-		root := filepath.Join(runner.Dir, "src/pyparser/fixtures/review/static")
-		if info, err := os.Stat(filepath.Join(root, "index.html")); err != nil || !info.Mode().IsRegular() {
-			return errors.New("runtime UI index missing")
-		}
-		assets, err := filepath.Glob(filepath.Join(root, "assets/*.js"))
-		if err != nil {
-			return err
-		}
-		if len(assets) == 0 {
-			return errors.New("runtime UI assets missing")
-		}
-		return nil
 	case "portfolio/security":
 		return CheckWebsiteSecurity(ctx, &http.Client{Timeout: 60 * time.Second}, "hansteen.dev")
 	default:

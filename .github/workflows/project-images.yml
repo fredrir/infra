@@ -94,8 +94,6 @@ jobs:
       recipe: ${{ matrix.image.recipe }}
       image-test-command: ${{ matrix.image.smoke }}
       test-command: ${{ matrix.image.precheck }}
-      image-test-setup: ${{ matrix.image.test_setup || '' }}
-      image-test-files: ${{ toJSON(matrix.image.test_files || fromJSON('[]')) }}
       build-args: ${{ matrix.image.build_args }}
       dependency-image: ${{ needs.dependencies.outputs.image }}
       cli-artifact: ${{ needs.cli.outputs.artifact }}

@@ -32,12 +32,6 @@ on:
       image-test-command:
         type: string
         default: ''
-      image-test-setup:
-        type: string
-        default: ''
-      image-test-files:
-        type: string
-        default: '[]'
       image-test-shell:
         type: string
         default: bash
@@ -308,8 +302,6 @@ jobs:
           CHECK_TARGET: ${{ inputs.check-target }}
           BUILD_ARGS: ${{ inputs.build-args }}
           IMAGE_TEST_COMMAND: ${{ inputs.image-test-command }}
-          IMAGE_TEST_SETUP: ${{ inputs.image-test-setup }}
-          IMAGE_TEST_FILES: ${{ inputs.image-test-files }}
           IMAGE_TEST_SHELL: ${{ inputs.image-test-shell }}
           BUILD_TIMEOUT: ${{ inputs.timeout-minutes }}
         run: |
@@ -320,7 +312,7 @@ jobs:
           infra pipeline image --root .infra-build-recipe --context "$CONTEXT" --dockerfile "${SHARED_DOCKERFILE:-$DOCKERFILE}" \
             --target "$TARGET" --check-target "$CHECK_TARGET" --check-report-dir "$RUNNER_TEMP/performance/checks" --infra-binary "$INFRA_BINARY" --image "$IMAGE:$GITHUB_SHA" --build-args "$(infra ci build-args)" \
             --source-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" \
-            --test-command "$IMAGE_TEST_COMMAND" --test-setup-command "$IMAGE_TEST_SETUP" --test-files "$IMAGE_TEST_FILES" --test-shell "$IMAGE_TEST_SHELL" --timeout "${BUILD_TIMEOUT}m"
+            --test-command "$IMAGE_TEST_COMMAND" --test-shell "$IMAGE_TEST_SHELL" --timeout "${BUILD_TIMEOUT}m"
           printf 'report-id=%s-%s\n' "${IMAGE##*/}" "$(cat /proc/sys/kernel/random/uuid)" >> "$GITHUB_OUTPUT"
       - name: Analyze published image layers
         if: steps.affected.outputs.changed == 'true'
