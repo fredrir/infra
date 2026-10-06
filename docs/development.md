@@ -45,7 +45,7 @@ git diff --exit-code -- '*BUILD.bazel'
 | --- | --- |
 | `infra dev doctor` | JSON diagnostics: Go, Bazel, pinned tools, Docker, KVM, QEMU, kubeconfig, cluster reachability, Ansible environment; non-zero exit on any failure |
 | `infra dev setup` | `infra` built into `.cache/dev/bin`; `core.hooksPath` set to `.githooks`; pinned tools installed into `.cache/dev/tools`; Ansible environment synced with `uv sync --frozen --group ci` |
-| Pre-commit hook | [`.githooks/pre-commit`](../.githooks/pre-commit): `infra ci prepare-validation` and `infra ci validate` over the working tree; output only on failure; `git commit --no-verify` skips |
+| Pre-commit hook | [`.githooks/pre-commit`](../.githooks/pre-commit): `infra ci prepare-validation` and `infra ci validate` over the working tree; `TF_DATA_DIR=.cache/pre-commit/tofu` keeps validation off the S3 backend, so no AWS session is needed; output only on failure; `git commit --no-verify` skips |
 | `infra dev clean [--all]` | `.cache/dev` removed; `--all` also stops the engines, removes their cache volumes, deletes the cluster and stops the guests |
 | `infra dev render [--project P] [--out FILE]` | Offline `flux build --dry-run` with `settings.yaml` substitution; `.cache/dev/render/platform.yaml`; JSON report: document count, unsubstituted variables |
 | `infra dev diff` | `flux diff kustomization`: server-side dry-run against `KUBECONFIG`; `*.sops.yaml` ignored; exit 1 on differences |
@@ -70,6 +70,35 @@ git diff --exit-code -- '*BUILD.bazel'
 | Image inputs | `images/catalog.yaml` `inputs`, plus the injected `infra` binary digest for `cli: true`; CLI source, test and `internal/dev` changes that leave the binary identical do not rebuild images |
 
 [Local development layout](../dev/README.md)
+
+## AWS access
+
+| Setting | Value |
+| --- | --- |
+| Identity | IAM Identity Center organization instance `portfolio` in `eu-north-1`; user `fredrir`; permission set `AdministratorAccess` on account `391824190305` |
+| Portal | `https://d-c3676b3dfe.awsapps.com/start` |
+| Session | 90-day Identity Center session; the CLI refreshes the 12-hour role credentials from it |
+| Profile | `default` in `~/.aws/config` on `macie` and `archie`; used by `aws`, `tofu` and the S3 state backend |
+| Root user | Console-only for account-level tasks |
+
+```ini
+[default]
+sso_session = llunde
+sso_account_id = 391824190305
+sso_role_name = AdministratorAccess
+region = eu-north-1
+
+[sso-session llunde]
+sso_start_url = https://d-c3676b3dfe.awsapps.com/start
+sso_region = eu-north-1
+sso_registration_scopes = sso:account:access
+```
+
+```sh
+aws sso login
+ssh archie aws sso login --use-device-code
+aws sts get-caller-identity
+```
 
 ## Binary reuse
 
