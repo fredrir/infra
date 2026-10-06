@@ -31,7 +31,6 @@
       "timeout": 90,
       "scanner_java": false,
       "recipe": "y-api",
-      "smoke": "",
       "build_args": ""
     },
     {
@@ -42,7 +41,6 @@
       "timeout": 90,
       "scanner_java": false,
       "recipe": "y-web",
-      "smoke": "",
       "build_args": ""
     }
   ],

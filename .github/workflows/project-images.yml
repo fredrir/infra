@@ -92,7 +92,6 @@ jobs:
       timeout-minutes: ${{ matrix.image.timeout }}
       scanner-java: ${{ matrix.image.scanner_java }}
       recipe: ${{ matrix.image.recipe }}
-      image-test-command: ${{ matrix.image.smoke }}
       test-command: ${{ matrix.image.precheck }}
       build-args: ${{ matrix.image.build_args }}
       dependency-image: ${{ needs.dependencies.outputs.image }}

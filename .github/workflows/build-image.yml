@@ -53,9 +53,6 @@ on:
       deploy:
         type: boolean
         default: true
-      layer-cache:
-        type: boolean
-        default: true
       scanner-java:
         type: boolean
         default: false
@@ -190,15 +187,6 @@ jobs:
           mkdir -p containers
           cp .infra-build-recipe/platform/projects/y/Caddyfile containers/Caddyfile
           printf 'SHARED_DOCKERFILE=.infra-build-recipe/platform/projects/y/%s.Dockerfile\n' "${RECIPE#y-}" >> "$GITHUB_ENV"
-      - name: Validate Dagger cache policy
-        if: steps.affected.outputs.changed == 'true'
-        env:
-          LAYER_CACHE: ${{ inputs.layer-cache }}
-        run: |
-          if [[ "$LAYER_CACHE" != true ]]; then
-            echo 'layer-cache=false is unsupported with Dagger; use an isolated engine for a cold build.' >&2
-            exit 1
-          fi
       - name: Check inputs
         if: steps.affected.outputs.changed == 'true'
         env:
@@ -219,7 +207,6 @@ jobs:
           TEST_COMMAND: ${{ inputs.test-command }}
           IMAGE: ${{ inputs.image }}
           CONTEXT: ${{ inputs.context }}
-          LAYER_CACHE: ${{ inputs.layer-cache }}
         run: infra ci measure-check --stage test-command --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- bash -euo pipefail -c "$TEST_COMMAND"
       - name: Install verification tools
         if: steps.affected.outputs.changed == 'true'

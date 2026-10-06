@@ -35,7 +35,6 @@
       "timeout": 120,
       "scanner_java": false,
       "recipe": "",
-      "smoke": "",
       "build_args": ""
     }
   ],

@@ -40,7 +40,6 @@
       "timeout": 45,
       "scanner_java": false,
       "recipe": "",
-      "smoke": "",
       "build_args": "",
       "variables": [
         "VITE_API_URL",

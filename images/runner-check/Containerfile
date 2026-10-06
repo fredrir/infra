@@ -74,8 +74,7 @@ RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
 COPY --chmod=755 .infra-artifacts/infra /usr/local/bin/infra
 COPY --from=tools /out/ /opt/tools/
 RUN RUNNER_TEMP=/opt infra ci install-tools age age-keygen uv helm yq \
-    && chmod 755 /opt/tools \
-    && ln -s /usr/local/bin/infra /usr/local/bin/infra-runner-hook
+    && chmod 755 /opt/tools
 ENV PATH=/usr/local/bin:/opt/tools:/opt/venv/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV UV_PYTHON_DOWNLOADS=never
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv

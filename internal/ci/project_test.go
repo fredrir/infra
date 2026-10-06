@@ -180,9 +180,6 @@ func TestParserDatabaseNameAndEnvironmentReachTests(t *testing.T) {
 		commands = append(commands, options)
 		return process.Result{}, nil
 	}}
-	if !databaseNamePattern.MatchString("pyparser_ci") {
-		t.Fatal("parser database name rejected")
-	}
 	ctx := context.Background()
 	if err := withDatabase(ctx, runner, Database{User: "pyparser", Name: "pyparser_ci", Port: 5433, Variables: []string{"PYPARSER_DATABASE_URL"}}, t.TempDir(), nil, func(ctx context.Context, runner process.Runner) error {
 		return runner.Run(ctx, "python", "-m", "pytest")

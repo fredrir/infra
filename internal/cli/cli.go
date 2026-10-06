@@ -26,16 +26,13 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if filepath.Base(os.Args[0]) == "MAKEDEV" {
 		return kata.MakeDevices(ctx, args, stderr)
 	}
-	if filepath.Base(os.Args[0]) == "infra-runner-hook" || filepath.Base(os.Args[0]) == "ci-job-started.sh" {
-		args = []string{"platform", "runner-hook"}
-	}
 	root := &cobra.Command{Use: "infra", Short: "Build, verify, and operate infrastructure", SilenceUsage: true, SilenceErrors: true}
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	root.SetArgs(args)
 	root.CompletionOptions.DisableDefaultCmd = true
 	ci := &cobra.Command{Use: "ci", Short: "Continuous integration commands", RunE: missingCommand}
-	ci.AddCommand(newPlanImagesCommand(), newCheckCommand(), newMeasureCommand(), newReadinessCommand(), newAffectedProjectCommand())
+	ci.AddCommand(newPlanImagesCommand(), newMeasureCommand(), newReadinessCommand(), newAffectedProjectCommand())
 	ci.AddCommand(newCheckBudgetCommand(), newMeasureCheckCommand())
 	root.AddCommand(ci, newPipelineCommand(), newDoctorCommand(), &cobra.Command{
 		Use: "version", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {

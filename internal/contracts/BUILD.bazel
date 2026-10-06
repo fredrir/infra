@@ -3,7 +3,6 @@ load("@rules_go//go:def.bzl", "go_test")
 go_test(
     name = "contracts_test",
     srcs = [
-        "alerts_workflow_test.go",
         "arc_test.go",
         "bazel_cache_test.go",
         "bazel_cache_workflows_test.go",

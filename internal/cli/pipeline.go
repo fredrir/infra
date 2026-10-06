@@ -14,8 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newCheckCommand() *cobra.Command { return newBuildCommand("check", "test") }
-
 func newPipelineCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "pipeline", Short: "Execute reproducible builds", RunE: missingCommand}
 	cmd.AddCommand(newBuildCommand("build", "build"), newBuildCommand("check", "test"), newBuildCommand("check-fast", "fast-check"), newBuildCommand("check-deep", "test"), newBuildCommand("prepare-check", "prepare-check"), newImageCommand())

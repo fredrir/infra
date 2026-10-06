@@ -39,7 +39,6 @@ type ProjectImage struct {
 	Timeout     int               `json:"timeout"`
 	ScannerJava bool              `json:"scanner_java"`
 	Recipe      string            `json:"recipe"`
-	Smoke       string            `json:"smoke"`
 	Precheck    string            `json:"precheck"`
 	Arguments   map[string]string `json:"arguments,omitempty"`
 	Variables   []string          `json:"variables,omitempty"`

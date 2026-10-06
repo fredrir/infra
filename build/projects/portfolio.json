@@ -43,7 +43,6 @@
       "timeout": 150,
       "scanner_java": false,
       "recipe": "",
-      "smoke": "",
       "build_args": "",
       "arguments": {
         "APP_VERSION": "$revision"
@@ -57,7 +56,6 @@
       "timeout": 150,
       "scanner_java": false,
       "recipe": "",
-      "smoke": "",
       "build_args": "",
       "arguments": {
         "VITE_APP_VERSION": "$revision"
@@ -76,7 +74,6 @@
       "timeout": 150,
       "scanner_java": false,
       "recipe": "",
-      "smoke": "",
       "build_args": "",
       "arguments": {
         "APP_VERSION": "$revision"

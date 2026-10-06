@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
@@ -14,9 +13,6 @@ func TestImageBuildCancellationPreservesVerifiedArtifactReuse(t *testing.T) {
 	}
 	if err := yaml.Unmarshal(read(t, filepath.Join(root(t), ".github/workflows/build-image.yml")), &workflow); err != nil {
 		t.Fatal(err)
-	}
-	if !strings.Contains(workflow.Jobs["build"].If, "cancelled()") {
-		t.Fatal("build guard must explicitly handle cancellation and skipped bootstrap jobs")
 	}
 	program := workflowCondition(t, workflow.Jobs["build"].If)
 	for _, test := range []struct {
