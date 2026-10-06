@@ -21,7 +21,7 @@ model_list:
     model: openai/PaddlePaddle/PaddleOCR-VL-1.6
     api_base: http://paddleocr:8080/v1
     api_key: os.environ/PADDLEOCR_API_KEY
-    max_parallel_requests: 1
+    max_parallel_requests: 2
   model_info:
     mode: chat
     supports_vision: true
