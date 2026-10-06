@@ -27,7 +27,7 @@ model_list:
     supports_vision: true
     input_cost_per_token: 0
     output_cost_per_token: 0
-    max_input_tokens: 8192
+    max_input_tokens: 16384
     max_output_tokens: 4096
 - model_name: vertex_ai/*
   litellm_params:

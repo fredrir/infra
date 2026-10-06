@@ -94,7 +94,7 @@ spec:
         - --alias
         - PaddlePaddle/PaddleOCR-VL-1.6
         - --ctx-size
-        - '16384'
+        - '32768'
         - --parallel
         - '2'
         - --threads
