@@ -227,7 +227,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Setting | Value |
 | --- | --- |
 | Hosts | Inventory group `volatile`, also in `agent`: `fredrir-10` |
-| Role | `llm/ntnu-egress` relay; future backfill |
+| Role | `llm/ntnu-egress` relay |
 | Reconciliation | `ansible/volatile.yml`, linear strategy with SSH pipelining over a persistent master, run after the apply records `complete` and before its lease is released; fleet plays target `…:!volatile` |
 | Failing or unreachable host | Recorded as `volatile_failure` in the completed reconciliation status; requests no recovery |
 | Deep verification | `volatile.yml --check` beside the fleet; results under `degraded`; outcome and exit status unchanged |
@@ -246,10 +246,10 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Volatile series labels | With `honorLabels: false`, fredrir-10's kubelet and cAdvisor series carry the target namespace `kube-system`, and their real `namespace` and `pod` move to `exported_namespace` and `exported_pod`, so namespace-keyed alerts do not attribute fredrir-10 series to the workload's namespace |
 | Kubelet scrape credential | The volatile kubelet monitors present a 1 h projected token (`bearerTokenFile`), not the chart's non-expiring `monitoring-prometheus-token`, so a hostile kubelet capturing it can replay it against the API for at most its lifetime; the token is the Prometheus pod's own `monitoring-prometheus` identity (nodes, nodes/metrics, services, endpoints, pods, endpointslices, ingresses read; no nodes/proxy, no writes). A dedicated least-privilege ServiceAccount is not achievable through the operator: projected tokens mint only for the pod's ServiceAccount, and a kubelet-only audience fails the kubelet's TokenReview against the cluster api-audiences, so the pod identity with a short lifetime is the least exposure. `monitoring-prometheus-token` is created by the kube-prometheus-stack chart (`prometheus.serviceAccount.createTokenSecret`) for the fleet kubelet monitor, not a leftover |
 | Readiness waits | `verify.yml` and `maintenance.yml` exclude `node-restriction.kubernetes.io/volatile`; `maintenance.yml` never targets volatile hosts, which take unattended patching |
-| Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes, 8472/udp with the fleet; the fleet reaches its 9100, 9253 and 10250; SSH from Macie, Archie and `tag:infra-reconciler` |
+| Tailnet tag | `tag:platform-volatile`: 6443 to the control-plane routes; fleet overlay grants in [Tailnet policy](../tailscale/policy.hujson); the fleet reaches its 9100, 9253 and 10250; SSH from Macie, Archie and `tag:infra-reconciler` |
 | Inbound access | Tailnet; NTNU VPN (`~/ntnu-proxy`, `10.50.0.0/16`) is owner-only break-glass SSH with keys only, never used by the fleet |
 | Container engines | Docker, containerd.io, Podman and Buildah removed at takeover; only the k3s agent runs |
-| Trust | NTNU controls hypervisor and network; no ProxyJump, `ForwardAgent=no`, no delegated secrets; holds its node credentials and the job credentials of its CI pools |
+| Trust | NTNU controls hypervisor and network; no ProxyJump, `ForwardAgent=no`, no delegated secrets; holds its node credentials; CI pools do not schedule there |
 | Removal | Delete from `agent`, `volatile` and `node-registration`; `kubectl delete node fredrir-10`; delete `fredrir-10.node-password.k3s` |
 
 | Data volume | Value |
@@ -259,7 +259,6 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Formatting | Only when `wipefs` finds no signature; foreign or whole-disk signatures fail closed |
 | Mount | `srv-data.mount` at `/srv/data`; `Options=nofail`; `WantedBy=local-fs.target` |
 | Layout | `data_volume_binds` (inventory-driven): `/srv/data/<name>` bound onto `/var/lib/rancher` (containerd images), `/var/lib/kubelet` (pod emptyDirs) — large mostly-sequential caches |
-| Hot scratch | Latency-sensitive CI scratch (Rust `target`, sccache) belongs in a `medium: Memory` emptyDir counted against the pod's memory, not on the IOPS-capped volume; deferred until fio-on-real-volume and pod-limit headroom are confirmed (3 Rust pods at 10Gi limits vs 62 GiB RAM), so it is a measured follow-up, not yet applied |
 | Consumers | `data_volume_consumers` get `RequiresMountsFor=` on the layout; running consumers restart once when a mount activates |
 | Missing volume | Consumers stay stopped; nothing writes the 40 GB root |
 
@@ -267,7 +266,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | --- | --- |
 | Path | Direct UDP to every fleet peer through NTNU's NAT; requires inbound UDP 41641 on each peer's provider firewall; Tailscale DERP is the fallback |
 | Overlay | Tailscale's bypass-marked packets never enter the pod CIDR (host firewall output chain), so tailscaled cannot pick pod addresses as endpoints |
-| Measure | On fredrir-10: `tailscale status` (`CurAddr` per peer); `tailscale ping --c 20 fredrir-07`; `iperf3` to fredrir-09 over the Tailnet; Rust job `rust-cache-restore` timings |
+| Measure | On fredrir-10: `tailscale status` (`CurAddr` per peer); `tailscale ping --c 20 fredrir-07`; `iperf3` to fredrir-09 over the Tailnet |
 
 | Flannel backend | Value |
 | --- | --- |
@@ -283,19 +282,18 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 
 | Order | Owner action | Value |
 | --- | --- | --- |
-| 1 | Roll out nsql | Pin an infra revision whose `rust-auto-tag.yml` runs on `rust-tag-amd64`. Every SHA in nsql's `auto-tag.sts.yaml` allowlist (current and previous) must be such a revision: drop the pre-split `a57b0e1` and `d9016b2` even if one entry remains. Check each with `git show <sha>:.github/workflows/rust-auto-tag.yml \| grep runs-on` |
-| 2 | Attach the OpenStack volume | The volume whose `/dev/disk/by-id` path is `data_volume_device` |
-| 3 | Apply `tailscale/policy.hujson` | Adds `tag:platform-volatile` |
-| 4 | Install the verified `infra` release at `/usr/local/bin/infra` over `ssh ntnu` | Release SHA-256 from the trusted build |
-| 5 | Deliver the enrollment key | `infra operations enrollment create-deliver --node fredrir-10 --role volatile --host ntnu --sudo` |
-| 6 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
-| 7 | Set inventory values | `tailscale_ip` |
-| 8 | Trust the host key | `fredrir-10 ssh-ed25519 …` in `ansible/files/reconciliation_known_hosts` and the admin `known_hosts` |
-| 9 | Confirm the fleet runs WireGuard (hard gate) | Every fleet node publishes `backend-type=wireguard` with its own verified key before fredrir-10 joins. `volatile.yml` refuses to enroll otherwise, and VXLAN or an unset backend must never coexist with an enrolled fredrir-10 |
-| 10 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 12 |
-| 11 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 30m --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
-| 12 | First converge from Macie or Archie within the token lifetime | `ansible-playbook ansible/volatile.yml --limit fredrir-10`; installs the reconciliation key and sets the hostname |
-| 13 | Delete the join token | On fredrir-07: `k3s token delete <id>`; the agent keeps its client cert and reconnects across restarts after the token is gone (verified) |
+| 1 | Attach the OpenStack volume | The volume whose `/dev/disk/by-id` path is `data_volume_device` |
+| 2 | Apply `tailscale/policy.hujson` | Adds `tag:platform-volatile` |
+| 3 | Install the verified `infra` release at `/usr/local/bin/infra` over `ssh ntnu` | Release SHA-256 from the trusted build |
+| 4 | Deliver the enrollment key | `infra operations enrollment create-deliver --node fredrir-10 --role volatile --host ntnu --sudo` |
+| 5 | Enroll transport | Bootstrap below; prints the Tailnet IPv4 |
+| 6 | Set inventory values | `tailscale_ip` |
+| 7 | Trust the host key | `fredrir-10 ssh-ed25519 …` in `ansible/files/reconciliation_known_hosts` and the admin `known_hosts` |
+| 8 | Confirm the fleet runs WireGuard (hard gate) | Every fleet node publishes `backend-type=wireguard` with its own verified key before fredrir-10 joins. `volatile.yml` refuses to enroll otherwise, and VXLAN or an unset backend must never coexist with an enrolled fredrir-10 |
+| 9 | Merge; wait for `node-registration` | Flux applies the policy that declares `fredrir-10`; volatile runs report `volatile_failure` until step 11 |
+| 10 | Write a per-node join token | On fredrir-07: `k3s token create --ttl 30m --description fredrir-10`; on fredrir-10: `/etc/rancher/k3s/agent-token`, root `0600` |
+| 11 | First converge from Macie or Archie within the token lifetime | `ansible-playbook ansible/volatile.yml --limit fredrir-10`; installs the reconciliation key and sets the hostname |
+| 12 | Delete the join token | On fredrir-07: `k3s token delete <id>`; the agent keeps its client cert and reconnects across restarts after the token is gone (verified) |
 
 ```sh
 inventory=$(mktemp)
@@ -331,7 +329,7 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | Heartbeat | Gatus `reconciliation_verification`: `success=true` when the verification matches; otherwise the differences or the failing stage; none while a reconciliation holds the lease |
 | Credentials | `ansible/roles/reconciler/files/credentials.sops.yaml`, maps `verify` and `apply`; installed as ciphertext through `host_secrets`; each unit's root `ExecStartPre` decrypts only its own map into the unit's runtime directory, and the supervisor deletes it once read; the role refuses a map missing any credential |
 | Cluster API | `https://<fredrir-07 tailnet address>:6443`; certificate authority `ansible/roles/reconciler/files/kubernetes-ca.crt` |
-| Host age key | `/etc/age/host.key` from `host_secrets`; `reconciler.yml --tags host_key` generates it and prints its recipient; [host-scoped secrets](Secrets.md#host-scoped-secrets) |
+| Host age key | `/etc/age/host.key` from `host_secrets`; `reconciler.yml --tags host_key` generates it and prints its recipient; [host-scoped secrets](secrets.md#host-scoped-secrets) |
 | SSH identity | Root `0600` `/etc/infra-reconcile/ssh/id_ed25519`, generated on the host and never copied; `reconciler.yml --tags ssh_identity` generates it and prints its public key; each unit's root `ExecStartPre` installs an owner-only `0400` copy for its user in the unit's runtime directory, removed when the unit stops |
 | Host keys | `/etc/infra-reconcile/known_hosts` from `ansible/files/reconciliation_known_hosts`: verified tailnet host keys with the `fredrir-06`, `fredrir-10` and `infra-build-09` aliases and `fredrir-09`'s tailnet address for `ProxyJump`; the role refuses a file without host keys |
 | Authorized key | `ansible/files/reconciliation.pub`, installed for `root` on managed hosts by `reconciliation-identity.yml` and on `fredrir-10` by `volatile.yml`; both refuse a file that is not an Ed25519 public key |
@@ -359,7 +357,7 @@ ansible-playbook -i "$inventory" ansible/tailscale-bootstrap.yml \
 | `kubernetes-token` | `flux-system/infrastructure-apply-token` |
 | `runner-app-key` | Runner App private key |
 | `publisher-app-key` | [Publisher App](#publishing) private key |
-| `provenance-token` | [Provenance token](Secrets.md#provenance-token) |
+| `provenance-token` | [Provenance token](secrets.md#provenance-token) |
 | `gatus-token` | Equal to `GATUS_TOKEN_RECONCILIATION_APPLY` in `ansible/roles/gatus/files/secrets.sops.yaml` |
 
 | Verify credential | Source |
@@ -465,7 +463,7 @@ Use the workflow performance artifact's attempt number and job queue timestamps 
 A successful recovery rerun against an already-serving revision does not replace the original delivery duration or its failed serving deadline.
 Frontend deployment records `publication-wait` until `production` contains the promoted infrastructure commit, then starts the 60-second exact served-revision check.
 Publication has an eight-minute budget within the existing ten-minute deployment job; total delivery latency includes both stages, and divergent production history fails immediately.
-Measured results and scope limits are recorded in [CI performance](ci-performance.md#execution-measurements).
+Measured results and scope limits are recorded in [CI performance](ci-performance.md#qualification-evidence).
 
 ## Egress policy gate
 

@@ -10,23 +10,17 @@
 | Cluster alerts       | Alertmanager; `platform/components/observability/alertmanager.secret.sops.yaml`                   |
 | Independent monitor  | Gatus on Ubuntu `fredrir-06`, outside Kubernetes                                                  |
 | Monitor settings     | `ansible/roles/gatus/templates/config.yaml.j2`; `${NAME}` secrets from `ansible/roles/gatus/files/secrets.sops.yaml` |
-| Native configuration | Root `0600` `/etc/gatus/config.yaml` through `LoadCredential`; secrets decrypted at start with the [host key](Secrets.md#host-scoped-secrets) |
+| Native configuration | Root `0600` `/etc/gatus/config.yaml` through `LoadCredential`; secrets decrypted at start with the [host key](secrets.md#host-scoped-secrets) |
 | Runtime              | `DynamicUser`, SQLite `/var/lib/gatus/gatus.db`, `MemoryMax=256M`                                 |
 | Listener             | Tailnet-only `100.86.241.75:8080`                                                                 |
 | Cross-check          | Cluster Prometheus scrapes `/metrics` each minute; `IndependentMonitorDown` after 10 minutes down |
 | HTTP checks          | Exact status codes; portfolio follows redirects; authentication boundaries checked separately     |
 | Response handling    | Status-only checks do not read response bodies; Y API checks its small GraphQL readiness response |
 
-| Backup heartbeat    | Maximum age |
-| ------------------- | ----------- |
-| `backups_parser`    | 8 hours     |
-| `backups_y`         | 8 hours     |
-| `backups_control`   | 8 hours     |
-| `backups_portfolio` | 2 hours     |
-
-| Verification heartbeat | Value |
+| Heartbeat configuration | Source |
 | --- | --- |
-| `reconciliation_verification` | Reconciler cloud verification; maximum age 2 hours; alerts after two failed runs in a row with the failing stage; [runbook](runbook.md#reconciler-host) |
+| Backup and reconciliation deadlines, failure thresholds and tokens | [Gatus external endpoints](../ansible/roles/gatus/templates/config.yaml.j2) |
+| Producer schedules and recovery | [Backups](platform.md#backups-and-recovery), [reconciler](runbook.md#reconciler-host) |
 
 Successful backup producers POST to `/api/v1/endpoints/backups_<name>/external?success=true` with separate Bearer tokens from their encrypted repository credentials. Producers keep tokens in private curl configuration files. Tailnet policy permits the control and worker producers to reach the monitor; Kubernetes network policies restrict backup pods to this destination.
 

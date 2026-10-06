@@ -1,18 +1,18 @@
-# Docs
+# Documentation
 
-## Layout
-
-| Path                              | Description                                      |
-| --------------------------------- | ------------------------------------------------ |
-| [Domains](domains.md)             |                                                  |
-| [Nodes](nodes.md)                 |                                                  |
-| [Requirements](Requirements.md)   |                                                  |
-| [Development](development.md)     | Go commands, build graph, binary distribution    |
-| [Runbook](runbook.md)             |                                                  |
-| [Platform](platform.md)           | Ownership, onboarding, validation and activation |
-| [Model serving](llm.md)           | LiteLLM, model runtimes, credentials and backups |
-| [Secrets](Secrets.md)             |                                                  |
-| [Kata Runtime](kata-runtime.md)   |                                                  |
-| [Platform Mail](platform-mail.md) |                                                  |
-| [Research](research/_INDEX.md)    |                                                  |
-| [CI performance](ci-performance.md) | Measurements, budgets and qualification |
+| Page | Use |
+| --- | --- |
+| [Requirements](requirements.md) | Tools and setup prerequisites |
+| [Development](development.md) | Local commands, builds and qualification |
+| [Platform](platform.md) | Ownership, services and project onboarding |
+| [Runbook](runbook.md) | Reconciliation, recovery, runners and storage |
+| [Rollout](rollout.md) | CLI releases and image promotion |
+| [CI performance](ci-performance.md) | Budgets, measurement and evidence |
+| [Flux artifacts](flux-artifacts.md) | Generation and selective reconciliation |
+| [Secrets](secrets.md) | Credential locations, delivery and rotation |
+| [Email alerts](mail-alerts.md) | Gatus, Alertmanager and heartbeats |
+| [Platform mail](platform-mail.md) | SES resources and validation |
+| [Model serving](llm.md) | Gateway, model runtimes and credentials |
+| [Kata runtime](kata-runtime.md) | Runtime build and native qualification |
+| [Nodes](nodes.md) | Fleet and workstation inventory |
+| [Domains](domains.md) | Domain ownership and services |

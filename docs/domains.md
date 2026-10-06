@@ -10,6 +10,7 @@
 | `yeeter.no`           | [Y](https://github.com/fredrir/Y)                             | Y                                         |
 | `fredrir.com`         | `fredrir/fredrir` (WiP)                                       | WiP Webpage                               |
 | `grafana.fredrir.com` | Infrastructure                                                | Authenticated metrics, logs and traces    |
+| `llm.fredrir.com` | Infrastructure | [Model gateway](llm.md), tailnet only |
 | `pkgs.fredrir.com`    | [packages](https://github.com/fredrir/packages)               | Signed apt, rpm and apk repositories      |
 | `admin.fredrir.com`   | Infrastructure                                                | Planned administrative dashboard          |
 | `keys.fredrir.com`    | Infrastructure                                                | Plain text administrative SSH public keys |

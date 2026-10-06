@@ -41,6 +41,8 @@ git diff --exit-code -- '*BUILD.bazel'
 
 ## Local development
 
+Command flags and defaults: `infra dev --help` and `infra dev <command> --help`.
+
 | Command | Result |
 | --- | --- |
 | `infra dev doctor` | JSON diagnostics: Go, Bazel, pinned tools, Docker, KVM, QEMU, kubeconfig, cluster reachability, Ansible environment; non-zero exit on any failure |
@@ -49,7 +51,7 @@ git diff --exit-code -- '*BUILD.bazel'
 | `infra dev clean [--all]` | `.cache/dev` removed; `--all` also stops the engines, removes their cache volumes, deletes the cluster and stops the guests |
 | `infra dev render [--project P] [--out FILE]` | Offline `flux build --dry-run` with `settings.yaml` substitution; `.cache/dev/render/platform.yaml`; JSON report: document count, unsubstituted variables |
 | `infra dev diff` | `flux diff kustomization`: server-side dry-run against `KUBECONFIG`; `*.sops.yaml` ignored; exit 1 on differences |
-| `infra dev engine start\|stop\|status [--profile build\|kata]` | `build/toolchain.json` engine image; `build`: `infra-dagger-dev` with 4 CPUs, 8 GiB, 1024 pids from the build engine role; `kata`: `infra-dagger-dev-kata` with 2 CPUs, 4 GiB, 256 pids from `kata.DefaultLimits`; 20 GiB GC policy; `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://NAME` |
+| `infra dev engine start\|stop\|status [--profile build\|kata]` | `build/toolchain.json` engine image; `build` and `kata` profiles from [engine configuration](../internal/dev/engine.go); `_EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://NAME` |
 | `infra dev cluster up\|sync\|status\|down [--profile minimal\|platform]` | k3d cluster `infra-dev` from `dev/cluster/k3d.yaml` with the production K3s image and committed Flux components; working tree pushed as OCI artifact `platform:dev` to the cluster registry; `root.yaml` Kustomizations retargeted with `dev/cluster/patches.yaml` (zero replicas, suspended jobs); encrypted Secrets replaced by dev-key placeholders or `dev/cluster/secrets` overrides; `STORAGE_CLASS=local-path`; kubeconfig `.cache/dev/cluster/kubeconfig` |
 | `infra dev hosts up\|status\|down [--purge]` | Ubuntu 26.04 guests from `dev/hosts/hosts.yaml` under QEMU/KVM: pinned cloud image, cloud-init seed, user-mode SSH forwarding, shared multicast segment carrying `tailscale0` with the fake tailnet and private addresses, stub `tailscaled.service`, seeded K3s join tokens; inventory `.cache/dev/hosts/inventory.yml` mirrors the production groups |
 | `infra dev hosts play\|check PLAYBOOK [-- flags]` | `ansible-playbook` from `.venv` against the dev inventory; `check` adds `--check --diff` |
@@ -57,7 +59,7 @@ git diff --exit-code -- '*BUILD.bazel'
 | `infra dev bench run [--baseline FILE] [SCENARIO...]` | hyperfine samples of `dev/bench/scenarios.yaml` with the freshly built binary; median, p95, CPU, peak memory and budget per scenario in `.cache/dev/bench/<timestamp>/summary.json` and `latest.json`; non-zero exit on failures, budget breaches or regressions beyond `--threshold` |
 | `infra dev bench compare BASE CANDIDATE` | Median deltas between two summaries |
 | `infra dev bench go [PACKAGE...]` | `go test -bench` with repetitions; benchstat against `.cache/dev/bench/go-baseline.txt` when present |
-| `infra dev qualify SUITE [-- go test flags]` | Gated suites `onboarding`, `image`, `reconcile-plan`, `publishing`, `kustomize`, `packages`, `kata`, `reconciler`, `engine-policy`, `admission-flood`; builds `.cache/dev/bin/infra` and starts the engine when the suite needs them |
+| `infra dev qualify SUITE [-- go test flags]` | [Suites and prerequisites](../dev/README.md); builds `.cache/dev/bin/infra` and starts the engine when the suite needs them |
 
 | Setting | Value |
 | --- | --- |
@@ -164,38 +166,15 @@ A local run first asks the remote cache for its capabilities with a 2 s deadline
 
 Production image pins, admission rules and caller commands must be promoted together; rebuilding source alone does not replace deployed images.
 
-```sh
-infra platform promote-tools --image "$VERIFIED_TOOLS_IMAGE"
-infra platform promote-tools --image "$VERIFIED_TOOLS_IMAGE" --apply
-git diff -- platform
-```
+[Release installation and image promotion](rollout.md).
 
-`promote-tools` updates the backup-tools image digest in workload manifests.
-
-| Dedicated VM setting            | Value                                                                                                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Host provisioning               | `ansible/build-vms.yml`; inventory group `build_vm_hosts`                                                                                   |
-| Runner and engine provisioning  | `ansible/build-runners.yml`; inventory group `build_engines`                                                                                |
-| Production placement            | `ansible/inventory/production.yml`; `infra-build-09` on `fredrir-09`                                                                        |
-| Host reservation                | 8.25 CPUs / 17,920 MiB reserved and the guest service's `MemoryMax`: 16 GiB guest plus 1,536 MiB for QEMU and its page cache (at least 1 GiB); resulting allocatable 7.5 CPUs / 13,721,548 KiB |
-| Guest                           | Eight CPUs / 16 GiB RAM / 80 GiB sparse persistent disk                                                                                     |
-| Host boundary                   | Unprivileged QEMU account; KVM device; loopback-only SSH forwarding; guest metrics forwarded to the tailnet address, port 9101              |
-| Guest egress                    | nftables `inet infra_build_vm` (`infra-build-vm-egress.service`, required by the guest): connections the QEMU account opens (new or untracked) to host addresses, RFC 1918, CGNAT/tailnet, link-local and ULA ranges dropped; host resolver `127.0.0.53:53` allowed; inbound SSH and metrics forwards unaffected; [qualification](../build/evidence/build-vm-guest-egress.json) |
-| Guest metrics                   | Node exporter `:9100`; `infra_cgroup_*` for `infra-engine.slice` and `infra-runners.slice`; Prometheus job `build-vm`                      |
-| Activation gates                | `build_vm_enabled=true`, `build_engine_dedicated=true`, `build_engine_qualified=true`                                                       |
-| Runner registration | `build/runners.json` counts per repository, named `infra-build-09-<repository>-<n>`; protected main pushes or manual runs only; listener roots `/home/runner-<repository>/<name>` (repository lowercased), `0700` |
-| Runner slice                    | Eight CPUs / 4 GiB aggregate for runner services and native child processes                                                                 |
-| Production Dagger ceiling | One engine per repository in `infra-engine.slice`: eight CPUs / 10 GiB RAM / 3,072 tasks for all engines together; three parallel operations per engine |
-| Standalone engine defaults      | Four CPUs / 8 GiB RAM / one parallel operation; configurable within host capacity                                                         |
-| Dagger connection | `unix:///run/infra-dagger/<repository>/engine.sock`, `root:infra-dagger-<repository>` `0660`; jobs have no Docker access; no published engine port; `/etc/infra-dagger/engine.json` refuses privileged executions |
-| Persistent caches | `infra-dagger-cache-<repository>` Docker volume per engine; engine-local Bazel action cache |
-| Runner environment | `/etc/infra-dagger/<repository>.env`: `_EXPERIMENTAL_DAGGER_RUNNER_HOST`, `INFRA_ENGINE_CPUS`, `INFRA_ENGINE_MEMORY_BYTES`, `INFRA_ENGINE_PARALLELISM`; `INFRA_SCANNER_DATABASES=/var/lib/infra-scanner/databases` |
-| Runner enforcement | Immutable root-owned job hook; `CI_POOL=main`; foreign owners, PRs and unprotected refs rejected; listener units: account `runner-<repository>` outside `docker`, `ProtectProc=invisible`, `PrivateTmp`, `ProtectHome=tmpfs` with only its own home, `NoNewPrivileges`, `UMask=0022` so copied sources stay readable to non-root image users |
-| Cache collection | `/etc/infra-dagger/<repository>.toml` at `/etc/dagger/engine.toml`, the path the engine entrypoint reads; ceiling `build_engine_cache_gib` per repository (default `build_engine_default_cache_gib`), 80 % target; Dagger ordinary layers first; named caches preferred for 48 h; 8 GiB / 4 GiB emergency free space |
-| Scanner databases | `infra-scanner-refresh.timer` (hourly) as `infra-scanner` publishes read-only generations to `/var/lib/infra-scanner/databases`; jobs link them into their own analysis caches |
-| Verified tooling                | CLI release checksum and revision; pinned GitHub runner archive                                                                             |
-| Warm ARC capacity               | One deploy runner                                                                                                                           |
-| Pool isolation | Trusted protected-branch jobs only; untrusted PR jobs use isolated hosted engines; one account, engine, cache and socket group per repository |
+| Dedicated VM | Source |
+| --- | --- |
+| Placement, reservations, guest sizing and runner limits | [Production inventory](../ansible/inventory/production.yml) |
+| Guest provisioning and network boundary | [Build VM role](../ansible/roles/build_vm), [egress qualification](../build/evidence/build-vm-guest-egress.json) |
+| Repository engines, cache policy and resource limits | [Build engine role](../ansible/roles/build_engine) |
+| Listener counts and repository identities | [Runner fleet](../build/runners.json) |
+| Admission, draining and upgrades | [Runner operation](runbook.md#ci-execution-and-runner-admission) |
 
 ```sh
 ansible-playbook -i ansible/inventory/production.yml \
@@ -253,14 +232,7 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /tmp/infra-linux ./cmd/infra
 
 ## Performance budgets
 
-| Path                | Budget                     | Measurement                                                                  |
-| ------------------- | -------------------------- | ---------------------------------------------------------------------------- |
-| Fast checks         | 10 seconds aggregate       | `infra pipeline check-fast`; `infra ci measure`; image check receipts        |
-| Deployment          | 60 seconds target          | Workflow creation through expected revision readiness, including queueing    |
-| Frontend deployment | 30 seconds target          | `https://llunde.no/.well-known/revision` must match source revision          |
-| Cold preparation    | Reported separately        | Dependency/toolchain compilation; never reported as a passing fast check     |
-| Process resources   | Per command                | CPU seconds and subprocess maximum RSS; remote engine resources are separate |
-| Cache resources     | Bounded persistent storage | VM volumes, Bazel action metrics and engine resource ceilings                |
+[CI budgets, measurement rules and qualification evidence](ci-performance.md).
 
 | Local operation                         | Command                                                                                                                 |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -277,7 +249,6 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /tmp/infra-linux ./cmd/infra
 Slow suites remain explicit local operations. Failed, missing or timed-out checks fail the gate. Preparation and qualification costs remain visible; the target budgets are not evidence of achieved end-to-end latency.
 
 ```sh
-TOOLS_IMAGE=ghcr.io/fredrir/platform-backup-tools@sha256:fae5ec1e022274171e39c2b999c49a7f04668aa772db5d8a8cefe7ecab2b5107
 infra platform prefetch --namespace llunde --node fredrir-09 \
   --utility-image "$TOOLS_IMAGE" --pull-secret ghcr --timeout 30s \
   "$VERIFIED_IMAGE" --apply

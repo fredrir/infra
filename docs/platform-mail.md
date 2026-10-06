@@ -37,9 +37,6 @@ Default SES MAIL FROM has SPF; a custom subdomain requires its own MX and SPF re
 
 | Runtime          | Value                                                                                                                                        |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local validation | OpenTofu 1.12.6; supported floor 1.10                                                                                                        |
-| Locked providers | AWS 5.100.0, Cloudflare 5.23.0, hcloud 1.68.0                                                                                                |
-| Execution        | Local review and mocked CI tests; production state assumed                                                                                   |
 | Backend          | S3 `llunde-pyparser-bucket`, key `tofu-state/infra.tfstate`, `eu-north-1`                                                                    |
 | Risks            | DNS ownership collision, overbroad sending authority, secret exposure, shared-state blast radius                                             |
 | Evidence         | Private plan/state backup, DNS inventory, sender policy, DKIM status and successful inbox receipt                                            |

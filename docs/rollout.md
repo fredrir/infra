@@ -14,16 +14,9 @@
 
 ## CLI installation
 
-The release manifest and checksums must be authenticated before these commands. Read the revision and Linux amd64 digest from the verified pin; a checksum beside an unauthenticated binary is insufficient.
+[Verify and install the release binary](development.md#binary-reuse), then install the pinned CLI on the reconciler:
 
 ```sh
-infra artifact install \
-  --url "$INFRA_BINARY_URL" \
-  --revision "$INFRA_REVISION" \
-  --sha256 "$INFRA_SHA256" \
-  --platform linux/amd64 \
-  --destination "$HOME/.local/bin/infra"
-
 (cd ansible && ansible-playbook reconciler.yml --limit fredrir-11 --tags infra_binary)
 ```
 

@@ -33,18 +33,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 
 ## Services
 
-| Address                                  | Service                                                               |
-| ---------------------------------------- | --------------------------------------------------------------------- |
-| `fredrir.com`                            | Reserved for the future `fredrir/fredrir` application                 |
-| `grafana.fredrir.com`                    | Authenticated Grafana, Prometheus metrics, Loki logs and Tempo traces |
-| `llm.fredrir.com`                        | [LiteLLM gateway and admin UI](llm.md), tailnet only                  |
-| `pkgs.fredrir.com`                       | Signed apt, rpm and apk repositories and `install.sh`                 |
-| `admin.fredrir.com`                      | Reserved for the future dashboard                                     |
-| `fredrir.no`                             | Centrally managed DNS; purpose unassigned                             |
-| `hansteen.dev`                           | Portfolio                                                             |
-| `yeeter.no`                              | Y                                                                     |
-| `parser.llunde.no`, `external.llunde.no` | Parser review and shared media                                        |
-| `llunde.no`, `api.llunde.no`             | Work-in-progress Llunde frontend/backend                              |
+[Domains and public services](domains.md) · [Model serving](llm.md)
 
 | Shared component       | Configuration                                                                                                                                                                                                                                                                     |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -57,7 +46,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | Object store           | SeaweedFS cells `seaweedfs-hel1` (`fredrir-04`) and `seaweedfs-nl` (`fredrir-09`); S3 over TLS only; [operation](runbook.md#object-store) |
 | Bazel cache            | bazel-remote on `fredrir-09`, tailnet only: read-only gRPC on 9092, writes on 9093; [operation](runbook.md#bazel-cache) |
 | Certificates           | cert-manager; ClusterIssuer `letsencrypt`, DNS-01 through Cloudflare with `cert-manager/cloudflare-dns`; self-check against the zone's authoritative nameservers; Traefik `websecure` only for annotated tailnet Ingresses |
-| Independent monitoring | Gatus on `fredrir-06`; 13 endpoint checks including `production` ⊆ `main`, five authenticated backup heartbeats and the `reconciliation` deep, verification and apply heartbeats; cluster alert when unreachable                                                                                                                                    |
+| Independent monitoring | Gatus on `fredrir-06`; endpoint checks, `production` ⊆ `main`, authenticated backup and reconciliation heartbeats; [configuration](../ansible/roles/gatus/templates/config.yaml.j2)                                                                                                                                    |
 | Email                  | `alerts@fredrir.com`; [credentials and operation](mail-alerts.md)                                                                                                                                                                                                                 |
 
 ## CI and deployments
@@ -66,7 +55,6 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Runner registration   | Separate `fredrir-infra-runners` GitHub App; encrypted credentials in ARC namespaces                                                                                                                                                                                                           |
 | Container builds      | Dagger through the compiled Go CLI on qualified `infra-build-09`; GitHub-hosted runners provide bootstrap; Bazel and Dagger keep separate caches; `infra pipeline image --target <target> --check-only` validates an intermediate stage                                                          |
-| Nix builds            | Retired; infrastructure workflows use Bazel and the pinned Go SDK                                                                                                                                                                                                                              |
 | Rust builds           | Ephemeral gVisor pools on the [Rust runner image](../images/runner-rust/Containerfile): `rust-pr-amd64`, `rust-amd64`, `rust-release-amd64`; `rust-amd64` and `rust-pr-amd64` prefer fredrir-04 and never run on volatile workers; sccache on the build cache; `target/` archive per toolchain, written by `rust-amd64` only                                                         |
 | CI capacity           | Check, deploy and Rust ARC pools retain slot limits; hosted Dagger jobs do not consume cluster slots; [execution boundaries](development.md#execution-boundaries)                                                                                                                              |
 | JavaScript actions | Node 24 LTS; pinned native Node 24 actions; explicit workflow runtime selection |
