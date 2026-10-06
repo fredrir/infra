@@ -26,6 +26,8 @@
 | Layout route | `/pp-structure/health`, `/pp-structure/v1/layout`; LiteLLM pass-through to `pp-structure:8012`; LiteLLM key required |
 | Document parsing | Cropping and result assembly run in the calling pipeline |
 | Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, PaddleOCR, the provider wildcards and the `deepseek` and `ntnu` access groups; `fredrir` also permits `codex`; parser key also permits `/pp-structure` and has a 150 USD budget per 30 days |
+| Client key | `fredrir`; 1Password `op://Dev/LITELLM_API_KEY/credential`; owned by `internal_user_viewer` user `fredrir-client`, which unlocks `/user/daily/activity`; LiteLLM refuses analytics to keys without a user |
+| Clients | pi `npm:pi-provider-litellm`; VS Code `vivswan.litellm-vscode-chat`; both discover models from `/model/info` |
 | Key limits | No key parallel, RPM or TPM limits; local models bounded by deployment `max_parallel_requests`; parser key 150 USD per 30 days |
 | Parser env | `LITELLM_API_URL` internal API; `LITELLM_API_KEY` from `llunde-pyparser/llm-gateway`; Doppler prod `LITELLM_*` entries are not read by the pods |
 | Tailnet forwarder | `llm/tailnet`: unprivileged userspace Tailscale, node `llm` with `tag:llm-gateway`, TCP 443 forwarded to Traefik `websecure`, which serves only the `llm-tailnet` Ingress; state in Secret `tailnet-state`; one-time auth key in `tailnet-auth`; re-registration changes the node address and the `llm_tailnet` record in `tofu/production.tfvars.json` |
@@ -77,8 +79,10 @@ export PARSER_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platf
 export MODELS='["ibm-granite/granite-docling-258M", "PaddlePaddle/PaddleOCR-VL-1.6", "vertex_ai/*", "deepseek", "qwencloud/*", "mistral/*", "ntnu"]'
 export CLIENT_MODELS="$(jq -c '. + ["codex"]' <<<"$MODELS")"
 curl --fail -G localhost:4000/key/info --data-urlencode "key=$PARSER_KEY" -H "Authorization: Bearer $LITELLM_MASTER_KEY"
+curl --fail localhost:4000/user/new -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
+  -d '{"user_id": "fredrir-client", "user_role": "internal_user_viewer", "auto_create_key": false}'
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
-  -d "{\"key\": \"$CLIENT_KEY\", \"models\": $CLIENT_MODELS, \"max_parallel_requests\": null, \"rpm_limit\": null, \"tpm_limit\": null}"
+  -d "{\"key\": \"$CLIENT_KEY\", \"user_id\": \"fredrir-client\", \"models\": $CLIENT_MODELS, \"max_parallel_requests\": null, \"rpm_limit\": null, \"tpm_limit\": null}"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
   -d "{\"key\": \"$PARSER_KEY\", \"models\": $MODELS, \"max_parallel_requests\": null, \"rpm_limit\": null, \"tpm_limit\": null, \"max_budget\": 150, \"budget_duration\": \"30d\", \"metadata\": {\"allowed_passthrough_routes\": [\"/pp-structure\"]}}"
 curl --fail https://llm.fredrir.com/pp-structure/health -H "Authorization: Bearer $PARSER_KEY"
