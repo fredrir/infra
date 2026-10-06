@@ -147,9 +147,8 @@ func TestParserGatewayEgressCannotEscapeItsApprovedService(t *testing.T) {
 	}
 }
 
-func TestModelGatewayIsServedOnlyToAccessAndTheTailnet(t *testing.T) {
+func TestModelGatewayIsServedOnlyToTheTailnet(t *testing.T) {
 	t.Parallel()
-	hosts := map[string]string{"llm-admin": "llm-admin.fredrir.com", "llm-tailnet": "llm.fredrir.com"}
 	var ingresses []string
 	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
 		if resource["kind"] != "Ingress" {
@@ -158,7 +157,7 @@ func TestModelGatewayIsServedOnlyToAccessAndTheTailnet(t *testing.T) {
 		name := at(resource, "metadata", "name").(string)
 		ingresses = append(ingresses, name)
 		for _, rule := range at(resource, "spec", "rules").([]any) {
-			if at(rule, "host") != hosts[name] {
+			if at(rule, "host") != "llm.fredrir.com" {
 				t.Fatalf("%s serves unexpected host %v", name, at(rule, "host"))
 			}
 			for _, path := range at(rule, "http", "paths").([]any) {
@@ -167,16 +166,13 @@ func TestModelGatewayIsServedOnlyToAccessAndTheTailnet(t *testing.T) {
 				}
 			}
 		}
-		if name == "llm-tailnet" {
-			annotations := at(resource, "metadata", "annotations").(object)
-			tls := at(resource, "spec", "tls", 0).(object)
-			if annotations["traefik.ingress.kubernetes.io/router.entrypoints"] != "websecure" || annotations["traefik.ingress.kubernetes.io/router.tls"] != "true" || tls["secretName"] != "llm-fredrir-com-tls" {
-				t.Fatal("tailnet gateway must be served only over TLS on websecure")
-			}
+		annotations := at(resource, "metadata", "annotations").(object)
+		tls := at(resource, "spec", "tls", 0).(object)
+		if annotations["traefik.ingress.kubernetes.io/router.entrypoints"] != "websecure" || annotations["traefik.ingress.kubernetes.io/router.tls"] != "true" || tls["secretName"] != "llm-fredrir-com-tls" {
+			t.Fatal("tailnet gateway must be served only over TLS on websecure")
 		}
 	}
-	slices.Sort(ingresses)
-	if !slices.Equal(ingresses, []string{"llm-admin", "llm-tailnet"}) {
+	if !slices.Equal(ingresses, []string{"llm-tailnet"}) {
 		t.Fatalf("model ingresses %v", ingresses)
 	}
 	data, err := os.ReadFile(filepath.Join(repoRoot(t), "platform/components/ingress/traefik.yaml"))

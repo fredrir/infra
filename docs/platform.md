@@ -37,8 +37,7 @@ Provider APIs provision machines; an existing SSH-accessible machine enters thro
 | ---------------------------------------- | --------------------------------------------------------------------- |
 | `fredrir.com`                            | Reserved for the future `fredrir/fredrir` application                 |
 | `grafana.fredrir.com`                    | Authenticated Grafana, Prometheus metrics, Loki logs and Tempo traces |
-| `llm.fredrir.com`                        | [LiteLLM model gateway](llm.md), tailnet only                         |
-| `llm-admin.fredrir.com`                  | [LiteLLM administration](llm.md) behind Cloudflare Access             |
+| `llm.fredrir.com`                        | [LiteLLM gateway and admin UI](llm.md), tailnet only                  |
 | `pkgs.fredrir.com`                       | Signed apt, rpm and apk repositories and `install.sh`                 |
 | `admin.fredrir.com`                      | Reserved for the future dashboard                                     |
 | `fredrir.no`                             | Centrally managed DNS; purpose unassigned                             |

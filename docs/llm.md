@@ -32,8 +32,8 @@
 | Parser env | `LITELLM_API_URL` internal API; `LITELLM_API_KEY` from `llunde-pyparser/llm-gateway`; Doppler prod `LITELLM_*` entries are not read by the pods |
 | Tailnet forwarder | `llm/tailnet`: unprivileged userspace Tailscale, node `llm` with `tag:llm-gateway`, TCP 443 forwarded to Traefik `websecure`, which serves only the `llm-tailnet` Ingress; state in Secret `tailnet-state`; one-time auth key in `tailnet-auth`; re-registration changes the node address and the `llm_tailnet` record in `tofu/production.tfvars.json` |
 | Tailnet access | `macie` and `archie` on TCP 443; [`tailscale/policy.hujson`](../tailscale/policy.hujson) |
-| Administration | `https://llm-admin.fredrir.com/ui`; Cloudflare Access app `llm-admin` with the shared GitHub login; the tunnel validates the Access token; `PROXY_BASE_URL`; LiteLLM login with a personal proxy admin account; `disable_env_credential_login` turns off master-key UI login; the master key still authorizes API calls |
-| Public exposure | Only `llm-admin.fredrir.com` behind Cloudflare Access |
+| Administration | `https://llm.fredrir.com/ui`; same tailnet access as the API; `PROXY_BASE_URL`; `FORWARDED_ALLOW_IPS` set to the pod network so Traefik's `X-Forwarded-Proto` keeps redirects on HTTPS; LiteLLM login with a personal proxy admin account; `disable_env_credential_login` turns off master-key UI login; the master key still authorizes API calls |
+| Public exposure | None |
 | Database | PostgreSQL 17.10; retained 5 GiB local volume on `fredrir-04` |
 | Backup | Daily `platform-backups/llm-database-backup`; encrypted control Restic repository; `llm,postgres` tags |
 | Retention | Shared repository maintenance: 7 daily, 4 weekly and 12 monthly snapshots per host and tags |

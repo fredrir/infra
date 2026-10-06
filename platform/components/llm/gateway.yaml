@@ -108,7 +108,9 @@ spec:
         - name: LITELLM_LOCAL_BLOG_POSTS
           value: 'true'
         - name: PROXY_BASE_URL
-          value: https://llm-admin.fredrir.com
+          value: https://llm.fredrir.com
+        - name: FORWARDED_ALLOW_IPS
+          value: 10.42.0.0/16
         resources:
           requests:
             cpu: 500m

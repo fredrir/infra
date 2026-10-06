@@ -32,17 +32,6 @@ locals {
       name = "platform-ingress"
       ingress = [
         {
-          hostname = local.llm_admin_host
-          service  = "http://traefik.ingress-system.svc.cluster.local:80"
-          origin_request = {
-            access = {
-              required  = true
-              team_name = split(".", data.cloudflare_zero_trust_organization.access.auth_domain)[0]
-              aud_tag   = [cloudflare_zero_trust_access_application.llm_admin.aud]
-            }
-          }
-        },
-        {
           hostname = "*.fredrir.com"
           service  = "http://traefik.ingress-system.svc.cluster.local:80"
         },
