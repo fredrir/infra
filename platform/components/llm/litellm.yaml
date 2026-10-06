@@ -1,5 +1,6 @@
 include:
 - ntnu-models.yaml
+- deepseek-models.yaml
 - codex-models.yaml
 model_list:
 - model_name: ibm-granite/granite-docling-258M
@@ -34,10 +35,6 @@ model_list:
     vertex_project: llunde
     vertex_location: global
     vertex_credentials: os.environ/AGENT_PLATFORM_CREDENTIALS
-- model_name: deepseek/*
-  litellm_params:
-    model: deepseek/*
-    api_key: os.environ/DEEPSEEK_API_KEY
 - model_name: qwencloud/*
   litellm_params:
     model: qwencloud/*

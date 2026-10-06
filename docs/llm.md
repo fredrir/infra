@@ -9,7 +9,7 @@
 | Upstream data | Image copies of the model map, Anthropic beta headers, autorouter presets, policy templates and blog posts; `LITELLM_LOCAL_*` |
 | Agent Platform | `vertex_ai/*`; project `llunde`, location `global`; Gemini, embeddings and Model Garden MaaS; Claude requires `global_online_prediction_requests_per_base_model` quota |
 | Agent Platform identity | `litellm@llunde.iam.gserviceaccount.com`; custom role `projects/llunde/roles/modelGatewayInference` with `aiplatform.endpoints.predict`; JSON key in `AGENT_PLATFORM_CREDENTIALS` |
-| DeepSeek | `deepseek/*`; `DEEPSEEK_API_KEY` |
+| DeepSeek | `deepseek/<model>` from [`deepseek-models.yaml`](../platform/components/llm/deepseek-models.yaml), access group `deepseek`; explicit because LiteLLM 1.104.0 lists `deepseek/*` expansions without the provider prefix, which cannot be routed; `DEEPSEEK_API_KEY` |
 | Alibaba Model Studio | `qwencloud/*`; international `dashscope-intl.aliyuncs.com`; `QWENCLOUD_API_KEY` |
 | Mistral AI Studio | `mistral/*`; `api.mistral.ai`; `MISTRAL_API_KEY` |
 | NTNU | `ntnu/<model>` from [`ntnu-models.yaml`](../platform/components/llm/ntnu-models.yaml), access group `ntnu`, metadata copied from NTNU `/v1/model/info`; `litellm_proxy` to `https://llm.hpc.ntnu.no/v1`; `NTNU_API_KEY` |
@@ -18,14 +18,14 @@
 | Codex requests | Streaming and non-streaming; [`codex-patch.py`](../platform/components/llm/codex-patch.py), loaded as `sitecustomize`, sends ChatGPT's mandatory `stream: true` only in the request bytes so LiteLLM follows the client's `stream` ([#34094](https://github.com/BerriAI/litellm/issues/34094)), and wraps string Responses `input` in a message list; instance entries set `supports_native_streaming` so `gpt-6-*` streams keep `stream: true`; recheck the patch on LiteLLM upgrades |
 | Codex isolation | The `chatgpt` provider blocks its process during device login, and LiteLLM resolves any `chatgpt/` model name to that provider, so the gateway uses `codex/` names and never loads it |
 | NTNU egress | `llm/ntnu-egress` HAProxy TCP passthrough on `fredrir-10`; ClusterIP `10.43.0.31`, pinned by `hostAliases` in the gateway pod, so TLS ends in LiteLLM and the relay sees only SNI |
-| Model list | `/v1/models` expands wildcards from the image model map; unlisted provider models still route; bare `deepseek-*` entries are listed but not routed |
+| Model list | `/v1/models` expands wildcards from the image model map; unlisted provider models still route |
 | Granite | `ibm-granite/granite-docling-258M`; llama.cpp on `fredrir-09`; DocTags output |
 | PaddleOCR | `PaddlePaddle/PaddleOCR-VL-1.6`; llama.cpp on `fredrir-04`; task-specific image-region recognition |
 | PP-StructureV3 | `ghcr.io/fredrir/pp-structure`; PaddleOCR 3.7.0 CPU on `fredrir-04`; layout blocks, reading order and OCR lines |
 | PP-StructureV3 source | [`fredrir/litellm`](https://github.com/fredrir/litellm) `services/pp-structure`; manual `VARIANT=cpu` build pinned by digest; public GHCR package since `llm` has no pull secret |
 | Layout route | `/pp-structure/health`, `/pp-structure/v1/layout`; LiteLLM pass-through to `pp-structure:8012`; LiteLLM key required |
 | Document parsing | Cropping and result assembly run in the calling pipeline |
-| Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, PaddleOCR and the provider wildcards; `fredrir` also permits `codex`; parser key also permits `/pp-structure` and has a 150 USD budget per 30 days |
+| Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, PaddleOCR, the provider wildcards and the `deepseek` and `ntnu` access groups; `fredrir` also permits `codex`; parser key also permits `/pp-structure` and has a 150 USD budget per 30 days |
 | Key limits | No key parallel, RPM or TPM limits; local models bounded by deployment `max_parallel_requests`; parser key 150 USD per 30 days |
 | Parser env | `LITELLM_API_URL` internal API; `LITELLM_API_KEY` from `llunde-pyparser/llm-gateway`; Doppler prod `LITELLM_*` entries are not read by the pods |
 | Tailnet forwarder | `llm/tailnet`: unprivileged userspace Tailscale, node `llm` with `tag:llm-gateway`, TCP 443 forwarded to Traefik `websecure`, which serves only the `llm-tailnet` Ingress; state in Secret `tailnet-state`; one-time auth key in `tailnet-auth`; re-registration changes the node address and the `llm_tailnet` record in `tofu/production.tfvars.json` |
@@ -74,7 +74,7 @@ kubectl -n llm rollout restart deploy/tailnet
 export LITELLM_MASTER_KEY="$(kubectl -n llm get secret litellm -o jsonpath='{.data.LITELLM_MASTER_KEY}' | base64 --decode)"
 export CLIENT_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platform/components/llm/client.secret.sops.yaml)"
 export PARSER_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platform/projects/llunde-pyparser/llm-gateway.secret.sops.yaml)"
-export MODELS='["ibm-granite/granite-docling-258M", "PaddlePaddle/PaddleOCR-VL-1.6", "vertex_ai/*", "deepseek/*", "qwencloud/*", "mistral/*", "ntnu"]'
+export MODELS='["ibm-granite/granite-docling-258M", "PaddlePaddle/PaddleOCR-VL-1.6", "vertex_ai/*", "deepseek", "qwencloud/*", "mistral/*", "ntnu"]'
 export CLIENT_MODELS="$(jq -c '. + ["codex"]' <<<"$MODELS")"
 curl --fail -G localhost:4000/key/info --data-urlencode "key=$PARSER_KEY" -H "Authorization: Bearer $LITELLM_MASTER_KEY"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
