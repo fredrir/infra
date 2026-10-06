@@ -50,8 +50,6 @@ filegroup(
     name = "s3_filter_module",
     srcs = [
         "components/object-store/filtertest/go.mod",
-        "components/object-store/filtertest/s3-filter.caddyfile.sha256",
-        "components/object-store/s3-filter.caddyfile",
     ],
     visibility = ["//internal/contracts:__pkg__"],
 )

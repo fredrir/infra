@@ -115,8 +115,6 @@ func ignoredGoInput(path string) bool {
 	return (strings.HasPrefix(path, "docs/") && strings.HasSuffix(path, ".md")) ||
 		(!strings.Contains(path, "/") && strings.HasSuffix(path, ".md")) ||
 		(strings.HasPrefix(path, "build/evidence/") && strings.HasSuffix(path, ".json")) ||
-		(strings.HasPrefix(path, "build/rollout/") && strings.HasSuffix(path, ".patch")) ||
-		path == "build/rollout/manifest.json" ||
 		(strings.HasPrefix(path, ".github/deployments/") && strings.HasSuffix(path, ".yaml"))
 }
 

@@ -170,7 +170,6 @@ func TestNonGoInputsSelectOnlyDeclaredDataDependents(t *testing.T) {
 		{"docs/platform.md", "set()"},
 		{"README.md", "set()"},
 		{"build/evidence/run.json", "set()"},
-		{"build/rollout/project.patch", "set()"},
 		{".github/deployments/123.yaml", "set()"},
 		{"platform/projects/example/release.yaml", "rdeps(//..., set(//platform:promotion_testdata))"},
 		{"platform/components/runners/check/runner.yaml", "rdeps(//..., set(//platform:policy_testdata //platform:promotion_testdata))"},

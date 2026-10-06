@@ -174,7 +174,7 @@ func newDependenciesCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		registry := ci.DependencyRegistry{Client: &http.Client{Timeout: 15 * time.Second}, Base: registryBase, Actor: environmentValue("GITHUB_ACTOR", "fredrir"), Token: os.Getenv("REGISTRY_TOKEN")}
+		registry := ci.DependencyRegistry{Client: &http.Client{Timeout: 15 * time.Second}, Base: registryBase, Actor: envDefault("GITHUB_ACTOR", "fredrir"), Token: os.Getenv("REGISTRY_TOKEN")}
 		if args[0] == "lookup" || args[0] == "resolve" {
 			plan, err = registry.Lookup(command.Context(), plan)
 			if err != nil {

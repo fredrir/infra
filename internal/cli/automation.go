@@ -23,7 +23,7 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	var tagOptions ci.TagOptions
 	tag.Flags().StringVar(&tagOptions.Image, "image", os.Getenv("IMAGE"), "Immutable image reference")
 	tag.Flags().StringVar(&tagOptions.Tag, "tag", os.Getenv("TAG"), "Destination tag")
-	tag.Flags().StringVar(&tagOptions.Registry, "registry", environmentValue("REGISTRY_URL", "https://ghcr.io"), "Registry URL")
+	tag.Flags().StringVar(&tagOptions.Registry, "registry", envDefault("REGISTRY_URL", "https://ghcr.io"), "Registry URL")
 	tag.RunE = func(command *cobra.Command, _ []string) error {
 		tagOptions.Actor, tagOptions.Token = os.Getenv("GITHUB_ACTOR"), os.Getenv("REGISTRY_TOKEN")
 		if err := ci.TagImage(command.Context(), &http.Client{Timeout: 60 * time.Second}, tagOptions); err != nil {
@@ -179,11 +179,4 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	draftRelease.Flags().BoolVar(&prerelease, "prerelease", os.Getenv("PRERELEASE") == "true", "Publish a prerelease")
 	releaseCommand.AddCommand(prepareRelease, buildRelease, draftRelease)
 	root.AddCommand(releaseCommand)
-}
-
-func environmentValue(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
-	}
-	return fallback
 }

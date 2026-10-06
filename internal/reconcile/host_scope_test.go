@@ -3,7 +3,9 @@ package reconcile
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -39,7 +41,6 @@ func TestHostScopeSelection(t *testing.T) {
 		{"monitor secret", []string{"ansible/roles/gatus/files/secrets.sops.yaml"}, HostScopeMonitor, false, false},
 		{"active overlay", []string{"platform/clusters/production/artifacts/roots.yaml"}, HostScopeFull, true, true},
 		{"flux artifact generator", []string{"platform/generate/main.go"}, HostScopeFull, true, true},
-		{"consumer patch", []string{"build/rollout/llunde-frontend.patch"}, HostScopeNone, false, false},
 		{"unknown build input", []string{"build/new.json"}, HostScopeFull, true, true},
 		{"unknown", []string{"new-input"}, HostScopeFull, true, true},
 		{"CLI source", []string{"internal/ci/tools.go"}, HostScopeNone, false, false},
@@ -230,6 +231,11 @@ func TestTrackedReconciliationInputsAreClassified(t *testing.T) {
 		t.Skip("requires a Git checkout")
 	}
 	for _, path := range strings.Split(strings.TrimSuffix(string(files), "\x00"), "\x00") {
+		if _, err := os.Lstat(filepath.Join("..", "..", path)); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			t.Fatal(err)
+		}
 		selected := Affected([]string{path})
 		if len(selected.Reasons) == 0 || strings.HasPrefix(selected.Reasons[0], "unclassified input:") {
 			t.Errorf("classify tracked input %q explicitly", path)

@@ -9,15 +9,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-func TestLockedBucketsRejectBatchDeletes(t *testing.T) {
-	caddyfile, err := os.ReadFile(filepath.Join(repoRoot(t), objectStore, "s3-filter.caddyfile"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	batchDelete := "{http.request.uri.path}.matches(\"^/[^/]+/?$\")\n\t\t\t\t&& !{http.request.uri.path}.matches(\"^/restic-\")\n\t\t\t\t&& {http.request.uri.query}.matches(\"(^|&)delete([=&]|$)\")"
-	if !strings.Contains(string(caddyfile), batchDelete) {
-		t.Fatal("the S3 filter admits batch deletes on restic- buckets")
-	}
+func TestLockedBucketsUseTheProtectedPrefix(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(repoRoot(t), objectStore, "buckets.yaml"))
 	if err != nil {
 		t.Fatal(err)

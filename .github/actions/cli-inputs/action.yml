@@ -16,7 +16,7 @@ runs:
           case "$path" in
             *_test.go) continue ;;
             cmd/*|internal/*) ;;
-            platform/generate/*.go|tests/infra/*.go|ansible/tests/*.go)
+            platform/generate/*.go)
               if grep -qx 'package main' "$path"; then
                 continue
               fi

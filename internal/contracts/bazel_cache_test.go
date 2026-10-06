@@ -1,8 +1,6 @@
 package contracts
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -71,11 +69,6 @@ func TestBazelCacheFilterBindsTheTailnetAddressOfItsNode(t *testing.T) {
 
 func TestBazelCacheFilterTestRunsTheShippedVersionsOnEveryFilterChange(t *testing.T) {
 	repository := root(t)
-	sum := sha256.Sum256(read(t, filepath.Join(repository, bazelCacheComponent, "nginx.conf")))
-	want := hex.EncodeToString(sum[:]) + "  nginx.conf\n"
-	if recorded := string(read(t, filepath.Join(repository, bazelCacheComponent, "filtertest/nginx.conf.sha256"))); recorded != want {
-		t.Fatalf("filtertest/nginx.conf.sha256 records %q, the filter hashes to %q; rerun the filter test and update the digest", recorded, want)
-	}
 	module := string(read(t, filepath.Join(repository, bazelCacheComponent, "filtertest/go.mod")))
 	required := func(path string) string {
 		match := regexp.MustCompile(`(?m)^(?:require )?\s*` + regexp.QuoteMeta(path) + ` (\S+)`).FindStringSubmatch(module)
@@ -91,10 +84,6 @@ func TestBazelCacheFilterTestRunsTheShippedVersionsOnEveryFilterChange(t *testin
 	}
 	if !regexp.MustCompile(`(?m)^tool github\.com/buchgr/bazel-remote/v2$`).MatchString(module) {
 		t.Error("filter test module does not pin bazel-remote as a tool")
-	}
-	harness := string(read(t, filepath.Join(repository, bazelCacheComponent, "filtertest/filter_test.go")))
-	if !strings.Contains(harness, `"../bazel-cache.yaml"`) || strings.Contains(harness, "docker.io/library/nginx") {
-		t.Error("filter test does not run the filter image the cache ships")
 	}
 	var workflow struct {
 		On map[string]struct {

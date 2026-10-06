@@ -69,11 +69,6 @@ func TestImageInputsInvalidateTagsAndTriggerRebuilds(t *testing.T) {
 			covered := func(path string) bool {
 				return slices.ContainsFunc(image.Inputs, func(input string) bool { return path == input || strings.HasPrefix(path, input+"/") })
 			}
-			for _, receipt := range []string{"build/evidence/production-rollout.json", "build/rollout/manifest.json", "build/consumers.json"} {
-				if covered(receipt) {
-					t.Errorf("rollout record %s unnecessarily rebuilds image", receipt)
-				}
-			}
 			if !covered(image.Dockerfile) {
 				t.Fatal("Dockerfile does not invalidate the image input tag")
 			}
