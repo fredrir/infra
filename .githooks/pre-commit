@@ -2,7 +2,7 @@
 set -eu
 cd "$(git rev-parse --show-toplevel)"
 PATH="$PWD/.venv/bin:$PWD/.cache/dev/tools:$PATH"
-export BEFORE=
+export BEFORE= TF_DATA_DIR="$PWD/.cache/pre-commit/tofu"
 for stage in prepare-validation validate; do
   if ! output=$(go run ./cmd/infra ci "$stage" 2>&1); then
     printf '%s\n' "$output" >&2
