@@ -30,11 +30,11 @@ var ToolAssets = map[string]ToolAsset{
 	"goreleaser": {"https://github.com/goreleaser/goreleaser/releases/download/v2.18.2/goreleaser_Linux_x86_64.tar.gz", "0a96edc9d9bc594e4a41cc4d59467c182062910ab24d9d1f6dd7b667d32606d3", "goreleaser"},
 	"nfpm":       {"https://github.com/goreleaser/nfpm/releases/download/v2.47.0/nfpm_2.47.0_Linux_x86_64.tar.gz", "0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783", "nfpm"},
 	"git-cliff":  {"https://github.com/orhun/git-cliff/releases/download/v2.14.1/git-cliff-2.14.1-x86_64-unknown-linux-musl.tar.gz", "cba6ae86f0a4205784eed8ef049fe53c904138806e33a1bda2e25026b17198eb", "git-cliff-2.14.1/git-cliff"},
-	"gh":         {"https://github.com/cli/cli/releases/download/v2.101.0/gh_2.101.0_linux_amd64.tar.gz", "9bca2d1c16825f109907a23307628a2f0698fbf99662b73a5cf0b020293072b8", "gh_2.101.0_linux_amd64/bin/gh"},
+	"gh":         {"https://github.com/fredrir/infra/releases/download/gh-v2.102.0-infra.1/gh-linux-amd64", "8d4f2407390d467fcbdb5133dac1e3795bd965056ba2894bf329e71195c40d64", ""},
 	"kustomize":  {"https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.8.1/kustomize_v5.8.1_linux_amd64.tar.gz", "029a7f0f4e1932c52a0476cf02a0fd855c0bb85694b82c338fc648dcb53a819d", "kustomize"},
 	"trivy":      {"https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz", "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a", "trivy"},
 	"yq":         {"https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_amd64", "c5f056448f973ae7d39b5401949648a78f2dc1947d6a8eb65be60d5c504b9385", ""},
-	"cosign":     {"https://github.com/fredrir/infra/releases/download/cosign-v3.1.3-infra.1/cosign-linux-amd64", "05e004d22d93dc6dffb1b1633c1a03fcf0369b2f6eb247b714e236b61a742c71", ""},
+	"cosign":     {"https://github.com/fredrir/infra/releases/download/cosign-v3.1.3-infra.2/cosign-linux-amd64", "cf13d2082ab266b8452e3ac0f9df41b412d24f2bc0b96009b85c78030bf3edb0", ""},
 }
 
 func InstallTools(ctx context.Context, temporary, pathOutput string, names []string) error {
