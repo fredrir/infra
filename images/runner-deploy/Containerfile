@@ -1,4 +1,4 @@
-FROM ghcr.io/fredrir/infra-runner-check@sha256:bfc11faad9e02ce555758e243ada83d7fabca99bb03e0e8c172dc00c7e6c97f6
+FROM ghcr.io/fredrir/infra-runner-check@sha256:d1b840893228c7adb52b32d994c9cf9a11d46912a62507d0b93f673f2270a0e9
 USER root
 COPY images/runner-check/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources
 RUN apt-get update -o APT::Update::Error-Mode=any \
