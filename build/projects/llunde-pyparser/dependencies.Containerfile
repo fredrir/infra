@@ -50,4 +50,6 @@ RUN --mount=type=bind,from=uv,source=/uv,target=/usr/local/bin/uv \
   && rm -rf src
 
 ARG PUBLIC_PARSER_DEPENDENCY_KEY
+# Follows the key ARG so every new dependency key picks up current Debian security fixes.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 LABEL io.llunde.parser.dependencies.key="${PUBLIC_PARSER_DEPENDENCY_KEY}"
