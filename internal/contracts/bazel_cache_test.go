@@ -162,7 +162,7 @@ func TestOnlyProtectedMainRunsReachTheCacheWriterPort(t *testing.T) {
 		{"main push", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/heads/main")}, []int{9092, 9093}},
 		{"main dispatch of the CLI build", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("infra-cli.yml", "refs/heads/main")}, []int{9092, 9093}},
 		{"main image build", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("build-image.yml", "refs/heads/main")}, nil},
-		{"main signing release", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("cosign-release.yml", "refs/heads/main")}, nil},
+		{"main signing release", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("tool-release.yml", "refs/heads/main")}, nil},
 		{"main deploy dispatch", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("deploy.yml", "refs/heads/main")}, nil},
 		{"future workflow on main", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("future.yml", "refs/heads/main")}, nil},
 		{"check workflow from a branch ending in main's ref", "ref:refs/heads/main", map[string]string{"ref_protected": "true", "job_workflow_ref": workflow("check.yml", "refs/heads/x@refs/heads/main")}, nil},

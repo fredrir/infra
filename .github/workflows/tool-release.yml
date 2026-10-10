@@ -1,0 +1,151 @@
+name: Release patched tool
+on:
+  workflow_dispatch:
+    inputs:
+      tool:
+        type: choice
+        required: true
+        options: [cosign, gh]
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+permissions:
+  contents: read
+concurrency:
+  group: tool-release-${{ inputs.tool }}
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.repository == 'fredrir/infra' && github.repository_owner_id == '114402558' && github.ref == 'refs/heads/main' && github.ref_protected
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TOOL: ${{ inputs.tool }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-infra
+        with:
+          root: .
+      - name: Install verification tools
+        run: infra ci install-tools gh trivy
+      - name: Require unpublished version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(jq -er .tag "build/tools/$TOOL/source.json")
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            printf 'Release %s already exists\n' "$tag" >&2
+            exit 1
+          fi
+          git -C "$GITHUB_WORKSPACE" -c credential.helper= -c http.extraHeader= fetch --quiet --force origin "refs/tags/$tag:refs/tags/$tag"
+          test "$(git -C "$GITHUB_WORKSPACE" rev-parse "refs/tags/$tag^{commit}")" = "$GITHUB_SHA"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        id: go-cache
+        with:
+          path: ~/.cache/infra-tool-go
+          key: ${{ inputs.tool }}-linux-amd64-${{ hashFiles(format('build/tools/{0}/*', inputs.tool)) }}
+          restore-keys: |
+            ${{ inputs.tool }}-linux-amd64-
+      - name: Prepare checksum-verified patched source
+        run: |
+          source="$RUNNER_TEMP/tool-source"
+          mkdir -p "$source" "$RUNNER_TEMP/release" "$HOME/.cache/infra-tool-go"
+          url=$(jq -er .source_url "build/tools/$TOOL/source.json")
+          digest=$(jq -er .source_sha256 "build/tools/$TOOL/source.json")
+          curl --fail --silent --show-error --location --retry 2 --max-time 60 "$url" --output "$RUNNER_TEMP/tool-source.tar.gz"
+          printf '%s  %s\n' "$digest" "$RUNNER_TEMP/tool-source.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/tool-source.tar.gz" --strip-components=1 -C "$source"
+          git -C "$source" apply --check "$GITHUB_WORKSPACE/build/tools/$TOOL/dependencies.patch"
+          git -C "$source" apply "$GITHUB_WORKSPACE/build/tools/$TOOL/dependencies.patch"
+      - name: Build patched Linux binary
+        id: build
+        run: |
+          image=$(jq -er .go_image "build/tools/$TOOL/source.json")
+          package=$(jq -er .package "build/tools/$TOOL/source.json")
+          ldflags=$(jq -er .ldflags "build/tools/$TOOL/source.json")
+          build_memory="$(awk '/^MemTotal:/ { print int($2 * 3 / 4 / 1024) "m" }' /proc/meminfo)"
+          docker run --rm --user "$(id -u):$(id -g)" --cpus="$(nproc)" --memory="$build_memory" --memory-swap="$build_memory" \
+            --volume "$RUNNER_TEMP/tool-source:/source" --volume "$RUNNER_TEMP/release:/release" \
+            --volume "$HOME/.cache/infra-tool-go:/cache" --workdir /source \
+            --env CGO_ENABLED=0 --env GOOS=linux --env GOARCH=amd64 --env GOTOOLCHAIN=local \
+            --env GOCACHE=/cache/build --env GOMODCACHE=/cache/modules --env PACKAGE="$package" --env LDFLAGS="$ldflags" --env OUTPUT="/release/$TOOL-linux-amd64" "$image" \
+            sh -euc '
+              sha256sum go.mod go.sum > /tmp/module-inputs.sha256
+              go mod download
+              go mod verify
+              sha256sum --check --strict /tmp/module-inputs.sha256
+              exec go build -trimpath -buildvcs=false -mod=readonly -ldflags="$LDFLAGS" -o "$OUTPUT" "$PACKAGE"
+            '
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: steps.go-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/infra-tool-go
+          key: ${{ inputs.tool }}-linux-amd64-${{ hashFiles(format('build/tools/{0}/*', inputs.tool)) }}
+      - name: Prepare vulnerability database
+        run: |
+          trivy image --download-db-only
+          mkdir -p "$RUNNER_TEMP/scan/usr/local/bin" "$RUNNER_TEMP/checks"
+          cp "$RUNNER_TEMP/release/$TOOL-linux-amd64" "$RUNNER_TEMP/scan/usr/local/bin/$TOOL"
+      - name: Qualify and scan within aggregate budget
+        run: |
+          # shellcheck disable=SC2016
+          infra ci measure --stage "$TOOL-qualification" --budget 10s --report-dir "$RUNNER_TEMP/checks" -- bash -euo pipefail -c '
+            "build/tools/$TOOL/qualify.sh" "$RUNNER_TEMP/release/$TOOL-linux-amd64"
+            trivy rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --skip-java-db-update --timeout 10s --format json --output "$RUNNER_TEMP/checks/scan.json" "$RUNNER_TEMP/scan"
+            jq -e '\''[.Results[] | select(.Type == "gobinary")] | length == 1'\'' "$RUNNER_TEMP/checks/scan.json"
+          '
+      - name: Describe downstream artifact
+        run: |
+          cp "build/tools/$TOOL/source.json" "$RUNNER_TEMP/release/source.json"
+          cp "build/tools/$TOOL/dependencies.patch" "$RUNNER_TEMP/release/dependencies.patch"
+          cp "$RUNNER_TEMP/tool-source/LICENSE" "$RUNNER_TEMP/release/LICENSE"
+          if [ -f "$RUNNER_TEMP/tool-source/NOTICE" ]; then cp "$RUNNER_TEMP/tool-source/NOTICE" "$RUNNER_TEMP/release/NOTICE"; fi
+          cp "$RUNNER_TEMP/checks/$TOOL-qualification.json" "$RUNNER_TEMP/release/qualification.json"
+          cp "$RUNNER_TEMP/checks/scan.json" "$RUNNER_TEMP/release/scan.json"
+          cd "$RUNNER_TEMP/release"
+          sha256sum "$TOOL-linux-amd64" source.json dependencies.patch qualification.json scan.json LICENSE > SHA256SUMS
+          if [ -f NOTICE ]; then sha256sum NOTICE >> SHA256SUMS; fi
+          jq -n --arg revision "$GITHUB_SHA" --arg file "$TOOL-linux-amd64" --arg sha256 "$(sha256sum "$TOOL-linux-amd64" | cut -d' ' -f1)" --slurpfile source source.json '{schema:1, revision:$revision, source:$source[0], binary:{file:$file, platform:"linux/amd64", sha256:$sha256}}' > manifest.json
+          sha256sum manifest.json >> SHA256SUMS
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        id: provenance
+        with:
+          subject-path: ${{ runner.temp }}/release/*
+      - name: Preserve attestation bundle
+        env:
+          ATTESTATION_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: cp "$ATTESTATION_BUNDLE" "$RUNNER_TEMP/release/provenance.jsonl"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ${{ inputs.tool }}-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish downstream version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(jq -er .tag "build/tools/$TOOL/source.json")
+          go=$(jq -er .go "build/tools/$TOOL/source.json")
+          cd "$RUNNER_TEMP/release"
+          assets=("$TOOL-linux-amd64" source.json dependencies.patch qualification.json scan.json manifest.json SHA256SUMS provenance.jsonl LICENSE)
+          if [ -f NOTICE ]; then assets+=(NOTICE); fi
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$tag" \
+            --notes "Downstream $TOOL build with the tracked dependency patch and Go $go; this is not an upstream release. Verify provenance and SHA256SUMS before installation." \
+            "${assets[@]}"
+          git -C "$GITHUB_WORKSPACE" -c credential.helper= -c http.extraHeader= fetch --quiet --force origin "refs/tags/$tag:refs/tags/$tag"
+          test "$(git -C "$GITHUB_WORKSPACE" rev-parse "refs/tags/$tag^{commit}")" = "$GITHUB_SHA"
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: ${{ inputs.tool }}-qualification-${{ github.run_id }}
+          path: ${{ runner.temp }}/checks
+          if-no-files-found: ignore
+          retention-days: 14

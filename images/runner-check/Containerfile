@@ -1,4 +1,4 @@
-FROM golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195 AS tools
+FROM golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61 AS tools
 ENV CGO_ENABLED=0
 ENV GOTOOLCHAIN=local
 ENV GOWORK=off
@@ -48,14 +48,44 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     && go test ./internal/tracing/traceattrs \
     && go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/opentofu/opentofu/version.dev=no" -o /out/tofu ./cmd/tofu \
     && rm -rf /src/tofu /tmp/source.tar.gz
+COPY images/runner-check/patches/kubectl.patch /tmp/kubectl.patch
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     mkdir -p /src/kubectl /out \
-    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/kubernetes/kubernetes/tar.gz/refs/tags/v1.36.4 \
-    && printf '%s  %s\n' 86a216801ddba7098a50c6f3b3fe5fbc28ba34ea5b1daa66d81c2d5307c301ac /tmp/source.tar.gz | sha256sum --check --strict \
+    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/kubernetes/kubernetes/tar.gz/refs/tags/v1.36.5 \
+    && printf '%s  %s\n' e768e95c34605f3829116736e189f46af54c6416c3229cadd7308e524202735b /tmp/source.tar.gz | sha256sum --check --strict \
     && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/kubectl \
     && cd /src/kubectl \
-    && go build -trimpath -buildvcs=false -ldflags="-s -w -X k8s.io/client-go/pkg/version.gitVersion=v1.36.4 -X k8s.io/component-base/version.gitVersion=v1.36.4" -o /out/kubectl ./cmd/kubectl \
+    && git apply /tmp/kubectl.patch \
+    && go build -trimpath -buildvcs=false -ldflags="-s -w -X k8s.io/client-go/pkg/version.gitVersion=v1.36.5 -X k8s.io/component-base/version.gitVersion=v1.36.5" -o /out/kubectl ./cmd/kubectl \
     && rm -rf /src/kubectl /tmp/source.tar.gz
+COPY images/runner-check/patches/helm.patch /tmp/helm.patch
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /src/helm /out \
+    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/helm/helm/tar.gz/refs/tags/v4.3.0 \
+    && printf '%s  %s\n' c9c930efa3abf03c331da421db81d61fb942218c7a7b80a8c0f0132d79fb5f62 /tmp/source.tar.gz | sha256sum --check --strict \
+    && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/helm \
+    && cd /src/helm \
+    && git apply /tmp/helm.patch \
+    && go build -trimpath -buildvcs=false -ldflags="-s -w -X helm.sh/helm/v4/internal/version.version=v4.3.0" -o /out/helm ./cmd/helm \
+    && rm -rf /src/helm /tmp/source.tar.gz
+COPY images/runner-check/patches/yq.patch /tmp/yq.patch
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /src/yq /out \
+    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/mikefarah/yq/tar.gz/refs/tags/v4.54.1 \
+    && printf '%s  %s\n' 0cec36e7035dd56c508bda56245cbd71e4495d2317bc2528165c4162bce79335 /tmp/source.tar.gz | sha256sum --check --strict \
+    && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/yq \
+    && cd /src/yq \
+    && git apply /tmp/yq.patch \
+    && go build -trimpath -buildvcs=false -ldflags="-s -w" -o /out/yq . \
+    && rm -rf /src/yq /tmp/source.tar.gz
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /src/age /out \
+    && curl --fail --silent --show-error --location --max-time 120 --output /tmp/source.tar.gz https://codeload.github.com/FiloSottile/age/tar.gz/refs/tags/v1.3.2 \
+    && printf '%s  %s\n' b07c28c6c4bdafa272073a310b75bc22c49da8904585a89c30e5ca4233e63843 /tmp/source.tar.gz | sha256sum --check --strict \
+    && tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src/age \
+    && cd /src/age \
+    && go build -trimpath -buildvcs=false -ldflags="-s -w -X main.Version=v1.3.2" -o /out/ ./cmd/age ./cmd/age-keygen \
+    && rm -rf /src/age /tmp/source.tar.gz
 
 FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
 USER root
@@ -73,7 +103,7 @@ RUN rm -rf /usr/bin/containerd /usr/bin/containerd-shim-runc-v2 /usr/bin/ctr \
         /home/runner/externals/node24/bin/npm /home/runner/externals/node24/bin/npx /home/runner/externals/node24/bin/corepack
 COPY --chmod=755 .infra-artifacts/infra /usr/local/bin/infra
 COPY --from=tools /out/ /opt/tools/
-RUN RUNNER_TEMP=/opt infra ci install-tools age age-keygen uv helm yq \
+RUN RUNNER_TEMP=/opt infra ci install-tools uv \
     && chmod 755 /opt/tools
 ENV PATH=/usr/local/bin:/opt/tools:/opt/venv/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV UV_PYTHON_DOWNLOADS=never

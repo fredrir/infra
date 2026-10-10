@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61 AS builder
 WORKDIR /source
 RUN curl --fail --silent --show-error --location --retry 2 --max-time 60 https://codeload.github.com/fluxcd/source-watcher/tar.gz/refs/tags/v2.2.4 --output /tmp/source.tar.gz && \
     printf 'f01d3eb03353089627dc384842da2fe7fdfedc05178f25ded8104affb1e90d3f  /tmp/source.tar.gz\n' | sha256sum --check --strict && \
@@ -20,7 +20,7 @@ COPY --from=builder /out/source-watcher /usr/local/bin/source-watcher
 COPY --from=builder /source/LICENSE /usr/share/licenses/source-watcher/LICENSE
 COPY images/source-watcher/source.json /usr/share/source-watcher/source.json
 LABEL org.opencontainers.image.title="infra-source-watcher" \
-    org.opencontainers.image.version="v2.2.4-infra.1" \
+    org.opencontainers.image.version="v2.2.4-infra.2" \
     org.opencontainers.image.source="https://github.com/fredrir/infra" \
     org.opencontainers.image.licenses="Apache-2.0" \
     io.fredrir.upstream.revision="06cb1109bfa7834e8403e2b543d9838e1623f85a"

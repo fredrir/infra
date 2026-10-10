@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "version": "v2.102.0-infra.1",
+  "tag": "gh-v2.102.0-infra.1",
+  "upstream_version": "v2.102.0",
+  "upstream_revision": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+  "source_url": "https://codeload.github.com/cli/cli/tar.gz/refs/tags/v2.102.0",
+  "source_sha256": "08bf0ef8b4409893889175e0f5279d30d6edd96465816042c0d7c72eac598158",
+  "go_image": "golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61",
+  "go": "1.27.2",
+  "package": "./cmd/gh",
+  "ldflags": "-s -w -buildid= -X github.com/cli/cli/v2/internal/build.Version=2.102.0 -X github.com/cli/cli/v2/internal/build.Date=2026-09-30"
+}
