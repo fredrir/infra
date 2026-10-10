@@ -78,3 +78,4 @@ ENV SCCACHE_IDLE_TIMEOUT=0
 ENV OBJECT_STORE_CA_FILE=/usr/local/share/object-store/ca.crt
 ENV RUNNER_ALLOW_RUNASROOT=1
 WORKDIR /home/runner
+RUN --mount=type=bind,source=images/runner-rust/verify.sh,target=/tmp/verify.sh /tmp/verify.sh
