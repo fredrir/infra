@@ -203,7 +203,8 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 		return nil, ctx.Err()
 	}
 	var attested []Order
-	failure := errors.New("no attestation names a deployment run")
+	var outputs []string
+	workflows := map[string][]string{}
 	unavailable := false
 	for index := range checks {
 		check := &checks[index]
@@ -211,7 +212,11 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 			_, _ = runner.Stderr.Write(check.stderr.Bytes())
 		}
 		if check.err != nil {
-			failure = fmt.Errorf("%s at workflow %s: %s", check.name, check.revision[:12], redacted(cmp.Or(lastLine(check.result.Stderr), check.err.Error()), environment))
+			output := redacted(cmp.Or(lastLine(check.result.Stderr), check.err.Error()), environment)
+			if workflows[output] == nil {
+				outputs = append(outputs, output)
+			}
+			workflows[output] = append(workflows[output], check.revision[:12])
 			unavailable = unavailable || UnavailableOutput(string(check.result.Stderr)) || check.result.ExitCode < 0
 			continue
 		}
@@ -222,6 +227,10 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 		attested = append(attested, orders...)
 	}
 	if len(attested) == 0 {
+		failure := errors.New("no attestation names a deployment run")
+		if len(outputs) > 0 {
+			failure = verifierFailure(checks[0].name, outputs, workflows)
+		}
 		failure = fmt.Errorf("image provenance did not match an approved workflow revision: %w", failure)
 		if unavailable {
 			return nil, Unavailable(failure)
@@ -242,7 +251,27 @@ type provenanceCheck struct {
 	err            error
 }
 
+func verifierFailure(verifier string, outputs []string, workflows map[string][]string) error {
+	failures := make([]error, len(outputs))
+	for index, output := range outputs {
+		at := "workflow " + workflows[output][0]
+		if len(workflows[output]) > 1 {
+			at = fmt.Sprintf("%d workflows", len(workflows[output]))
+		}
+		failures[index] = fmt.Errorf("%s at %s: %s", verifier, at, output)
+	}
+	return errors.Join(failures...)
+}
+
 func (check *provenanceCheck) run(ctx context.Context, runner process.Runner, environment []string, retryTrigger bool) {
+	cache, err := os.MkdirTemp("", "provenance-")
+	if err != nil {
+		check.result, check.err = process.Result{ExitCode: -1}, err
+		return
+	}
+	defer os.RemoveAll(cache)
+	// Verifiers sharing a TUF cache overwrite each other's metadata mid-refresh.
+	environment = append(slices.Clone(environment), "TUF_ROOT="+cache, "XDG_CACHE_HOME="+cache)
 	check.result, check.err = runner.Invoke(ctx, process.Options{Name: check.name, Args: check.arguments, Dir: runner.Dir, Env: environment, Stderr: &check.stderr})
 	if check.err == nil || !retryTrigger || ctx.Err() != nil {
 		return

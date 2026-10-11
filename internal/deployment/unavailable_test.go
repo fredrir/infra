@@ -17,6 +17,8 @@ func TestUnavailableOutputSeparatesOutagesFromRejections(t *testing.T) {
 		"read tcp 10.0.0.1:443: read: connection reset by peer":                                                      true,
 		"fatal: unable to access 'https://github.com/fredrir/infra.git/': Could not resolve host: github.com":        true,
 		"error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500":                                  true,
+		"error getting live trusted root: failed to create TUF client failed to persist metadata":                    true,
+		"Error: failed to create TUF client: failed to load metadata":                                                true,
 		"Error: no matching attestations found":                                                                      false,
 		"Error: none of the expected identities matched what was in the certificate":                                 false,
 		"fatal: remote error: upload-pack: not our ref 0123456789abcdef":                                             false,

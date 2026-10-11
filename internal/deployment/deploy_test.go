@@ -3,9 +3,11 @@ package deployment
 import (
 	"context"
 	"errors"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/fstest"
@@ -142,5 +144,54 @@ func TestProvenanceChecksApprovedRevisionsConcurrentlyAndRetriesOnlyTriggerMisma
 	}
 	if _, err := VerifyProvenance(context.Background(), runner, root, "1328252868", mapping, image, digest, revision); err == nil || !strings.Contains(err.Error(), "approved workflow revision") {
 		t.Fatalf("unmatched provenance accepted: %v", err)
+	}
+}
+
+func TestProvenanceChecksKeepPrivateTUFCachesAndReportEachCause(t *testing.T) {
+	var revisions []string
+	for digit := 1; digit <= 4; digit++ {
+		revisions = append(revisions, strings.Repeat(strconv.Itoa(digit), 40))
+	}
+	trust := "claim_pattern:\n  job_workflow_sha: '^(" + strings.Join(revisions, "|") + ")$'\n"
+	root := fstest.MapFS{".github/chainguard/deploy-1.sts.yaml": {Data: []byte(trust)}}
+	mismatch := "Error: no matching attestations: missing or incorrect annotation\n"
+	outage := "Error: setting trusted material: getting trusted root from TUF for new bundle verification: error getting live trusted root: failed to create TUF client failed to load metadata: tuf refresh failed: failed to persist metadata\n"
+	var lock sync.Mutex
+	caches := map[string]bool{}
+	runner := process.Runner{Env: []string{"TUF_ROOT=/shared", "XDG_CACHE_HOME=/shared"}, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
+		environment := map[string]string{}
+		for _, entry := range options.Env {
+			name, value, _ := strings.Cut(entry, "=")
+			environment[name] = value
+		}
+		cache := environment["TUF_ROOT"]
+		if info, err := os.Stat(cache); err != nil || !info.IsDir() || environment["XDG_CACHE_HOME"] != cache {
+			t.Errorf("verifier cache %q, XDG_CACHE_HOME %q", cache, environment["XDG_CACHE_HOME"])
+		}
+		lock.Lock()
+		caches[cache] = true
+		lock.Unlock()
+		stderr := mismatch
+		if slices.Contains(options.Args, "workflow-revision="+revisions[2]) {
+			stderr = outage
+		}
+		return process.Result{Stderr: []byte(stderr), ExitCode: 1}, errors.New("exit status 1")
+	}}
+	_, err := VerifyProvenance(context.Background(), runner, root, "1", Mapping{Repository: "fredrir/example", Visibility: "private"}, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40))
+	if !errors.Is(err, ErrSourceUnavailable) {
+		t.Fatalf("TUF outage is not retryable: %v", err)
+	}
+	for _, want := range []string{"cosign at 3 workflows: Error: no matching attestations", "cosign at workflow 333333333333: Error: setting trusted material"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("%q missing from %v", want, err)
+		}
+	}
+	if len(caches) != len(revisions) {
+		t.Fatalf("%d verifiers shared %d TUF caches", len(revisions), len(caches))
+	}
+	for cache := range caches {
+		if _, err := os.Stat(cache); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("TUF cache %s outlived its verifier: %v", cache, err)
+		}
 	}
 }
