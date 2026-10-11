@@ -339,7 +339,7 @@ spec:
         - name: PYPARSER_ENV
           value: production
         - name: PYPARSER_WORKER_STAGES
-          value: CLASSIFY,BATCH,SPLIT,STRUCTURE_TASK
+          value: CLASSIFY,BATCH,SPLIT
         - name: HOME
           value: /tmp
         - name: USER
