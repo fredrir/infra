@@ -16,7 +16,7 @@ func main() {
 	defer stop()
 	if err := cli.Run(ctx, os.Args[1:], os.Stdout, os.Stderr); err != nil {
 		if !errors.Is(err, cli.ErrNothingPending) {
-			fmt.Fprintln(os.Stderr, "infra:", err)
+			fmt.Fprintln(os.Stderr, "infra:", cli.ErrorMessage(err))
 		}
 		os.Exit(cli.ExitCode(err))
 	}

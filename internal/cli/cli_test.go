@@ -20,6 +20,8 @@ import (
 
 	"github.com/fredrir/infra/internal/cli"
 	"github.com/fredrir/infra/internal/reconcile"
+
+	"dagger.io/dagger"
 )
 
 func TestPlanWritesJSONAndAppendsGitHubOutput(t *testing.T) {
@@ -107,6 +109,26 @@ func TestExitCodeSeparatesRetryFromFailure(t *testing.T) {
 		if got := cli.ExitCode(test.err); got != test.want {
 			t.Errorf("%v exits %d, want %d", test.err, got, test.want)
 		}
+	}
+}
+
+func TestErrorMessageShowsFailedCommandOutput(t *testing.T) {
+	var stdout []string
+	for line := range 25 {
+		stdout = append(stdout, fmt.Sprintf("line %d", line))
+	}
+	failed := &dagger.ExecError{
+		Cmd:      []string{"/bin/sh", "-c", "bun run typecheck"},
+		ExitCode: 1,
+		Stdout:   strings.Join(stdout, "\n") + "\n",
+		Stderr:   "error: script \"typecheck\" exited with code 1\n",
+	}
+	want := "/bin/sh -c bun run typecheck exited with status 1\n" + strings.Join(stdout[5:], "\n") + "\nerror: script \"typecheck\" exited with code 1"
+	if got := cli.ErrorMessage(failed); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got := cli.ErrorMessage(errors.New("state unavailable")); got != "state unavailable" {
+		t.Errorf("plain error became %q", got)
 	}
 }
 

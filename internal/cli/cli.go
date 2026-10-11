@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/fredrir/infra/internal/ci"
@@ -17,6 +18,8 @@ import (
 	"github.com/fredrir/infra/internal/kata"
 	"github.com/fredrir/infra/internal/reconcile"
 	"github.com/spf13/cobra"
+
+	"dagger.io/dagger"
 )
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -116,4 +119,25 @@ func ExitCode(err error) int {
 	default:
 		return 1
 	}
+}
+
+const errorOutputLines = 20
+
+func ErrorMessage(err error) string {
+	var exec *dagger.ExecError
+	if !errors.As(err, &exec) {
+		return err.Error()
+	}
+	message := []string{fmt.Sprintf("%s exited with status %d", strings.Join(exec.Cmd, " "), exec.ExitCode)}
+	for _, output := range []string{exec.Stdout, exec.Stderr} {
+		if output = lastLines(output, errorOutputLines); output != "" {
+			message = append(message, output)
+		}
+	}
+	return strings.Join(message, "\n")
+}
+
+func lastLines(text string, count int) string {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	return strings.Join(lines[max(0, len(lines)-count):], "\n")
 }
