@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -25,7 +26,15 @@ import (
 
 const parserDependencyImage = "ghcr.io/fredrir/pyparser-dependencies"
 
-var digestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+var (
+	digestPattern        = regexp.MustCompile(`^[a-f0-9]{64}$`)
+	debianReleasePattern = regexp.MustCompile(`(?m)^ARG PYTHON_IMAGE=\S+:\S*-([a-z]+)@sha256:[a-f0-9]{64}$`)
+)
+
+type DebianArchive struct {
+	Client *http.Client
+	Base   string
+}
 
 type DependencyPlan struct {
 	Key        string `json:"key"`
@@ -37,9 +46,10 @@ type DependencyPlan struct {
 	Build      bool   `json:"build"`
 }
 
-func PlanDependencies(ctx context.Context, runner process.Runner, infraRoot string) (DependencyPlan, error) {
+func PlanDependencies(ctx context.Context, runner process.Runner, infraRoot string, archive DebianArchive) (DependencyPlan, error) {
 	recipe := "build/projects/llunde-pyparser/dependencies.Containerfile"
 	inputs := map[string]string{}
+	release := ""
 	for _, name := range []string{recipe, "internal/ci/dependencies.go"} {
 		file := filepath.Join(infraRoot, name)
 		info, err := os.Lstat(file)
@@ -55,6 +65,12 @@ func PlanDependencies(ctx context.Context, runner process.Runner, infraRoot stri
 		}
 		digest := sha256.Sum256(data)
 		inputs[name] = hex.EncodeToString(digest[:])
+		if match := debianReleasePattern.FindSubmatch(data); name == recipe && match != nil {
+			release = string(match[1])
+		}
+	}
+	if release == "" {
+		return DependencyPlan{}, errors.New("dependency recipe PYTHON_IMAGE has no Debian release")
 	}
 	for _, name := range []string{"pyproject.toml", "uv.lock"} {
 		info, err := os.Lstat(filepath.Join(runner.Dir, name))
@@ -86,6 +102,11 @@ func PlanDependencies(ctx context.Context, runner process.Runner, infraRoot stri
 	}
 	digest := sha256.Sum256(canonical)
 	inputs["runtime-lock"] = hex.EncodeToString(digest[:])
+	indexes, err := archive.packageIndexes(ctx, release)
+	if err != nil {
+		return DependencyPlan{}, err
+	}
+	maps.Copy(inputs, indexes)
 	encoded, err := json.Marshal(inputs)
 	if err != nil {
 		return DependencyPlan{}, err
@@ -93,6 +114,33 @@ func PlanDependencies(ctx context.Context, runner process.Runner, infraRoot stri
 	digest = sha256.Sum256(encoded)
 	key := hex.EncodeToString(digest[:])
 	return DependencyPlan{Key: key, Tag: "inputs-" + key, Repository: parserDependencyImage, Dockerfile: recipe, BuildArgs: "PUBLIC_PARSER_DEPENDENCY_KEY=" + key, Build: true}, nil
+}
+
+func (archive DebianArchive) packageIndexes(ctx context.Context, release string) (map[string]string, error) {
+	indexes := map[string]string{}
+	for _, suite := range []string{"debian/dists/" + release, "debian/dists/" + release + "-updates", "debian-security/dists/" + release + "-security"} {
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(archive.Base, "/")+"/"+suite+"/InRelease", nil)
+		if err != nil {
+			return nil, err
+		}
+		body, _, err := fetchMetadata(archive.Client, request, false)
+		if err != nil {
+			return nil, fmt.Errorf("debian %s: %w", suite, err)
+		}
+		section := ""
+		for _, line := range strings.Split(string(body), "\n") {
+			fields := strings.Fields(line)
+			if !strings.HasPrefix(line, " ") {
+				section = line
+			} else if section == "SHA256:" && len(fields) == 3 && (fields[2] == "main/binary-amd64/Packages" || fields[2] == "main/binary-all/Packages") && digestPattern.MatchString(fields[0]) {
+				indexes[suite+"/"+fields[2]] = fields[0]
+			}
+		}
+		if indexes[suite+"/main/binary-amd64/Packages"] == "" {
+			return nil, fmt.Errorf("debian %s: amd64 package index missing", suite)
+		}
+	}
+	return indexes, nil
 }
 
 type DependencyRegistry struct {
@@ -113,7 +161,7 @@ func (registry *DependencyRegistry) request(ctx context.Context, kind, reference
 		if registry.Token != "" {
 			request.SetBasicAuth(registry.Actor, registry.Token)
 		}
-		body, _, err := registry.fetch(request, false)
+		body, _, err := fetchMetadata(registry.Client, request, false)
 		if err != nil {
 			return nil, false, err
 		}
@@ -140,7 +188,7 @@ func (registry *DependencyRegistry) request(ctx context.Context, kind, reference
 	}
 	request.Header.Set("Authorization", "Bearer "+registry.bearer)
 	request.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json")
-	body, missing, err := registry.fetch(request, kind == "manifests" && strings.HasPrefix(reference, "inputs-"))
+	body, missing, err := fetchMetadata(registry.Client, request, kind == "manifests" && strings.HasPrefix(reference, "inputs-"))
 	if err != nil || missing {
 		return nil, missing, err
 	}
@@ -151,15 +199,15 @@ func (registry *DependencyRegistry) request(ctx context.Context, kind, reference
 	return body, false, nil
 }
 
-func (registry *DependencyRegistry) fetch(request *http.Request, allowMissing bool) ([]byte, bool, error) {
-	client := *registry.Client
+func fetchMetadata(base *http.Client, request *http.Request, allowMissing bool) ([]byte, bool, error) {
+	client := *base
 	client.CheckRedirect = func(next *http.Request, previous []*http.Request) error {
 		if len(previous) >= 5 {
-			return errors.New("registry redirect limit")
+			return errors.New("redirect limit")
 		}
 		origin := previous[0].URL
 		if origin.Scheme == "https" && next.URL.Scheme != "https" {
-			return errors.New("registry redirect requires HTTPS")
+			return errors.New("redirect requires HTTPS")
 		}
 		if next.URL.Host != origin.Host || next.URL.Scheme != origin.Scheme {
 			next.Header.Del("Authorization")
@@ -172,7 +220,7 @@ func (registry *DependencyRegistry) fetch(request *http.Request, allowMissing bo
 			body, readErr := io.ReadAll(io.LimitReader(response.Body, (2<<20)+1))
 			response.Body.Close()
 			if len(body) > 2<<20 {
-				return nil, false, errors.New("registry metadata exceeds limit")
+				return nil, false, fmt.Errorf("%s metadata exceeds limit", request.URL.Host)
 			}
 			if response.StatusCode == 404 && allowMissing {
 				return nil, true, nil
@@ -181,11 +229,11 @@ func (registry *DependencyRegistry) fetch(request *http.Request, allowMissing bo
 				return body, false, readErr
 			}
 			if response.StatusCode != 429 && response.StatusCode != 500 && response.StatusCode != 502 && response.StatusCode != 503 && response.StatusCode != 504 {
-				return nil, false, fmt.Errorf("registry returned HTTP %d", response.StatusCode)
+				return nil, false, fmt.Errorf("%s returned HTTP %d", request.URL.Host, response.StatusCode)
 			}
 		}
 		if attempt == 2 {
-			return nil, false, errors.New("registry request failed")
+			return nil, false, fmt.Errorf("%s request failed", request.URL.Host)
 		}
 		timer := time.NewTimer(time.Duration(attempt+1) * 500 * time.Millisecond)
 		select {
@@ -195,7 +243,7 @@ func (registry *DependencyRegistry) fetch(request *http.Request, allowMissing bo
 		case <-timer.C:
 		}
 	}
-	return nil, false, errors.New("registry retries exhausted")
+	return nil, false, fmt.Errorf("%s retries exhausted", request.URL.Host)
 }
 
 func (registry *DependencyRegistry) Lookup(ctx context.Context, plan DependencyPlan) (DependencyPlan, error) {

@@ -164,17 +164,18 @@ func newProjectCICommand() *cobra.Command {
 }
 
 func newDependenciesCommand() *cobra.Command {
-	var root, infraRoot, output, image, registryBase string
+	var root, infraRoot, output, image, registryBase, debianBase string
 	command := &cobra.Command{Use: "dependencies plan|lookup|verify|resolve", Short: "Resolve verified runtime dependency images", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
 		if !strings.Contains("|plan|lookup|verify|resolve|", "|"+args[0]+"|") {
 			return errors.New("unknown dependency operation")
 		}
 		runner := process.Runner{Dir: root, Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}
-		plan, err := ci.PlanDependencies(command.Context(), runner, infraRoot)
+		client := &http.Client{Timeout: 15 * time.Second}
+		plan, err := ci.PlanDependencies(command.Context(), runner, infraRoot, ci.DebianArchive{Client: client, Base: debianBase})
 		if err != nil {
 			return err
 		}
-		registry := ci.DependencyRegistry{Client: &http.Client{Timeout: 15 * time.Second}, Base: registryBase, Actor: envDefault("GITHUB_ACTOR", "fredrir"), Token: os.Getenv("REGISTRY_TOKEN")}
+		registry := ci.DependencyRegistry{Client: client, Base: registryBase, Actor: envDefault("GITHUB_ACTOR", "fredrir"), Token: os.Getenv("REGISTRY_TOKEN")}
 		if args[0] == "lookup" || args[0] == "resolve" {
 			plan, err = registry.Lookup(command.Context(), plan)
 			if err != nil {
@@ -207,5 +208,6 @@ func newDependenciesCommand() *cobra.Command {
 	command.Flags().StringVar(&output, "github-output", os.Getenv("GITHUB_OUTPUT"), "Workflow output file")
 	command.Flags().StringVar(&image, "image", os.Getenv("IMAGE"), "Immutable dependency image")
 	command.Flags().StringVar(&registryBase, "registry", "https://ghcr.io", "Registry URL")
+	command.Flags().StringVar(&debianBase, "debian-archive", "https://deb.debian.org", "Debian archive URL")
 	return command
 }

@@ -15,17 +15,19 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/fredrir/infra/internal/process"
 )
 
-func TestRuntimeDependencyKeyIgnoresDevLockChangesButTracksRecipeAndRuntime(t *testing.T) {
+func TestRuntimeDependencyKeyIgnoresDevLockChangesButTracksRecipeRuntimeAndDebianPackages(t *testing.T) {
 	root := t.TempDir()
-	for _, name := range []string{"build/projects/llunde-pyparser/dependencies.Containerfile", "internal/ci/dependencies.go", "pyproject.toml", "uv.lock"} {
+	recipe := "ARG PYTHON_IMAGE=docker.io/library/python:3.14.8-slim-bookworm@sha256:" + strings.Repeat("0", 64) + "\n"
+	for name, content := range map[string]string{"build/projects/llunde-pyparser/dependencies.Containerfile": recipe, "internal/ci/dependencies.go": "input", "pyproject.toml": "input", "uv.lock": "input"} {
 		path := filepath.Join(root, name)
 		os.MkdirAll(filepath.Dir(path), 0755)
-		os.WriteFile(path, []byte("input"), 0644)
+		os.WriteFile(path, []byte(content), 0644)
 	}
 	lock := "lock-version = '1.0'\n[[packages]]\nname='runtime'\nversion='1.0'\n"
 	runner := process.Runner{Dir: root, Execute: func(_ context.Context, options process.Options) (process.Result, error) {
@@ -34,35 +36,66 @@ func TestRuntimeDependencyKeyIgnoresDevLockChangesButTracksRecipeAndRuntime(t *t
 		}
 		return process.Result{Stdout: []byte(lock)}, nil
 	}}
-	before, err := PlanDependencies(context.Background(), runner, root)
+	var security atomic.Value
+	security.Store(strings.Repeat("a", 64))
+	var published atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		packages := map[string]string{"/debian/dists/bookworm/InRelease": strings.Repeat("b", 64), "/debian/dists/bookworm-updates/InRelease": strings.Repeat("c", 64), "/debian-security/dists/bookworm-security/InRelease": security.Load().(string)}[r.URL.Path]
+		if packages == "" {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprintf(w, "Date: %d\nSHA256:\n %s 1 main/binary-amd64/Packages\n %s 1 main/binary-all/Packages\n %s 1 main/i18n/Index\n", published.Add(1), packages, strings.Repeat("d", 64), strings.Repeat("e", 64))
+	}))
+	defer server.Close()
+	archive := DebianArchive{Client: server.Client(), Base: server.URL}
+	before, err := PlanDependencies(context.Background(), runner, root, archive)
 	if err != nil {
 		t.Fatal(err)
 	}
+	after, err := PlanDependencies(context.Background(), runner, root, archive)
+	if err != nil || before.Key != after.Key {
+		t.Fatal("republished Debian release metadata rebuilt image")
+	}
 	os.WriteFile(filepath.Join(root, "uv.lock"), []byte("dev-only change"), 0644)
-	after, err := PlanDependencies(context.Background(), runner, root)
+	after, err = PlanDependencies(context.Background(), runner, root, archive)
 	if err != nil || before.Key != after.Key {
 		t.Fatal("dev dependency change rebuilt runtime image")
 	}
 	lock = strings.ReplaceAll(lock, "1.0'\n", "2.0'\n")
-	after, err = PlanDependencies(context.Background(), runner, root)
+	after, err = PlanDependencies(context.Background(), runner, root, archive)
 	if err != nil || before.Key == after.Key {
 		t.Fatal("runtime dependency change reused image")
 	}
 	lock = "lock-version='1.0'\n[[packages]]\nversion='1.0'\nname='runtime'\n"
-	after, err = PlanDependencies(context.Background(), runner, root)
+	after, err = PlanDependencies(context.Background(), runner, root, archive)
 	if err != nil || before.Key != after.Key {
 		t.Fatal("TOML formatting changed dependency key")
 	}
 	os.WriteFile(filepath.Join(root, "pyproject.toml"), []byte("new entry point"), 0644)
-	after, err = PlanDependencies(context.Background(), runner, root)
+	after, err = PlanDependencies(context.Background(), runner, root, archive)
 	if err != nil || before.Key == after.Key {
 		t.Fatal("package metadata change reused installed entry points")
 	}
 	os.WriteFile(filepath.Join(root, "pyproject.toml"), []byte("input"), 0644)
-	os.WriteFile(filepath.Join(root, "build/projects/llunde-pyparser/dependencies.Containerfile"), []byte("new recipe"), 0644)
-	after, err = PlanDependencies(context.Background(), runner, root)
+	security.Store(strings.Repeat("f", 64))
+	after, err = PlanDependencies(context.Background(), runner, root, archive)
+	if err != nil || before.Key == after.Key {
+		t.Fatal("Debian security update reused image")
+	}
+	security.Store(strings.Repeat("a", 64))
+	os.WriteFile(filepath.Join(root, "build/projects/llunde-pyparser/dependencies.Containerfile"), []byte(recipe+"new recipe"), 0644)
+	after, err = PlanDependencies(context.Background(), runner, root, archive)
 	if err != nil || before.Key == after.Key {
 		t.Fatal("recipe change reused image")
+	}
+	os.WriteFile(filepath.Join(root, "build/projects/llunde-pyparser/dependencies.Containerfile"), []byte(strings.Replace(recipe, "bookworm", "trixie", 1)), 0644)
+	if _, err := PlanDependencies(context.Background(), runner, root, archive); err == nil {
+		t.Fatal("unpublished Debian release produced a key")
+	}
+	os.WriteFile(filepath.Join(root, "build/projects/llunde-pyparser/dependencies.Containerfile"), []byte(strings.Replace(recipe, "-slim-bookworm", "-slim", 1)), 0644)
+	if _, err := PlanDependencies(context.Background(), runner, root, archive); err == nil {
+		t.Fatal("recipe without a Debian release produced a key")
 	}
 }
 
@@ -144,7 +177,7 @@ func TestDependencyRegistryStripsAuthorizationOnCrossOriginRedirect(t *testing.T
 	registry := DependencyRegistry{Client: origin.Client()}
 	request, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, origin.URL, nil)
 	request.Header.Set("Authorization", "Bearer secret")
-	if _, _, err := registry.fetch(request, false); err != nil {
+	if _, _, err := fetchMetadata(registry.Client, request, false); err != nil {
 		t.Fatal(err)
 	}
 }
