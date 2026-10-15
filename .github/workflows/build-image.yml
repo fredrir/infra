@@ -330,7 +330,7 @@ jobs:
             skip=(--skip-dirs "$SKIP_DIRS")
           fi
           infra ci measure-check --stage vulnerability-scan --budget 10s --report-dir "$RUNNER_TEMP/performance/checks" -- \
-            infra ci scanner scan -- image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --skip-java-db-update --timeout 10s "${skip[@]}" "$IMAGE"
+            infra ci scanner scan -- image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --skip-java-db-update --timeout 10s --ignorefile .infra-build-recipe/.github/trivy-ignore.yaml "${skip[@]}" "$IMAGE"
       - uses: ./.infra-build-recipe/.github/actions/attest-image
         id: provenance
         if: steps.affected.outputs.changed == 'true' && (!github.event.repository.private)

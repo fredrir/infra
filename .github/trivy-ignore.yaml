@@ -1,0 +1,19 @@
+vulnerabilities:
+  - id: CVE-2026-58280
+    paths: ["home/runner/bin/*.deps.json"]
+    expired_at: 2026-10-29
+  - id: CVE-2026-69651
+    paths: ["home/runner/bin/*.deps.json"]
+    expired_at: 2026-10-29
+  - id: CVE-2026-96225
+    paths: ["home/runner/bin/*.deps.json"]
+    expired_at: 2026-10-29
+  - id: CVE-2026-96231
+    paths: ["home/runner/bin/*.deps.json"]
+    expired_at: 2026-10-29
+  - id: CVE-2026-96233
+    paths: ["home/runner/bin/*.deps.json"]
+    expired_at: 2026-10-29
+  - id: CVE-2026-84008
+    paths: ["home/runner/bin/*.deps.json"]
+    expired_at: 2026-10-29

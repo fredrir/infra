@@ -31,7 +31,7 @@ jobs:
           git cat-file -e "$base^{commit}"
           git cat-file -e "$CI_REVISION^{commit}"
           changed=false
-          if ! git diff --quiet "$base" "$CI_REVISION" -- internal/ cmd/infra/ go.mod go.sum build/toolchain.json build/projects/ .github/workflows/ .github/actions/ platform/projects/y/*.Dockerfile platform/projects/y/Caddyfile; then
+          if ! git diff --quiet "$base" "$CI_REVISION" -- internal/ cmd/infra/ go.mod go.sum build/toolchain.json build/projects/ .github/trivy-ignore.yaml .github/workflows/ .github/actions/ platform/projects/y/*.Dockerfile platform/projects/y/Caddyfile; then
             changed=true
           fi
           printf 'changed=%s\n' "$changed" >> "$GITHUB_OUTPUT"
