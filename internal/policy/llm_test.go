@@ -69,7 +69,7 @@ func TestParserUsesTheAuthenticatedModelGateway(t *testing.T) {
 	}
 }
 
-func TestLayoutRouteRequiresGatewayKeys(t *testing.T) {
+func TestPassThroughRoutesRequireGatewayKeys(t *testing.T) {
 	t.Parallel()
 	var config struct {
 		GeneralSettings struct {
@@ -89,16 +89,26 @@ func TestLayoutRouteRequiresGatewayKeys(t *testing.T) {
 			}
 		}
 	}
+	type target struct {
+		url            string
+		includeSubpath bool
+	}
+	expected := map[string]target{
+		"/pp-structure":      {"http://pp-structure:8012", true},
+		"/ntnu/v1/systemone": {"https://llm.hpc.ntnu.no/v1/systemone", false},
+	}
 	routes := config.GeneralSettings.PassThroughEndpoints
-	if len(routes) != 1 {
+	if len(routes) != len(expected) {
 		t.Fatalf("unexpected pass-through routes %v", routes)
 	}
-	route := routes[0]
-	if route.Path != "/pp-structure" || route.Target != "http://pp-structure:8012" || !route.IncludeSubpath {
-		t.Fatalf("layout route misrouted: %+v", route)
-	}
-	if !route.Auth || route.ForwardHeaders {
-		t.Fatal("layout route bypasses gateway keys or leaks client credentials")
+	for _, route := range routes {
+		want, ok := expected[route.Path]
+		if !ok || route.Target != want.url || route.IncludeSubpath != want.includeSubpath {
+			t.Fatalf("pass-through route misrouted: %+v", route)
+		}
+		if !route.Auth || route.ForwardHeaders {
+			t.Fatalf("%s bypasses gateway keys or leaks client credentials", route.Path)
+		}
 	}
 }
 

@@ -13,6 +13,8 @@
 | Alibaba Model Studio | `qwencloud/*`; international `dashscope-intl.aliyuncs.com`; `QWENCLOUD_API_KEY` |
 | Mistral AI Studio | `mistral/*`; `api.mistral.ai`; `MISTRAL_API_KEY` |
 | NTNU | `ntnu/<model>` from [`ntnu-models.yaml`](../platform/components/llm/ntnu-models.yaml), access group `ntnu`, metadata copied from NTNU `/v1/model/info`; `litellm_proxy` to `https://llm.hpc.ntnu.no/v1`; `NTNU_API_KEY` |
+| NTNU GLM instant | The GLM-5.3 chat templates always open `<think>` and ignore `enable_thinking`, so the `-instant` entries set vLLM `continue_final_message` and [`continuation.py`](../platform/components/llm/continuation.py) appends an empty assistant turn, which the template renders as `<think></think>` |
+| NTNU decisions | `POST /ntnu/v1/systemone`; LiteLLM pass-through to NTNU `/v1/systemone` with `NTNU_API_KEY`; Jev/SystemOne request body with model `Cloudflare/clef-flash`; NTNU's chat routes and `/typesafe` route cannot serve it |
 | Codex | `codex/<model>` from [`codex-models.yaml`](../platform/components/llm/codex-models.yaml), access group `codex`, `fredrir` key only; `litellm_proxy` to `llm/codex`, a separate LiteLLM instance using the ChatGPT Pro subscription through the `chatgpt` provider; `CODEX_API_KEY` |
 | Codex instance | One replica on `fredrir-04`; config [`codex-litellm.yaml`](../platform/components/llm/codex-litellm.yaml); device-code login token in retained volume `codex-auth`; `CHATGPT_DEFAULT_INSTRUCTIONS` set to a single space replaces the injected Codex system prompt |
 | Codex requests | Streaming and non-streaming; [`codex-patch.py`](../platform/components/llm/codex-patch.py), loaded as `sitecustomize`, sends ChatGPT's mandatory `stream: true` only in the request bytes so LiteLLM follows the client's `stream` ([#34094](https://github.com/BerriAI/litellm/issues/34094)), and wraps string Responses `input` in a message list; instance entries set `supports_native_streaming` so `gpt-6-*` streams keep `stream: true`; recheck the patch on LiteLLM upgrades; entries declare `temperature: 1.0` because the `chatgpt` provider rejects other values while reasoning is active |
@@ -25,7 +27,7 @@
 | PP-StructureV3 source | [`fredrir/litellm`](https://github.com/fredrir/litellm) `services/pp-structure`; manual `VARIANT=cpu` build pinned by digest; public GHCR package since `llm` has no pull secret |
 | Layout route | `/pp-structure/health`, `/pp-structure/v1/layout`; LiteLLM pass-through to `pp-structure:8012`; LiteLLM key required |
 | Document parsing | Cropping and result assembly run in the calling pipeline |
-| Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, PaddleOCR, the provider wildcards and the `deepseek` and `ntnu` access groups; `fredrir` also permits `codex`; parser key also permits `/pp-structure` and has a 150 USD budget per 30 days |
+| Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, PaddleOCR, the provider wildcards and the `deepseek` and `ntnu` access groups; `fredrir` also permits `codex` and `/ntnu/v1/systemone`; parser key also permits `/pp-structure` and has a 150 USD budget per 30 days |
 | Client key | `fredrir`; 1Password `op://Dev/LITELLM_API_KEY/credential`; owned by `internal_user_viewer` user `fredrir-client`, which unlocks `/user/daily/activity`; LiteLLM refuses analytics to keys without a user |
 | Clients | pi `npm:pi-provider-litellm`; VS Code `vivswan.litellm-vscode-chat`; both discover models from `/model/info` |
 | Key limits | No key parallel, RPM or TPM limits; local models bounded by deployment `max_parallel_requests`; parser key 150 USD per 30 days |
@@ -82,7 +84,7 @@ curl --fail -G localhost:4000/key/info --data-urlencode "key=$PARSER_KEY" -H "Au
 curl --fail localhost:4000/user/new -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
   -d '{"user_id": "fredrir-client", "user_role": "internal_user_viewer", "auto_create_key": false}'
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
-  -d "{\"key\": \"$CLIENT_KEY\", \"user_id\": \"fredrir-client\", \"models\": $CLIENT_MODELS, \"max_parallel_requests\": null, \"rpm_limit\": null, \"tpm_limit\": null}"
+  -d "{\"key\": \"$CLIENT_KEY\", \"user_id\": \"fredrir-client\", \"models\": $CLIENT_MODELS, \"max_parallel_requests\": null, \"rpm_limit\": null, \"tpm_limit\": null, \"metadata\": {\"allowed_passthrough_routes\": [\"/ntnu/v1/systemone\"]}}"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
   -d "{\"key\": \"$PARSER_KEY\", \"models\": $MODELS, \"max_parallel_requests\": null, \"rpm_limit\": null, \"tpm_limit\": null, \"max_budget\": 150, \"budget_duration\": \"30d\", \"metadata\": {\"allowed_passthrough_routes\": [\"/pp-structure\"]}}"
 curl --fail https://llm.fredrir.com/pp-structure/health -H "Authorization: Bearer $PARSER_KEY"

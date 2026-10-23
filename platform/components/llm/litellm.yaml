@@ -63,7 +63,17 @@ general_settings:
     - GET
     - POST
     timeout: 180
+  - path: /ntnu/v1/systemone
+    target: https://llm.hpc.ntnu.no/v1/systemone
+    headers:
+      Authorization: Bearer os.environ/NTNU_API_KEY
+    auth: true
+    methods:
+    - POST
+    timeout: 120
 litellm_settings:
+  callbacks:
+  - continuation.continuation
   request_timeout: 600
   num_retries: 0
   set_verbose: false

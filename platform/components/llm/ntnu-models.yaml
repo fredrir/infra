@@ -29,6 +29,8 @@ model_list:
     api_key: os.environ/NTNU_API_KEY
     chat_template_kwargs:
       enable_thinking: false
+    continue_final_message: true
+    add_generation_prompt: false
   model_info:
     mode: chat
     access_groups:
@@ -379,6 +381,8 @@ model_list:
     api_key: os.environ/NTNU_API_KEY
     chat_template_kwargs:
       enable_thinking: false
+    continue_final_message: true
+    add_generation_prompt: false
   model_info:
     mode: chat
     access_groups:

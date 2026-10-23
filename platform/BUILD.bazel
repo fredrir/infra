@@ -5,7 +5,7 @@ filegroup(
         "clusters/production/root.yaml",
         "components/**/*.yaml",
         "components/bazel-cache/nginx.conf",
-        "components/llm/codex-patch.py",
+        "components/llm/*.py",
         "components/object-store/**",
         "components/object-store-trust/**",
         "projects/**/*.yaml",

@@ -28,6 +28,7 @@ configMapGenerator:
   - ntnu-models.yaml
   - deepseek-models.yaml
   - codex-models.yaml
+  - continuation.py
 - name: codex
   files:
   - config.yaml=codex-litellm.yaml
