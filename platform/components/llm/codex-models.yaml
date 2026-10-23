@@ -17,6 +17,7 @@ model_list:
     supports_parallel_function_calling: true
     supports_tool_choice: true
     supports_system_messages: true
+    temperature: 1.0
     input_cost_per_token: 0
     output_cost_per_token: 0
 - model_name: codex/gpt-6-astra
@@ -37,6 +38,7 @@ model_list:
     supports_parallel_function_calling: true
     supports_tool_choice: true
     supports_system_messages: true
+    temperature: 1.0
     input_cost_per_token: 0
     output_cost_per_token: 0
 - model_name: codex/gpt-6-sol
@@ -57,6 +59,7 @@ model_list:
     supports_parallel_function_calling: true
     supports_tool_choice: true
     supports_system_messages: true
+    temperature: 1.0
     input_cost_per_token: 0
     output_cost_per_token: 0
 - model_name: codex/gpt-6-luna
@@ -77,6 +80,7 @@ model_list:
     supports_parallel_function_calling: true
     supports_tool_choice: true
     supports_system_messages: true
+    temperature: 1.0
     input_cost_per_token: 0
     output_cost_per_token: 0
 - model_name: codex/gpt-5.6-sol
@@ -97,6 +101,7 @@ model_list:
     supports_parallel_function_calling: true
     supports_tool_choice: true
     supports_system_messages: true
+    temperature: 1.0
     input_cost_per_token: 0
     output_cost_per_token: 0
 - model_name: codex/gpt-5.6-terra
@@ -117,6 +122,7 @@ model_list:
     supports_parallel_function_calling: true
     supports_tool_choice: true
     supports_system_messages: true
+    temperature: 1.0
     input_cost_per_token: 0
     output_cost_per_token: 0
 - model_name: codex/gpt-5.6-luna
@@ -137,6 +143,7 @@ model_list:
     supports_parallel_function_calling: true
     supports_tool_choice: true
     supports_system_messages: true
+    temperature: 1.0
     input_cost_per_token: 0
     output_cost_per_token: 0
 - model_name: codex/gpt-5.5
@@ -157,5 +164,6 @@ model_list:
     supports_parallel_function_calling: true
     supports_tool_choice: true
     supports_system_messages: true
+    temperature: 1.0
     input_cost_per_token: 0
     output_cost_per_token: 0
