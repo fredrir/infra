@@ -153,11 +153,16 @@ model_list:
       mode: chat
       access_groups:
         - ntnu
+      supports_reasoning: true
+      reasoning_effort_levels:
+        - low
+        - high
+        - xhigh
+        - max
       supports_vision: true
       max_input_tokens: 699050
       max_output_tokens: 349525
       supports_response_schema: true
-      supports_reasoning: true
       supports_function_calling: true
       supports_tool_choice: true
       supports_system_messages: true
