@@ -90,7 +90,6 @@ endpoints:
         - type: email
     - name: rif-mirror-auth
       group: applications
-      enabled: false
       url: https://rif-mirror.fredrir.com/files/by-name/gatus
       interval: 1m
       client:
@@ -219,7 +218,6 @@ external-endpoints:
           send-on-resolved: true
     - name: rif
       group: backups
-      enabled: false
       token: "${GATUS_TOKEN_BACKUPS_RIF}"
       heartbeat:
         interval: 26h
