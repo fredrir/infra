@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: imgproxy
+spec:
+  selector:
+    app: imgproxy
+  ports:
+    - name: http
+      port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: imgproxy
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels:
+      app: imgproxy
+  template:
+    metadata:
+      labels:
+        app: imgproxy
+    spec:
+      automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-04
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: imgproxy
+          image: ghcr.io/imgproxy/imgproxy:v4.0.22@sha256:b2953f6a7417be7e8a88819da9d3428270ca942cff280f8e143406fb5f962ed0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          envFrom: [{secretRef: {name: imgproxy}}]
+          env:
+            - {name: IMGPROXY_BIND, value: ":8080"}
+            - {name: IMGPROXY_USE_S3, value: "true"}
+            - {name: IMGPROXY_S3_ENDPOINT, value: "https://seaweedfs-nl.object-store.svc.cluster.local:8333"}
+            - {name: IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE, value: "true"}
+            - {name: IMGPROXY_S3_REGION, value: nl}
+            - {name: SSL_CERT_FILE, value: /etc/object-store/ca.crt}
+          ports: [{name: http, containerPort: 8080}]
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {cpu: "2", memory: 1Gi}
+          volumeMounts:
+            - {name: object-store-ca, mountPath: /etc/object-store, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: object-store-ca
+          configMap: {name: object-store-ca}
+        - name: tmp
+          emptyDir: {sizeLimit: 256Mi}

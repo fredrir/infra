@@ -22,3 +22,13 @@ spec:
                 name: mirror
                 port:
                   name: http
+    - host: rif-api.fredrir.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mirror
+                port:
+                  name: http

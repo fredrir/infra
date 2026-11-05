@@ -50,16 +50,28 @@ spec:
           envFrom: [{secretRef: {name: mirror}}]
           env:
             - {name: S3_CA_FILE, value: /etc/object-store/ca.crt}
-            - {name: GOMEMLIMIT, value: 200MiB}
+            - {name: BACKUP_S3_ENDPOINT, value: "https://seaweedfs-hel1.object-store.svc.cluster.local:8333"}
+            - {name: BACKUP_S3_BUCKET, value: rif-backup}
+            - {name: BACKUP_S3_REGION, value: hel1}
+            - {name: BACKUP_S3_CA_FILE, value: /etc/object-store/ca.crt}
+            - {name: BACKUP_ASSETS, value: "false"}
+            - {name: PUBLIC_API_URL, value: "https://rif-api.fredrir.com"}
+            - {name: PUBLIC_CDN_URL, value: "https://rif-api.fredrir.com"}
+            - {name: CORS_ORIGINS, value: "https://admin.rif.no,https://rif.no,https://www.rif.no,http://localhost:3333,http://localhost:3000"}
+            - {name: ENGINE_URL, value: "http://engine:8081"}
+            - {name: IMGPROXY_URL, value: "http://imgproxy:8080"}
+            - {name: TMPDIR, value: /tmp}
+            - {name: GOMEMLIMIT, value: 400MiB}
           ports: [{name: http, containerPort: 8080}]
           lifecycle:
             preStop:
               sleep: {seconds: 5}
           resources:
-            requests: {cpu: 50m, memory: 64Mi}
-            limits: {cpu: "1", memory: 256Mi}
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: "1", memory: 512Mi}
           volumeMounts:
             - {name: object-store-ca, mountPath: /etc/object-store, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 10
@@ -67,3 +79,5 @@ spec:
       volumes:
         - name: object-store-ca
           configMap: {name: object-store-ca}
+        - name: tmp
+          emptyDir: {sizeLimit: 1Gi}

@@ -11,6 +11,9 @@
     "targets": {
       "rif-mirror": [
         "apps/mirror/"
+      ],
+      "rif-mirror-engine": [
+        "apps/mirror/engine/"
       ]
     }
   },
@@ -18,6 +21,16 @@
     {
       "image": "ghcr.io/fredrir/rif-mirror",
       "dockerfile": "apps/mirror/Dockerfile",
+      "target": "",
+      "check_target": "",
+      "timeout": 30,
+      "scanner_java": false,
+      "recipe": "",
+      "build_args": ""
+    },
+    {
+      "image": "ghcr.io/fredrir/rif-mirror-engine",
+      "dockerfile": "apps/mirror/engine/Dockerfile",
       "target": "",
       "check_target": "",
       "timeout": 30,

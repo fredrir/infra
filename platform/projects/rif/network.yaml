@@ -37,6 +37,8 @@ spec:
     - from:
         - podSelector:
             matchLabels: {app: mirror}
+        - podSelector:
+            matchLabels: {app: engine}
       ports: [{protocol: TCP, port: 5432}]
 ---
 apiVersion: networking.k8s.io/v1
@@ -68,6 +70,14 @@ spec:
             matchLabels: {app: postgres}
       ports: [{protocol: TCP, port: 5432}]
     - to:
+        - podSelector:
+            matchLabels: {app: engine}
+      ports: [{protocol: TCP, port: 8081}]
+    - to:
+        - podSelector:
+            matchLabels: {app: imgproxy}
+      ports: [{protocol: TCP, port: 8080}]
+    - to:
         - ipBlock:
             cidr: 0.0.0.0/0
             except:
@@ -87,6 +97,49 @@ spec:
   podSelector:
     matchLabels: {app: mirror}
   policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: object-store
+          podSelector:
+            matchExpressions:
+              - {key: app.kubernetes.io/name, operator: In, values: [seaweedfs]}
+              - {key: app.kubernetes.io/instance, operator: In, values: [nl, hel1]}
+      ports: [{protocol: TCP, port: 8333}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: engine
+spec:
+  podSelector:
+    matchLabels: {app: engine}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: mirror}
+      ports: [{protocol: TCP, port: 8081}]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app: postgres}
+      ports: [{protocol: TCP, port: 5432}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: imgproxy
+spec:
+  podSelector:
+    matchLabels: {app: imgproxy}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: mirror}
+      ports: [{protocol: TCP, port: 8080}]
   egress:
     - to:
         - namespaceSelector:

@@ -4,3 +4,6 @@ images:
   ghcr.io/fredrir/rif-mirror:
     path: platform/projects/rif
     mode: kustomize
+  ghcr.io/fredrir/rif-mirror-engine:
+    path: platform/projects/rif
+    mode: kustomize

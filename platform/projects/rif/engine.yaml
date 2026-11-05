@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: engine
+spec:
+  selector:
+    app: engine
+  ports:
+    - name: http
+      port: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: engine
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels:
+      app: engine
+  template:
+    metadata:
+      labels:
+        app: engine
+    spec:
+      automountServiceAccountToken: false
+      dnsConfig:
+        options: [{name: ndots, value: "2"}]
+      imagePullSecrets: [{name: ghcr}]
+      nodeSelector:
+        kubernetes.io/hostname: fredrir-04
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: engine
+          image: ghcr.io/fredrir/rif-mirror-engine@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          envFrom: [{secretRef: {name: engine}}]
+          env:
+            - {name: SANITY_PROJECT_ID, value: j9z3p7f8}
+            - {name: SANITY_DATASET, value: production}
+            - {name: CDN_BASE_URL, value: "https://rif-api.fredrir.com"}
+            - {name: ENGINE_HOST, value: 0.0.0.0}
+            - {name: ENGINE_PORT, value: "8081"}
+            - {name: HOME, value: /tmp}
+            - {name: BUN_RUNTIME_TRANSPILER_CACHE_PATH, value: "0"}
+          ports: [{name: http, containerPort: 8081}]
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}

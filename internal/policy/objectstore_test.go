@@ -359,6 +359,8 @@ func objectStoreActions(identity string) []string {
 		return reader("parser-dataset")
 	case "rif-mirror":
 		return objectWriter("rif")
+	case "rif-mirror-backup":
+		return objectWriter("rif-backup")
 	case "restic-parser", "restic-y", "restic-portfolio", "restic-rif":
 		return objectWriter(strings.Replace(identity, "restic-", "backup-", 1))
 	}
@@ -664,6 +666,7 @@ var objectStorePeers = map[string]map[string][]object{
 			{"podSelector": object{"matchLabels": object{"app.kubernetes.io/name": "object-store-provisioner"}}},
 			{"namespaceSelector": object{"matchLabels": object{"infra.fredrir.com/tier": "ci"}}, "podSelector": object{"matchExpressions": []any{object{"key": "actions.github.com/scale-set-name", "operator": "In", "values": []any{"rust-amd64", "rust-pr-amd64", "rust-release-amd64"}}}}},
 			{"namespaceSelector": object{"matchExpressions": []any{object{"key": "kubernetes.io/metadata.name", "operator": "In", "values": []any{"llunde-pyparser", "portfolio", "rif", "y"}}}}, "podSelector": object{"matchExpressions": []any{object{"key": "app.kubernetes.io/name", "operator": "In", "values": []any{"data-backup", "repository-maintenance"}}}}},
+			{"namespaceSelector": object{"matchLabels": object{"kubernetes.io/metadata.name": "rif"}}, "podSelector": object{"matchLabels": object{"app": "mirror"}}},
 		},
 		"9327": {prometheusPeer},
 		"9328": {prometheusPeer},
@@ -674,6 +677,7 @@ var objectStorePeers = map[string]map[string][]object{
 			{"namespaceSelector": object{"matchLabels": object{"kubernetes.io/metadata.name": "llunde-pyparser"}}, "podSelector": object{"matchLabels": object{"app.kubernetes.io/name": "data-backup"}}},
 			{"namespaceSelector": object{"matchLabels": object{"kubernetes.io/metadata.name": "llunde-pyparser"}}, "podSelector": object{"matchLabels": object{"app.kubernetes.io/part-of": "llunde-pyparser", "app.kubernetes.io/component": "application"}}},
 			{"namespaceSelector": object{"matchLabels": object{"kubernetes.io/metadata.name": "rif"}}, "podSelector": object{"matchLabels": object{"app": "mirror"}}},
+			{"namespaceSelector": object{"matchLabels": object{"kubernetes.io/metadata.name": "rif"}}, "podSelector": object{"matchLabels": object{"app": "imgproxy"}}},
 		},
 		"9327": {prometheusPeer},
 		"9328": {prometheusPeer},

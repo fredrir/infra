@@ -124,6 +124,20 @@
         }
       ],
       "name": "restic-rif"
+    },
+    {
+      "actions": [
+        "Read:rif-backup",
+        "Write:rif-backup/*",
+        "List:rif-backup"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${RIF_MIRROR_BACKUP_ACCESS_KEY_ID}",
+          "secretKey": "${RIF_MIRROR_BACKUP_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "rif-mirror-backup"
     }
   ]
 }

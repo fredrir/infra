@@ -18,6 +18,8 @@ cells:
         quotaGiB: 1
       - name: backup-rif
         quotaGiB: 1
+      - name: rif-backup
+        quotaGiB: 1
   - name: nl
     endpoint: https://seaweedfs-nl.object-store.svc.cluster.local:8333
     buckets:
