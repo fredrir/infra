@@ -90,7 +90,8 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
 FROM ghcr.io/actions/actions-runner:2.338.2@sha256:759a1d94a15b05941aba5196974ff43fe15b4cbba29b694b35cbc32a1166b232
 USER root
 COPY images/runner-check/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources
-RUN apt-get update -o APT::Update::Error-Mode=any \
+RUN printf 'Acquire::Retries "5";\n' > /etc/apt/apt.conf.d/80-retries \
+    && apt-get update -o APT::Update::Error-Mode=any \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         bash ca-certificates coreutils curl git jq openssh-client openssl python3 python3-venv sqlite3 zstd \
