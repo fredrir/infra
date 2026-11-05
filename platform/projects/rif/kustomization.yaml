@@ -27,6 +27,6 @@ patches:
           path: /spec/suspend
           value: true
 images:
-    - digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    - digest: sha256:363fed972ddeb51191b4643bf0441d47561e9d2f65445e029ddba94a2261ad6c
       name: ghcr.io/fredrir/rif-mirror
       newName: ghcr.io/fredrir/rif-mirror
