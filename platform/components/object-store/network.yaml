@@ -42,12 +42,6 @@ spec:
                 values:
                   - data-backup
                   - repository-maintenance
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: rif
-          podSelector:
-            matchLabels:
-              app: mirror
       ports:
         - port: 8333
           protocol: TCP
@@ -88,12 +82,6 @@ spec:
           podSelector:
             matchLabels:
               app: mirror
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: rif
-          podSelector:
-            matchLabels:
-              app: imgproxy
       ports:
         - port: 8333
           protocol: TCP

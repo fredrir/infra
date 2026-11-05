@@ -48,24 +48,18 @@ spec:
           envFrom: [{secretRef: {name: imgproxy}}]
           env:
             - {name: IMGPROXY_BIND, value: ":8080"}
-            - {name: IMGPROXY_USE_S3, value: "true"}
-            - {name: IMGPROXY_S3_ENDPOINT, value: "https://seaweedfs-nl.object-store.svc.cluster.local:8333"}
-            - {name: IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE, value: "true"}
-            - {name: IMGPROXY_S3_REGION, value: nl}
-            - {name: SSL_CERT_FILE, value: /etc/object-store/ca.crt}
+            - {name: IMGPROXY_ALLOWED_SOURCES, value: "http://mirror:8080/originals/"}
+            - {name: IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES, value: "true"}
           ports: [{name: http, containerPort: 8080}]
           resources:
             requests: {cpu: 100m, memory: 192Mi}
             limits: {cpu: "2", memory: 1Gi}
           volumeMounts:
-            - {name: object-store-ca, mountPath: /etc/object-store, readOnly: true}
             - {name: tmp, mountPath: /tmp}
           readinessProbe:
             httpGet: {path: /health, port: http}
             periodSeconds: 10
             timeoutSeconds: 5
       volumes:
-        - name: object-store-ca
-          configMap: {name: object-store-ca}
         - name: tmp
           emptyDir: {sizeLimit: 256Mi}

@@ -54,6 +54,8 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-system
+        - podSelector:
+            matchLabels: {app: imgproxy}
       ports: [{protocol: TCP, port: 8080}]
 ---
 apiVersion: networking.k8s.io/v1
@@ -103,9 +105,9 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: object-store
           podSelector:
-            matchExpressions:
-              - {key: app.kubernetes.io/name, operator: In, values: [seaweedfs]}
-              - {key: app.kubernetes.io/instance, operator: In, values: [nl, hel1]}
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+              app.kubernetes.io/instance: nl
       ports: [{protocol: TCP, port: 8333}]
 ---
 apiVersion: networking.k8s.io/v1
@@ -142,11 +144,6 @@ spec:
       ports: [{protocol: TCP, port: 8080}]
   egress:
     - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: object-store
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: seaweedfs
-              app.kubernetes.io/instance: nl
-      ports: [{protocol: TCP, port: 8333}]
+        - podSelector:
+            matchLabels: {app: mirror}
+      ports: [{protocol: TCP, port: 8080}]
