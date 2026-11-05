@@ -1,4 +1,4 @@
-FROM golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61 AS tools
+FROM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS tools
 ENV CGO_ENABLED=0
 ENV GOTOOLCHAIN=local
 ENV GOWORK=off
@@ -87,7 +87,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     && go build -trimpath -buildvcs=false -ldflags="-s -w -X main.Version=v1.3.2" -o /out/ ./cmd/age ./cmd/age-keygen \
     && rm -rf /src/age /tmp/source.tar.gz
 
-FROM ghcr.io/actions/actions-runner:2.337.0@sha256:e5496277be5d09bc968b3d64911b74e219ac4a3f2edce956a3ecf9271bea1ef4
+FROM ghcr.io/actions/actions-runner:2.338.2@sha256:759a1d94a15b05941aba5196974ff43fe15b4cbba29b694b35cbc32a1166b232
 USER root
 COPY images/runner-check/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources
 RUN apt-get update -o APT::Update::Error-Mode=any \

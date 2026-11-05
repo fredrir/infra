@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS rclone
+FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS rclone
 RUN apk add --no-cache git
 WORKDIR /src
 RUN git init -q . \
@@ -10,18 +10,18 @@ RUN go get google.golang.org/grpc@v1.84.0-dev.0.20260825144003-d5a41119e0e3 gola
     && go mod tidy
 RUN CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -X github.com/rclone/rclone/fs.Version=v1.75.1' -o /usr/local/bin/rclone .
 
-FROM docker.io/library/golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS restic
+FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS restic
 RUN apk add --no-cache git
 WORKDIR /src
 RUN git init -q . \
     && git remote add origin https://github.com/restic/restic.git \
     && git fetch -q --depth 1 origin 6099d4b5c4376368d42b9982c7d3e93ba13d83b1 \
     && git checkout -q FETCH_HEAD
-RUN go get golang.org/x/crypto@v0.58.0 golang.org/x/net@v0.61.0 golang.org/x/text@v0.43.0 google.golang.org/grpc@v1.83.2 \
+RUN go get golang.org/x/crypto@v0.58.0 golang.org/x/net@v0.61.0 golang.org/x/text@v0.43.0 google.golang.org/grpc@v1.83.2 github.com/go-jose/go-jose/v4@v4.1.6 github.com/klauspost/compress@v1.18.7 \
     && go mod tidy
 RUN CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -X main.version=0.19.1' -o /usr/local/bin/restic ./cmd/restic
 
-FROM docker.io/library/golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS kubectl
+FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS kubectl
 RUN apk add --no-cache git
 WORKDIR /src
 RUN git init -q . \
@@ -33,7 +33,7 @@ ENV GOWORK=off
 RUN go get golang.org/x/net@v0.61.0
 RUN CGO_ENABLED=0 go build -mod=readonly -trimpath -ldflags '-s -w -X k8s.io/client-go/pkg/version.gitVersion=v1.37.1 -X k8s.io/component-base/version.gitVersion=v1.37.1' -o /usr/local/bin/kubectl ./cmd/kubectl
 
-FROM docker.io/library/alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+FROM docker.io/library/alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 RUN sed -i 's|http://|https://|g' /etc/apk/repositories \
     && apk upgrade --no-cache \
     && apk add --no-cache bash ca-certificates coreutils curl jq mongodb-tools postgresql17-client sqlite tar

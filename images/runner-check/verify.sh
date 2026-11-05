@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-/home/runner/run.sh --version | grep -x 2.337.0
+/home/runner/run.sh --version | grep -x 2.338.2
 kubectl version --client
 kustomize version
 helm version --short

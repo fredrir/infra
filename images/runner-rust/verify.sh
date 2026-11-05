@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-/home/runner/run.sh --version | grep -x 2.337.0
+/home/runner/run.sh --version | grep -x 2.338.2
 rustc --version | grep '^rustc 1\.98\.1 '
 cargo +1.95.0 --version | grep '^cargo 1\.95\.0 '
 zig version | grep -x 0.16.0
