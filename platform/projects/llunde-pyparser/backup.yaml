@@ -121,7 +121,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: backup
-              image: ghcr.io/fredrir/platform-backup-tools@sha256:abc6700d00a72c4f7023bf45da37a7b75b631df17ea306e5e874dcde10a59157
+              image: ghcr.io/fredrir/platform-backup-tools@sha256:4e95681e4092b98cc78f4ed7239047c8854143eb9e48d63fc75001fbf177df15
               imagePullPolicy: IfNotPresent
               args:
                 - platform
