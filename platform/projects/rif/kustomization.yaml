@@ -18,6 +18,14 @@ components:
     - ../../components/backup-primary
     - ../../components/object-store-trust
     - ../../components/netpol-gate/egress
+patches:
+    - target:
+        kind: CronJob
+        name: repository-maintenance
+      patch: |-
+        - op: replace
+          path: /spec/suspend
+          value: true
 images:
     - digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
       name: ghcr.io/fredrir/rif-mirror
