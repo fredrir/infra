@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "tag": "infra-v0.2.38",
-  "revision": "baa84cc798fcd432d1fd39a21fc888dbb9ac2404",
-  "sha256": "daa1adf0c44f2829f76d99cf207e3f3f022161ccf1f210723fc90e529b450bc4",
-  "inputs_sha256": "19860da5cd5e4846087c08c83ce02bd55e8c33b38f0eb2e3248c208579a700b3"
+  "tag": "infra-v0.2.39",
+  "revision": "d04d420d7111aa92b860a031c6de94b0faa47234",
+  "sha256": "5d2ed617de93c2cbeb2d42c9921926444ca69392642d3020154fd74886ce342c",
+  "inputs_sha256": "01874a8a486e4b09133b925dfcb4ff8f5756729eca73b2fadaf69ab2b65c88ac"
 }
