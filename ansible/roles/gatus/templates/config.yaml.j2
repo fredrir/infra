@@ -88,6 +88,18 @@ endpoints:
         - '[STATUS] == 403'
       alerts:
         - type: email
+    - name: rif-mirror-auth
+      group: applications
+      enabled: false
+      url: https://rif-mirror.fredrir.com/files/by-name/gatus
+      interval: 1m
+      client:
+        timeout: 10s
+        ignore-redirect: true
+      conditions:
+        - '[STATUS] == 401'
+      alerts:
+        - type: email
     - name: "y"
       group: applications
       url: https://yeeter.no/
@@ -198,6 +210,17 @@ external-endpoints:
     - name: portfolio
       group: backups
       token: "${GATUS_TOKEN_BACKUPS_PORTFOLIO}"
+      heartbeat:
+        interval: 26h
+      alerts:
+        - type: email
+          failure-threshold: 1
+          success-threshold: 1
+          send-on-resolved: true
+    - name: rif
+      group: backups
+      enabled: false
+      token: "${GATUS_TOKEN_BACKUPS_RIF}"
       heartbeat:
         interval: 26h
       alerts:

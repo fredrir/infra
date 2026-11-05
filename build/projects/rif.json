@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "repository": "fredrir/rif",
+  "repository_id": "820906810",
+  "inputs": {
+    "schema": 1,
+    "shared": [
+      ".github/workflows/mirror.yml"
+    ],
+    "ignored": [],
+    "targets": {
+      "rif-mirror": [
+        "apps/mirror/"
+      ]
+    }
+  },
+  "images": [
+    {
+      "image": "ghcr.io/fredrir/rif-mirror",
+      "dockerfile": "apps/mirror/Dockerfile",
+      "target": "",
+      "check_target": "",
+      "timeout": 30,
+      "scanner_java": false,
+      "recipe": "",
+      "build_args": ""
+    }
+  ],
+  "checks": []
+}

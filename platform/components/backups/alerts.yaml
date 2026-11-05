@@ -8,7 +8,7 @@ spec:
     rules:
     - alert: ApplicationBackupOverdue
       expr: |
-        (time() - kube_cronjob_status_last_successful_time{namespace=~"llunde-pyparser|y|portfolio",cronjob="data-backup"} > 93600)
+        (time() - kube_cronjob_status_last_successful_time{namespace=~"llunde-pyparser|y|portfolio|rif",cronjob="data-backup"} > 93600)
         and on(namespace,cronjob) (kube_cronjob_spec_suspend == 0)
       for: 10m
       labels:

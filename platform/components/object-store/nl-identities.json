@@ -38,6 +38,20 @@
         }
       ],
       "name": "parser-backup"
+    },
+    {
+      "actions": [
+        "Read:rif",
+        "Write:rif/*",
+        "List:rif"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${RIF_MIRROR_ACCESS_KEY_ID}",
+          "secretKey": "${RIF_MIRROR_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "rif-mirror"
     }
   ]
 }

@@ -19,6 +19,7 @@ My infrastructure, for my personal projects, services and hobbies
 | `yeeter.no`                              | Y                                               |
 | `parser.llunde.no`, `external.llunde.no` | Parser review and shared media                  |
 | `llunde.no`, `api.llunde.no`             | Work-in-progress Llunde frontend/backend        |
+| `rif-mirror.fredrir.com`                 | RIF Sanity mirror file origin                   |
 
 ## Nodes
 

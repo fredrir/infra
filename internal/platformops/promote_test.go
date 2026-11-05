@@ -13,7 +13,7 @@ import (
 
 func TestToolsPromotionChangesOnlyImagePins(t *testing.T) {
 	root := t.TempDir()
-	for _, path := range []string{"platform/components/controllers/ci-slots.yaml", "platform/components/object-store/provisioner.yaml", "platform/components/repository-maintenance/maintenance.yaml", "platform/projects/y/backup.yaml", "platform/projects/llunde-pyparser/backup.yaml", "platform/projects/portfolio/backup.yaml"} {
+	for _, path := range []string{"platform/components/controllers/ci-slots.yaml", "platform/components/object-store/provisioner.yaml", "platform/components/repository-maintenance/maintenance.yaml", "platform/projects/y/backup.yaml", "platform/projects/llunde-pyparser/backup.yaml", "platform/projects/portfolio/backup.yaml", "platform/projects/rif/backup.yaml"} {
 		full := filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			t.Fatal(err)
@@ -28,8 +28,8 @@ func TestToolsPromotionChangesOnlyImagePins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(edits) != 6 {
-		t.Fatalf("expected six changes, got %d", len(edits))
+	if len(edits) != 7 {
+		t.Fatalf("expected seven changes, got %d", len(edits))
 	}
 	for _, edit := range edits {
 		var want, got any

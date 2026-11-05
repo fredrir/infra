@@ -34,8 +34,8 @@ const (
 var ErrClusterNotReady = errors.New("cluster kustomizations are not ready")
 
 var ClusterProfiles = map[string][]string{
-	"minimal":  {"platform-policy", "project-llunde", "project-portfolio", "project-y", "project-llunde-pyparser"},
-	"platform": {"platform-policy", "project-llunde", "project-portfolio", "project-y", "project-llunde-pyparser", "platform-sources", "platform-ingress", "platform-observability", "platform-object-store", "platform-backups", "platform-dns"},
+	"minimal":  {"platform-policy", "project-llunde", "project-portfolio", "project-y", "project-llunde-pyparser", "project-rif"},
+	"platform": {"platform-policy", "project-llunde", "project-portfolio", "project-y", "project-llunde-pyparser", "project-rif", "platform-sources", "platform-ingress", "platform-observability", "platform-object-store", "platform-backups", "platform-dns"},
 }
 
 var devSettings = map[string]string{"STORAGE_CLASS": "local-path"}

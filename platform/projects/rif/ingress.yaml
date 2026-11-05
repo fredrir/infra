@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mirror
+spec:
+  ingressClassName: platform
+  rules:
+    - host: rif-mirror.fredrir.com
+      http:
+        paths:
+          - path: /files/by-name/
+            pathType: Prefix
+            backend:
+              service:
+                name: mirror
+                port:
+                  name: http
+          - path: /webhook
+            pathType: Exact
+            backend:
+              service:
+                name: mirror
+                port:
+                  name: http

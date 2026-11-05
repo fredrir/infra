@@ -269,11 +269,14 @@ spec:
       == {"app.kubernetes.io/name": "traefik"} && has(r.ports) && r.ports.size() ==
       1 && r.ports.all(port, has(port.port) && port.port == 8000 && !has(port.endPort)
       && (!has(port.protocol) || port.protocol == "TCP"))) || (request.userInfo.username
-      == "system:serviceaccount:flux-system:platform-reconciler" && request.namespace
+      == "system:serviceaccount:flux-system:platform-reconciler" && ((request.namespace
       == "llunde-pyparser" && (object.metadata.name == "object-store-egress" ||
       (object.metadata.name == "backup-dataset-egress" && has(object.spec.podSelector.matchLabels)
       && !has(object.spec.podSelector.matchExpressions) && object.spec.podSelector.matchLabels
-      == {"app.kubernetes.io/name": "data-backup"})) && has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels)
+      == {"app.kubernetes.io/name": "data-backup"}))) || (request.namespace == "rif"
+      && object.metadata.name == "object-store-egress" && has(object.spec.podSelector.matchLabels)
+      && !has(object.spec.podSelector.matchExpressions) && object.spec.podSelector.matchLabels
+      == {"app": "mirror"})) && has(p.namespaceSelector) && has(p.namespaceSelector.matchLabels)
       && !has(p.namespaceSelector.matchExpressions) && p.namespaceSelector.matchLabels
       == {"kubernetes.io/metadata.name": "object-store"} && has(p.podSelector) && has(p.podSelector.matchLabels)
       && !has(p.podSelector.matchExpressions) && p.podSelector.matchLabels == {"app.kubernetes.io/name":
@@ -281,7 +284,7 @@ spec:
       == 1 && r.ports.all(port, has(port.port) && port.port == 8333 && !has(port.endPort)
       && (!has(port.protocol) || port.protocol == "TCP"))) || (request.userInfo.username
       == "system:serviceaccount:flux-system:platform-reconciler" && request.namespace
-      in ["llunde-pyparser", "portfolio", "y"] && has(object.spec.podSelector.matchLabels)
+      in ["llunde-pyparser", "portfolio", "rif", "y"] && has(object.spec.podSelector.matchLabels)
       && !has(object.spec.podSelector.matchExpressions) && ((object.metadata.name ==
       "backup-object-store-egress" && object.spec.podSelector.matchLabels == {"app.kubernetes.io/name":
       "data-backup"}) || (object.metadata.name == "maintenance-object-store-egress"

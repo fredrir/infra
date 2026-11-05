@@ -110,6 +110,20 @@
         }
       ],
       "name": "restic-portfolio"
+    },
+    {
+      "actions": [
+        "Read:backup-rif",
+        "Write:backup-rif/*",
+        "List:backup-rif"
+      ],
+      "credentials": [
+        {
+          "accessKey": "${RESTIC_RIF_ACCESS_KEY_ID}",
+          "secretKey": "${RESTIC_RIF_SECRET_ACCESS_KEY}"
+        }
+      ],
+      "name": "restic-rif"
     }
   ]
 }

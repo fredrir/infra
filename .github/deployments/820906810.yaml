@@ -1,0 +1,6 @@
+repository: fredrir/rif
+visibility: private
+images:
+  ghcr.io/fredrir/rif-mirror:
+    path: platform/projects/rif
+    mode: kustomize

@@ -95,7 +95,7 @@ func (c *Commands) loadKubernetes(ctx context.Context) error {
 
 func projectOwners(project string) []string {
 	switch project {
-	case "llunde", "portfolio", "y":
+	case "llunde", "portfolio", "y", "rif":
 		return []string{"project-" + project}
 	case "llunde-pyparser":
 		return []string{"project-llunde-pyparser", "llunde-pyparser-migration", "llunde-pyparser-application"}

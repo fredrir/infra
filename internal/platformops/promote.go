@@ -38,6 +38,7 @@ func ToolsPromotion(root, image string) ([]Edit, error) {
 		"platform/projects/y/backup.yaml",
 		"platform/projects/llunde-pyparser/backup.yaml",
 		"platform/projects/portfolio/backup.yaml",
+		"platform/projects/rif/backup.yaml",
 	}
 	var edits []Edit
 	for _, item := range paths {

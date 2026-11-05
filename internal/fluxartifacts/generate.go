@@ -25,6 +25,7 @@ var projectComponents = map[string][]string{
 	"portfolio":       {"backup-job", "repository-maintenance", "backup-primary", "netpol-gate/egress"},
 	"y":               {"backup-job", "repository-maintenance", "backup-primary", "netpol-gate/egress"},
 	"llunde-pyparser": {"backup-job", "repository-maintenance", "backup-primary", "object-store-trust", "netpol-gate/egress"},
+	"rif":             {"backup-job", "repository-maintenance", "backup-primary", "object-store-trust", "netpol-gate/egress"},
 }
 
 func Run(root string, check bool) error {
@@ -101,7 +102,7 @@ func generate(root string, check bool) error {
 		return object{"name": name, "originRevision": "@repo", "copy": copies}
 	}
 	artifacts = append(artifacts, artifact(policyName, "platform/components/policy", nil))
-	for _, project := range []string{"llunde", "portfolio", "y", "llunde-pyparser"} {
+	for _, project := range []string{"llunde", "portfolio", "y", "llunde-pyparser", "rif"} {
 		artifacts = append(artifacts, artifact("project-"+project, "platform/projects/"+project, projectComponents[project]))
 	}
 	sources := object{"apiVersion": "source.extensions.fluxcd.io/v1beta1", "kind": "ArtifactGenerator", "metadata": object{"name": "platform-artifacts", "namespace": "flux-system"}, "spec": object{"sources": []any{object{"alias": "repo", "kind": "GitRepository", "name": "flux-system"}}, "artifacts": artifacts}}
@@ -128,7 +129,7 @@ func generate(root string, check bool) error {
 		}
 	}
 	var projectRoots []object
-	for _, project := range []string{"llunde", "portfolio", "y", "llunde-pyparser"} {
+	for _, project := range []string{"llunde", "portfolio", "y", "llunde-pyparser", "rif"} {
 		root := object{"apiVersion": "kustomize.toolkit.fluxcd.io/v1", "kind": "Kustomization", "metadata": object{"name": "project-" + project, "namespace": "flux-system"}, "spec": object{"interval": "10m", "retryInterval": "1m", "timeout": "15m", "sourceRef": object{"kind": "ExternalArtifact", "name": "project-" + project}, "path": "./platform/projects/" + project, "prune": true, "wait": false, "serviceAccountName": "platform-reconciler", "postBuild": object{"substituteFrom": []any{object{"kind": "ConfigMap", "name": "platform-settings"}}}, "decryption": object{"provider": "sops", "secretRef": object{"name": "sops-age"}}, "dependsOn": []any{object{"name": "platform-policy", "readyExpr": barrier}}}}
 		if project == "llunde-pyparser" {
 			root["spec"].(object)["healthChecks"] = []any{object{"apiVersion": "apps/v1", "kind": "StatefulSet", "name": "postgres", "namespace": project}}

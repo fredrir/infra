@@ -56,7 +56,7 @@ infra dev clean --all
 
 | Cluster profile | Kustomizations |
 | --- | --- |
-| `minimal` | `platform-policy`, `project-llunde`, `project-portfolio`, `project-y`, `project-llunde-pyparser` |
+| `minimal` | `platform-policy`, `project-llunde`, `project-portfolio`, `project-y`, `project-llunde-pyparser`, `project-rif` |
 | `platform` | minimal plus `platform-sources`, `platform-ingress`, `platform-observability`, `platform-object-store`, `platform-backups`, `platform-dns` |
 | never | `platform-controllers`, `platform-runners`, `llunde-pyparser-migration`, `llunde-pyparser-application` |
 

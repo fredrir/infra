@@ -16,8 +16,12 @@ cells:
         quotaGiB: 5
       - name: backup-portfolio
         quotaGiB: 1
+      - name: backup-rif
+        quotaGiB: 1
   - name: nl
     endpoint: https://seaweedfs-nl.object-store.svc.cluster.local:8333
     buckets:
       - name: parser-dataset
         quotaGiB: 100
+      - name: rif
+        quotaGiB: 20

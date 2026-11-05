@@ -134,6 +134,7 @@ func TestArtifactCheckIncludesParserChildrenAndPropagatesRenderFailure(t *testin
 		"platform/projects/llunde-pyparser/kustomization.yaml",
 		"platform/projects/llunde-pyparser/migration/kustomization.yaml",
 		"platform/projects/llunde-pyparser/application/kustomization.yaml",
+		"platform/projects/rif/kustomization.yaml",
 	} {
 		write(path, "resources: []\n")
 	}
@@ -154,8 +155,8 @@ func TestArtifactCheckIncludesParserChildrenAndPropagatesRenderFailure(t *testin
 	if err := Check(root, render); err != nil {
 		t.Fatal(err)
 	}
-	if len(rendered) != 14 {
-		t.Fatalf("rendered %d paths, want 14: %v", len(rendered), rendered)
+	if len(rendered) != 16 {
+		t.Fatalf("rendered %d paths, want 16: %v", len(rendered), rendered)
 	}
 	for _, child := range []string{"migration", "application"} {
 		count := 0

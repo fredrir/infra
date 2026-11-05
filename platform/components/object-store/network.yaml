@@ -33,6 +33,7 @@ spec:
                 values:
                   - llunde-pyparser
                   - portfolio
+                  - rif
                   - 'y'
           podSelector:
             matchExpressions:
@@ -75,6 +76,12 @@ spec:
             matchLabels:
               app.kubernetes.io/part-of: llunde-pyparser
               app.kubernetes.io/component: application
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rif
+          podSelector:
+            matchLabels:
+              app: mirror
       ports:
         - port: 8333
           protocol: TCP

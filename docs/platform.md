@@ -210,7 +210,8 @@ kubectl get cronjobs --all-namespaces
 | Parser PostgreSQL, local files and dataset | Daily, 00:15 UTC | SeaweedFS `hel1` | Latest 3 snapshots |
 | Y MongoDB and media | Daily, 03:35 UTC | SeaweedFS `hel1` | Latest 3 snapshots |
 | Portfolio PostgreSQL | Daily, 04:05 UTC | SeaweedFS `hel1` | Latest 3 snapshots |
-| Parser, Y and portfolio | Every 14 UTC calendar days since the last successful snapshot | AWS S3 | Latest snapshot |
+| RIF PostgreSQL and mirror bucket | Daily, 04:35 UTC | SeaweedFS `hel1` | Latest 3 snapshots |
+| Parser, Y, portfolio and RIF | Every 14 UTC calendar days since the last successful snapshot | AWS S3 | Latest snapshot |
 | Control-plane recovery data | Daily, 05:55 UTC | AWS S3 | 7 daily, 4 weekly, 12 monthly |
 | Repository integrity checks | Weekly | Each configured repository | Prunes according to that repository's policy |
 

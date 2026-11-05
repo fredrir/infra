@@ -7,6 +7,7 @@
 | `parser.llunde.no`    | [llunde-pyparser](https://github.com/fredrir/llunde-pyparser) | Parser                                    |
 | `external.llunde.no`  | [llunde-pyparser](https://github.com/fredrir/llunde-pyparser) | External parser                           |
 | `hansteen.dev`        | [portfolio](https://github.com/fredrir/portfolio)             | Portfolio                                 |
+| `rif-mirror.fredrir.com` | [rif](https://github.com/fredrir/rif)                      | Sanity mirror file origin for `rif.no`    |
 | `yeeter.no`           | [Y](https://github.com/fredrir/Y)                             | Y                                         |
 | `fredrir.com`         | `fredrir/fredrir` (WiP)                                       | WiP Webpage                               |
 | `grafana.fredrir.com` | Infrastructure                                                | Authenticated metrics, logs and traces    |
