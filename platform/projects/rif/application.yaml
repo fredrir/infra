@@ -31,7 +31,7 @@ spec:
         options: [{name: ndots, value: "2"}]
       imagePullSecrets: [{name: ghcr}]
       nodeSelector:
-        kubernetes.io/hostname: fredrir-09
+        kubernetes.io/hostname: fredrir-04
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532

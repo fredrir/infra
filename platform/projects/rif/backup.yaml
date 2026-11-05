@@ -25,7 +25,7 @@ spec:
           dnsConfig:
             options: [{name: ndots, value: "2"}]
           nodeSelector:
-            kubernetes.io/hostname: fredrir-09
+            kubernetes.io/hostname: fredrir-04
             kubernetes.io/arch: amd64
           priorityClassName: batch
           terminationGracePeriodSeconds: 120

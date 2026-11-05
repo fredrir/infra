@@ -18,6 +18,14 @@ components:
     - ../../components/backup-primary
     - ../../components/object-store-trust
     - ../../components/netpol-gate/egress
+patches:
+    - target:
+        kind: CronJob
+        name: repository-maintenance
+      patch: |-
+        - op: replace
+          path: /spec/jobTemplate/spec/template/spec/nodeSelector/kubernetes.io~1hostname
+          value: fredrir-04
 images:
     - digest: sha256:363fed972ddeb51191b4643bf0441d47561e9d2f65445e029ddba94a2261ad6c
       name: ghcr.io/fredrir/rif-mirror
