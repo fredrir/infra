@@ -34,6 +34,6 @@ images:
     - digest: sha256:8b6b89eda0ce838691f7cae6eb3b0473d5d91a475b2f636821f84bddfa6fdbc4
       name: ghcr.io/fredrir/rif-mirror
       newName: ghcr.io/fredrir/rif-mirror
-    - digest: sha256:b9ce01f7bcb33616743a675c7554f5346f0e6dcfb9456eea38d3e420d5ff4c3b
+    - digest: sha256:c51d76ee9698ec3e2fab4e40c3abfac7153cb18fda077aa69ac1691b8a1207ac
       name: ghcr.io/fredrir/rif-mirror-engine
       newName: ghcr.io/fredrir/rif-mirror-engine
