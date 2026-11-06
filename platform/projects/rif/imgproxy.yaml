@@ -50,6 +50,8 @@ spec:
             - {name: IMGPROXY_BIND, value: ":8080"}
             - {name: IMGPROXY_ALLOWED_SOURCES, value: "http://mirror:8080/originals/"}
             - {name: IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES, value: "true"}
+            - {name: IMGPROXY_JPEG_PROGRESSIVE, value: "true"}
+            - {name: IMGPROXY_MAX_ANIMATION_FRAMES, value: "300"}
           ports: [{name: http, containerPort: 8080}]
           resources:
             requests: {cpu: 100m, memory: 192Mi}
