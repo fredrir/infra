@@ -111,6 +111,4 @@ spec:
               preference:
                 matchExpressions:
                 - key: node-restriction.kubernetes.io/volatile
-                  operator: In
-                  values:
-                  - 'true'
+                  operator: DoesNotExist
