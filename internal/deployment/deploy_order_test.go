@@ -26,7 +26,7 @@ func TestProvenanceVerifierFailuresNameTheirCause(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			runner := process.Runner{Env: []string{"GH_TOKEN=ghs_attestationsecret"}, Execute: func(context.Context, process.Options) (process.Result, error) { return test.result, test.err }}
-			_, err := VerifyProvenance(context.Background(), runner, trust, "1", mapping, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40))
+			_, err := VerifyProvenance(context.Background(), runner, trust, "1", mapping, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40), "")
 			if err == nil || !strings.Contains(err.Error(), test.want) || strings.Contains(err.Error(), "ghs_attestationsecret") {
 				t.Fatalf("verifier failure reported as %v", err)
 			}
@@ -49,7 +49,7 @@ func TestManualDeploymentRequiresExplicitTriggerTrust(t *testing.T) {
 			}
 			return process.Result{ExitCode: 1}, errors.New("trigger mismatch")
 		}}
-		orders, err := VerifyProvenance(context.Background(), runner, trust, "1", Mapping{Repository: "fredrir/example", Visibility: "private"}, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40))
+		orders, err := VerifyProvenance(context.Background(), runner, trust, "1", Mapping{Repository: "fredrir/example", Visibility: "private"}, "ghcr.io/fredrir/example", "sha256:"+strings.Repeat("a", 64), strings.Repeat("b", 40), "")
 		if (err == nil) != allowed || (allowed && len(orders) != 1) {
 			t.Fatalf("manual trigger trust %v: %v", allowed, err)
 		}

@@ -20,7 +20,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-type Options struct{ Root, RepositoryID, Revision, Image, Digest, Token string }
+type Options struct{ Root, RepositoryID, Revision, WorkflowRevision, Image, Digest, Token string }
 type Target struct{ Path, Mode, Workload string }
 type Mapping struct {
 	Repository, Visibility string
@@ -77,7 +77,7 @@ func Deploy(ctx context.Context, runner process.Runner, options Options, render 
 	if project != resolved {
 		return fmt.Errorf("deployment project must not traverse symlinks")
 	}
-	attested, err := VerifyProvenance(ctx, runner, os.DirFS(root), options.RepositoryID, mapping, options.Image, options.Digest, options.Revision)
+	attested, err := VerifyProvenance(ctx, runner, os.DirFS(root), options.RepositoryID, mapping, options.Image, options.Digest, options.Revision, options.WorkflowRevision)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func Deploy(ctx context.Context, runner process.Runner, options Options, render 
 	return fmt.Errorf("deployment push failed after three attempts")
 }
 
-func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, repositoryID string, mapping Mapping, image, digest, revision string) ([]Order, error) {
+func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, repositoryID string, mapping Mapping, image, digest, revision, workflowHint string) ([]Order, error) {
 	if !repositoryIDPattern.MatchString(repositoryID) {
 		return nil, fmt.Errorf("invalid deployment repository ID")
 	}
@@ -173,6 +173,17 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 	if err != nil {
 		return nil, err
 	}
+	retryTrigger := mapping.Visibility == "private" && identity.ClaimPattern.Event == "^(push|workflow_dispatch)$"
+	if slices.Contains(revisions, workflowHint) {
+		orders, err := verifyRevisions(ctx, runner, mapping, image, digest, revision, []string{workflowHint}, retryTrigger)
+		if err == nil || ctx.Err() != nil {
+			return orders, err
+		}
+	}
+	return verifyRevisions(ctx, runner, mapping, image, digest, revision, revisions, retryTrigger)
+}
+
+func verifyRevisions(ctx context.Context, runner process.Runner, mapping Mapping, image, digest, revision string, revisions []string, retryTrigger bool) ([]Order, error) {
 	environment := append(os.Environ(), runner.Env...)
 	checks := make([]provenanceCheck, len(revisions))
 	for index, workflowRevision := range revisions {
@@ -185,7 +196,6 @@ func VerifyProvenance(ctx context.Context, runner process.Runner, root fs.FS, re
 		}
 		checks[index] = provenanceCheck{revision: workflowRevision, name: name, arguments: arguments}
 	}
-	retryTrigger := mapping.Visibility == "private" && identity.ClaimPattern.Event == "^(push|workflow_dispatch)$"
 	// Approved revisions grow with every CI promotion; checking them one at a time outlives the deployment budget.
 	var group sync.WaitGroup
 	slots := make(chan struct{}, provenanceConcurrency)

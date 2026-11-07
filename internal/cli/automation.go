@@ -46,7 +46,7 @@ func registerAutomationCommands(root, ciCommand *cobra.Command) {
 	ciCommand.AddCommand(tag, buildArgs)
 	deploy := &cobra.Command{Use: "deploy ROOT", Short: "Publish a provenance-verified deployment", Args: cobra.ExactArgs(1)}
 	deploy.RunE = func(command *cobra.Command, args []string) error {
-		options := deployment.Options{Root: args[0], RepositoryID: os.Getenv("SOURCE_REPOSITORY_ID"), Revision: os.Getenv("SOURCE_REVISION"), Image: os.Getenv("IMAGE_NAME"), Digest: os.Getenv("IMAGE_DIGEST"), Token: os.Getenv("DEPLOY_TOKEN")}
+		options := deployment.Options{Root: args[0], RepositoryID: os.Getenv("SOURCE_REPOSITORY_ID"), Revision: os.Getenv("SOURCE_REVISION"), WorkflowRevision: os.Getenv("WORKFLOW_REVISION"), Image: os.Getenv("IMAGE_NAME"), Digest: os.Getenv("IMAGE_DIGEST"), Token: os.Getenv("DEPLOY_TOKEN")}
 		return ci.DeployAuthenticated(command.Context(), process.Runner{Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr()}, options, os.Getenv("GITHUB_ACTOR"), os.Getenv("REGISTRY_TOKEN"))
 	}
 	ciCommand.AddCommand(deploy)

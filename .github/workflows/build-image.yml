@@ -408,9 +408,10 @@ jobs:
           GH_TOKEN: ${{ steps.deployment-token.outputs.token }}
           IMAGE: ${{ inputs.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          WORKFLOW_REVISION: ${{ job.workflow_sha }}
         run: |
           gh workflow run deploy.yml --repo fredrir/infra --ref main -f "repository-id=$GITHUB_REPOSITORY_ID" \
-            -f "image=$IMAGE" -f "digest=$DIGEST" -f "source-revision=$GITHUB_SHA"
+            -f "image=$IMAGE" -f "digest=$DIGEST" -f "source-revision=$GITHUB_SHA" -f "workflow-revision=$WORKFLOW_REVISION"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: always() && runner.environment == 'github-hosted' && steps.scanner-restore.outputs.cache-primary-key != '' && steps.scanner-restore.outputs.cache-hit != 'true'
         with:

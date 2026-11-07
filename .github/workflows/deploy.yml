@@ -15,6 +15,9 @@ on:
       source-revision:
         required: true
         type: string
+      workflow-revision:
+        required: false
+        type: string
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 permissions:
@@ -60,6 +63,7 @@ jobs:
           IMAGE_NAME: ${{ inputs.image }}
           IMAGE_DIGEST: ${{ inputs.digest }}
           SOURCE_REVISION: ${{ inputs.source-revision }}
+          WORKFLOW_REVISION: ${{ inputs.workflow-revision }}
         run: infra ci measure --stage promotion --budget 30s --report-dir "$RUNNER_TEMP/performance" -- infra ci deploy "$GITHUB_WORKSPACE"
       - name: Wait for production publication
         if: inputs.image == 'ghcr.io/fredrir/llunde-frontend'

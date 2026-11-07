@@ -324,7 +324,7 @@ func (g provenanceGate) deployedBy(ctx context.Context, commit string, changed m
 	attestations := g.verifier.Runner
 	attestations.Env = append(slices.Clone(attestations.Env), g.verifier.Env...)
 	attestations.Stdout = nil
-	attested, err := deployment.VerifyProvenance(ctx, attestations, tree, source.repositoryID, source.mapping, order.Image, order.Digest, order.Revision)
+	attested, err := deployment.VerifyProvenance(ctx, attestations, tree, source.repositoryID, source.mapping, order.Image, order.Digest, order.Revision, "")
 	if err != nil {
 		return fmt.Errorf("%s at %s: %w", order.Image+"@"+order.Digest, order.Revision, err)
 	}
