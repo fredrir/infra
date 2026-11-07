@@ -22,12 +22,8 @@
 | NTNU egress | `llm/ntnu-egress` HAProxy TCP passthrough on `fredrir-10`; ClusterIP `10.43.0.31`, pinned by `hostAliases` in the gateway pod, so TLS ends in LiteLLM and the relay sees only SNI |
 | Model list | `/v1/models` expands wildcards from the image model map; unlisted provider models still route |
 | Granite | `ibm-granite/granite-docling-258M`; llama.cpp on `fredrir-09`; DocTags output |
-| PaddleOCR | `PaddlePaddle/PaddleOCR-VL-1.6`; llama.cpp on `fredrir-04`; task-specific image-region recognition |
-| PP-StructureV3 | `ghcr.io/fredrir/pp-structure`; PaddleOCR 3.7.0 CPU on `fredrir-04`; layout blocks, reading order and OCR lines |
-| PP-StructureV3 source | [`fredrir/litellm`](https://github.com/fredrir/litellm) `services/pp-structure`; manual `VARIANT=cpu` build pinned by digest; public GHCR package since `llm` has no pull secret |
-| Layout route | `/pp-structure/health`, `/pp-structure/v1/layout`; LiteLLM pass-through to `pp-structure:8012`; LiteLLM key required |
 | Document parsing | Cropping and result assembly run in the calling pipeline |
-| Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, PaddleOCR, the provider wildcards and the `deepseek` and `ntnu` access groups; `fredrir` also permits `codex` and `/ntnu/v1/systemone`; parser key also permits `/pp-structure` and has a 150 USD budget per 30 days |
+| Credentials | SOPS-encrypted master, salt, backend, provider and client keys; `fredrir` and parser keys permit Granite, the provider wildcards and the `deepseek` and `ntnu` access groups; `fredrir` also permits `codex` and `/ntnu/v1/systemone`; parser key has a 150 USD budget per 30 days |
 | Client key | `fredrir`; 1Password `op://Dev/LITELLM_API_KEY/credential`; owned by `internal_user_viewer` user `fredrir-client`, which unlocks `/user/daily/activity`; LiteLLM refuses analytics to keys without a user |
 | Clients | pi `npm:pi-provider-litellm`; VS Code `vivswan.litellm-vscode-chat`; both discover models from `/model/info` |
 | Key limits | No key parallel, RPM or TPM limits; local models bounded by deployment `max_parallel_requests`; parser key 150 USD per 30 days |
@@ -39,7 +35,7 @@
 | Database | PostgreSQL 17.10; retained 5 GiB local volume on `fredrir-04` |
 | Backup | Daily `platform-backups/llm-database-backup`; encrypted control Restic repository; `llm,postgres` tags |
 | Retention | Shared repository maintenance: 7 daily, 4 weekly and 12 monthly snapshots per host and tags |
-| Model caches | Independent disposable local volumes; downloads use immutable Hugging Face revisions; PP-StructureV3 weights ship in the image |
+| Model caches | Independent disposable local volumes; downloads use immutable Hugging Face revisions |
 | Availability | Single gateway, database and model replicas; upgrades can briefly interrupt requests |
 | Additional replicas | Add Redis for shared limits and router state before increasing the gateway replica count |
 | Research date | 2026-10-05 |
@@ -53,11 +49,6 @@ kubectl -n llm port-forward service/litellm 4000:4000
 export LITELLM_API_KEY="$(kubectl -n llm get secret litellm-client -o jsonpath='{.data.LITELLM_API_KEY}' | base64 --decode)"
 curl --fail https://llm.fredrir.com/v1/models -H "Authorization: Bearer $LITELLM_API_KEY"
 kubectl -n platform-backups create job --from=cronjob/llm-database-backup llm-database-backup-manual
-```
-
-```sh
-docker build --build-arg VARIANT=cpu -t ghcr.io/fredrir/pp-structure:"$(git -C ~/litellm rev-parse --short HEAD)" ~/litellm/services/pp-structure
-docker push ghcr.io/fredrir/pp-structure:"$(git -C ~/litellm rev-parse --short HEAD)"
 ```
 
 ```sh
@@ -78,7 +69,7 @@ kubectl -n llm rollout restart deploy/tailnet
 export LITELLM_MASTER_KEY="$(kubectl -n llm get secret litellm -o jsonpath='{.data.LITELLM_MASTER_KEY}' | base64 --decode)"
 export CLIENT_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platform/components/llm/client.secret.sops.yaml)"
 export PARSER_KEY="$(sops -d --extract '["stringData"]["LITELLM_API_KEY"]' platform/projects/llunde-pyparser/llm-gateway.secret.sops.yaml)"
-export MODELS='["ibm-granite/granite-docling-258M", "PaddlePaddle/PaddleOCR-VL-1.6", "vertex_ai/*", "deepseek", "qwencloud/*", "mistral/*", "ntnu"]'
+export MODELS='["ibm-granite/granite-docling-258M", "vertex_ai/*", "deepseek", "qwencloud/*", "mistral/*", "ntnu"]'
 export CLIENT_MODELS="$(jq -c '. + ["codex"]' <<<"$MODELS")"
 curl --fail -G localhost:4000/key/info --data-urlencode "key=$PARSER_KEY" -H "Authorization: Bearer $LITELLM_MASTER_KEY"
 curl --fail localhost:4000/user/new -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
@@ -86,8 +77,7 @@ curl --fail localhost:4000/user/new -H "Authorization: Bearer $LITELLM_MASTER_KE
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
   -d "{\"key\": \"$CLIENT_KEY\", \"user_id\": \"fredrir-client\", \"models\": $CLIENT_MODELS, \"max_parallel_requests\": null, \"rpm_limit\": null, \"tpm_limit\": null, \"metadata\": {\"allowed_passthrough_routes\": [\"/ntnu/v1/systemone\"]}}"
 curl --fail localhost:4000/key/update -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
-  -d "{\"key\": \"$PARSER_KEY\", \"models\": $MODELS, \"max_parallel_requests\": null, \"rpm_limit\": null, \"tpm_limit\": null, \"max_budget\": 150, \"budget_duration\": \"30d\", \"metadata\": {\"allowed_passthrough_routes\": [\"/pp-structure\"]}}"
-curl --fail https://llm.fredrir.com/pp-structure/health -H "Authorization: Bearer $PARSER_KEY"
+  -d "{\"key\": \"$PARSER_KEY\", \"models\": $MODELS, \"max_parallel_requests\": null, \"rpm_limit\": null, \"tpm_limit\": null, \"max_budget\": 150, \"budget_duration\": \"30d\"}"
 ```
 
 ```sh
@@ -99,7 +89,6 @@ kubectl -n llm exec deploy/codex -- rm /var/lib/codex/auth.json && kubectl -n ll
 | --- | --- |
 | [LiteLLM production practices](https://docs.litellm.ai/docs/proxy/prod) | Worker count, timeouts, PostgreSQL, persistent salt, resource bounds and Redis when scaling |
 | [LiteLLM 1.104.0](https://github.com/BerriAI/litellm/releases/tag/v1.104.0) | Latest stable release; image signature verified with the upstream key pinned at commit `0112e53`; schema migration tested on a copy of the production database |
-| [PaddleOCR deployment](https://www.paddleocr.ai/main/en/version3.x/pipeline_usage/PaddleOCR-VL.html) | CPU support, llama.cpp serving and separation of the VLM from the document pipeline |
 | [LiteLLM pass-through](https://docs.litellm.ai/docs/proxy/pass_through) | Route syntax; 1.104.0 enforces `auth` without a license and requires `allowed_passthrough_routes` per key |
 | [LiteLLM Vertex AI](https://docs.litellm.ai/docs/providers/vertex) | `vertex_ai/` authenticates with service accounts, ADC or WIF; API keys only on `gemini/` |
 | [LiteLLM DashScope](https://docs.litellm.ai/docs/providers/dashscope) | International endpoint; `qwencloud` outside mainland China |
@@ -107,5 +96,3 @@ kubectl -n llm exec deploy/codex -- rm /var/lib/codex/auth.json && kubectl -n ll
 | [LiteLLM ChatGPT Subscription](https://docs.litellm.ai/docs/providers/chatgpt) | `chatgpt/` provider; device-code OAuth; `CHATGPT_TOKEN_DIR` and `CHATGPT_DEFAULT_INSTRUCTIONS` |
 | [LiteLLM Mistral](https://docs.litellm.ai/docs/providers/mistral) | `mistral/` prefix; `MISTRAL_API_KEY` |
 | [Agent Platform name changes](https://docs.cloud.google.com/gemini-enterprise-agent-platform/vertex-ai-name-changes) | Vertex AI renamed to Gemini Enterprise Agent Platform |
-| [PP-StructureV3](https://www.paddleocr.ai/main/en/version3.x/pipeline_usage/PP-StructureV3.html) | Layout detection, reading order and OCR in one CPU pipeline |
-| [PaddleOCR-VL-1.6 GGUF](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF) | Official model and vision projector |

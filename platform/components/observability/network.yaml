@@ -54,7 +54,7 @@ spec:
         matchExpressions:
         - key: app.kubernetes.io/name
           operator: In
-          values: [granite, paddleocr]
+          values: [granite]
     ports:
     - {port: 8080, protocol: TCP}
   - to:

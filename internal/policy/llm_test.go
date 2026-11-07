@@ -14,7 +14,7 @@ func TestSharedModelsRunOnTheirReservedNodes(t *testing.T) {
 	t.Parallel()
 	e := newEvaluator(t)
 	served := map[string]bool{}
-	nodes := map[string]string{"granite": "fredrir-09", "paddleocr": "fredrir-04", "pp-structure": "fredrir-04", "litellm": "fredrir-04", "tailnet": "fredrir-04", "ntnu-egress": "fredrir-10", "codex": "fredrir-04"}
+	nodes := map[string]string{"granite": "fredrir-09", "litellm": "fredrir-04", "tailnet": "fredrir-04", "ntnu-egress": "fredrir-10", "codex": "fredrir-04"}
 	for _, resource := range renderedTree(t, "platform", "platform/components/llm") {
 		if resource["kind"] != "Deployment" {
 			continue
@@ -94,7 +94,6 @@ func TestPassThroughRoutesRequireGatewayKeys(t *testing.T) {
 		includeSubpath bool
 	}
 	expected := map[string]target{
-		"/pp-structure":      {"http://pp-structure:8012", true},
 		"/ntnu/v1/systemone": {"https://llm.hpc.ntnu.no/v1/systemone", false},
 	}
 	routes := config.GeneralSettings.PassThroughEndpoints

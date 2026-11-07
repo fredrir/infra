@@ -113,7 +113,7 @@ spec:
           value: 10.42.0.0/16
         resources:
           requests:
-            cpu: 500m
+            cpu: 150m
             memory: 4Gi
           limits:
             cpu: '1'

@@ -14,8 +14,6 @@ resources:
 - codex.secret.sops.yaml
 - tailnet.secret.sops.yaml
 - granite.yaml
-- paddleocr.yaml
-- pp-structure.yaml
 - ingress.yaml
 - certificate.yaml
 - monitoring.yaml

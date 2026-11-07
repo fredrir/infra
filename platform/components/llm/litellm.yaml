@@ -16,19 +16,6 @@ model_list:
     output_cost_per_token: 0
     max_input_tokens: 8192
     max_output_tokens: 4096
-- model_name: PaddlePaddle/PaddleOCR-VL-1.6
-  litellm_params:
-    model: openai/PaddlePaddle/PaddleOCR-VL-1.6
-    api_base: http://paddleocr:8080/v1
-    api_key: os.environ/PADDLEOCR_API_KEY
-    max_parallel_requests: 2
-  model_info:
-    mode: chat
-    supports_vision: true
-    input_cost_per_token: 0
-    output_cost_per_token: 0
-    max_input_tokens: 16384
-    max_output_tokens: 4096
 - model_name: vertex_ai/*
   litellm_params:
     model: vertex_ai/*
@@ -55,14 +42,6 @@ general_settings:
   health_check_details: false
   trusted_proxy_ranges: []
   pass_through_endpoints:
-  - path: /pp-structure
-    target: http://pp-structure:8012
-    include_subpath: true
-    auth: true
-    methods:
-    - GET
-    - POST
-    timeout: 180
   - path: /ntnu/v1/systemone
     target: https://llm.hpc.ntnu.no/v1/systemone
     headers:
