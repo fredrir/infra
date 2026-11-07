@@ -34,7 +34,7 @@ My infrastructure, for my personal projects, services and hobbies
 | 7 | fredrir-07 | hetzner-three | Ubuntu 26.04.1 LTS | Hetzner | CX33 | x86, 4 vCPU, 8 GB RAM, 80 GB disk | hel1 | 4.80 € / month | K3s control plane and etcd | 24/7 |
 | 8 | fredrir-08 | hetzner-four | Ubuntu 26.04.1 LTS | Hetzner | CX33 | x86, 4 vCPU, 8 GB RAM, 80 GB disk | hel1 | 4.80 € / month | K3s control plane and etcd | 24/7 |
 | 9 | fredrir-09 | one-cloud-one | Ubuntu 26.04 LTS | one.com | Cloud server XXL | x86, 16 vCPU, 32 GB RAM, 800 GB disk | Netherlands | 349 kr / month | Shared production and CI worker; retained local data | 24/7 |
-| 10 | fredrir-10 | | Ubuntu 26.04 LTS | | sx3.16c64r | x86 Haswell, 16 vCPU, 62 GiB RAM, 40 GB root, up to 512 GB OpenStack volume; no outbound UDP | Trondheim | | Tainted K3s agent | 24/7; Volatile |
+| 10 | fredrir-10 | | Ubuntu 26.04 LTS | | sx3.16c64r | x86 Haswell, 16 vCPU, 62 GiB RAM, 40 GB root, up to 512 GB OpenStack volume; no outbound UDP | Trondheim | | Tainted K3s agent; deploy runners | 24/7; Volatile |
 
 
 ## For More Information

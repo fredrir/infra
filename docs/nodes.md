@@ -13,7 +13,7 @@
 | `fredrir-07` | hetzner-three | CX33 | K3s control plane and etcd |
 | `fredrir-08` | hetzner-four | CX33 | K3s control plane and etcd |
 | `fredrir-09` | one-cloud-one | Cloud server XXL | Shared production and CI worker; retained local data |
-| `fredrir-10` |  | sx3.16c64r | Tainted K3s agent |
+| `fredrir-10` |  | sx3.16c64r | Tainted K3s agent; deploy runners |
 | `fredrir-11` | | Hetzner CX33 | Reconciler; separate provider project |
 
 ## Roles
@@ -22,7 +22,7 @@
 | ---------------- | --------------------------------------------------------------------------------------------- |
 | Control plane    | Three servers in `hel1`, private etcd network and spread placement group                      |
 | Shared workers   | CCX23 and one.com XXL; Kubernetes capability-based placement                                  |
-| Volatile worker  | `fredrir-10`; NTNU egress relay; see [volatile workers](runbook.md#volatile-workers)   |
+| Volatile worker  | `fredrir-10`; NTNU egress relay and deploy runners; see [volatile workers](runbook.md#volatile-workers)   |
 | Inventory        | [Ansible production inventory](../ansible/inventory/production.yml)                           |
 
 See [platform operation](platform.md) and [reconciler operation](runbook.md#reconciler-host).

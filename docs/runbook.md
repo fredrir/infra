@@ -227,7 +227,7 @@ Do not remove an active reconciliation or OpenTofu lock while its writer is runn
 | Setting | Value |
 | --- | --- |
 | Hosts | Inventory group `volatile`, also in `agent`: `fredrir-10` |
-| Role | `llm/ntnu-egress` relay |
+| Role | `llm/ntnu-egress` relay; preferred node for `deploy-amd64` runners |
 | Reconciliation | `ansible/volatile.yml`, linear strategy with SSH pipelining over a persistent master, run after the apply records `complete` and before its lease is released; fleet plays target `…:!volatile` |
 | Failing or unreachable host | Recorded as `volatile_failure` in the completed reconciliation status; requests no recovery |
 | Deep verification | `volatile.yml --check` beside the fleet; results under `degraded`; outcome and exit status unchanged |

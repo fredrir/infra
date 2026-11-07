@@ -53,6 +53,11 @@ spec:
         nodeSelector:
           node-restriction.kubernetes.io/gvisor: 'true'
           kubernetes.io/arch: amd64
+        tolerations:
+        - key: node-restriction.kubernetes.io/volatile
+          operator: Equal
+          value: 'true'
+          effect: NoSchedule
         priorityClassName: ci
         restartPolicy: Never
         activeDeadlineSeconds: 900
@@ -102,3 +107,10 @@ spec:
                 matchExpressions:
                 - key: node-restriction.kubernetes.io/kata
                   operator: DoesNotExist
+            - weight: 50
+              preference:
+                matchExpressions:
+                - key: node-restriction.kubernetes.io/volatile
+                  operator: In
+                  values:
+                  - 'true'

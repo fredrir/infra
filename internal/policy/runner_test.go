@@ -173,18 +173,30 @@ func placementScore(nodeAffinity object, labels ...string) int {
 	return score
 }
 
-func TestNoCIPoolToleratesVolatileWorkers(t *testing.T) {
+func TestOnlyTheDeployPoolToleratesVolatileWorkers(t *testing.T) {
 	t.Parallel()
+	deployPoolFound := false
 	for _, overlay := range at(load(t, "platform/components/runners/kustomization.yaml"), "resources").([]any) {
 		for _, resource := range rendered(t, "platform/components/runners/"+overlay.(string)) {
 			if resource["kind"] != "HelmRelease" {
 				continue
 			}
 			values := at(resource, "spec", "values").(object)
-			if toleratesVolatile(at(values, "template", "spec").(object)["tolerations"]) {
+			tolerates := toleratesVolatile(at(values, "template", "spec").(object)["tolerations"])
+			if values["runnerScaleSetName"] == "deploy-amd64" {
+				deployPoolFound = true
+				if !tolerates {
+					t.Error("deploy-amd64 does not tolerate volatile workers")
+				}
+				continue
+			}
+			if tolerates {
 				t.Errorf("%s tolerates volatile workers", values["runnerScaleSetName"])
 			}
 		}
+	}
+	if !deployPoolFound {
+		t.Error("deploy-amd64 not rendered")
 	}
 }
 
