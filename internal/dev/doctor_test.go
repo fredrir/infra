@@ -168,7 +168,7 @@ func TestDoctorRejectsDirectoriesAndMissingKubeconfigs(t *testing.T) {
 }
 
 func TestPinnedVersionsFollowAssetURLs(t *testing.T) {
-	for name, expected := range map[string]string{"kubectl": "1.36.3", "helm": "4.3.0", "sops": "3.13.3", "uv": "0.12.17", "kustomize": "5.8.1", "cosign": "3.1.3", "k3d": "5.9.0", "hyperfine": "1.20.0", "age-keygen": "1.3.2"} {
+	for name, expected := range map[string]string{"kubectl": "1.36.3", "helm": "4.3.0", "sops": "3.13.3", "uv": "0.12.17", "kustomize": "5.8.1", "cosign": "3.1.4", "k3d": "5.9.0", "hyperfine": "1.20.0", "age-keygen": "1.3.2"} {
 		asset, ok := ci.Tool(name)
 		if !ok {
 			t.Fatalf("%s is not pinned", name)
