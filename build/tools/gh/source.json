@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "v2.102.0-infra.1",
-  "tag": "gh-v2.102.0-infra.1",
-  "upstream_version": "v2.102.0",
-  "upstream_revision": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
-  "source_url": "https://codeload.github.com/cli/cli/tar.gz/refs/tags/v2.102.0",
-  "source_sha256": "08bf0ef8b4409893889175e0f5279d30d6edd96465816042c0d7c72eac598158",
-  "go_image": "golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61",
-  "go": "1.27.2",
+  "version": "v2.103.3-infra.1",
+  "tag": "gh-v2.103.3-infra.1",
+  "upstream_version": "v2.103.3",
+  "upstream_revision": "63837fb778d6a39f02be0ce76ff89f2bc8d74bdc",
+  "source_url": "https://codeload.github.com/cli/cli/tar.gz/refs/tags/v2.103.3",
+  "source_sha256": "bb148138a3a2fe023e57c78042fe3b42fc09171c0e8fff4cf983b227b7a2eade",
+  "go_image": "golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9",
+  "go": "1.27.3",
   "package": "./cmd/gh",
-  "ldflags": "-s -w -buildid= -X github.com/cli/cli/v2/internal/build.Version=2.102.0 -X github.com/cli/cli/v2/internal/build.Date=2026-09-30"
+  "ldflags": "-s -w -buildid= -X github.com/cli/cli/v2/internal/build.Version=2.103.3 -X github.com/cli/cli/v2/internal/build.Date=2026-10-26"
 }
