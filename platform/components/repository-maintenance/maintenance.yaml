@@ -35,7 +35,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: maintenance
-              image: ghcr.io/fredrir/platform-backup-tools@sha256:4e95681e4092b98cc78f4ed7239047c8854143eb9e48d63fc75001fbf177df15
+              image: ghcr.io/fredrir/platform-backup-tools@sha256:727ad304d8a6ed82505df39752dc3c9390139397ef645cdffbd72803eaf42a66
               imagePullPolicy: IfNotPresent
               args:
                 - platform
