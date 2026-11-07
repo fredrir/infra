@@ -31,9 +31,9 @@ patches:
           path: /spec/jobTemplate/spec/template/spec/nodeSelector/kubernetes.io~1hostname
           value: fredrir-04
 images:
-    - digest: sha256:06826e0eb87da9912d540bc9dfaf7f022863e27411ca2a16565af1bc1d31c6ff
+    - digest: sha256:9c560f15ad168d79a2c71cbe121c8ccd8c5bcbbc9b41f9f93637493822f13ae5
       name: ghcr.io/fredrir/rif-mirror
       newName: ghcr.io/fredrir/rif-mirror
-    - digest: sha256:39701fd14ff507cadb9faee20740d02bdc6a597a926b4683e7911f538ef5fc76
+    - digest: sha256:d2c8abcde68e06c00023e9cfed81488640b4f7050d7113402bcb323f2b613c45
       name: ghcr.io/fredrir/rif-mirror-engine
       newName: ghcr.io/fredrir/rif-mirror-engine
