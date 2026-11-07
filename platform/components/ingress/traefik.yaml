@@ -29,6 +29,8 @@ spec:
       replicas: 2
     service:
       type: ClusterIP
+      spec:
+        trafficDistribution: PreferSameNode
     ingressClass:
       enabled: true
       isDefaultClass: false
