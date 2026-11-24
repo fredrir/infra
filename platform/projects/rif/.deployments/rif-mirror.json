@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "image": "ghcr.io/fredrir/rif-mirror",
-  "revision": "f80bfc0d16b622bcc01daad480ecf52ef92494df",
-  "digest": "sha256:9c560f15ad168d79a2c71cbe121c8ccd8c5bcbbc9b41f9f93637493822f13ae5",
-  "run_id": 42334655157,
+  "revision": "7de3eb815c30de593183830892f532fdec87ca98",
+  "digest": "sha256:b26466b3211469b190778e8efe9796914518ea410e5a97baf2a29e8b2701428f",
+  "run_id": 45393629348,
   "attempt": 1
 }
