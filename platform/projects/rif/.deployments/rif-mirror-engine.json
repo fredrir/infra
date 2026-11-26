@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "image": "ghcr.io/fredrir/rif-mirror-engine",
-  "revision": "2632176ace4cea0d30e62031fd67fb7fe02acaa4",
-  "digest": "sha256:d2c8abcde68e06c00023e9cfed81488640b4f7050d7113402bcb323f2b613c45",
-  "run_id": 42331828550,
-  "attempt": 3
+  "revision": "35700fff2867e3966bb32944e21674df9a1c31d9",
+  "digest": "sha256:8c924fcd0fd6214a9f8311531d488565cdef95e2b7c09fc4e1cf148e93f2e695",
+  "run_id": 45834392971,
+  "attempt": 1
 }
